@@ -12,68 +12,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// manualClock is an exchange.Clock whose timers fire in Advance.
-type manualClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*manualTimer
-}
+// manualClock is the test clock, a [clocktest.Fake] whose timers fire in
+// Advance.
+type manualClock struct{ *clocktest.Fake }
 
-type manualTimer struct {
-	at      time.Time
-	f       func()
-	stopped bool
-}
+func newManualClock() *manualClock { return &manualClock{clocktest.New(time.Time{})} }
 
-func (t *manualTimer) Stop() bool { was := !t.stopped; t.stopped = true; return was }
-
-func (c *manualClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *manualClock) AfterFunc(d time.Duration, f func()) exchange.Timer {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &manualTimer{at: c.now.Add(d), f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (c *manualClock) armed() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n := 0
-	for _, t := range c.timers {
-		if !t.stopped {
-			n++
-		}
-	}
-	return n
-}
-
-func (c *manualClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(d)
-	var due []*manualTimer
-	for _, t := range c.timers {
-		if !t.stopped && !t.at.After(c.now) {
-			t.stopped = true
-			due = append(due, t)
-		}
-	}
-	c.mu.Unlock()
-	for _, t := range due {
-		t.f()
-	}
-}
+func (c *manualClock) armed() int { return c.Pending() }
 
 // failingStore fails Save while fail is set.
 type failingStore struct {
@@ -162,7 +114,7 @@ func newTestPersister(st Store, interval time.Duration, clock exchange.Clock) (*
 func TestCacheWriteThrough(t *testing.T) {
 	t.Parallel()
 	st := &MemoryStore{}
-	p, image := newTestPersister(st, 0, &manualClock{})
+	p, image := newTestPersister(st, 0, newManualClock())
 	image.Lock()
 	c := newCache(p, 1, 6, nil, nil)
 	c.externalSet(map[uint32]*spec.Node{0: ptr(boolNode(true)), 0xFFFB: ptr(listNode(0, 0xFFFB))}, ptr(uint32(7)))
@@ -196,7 +148,7 @@ func TestCacheWriteThrough(t *testing.T) {
 func TestCacheBuffered(t *testing.T) {
 	t.Parallel()
 	st := &failingStore{}
-	clock := &manualClock{}
+	clock := newManualClock()
 	p, image := newTestPersister(st, 5*time.Second, clock)
 	image.Lock()
 	a := newCache(p, 1, 6, nil, nil)

@@ -12,8 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
 
@@ -101,6 +103,9 @@ type PaseSessionCloser interface {
 // guaranteeing the bridge's long-lived PASE acceptor is reinstated
 // regardless of whether the window closed early or by timeout.
 type CommissioningWindow struct {
+	// clock times the window (see [CommissioningWindow.SetClock]).
+	clock clockvar.Var
+
 	mu sync.RWMutex
 	// blocked, while non-nil, refuses every window ([SetBlocked]).
 	blocked        error
@@ -141,7 +146,7 @@ type CommissioningWindow struct {
 	// closeTimer fires when the window expires so the bridge auto-
 	// reverts to "no PASE acceptor". Cancelled when RevokeWindow
 	// closes the window early.
-	closeTimer *time.Timer
+	closeTimer clock.Timer
 
 	// restore, when non-nil, is invoked on every window-close
 	// transition (early revoke or timer expiry) so the ephemeral
@@ -185,6 +190,11 @@ type CommissioningWindow struct {
 	// Commissioning Window path (see [PaseVerifierInstaller]).
 	paseVerifierInstaller PaseVerifierInstaller
 }
+
+// SetClock sets the clock the window's timeout runs on; nil is
+// [clock.System]. [Bridge.AttachCommissioningWindow] sets the bridge's.
+// A window already open keeps the timer it was opened with.
+func (w *CommissioningWindow) SetClock(c clock.Clock) { w.clock.Store(c) }
 
 // NewCommissioningWindow returns a fresh, closed window.
 func NewCommissioningWindow() *CommissioningWindow {
@@ -412,10 +422,10 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	}
 	w.open = true
 	w.own = true
-	w.expiresAt = time.Now().Add(timeout)
+	w.expiresAt = w.clock.Load().Now().Add(timeout)
 	w.durationSec = uint16(min(timeout/time.Second, 1<<16-1)) //nolint:gosec // clamped to uint16
-	var timer *time.Timer
-	timer = time.AfterFunc(timeout, func() {
+	var timer clock.Timer
+	timer = w.clock.Load().AfterFunc(timeout, func() {
 		w.mu.Lock()
 		if w.closeTimer != timer {
 			// Restarted or closed since.
@@ -563,7 +573,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	w.open = true
 	w.discriminator = params.Discriminator
 	w.durationSec = params.CommissioningTimeoutSeconds
-	w.expiresAt = time.Now().Add(time.Duration(params.CommissioningTimeoutSeconds) * time.Second)
+	w.expiresAt = w.clock.Load().Now().Add(time.Duration(params.CommissioningTimeoutSeconds) * time.Second)
 	// Persist admin fabric / vendor metadata so the cluster can
 	// reflect them via AdminFabricIndex / AdminVendorId attributes
 	// per Matter §11.19.5.2.
@@ -579,8 +589,8 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	}
 	hook := w.transitionHooks()
 	armer := w.failSafeArmer
-	var timer *time.Timer
-	timer = time.AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
+	var timer clock.Timer
+	timer = w.clock.Load().AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
 		w.mu.Lock()
 		if w.closeTimer != timer {
 			// Closed (or replaced) since.

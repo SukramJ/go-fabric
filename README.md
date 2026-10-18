@@ -151,6 +151,23 @@ An identifier on its way out is marked, kept working, and only then removed.
    release in which their code still compiles and the warning is already
    visible.
 
+Currently deprecated, each with its replacement — all marked when the time
+port `clock` landed (`[Unreleased]` in the changelog), removable in
+`v0.10.0` at the earliest:
+
+| Deprecated | Replacement |
+| --- | --- |
+| `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock`, `btp.Options.Clock` | `btp.Options.TimeSource` (a `clock.Clock`), `clock.System` |
+| `cluster/onoff.Clock`, `onoff.Config.Clock` | `onoff.Config.TimeSource` |
+| `cluster/core.OtaClock`, `core.OTARequestorConfig.Clock` | `core.OTARequestorConfig.TimeSource` |
+| `cluster/core.OTAProviderConfig.Now` | `core.OTAProviderConfig.Clock` |
+| `cluster/core.CommissionerControlConfig.Now` | `core.CommissionerControlConfig.Clock` |
+| `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` |
+| `cluster/closure.DimensionConfig.Now` | `closure.DimensionConfig.Clock` |
+| `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each |
+| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
+| `controller/ca.Config.Now` | `ca.Config.Clock` |
+
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
 they are only ever *acted on* in a minor one.

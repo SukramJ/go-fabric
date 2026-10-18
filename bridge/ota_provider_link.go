@@ -256,7 +256,7 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	}
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: link.sessionID, addr: link.addr, exchangeID: b.nextOutboundExchangeID(),
-		createdAt: time.Now(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
+		createdAt: b.clk().Now(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
 	b.resumption.initiated.Store(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID}, ex)
 	return ex, nil
@@ -461,7 +461,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if tracker != nil {
-		tracker.Track(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, time.Now())
+		tracker.Track(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now())
 	}
 	if err := sendVia(listener, dest, datagram); err != nil {
 		if tracker != nil {
@@ -520,7 +520,7 @@ func (e *initiatedSecureExchange) Close() error {
 			e.b.resumption.initiated.Delete(key)
 		}
 		e.b.expediteDuplicateAck(e.sessionID, e.exchangeID, !e.responder)
-		e.b.RunAckPumpOnce(time.Now())
+		e.b.RunAckPumpOnce(e.b.clk().Now())
 	})
 	return nil
 }

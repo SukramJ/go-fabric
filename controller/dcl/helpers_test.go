@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
 var (
@@ -356,80 +356,19 @@ func (f *fakeDCL) publishPoints(issuer testCert, points ...map[string]any) {
 	})
 }
 
-// manualClock is an exchange.Clock whose timers fire when the test says.
-type manualClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*manualTimer
-}
-
-type manualTimer struct {
-	c       *manualClock
-	at      time.Time
-	f       func()
-	stopped bool
-}
+// manualClock is the test clock, a [clocktest.Fake]: timers fire when the
+// test advances it.
+type manualClock struct{ *clocktest.Fake }
 
 func newManualClock() *manualClock {
-	return &manualClock{now: time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)}
+	return &manualClock{clocktest.New(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC))}
 }
 
-func (c *manualClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *manualClock) AfterFunc(d time.Duration, f func()) exchange.Timer {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &manualTimer{c: c, at: c.now.Add(d), f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (t *manualTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.stopped
-	t.stopped = true
-	return was
-}
-
-// advance moves the clock by d and runs the timers due, in order, on the
-// test's goroutine.
-func (c *manualClock) advance(d time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(d)
-	var due []*manualTimer
-	rest := c.timers[:0]
-	for _, t := range c.timers {
-		if !t.stopped && !t.at.After(c.now) {
-			t.stopped = true
-			due = append(due, t)
-		} else if !t.stopped {
-			rest = append(rest, t)
-		}
-	}
-	c.timers = rest
-	c.mu.Unlock()
-	for _, t := range due {
-		t.f()
-	}
-}
+// advance moves the clock by d and runs the timers due, in order.
+func (c *manualClock) advance(d time.Duration) { c.Advance(d) }
 
 // pending is the number of armed timers.
-func (c *manualClock) pending() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n := 0
-	for _, t := range c.timers {
-		if !t.stopped {
-			n++
-		}
-	}
-	return n
-}
+func (c *manualClock) pending() int { return c.Pending() }
 
 // logRecorder keeps the error attributes of the records it receives.
 type logRecorder struct {

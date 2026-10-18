@@ -8,10 +8,10 @@ import (
 	"errors"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
@@ -303,24 +303,6 @@ func TestCommodityMetering(t *testing.T) {
 	}
 }
 
-// tariffClock is a settable clock.
-type tariffClock struct {
-	mu  sync.Mutex
-	now time.Time
-}
-
-func (c *tariffClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *tariffClock) advance(d time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(d)
-	c.mu.Unlock()
-}
-
 const allTariffFeatures = energy.TariffFeaturePricing | energy.TariffFeatureFriendlyCredit | energy.TariffFeatureAuxiliaryLoad |
 	energy.TariffFeaturePeakPeriod | energy.TariffFeaturePowerThreshold | energy.TariffFeatureRandomization
 
@@ -377,12 +359,12 @@ func sample2() energy.Tariff {
 	}
 }
 
-func newTariff(t *testing.T) (*energy.CommodityTariffServer, *tariffClock) {
+func newTariff(t *testing.T) (*energy.CommodityTariffServer, *clocktest.Fake) {
 	t.Helper()
 	// The preset's TariffTestTimestamp, 01-Jun-2025 00:00 UTC
 	// (CommodityTariffSamples.h:413).
-	clock := &tariffClock{now: time.Unix(1748736000, 0)}
-	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{Features: allTariffFeatures, Now: clock.Now})
+	clock := clocktest.New(time.Unix(1748736000, 0))
+	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{Features: allTariffFeatures, Clock: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +407,7 @@ func TestCommodityTariffDerived(t *testing.T) { //nolint:funlen // one sequence
 
 	// Change Time: the day entry moves on, the day does not
 	// (TC_SETRF_2_3.py steps 12-16).
-	clock.advance(4 * time.Hour)
+	clock.Advance(4 * time.Hour)
 	if err := srv.SyncTime(); err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +422,7 @@ func TestCommodityTariffDerived(t *testing.T) { //nolint:funlen // one sequence
 	}
 	// Change Day (steps 17-21).
 	nextDay := read(t, srv, ct.AttrNextDay)
-	clock.advance(24 * time.Hour)
+	clock.Advance(24 * time.Hour)
 	if err := srv.SyncTime(); err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +499,7 @@ func TestCommodityTariffDelayed(t *testing.T) {
 	if err := srv.SyncTime(); err != nil || read(t, srv, ct.AttrTariffInfo) != nil {
 		t.Errorf("activated before its StartDate: %v", err)
 	}
-	clock.advance(time.Hour)
+	clock.Advance(time.Hour)
 	if err := srv.SyncTime(); err != nil {
 		t.Logf("SyncTime: %v", err)
 	}

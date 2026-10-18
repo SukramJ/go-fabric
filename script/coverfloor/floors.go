@@ -44,6 +44,8 @@ var floors = []packageFloor{
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (84.9 % to 83.6 %)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
+	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 90},
@@ -158,6 +160,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{

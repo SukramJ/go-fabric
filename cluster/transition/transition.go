@@ -57,6 +57,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // DefaultStepInterval is the time between two steps of a gradual
@@ -117,6 +119,8 @@ type Config struct {
 	// or by a command: its quieter report is due now (matter.js
 	// quiet.emitNow). Optional.
 	Settled func(name string)
+	// Clock paces the steps; nil is [clock.System].
+	Clock clock.Clock
 }
 
 // Transition is one transition request (matter.js
@@ -177,7 +181,7 @@ type Engine struct {
 	mu            sync.Mutex
 	order         []string // running properties, in start order
 	states        map[string]*state
-	timer         *time.Timer
+	timer         clock.Timer
 	gen           uint64 // identifies the armed timer
 	nextTick      time.Time
 	prevPublished int
@@ -188,6 +192,7 @@ func New(cfg Config) *Engine {
 	if cfg.StepInterval <= 0 {
 		cfg.StepInterval = DefaultStepInterval
 	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	return &Engine{cfg: cfg, states: map[string]*state{}}
 }
 
@@ -280,7 +285,7 @@ func (e *Engine) startLocked(t Transition) (Change, bool) {
 		return Change{}, false
 	}
 
-	now := time.Now()
+	now := e.cfg.Clock.Now()
 	st.prevStepAt = now.Add(-e.cfg.StepInterval)
 	e.mu.Lock()
 	e.states[t.Name] = st
@@ -566,7 +571,7 @@ func (e *Engine) armLocked(at time.Time) {
 	e.gen++
 	gen := e.gen
 	e.nextTick = at
-	e.timer = time.AfterFunc(time.Until(at), func() { e.tick(gen) })
+	e.timer = e.cfg.Clock.AfterFunc(clock.Until(e.cfg.Clock, at), func() { e.tick(gen) })
 }
 
 // disarmLocked stops the step timer. The caller holds mu.
@@ -591,12 +596,12 @@ func (e *Engine) tick(gen uint64) {
 	e.timer = nil
 	e.mu.Unlock()
 
-	e.step(time.Now())
+	e.step(e.cfg.Clock.Now())
 
 	e.mu.Lock()
 	if len(e.states) > 0 && e.timer == nil {
 		next := e.nextTick.Add(e.cfg.StepInterval)
-		if now := time.Now(); next.Before(now) {
+		if now := e.cfg.Clock.Now(); next.Before(now) {
 			next = now
 		}
 		e.armLocked(next)

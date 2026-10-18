@@ -16,6 +16,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
@@ -31,71 +32,16 @@ import (
 
 // --- fakes -----------------------------------------------------------------
 
-type fakeTimer struct {
-	at      time.Time
-	d       time.Duration
-	f       func()
-	stopped bool
-	fired   bool
-}
+// fakeClock is the test clock, a [clocktest.Fake].
+type fakeClock struct{ *clocktest.Fake }
 
-type fakeClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*fakeTimer
-}
+func newFakeClock() *fakeClock { return &fakeClock{clocktest.New(time.Unix(1_700_000_000, 0))} }
 
-func newFakeClock() *fakeClock { return &fakeClock{now: time.Unix(1_700_000_000, 0)} }
+// pending is the time left on each armed timer.
+func (c *fakeClock) pending() []time.Duration { return c.Armed() }
 
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) func() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{at: c.now.Add(d), d: d, f: f}
-	c.timers = append(c.timers, t)
-	return func() bool {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		was := !t.stopped && !t.fired
-		t.stopped = true
-		return was
-	}
-}
-
-// pending is the delays of the timers neither fired nor stopped.
-func (c *fakeClock) pending() []time.Duration {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var out []time.Duration
-	for _, t := range c.timers {
-		if !t.stopped && !t.fired {
-			out = append(out, t.d)
-		}
-	}
-	return out
-}
-
-// advance moves the clock and fires every timer now due.
-func (c *fakeClock) advance(d time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(d)
-	var due []*fakeTimer
-	for _, t := range c.timers {
-		if !t.stopped && !t.fired && !t.at.After(c.now) {
-			t.fired = true
-			due = append(due, t)
-		}
-	}
-	c.mu.Unlock()
-	for _, t := range due {
-		t.f()
-	}
-}
+// advance moves the clock and fires every timer due.
+func (c *fakeClock) advance(d time.Duration) { c.Advance(d) }
 
 type recordedEvent struct {
 	id   uint32
@@ -390,7 +336,7 @@ func newOtaHarness(t *testing.T, mutate func(*OTARequestorConfig)) *otaHarness {
 		Applier:     h.applier,
 		Store:       h.store,
 		DownloadDir: h.dir,
-		Clock:       h.clock,
+		TimeSource:  h.clock,
 		Rand:        func(int) int { return 0 },
 	}
 	if mutate != nil {
@@ -1182,7 +1128,7 @@ func TestOTARequestor_Persistence(t *testing.T) {
 	h.r.prepareApplyUpdate(context.Background(), 2, h.r.downloadPath(), nil, []byte("token-12345678"))
 
 	r2, err := NewOTASoftwareUpdateRequestor(OTARequestorConfig{
-		NodeInformation: h.r.cfg.NodeInformation, DownloadDir: h.dir, Store: h.store, Clock: h.clock,
+		NodeInformation: h.r.cfg.NodeInformation, DownloadDir: h.dir, Store: h.store, TimeSource: h.clock,
 	})
 	if err != nil {
 		t.Fatal(err)

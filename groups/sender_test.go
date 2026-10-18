@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
@@ -77,7 +78,7 @@ func senderSetup(t *testing.T) (*Manager, *memStore, *fakeTransport) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.now = func() time.Time { return time.UnixMilli(1_700_000_000_000) }
+	m.clock = clocktest.New(time.UnixMilli(1_700_000_000_000))
 	m.counterRandom = fixedStart(0x0010_0000)
 	tr := &fakeTransport{}
 	m.SetTransport(tr)
@@ -118,11 +119,11 @@ func TestSenderKeySelection(t *testing.T) {
 		t.Errorf("sender %+v, want slot 2 of key set 5", s)
 	}
 	// The start time counts once it is not after now (KeySets.ts:127).
-	m.now = func() time.Time { return now.Add(time.Millisecond) }
+	m.clock = clocktest.New(now.Add(time.Millisecond))
 	if s, err := m.Sender(ctx, 1, 11); err != nil || s.KeySetID() != 6 {
 		t.Errorf("a key starting now: %v", err)
 	}
-	m.now = func() time.Time { return now }
+	m.clock = clocktest.New(now)
 	if _, err := m.Sender(ctx, 1, 11); !errors.Is(err, ErrKeyNotStarted) {
 		t.Errorf("a key starting in the future: %v, want ErrKeyNotStarted", err)
 	}
@@ -137,11 +138,11 @@ func TestSenderKeySelection(t *testing.T) {
 	if _, err := m.Sender(ctx, 9, 257); !errors.Is(err, ErrNoFabric) {
 		t.Errorf("unknown fabric: %v", err)
 	}
-	m.now = func() time.Time { return time.UnixMilli(-1) }
+	m.clock = clocktest.New(time.UnixMilli(-1))
 	if _, err := m.Sender(ctx, 1, 257); !errors.Is(err, ErrKeyNotStarted) {
 		t.Errorf("a clock before 1970: %v", err)
 	}
-	m.now = func() time.Time { return now }
+	m.clock = clocktest.New(now)
 
 	// Without a transport there is no interface (GroupSession.ts:144-148);
 	// without a counter store nothing can be numbered.

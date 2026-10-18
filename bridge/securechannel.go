@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -550,7 +551,7 @@ const (
 func (b *Bridge) claimPaseInFlight(exchangeID uint16) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	now := time.Now()
+	now := b.clk().Now()
 	idle := b.paseInFlightSince.IsZero() || now.Sub(b.paseInFlightSince) > pasePairingTimeout
 	if !idle && b.paseInFlightExchange != exchangeID {
 		return false
@@ -640,7 +641,7 @@ func (b *Bridge) engagePaseLockout() time.Duration {
 		cooldown *= 2
 	}
 	cooldown = min(cooldown, paseLockoutMaxCooldown)
-	b.paseLockoutUntil = time.Now().Add(cooldown)
+	b.paseLockoutUntil = b.clk().Now().Add(cooldown)
 	b.paseFailures.Store(0)
 	return cooldown
 }
@@ -660,7 +661,7 @@ func (b *Bridge) paseLockedOut() bool {
 	b.mu.RLock()
 	until := b.paseLockoutUntil
 	b.mu.RUnlock()
-	return !until.IsZero() && time.Now().Before(until)
+	return !until.IsZero() && b.clk().Now().Before(until)
 }
 
 // resetPaseFailures clears the per-window PASE state — the failure counter,
@@ -1323,7 +1324,7 @@ func (b *Bridge) closeSecureSessionsForShutdown() {
 	if !started || reg == nil {
 		return
 	}
-	deadline := time.Now().Add(stopSessionCloseBudget)
+	deadline := b.clk().Now().Add(stopSessionCloseBudget)
 	done := make(chan int, 1)
 	go func() { done <- reg.CloseAllGraceful(deadline) }()
 	select {
@@ -1331,7 +1332,7 @@ func (b *Bridge) closeSecureSessionsForShutdown() {
 		if n > 0 {
 			b.logger.Info("matter.bridge.stop.sessions_closed", slog.Int("count", n))
 		}
-	case <-time.After(stopSessionCloseBudget):
+	case <-clock.After(b.clk(), stopSessionCloseBudget):
 		b.logger.Warn("matter.bridge.stop.session_close_timeout",
 			slog.Duration("budget", stopSessionCloseBudget))
 	}

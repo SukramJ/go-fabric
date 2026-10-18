@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
@@ -151,7 +152,12 @@ type DimensionConfig struct {
 
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
-	// Now defaults to time.Now; tests set it.
+	// Clock is the server's time source. Set, it wins over Now; neither
+	// set is [clock.System].
+	Clock clock.Clock
+	// Now is the server's clock reading.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
 	Now func() time.Time
 }
 
@@ -203,8 +209,11 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("closuredimension: %w", err)
 	}
-	if cfg.Now == nil {
-		cfg.Now = time.Now
+	switch {
+	case cfg.Clock != nil:
+		cfg.Now = cfg.Clock.Now
+	case cfg.Now == nil:
+		cfg.Now = clock.System{}.Now
 	}
 	s := &DimensionServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
 	if err := s.checkFixed(); err != nil {

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -379,19 +380,14 @@ func TestStep(t *testing.T) {
 	}
 }
 
-// fakeClock drives the CurrentState throttle by hand.
-type fakeClock struct{ now time.Time }
-
-func (c *fakeClock) Now() time.Time { return c.now }
-
 // TestCurrentStateReporting follows chip's rules (:210-324): the first
 // change, a change of nullness, reaching the target, and a Latch or Speed
 // change report at once; any other Position change at most every 5 s.
 func TestCurrentStateReporting(t *testing.T) {
 	t.Parallel()
-	clk := &fakeClock{now: time.Unix(1000, 0)}
+	clk := clocktest.New(time.Unix(1000, 0)) // drives the CurrentState throttle by hand
 	cfg := chipPanel(&panel{})
-	cfg.Now = clk.Now
+	cfg.Clock = clk
 	dv := &cluster.DataVersionTracker{}
 	cfg.DataVersion = dv
 	srv := newDimension(t, cfg)
@@ -423,7 +419,7 @@ func TestCurrentStateReporting(t *testing.T) {
 		t.Error("a held-back value does not read")
 	}
 	version := srv.MatterDataVersion()
-	clk.now = clk.now.Add(5 * time.Second)
+	clk.Advance(5 * time.Second)
 	set(5000, false) // 5 s later: reported
 	if reports != 3 || srv.MatterDataVersion() == version || dv.Current() != srv.MatterDataVersion() {
 		t.Errorf("after 5 s: %d reports", reports)

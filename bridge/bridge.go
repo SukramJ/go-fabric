@@ -193,6 +193,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
@@ -279,6 +280,12 @@ type Config struct {
 	// individual call is given its own context derived from the
 	// caller's; no global ticker is involved.
 	AdvertiseTimeout time.Duration
+	// Clock is the bridge's time source: the acknowledgement pump, MRP
+	// stamps, the TimedRequest window, PASE lockout, the subscription
+	// reports' timers and every other interval of the device side. nil is
+	// [clock.System]. A [github.com/SukramJ/go-fabric/node] hands its
+	// own clock in here.
+	Clock clock.Clock
 }
 
 // validate reports whether the config carries every required field.
@@ -306,6 +313,8 @@ func (c Config) validate() error {
 // topology / dispatcher pair is swapped atomically on [Reassemble]
 // so in-flight IM dispatches see a consistent view.
 type Bridge struct {
+	// clock is cfg.Clock resolved; it never changes after New.
+	clock clock.Clock
 	// groupRx serialises the group-message receive path: decode, replay
 	// check, dispatch and the GroupcastTesting outcome of one datagram
 	// complete before the next group datagram is looked at. See
@@ -380,7 +389,7 @@ type Bridge struct {
 	groupNetMu     sync.Mutex
 	groupMember    multicastMember
 	groupJoined    map[string]net.IP
-	groupJoinRetry *time.Timer
+	groupJoinRetry clock.Timer
 
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for
@@ -713,6 +722,7 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	}
 
 	br := &Bridge{
+		clock:          clock.Or(cfg.Clock),
 		cfg:            cfg,
 		snapshotter:    snap,
 		logger:         logger.With(slog.String("subsystem", "matter.bridge")),
@@ -725,6 +735,7 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 		eventLog:       im.NewEventLog(),
 		sigma1Replied:  make(map[uint16][32]byte),
 	}
+	br.eventLog.SetClock(br.clock)
 	return br, nil
 }
 
@@ -1427,6 +1438,13 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 	b.mu.Unlock()
 }
 
+// Clock is the bridge's time source ([Config.Clock], or [clock.System]).
+func (b *Bridge) Clock() clock.Clock { return b.clk() }
+
+// clk is the bridge's clock; [clock.System] for a Bridge not built by
+// [New] (white-box tests).
+func (b *Bridge) clk() clock.Clock { return clock.Or(b.clock) }
+
 // AttachCommissioningWindow parks the bridge-side [CommissioningWindow]
 // tracker where [Bridge.CommissioningWindow] can hand it back. That is
 // the whole effect: no bridge path reads the field, and [Reassemble]
@@ -1439,6 +1457,9 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 //
 // Pass nil to detach.
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
+	if w != nil {
+		w.SetClock(b.clk())
+	}
 	b.mu.Lock()
 	b.commissioningWindow = w
 	roots := b.rootClusters

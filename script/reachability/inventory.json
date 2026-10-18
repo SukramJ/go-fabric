@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5303,
+  "entry_points": 5322,
   "entry_packages": [
     ".",
     "bdx",
@@ -9,6 +9,8 @@
     "bootid",
     "bridge",
     "bridge/bridgetest",
+    "clock",
+    "clock/clocktest",
     "cluster",
     "cluster/alarm",
     "cluster/alarmbase",
@@ -189,6 +191,7 @@
     "im/subscription",
     "internal/chipdm",
     "internal/chiptool",
+    "internal/clockvar",
     "internal/paritytest",
     "mdns",
     "node",
@@ -220,9 +223,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12769,
-    "reachable": 9005,
-    "whitelisted": 3759,
+    "total_exported": 12787,
+    "reachable": 9016,
+    "whitelisted": 3766,
     "unreachable": 5
   },
   "by_package": [
@@ -283,7 +286,7 @@
       "package": "secure/mattercert",
       "identifier": "ErrExpired",
       "file": "secure/mattercert/verify.go",
-      "line": 62,
+      "line": 68,
       "kind": "var"
     },
     {
@@ -5364,6 +5367,13 @@
       "line": 23
     },
     {
+      "package": "clock/clocktest",
+      "identifier": "Fake",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 29
+    },
+    {
       "package": "cluster",
       "identifier": "DataVersionTracker",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -5390,6 +5400,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/coerce_test.go",
       "line": 30
+    },
+    {
+      "package": "cluster",
+      "identifier": "TestQuieterStaleFlushDoesNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/attribute_changes_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/alarm",
@@ -5487,14 +5504,14 @@
       "identifier": "DimensionFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 77
+      "line": 78
     },
     {
       "package": "cluster/closure",
       "identifier": "DimensionState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 80
+      "line": 81
     },
     {
       "package": "cluster/closure",
@@ -5508,14 +5525,14 @@
       "identifier": "LatchControlModes",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 90
+      "line": 91
     },
     {
       "package": "cluster/closure",
       "identifier": "LimitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 84
+      "line": 85
     },
     {
       "package": "cluster/closure",
@@ -5536,28 +5553,28 @@
       "identifier": "StepDirection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "cluster/closure",
       "identifier": "ThreeLevelAuto",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 86
+      "line": 87
     },
     {
       "package": "cluster/closure",
       "identifier": "UnitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 82
+      "line": 83
     },
     {
       "package": "cluster/core",
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 446
+      "line": 459
     },
     {
       "package": "cluster/core",
@@ -5578,7 +5595,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 580
+      "line": 594
     },
     {
       "package": "cluster/core",
@@ -5676,35 +5693,35 @@
       "identifier": "TestCommissionerControlApproved",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 172
+      "line": 173
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlCASEOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 133
+      "line": 134
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 329
+      "line": 327
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlDenied",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 255
+      "line": 256
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlExpired",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 300
+      "line": 301
     },
     {
       "package": "cluster/core",
@@ -5718,21 +5735,21 @@
       "identifier": "TestCommissionerControlRandFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 349
+      "line": 347
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissionerControlTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 284
+      "line": 285
     },
     {
       "package": "cluster/core",
       "identifier": "TestCommissioningApprovalRequestMatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/commissioner_control_test.go",
-      "line": 365
+      "line": 363
     },
     {
       "package": "cluster/core",
@@ -5774,7 +5791,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 614
+      "line": 628
     },
     {
       "package": "cluster/core",
@@ -5809,77 +5826,77 @@
       "identifier": "TestOTAProvider_BDXNotEnabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 469
+      "line": 453
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_BusyWhileDownloading",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 259
+      "line": 243
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_Consent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 389
+      "line": 373
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_DelayedActionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 361
+      "line": 345
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_DirectConsentApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 438
+      "line": 422
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_DownloadToApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 306
+      "line": 290
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_NeedsACASEPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 486
+      "line": 470
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_NotAvailable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 166
+      "line": 150
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_Protocols",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 452
+      "line": 436
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_RebootDetected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 285
+      "line": 269
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTAProvider_UpdateAvailable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
-      "line": 181
+      "line": 165
     },
     {
       "package": "cluster/core",
@@ -5893,147 +5910,147 @@
       "identifier": "TestOTARequestor_Announce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 674
+      "line": 620
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_ApplyActions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 997
+      "line": 943
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_ApplyFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1046
+      "line": 992
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_BusyReportsDelayedOnQuery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1229
+      "line": 1175
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_ChooseProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 716
+      "line": 662
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_Consent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 890
+      "line": 836
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DecodeDefaultProvidersWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 641
+      "line": 587
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DefaultProvidersWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 589
+      "line": 535
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DownloadFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 945
+      "line": 891
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_DownloadProtocolNotSupported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 818
+      "line": 764
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_EnableDisable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 562
+      "line": 508
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_FileAlreadyDownloaded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1067
+      "line": 1013
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_FullUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 742
+      "line": 688
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_Initialize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 456
+      "line": 402
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_InvalidAnswers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 840
+      "line": 786
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_InvalidImage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 974
+      "line": 920
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_NotAvailableAndBusy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 778
+      "line": 724
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_OnlineAddsDefaultsAndSchedules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 482
+      "line": 428
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_Persistence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1177
+      "line": 1123
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_PreviousUpdateApplied",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 504
+      "line": 450
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_PreviousUpdateFailed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 538
+      "line": 484
     },
     {
       "package": "cluster/core",
@@ -6047,35 +6064,35 @@
       "identifier": "TestOTARequestor_QueryTimerFires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1095
+      "line": 1041
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_ReadsAndGlobals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1200
+      "line": 1146
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_UpdateProgress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1161
+      "line": 1107
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestor_UpdateStateRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1136
+      "line": 1082
     },
     {
       "package": "cluster/core",
       "identifier": "TestOtaRequestorBdxBlockSizeByChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1286
+      "line": 1232
     },
     {
       "package": "cluster/core",
@@ -6285,7 +6302,7 @@
       "identifier": "AdjustmentCause",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "cluster/energy",
@@ -6313,14 +6330,14 @@
       "identifier": "ChargingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 55
+      "line": 56
     },
     {
       "package": "cluster/energy",
       "identifier": "ChargingTargetSchedule",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "cluster/energy",
@@ -6355,84 +6372,84 @@
       "identifier": "DayEntryRandomizationType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "cluster/energy",
       "identifier": "DemCause",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 66
+      "line": 67
     },
     {
       "package": "cluster/energy",
       "identifier": "DemFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 56
+      "line": 57
     },
     {
       "package": "cluster/energy",
       "identifier": "EsaState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "cluster/energy",
       "identifier": "EsaType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 58
+      "line": 59
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseFault",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "cluster/energy",
       "identifier": "Forecast",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 75
+      "line": 76
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastConstraint",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 82
+      "line": 83
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastSlot",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 77
+      "line": 78
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastUpdateReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 84
+      "line": 85
     },
     {
       "package": "cluster/energy",
@@ -6481,28 +6498,28 @@
       "identifier": "OptOutState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustCapability",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 71
+      "line": 72
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 73
+      "line": 74
     },
     {
       "package": "cluster/energy",
@@ -6537,84 +6554,84 @@
       "identifier": "SlotAdjustment",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 79
+      "line": 80
     },
     {
       "package": "cluster/energy",
       "identifier": "SupplyState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "cluster/energy",
       "identifier": "TargetDays",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 57
+      "line": 58
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffCalendarPeriod",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 59
+      "line": 60
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffComponent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDay",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 57
+      "line": 58
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDayEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDayPattern",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffInformation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffPeriod",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 55
+      "line": 56
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffUnit",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "cluster/energy",
@@ -6740,7 +6757,7 @@
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "cluster/measurement",
@@ -6929,35 +6946,35 @@
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/onoff/server.go",
-      "line": 21
+      "line": 22
     },
     {
       "package": "cluster/onoff",
       "identifier": "TestDelayedSceneApplyStaleRun",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/onoff/server_internal_test.go",
-      "line": 77
+      "line": 86
     },
     {
       "package": "cluster/onoff",
       "identifier": "TestStaleTickDoesNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/onoff/server_internal_test.go",
-      "line": 52
+      "line": 61
     },
     {
       "package": "cluster/onoff",
       "identifier": "TestTickHoldsAt0xFFFF",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/onoff/server_internal_test.go",
-      "line": 27
+      "line": 36
     },
     {
       "package": "cluster/opstate",
       "identifier": "TestCountdownTimeIsReportedAsAQuieterAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/countdown_internal_test.go",
-      "line": 18
+      "line": 19
     },
     {
       "package": "cluster/pump",
@@ -6992,70 +7009,70 @@
       "identifier": "Area",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 83
+      "line": 84
     },
     {
       "package": "cluster/servicearea",
       "identifier": "AreaInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 85
+      "line": 86
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 81
+      "line": 82
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LandmarkInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 89
+      "line": 90
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LocationInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 87
+      "line": 88
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Map",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 91
+      "line": 92
     },
     {
       "package": "cluster/servicearea",
       "identifier": "OperationalStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Progress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SelectAreasStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 97
+      "line": 98
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SkipAreaStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "cluster/spec",
@@ -15658,168 +15675,168 @@
       "identifier": "TestBleScannerAnotherTimeoutDoesNotEndDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 568
+      "line": 508
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsEveryDiscoveryForIdentifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 652
+      "line": 592
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsOnlyTheCanceled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 625
+      "line": 565
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCloseSettlesContinuousDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 700
+      "line": 640
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDiscoveriesAskingDifferently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 593
+      "line": 533
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDropsRotatedAddressByElapsedTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 310
+      "line": 250
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerFailsDiscoveriesWhenScanCannotStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 674
+      "line": 614
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerForgetsAfter15MinutesOfListening",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 412
+      "line": 352
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerForgetsOneShotRecordAfter15Minutes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 398
+      "line": 338
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerHandsAdvertisementToEveryDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 511
+      "line": 451
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerIgnoresNonMatterServiceData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 720
+      "line": 660
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsBothWithinStaleWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 283
+      "line": 223
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsEntriesWithOtherServiceData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 357
+      "line": 297
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsEntryNobodyListenedFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 322
+      "line": 262
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsRefreshedEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 341
+      "line": 281
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerMergesRepeatAdvertisements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 275
+      "line": 215
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOffersStalePeripheralAgain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 385
+      "line": 325
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOneShotRecordDoesNotAgeWhileScanning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 431
+      "line": 371
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOneShotWaitsWhileOnlyUnreachableAdvertise",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 472
+      "line": 412
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerPurgesWithIgnoreExisting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 491
+      "line": 431
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerReachability",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 454
+      "line": 394
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerReplacesAfterStaleWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 295
+      "line": 235
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerStopsOfferingStalePeripheral",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 372
+      "line": 312
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerTimeoutEndsOneDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 539
+      "line": 479
     },
     {
       "package": "controller/ca/keyfile",
@@ -15882,14 +15899,14 @@
       "identifier": "TestCacheBuffered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 196
+      "line": 148
     },
     {
       "package": "controller/client",
       "identifier": "TestCacheWriteThrough",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 162
+      "line": 114
     },
     {
       "package": "controller/client",
@@ -15987,14 +16004,14 @@
       "identifier": "TestMemoryStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 258
+      "line": 210
     },
     {
       "package": "controller/client",
       "identifier": "TestMemoryStoreConcurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 301
+      "line": 253
     },
     {
       "package": "controller/client",
@@ -16057,21 +16074,21 @@
       "identifier": "TestRegistryAutoStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 250
+      "line": 251
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 150
+      "line": 151
     },
     {
       "package": "controller/client",
       "identifier": "TestRegistryErase",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 304
+      "line": 305
     },
     {
       "package": "controller/client",
@@ -16085,7 +16102,7 @@
       "identifier": "TestRegistryRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
-      "line": 187
+      "line": 188
     },
     {
       "package": "controller/client",
@@ -16106,7 +16123,7 @@
       "identifier": "TestSettingsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 325
+      "line": 277
     },
     {
       "package": "controller/client",
@@ -17125,6 +17142,20 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "Clock",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/clock.go",
+      "line": 15
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "SystemClock",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/clock.go",
+      "line": 21
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestActiveTimestamp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/address_test.go",
@@ -17416,6 +17447,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 69
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Timer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/clock.go",
+      "line": 18
     },
     {
       "package": "controller/handshake",
@@ -17996,35 +18034,42 @@
       "identifier": "TestACapacityBelowOneStillProducesAUsableRing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 88
+      "line": 91
     },
     {
       "package": "diagevent",
       "identifier": "TestAnUnwiredRingIsSilentRatherThanFatal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 48
+      "line": 51
     },
     {
       "package": "diagevent",
       "identifier": "TestRecordingIsSafeUnderConcurrentWireTraffic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 65
+      "line": 68
+    },
+    {
+      "package": "diagevent",
+      "identifier": "TestSetClockStampsUnstampedEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 123
     },
     {
       "package": "diagevent",
       "identifier": "TestSnapshotIsACopy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 104
+      "line": 107
     },
     {
       "package": "diagevent",
       "identifier": "TestTheRingKeepsTheNewestAndDropsTheOldest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 21
+      "line": 24
     },
     {
       "package": "eligibility",
@@ -19893,7 +19938,7 @@
       "identifier": "TestNextExchangeIDWraps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 345
+      "line": 346
     },
     {
       "package": "groups",
@@ -19914,35 +19959,35 @@
       "identifier": "TestSenderCacheIsKeyedByKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 183
+      "line": 184
     },
     {
       "package": "groups",
       "identifier": "TestSenderDatagramMatchesMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 223
+      "line": 224
     },
     {
       "package": "groups",
       "identifier": "TestSenderInvokeAndWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 392
+      "line": 393
     },
     {
       "package": "groups",
       "identifier": "TestSenderKeySelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 90
+      "line": 91
     },
     {
       "package": "groups",
       "identifier": "TestSenderSendsTheGroupMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
-      "line": 264
+      "line": 265
     },
     {
       "package": "groups",
@@ -21783,77 +21828,77 @@
       "identifier": "TestHostAddrsFor_Policy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 356
+      "line": 355
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_AAAAQueryInSelectionPreferenceOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 124
+      "line": 123
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_ANYQueryAnswersAll",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 133
+      "line": 132
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_AQueryAnswersARecordsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 108
+      "line": 107
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_DuplicateQuestionSuppression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 239
+      "line": 238
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 194
+      "line": 193
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_KnownAnswerSuppressionAndCacheFlush",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 179
+      "line": 178
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_MixedQueryAddsTheRestAsAdditionals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 142
+      "line": 141
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_QUThenQMGetsOneMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 258
+      "line": 257
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_UnicastOnlyAfterRecentMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 211
+      "line": 210
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_UnknownNameOtherInterfaceOrStopped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 154
+      "line": 153
     },
     {
       "package": "mdns",
@@ -22210,7 +22255,7 @@
       "identifier": "TestSubtypeResponder_AnswersHostThroughTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 296
+      "line": 295
     },
     {
       "package": "mdns",
@@ -22413,7 +22458,7 @@
       "identifier": "TestZeroconf_HandsHostNameToResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 331
+      "line": 330
     },
     {
       "package": "node",
@@ -25872,6 +25917,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/conn_test.go",
       "line": 37
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestDeprecatedSystemClockFires",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/helpers_test.go",
+      "line": 101
     },
     {
       "package": "transport/btp",

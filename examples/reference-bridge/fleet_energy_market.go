@@ -175,7 +175,7 @@ func (d *demoEnergyTariff) build() {
 		tariff, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
 			Features: energy.TariffFeaturePricing | energy.TariffFeatureFriendlyCredit | energy.TariffFeatureAuxiliaryLoad |
 				energy.TariffFeaturePeakPeriod | energy.TariffFeaturePowerThreshold | energy.TariffFeatureRandomization,
-			Now: d.clock.now, DataVersion: &d.version.tariff,
+			Now: d.clock.now, DataVersion: &d.version.tariff, //nolint:staticcheck // SA1019: the example keeps its own clock (a chip-style TestTimeManager), read through Now
 		})
 		if err != nil {
 			panic(fmt.Sprintf("tariff CommodityTariff: %v", err))

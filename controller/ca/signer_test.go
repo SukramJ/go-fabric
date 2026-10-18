@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ca"
 )
 
@@ -55,7 +56,7 @@ func TestRootSigner(t *testing.T) {
 	settings := &mapSettings{}
 	st := ca.SettingStore{Settings: settings}
 	root := newRefSigner(t, "pkcs11:token=ctl;object=root")
-	c, err := ca.New(ca.Config{Store: st, RootSigner: root, Now: fixedNow})
+	c, err := ca.New(ca.Config{Store: st, RootSigner: root, Clock: clocktest.New(issuedAt)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,14 +76,14 @@ func TestRootSigner(t *testing.T) {
 		t.Fatalf("stored %s", js)
 	}
 
-	again, err := ca.New(ca.Config{Store: st, RootSigner: root, Now: fixedNow})
+	again, err := ca.New(ca.Config{Store: st, RootSigner: root, Clock: clocktest.New(issuedAt)})
 	if err != nil || !bytes.Equal(again.RootCert(), c.RootCert()) {
 		t.Fatalf("reopen: %v", err)
 	}
-	if _, err := ca.New(ca.Config{Store: st, Now: fixedNow}); !errors.Is(err, ca.ErrConfig) || !strings.Contains(err.Error(), "pkcs11:") {
+	if _, err := ca.New(ca.Config{Store: st, Clock: clocktest.New(issuedAt)}); !errors.Is(err, ca.ErrConfig) || !strings.Contains(err.Error(), "pkcs11:") {
 		t.Fatalf("without the signer: %v", err)
 	}
-	if _, err := ca.New(ca.Config{Store: st, RootSigner: newRefSigner(t, "other"), Now: fixedNow}); !errors.Is(err, ca.ErrConfig) {
+	if _, err := ca.New(ca.Config{Store: st, RootSigner: newRefSigner(t, "other"), Clock: clocktest.New(issuedAt)}); !errors.Is(err, ca.ErrConfig) {
 		t.Fatalf("another key: %v", err)
 	}
 	if ca.KeyRefOf(bareSigner{root.key}) != ca.ExternalKeyRef {
@@ -95,7 +96,7 @@ func TestRootSigner(t *testing.T) {
 func TestRootSignerTakesOverStoredKey(t *testing.T) {
 	settings := &mapSettings{}
 	st := ca.SettingStore{Settings: settings}
-	if _, err := ca.New(ca.Config{Store: st, Now: fixedNow}); err != nil {
+	if _, err := ca.New(ca.Config{Store: st, Clock: clocktest.New(issuedAt)}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(settings.m[ca.DefaultSettingKey], "privateKey") {
@@ -110,7 +111,7 @@ func TestRootSignerTakesOverStoredKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	signer := &refSigner{key: k, ref: "file:/k"}
-	if _, err := ca.New(ca.Config{Store: st, RootSigner: signer, Now: fixedNow}); err != nil {
+	if _, err := ca.New(ca.Config{Store: st, RootSigner: signer, Clock: clocktest.New(issuedAt)}); err != nil {
 		t.Fatal(err)
 	}
 	if js := settings.m[ca.DefaultSettingKey]; strings.Contains(js, "privateKey") || !strings.Contains(js, `"rootKeyRef":"file:/k"`) {
@@ -124,7 +125,7 @@ func TestICACSigner(t *testing.T) {
 	settings := &mapSettings{}
 	st := ca.SettingStore{Settings: settings}
 	root, icac := newRefSigner(t, "root"), newRefSigner(t, "icac")
-	cfg := ca.Config{Store: st, IntermediateCA: true, RootSigner: root, ICACSigner: icac, Now: fixedNow}
+	cfg := ca.Config{Store: st, IntermediateCA: true, RootSigner: root, ICACSigner: icac, Clock: clocktest.New(issuedAt)}
 	c, err := ca.New(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -146,13 +147,13 @@ func TestICACSigner(t *testing.T) {
 		t.Fatalf("reopen: %v", err)
 	}
 	// The root may stay offline: the ICAC signer alone opens it.
-	if _, err := ca.New(ca.Config{Store: st, IntermediateCA: true, ICACSigner: icac, Now: fixedNow}); err != nil {
+	if _, err := ca.New(ca.Config{Store: st, IntermediateCA: true, ICACSigner: icac, Clock: clocktest.New(issuedAt)}); err != nil {
 		t.Fatalf("offline root: %v", err)
 	}
 	if !strings.Contains(settings.m[ca.DefaultSettingKey], `"rootKeyRef":"root"`) {
 		t.Fatal("the offline root's KeyRef was dropped")
 	}
-	if _, err := ca.New(ca.Config{Store: st, IntermediateCA: true, Now: fixedNow}); !errors.Is(err, ca.ErrConfig) {
+	if _, err := ca.New(ca.Config{Store: st, IntermediateCA: true, Clock: clocktest.New(issuedAt)}); !errors.Is(err, ca.ErrConfig) {
 		t.Fatalf("without the ICAC signer: %v", err)
 	}
 	if _, err := ca.New(ca.Config{ICACSigner: icac}); !errors.Is(err, ca.ErrConfig) {

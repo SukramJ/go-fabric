@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -55,6 +56,8 @@ type caseIdentities struct {
 	byIdx  map[uint8]*caseFabric
 	latest *caseFabric
 	logger *slog.Logger
+	// clock is the certificate verifiers' time; nil is clock.System.
+	clock clock.Clock
 }
 
 func newCaseIdentities(logger *slog.Logger) *caseIdentities {
@@ -164,7 +167,7 @@ func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex 
 	if err != nil {
 		return fmt.Errorf("parse operational key %d: %w", fabricIndex, err)
 	}
-	verifier, err := mattercert.NewVerifier(fabric.RootPublicKey, mattercert.SystemTime{})
+	verifier, err := mattercert.NewVerifier(fabric.RootPublicKey, clock.Or(c.clock))
 	if err != nil {
 		return fmt.Errorf("peer verifier %d: %w", fabricIndex, err)
 	}
@@ -254,6 +257,7 @@ func wireSecurity(
 	logger *slog.Logger,
 ) *security {
 	sessions := operational.NewManager(st)
+	sessions.SetClock(br.Clock())
 
 	// The session lookup is what turns a Header.SessionID on the wire into
 	// decryption keys, a fabric index and a subject. The fabric and subject
@@ -307,7 +311,7 @@ func wireSecurity(
 	br.AttachSessionLookup(lookup)
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
-	subs := subscription.NewManager(subscription.Config{}, br.SubscriptionReporter(), logger)
+	subs := subscription.NewManager(subscription.Config{Clock: br.Clock()}, br.SubscriptionReporter(), logger)
 	subs.Start(ctx)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
 	br.AttachSubscriptionManager(subs)
@@ -335,6 +339,7 @@ func wireSecurity(
 		}
 		return adapter
 	})
+	paseProvider.SetClock(br.Clock())
 	paseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	// Not attached here: it accepts PASE only while the node's own
 	// commissioning window is open (commissioning.go), as matter.js sets
@@ -351,6 +356,7 @@ func wireSecurity(
 		return adapter
 	})
 	caseProvider.SetOnEvict(br.ForgetSigma1Replied)
+	caseProvider.SetClock(br.Clock())
 	caseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	br.AttachCaseHandlerProvider(caseProvider.Resolve)
 
@@ -362,7 +368,7 @@ func wireSecurity(
 	// Skip these and every restart costs each controller its subscription
 	// liveness timeout before it re-subscribes.
 	br.AttachSubscriptionStore(st)
-	br.AttachOperationalResolver(mdns.NewOperationalResolver(logger))
+	br.AttachOperationalResolver(operationalResolver(logger, br.Clock()))
 	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
 
 	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
@@ -629,4 +635,12 @@ type rejectingVerifier struct{}
 // VerifyAndExtractPubKey implements [sigma.PeerVerifier].
 func (rejectingVerifier) VerifyAndExtractPubKey(_, _ []byte) (*ecdsa.PublicKey, error) {
 	return nil, errors.New("no fabric installed yet: commission the bridge before opening a CASE session")
+}
+
+// operationalResolver is the mDNS resolver of the node's CASE initiator,
+// its query retries on c.
+func operationalResolver(logger *slog.Logger, c clock.Clock) *mdns.OperationalResolver {
+	r := mdns.NewOperationalResolver(logger)
+	r.SetClock(c)
+	return r
 }

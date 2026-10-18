@@ -7,6 +7,9 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // PerExchangeCaseProvider is a [CaseHandlerProvider] that lazily
@@ -35,6 +38,7 @@ import (
 // (Sigma1 arrived, Sigma3 never came) do not leak entries in the
 // sigma1Replied dedupe map — see [Bridge.forgetSigma1Replied].
 type PerExchangeCaseProvider struct {
+	clock    clockvar.Var // see SetClock
 	mu       sync.Mutex
 	entries  map[uint16]*caseEntry
 	factory  func() *CaseAdapter
@@ -47,6 +51,10 @@ type caseEntry struct {
 	adapter     *CaseAdapter
 	lastTouched time.Time
 }
+
+// SetClock sets the clock the entries are stamped and reaped on; nil is
+// [clock.System]. Call it before [PerExchangeCaseProvider.StartReaper].
+func (p *PerExchangeCaseProvider) SetClock(c clock.Clock) { p.clock.Store(c) }
 
 // NewPerExchangeCaseProvider constructs a provider backed by factory.
 // A nil factory produces a provider that always returns nil from
@@ -68,7 +76,7 @@ func (p *PerExchangeCaseProvider) Resolve(exchangeID uint16) CaseHandler {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if e, ok := p.entries[exchangeID]; ok {
-		e.lastTouched = time.Now()
+		e.lastTouched = p.clock.Load().Now()
 		return e.adapter
 	}
 	if p.factory == nil {
@@ -78,7 +86,7 @@ func (p *PerExchangeCaseProvider) Resolve(exchangeID uint16) CaseHandler {
 	if a == nil {
 		return nil
 	}
-	p.entries[exchangeID] = &caseEntry{adapter: a, lastTouched: time.Now()}
+	p.entries[exchangeID] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
 	return a
 }
 
@@ -152,13 +160,13 @@ func (p *PerExchangeCaseProvider) StartReaper(parent context.Context, interval, 
 	p.mu.Unlock()
 
 	p.reaperWG.Go(func() {
-		t := time.NewTicker(interval)
+		t := p.clock.Load().NewTicker(interval)
 		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-t.C:
+			case <-t.C():
 				p.reapLocked(ttl)
 			}
 		}
@@ -178,7 +186,7 @@ func (p *PerExchangeCaseProvider) StopReaper() {
 }
 
 func (p *PerExchangeCaseProvider) reapLocked(ttl time.Duration) {
-	cutoff := time.Now().Add(-ttl)
+	cutoff := p.clock.Load().Now().Add(-ttl)
 	p.mu.Lock()
 	var evicted []uint16
 	for k, e := range p.entries {

@@ -57,6 +57,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
@@ -135,6 +136,9 @@ type ColorControlServerConfig struct {
 	// gate. Nil means the endpoint has none and every command executes
 	// (matter.js #optionsAllowExecution: `!this.agent.has(OnOffServer)`).
 	OnOff OnOffState
+	// Clock paces the transitions and the quieters; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // OnOffState is the On/Off state of the endpoint a [ColorControlServer]
@@ -363,11 +367,12 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
-		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.Notify(id) }}
+		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.Notify(id) }, Clock: cfg.Clock}
 	}
 	s.engine = transition.New(transition.Config{
 		Manage:       cfg.ManageTransitions,
 		StepInterval: cfg.TransitionStepInterval,
+		Clock:        cfg.Clock,
 		Properties: map[string]transition.Property{
 			propHue:              {Min: minHueValue, Max: maxHueValue, Cyclic: true},
 			propEnhancedHue:      {Min: minHueValue, Max: maxEnhancedHueValue, Cyclic: true},

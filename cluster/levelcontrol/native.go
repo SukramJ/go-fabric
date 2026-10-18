@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -83,6 +84,9 @@ type NativeConfig struct {
 	// would leave in effect, before they take effect; an error refuses
 	// the write and keeps the previous values.
 	Persist func(ctx context.Context, options uint8, onLevel *uint8) error
+	// Clock pays a ramp's switch-off when the ramp is due to end; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // NativeSource is the [LevelSource] [NewNativeSource] builds. It holds the
@@ -102,7 +106,8 @@ type NativeSource struct {
 	onLevel *uint8
 	// off is the switch-off a "with On/Off" ramp to the minimum owes once
 	// the level is there; nil when none is owed.
-	off *pendingOff
+	off   *pendingOff
+	clock clock.Clock
 }
 
 // pendingOff is a switch-off owed by one ramp: armed until the level
@@ -111,7 +116,7 @@ type pendingOff struct {
 	ctx context.Context
 	// deadline pays the switch-off when the ramp is due to end, for a
 	// device that does not notify or report the level it reached.
-	deadline *time.Timer
+	deadline clock.Timer
 }
 
 // Compile-time assertions.
@@ -133,7 +138,7 @@ var (
 // MoveToLevel alone, which the source then forwards ungated as an
 // immediate ramp.
 func NewNativeSource(dev NativeRamp, onOff OnOff, cfg NativeConfig) *NativeSource {
-	n := &NativeSource{dev: dev, onOff: onOff, minLevel: LevelMin, persist: cfg.Persist, options: cfg.Options}
+	n := &NativeSource{dev: dev, onOff: onOff, minLevel: LevelMin, persist: cfg.Persist, options: cfg.Options, clock: clock.Or(cfg.Clock)}
 	if cfg.Lighting {
 		n.minLevel = LightingLevelMin
 	}
@@ -470,7 +475,7 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 		// When the ramp is due to end the target is the level, reported or
 		// not: matter.js's transition steps to targetValue and couples off
 		// on that commit (Transitions.ts, LevelControlServer.ts:624-627).
-		p.deadline = time.AfterFunc(d, func() { _ = n.pay(p) })
+		p.deadline = n.clock.AfterFunc(d, func() { _ = n.pay(p) })
 	}
 	n.mu.Unlock()
 	return n.settle(p)

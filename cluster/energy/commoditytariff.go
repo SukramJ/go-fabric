@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
@@ -189,8 +190,13 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 // CommodityTariffConfig carries the construction parameters.
 type CommodityTariffConfig struct {
 	Features TariffFeature
+	// Clock is the clock the tariff's current day and day entry are read
+	// from. Set, it wins over Now; neither set is [clock.System].
+	Clock clock.Clock
 	// Now is the clock the tariff's current day and day entry are read
-	// from; nil is time.Now.
+	// from.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
 	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
@@ -257,8 +263,11 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		return nil, fmt.Errorf("energy: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
-	if s.now == nil {
-		s.now = time.Now
+	switch {
+	case cfg.Clock != nil:
+		s.now = cfg.Clock.Now
+	case s.now == nil:
+		s.now = clock.System{}.Now
 	}
 	return s, nil
 }

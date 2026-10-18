@@ -13,13 +13,12 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 )
 
 var issuedAt = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
-
-func fixedNow() time.Time { return issuedAt }
 
 // matterSeconds is t in Matter epoch seconds.
 func matterSeconds(t time.Time) uint64 {
@@ -52,7 +51,7 @@ func decode(t *testing.T, raw []byte) *mattercert.Certificate {
 // against the root and carries the fields of CertificateAuthority.ts:287-320.
 func TestRootAndNOCRoundTrip(t *testing.T) {
 	t.Parallel()
-	c, err := ca.New(ca.Config{Now: fixedNow})
+	c, err := ca.New(ca.Config{Clock: clocktest.New(issuedAt)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +113,7 @@ func TestRootAndNOCRoundTrip(t *testing.T) {
 // root; NOCs are issued and signed by the ICAC (#getSigningParameters).
 func TestICACChain(t *testing.T) {
 	t.Parallel()
-	c, err := ca.New(ca.Config{Now: fixedNow, IntermediateCA: true})
+	c, err := ca.New(ca.Config{Clock: clocktest.New(issuedAt), IntermediateCA: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +144,7 @@ func TestICACChain(t *testing.T) {
 func TestStoreSaveAndLoad(t *testing.T) {
 	t.Parallel()
 	store := &ca.MemoryStore{}
-	first, err := ca.New(ca.Config{Store: store, Now: fixedNow})
+	first, err := ca.New(ca.Config{Store: store, Clock: clocktest.New(issuedAt)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +160,7 @@ func TestStoreSaveAndLoad(t *testing.T) {
 		t.Fatalf("counter %d after one NOC, %d saves", st.NextCertificateID, store.Saves())
 	}
 
-	second, err := ca.New(ca.Config{Store: store, Now: fixedNow})
+	second, err := ca.New(ca.Config{Store: store, Clock: clocktest.New(issuedAt)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +243,11 @@ func TestRejects(t *testing.T) {
 	if _, err := c.GenerateNOC([]byte{4, 1, 2}, 1, 1, nil); err == nil {
 		t.Fatal("a malformed subject key was accepted")
 	}
-	if _, err := ca.New(ca.Config{Now: func() time.Time { return time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC) }}); err == nil {
+	if _, err := ca.New(ca.Config{Clock: clocktest.New(time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC))}); err == nil {
 		t.Fatal("a notBefore before the Matter epoch was accepted")
+	}
+	// The deprecated Now keeps working for its window.
+	if _, err := ca.New(ca.Config{Now: func() time.Time { return time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC) }}); err == nil { //nolint:staticcheck // SA1019: the deprecated path is under test
+		t.Fatal("a notBefore before the Matter epoch was accepted through the deprecated Now")
 	}
 }

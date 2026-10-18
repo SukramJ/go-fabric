@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
@@ -38,6 +39,8 @@ import (
 // reflects what the spec mandates.
 type GeneralCommissioning struct {
 	mu sync.RWMutex
+
+	clock clock.Clock
 
 	breadcrumb                   uint64
 	regulatoryConfig             uint8
@@ -210,6 +213,9 @@ type GeneralCommissioningConfig struct {
 	// ArmFailSafe returns BusyWithOtherAdmin per Matter §11.10.6.2.
 	// Wired by the daemon post-construction; nil skips the check.
 	IsCommissioningWindowOpen func() bool
+	// Clock is the fail-safe's clock: its expiry, the cumulative limit and
+	// the expiry watcher. nil is [clock.System].
+	Clock clock.Clock
 }
 
 // NewGeneralCommissioning constructs the cluster.
@@ -239,6 +245,7 @@ func NewGeneralCommissioning(cfg GeneralCommissioningConfig) (*GeneralCommission
 		locationCapability:           cfg.LocationCapability,
 		supportsConcurrentConnection: cfg.SupportsConcurrentConnection,
 		failSafeMaxSeconds:           cfg.FailSafeMaxSeconds,
+		clock:                        clock.Or(cfg.Clock),
 		cumulativeFailSafeMaxSec:     cfg.CumulativeFailSafeMaxSeconds,
 		onFailSafeExpired:            cfg.OnFailSafeExpired,
 		onCommissioningComplete:      cfg.OnCommissioningComplete,
@@ -583,7 +590,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// refuse further arms. Mirrors chip src/app/FailSafeContext.cpp:106-133
 	// HandleMaxCumulativeFailSafeTimer — the cumulative timer starts on the
 	// first arm and runs independently; re-arms cannot reset it.
-	now := time.Now()
+	now := g.clock.Now()
 	if !g.failSafeCumulativeStarted {
 		g.failSafeCumulativeStarted = true
 		g.failSafeCumulativeDeadline = now.Add(time.Duration(g.cumulativeFailSafeMaxSec) * time.Second)
@@ -649,15 +656,15 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 // moment. Runs in a fresh goroutine off ArmFailSafe; harmless if the
 // commissioner calls CommissioningComplete or re-arms before timeout.
 func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIndex uint8, expiresAt time.Time) {
-	timer := time.NewTimer(time.Until(expiresAt))
+	timer := g.clock.NewTimer(clock.Until(g.clock, expiresAt))
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return
-	case <-timer.C:
+	case <-timer.C():
 	}
 	g.mu.Lock()
-	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(time.Now())
+	stillArmed := g.failSafeArmed && !g.failSafeExpiresAt.After(g.clock.Now())
 	if stillArmed {
 		g.failSafeArmed = false
 		// chip's GeneralCommissioningCluster.cpp:146 (kFailSafeTimerExpired
@@ -859,9 +866,9 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
 	// override the context's fabric filter if needed, or set directly.
 	g.mu.Lock()
-	fresh := !g.failSafeArmed || !g.failSafeExpiresAt.After(time.Now())
+	fresh := !g.failSafeArmed || !g.failSafeExpiresAt.After(g.clock.Now())
 	g.failSafeArmed = true
-	g.failSafeExpiresAt = time.Now().Add(time.Duration(seconds) * time.Second)
+	g.failSafeExpiresAt = g.clock.Now().Add(time.Duration(seconds) * time.Second)
 	g.breadcrumb = req.Breadcrumb
 	g.failSafeFabricIndex = fabricIndex
 	g.dataVersion.Bump()
@@ -928,7 +935,7 @@ func (g *GeneralCommissioning) SetCurrentFabric(idx uint8) {
 func (g *GeneralCommissioning) FailSafeArmed() bool {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return g.failSafeArmed && g.failSafeExpiresAt.After(time.Now())
+	return g.failSafeArmed && g.failSafeExpiresAt.After(g.clock.Now())
 }
 
 // PaseSessionAutoArmSeconds is the default fail-safe window duration
@@ -951,7 +958,7 @@ const PaseSessionAutoArmSeconds uint16 = 60
 // Pake3 completion.
 func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
 	g.mu.Lock()
-	alreadyArmed := g.failSafeArmed && g.failSafeExpiresAt.After(time.Now())
+	alreadyArmed := g.failSafeArmed && g.failSafeExpiresAt.After(g.clock.Now())
 	g.mu.Unlock()
 	if alreadyArmed {
 		// Commissioner already sent ArmFailSafe explicitly; don't

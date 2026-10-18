@@ -61,6 +61,7 @@ func (b *Bridge) openTransports() (udpListener *udp.Listener, tcpListener *tcp.L
 			LocalAddr:  tcpBindAddr(b.cfg.Listen, b.cfg.PreferIPv4, port),
 			PreferIPv4: b.cfg.PreferIPv4,
 			Logger:     b.logger,
+			Clock:      b.clk(),
 		})
 		if err == nil {
 			return udpListener, tcpListener, nil

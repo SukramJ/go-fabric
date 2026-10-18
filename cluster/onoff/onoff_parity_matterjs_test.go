@@ -27,7 +27,7 @@ import (
 func TestParityMatterJS_OnOffServers(t *testing.T) {
 	t.Parallel()
 	for features := range onoff.Feature(1 << 3) {
-		srv, err := onoff.New(onoff.Config{Features: features, Clock: &fakeClock{}})
+		srv, err := onoff.New(onoff.Config{Features: features, TimeSource: newFakeClock()})
 		conflict := features&onoff.FeatureOFFONLY != 0 && features&(onoff.FeatureLT|onoff.FeatureDF) != 0
 		if conflict {
 			if !errors.Is(err, onoff.ErrInvalidConfig) {

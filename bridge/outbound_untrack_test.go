@@ -12,7 +12,7 @@ import (
 // what Track registered just before the send.
 func TestOutboundReliableUntrack(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	tr.Track(7, 1, 2, []byte{1}, nil, time.Now())
 	tr.Track(8, 1, 2, []byte{1}, nil, time.Now())
 	tr.Untrack(1, 7)

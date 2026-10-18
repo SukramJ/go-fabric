@@ -305,7 +305,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 // "subscribe").
 func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timeout := b.chunkStatusResponseTimeout(sessionID)
-	timer := time.NewTimer(timeout)
+	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case status := <-waitCh:
@@ -319,7 +319,7 @@ func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string
 			slog.Int("exchange", int(exchangeID)),
 			slog.String("status", status.String()))
 		return fmt.Errorf("%w: %s", errChunkRejected, status.String())
-	case <-timer.C:
+	case <-timer.C():
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		b.logger.Debug("matter.tx."+op+".chunk_ack_timeout",
 			slog.String("src", srcString(src)),
@@ -385,7 +385,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 	// WriteHandler serves the whole interaction (TC-ACL-2.6, 2.8).
 	writeCtx = im.WithWriteTransaction(writeCtx, b.routing.writeTransaction(
 		mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator},
-		req.MoreChunkedMessages, time.Now(),
+		req.MoreChunkedMessages, b.clk().Now(),
 	))
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
 	b.reportWrittenAttributes(resp)
@@ -616,7 +616,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 // or missing-prior-TimedRequest cases are rejected via
 // StatusResponse with the spec-mandated codes.
 func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, req im.TimedRequest) error {
-	now := time.Now()
+	now := b.clk().Now()
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot
 	// consume a deadline registered by another session.

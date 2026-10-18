@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"slices"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // Verifier validates a NOC chain against a fabric root.
@@ -33,16 +35,20 @@ type Verifier struct {
 	now  TimeSource
 }
 
-// TimeSource returns the current time for NotBefore/NotAfter checks.
+// TimeSource returns the current time for NotBefore/NotAfter checks: the
+// one method of the module's time port, [clock.Clock], that a verifier
+// needs, so a [clock.Clock] is passed to [NewVerifier] as it is.
 type TimeSource interface {
 	Now() time.Time
 }
 
 // SystemTime delegates to time.Now.
+//
+// Deprecated: use [clock.System]; SystemTime may be removed in v0.10.0.
 type SystemTime struct{}
 
 // Now implements [TimeSource].
-func (SystemTime) Now() time.Time { return time.Now() }
+func (SystemTime) Now() time.Time { return clock.System{}.Now() }
 
 // FixedTime returns a [TimeSource] that always reports t — for tests.
 type FixedTime struct{ T time.Time }
@@ -164,7 +170,7 @@ func bytesEqual(a, b []byte) bool {
 // NewVerifier returns a verifier rooted at rootPubKey. The key must be
 // a P-256 public key in uncompressed (0x04 prefix, 65 bytes) form —
 // the canonical Matter root-CA public-key shape.
-func NewVerifier(rootPubKey []byte, clock TimeSource) (*Verifier, error) {
+func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 	if len(rootPubKey) != 65 || rootPubKey[0] != 0x04 {
 		return nil, fmt.Errorf("%w: root pub key length=%d prefix=%#x", ErrMalformed, len(rootPubKey), rootPubKey[0])
 	}
@@ -172,12 +178,12 @@ func NewVerifier(rootPubKey []byte, clock TimeSource) (*Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: root pub key off-curve: %w", ErrMalformed, err)
 	}
-	if clock == nil {
-		clock = SystemTime{}
+	if ts == nil {
+		ts = clock.System{}
 	}
 	return &Verifier{
 		root: root,
-		now:  clock,
+		now:  ts,
 	}, nil
 }
 

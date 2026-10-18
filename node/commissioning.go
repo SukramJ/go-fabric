@@ -325,6 +325,7 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 		}
 		return adapter
 	})
+	provider.SetClock(h.br.Clock())
 	provider.StartReaper(context.Background(), 30*time.Second, time.Minute)
 
 	h.installMu.Lock()

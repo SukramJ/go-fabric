@@ -21,6 +21,9 @@ import (
 	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // ErrOperationalNotResolved is returned when a peer's operational instance
@@ -61,7 +64,12 @@ const (
 type OperationalResolver struct {
 	logger *slog.Logger
 	open   func() (QueryConn, error)
+	clock  clockvar.Var
 }
+
+// SetClock sets the clock the query retries are paced on; nil is
+// [clock.System].
+func (r *OperationalResolver) SetClock(c clock.Clock) { r.clock.Store(c) }
 
 // NewOperationalResolver returns a resolver on the host's multicast
 // interfaces.
@@ -93,13 +101,13 @@ func (r *OperationalResolver) ResolveOperational(ctx context.Context, compressed
 	}
 	send()
 	interval := resolveInitialInterval
-	timer := time.NewTimer(jitter(interval))
+	timer := r.clock.Load().NewTimer(jitter(interval))
 	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("%w: %s: %w", ErrOperationalNotResolved, res.instance, ctx.Err())
-		case <-timer.C:
+		case <-timer.C():
 			send()
 			interval = min(interval*resolveBackoffFactor, resolveMaxInterval)
 			timer.Reset(jitter(interval))

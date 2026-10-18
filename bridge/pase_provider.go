@@ -7,6 +7,9 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // PerExchangePaseProvider is a [PaseHandlerProvider] that lazily
@@ -25,6 +28,7 @@ import (
 // daemon's lifetime should always wire the reaper; without it the
 // adapters map grows unboundedly.
 type PerExchangePaseProvider struct {
+	clock    clockvar.Var // see SetClock
 	mu       sync.Mutex
 	entries  map[uint16]*paseEntry
 	factory  func() *PaseAdapter
@@ -40,8 +44,13 @@ type paseEntry struct {
 	// not complete within 60 s per Matter §4.13.1.7.
 	// Mirrors matter.js packages/protocol/src/session/pase/PaseServer.ts:37
 	// `PASE_PAIRING_TIMEOUT = Seconds(60)`.
-	expireTimer *time.Timer
+	expireTimer clock.Timer
 }
+
+// SetClock sets the clock the 60 s exchange timeout, the entries' stamps
+// and the reaper run on; nil is [clock.System]. Call it before the first
+// Resolve.
+func (p *PerExchangePaseProvider) SetClock(c clock.Clock) { p.clock.Store(c) }
 
 // NewPerExchangePaseProvider constructs a provider backed by factory.
 // A nil factory produces a provider that always returns nil from
@@ -73,7 +82,7 @@ func (p *PerExchangePaseProvider) Resolve(exchangeID uint16) PaseHandler {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if e, ok := p.entries[exchangeID]; ok {
-		e.lastTouched = time.Now()
+		e.lastTouched = p.clock.Load().Now()
 		return e.adapter
 	}
 	if p.factory == nil {
@@ -85,12 +94,12 @@ func (p *PerExchangePaseProvider) Resolve(exchangeID uint16) PaseHandler {
 	}
 	eid := exchangeID // capture for closure
 	// Enforce 60 s per-exchange hard timeout per Matter §4.13.1.7.
-	expireTimer := time.AfterFunc(60*time.Second, func() {
+	expireTimer := p.clock.Load().AfterFunc(60*time.Second, func() {
 		p.Forget(eid)
 	})
 	p.entries[exchangeID] = &paseEntry{
 		adapter:     a,
-		lastTouched: time.Now(),
+		lastTouched: p.clock.Load().Now(),
 		expireTimer: expireTimer,
 	}
 	return a
@@ -158,13 +167,13 @@ func (p *PerExchangePaseProvider) StartReaper(parent context.Context, interval, 
 	p.mu.Unlock()
 
 	p.reaperWG.Go(func() {
-		t := time.NewTicker(interval)
+		t := p.clock.Load().NewTicker(interval)
 		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case now := <-t.C:
+			case now := <-t.C():
 				p.reapBefore(now.Add(-ttl))
 			}
 		}

@@ -106,7 +106,8 @@ mechanical and guarded by tests that fail on drift.
 | Group and data | `groups`, `binding`, `bdx`, `bdx/otaimage` |
 | Persistence | `store`, `endpoint/sqlitestore`, `controller/client/sqlstore` |
 | Codec and model | `tlv`, `schema`, `parity` |
-| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest` |
+| Time | `clock` (the time port every package reads), `clock/clocktest` (the test clock) |
+| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `clock/clocktest` |
 
 Everything outside `internal/` is public API under the
 [deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability).

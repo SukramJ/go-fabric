@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -43,7 +44,7 @@ func commissionedFabric(t *testing.T) (*net.UDPAddr, handshake.Fabric) {
 	s.Close()
 	id := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
 	id.FabricIndex = 1
-	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +179,7 @@ func TestCASEPeerChainDoesNotVerify(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	other := bridgetest.Dial(t, addr.String(), bridgetest.Options{Passcode: testPasscode, FabricID: testFabricID, NodeID: testNodeID, Seed: 99})
-	wrongRoot, err := mattercert.NewVerifier(other.RootPublicKey(), mattercert.SystemTime{})
+	wrongRoot, err := mattercert.NewVerifier(other.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -141,13 +141,13 @@ func TestConnOverAsyncGATTPair(t *testing.T) {
 }
 
 func TestSessionIdleTimeoutClosesCentral(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	disconnected := false
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
 		Write:      func([]byte) error { return nil },
 		Disconnect: func() error { disconnected = true; return nil },
 		Message:    func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestSessionIdleTimeoutClosesCentral(t *testing.T) {
 func TestSessionSuspendAndUnsupportedVersion(t *testing.T) {
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
 		Write: func([]byte) error { return nil }, Disconnect: func() error { t.Error("disconnect on suspend"); return nil }, Message: func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: &fakeClock{}})
+	}, MaximumBTPMTU, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestSessionNonProtocolErrorReturned(t *testing.T) {
 	s, err := NewPeripheral(20, unhex(t, handshake185w6), Callbacks{
 		Write: func([]byte) error { return nil }, Disconnect: func() error { return nil },
 		Message: func([]byte) error { return errors.New("handler") },
-	}, Options{Clock: &fakeClock{}})
+	}, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestSessionNonProtocolErrorReturned(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 	// A truncated packet is no protocol error either (matter.js's RangeError).
-	s2, _ := NewPeripheral(20, unhex(t, handshake185w6), Callbacks{Write: func([]byte) error { return nil }, Disconnect: func() error { return nil }}, Options{Clock: &fakeClock{}})
+	s2, _ := NewPeripheral(20, unhex(t, handshake185w6), Callbacks{Write: func([]byte) error { return nil }, Disconnect: func() error { return nil }}, Options{TimeSource: newFakeClock()})
 	if err := s2.HandleIncoming([]byte{0x05}); !errors.Is(err, ErrTruncated) {
 		t.Fatalf("truncated %v", err)
 	}

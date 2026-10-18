@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // TimeSynchronization implements the minimum required surface of the
@@ -26,7 +28,13 @@ import (
 // chip-tool reads UTCTime + Granularity during ReadCommissioningInfo;
 // returning sensible values keeps the commissioning flow clean
 // instead of producing 0xC3 UnsupportedCluster errors.
-type TimeSynchronization struct{}
+type TimeSynchronization struct {
+	// clock is the UTC source (see [TimeSynchronization.SetClock]).
+	clock clockvar.Var
+}
+
+// SetClock sets the clock UTCTime is read from; nil is [clock.System].
+func (t *TimeSynchronization) SetClock(c clock.Clock) { t.clock.Store(c) }
 
 const (
 	timeSyncClusterID       = timesyncdef.ClusterID
@@ -60,7 +68,7 @@ const matterEpochOffsetSec int64 = 946684800
 // the clock [GeneralDiagnostics.SetUTCClock] takes, so TimeSnapshot
 // carries a PosixTimeMs exactly when UTCTime is not null.
 func (t *TimeSynchronization) UTC() (time.Time, bool) {
-	now := time.Now()
+	now := t.clock.Load().Now()
 	if now.Unix() < matterEpochOffsetSec {
 		return time.Time{}, false
 	}

@@ -5,10 +5,10 @@ package cluster_test
 
 import (
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -34,79 +34,68 @@ func TestAttributeChangesNotifiesInOrderAndUnsubscribes(t *testing.T) {
 	}
 }
 
-// fakeClock drives a Quieter by hand.
-type fakeClock struct {
-	mu    sync.Mutex
-	now   time.Time
-	armed []func()
-	waits []time.Duration
-}
-
-func (f *fakeClock) Now() time.Time {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.now
-}
-
-func (f *fakeClock) AfterFunc(d time.Duration, fn func()) *time.Timer {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.armed = append(f.armed, fn)
-	f.waits = append(f.waits, d)
-	return time.NewTimer(time.Hour)
-}
-
-func (f *fakeClock) advance(d time.Duration) {
-	f.mu.Lock()
-	f.now = f.now.Add(d)
-	f.mu.Unlock()
-}
-
-func (f *fakeClock) fire(i int) { f.armed[i]() }
-
 // TestQuieterMirrorsMatterJSQuietEvent walks the QuietObservable rules: a
 // change from or to null reports at once, the first non-null change
 // reports at once, a change within a second of the last report is held
 // and reported once with the latest value when the second is up.
 func TestQuieterMirrorsMatterJSQuietEvent(t *testing.T) {
 	t.Parallel()
-	clk := &fakeClock{now: time.Unix(1000, 0)}
+	clk := clocktest.New(time.Unix(1000, 0))
 	reports := 0
-	q := &cluster.Quieter{Report: func() { reports++ }, Now: clk.Now, AfterFunc: clk.AfterFunc}
+	q := &cluster.Quieter{Report: func() { reports++ }, Clock: clk}
 
 	q.Changed(true, false) // null → 60: now
 	if reports != 1 {
 		t.Fatalf("null → value: %d reports, want 1", reports)
 	}
-	clk.advance(100 * time.Millisecond)
+	clk.Advance(100 * time.Millisecond)
 	q.Changed(false, false) // 60 → 59 within the second: held
 	q.Changed(false, false) // 59 → 58: still held, one timer
-	if reports != 1 || len(clk.armed) != 1 || clk.waits[0] != 900*time.Millisecond {
-		t.Fatalf("held changes: %d reports, %d timers (%v)", reports, len(clk.armed), clk.waits)
+	if armed := clk.Armed(); reports != 1 || len(armed) != 1 || armed[0] != 900*time.Millisecond {
+		t.Fatalf("held changes: %d reports, timers %v", reports, armed)
 	}
-	clk.advance(900 * time.Millisecond)
-	clk.fire(0)
+	clk.Advance(900 * time.Millisecond)
 	if reports != 2 {
 		t.Fatalf("after the interval: %d reports, want 2", reports)
 	}
-	clk.fire(0) // a stale timer does nothing
-	if reports != 2 {
-		t.Fatalf("stale timer reported: %d", reports)
+	if n := clk.Pending(); n != 0 { // the report went out; nothing is held
+		t.Fatalf("%d timers armed after the held report", n)
 	}
-	clk.advance(1001 * time.Millisecond)
+	clk.Advance(1001 * time.Millisecond)
 	q.Changed(false, false) // more than a second later: now
 	if reports != 3 {
 		t.Fatalf("after a quiet second: %d reports, want 3", reports)
 	}
-	clk.advance(10 * time.Millisecond)
+	clk.Advance(10 * time.Millisecond)
 	q.Changed(false, false) // held …
 	q.Changed(false, true)  // … then to null: now, and the held one is dropped
 	if reports != 4 {
 		t.Fatalf("value → null: %d reports, want 4", reports)
 	}
-	clk.fire(1)
-	if reports != 4 {
-		t.Fatalf("a timer superseded by an immediate report fired: %d", reports)
+	clk.Advance(time.Second)
+	if reports != 4 || clk.Pending() != 0 {
+		t.Fatalf("a timer superseded by an immediate report fired: %d reports, %d armed", reports, clk.Pending())
+	}
+}
+
+// TestQuieterDeprecatedNowAndAfterFunc: the deprecated Now and AfterFunc
+// keep driving the throttle for their window.
+func TestQuieterDeprecatedNowAndAfterFunc(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1000, 0)
+	var armed []time.Duration
+	reports := 0
+	q := &cluster.Quieter{Report: func() { reports++ }}
+	q.Now = func() time.Time { return now }                     //nolint:staticcheck // SA1019: the deprecated path is under test
+	q.AfterFunc = func(d time.Duration, _ func()) *time.Timer { //nolint:staticcheck // SA1019: the deprecated path is under test
+		armed = append(armed, d)
+		return time.NewTimer(time.Hour)
+	}
+	q.Changed(false, false)
+	now = now.Add(100 * time.Millisecond)
+	q.Changed(false, false)
+	if reports != 1 || len(armed) != 1 || armed[0] != 900*time.Millisecond {
+		t.Fatalf("deprecated seam: %d reports, armed %v", reports, armed)
 	}
 }
 
@@ -131,27 +120,29 @@ func TestQuieterDefaultsToTheWallClock(t *testing.T) {
 // timer no longer fires), and with nothing held nothing is reported.
 func TestQuieterEmitNow(t *testing.T) {
 	t.Parallel()
-	clk := &fakeClock{now: time.Unix(1000, 0)}
+	clk := clocktest.New(time.Unix(1000, 0))
 	reports := 0
-	q := &cluster.Quieter{Report: func() { reports++ }, Now: clk.Now, AfterFunc: clk.AfterFunc}
+	q := &cluster.Quieter{Report: func() { reports++ }, Clock: clk}
 
 	q.EmitNow()
 	if reports != 0 {
 		t.Fatalf("EmitNow with nothing held: %d reports", reports)
 	}
 	q.Changed(false, false) // first change: now
-	clk.advance(200 * time.Millisecond)
+	clk.Advance(200 * time.Millisecond)
 	q.Changed(false, false) // held
 	q.EmitNow()
 	if reports != 2 {
 		t.Fatalf("EmitNow with a held change: %d reports, want 2", reports)
 	}
-	clk.fire(0)
+	if n := clk.Pending(); n != 0 {
+		t.Fatalf("EmitNow left the held report's timer armed (%d)", n)
+	}
 	q.EmitNow()
 	if reports != 2 {
 		t.Fatalf("the superseded timer or a second EmitNow reported: %d", reports)
 	}
-	clk.advance(300 * time.Millisecond)
+	clk.Advance(300 * time.Millisecond)
 	q.Changed(false, false) // within a second of the EmitNow report: held
 	if reports != 2 {
 		t.Fatalf("EmitNow did not count as the last report: %d", reports)

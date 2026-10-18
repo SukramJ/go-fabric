@@ -200,7 +200,7 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 		m.mu.Unlock()
 		return nil, err
 	}
-	keySetID, ek, err := f.currentKey(groupID, m.now().UnixMilli())
+	keySetID, ek, err := f.currentKey(groupID, m.sendClock().UnixMilli())
 	if err != nil {
 		m.mu.Unlock()
 		return nil, err

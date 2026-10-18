@@ -19,7 +19,7 @@ import (
 // counter, Ack it, Pending drops to zero.
 func TestOutboundReliable_TrackAck(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4242}
 	tr.Track(101, 0, 0, []byte{0xDE, 0xAD}, dest, time.Now())
 	if tr.Pending() != 1 {
@@ -49,7 +49,7 @@ func TestOutboundReliable_TrackAck(t *testing.T) {
 // (500ms × 1.1 × 1.25 = 687.5ms), not the old flat 300 ms.
 func TestOutboundReliable_TickRetransmits(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 5151}
 	now := time.Unix(0, 0)
 	tr.Track(7, 0, 0, []byte{0xAA}, dest, now)
@@ -94,7 +94,7 @@ func TestOutboundReliable_TickRetransmits(t *testing.T) {
 // associated subscription.
 func TestOutboundReliable_TickGivesUp(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	tr.Track(3, 0, 0, []byte{0x01}, &net.UDPAddr{}, time.Unix(0, 0))
 
 	// Drive past every retry: keep advancing time and ticking.
@@ -130,7 +130,7 @@ func TestOutboundReliable_TickGivesUp(t *testing.T) {
 // must stop retransmitting the now-superseded Sigma2 datagrams.
 func TestOutboundReliable_AbandonExchange(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 3), Port: 5353}
 	const targetExchange = uint16(0xABCD)
 	const otherExchange = uint16(0x1234)
@@ -210,7 +210,7 @@ func TestOutboundReliable_PerSessionBaseInterval(t *testing.T) {
 		}
 		return 0 // unresolved → tracker falls back to the spec idle default (500ms)
 	}
-	tr := newOutboundReliableTracker(baseFor)
+	tr := newOutboundReliableTracker(baseFor, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4040}
 	t0 := time.Unix(0, 0)
 
@@ -271,7 +271,7 @@ func TestOutboundReliable_PerSessionBaseInterval(t *testing.T) {
 // seeded MRP counters (Matter §4.5.4) happened to coincide.
 func TestOutboundReliable_AckIsSessionScoped(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4141}
 	const sessionA = uint16(11)
 	const sessionB = uint16(22)
@@ -396,7 +396,7 @@ func TestSubscription_ReleaseCounterOnPeerAck(t *testing.T) {
 // and returns false.
 func TestOutboundReliable_AckStrayWithWaiter(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	// Install a waiter directly without a matching pending entry.
 	ch := make(chan error, 1)
 	const sessionID = uint16(0)
@@ -424,7 +424,7 @@ func TestOutboundReliable_AckStrayWithWaiter(t *testing.T) {
 // (it will be retried on the next tick).
 func TestOutboundReliable_TickSendError(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5353}
 	now := time.Unix(0, 0)
 	tr.Track(42, 0, 0, []byte{0xAA}, dest, now)
@@ -453,7 +453,7 @@ func TestOutboundReliable_TickSendError(t *testing.T) {
 // returns nil immediately without blocking.
 func TestWaitForAck_NotPending_ReturnsNilImmediately(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	// Counter 999 was never tracked.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -466,7 +466,7 @@ func TestWaitForAck_NotPending_ReturnsNilImmediately(t *testing.T) {
 // ctx.Err() when the context is cancelled before the ACK arrives.
 func TestWaitForAck_ContextCancelled(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
 	tr.Track(77, 0, 0, []byte{0x01}, dest, time.Now())
 
@@ -493,7 +493,7 @@ func TestWaitForAck_ContextCancelled(t *testing.T) {
 // blocked on the wait.
 func TestWaitForAck_AckClosesChannel(t *testing.T) {
 	t.Parallel()
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5678}
 	const counter = uint32(88)
 	tr.Track(counter, 0, 0, []byte{0xAA}, dest, time.Now())

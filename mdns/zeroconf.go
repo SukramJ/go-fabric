@@ -15,6 +15,9 @@ import (
 	"time"
 
 	"github.com/grandcat/zeroconf"
+
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // Zeroconf is an [Advertiser] backed by github.com/grandcat/zeroconf.
@@ -58,6 +61,8 @@ import (
 // changes. Which host interfaces contribute A/AAAA records is likewise
 // decided here, by [Zeroconf.InterfaceFilter].
 type Zeroconf struct {
+	// clock paces the subtype re-announcement and the re-announce loop.
+	clock   clockvar.Var
 	mu      sync.RWMutex
 	servers map[string]*zeroconf.Server
 	items   map[string]Service
@@ -109,6 +114,19 @@ type Zeroconf struct {
 	HostName string
 }
 
+// SetClock sets the clock the subtype re-announcement and the re-announce
+// loop run on, and the attached [SubtypeResponder]'s; nil is
+// [clock.System].
+func (z *Zeroconf) SetClock(c clock.Clock) {
+	z.clock.Store(c)
+	z.mu.RLock()
+	r := z.responder
+	z.mu.RUnlock()
+	if r != nil {
+		r.SetClock(c)
+	}
+}
+
 // NewZeroconf returns a multicast advertiser backed by zeroconf. The
 // caller is responsible for calling [Zeroconf.Close] (typically
 // during the daemon's shutdown sequence).
@@ -137,6 +155,9 @@ func (z *Zeroconf) AttachSubtypeResponder(r *SubtypeResponder) {
 	z.mu.Lock()
 	z.responder = r
 	z.mu.Unlock()
+	if r != nil {
+		r.SetClock(z.clock.Load())
+	}
 }
 
 // hostIface is the testable shape of one network interface: its name,
@@ -528,7 +549,7 @@ func (z *Zeroconf) announceSubtypes() {
 		return
 	}
 	r.Announce()
-	time.AfterFunc(time.Second, r.Announce)
+	z.clock.Load().AfterFunc(time.Second, r.Announce)
 }
 
 // shutdownByKeyLocked tears down the primary server identified by
@@ -631,7 +652,7 @@ func (z *Zeroconf) StartReannounceLoop(ctx context.Context, interval time.Durati
 	}
 	go func() {
 		defer release()
-		ticker := time.NewTicker(interval)
+		ticker := z.clock.Load().NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -641,7 +662,7 @@ func (z *Zeroconf) StartReannounceLoop(ctx context.Context, interval time.Durati
 				return
 			case <-triggerCh:
 				z.republishAll(ctx)
-			case <-ticker.C:
+			case <-ticker.C():
 				z.republishAll(ctx)
 			}
 		}

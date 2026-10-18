@@ -108,7 +108,7 @@ func TestLoad(t *testing.T) {
 	cd := entry(CDSignerDir, cdSKID, cdDER, KindProduction)
 	files := map[string][]byte{good.File: secattestation.TestPAAFFF1Cert, cd.File: cdDER}
 
-	s, err := load(mapFS(t, Source{Ledger: "l", BuiltAt: testNow, PAA: section(good), CDSigners: section(cd)}, files), testNow)
+	s, err := LoadAt(mapFS(t, Source{Ledger: "l", BuiltAt: testNow, PAA: section(good), CDSigners: section(cd)}, files), testNow)
 	if err != nil {
 		t.Fatal(err)
 	}

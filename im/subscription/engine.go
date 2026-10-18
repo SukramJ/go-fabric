@@ -36,7 +36,7 @@ import (
 // `notes/parity/by_design.md` §"Systematic Parity Run #02".
 func (m *Manager) run(ctx context.Context) {
 	defer m.wg.Done()
-	ticker := time.NewTicker(m.cfg.TickInterval)
+	ticker := m.cfg.Clock.NewTicker(m.cfg.TickInterval)
 	defer ticker.Stop()
 
 	for {
@@ -45,7 +45,7 @@ func (m *Manager) run(ctx context.Context) {
 			return
 		case <-m.stopCh:
 			return
-		case now := <-ticker.C:
+		case now := <-ticker.C():
 			m.tick(ctx, now)
 		}
 	}

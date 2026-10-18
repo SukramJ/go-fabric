@@ -138,7 +138,7 @@ func (n *Node) clientFabric(addr handshake.PeerAddress) (handshake.Fabric, bool)
 	verifier, isCert := f.verifier.(*mattercert.Verifier)
 	if !isCert {
 		var err error
-		if verifier, err = mattercert.NewVerifier(f.rootPublicKey, mattercert.SystemTime{}); err != nil {
+		if verifier, err = mattercert.NewVerifier(f.rootPublicKey, n.cfg.Clock); err != nil {
 			return handshake.Fabric{}, false
 		}
 	}

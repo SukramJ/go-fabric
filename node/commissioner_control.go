@@ -43,6 +43,7 @@ func (n *Node) buildCommissionerControl() (*mattercore.CommissionerControl, erro
 	cc, err := mattercore.NewCommissionerControl(mattercore.CommissionerControlConfig{
 		Approver: cfg.Approver, Commissioner: cfg.Commissioner, SupportedDeviceCategories: cfg.SupportedDeviceCategories,
 		ApprovalTimeout: cfg.ApprovalTimeout, ApprovalValidity: cfg.ApprovalValidity, Logger: n.logger,
+		Clock: n.cfg.Clock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)

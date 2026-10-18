@@ -257,7 +257,7 @@ func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 		return nil
 	}
 	r.sessions = 0
-	if r.liveHandshakesLocked(time.Now()) > 0 {
+	if r.liveHandshakesLocked(b.clk().Now()) > 0 {
 		return nil
 	}
 	return r
@@ -294,7 +294,7 @@ func (b *Bridge) holdHandshake(src net.Addr, exchangeID uint16, pase bool) {
 	if r.handshakes == nil {
 		r.handshakes = make(map[uint16]handshakeHold)
 	}
-	r.handshakes[exchangeID] = handshakeHold{pase: pase, since: time.Now()}
+	r.handshakes[exchangeID] = handshakeHold{pase: pase, since: b.clk().Now()}
 }
 
 // releaseHandshake ends the hold of the handshake on exchangeID over src.

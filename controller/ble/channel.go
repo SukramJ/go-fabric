@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -134,7 +133,7 @@ func Dial(ctx context.Context, central Central, p Peripheral, opts DialOptions) 
 			return conn.Disconnect()
 		},
 		Message: c.deliver,
-	}, segment, btp.Options{Clock: btpClock{opts.Clock}, Logger: opts.Logger})
+	}, segment, btp.Options{TimeSource: opts.Clock, Logger: opts.Logger})
 	if err != nil {
 		_ = conn.Disconnect()
 		return nil, err
@@ -228,8 +227,3 @@ func (c *Channel) Close() error {
 	c.closeOnce.Do(func() { close(c.closed) })
 	return err
 }
-
-// btpClock is an exchange.Clock as the BTP session's clock.
-type btpClock struct{ c exchange.Clock }
-
-func (b btpClock) AfterFunc(d time.Duration, f func()) btp.Timer { return b.c.AfterFunc(d, f) }

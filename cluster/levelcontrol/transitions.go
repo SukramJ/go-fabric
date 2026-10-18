@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/contract"
@@ -37,6 +38,9 @@ type Transitions struct {
 	// StepInterval is the time between two steps; zero is
 	// [transition.DefaultStepInterval] (matter.js transitionStepInterval).
 	StepInterval time.Duration
+	// Clock paces the steps and the CurrentLevel quieter; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // OnOff is the On/Off state of the endpoint a LevelControl server under
@@ -81,10 +85,11 @@ type coupling struct {
 // and MaxLevel, RemainingTime reported by hand.
 func (s *Server) initTransitions(cfg Transitions) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
-	s.quiet = &cluster.Quieter{Report: func() { s.changes.Notify(AttrCurrentLevel) }}
+	s.quiet = &cluster.Quieter{Report: func() { s.changes.Notify(AttrCurrentLevel) }, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
 		Manage:       true,
 		StepInterval: cfg.StepInterval,
+		Clock:        cfg.Clock,
 		Properties: map[string]transition.Property{
 			propCurrentLevel: {Min: float64(s.minLevel()), Max: float64(LevelMax)},
 		},

@@ -8,54 +8,31 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
-// fakeClock is a manual Clock: timers fire, in order, inside Advance.
+// fakeClock is the test clock, a [clocktest.Fake] (timers fire, in order,
+// inside Advance), that also records the duration of every timer started.
 type fakeClock struct {
+	*clocktest.Fake
 	mu      sync.Mutex
-	now     time.Time
-	timers  []*fakeTimer
 	started []time.Duration
 }
 
-type fakeTimer struct {
-	c       *fakeClock
-	at      time.Time
-	f       func()
-	stopped bool
-	fired   bool
-}
+func newFakeClock() *fakeClock { return &fakeClock{Fake: clocktest.New(time.Unix(1_000_000, 0))} }
 
-func newFakeClock() *fakeClock { return &fakeClock{now: time.Unix(1_000_000, 0)} }
-
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
+// AfterFunc arms the timer on the fake and records d.
 func (c *fakeClock) AfterFunc(d time.Duration, f func()) Timer {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{c: c, at: c.now.Add(d), f: f}
-	c.timers = append(c.timers, t)
 	c.started = append(c.started, d)
-	return t
-}
-
-func (t *fakeTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.stopped && !t.fired
-	t.stopped = true
-	return was
+	c.mu.Unlock()
+	return c.Fake.AfterFunc(d, f)
 }
 
 // durations returns the durations of every timer started so far.
@@ -65,44 +42,8 @@ func (c *fakeClock) durations() []time.Duration {
 	return append([]time.Duration(nil), c.started...)
 }
 
-// Advance moves the clock by d, firing every due timer in order.
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	target := c.now.Add(d)
-	for {
-		sort.SliceStable(c.timers, func(i, j int) bool { return c.timers[i].at.Before(c.timers[j].at) })
-		var next *fakeTimer
-		for _, t := range c.timers {
-			if !t.stopped && !t.fired && !t.at.After(target) {
-				next = t
-				break
-			}
-		}
-		if next == nil {
-			break
-		}
-		next.fired = true
-		c.now = next.at
-		c.mu.Unlock()
-		next.f()
-		c.mu.Lock()
-	}
-	c.now = target
-	c.mu.Unlock()
-}
-
 // pendingTimers counts the timers that may still fire.
-func (c *fakeClock) pendingTimers() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n := 0
-	for _, t := range c.timers {
-		if !t.stopped && !t.fired {
-			n++
-		}
-	}
-	return n
-}
+func (c *fakeClock) pendingTimers() int { return c.Pending() }
 
 // sent is one datagram the manager sent.
 type sent struct {

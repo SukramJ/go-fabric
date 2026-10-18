@@ -11,7 +11,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -594,7 +593,7 @@ func (b *Bridge) sendSubscribeResponse(
 	// primer above.
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
 		if sub, err := m.Get(subID); err == nil {
-			sub.EndPriming(time.Now())
+			sub.EndPriming(b.clk().Now())
 		}
 	}
 	b.logger.Debug("matter.rx.im.subscribe",

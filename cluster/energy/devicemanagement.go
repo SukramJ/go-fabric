@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
@@ -200,8 +201,13 @@ type DeviceEnergyConfig struct {
 	AbsMaxPower int64
 	// Manager carries out the requests; required.
 	Manager DemManager
-	// Now is the wall clock the epoch-s times are read from; nil is
-	// time.Now.
+	// Clock is the wall clock the epoch-s times are read from and the
+	// PowerAdjust and Pause timers run on. Set, it wins over Now (which
+	// then only reads); neither set is [clock.System].
+	Clock clock.Clock
+	// Now is the wall clock the epoch-s times are read from.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
 	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
@@ -221,6 +227,7 @@ type DeviceEnergyManagementServer struct {
 	srv     *spec.Server
 	manager DemManager
 	now     func() time.Time
+	clock   clock.Clock // the timers' clock
 
 	// mu serialises the delegate state, as chip's single-threaded stack
 	// does; it is held across the manager hooks (see [DemManager]).
@@ -228,9 +235,9 @@ type DeviceEnergyManagementServer struct {
 	endpoint              uint16
 	powerAdjustInProgress bool
 	powerAdjustStartUtc   uint32
-	powerAdjustTimer      *time.Timer
+	powerAdjustTimer      clock.Timer
 	pauseInProgress       bool
-	pauseTimer            *time.Timer
+	pauseTimer            clock.Timer
 }
 
 // Compile-time assertions.
@@ -253,7 +260,7 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	if cfg.Manager == nil {
 		return nil, ErrNoDemManager
 	}
-	s := &DeviceEnergyManagementServer{manager: cfg.Manager, now: cfg.Now}
+	s := &DeviceEnergyManagementServer{manager: cfg.Manager, now: cfg.Now, clock: clock.Or(cfg.Clock)}
 	handlers := map[uint32]spec.CommandHandler{
 		dem.CmdPowerAdjustRequest:             s.powerAdjustRequest,
 		dem.CmdCancelPowerAdjustRequest:       s.cancelPowerAdjustRequest,
@@ -269,8 +276,11 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 		return nil, fmt.Errorf("energy: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
-	if s.now == nil {
-		s.now = time.Now
+	switch {
+	case cfg.Clock != nil:
+		s.now = cfg.Clock.Now
+	case s.now == nil:
+		s.now = clock.System{}.Now
 	}
 	values := map[uint32]any{
 		dem.AttrEsaType:        cfg.EsaType,
@@ -612,8 +622,8 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 	if err := s.setCapabilityCauseLocked(reason); err != nil { // :138-146
 		return err
 	}
-	s.powerAdjustInProgress = true                                                                   // :155
-	s.powerAdjustTimer = time.AfterFunc(time.Duration(r.Duration)*time.Second, s.powerAdjustExpired) // :157
+	s.powerAdjustInProgress = true                                                                      // :155
+	s.powerAdjustTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.powerAdjustExpired) // :157
 	// chip undoes the request when logging the event fails (:166-178,
 	// HandlePowerAdjustRequestFailure :188-200); PowerAdjustStart is in
 	// the EventList whenever the command is (both "PA"), so it cannot.
@@ -795,8 +805,8 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 		generateEvent = true
 		s.pauseInProgress = true
 	}
-	s.pauseTimer = time.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired) // :443
-	if herr := s.manager.Pause(ctx, r.Duration, r.Cause); herr != nil {                  // :451-460
+	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired) // :443
+	if herr := s.manager.Pause(ctx, r.Duration, r.Cause); herr != nil {                     // :451-460
 		s.pauseFailureLocked()
 		return nil, demFailure("PauseRequest: %v", herr)
 	}

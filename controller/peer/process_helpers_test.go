@@ -6,7 +6,6 @@ package peer
 import (
 	"encoding/binary"
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -18,19 +17,8 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// pendingDurations are the remaining durations of the live timers, sorted.
-func (c *fakeClock) pending() []time.Duration {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var out []time.Duration
-	for _, t := range c.timers {
-		if !t.stopped && !t.fired {
-			out = append(out, t.at.Sub(c.now))
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
+// pending are the remaining durations of the live timers, sorted.
+func (c *fakeClock) pending() []time.Duration { return c.Armed() }
 
 // hasTimer reports whether a live timer is due in exactly d.
 func (c *fakeClock) hasTimer(d time.Duration) bool {

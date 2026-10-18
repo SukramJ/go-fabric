@@ -22,7 +22,7 @@ import (
 // does for an endpoint that is not installed.
 func shaped(id uint32, values map[uint32]spec.Node) *Cluster {
 	var mu sync.RWMutex
-	p, _ := newTestPersister(&MemoryStore{}, 0, &manualClock{})
+	p, _ := newTestPersister(&MemoryStore{}, 0, newManualClock())
 	c := newCluster(&mu, id, newCache(p, 1, id, values, ptr(uint32(4))))
 	c.readInput()
 	if c.buildable() {

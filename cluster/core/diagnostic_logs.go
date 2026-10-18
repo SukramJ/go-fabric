@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
@@ -40,6 +41,7 @@ type DiagnosticLogs struct {
 	collector LogCollector
 	exchanges BDXExchangeOpener
 	bootEpoch time.Time
+	clock     clock.Clock
 	logger    *slog.Logger
 	// busy is set while a BDX transfer runs: chip has one
 	// BDXDiagnosticLogsProvider (DLC:62-64, :146-150).
@@ -218,7 +220,7 @@ func matterEpochMicros(t time.Time) uint64 {
 // counts from this point. Operators that need a precise boot epoch can
 // override it via [DiagnosticLogs.SetBootEpoch].
 func NewDiagnosticLogs() *DiagnosticLogs {
-	return &DiagnosticLogs{bootEpoch: time.Now(), logger: slog.Default()}
+	return &DiagnosticLogs{bootEpoch: clock.System{}.Now(), clock: clock.System{}, logger: slog.Default()}
 }
 
 // AttachProvider wires a byte-slice log source; a provider that is also a
@@ -264,6 +266,16 @@ func (d *DiagnosticLogs) SetLogger(l *slog.Logger) {
 	d.mu.Unlock()
 }
 
+// SetClock sets the clock the log timestamps are read from and restamps
+// the boot epoch to that clock's now; nil is [clock.System]. Call it
+// before [DiagnosticLogs.SetBootEpoch].
+func (d *DiagnosticLogs) SetClock(c clock.Clock) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.clock = clock.Or(c)
+	d.bootEpoch = d.clock.Now()
+}
+
 // SetBootEpoch overrides the timestamp a [LogProvider]'s TimeSinceBoot is
 // computed against. Most operators won't need this; default is the
 // cluster construction time.
@@ -283,10 +295,10 @@ type sliceCollector struct {
 
 func (s *sliceCollector) stamps() LogTimestamps {
 	s.d.mu.RLock()
-	boot := s.d.bootEpoch
+	boot, clk := s.d.bootEpoch, s.d.clock
 	s.d.mu.RUnlock()
-	utc := matterEpochMicros(time.Now())
-	since := uint64(max(time.Since(boot).Microseconds(), 0)) //nolint:gosec // non-negative, systime-us
+	utc := matterEpochMicros(clk.Now())
+	since := uint64(max(clock.Since(clk, boot).Microseconds(), 0)) //nolint:gosec // non-negative, systime-us
 	return LogTimestamps{UTC: &utc, SinceBoot: &since}
 }
 

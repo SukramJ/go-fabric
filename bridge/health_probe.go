@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // HealthComponentName is the tracker component the Matter bridge
@@ -67,6 +69,19 @@ func StartHealthProbe(
 	tracker HealthRecorder,
 	interval time.Duration,
 ) func() {
+	return StartHealthProbeWithClock(ctx, clock.System{}, status, tracker, interval)
+}
+
+// StartHealthProbeWithClock is [StartHealthProbe] with the probe interval
+// on c instead of the system clock; nil is [clock.System].
+func StartHealthProbeWithClock(
+	ctx context.Context,
+	c clock.Clock,
+	status Status,
+	tracker HealthRecorder,
+	interval time.Duration,
+) func() {
+	c = clock.Or(c)
 	if status == nil || tracker == nil {
 		return func() {}
 	}
@@ -78,13 +93,13 @@ func StartHealthProbe(
 	go func() {
 		defer close(done)
 		probeOnce(status, tracker)
-		ticker := time.NewTicker(interval)
+		ticker := c.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-pctx.Done():
 				return
-			case <-ticker.C:
+			case <-ticker.C():
 				probeOnce(status, tracker)
 			}
 		}

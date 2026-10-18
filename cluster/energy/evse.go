@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -156,8 +157,13 @@ type EvseConfig struct {
 	// nobody, as chip's delegate without a registered callback
 	// (EvseDelegate.cpp:1286-1289).
 	Host EvseHost
-	// Now is the wall clock the epoch-s times are read from; nil is
-	// time.Now.
+	// Clock is the wall clock the epoch-s times are read from and the
+	// enable timer runs on. Set, it wins over Now (which then only
+	// reads); neither set is [clock.System].
+	Clock clock.Clock
+	// Now is the wall clock the epoch-s times are read from.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
 	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
@@ -179,6 +185,7 @@ type EvseServer struct {
 	own     cluster.DataVersionTracker
 	host    EvseHost
 	now     func() time.Time
+	clock   clock.Clock // the enable timer's clock
 
 	// mu serialises the state machine, as chip's single-threaded stack
 	// does. pending holds the changes to report once it is released.
@@ -202,7 +209,7 @@ type EvseServer struct {
 	session            evseSession
 	importedAtTransfer int64
 	exportedAtTransfer int64
-	enabledTimer       *time.Timer
+	enabledTimer       clock.Timer
 	targets            []ChargingTargetSchedule
 	vehicleID          *string
 }
@@ -242,9 +249,12 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 	if cfg.StartDiagnostics {
 		opts.Commands = append(opts.Commands, evse.CmdStartDiagnostics)
 	}
-	s := &EvseServer{host: cfg.Host, now: cfg.Now, version: cfg.DataVersion, nominalVoltage: evseDefaultMainsVoltage}
-	if s.now == nil {
-		s.now = time.Now
+	s := &EvseServer{host: cfg.Host, now: cfg.Now, clock: clock.Or(cfg.Clock), version: cfg.DataVersion, nominalVoltage: evseDefaultMainsVoltage}
+	switch {
+	case cfg.Clock != nil:
+		s.now = cfg.Clock.Now
+	case s.now == nil:
+		s.now = clock.System{}.Now
 	}
 	if s.version == nil {
 		s.version = &s.own
@@ -1038,7 +1048,7 @@ func (s *EvseServer) scheduleEnabledCheckLocked() {
 	now := s.nowEpoch()
 	if *until > now { // :308-315
 		s.stopEnabledTimerLocked()
-		s.enabledTimer = time.AfterFunc(time.Duration(*until-now)*time.Second, s.enabledTimerExpired)
+		s.enabledTimer = s.clock.AfterFunc(time.Duration(*until-now)*time.Second, s.enabledTimerExpired)
 		return
 	}
 	switch s.SupplyState() { // :321-332

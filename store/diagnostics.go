@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // DiagnosticsRecord is the persisted counter pair a host seeds into the
@@ -62,7 +64,7 @@ func (s *Store) SaveDiagnostics(ctx context.Context, rec DiagnosticsRecord) erro
 		`UPDATE matter_diagnostics
 		 SET reboot_count = ?, base_operational_hours = ?, updated_at = ?
 		 WHERE id = 1`,
-		rec.RebootCount, rec.BaseOperationalHours, time.Now().Unix())
+		rec.RebootCount, rec.BaseOperationalHours, clock.System{}.Now().Unix())
 	if err != nil {
 		return fmt.Errorf("matter store: save diagnostics: %w", err)
 	}

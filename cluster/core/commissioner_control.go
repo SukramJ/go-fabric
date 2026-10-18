@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
@@ -124,7 +125,12 @@ type CommissionerControlConfig struct {
 	// Rand mints the passcode, discriminator and salt; nil is
 	// crypto/rand.
 	Rand io.Reader
-	// Now is the clock of ApprovalValidity; nil is time.Now.
+	// Clock is the clock of ApprovalValidity. Set, it wins over Now;
+	// neither set is [clock.System].
+	Clock clock.Clock
+	// Now is the clock of ApprovalValidity.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
 	Now func() time.Time
 	// Logger receives the server's log; nil discards it.
 	Logger *slog.Logger
@@ -208,8 +214,11 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 	if c.rand == nil {
 		c.rand = rand.Reader
 	}
-	if c.now == nil {
-		c.now = time.Now
+	switch {
+	case cfg.Clock != nil:
+		c.now = cfg.Clock.Now
+	case c.now == nil:
+		c.now = clock.System{}.Now
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	handlers := map[uint32]spec.CommandHandler{

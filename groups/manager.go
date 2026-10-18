@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/aesccm"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -149,7 +150,15 @@ type Manager struct {
 	transport      MulticastTransport
 	exchangeID     uint16
 	exchangeSeeded bool
-	now            func() time.Time
+	clock          clock.Clock
+}
+
+// SetClock sets the clock that selects the current epoch key of a group
+// send; nil is [clock.System]. Call it before the first send.
+func (m *Manager) SetClock(c clock.Clock) {
+	m.senderMu.Lock()
+	defer m.senderMu.Unlock()
+	m.clock = clock.Or(c)
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -169,7 +178,7 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
-		now:           time.Now,
+		clock:         clock.System{},
 	}, nil
 }
 
@@ -727,4 +736,11 @@ func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
 		}
 	}
 	return out, nil
+}
+
+// sendClock is the time that selects a send's epoch key.
+func (m *Manager) sendClock() time.Time {
+	m.senderMu.Lock()
+	defer m.senderMu.Unlock()
+	return m.clock.Now()
 }
