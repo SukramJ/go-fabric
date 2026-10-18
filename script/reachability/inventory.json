@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5512,
+  "entry_points": 5582,
   "entry_packages": [
     ".",
     "bdx",
@@ -225,9 +225,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13006,
+    "total_exported": 13041,
     "reachable": 9112,
-    "whitelisted": 3889,
+    "whitelisted": 3924,
     "unreachable": 5
   },
   "by_package": [
@@ -16437,6 +16437,27 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestCommissioningConnection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_parity_matterjs_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissioningConnectionScripted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_parity_matterjs_test.go",
+      "line": 699
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissioningConnectionStagger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_parity_matterjs_test.go",
+      "line": 485
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestConfigureRegulatoryInformation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -16689,6 +16710,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestThreadNetworkNameResolution",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/threadnetworkname_parity_matterjs_test.go",
+      "line": 20
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestUpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -16931,6 +16959,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/snapshot/snapshot_test.go",
       "line": 174
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestCommissionableMdnsScanner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_parity_matterjs_test.go",
+      "line": 105
     },
     {
       "package": "controller/discovery",
@@ -17907,6 +17942,34 @@
     },
     {
       "package": "controller/interaction",
+      "identifier": "TestInputChunkAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestInputChunkEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 219
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestInputChunkOrderingAcrossAttributesAndEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 286
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestInputChunkRelaxedIntegerTypeChecks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 301
+    },
+    {
+      "package": "controller/interaction",
       "identifier": "TestRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/interaction/sustained_internal_test.go",
@@ -18142,6 +18205,132 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
       "line": 132
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerAddressMonitorBackoff",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 237
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerAddressMonitorCoalescing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 200
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerAddressMonitorVerifyReachability",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 111
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connect_timeout_parity_matterjs_test.go",
+      "line": 52
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionErrorHandlerDelayContract",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 81
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionErrorHandlerRediscoveryGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 109
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionErrorHandlerSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 58
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementAfterStabilization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 50
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementKeepAlive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 126
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementStagger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 168
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementSuperseded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 97
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 224
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickLocalAbort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 282
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickObserver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 344
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickOrigin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 91
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickRateLimiting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 154
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerConnectionKickTiming",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 25
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestPeerEstablishmentProgressDetector",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/peer_establishment_progress_parity_matterjs_test.go",
+      "line": 18
     },
     {
       "package": "controller/peer",
@@ -21491,6 +21680,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestReadAttributePathsWildcardDedupe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/read_attribute_paths_parity_matterjs_test.go",
+      "line": 16
+    },
+    {
+      "package": "im",
       "identifier": "TestReadEventFilterArray_DecodesPeerWireLayout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
@@ -22460,77 +22656,77 @@
       "identifier": "TestHostAddrsFor_Policy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 355
+      "line": 360
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_AAAAQueryInSelectionPreferenceOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 123
+      "line": 128
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_ANYQueryAnswersAll",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 132
+      "line": 137
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_AQueryAnswersARecordsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 107
+      "line": 112
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_DuplicateQuestionSuppression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 238
+      "line": 243
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 193
+      "line": 198
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_KnownAnswerSuppressionAndCacheFlush",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 178
+      "line": 183
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_MixedQueryAddsTheRestAsAdditionals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 141
+      "line": 146
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_QUThenQMGetsOneMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 257
+      "line": 262
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_UnicastOnlyAfterRecentMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 210
+      "line": 215
     },
     {
       "package": "mdns",
       "identifier": "TestHostAnswer_UnknownNameOtherInterfaceOrStopped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 153
+      "line": 158
     },
     {
       "package": "mdns",
@@ -22692,6 +22888,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_internal_test.go",
       "line": 433
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerAnswerSuppression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 457
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerCacheFlushBit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 413
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerHandleDuplicateMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 473
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerHostName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 564
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerRespondsAsUnicast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 508
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerRespondsToStandardQueries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 399
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestMdnsServerUnknownNameQueryRejection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 548
     },
     {
       "package": "mdns",
@@ -22887,7 +23132,7 @@
       "identifier": "TestSubtypeResponder_AnswersHostThroughTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 295
+      "line": 300
     },
     {
       "package": "mdns",
@@ -23090,7 +23335,7 @@
       "identifier": "TestZeroconf_HandsHostNameToResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
-      "line": 330
+      "line": 335
     },
     {
       "package": "node",

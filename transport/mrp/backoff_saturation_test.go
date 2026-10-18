@@ -14,7 +14,7 @@ import (
 // TestBackoffDurationSaturates holds the overflow guard: from transmission
 // 52 on the float product exceeds a Duration, which wrapped to a negative
 // wait before. The backoff never shrinks with the transmission number, as
-// matter.js MRP.retransmissionIntervalOf (MRP.ts:183-190) in JavaScript
+// matter.js MRP.retransmissionIntervalOf (MRP.ts:162-190) in JavaScript
 // numbers never does.
 func TestBackoffDurationSaturates(t *testing.T) {
 	t.Parallel()
