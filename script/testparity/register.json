@@ -4280,7 +4280,9 @@
       "status": "partial",
       "go": [
         "transport/tcp:TestDialerRoundTrip",
-        "transport/tcp:TestListenerEchoRoundTrip"
+        "transport/tcp:TestListenerEchoRoundTrip",
+        "transport/tcp:TestTcpTransportOnDisconnect",
+        "transport/tcp:TestTcpTransportClose"
       ],
       "missing": [
         "returns true for TCP",
@@ -4288,11 +4290,9 @@
         "returns false for BLE",
         "throws for non-IP address",
         "reuses existing connection for same address",
-        "creates different connections for different addresses",
-        "fires when a connection drops",
-        "closes server and all connections"
+        "creates different connections for different addresses"
       ],
-      "reason": "Dialing, accepting and receiving a framed message are covered; transport selection, connection reuse and the error cases are not.",
+      "reason": "Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169).",
       "snapshotSha": "2bd01254e917beb77613a9be516573772dcf2cc7"
     }
   ]
