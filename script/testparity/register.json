@@ -2708,8 +2708,14 @@
     },
     {
       "path": "packages/protocol/test/certificate/CertificationDeclarationTest.ts",
-      "status": "planned",
-      "reason": "Parsing a Certification Declaration: round trip, signer key identifier, signature, provisional CD.",
+      "status": "partial",
+      "go": [
+        "controller/attestation:TestCertificationDeclarationParse"
+      ],
+      "missing": [
+        "round-trips a provisional CD correctly"
+      ],
+      "reason": "The generate-then-parse round trip, the signer subject key identifier, the signature over signedData, the TlvDc decode of signedData and the refusal of garbage are ported on secure/attestation.BuildTestCertificationDeclaration and parseDeclaration; the provisional round trip is missing because the Go generator has no provisional flag (matter.js CertificationDeclaration.ts:165-181 generate(…, provisional)).",
       "snapshotSha": "d500fb7a7c28446d3b6141f9b3a88f8907bce528"
     },
     {
