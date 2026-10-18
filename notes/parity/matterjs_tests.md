@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 16 |
+| ported | 17 |
 | partial | 100 |
-| planned | 121 |
+| planned | 120 |
 | excluded | 87 |
 | total | 324 |
 
@@ -105,7 +105,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
-| [protocol/test/ota](#protocoltestota) | 2 | 1 | 0 | 1 | 0 |
+| [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 8 | 0 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
@@ -828,7 +828,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | OtaImageReaderTest.ts | 468 | ported | `bdx:TestOtaImageParityMatterJS`<br>`bdx/otaimage:TestDigestTypes`<br>`bdx/otaimage:TestHeaderBounds`<br>`bdx/otaimage:TestRefusals`<br>`bdx/otaimage:TestOtaImageReaderHeader`<br>`bdx/otaimage:TestOtaImageReaderFile`<br>`bdx/otaimage:TestOtaImageReaderExtractPayload`<br>`bdx/otaimage:TestOtaImageReaderErrorHandling` | Every it of header, file (whole-file checksum with its algorithm, or the payload digest with calculateFullChecksum false), extractPayload and error handling is ported through ReadHeader / ValidateFile / ExtractPayload. |
-| OtaImageWriterTest.ts | 524 | planned | â€” | Writing an OTA image (header fields, digest, total size) and reading it back. |
+| OtaImageWriterTest.ts | 524 | ported | `bdx/otaimage:TestOtaImageWriterCreate`<br>`bdx/otaimage:TestOtaImageWriterRoundTripWithOtaImageReader`<br>`bdx/otaimage:TestOtaImageWriterConfigurableHashAlgorithms` | Every it of create, the round-trip with the reader and the configurable hash algorithms is ported through CreateWithChecksum, ReadHeader and ValidateFile. |
 
 ## protocol/test/peer
 
@@ -1177,10 +1177,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 - `IcdCheckInSenderTest.ts` â€” The device's Check-In sender, milestone 5 phase 23.
 - `IcdCheckInSuppressionTest.ts` â€” Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23.
 - `IcdCounterTest.ts` â€” The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23.
-
-### protocol/test/ota
-
-- `OtaImageWriterTest.ts` â€” Writing an OTA image (header fields, digest, total size) and reading it back.
 
 ### protocol/test/peer
 

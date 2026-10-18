@@ -3660,8 +3660,13 @@
     },
     {
       "path": "packages/protocol/test/ota/OtaImageWriterTest.ts",
-      "status": "planned",
-      "reason": "Writing an OTA image (header fields, digest, total size) and reading it back.",
+      "status": "ported",
+      "go": [
+        "bdx/otaimage:TestOtaImageWriterCreate",
+        "bdx/otaimage:TestOtaImageWriterRoundTripWithOtaImageReader",
+        "bdx/otaimage:TestOtaImageWriterConfigurableHashAlgorithms"
+      ],
+      "reason": "Every it of create, the round-trip with the reader and the configurable hash algorithms is ported through CreateWithChecksum, ReadHeader and ValidateFile.",
       "snapshotSha": "e7ece676a33bda942b008ee5ae79666073fec1e4"
     },
     {
