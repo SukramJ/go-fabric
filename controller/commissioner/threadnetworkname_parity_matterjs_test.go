@@ -43,27 +43,34 @@ func TestThreadNetworkNameResolution(t *testing.T) {
 	}
 
 	t.Run("derives the name from the dataset when none is supplied", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "", datasetMyNet, "MyNet")
 	})
 	t.Run("treats an empty-string name as absent and derives", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "", datasetMyNet, "MyNet")
 	})
 	t.Run("returns the supplied name when it matches the dataset", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "MyNet", datasetMyNet, "MyNet")
 	})
 	t.Run("declines with a typed error when the supplied name mismatches the dataset", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolve("OtherNet", datasetMyNet)
 		if !errors.Is(err, ErrThreadNetworkNameMismatch) || !regexp.MustCompile(`OtherNet.*MyNet`).MatchString(err.Error()) {
 			t.Fatalf("err = %v", err)
 		}
 	})
 	t.Run("keeps the supplied name when the dataset carries no network name", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "MyNet", datasetNoName, "MyNet")
 	})
 	t.Run("returns undefined when neither the params nor the dataset carry a name", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "", datasetNoName, "")
 	})
 	t.Run("falls back to the supplied name and does not throw when the dataset cannot be decoded", func(t *testing.T) {
+		t.Parallel()
 		expect(t, "MyNet", datasetMalformed, "MyNet")
 	})
 }
