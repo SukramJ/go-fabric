@@ -132,7 +132,7 @@ NODE_BIN=$(command -v node)
 sudo -n true 2>/dev/null || verdict environment "sudo without a password is not available (btvirt needs root)"
 
 sudo modprobe hci_vhci 2>"$LOG_DIR/modprobe.log"
-[ -e /dev/vhci ] || verdict environment "no /dev/vhci: the kernel has no hci_vhci module ($(uname -r))"
+[ -e /dev/vhci ] || verdict environment "no /dev/vhci: the kernel has no hci_vhci module ($(uname -r); Ubuntu: linux-modules-extra-$(uname -r))"
 sudo systemctl start bluetooth 2>"$LOG_DIR/bluetoothd.log"
 systemctl is-active --quiet bluetooth || verdict environment "bluetoothd does not run"
 

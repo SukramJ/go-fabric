@@ -53,6 +53,11 @@ jobs:
           sudo apt-get update
           # make and g++: packages/nodejs-ble/README.md (node-gyp builds bleno and noble).
           sudo apt-get install -y --no-install-recommends bluez bluez-test-tools make g++
+          # The runner's Azure kernel ships hci_vhci (and the Bluetooth stack)
+          # in its extra modules only (run 39099404692: "Module hci_vhci not
+          # found in directory /lib/modules/…-azure"). Without them the script
+          # ends "environment".
+          sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
           bluetoothctl --version
           command -v btvirt || dpkg -L bluez-test-tools | grep /bin/
           node --version
