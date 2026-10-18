@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 27 |
+| ported | 28 |
 | partial | 102 |
-| planned | 108 |
+| planned | 107 |
 | excluded | 87 |
 | total | 324 |
 
@@ -88,7 +88,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/storage](#nodeteststorage) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/tsconfigs/nonstrict](#nodetesttsconfigsnonstrict) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
-| [protocol/test/action/client](#protocoltestactionclient) | 5 | 0 | 0 | 4 | 1 |
+| [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
@@ -672,7 +672,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | --- | --- | --- |
 | ClientInteractionInvokeTest.ts | 902 | planned | — | The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1). |
 | ClientInteractionSubscribeTest.ts | 352 | planned | — | The controller's subscribe under abort and close, including an open BDX exchange. |
-| InputChunkTest.ts | 672 | planned | — | The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails. |
+| InputChunkTest.ts | 672 | ported | `controller/interaction:TestInputChunkAttributes`<br>`controller/interaction:TestInputChunkEvents`<br>`controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents`<br>`controller/interaction:TestInputChunkRelaxedIntegerTypeChecks` | All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. |
 | LargeMessageTransportTest.ts | 106 | excluded | `controller-stage` until M5 phase 25 | The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25. |
 | ReadScopeTest.ts | 60 | planned | — | Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter). |
 
@@ -1124,7 +1124,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
 - `ClientInteractionSubscribeTest.ts` — The controller's subscribe under abort and close, including an open BDX exchange.
-- `InputChunkTest.ts` — The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails.
 - `ReadScopeTest.ts` — Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter).
 
 ### protocol/test/action/client/subscription

@@ -2355,8 +2355,14 @@
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "status": "planned",
-      "reason": "The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails.",
+      "status": "ported",
+      "go": [
+        "controller/interaction:TestInputChunkAttributes",
+        "controller/interaction:TestInputChunkEvents",
+        "controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
+        "controller/interaction:TestInputChunkRelaxedIntegerTypeChecks"
+      ],
+      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
       "snapshotSha": "772ad2cf993296093f21c9d2ebc71b6ac3f5092b"
     },
     {
