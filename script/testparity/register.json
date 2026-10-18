@@ -3791,28 +3791,22 @@
         "controller/peer:TestMonitorSessionSuspect",
         "controller/peer:TestMonitorMigratesToAnAlternate",
         "controller/peer:TestMonitorStillDiscoveredAndCooldown",
-        "controller/peer:TestMonitorAllProbesFail"
+        "controller/peer:TestMonitorAllProbesFail",
+        "controller/peer:TestPeerAddressMonitorVerifyReachability",
+        "controller/peer:TestPeerAddressMonitorCoalescing",
+        "controller/peer:TestPeerAddressMonitorBackoff"
       ],
       "missing": [
-        "session-suspect alone: current fails → no alternate walk, session closed, false",
-        "address-change: current matches a channel-agnostic discovered address → skip, no probe",
-        "coalesces concurrent triggers into one run",
-        "session-suspect stays current-only even when an address-change joins the run",
-        "close() stops the timer and awaits the in-flight run",
-        "a caller's own aborted signal yields false without preventing the peer-owned run",
         "sleeping LIT ICD whose address left mDNS: adopts a discovered address on trust, no probe",
         "sleeping LIT ICD prefers a discovered address in the session's IP family",
         "sleeping LIT ICD still in mDNS: keeps its address untouched, no probe",
         "session-suspect on a sleeping LIT ICD never probes or closes the session",
-        "an address change does not reset the growing cooldown",
-        "session-suspect resets the backoff so the next address-change probes immediately",
         "keeps the probe cooldown across a forward wall-clock step",
         "ends the probe cooldown on schedule across a backward wall-clock step",
         "keeps the probe cooldown when the clock stepped back before the first probe",
-        "a timer-fired address check is tracked exactly once",
-        "a session-suspect run does not arm the address-change debounce"
+        "a timer-fired address check is tracked exactly once"
       ],
-      "reason": "The session-suspect check, migration to an alternate, the still-discovered no-op and the all-fail close are covered; coalescing, abort and the sleeping-LIT cases are not.",
+      "reason": "The session-suspect and address-change runs (current-only, channel-agnostic skip, migration, all-fail close), coalescing including a joining address-change, close awaiting the in-flight run, a joiner's own abort and the probe backoff (growth across address churn, the suspect reset, no debounce after a suspect run) are ported against a live session; the sleeping-LIT-ICD branch (PeerAddressMonitor.ts:143-172) is not in Go (no fabric ICD wakefulness model, ADR 0020 stage 4), the wall-clock steps need a second clock reading clocktest.Fake does not have, and the trackWork count has no Go counterpart (the peer tracks work in a WaitGroup with no observable count).",
       "snapshotSha": "6e69549d9e68858d4b087b95eb3c32703ae77a4d"
     },
     {
