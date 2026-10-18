@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5628,
+  "entry_points": 5629,
   "entry_packages": [
     ".",
     "bdx",
@@ -225,9 +225,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13098,
-    "reachable": 9123,
-    "whitelisted": 3970,
+    "total_exported": 13100,
+    "reachable": 9124,
+    "whitelisted": 3971,
     "unreachable": 5
   },
   "by_package": [
@@ -24228,38 +24228,45 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestBuildDNStandardAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/dn_standard_test.go",
+      "line": 17
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestCertificatesDecodeicacificate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 255
+      "line": 220
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCertificatesGeneratesTheCorrectASN1Bytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 98
+      "line": 68
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCertificatesOperationalCertDecodeSizeLimits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 316
+      "line": 281
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCertificatesSpecialNocEncodingCases",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 216
+      "line": 181
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCertificatesVerifiesCertificates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 133
+      "line": 102
     },
     {
       "package": "secure/mattercert",

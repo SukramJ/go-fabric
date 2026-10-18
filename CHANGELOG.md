@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `secure/mattercert`: the TBS DER of an operational certificate carries the standard X.520 attributes of its subject and issuer (commonName, organizationName, countryName, … — TLV tags 1-16 as UTF8String, domainComponent as IA5String, 129-143 as PrintableString) in their arrival order, so a chain whose DNs carry them verifies (matter.js `operational.ts:69-110`, `Certificate.ts:895-964`, `X520.ts:28-79`). They were dropped, and the Google root, ICAC and NOC of matter.js's `TestCertificates.ts` failed ECDSA verification — a controller with such a chain could not establish CASE. `DistinguishedName.Attributes` (`DNAttribute`) exposes them.
+- `secure/mattercert`: `Verifier.VerifyAndExtractPubKey` chooses a NOC's issuer by its authorityKeyIdentifier — the ICAC when it names the ICAC's subjectKeyIdentifier, the root otherwise — so a root-signed NOC presented together with an ICAC verifies (matter.js `Noc.ts:170-186`); the ICAC was taken as the issuer whenever one was given.
+
 ## [0.7.3] — 2026-10-18
 
 Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5, brief BH): the port of matter.js `packages/protocol/test` at `862ad75f` — one `*_parity_matterjs_test.go` per matter.js file, the register `script/testparity/register.json` naming every Go test and every `it` still missing. The ports found the gaps below; each fix cites the matter.js lines it mirrors.
