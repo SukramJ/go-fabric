@@ -3938,8 +3938,21 @@
     },
     {
       "path": "packages/protocol/test/protocol/DeviceAdvertiserTest.ts",
-      "status": "planned",
-      "reason": "The device advertiser: commissioning advertisement after a PASE close, the TCP T key, ICD fields of the operational advertisement.",
+      "status": "partial",
+      "go": [
+        "secure/operational:TestDeviceAdvertiserSessionDeletedHandler",
+        "bridge:TestTriggerSessionReannounce_RepublishesActiveRecords",
+        "bridge:TestDeviceAdvertiserTcpTKey",
+        "bridge:TestDeviceAdvertiserIcdAdvertisementProvider"
+      ],
+      "missing": [
+        "includes ICD operating mode and intervals in operational advertisement when a provider is registered",
+        "refreshOperationalAdvertisement does nothing when not in operational mode",
+        "clearing the provider reverts to no ICD fields on next advertisement",
+        "feeds the node's session intervals into a non-ICD operational advertisement",
+        "lets the ICD provider override the node's session intervals"
+      ],
+      "reason": "The session deleted handler (a PASE close fires the reannounce trigger, a deleted fabric's CASE teardown does not), the T key for both, none and server-only transports, the absent ICD key and a repeated AnnounceFabric as the refresh are ported; the bridge has no ICD advertisement provider (DeviceAdvertiser.ts:195-197) nor an operational-mode state gating the refresh (:206-209), and AnnounceFabric advertises the mdns default SII/SAI/SAT rather than the node's configured session intervals (:363-364).",
       "snapshotSha": "4c439c1a8d84ebe34ea7716e87ef4bc4be608c09"
     },
     {
