@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5316,
+  "entry_points": 5317,
   "entry_packages": [
     ".",
     "bdx",
@@ -222,20 +222,14 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12784,
-    "reachable": 9014,
-    "whitelisted": 3763,
-    "unreachable": 7
+    "total_exported": 12785,
+    "reachable": 9016,
+    "whitelisted": 3764,
+    "unreachable": 5
   },
   "by_package": [
     {
       "package": "cluster/measurement",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "controller/dcl/snapshot",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 0
@@ -263,12 +257,6 @@
       "unreachable_funcs": 0,
       "unreachable_types": 0,
       "unreachable_other": 1
-    },
-    {
-      "package": "transport/btp",
-      "unreachable_funcs": 0,
-      "unreachable_types": 1,
-      "unreachable_other": 0
     }
   ],
   "unreachable": [
@@ -277,13 +265,6 @@
       "identifier": "CelsiusToInt16",
       "file": "cluster/measurement/measurement.go",
       "line": 1662,
-      "kind": "func"
-    },
-    {
-      "package": "controller/dcl/snapshot",
-      "identifier": "LoadAt",
-      "file": "controller/dcl/snapshot/snapshot.go",
-      "line": 131,
       "kind": "func"
     },
     {
@@ -313,13 +294,6 @@
       "file": "secure/sigma/sigma.go",
       "line": 94,
       "kind": "var"
-    },
-    {
-      "package": "transport/btp",
-      "identifier": "SystemClock",
-      "file": "transport/btp/session.go",
-      "line": 67,
-      "kind": "type"
     }
   ],
   "whitelisted": [
@@ -25928,6 +25902,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/conn_test.go",
       "line": 37
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestDeprecatedSystemClockFires",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/helpers_test.go",
+      "line": 101
     },
     {
       "package": "transport/btp",

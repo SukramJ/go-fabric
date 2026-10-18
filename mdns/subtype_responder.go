@@ -85,7 +85,9 @@ type SubtypeResponder struct {
 // answerer's suppression windows run on; nil is [clock.System].
 func (r *SubtypeResponder) SetClock(c clock.Clock) {
 	r.clock.Store(c)
-	r.host.clock.Store(c)
+	if r.host != nil {
+		r.host.clock.Store(c)
+	}
 }
 
 // NewSubtypeResponder binds the responder to the mDNS multicast
