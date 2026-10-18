@@ -55,7 +55,7 @@
   },
   {
     "file": "bdx/session.go",
-    "line": 139,
+    "line": 144,
     "citation": "bdx-session-initiator.ts:155-178",
     "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
     "identifier": "buildInitMessage",
@@ -622,7 +622,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 951,
+    "line": 958,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -1173,7 +1173,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 591,
+    "line": 604,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",

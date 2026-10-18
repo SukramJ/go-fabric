@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5419,
+  "entry_points": 5512,
   "entry_packages": [
     ".",
     "bdx",
@@ -176,6 +176,7 @@
     "controller/handshake",
     "controller/interaction",
     "controller/peer",
+    "controller/thread",
     "device",
     "diagevent",
     "eligibility",
@@ -224,9 +225,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12891,
-    "reachable": 9050,
-    "whitelisted": 3836,
+    "total_exported": 13006,
+    "reachable": 9112,
+    "whitelisted": 3889,
     "unreachable": 5
   },
   "by_package": [
@@ -3203,6 +3204,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
       "line": 869
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFabricRemoveFromSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_parity_matterjs_test.go",
+      "line": 24
     },
     {
       "package": "bridge",
@@ -15715,178 +15723,276 @@
     },
     {
       "package": "controller/attestation",
+      "identifier": "TestCertificatesFallbackVendorIDProductID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/certificates_parity_matterjs_test.go",
+      "line": 48
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificatesPaaFromAsn1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/certificates_parity_matterjs_test.go",
+      "line": 113
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificatesParseMatterFallbackVidPid",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/certificates_parity_matterjs_test.go",
+      "line": 63
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificationDeclarationParse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/certificationdeclaration_parity_matterjs_test.go",
+      "line": 44
+    },
+    {
+      "package": "controller/attestation",
       "identifier": "TestFallbackIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/cert_internal_test.go",
       "line": 19
     },
     {
+      "package": "controller/attestation",
+      "identifier": "TestPqcAttestationCertificatesAnnexHExamples",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
+      "line": 154
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestPqcAttestationCertificatesParsing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
+      "line": 189
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "ErrScannerClosed",
+      "reason": "deprecated: kept for the deprecation window; nothing returns it",
+      "file": "controller/ble/scanner.go",
+      "line": 53
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleListeningClock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/listening_parity_matterjs_test.go",
+      "line": 15
+    },
+    {
       "package": "controller/ble",
       "identifier": "TestBleScannerAnotherTimeoutDoesNotEndDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 508
+      "line": 606
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsEveryDiscoveryForIdentifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 592
+      "line": 690
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCancelEndsOnlyTheCanceled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 565
+      "line": 663
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 1431
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerCloseSettlesContinuousDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 640
+      "line": 736
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerDeduplicationAndAging",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 834
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDiscoveriesAskingDifferently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 533
+      "line": 631
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerDiscoveriesForOneIdentifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 1408
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerDropsRotatedAddressByElapsedTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 250
+      "line": 348
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerFailsDiscoveriesWhenScanCannotStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 614
+      "line": 712
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerForgetCommissionedDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 969
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerForgetsAfter15MinutesOfListening",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 352
+      "line": 450
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerForgetsOneShotRecordAfter15Minutes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 338
+      "line": 436
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerHandsAdvertisementToEveryDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 451
+      "line": 549
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerIgnoresNonMatterServiceData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 660
+      "line": 758
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsBothWithinStaleWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 223
+      "line": 321
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsEntriesWithOtherServiceData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 297
+      "line": 395
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsEntryNobodyListenedFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 262
+      "line": 360
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerKeepsRefreshedEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 281
+      "line": 379
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerMergesRepeatAdvertisements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 215
+      "line": 313
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOffersStalePeripheralAgain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 325
+      "line": 423
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOneShotRecordDoesNotAgeWhileScanning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 371
+      "line": 469
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerOneShotWaitsWhileOnlyUnreachableAdvertise",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 412
+      "line": 510
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerOverlapping",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 1149
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerPurgesWithIgnoreExisting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 431
+      "line": 529
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerReachability",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 394
+      "line": 492
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerReachabilityCases",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 1043
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerReplacesAfterStaleWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 235
+      "line": 333
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerStopsOfferingStalePeripheral",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 312
+      "line": 410
     },
     {
       "package": "controller/ble",
       "identifier": "TestBleScannerTimeoutEndsOneDiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_parity_matterjs_test.go",
-      "line": 479
+      "line": 577
     },
     {
       "package": "controller/ca/keyfile",
@@ -16289,6 +16395,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestCertificatesGetPublicKeyFromCsr",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/certificates_parity_matterjs_test.go",
+      "line": 99
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestChannelDropFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
@@ -16384,6 +16497,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
       "line": 354
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityCreateFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
+      "line": 70
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityDefaultAdminVendorID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
+      "line": 124
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityFabricCreation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
+      "line": 158
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricAuthorityKeypairRotation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabricauthority_parity_matterjs_test.go",
+      "line": 137
     },
     {
       "package": "controller/commissioner",
@@ -16797,6 +16938,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/service_test.go",
       "line": 172
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestDiscoveryDataCaseInsensitiveKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
+      "line": 70
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestDiscoveryDataIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
+      "line": 117
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestDiscoveryDataSessionIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
+      "line": 86
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestDiscoveryDataTransports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
+      "line": 146
     },
     {
       "package": "controller/discovery",
@@ -18029,6 +18198,90 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/connection_test.go",
       "line": 292
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestBasicTlvCodecEncode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/tlv_parity_matterjs_test.go",
+      "line": 85
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestBasicTlvCodecWalk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/tlv_parity_matterjs_test.go",
+      "line": 35
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestDatasetFieldsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_test.go",
+      "line": 46
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestDatasetReplayEdges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_test.go",
+      "line": 17
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestDecodeDatasetHexWhitespace",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_test.go",
+      "line": 108
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestDecodeUTF8MatchesTextDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_test.go",
+      "line": 90
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestMeshCopTlvTypesName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/meshcop_parity_matterjs_test.go",
+      "line": 61
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestMeshCopTlvTypesType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/meshcop_parity_matterjs_test.go",
+      "line": 11
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestOperationalDatasetDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_parity_matterjs_test.go",
+      "line": 51
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestOperationalDatasetDecodeHex",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_parity_matterjs_test.go",
+      "line": 194
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestOperationalDatasetEncode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_parity_matterjs_test.go",
+      "line": 129
+    },
+    {
+      "package": "controller/thread",
+      "identifier": "TestOperationalDatasetRedact",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/thread/dataset_parity_matterjs_test.go",
+      "line": 219
     },
     {
       "package": "device",
@@ -20027,6 +20280,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestFabricGroupsManagerGroupIPv6AddressCalculation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/fabric_groups_manager_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "groups",
       "identifier": "TestForgetFabricDropsItsGroups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
@@ -20132,10 +20392,73 @@
     },
     {
       "package": "groups",
+      "identifier": "TestGroupsCurrentKeyForID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groups_parity_matterjs_test.go",
+      "line": 217
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupsIDMap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groups_parity_matterjs_test.go",
+      "line": 75
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupsMulticastAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groups_parity_matterjs_test.go",
+      "line": 42
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupsMulticastPolicy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groups_multicast_policy_parity_matterjs_test.go",
+      "line": 24
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupsSubjectForGroup",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groups_parity_matterjs_test.go",
+      "line": 137
+    },
+    {
+      "package": "groups",
       "identifier": "TestKeySetWithoutUsableEpochKeyIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
       "line": 372
+    },
+    {
+      "package": "groups",
+      "identifier": "TestKeySetsAllKeysForID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/keysets_parity_matterjs_test.go",
+      "line": 124
+    },
+    {
+      "package": "groups",
+      "identifier": "TestKeySetsContainsOperationalKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/keysets_parity_matterjs_test.go",
+      "line": 203
+    },
+    {
+      "package": "groups",
+      "identifier": "TestKeySetsCurrentKeyForID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/keysets_parity_matterjs_test.go",
+      "line": 161
+    },
+    {
+      "package": "groups",
+      "identifier": "TestKeySetsForIDAdd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/keysets_parity_matterjs_test.go",
+      "line": 86
     },
     {
       "package": "groups",
@@ -20178,6 +20501,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/messagecounter_parity_matterjs_test.go",
       "line": 115
+    },
+    {
+      "package": "groups",
+      "identifier": "TestMessagingStateReceptionStateFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/messaging_state_parity_matterjs_test.go",
+      "line": 16
     },
     {
       "package": "groups",
@@ -23079,6 +23409,13 @@
     },
     {
       "package": "secure/attestation",
+      "identifier": "TestPqcAttestationCertificatesDeviceCertification",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/attestation/pqcattestationcertificates_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "secure/attestation",
       "identifier": "TestTestCMSSigner_LooksLikeAppendixF",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/attestation/testpaa_test.go",
@@ -23321,6 +23658,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/fuzz_decode_test.go",
       "line": 45
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCertificatesDecodeicacificate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/certificates_parity_matterjs_test.go",
+      "line": 255
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCertificatesGeneratesTheCorrectASN1Bytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/certificates_parity_matterjs_test.go",
+      "line": 98
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCertificatesOperationalCertDecodeSizeLimits",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/certificates_parity_matterjs_test.go",
+      "line": 316
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCertificatesSpecialNocEncodingCases",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/certificates_parity_matterjs_test.go",
+      "line": 216
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCertificatesVerifiesCertificates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/certificates_parity_matterjs_test.go",
+      "line": 133
     },
     {
       "package": "secure/mattercert",

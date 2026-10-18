@@ -333,8 +333,9 @@ const (
 	// defaultAdminVendorID is matter.js DEFAULT_ADMIN_VENDOR_ID
 	// (FabricAuthority.ts:47), the test vendor.
 	defaultAdminVendorID uint16 = 0xFFF1
-	// maxOperationalVendorID bounds VendorId.isOperational
-	// (packages/types/src/datatype/VendorId.ts:22, :44).
+	// maxOperationalVendorID is the upper bound of matter.js's VendorId
+	// constructor (packages/types/src/datatype/VendorId.ts:22). Its
+	// isOperational applies the bound (VendorId.ts:44).
 	maxOperationalVendorID uint16 = 0xFFF4
 )
 

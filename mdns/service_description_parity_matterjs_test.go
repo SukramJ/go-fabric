@@ -24,9 +24,9 @@ func serviceDescriptionTXT(svc mdns.Service) map[string]string {
 // TestServiceDescriptionOperational covers ServiceDescriptionTest.ts:11-33.
 // matter.js checks the fields of the ServiceDescription.Operational
 // object; Go has no description object between the configuration and the
-// record, so the port checks that BuildOperationalService carries the same
-// values into the operational record's TXT keys
-// (MdnsAdvertisement.ts:183-209).
+// record. The port checks instead that BuildOperationalService carries the
+// same values into the operational record's TXT keys, as matter.js writes
+// them (MdnsAdvertisement.ts:183-209).
 func TestServiceDescriptionOperational(t *testing.T) {
 	t.Parallel()
 	const lit, sit uint8 = 1, 0 // IcdManagement.OperatingMode
