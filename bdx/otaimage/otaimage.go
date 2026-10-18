@@ -287,45 +287,85 @@ type FileOptions struct {
 	// ExpectedTotalSize, when set, must equal the total size the prefix
 	// states — unless ExpectedChecksum matched, which wins.
 	ExpectedTotalSize *uint64
-	// ExpectedChecksum is the base64 SHA-256 of the whole file (the DCL's
+	// ExpectedChecksum is the base64 whole-file checksum (the DCL's
 	// OtaChecksum); empty skips the comparison.
 	ExpectedChecksum string
+	// ChecksumType is the whole-file checksum's algorithm; zero is
+	// SHA-256 (OtaImageReader.ts:52, :79-81).
+	ChecksumType uint8
+	// SkipFullChecksum is matter.js's calculateFullChecksum: false
+	// (default true): the header's payload digest is verified instead of
+	// the whole-file checksum (OtaImageReader.ts:261-278).
+	SkipFullChecksum bool
 }
 
 // ValidateFile reads a whole image and checks that its payload has the size
 // the header states, and the optional whole-file checksum and total size.
-// It does not check the payload digest: matter.js's file() computes the
-// whole-file checksum instead when it can (calculateFullChecksum, default
-// true), leaving the digest to [ExtractPayload].
+// By default it computes the whole-file checksum and leaves the payload
+// digest to [ExtractPayload]; with SkipFullChecksum it verifies the payload
+// digest instead.
 //
-// Mirrors OtaImageReader.file (OtaImageReader.ts:65-110) with
-// #processPayloadDigest's full-checksum branch (:246-260).
+// Mirrors matter.js packages/protocol/src/ota/OtaImageReader.ts:65-110
+// (file) with both branches of #processPayloadDigest (:246-278).
 func ValidateFile(r io.Reader, opts FileOptions) (Header, error) {
 	h, p, raw, err := ReadHeader(r)
 	if err != nil {
 		return Header{}, err
 	}
-	sum := sha256.New()
-	sum.Write(raw)
-	n, err := io.Copy(sum, r)
-	if err != nil {
-		return Header{}, fmt.Errorf("ota image: read payload: %w", err)
-	}
-	if uint64(n) != h.PayloadSize { //nolint:gosec // io.Copy never returns a negative count
-		return Header{}, invalid("OTA payload size mismatch: expected %d, got %d", h.PayloadSize, n)
-	}
-	matched := false
-	if opts.ExpectedChecksum != "" {
-		got := base64.StdEncoding.EncodeToString(sum.Sum(nil))
-		if got != opts.ExpectedChecksum {
-			return Header{}, invalid("OTA full file checksum mismatch: expected %q, got %q", opts.ExpectedChecksum, got)
+	fullChecksum := ""
+	if opts.SkipFullChecksum {
+		if err := verifyPayloadDigest(h, r, io.Discard); err != nil {
+			return Header{}, err
 		}
-		matched = true
+	} else {
+		ct := opts.ChecksumType
+		if ct == 0 {
+			ct = DigestSHA256
+		}
+		sum := NewDigest(ct)
+		if sum == nil {
+			return Header{}, invalid("Cannot compute %d OTA digest", ct)
+		}
+		sum.Write(raw)
+		n, err := io.Copy(sum, r)
+		if err != nil {
+			return Header{}, fmt.Errorf("ota image: read payload: %w", err)
+		}
+		if uint64(n) != h.PayloadSize { //nolint:gosec // io.Copy never returns a negative count
+			return Header{}, invalid("OTA payload size mismatch: expected %d, got %d", h.PayloadSize, n)
+		}
+		fullChecksum = base64.StdEncoding.EncodeToString(sum.Sum(nil))
 	}
-	if opts.ExpectedTotalSize != nil && *opts.ExpectedTotalSize != p.TotalSize && !matched {
+	// Without a computed checksum an expected one mismatches, as matter.js's
+	// undefined #fullFileChecksum does (OtaImageReader.ts:89-93).
+	if opts.ExpectedChecksum != "" && fullChecksum != opts.ExpectedChecksum {
+		return Header{}, invalid("OTA full file checksum mismatch: expected %q, got %q", opts.ExpectedChecksum, fullChecksum)
+	}
+	if opts.ExpectedTotalSize != nil && *opts.ExpectedTotalSize != p.TotalSize && opts.ExpectedChecksum == "" {
 		return Header{}, invalid("OTA file size mismatch: expected %d, got %d", *opts.ExpectedTotalSize, p.TotalSize)
 	}
 	return h, nil
+}
+
+// verifyPayloadDigest copies the payload from r to w and checks it against
+// the header's digest type, size and digest (OtaImageReader.ts:261-278,
+// :315-329).
+func verifyPayloadDigest(h Header, r io.Reader, w io.Writer) error {
+	digest := NewDigest(h.ImageDigestType)
+	if digest == nil {
+		return invalid("Unsupported OTA image digest type: %d", h.ImageDigestType)
+	}
+	n, err := io.Copy(io.MultiWriter(digest, w), r)
+	if err != nil {
+		return fmt.Errorf("ota image: read payload: %w", err)
+	}
+	if uint64(n) != h.PayloadSize { //nolint:gosec // io.Copy never returns a negative count
+		return invalid("OTA payload size mismatch: expected %d, got %d", h.PayloadSize, n)
+	}
+	if got := digest.Sum(nil); !bytes.Equal(got, h.ImageDigest) {
+		return invalid("OTA file digest mismatch %x vs. %x", got, h.ImageDigest)
+	}
+	return nil
 }
 
 // ExtractPayload reads a whole image, writes its payload to w and checks the
@@ -339,19 +379,8 @@ func ExtractPayload(r io.Reader, w io.Writer, expectedTotalSize *uint64) (Header
 	if err != nil {
 		return Header{}, err
 	}
-	digest := NewDigest(h.ImageDigestType)
-	if digest == nil {
-		return Header{}, invalid("Unsupported OTA image digest type: %d", h.ImageDigestType)
-	}
-	n, err := io.Copy(io.MultiWriter(digest, w), r)
-	if err != nil {
-		return Header{}, fmt.Errorf("ota image: read payload: %w", err)
-	}
-	if uint64(n) != h.PayloadSize { //nolint:gosec // io.Copy never returns a negative count
-		return Header{}, invalid("OTA payload size mismatch: expected %d, got %d", h.PayloadSize, n)
-	}
-	if got := digest.Sum(nil); !bytes.Equal(got, h.ImageDigest) {
-		return Header{}, invalid("OTA file digest mismatch %x vs. %x", got, h.ImageDigest)
+	if err := verifyPayloadDigest(h, r, w); err != nil {
+		return Header{}, err
 	}
 	if expectedTotalSize != nil && *expectedTotalSize != p.TotalSize {
 		return Header{}, invalid("OTA file size mismatch: expected %d, got %d", *expectedTotalSize, p.TotalSize)
@@ -372,6 +401,39 @@ type CreateOptions struct {
 	Payload                      []byte
 	// ImageDigestType defaults to SHA-256.
 	ImageDigestType uint8
+	// FullFileChecksumType is the algorithm of [CreateWithChecksum]'s
+	// whole-file checksum; it defaults to SHA-256 (OtaImageWriter.ts:66).
+	FullFileChecksumType uint8
+}
+
+// Result is an image with its whole-file checksum (OtaImageWriterResult,
+// OtaImageWriter.ts:13-20).
+type Result struct {
+	Image []byte
+	// FullFileChecksum is the base64 checksum of the whole image.
+	FullFileChecksum string
+	// FullFileChecksumType is the checksum's algorithm identifier.
+	FullFileChecksumType uint8
+}
+
+// CreateWithChecksum writes an image as [Create] does and computes its
+// whole-file checksum. Mirrors matter.js
+// packages/protocol/src/ota/OtaImageWriter.ts:107-115 (create's result).
+func CreateWithChecksum(opts CreateOptions) (Result, error) {
+	ct := opts.FullFileChecksumType
+	if ct == 0 {
+		ct = DigestSHA256
+	}
+	sum := NewDigest(ct)
+	if sum == nil {
+		return Result{}, invalid("Unsupported OTA full file checksum type: %d", ct)
+	}
+	image, err := Create(opts)
+	if err != nil {
+		return Result{}, err
+	}
+	sum.Write(image)
+	return Result{Image: image, FullFileChecksum: base64.StdEncoding.EncodeToString(sum.Sum(nil)), FullFileChecksumType: ct}, nil
 }
 
 // Create writes an image. Mirrors OtaImageWriter.create

@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 14 |
-| partial | 101 |
+| ported | 15 |
+| partial | 100 |
 | planned | 122 |
 | excluded | 87 |
 | total | 324 |
@@ -105,7 +105,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
-| [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
+| [protocol/test/ota](#protocoltestota) | 2 | 1 | 0 | 1 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 8 | 0 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
@@ -827,7 +827,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OtaImageReaderTest.ts | 468 | partial | `bdx:TestOtaImageParityMatterJS`<br>`bdx/otaimage:TestDigestTypes`<br>`bdx/otaimage:TestHeaderBounds`<br>`bdx/otaimage:TestRefusals` | Header parsing and digest validation are covered; the optional fields, full-file checksum and streaming cases are not ported case by case. Missing: “reads OTA image header without optional fields”; “reads header with custom hash algorithm”; “computes full file checksum when enabled”; “validates full file checksum when expectedChecksum provided”; “throws error when full file checksum doesn't match”; “supports custom checksum types”; “validates payload digest during file reading”; “rejects an unsupported image digest type with an OtaImageError”; “handles different hash algorithms for payload validation”; “extracts payload to writable stream”; “validates digest while extracting payload”; “throws error for invalid/truncated file”; “throws error for size mismatch”. |
+| OtaImageReaderTest.ts | 468 | ported | `bdx:TestOtaImageParityMatterJS`<br>`bdx/otaimage:TestDigestTypes`<br>`bdx/otaimage:TestHeaderBounds`<br>`bdx/otaimage:TestRefusals`<br>`bdx/otaimage:TestOtaImageReaderHeader`<br>`bdx/otaimage:TestOtaImageReaderFile`<br>`bdx/otaimage:TestOtaImageReaderExtractPayload`<br>`bdx/otaimage:TestOtaImageReaderErrorHandling` | Every it of header, file (whole-file checksum with its algorithm, or the payload digest with calculateFullChecksum false), extractPayload and error handling is ported through ReadHeader / ValidateFile / ExtractPayload. |
 | OtaImageWriterTest.ts | 524 | planned | — | Writing an OTA image (header fields, digest, total size) and reading it back. |
 
 ## protocol/test/peer

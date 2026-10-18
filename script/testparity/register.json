@@ -3641,29 +3641,18 @@
     },
     {
       "path": "packages/protocol/test/ota/OtaImageReaderTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "bdx:TestOtaImageParityMatterJS",
         "bdx/otaimage:TestDigestTypes",
         "bdx/otaimage:TestHeaderBounds",
-        "bdx/otaimage:TestRefusals"
+        "bdx/otaimage:TestRefusals",
+        "bdx/otaimage:TestOtaImageReaderHeader",
+        "bdx/otaimage:TestOtaImageReaderFile",
+        "bdx/otaimage:TestOtaImageReaderExtractPayload",
+        "bdx/otaimage:TestOtaImageReaderErrorHandling"
       ],
-      "missing": [
-        "reads OTA image header without optional fields",
-        "reads header with custom hash algorithm",
-        "computes full file checksum when enabled",
-        "validates full file checksum when expectedChecksum provided",
-        "throws error when full file checksum doesn't match",
-        "supports custom checksum types",
-        "validates payload digest during file reading",
-        "rejects an unsupported image digest type with an OtaImageError",
-        "handles different hash algorithms for payload validation",
-        "extracts payload to writable stream",
-        "validates digest while extracting payload",
-        "throws error for invalid/truncated file",
-        "throws error for size mismatch"
-      ],
-      "reason": "Header parsing and digest validation are covered; the optional fields, full-file checksum and streaming cases are not ported case by case.",
+      "reason": "Every it of header, file (whole-file checksum with its algorithm, or the payload digest with calculateFullChecksum false), extractPayload and error handling is ported through ReadHeader / ValidateFile / ExtractPayload.",
       "snapshotSha": "04a20f60d44a9fb6454a8737c29324b7a0c4c73e"
     },
     {
