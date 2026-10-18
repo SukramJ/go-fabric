@@ -9,6 +9,37 @@ import (
 	"github.com/SukramJ/go-fabric/schema"
 )
 
+// listedDeviceTypes returns the device-type ids ep's Descriptor
+// DeviceTypeList carries, in its order: a part lists its own device type
+// alone, a bridged endpoint its primary device type (when it has one) and
+// BridgedNode. [ClusterServers] builds the list from it, and the assembly
+// reads its composition from it, so the two cannot disagree.
+func listedDeviceTypes(ep *Endpoint) []uint32 {
+	if ep.Part {
+		return []uint32{uint32(ep.DeviceType)}
+	}
+	if ep.DeviceType == 0 {
+		return []uint32{matterDeviceTypeBridgedNode}
+	}
+	return []uint32{uint32(ep.DeviceType), matterDeviceTypeBridgedNode}
+}
+
+// composesFullFamily reports whether one of ep's listed device types
+// composes the endpoint's PartsList of every descendant rather than of its
+// own children (Core § 9.2.7), read from the schema at run time.
+//
+// Mirrors matter.js packages/node/src/behaviors/descriptor/DescriptorServer.ts:262-270
+// (#composesFullFamily: some entry of the DeviceTypeList whose
+// effectiveComposition is EndpointComposition.FullFamily).
+func composesFullFamily(ep *Endpoint) bool {
+	for _, id := range listedDeviceTypes(ep) {
+		if dt, ok := schema.DeviceTypeDefinitionOf(id); ok && dt.Composition == schema.CompositionFullFamily {
+			return true
+		}
+	}
+	return false
+}
+
 // isNotFound matches the [ErrNotFound] sentinel via errors.Is. Wrapped
 // to keep the assembler call sites concise.
 func isNotFound(err error) bool {

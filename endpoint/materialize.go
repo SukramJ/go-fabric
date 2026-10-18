@@ -265,17 +265,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// + decoder dump of a successful Apple pair) emits
 	// `DeviceTypeList=[{OnOffLight(0x0100) rev3}, {BridgedNode(19) rev3}]`
 	// — primary first, BridgedNode last. Mirror that order.
-	bridgedRev := deviceTypeRevision(uint16(matterDeviceTypeBridgedNode))
-	deviceTypes := make([]mattercore.DeviceTypeStruct, 0, 2)
-	if ep.DeviceType != 0 {
-		deviceTypes = append(deviceTypes, mattercore.DeviceTypeStruct{
-			DeviceType: uint32(ep.DeviceType),
-			Revision:   deviceTypeRevision(ep.DeviceType),
-		})
-	}
-	deviceTypes = append(deviceTypes, mattercore.DeviceTypeStruct{
-		DeviceType: matterDeviceTypeBridgedNode, Revision: bridgedRev,
-	})
+	deviceTypes := descriptorDeviceTypes(ep)
 
 	// Spec §1.4: Identify (0x0003) is mandatory on every endpoint other
 	// than Root and NetworkCommissioning. Apple Home's HAP-service
@@ -334,9 +324,7 @@ func partClusterServers(ep *Endpoint, inner []contract.ClusterServer) []contract
 		out = append(out, ep.identifyServer())
 	}
 	out = append(out, inner...)
-	descriptor, err := mattercore.NewDescriptor([]mattercore.DeviceTypeStruct{{
-		DeviceType: uint32(ep.DeviceType), Revision: deviceTypeRevision(ep.DeviceType),
-	}}, nil, ep.ClientClusters, ep.PartIDs)
+	descriptor, err := mattercore.NewDescriptor(descriptorDeviceTypes(ep), nil, ep.ClientClusters, ep.PartIDs)
 	if err != nil {
 		return out
 	}
@@ -566,3 +554,14 @@ func bridgedVendorName(ep *Endpoint) string {
 
 // identifyClusterID is the Identify cluster (identify.element.ts, 0x0003).
 const identifyClusterID uint32 = 0x0003
+
+// descriptorDeviceTypes is ep's DeviceTypeList: [listedDeviceTypes], each
+// with the revision [deviceTypeRevision] advertises for it.
+func descriptorDeviceTypes(ep *Endpoint) []mattercore.DeviceTypeStruct {
+	ids := listedDeviceTypes(ep)
+	out := make([]mattercore.DeviceTypeStruct, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, mattercore.DeviceTypeStruct{DeviceType: id, Revision: deviceTypeRevision(uint16(id))})
+	}
+	return out
+}

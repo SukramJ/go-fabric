@@ -219,6 +219,15 @@ const deviceTypeAggregator = 0x000E
 // it, depth first: the spec's endpoint first, then its parts' endpoints.
 // Mirrors matter.js Endpoint parts: a part is a child endpoint, numbered
 // like any other, in its parent's PartsList.
+//
+// The PartsList follows the endpoint's composition. An endpoint whose
+// device-type list holds a full-family type — a bridged node, BridgedNode
+// being full-family since matter.js #4735 (Device Library § 2.5.6) — lists
+// every descendant; any other endpoint its direct parts. Mirrors matter.js
+// packages/node/src/behaviors/descriptor/DescriptorServer.ts:227-254
+// (#currentPartsListNumbers: the IndexBehavior's partsByNumber, the
+// endpoint itself removed, for a full-family composer; endpoint.parts
+// otherwise; ascending either way).
 func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
 	ep, err := a.buildEndpoint(ctx, scope, spec)
 	if err != nil {
@@ -234,6 +243,12 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *S
 		}
 		ep.PartIDs = append(ep.PartIDs, children[0].ID)
 		out = append(out, children...)
+	}
+	if composesFullFamily(ep) {
+		ep.PartIDs = ep.PartIDs[:0]
+		for _, d := range out[1:] {
+			ep.PartIDs = append(ep.PartIDs, d.ID)
+		}
 	}
 	slices.Sort(ep.PartIDs)
 	return out, nil

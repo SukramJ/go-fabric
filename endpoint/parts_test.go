@@ -151,3 +151,76 @@ func TestComposedSourceWithoutClustersIsBridged(t *testing.T) {
 		t.Errorf("sourceless endpoint mounts %v", got)
 	}
 }
+
+// TestBridgedNodePartsListIsFullFamily pins the one model change of the
+// 862ad75f lift: BridgedNode composes its full family (matter.js #4735,
+// packages/model/src/standard/elements/bridged-node.element.ts:17,
+// Device Library § 2.5.6, the refrigerator example). A bridged
+// Refrigerator with two cabinets, one of which has a part of its own,
+// lists all three descendants in its PartsList; the intermediate cabinet,
+// whose TemperatureControlledCabinet composes a tree, lists its own child
+// only, and the leaves list none. Mirrors matter.js
+// packages/node/src/behaviors/descriptor/DescriptorServer.ts:227-254
+// (#currentPartsListNumbers) and DescriptorServer.ts:262-270
+// (#composesFullFamily).
+func TestBridgedNodePartsListIsFullFamily(t *testing.T) {
+	t.Parallel()
+	const dtRefrigerator, dtCabinet, dtPowerSource = 0x0070, 0x0071, 0x0011
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cabinet := func(key string, parts ...Spec) Spec {
+		return Spec{
+			StableKey: StringKey(key), DeviceType: dtCabinet,
+			Source: deviceTypeSource{dt: dtCabinet, servers: []contract.ClusterServer{dtServer{id: 0x0056}}},
+			Parts:  parts,
+		}
+	}
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+		StableKey: StringKey("fridge"), DeviceType: dtRefrigerator, FriendlyName: "Fridge",
+		Source: deviceTypeSource{dt: dtRefrigerator},
+		Parts: []Spec{
+			cabinet("fridge:cooler", Spec{
+				StableKey: StringKey("fridge:cooler:battery"), DeviceType: dtPowerSource,
+				PowerSource: measurementSource{contract.MeasurementBattery},
+			}),
+			cabinet("fridge:freezer"),
+		},
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(topo.Endpoints) != 6 {
+		t.Fatalf("endpoints = %d, want root, aggregator, fridge, cooler, its battery, freezer", len(topo.Endpoints))
+	}
+	fridge, cooler, battery, freezer := topo.Endpoints[2], topo.Endpoints[3], topo.Endpoints[4], topo.Endpoints[5]
+	if battery.ParentEndpointID != cooler.ID || cooler.ParentEndpointID != fridge.ID || freezer.ParentEndpointID != fridge.ID {
+		t.Fatalf("parent chain: cooler→%d battery→%d freezer→%d", cooler.ParentEndpointID, battery.ParentEndpointID, freezer.ParentEndpointID)
+	}
+	partsList := func(ep *Endpoint) []uint16 {
+		t.Helper()
+		for _, srv := range ClusterServers(ep) {
+			if srv.MatterClusterID() == 0x001D {
+				v, _ := srv.MatterRead(0x0003)
+				return v.([]uint16)
+			}
+		}
+		t.Fatalf("endpoint %d mounts no Descriptor", ep.ID)
+		return nil
+	}
+	want := []uint16{cooler.ID, battery.ID, freezer.ID}
+	slices.Sort(want)
+	if got := partsList(fridge); !slices.Equal(got, want) {
+		t.Errorf("bridged node PartsList = %v, want every descendant %v", got, want)
+	}
+	if got := partsList(cooler); !slices.Equal(got, []uint16{battery.ID}) {
+		t.Errorf("intermediate part PartsList = %v, want its child [%d] only", got, battery.ID)
+	}
+	if got := partsList(battery); len(got) != 0 {
+		t.Errorf("leaf PartsList = %v, want empty", got)
+	}
+	if got := partsList(freezer); len(got) != 0 {
+		t.Errorf("childless part PartsList = %v, want empty", got)
+	}
+}
