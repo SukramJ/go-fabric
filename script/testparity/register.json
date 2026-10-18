@@ -4039,31 +4039,23 @@
       "path": "packages/protocol/test/protocol/TcpSessionBindingTest.ts",
       "status": "partial",
       "go": [
-        "bridge:TestTCPConnectionDropEvictsBoundSessions"
+        "bridge:TestTCPConnectionDropEvictsBoundSessions",
+        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
+        "bridge:TestTcpSessionBindingManagerReaction",
+        "bridge:TestTcpSessionBindingConnectionLifecycle",
+        "bridge:TestTcpSessionBindingChannelTypeDetection",
+        "transport/tcp:TestTcpTransportOnDisconnect"
       ],
       "missing": [
-        "finds sessions by channel identity",
-        "sessions on different connections are distinguishable",
-        "session force-close marks session as closing",
-        "exchange can be closed with error",
-        "names the originating environment on the lines the drop produces",
-        "names no origin when the manager is built without one",
-        "leaves a session on another connection alone",
         "gives the closed exchange a cause that claims nothing about the peer",
-        "fires disconnect listeners when connection drops",
         "disconnect listener can be removed",
         "onDisconnect is detected via typeof check",
-        "TCP connection is NOT closed by MessageChannel.close()",
-        "multiple sessions can share the same TCP connection",
-        "closing one session does not affect sessions on other connections",
-        "TCP channels have type TCP",
-        "UDP channels have type UDP",
         "finds a TCP session among mixed sessions",
         "returns undefined when no TCP session exists",
         "skips closing TCP sessions",
         "returns undefined when all TCP sessions are closing"
       ],
-      "reason": "A dropped TCP connection closing its sessions is covered on the device side; the remaining binding and logging cases are not.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp; the device bridge's exchanges hold no awaitable with an error cause, the listener's onClose is a Serve argument with no handle to remove nor a duck-typed probe, and the TCP session selection is PeerExchangeProvider's controller-side logic with no device-side counterpart.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {
