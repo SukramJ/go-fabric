@@ -4,12 +4,16 @@
 package fabrictest_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
 )
 
 // TestControllerDiscover: the controller finds the uncommissioned device
@@ -50,5 +54,35 @@ func TestControllerCommissionNode(t *testing.T) {
 	}
 	if err := site.Eventually(ctx, "the subscription", n.SubscriptionActive); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestControllerAttestationStore: without a trust store the attestation
+// carries the DclServiceUnavailable warning; a store of another root does
+// not trust the device's chain.
+func TestControllerAttestationStore(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name  string
+		opts  fabrictest.ControllerOptions
+		check attestation.Check
+	}{
+		{"no store", fabrictest.ControllerOptions{NoAttestationStore: true}, attestation.DclServiceUnavailable},
+		{"another root", fabrictest.ControllerOptions{Attestation: &attestation.StaticStore{PAAs: []attestation.PAA{{DER: secattestation.TestPAAFFF1Cert}}, AcceptTest: true}}, attestation.PaaNotTrusted},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			site := fabrictest.NewSite(t, fabrictest.Options{})
+			var seen []attestation.Finding
+			_ = site.CommissionedPair(fabrictest.PairOptions{Controller: c.opts, Commission: fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
+				o.OnAttestationFailure = attestation.Policy{Decide: func(f []attestation.Finding) (bool, string, error) {
+					seen = f
+					return true, "", nil
+				}}
+			}}})
+			if !slices.ContainsFunc(seen, func(f attestation.Finding) bool { return f.Check == c.check }) {
+				t.Fatalf("findings %+v, want %s", seen, c.check)
+			}
+		})
 	}
 }

@@ -52,6 +52,13 @@ type ControllerOptions struct {
 	// template. Its Store is the controller's own [client.MemoryStore],
 	// kept across restarts; an edit may replace it.
 	Registry func(*client.RegistryConfig)
+	// Attestation is the commissioner's trust store; nil is
+	// attestation.TestStore (the CSA test PAAs, test roots accepted).
+	Attestation attestation.PAAStore
+	// NoAttestationStore commissions without a trust store — matter.js's
+	// controller without a DclCertificateService: every attestation
+	// carries the DclServiceUnavailable warning. It overrides Attestation.
+	NoAttestationStore bool
 }
 
 // Controller is an in-process Matter controller of a site: the module's
@@ -163,7 +170,7 @@ func (c *Controller) start() error {
 	// With Fabrics the commissioner runs the CASE responder that adopts
 	// the sessions a device opens to the controller into the peer set.
 	if c.com, err = commissioner.New(commissioner.Context{
-		Exchanges: c.mgr, Peers: c.set, Attestation: attestation.TestStore(), Logger: log, Clock: clk,
+		Exchanges: c.mgr, Peers: c.set, Attestation: c.trustStore(), Logger: log, Clock: clk,
 		Subscriptions: c.subs, Fabrics: []*commissioner.Fabric{c.fabric}, Resumption: c.resume,
 	}); err != nil {
 		return fmt.Errorf("commissioner: %w", err)
@@ -180,6 +187,17 @@ func (c *Controller) start() error {
 		return fmt.Errorf("client registry: %w", err)
 	}
 	return nil
+}
+
+// trustStore is the commissioner's attestation trust store.
+func (c *Controller) trustStore() attestation.PAAStore {
+	switch {
+	case c.opts.NoAttestationStore:
+		return nil
+	case c.opts.Attestation != nil:
+		return c.opts.Attestation
+	}
+	return attestation.TestStore()
 }
 
 // Close stops the controller. It is idempotent.

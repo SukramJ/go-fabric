@@ -21,6 +21,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - `fabrictest.Controller.PASE(ctx, device)`: a PASE session to a device in its commissioning window, as a `Pair` whose `Interaction` speaks over `Pair.PASESession` — the session without fabric matter.js's tests build; the wire helpers accept it.
 - `fabrictest.Controller.Restart(ctx)`: stops the controller and starts it again on its stores — certificate authority, fabric, CASE resumption records and the client node registry's store — so the registry restores its nodes, as matter.js's controller ServerNode restarted on its storage. `fabrictest.ControllerOptions.Registry` edits the registry's configuration (hooks, AutoStart, store) on every start.
 - `fabrictest.Controller.Discover(ctx, id, timeout)` finds commissionable devices on the site, the timeout on the site's clock; `fabrictest.Controller.CommissionNode(ctx, device, opts)` commissions a device through the controller's client node registry as matter.js `controller.peers.commission` does — discovered by its discriminator, the registry's node commissioned and started.
+- `fabrictest.ControllerOptions.Attestation` sets the commissioner's attestation trust store (nil keeps `attestation.TestStore`), `NoAttestationStore` commissions without one, as matter.js's controller without a DclCertificateService.
 
 ### Fixed
 

@@ -1755,31 +1755,20 @@
         "controller/commissioner:TestRejectedAttestation",
         "controller/commissioner:TestAcceptedFailedAttestation",
         "controller/dcl:TestCommissionWithDCLStore",
-        "controller/dcl:TestCommissionRevokedDAC"
+        "controller/dcl:TestCommissionRevokedDAC",
+        "controller/client:TestClientAttestationNoTrustStoreParity",
+        "controller/client:TestClientAttestationTrustStoreParity",
+        "controller/client:TestClientAttestationCallbackContractParity"
       ],
       "missing": [
-        "commissions with default policy (undefined)",
-        "custom callback receives DclServiceUnavailable warning and other findings",
-        "custom callback receives findings and rejects",
-        "callback receives CertificationTypeTest and other expected findings",
-        "rejects with onAttestationFailure=false despite valid chain",
         "self-heals a corrupt cached PAA by re-fetching from DCL",
         "surfaces an unrecoverable corrupt cached PAA as a judgeable finding",
         "rejects an unrecoverable corrupt cached PAA when policy rejects, surfacing the cause",
-        "emits TrustedAsTestCertificate finding, callback rejects",
-        "emits TrustedAsTestCertificate finding, callback accepts → commissioning proceeds",
-        "PaaNotTrusted error finding, callback rejects",
-        "PaaNotTrusted error finding, callback accepts → commissioning proceeds",
         "rejects when PAI serial is in revocation list",
         "passes when revocation list has different serial numbers",
-        "dynamically fetches revocation data from DCL during commissioning",
-        "string return on success-path findings wraps the synthesized error as cause",
-        "string return on hard-error finding wraps the original DeviceAttestationError as cause",
-        "callback throw propagates verbatim (no wrapping)",
-        "callback throwing DeviceAttestationError on success-path findings propagates without re-invocation",
-        "callback throwing DeviceAttestationError on hard-error finding propagates without re-invocation"
+        "dynamically fetches revocation data from DCL during commissioning"
       ],
-      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store are covered; the findings callbacks and corrupt-cache cases are not.",
+      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest.",
       "snapshotSha": "f9312f9c95045cfa3ad304b8b2e26732aab89708"
     },
     {
