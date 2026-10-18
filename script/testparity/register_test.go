@@ -166,6 +166,7 @@ func TestTestparityEntryValidation(t *testing.T) {
 		{Path: "p", Status: StatusPorted, Go: []string{"im:TestX"}, Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusPartial, Go: []string{"secure/channel:TestY"}, Missing: []string{"m"}, Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusPlanned, Reason: "r", SnapshotSHA: sha},
+		{Path: "p", Status: StatusPlanned, Until: "M5 phase 23", Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M4", Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusExcluded, Class: ClassDeviceBLEThread, Until: "M7", Reason: "r", SnapshotSHA: sha},
 		{Path: "p", Status: StatusExcluded, Class: ClassJSRuntimeOnly, Reason: "r", SnapshotSHA: sha},
@@ -190,6 +191,8 @@ func TestTestparityEntryValidation(t *testing.T) {
 		"planned with go":       {Path: "p", Status: StatusPlanned, Go: []string{"im:TestX"}, Reason: "r", SnapshotSHA: sha},
 		"stage without until":   {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Reason: "r", SnapshotSHA: sha},
 		"until on js-runtime":   {Path: "p", Status: StatusExcluded, Class: ClassJSRuntimeOnly, Until: "M9", Reason: "r", SnapshotSHA: sha},
+		"malformed until":       {Path: "p", Status: StatusPlanned, Until: "later", Reason: "r", SnapshotSHA: sha},
+		"until past M7":         {Path: "p", Status: StatusExcluded, Class: ClassControllerStage, Until: "M9", Reason: "r", SnapshotSHA: sha},
 		"missing on excluded":   {Path: "p", Status: StatusExcluded, Class: ClassJointFabric, Missing: []string{"m"}, Reason: "r", SnapshotSHA: sha},
 		"blank reason (spaces)": {Path: "p", Status: StatusPlanned, Reason: "  ", SnapshotSHA: sha},
 	}

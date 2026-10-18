@@ -132,6 +132,9 @@ func goOrClass(e *Entry) string {
 		}
 		return "`" + e.Class + "`"
 	default:
+		if e.Until != "" {
+			return "until " + cell(e.Until)
+		}
 		return "—"
 	}
 }

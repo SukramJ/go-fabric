@@ -133,7 +133,8 @@ Sonnet-Read vor; `ported` nur, wenn die Go-Tests die `it`-Fälle semantisch
 abdecken, sonst `partial` mit `missing`. Ich prüfe jeden `excluded`-Eintrag
 und eine Stichprobe von zehn Prozent der `ported`. Der Ratchet-Startwert ist
 die Zahl der `planned` nach der Befüllung; Phase 16 bringt ihn für
-`protocol/test` und `node/test/node` auf 0, Meilenstein 3 für
+`protocol/test` und `node/test/node` auf die Zahl der Einträge mit `until`
+(sieben, Entscheidung 0.10 in §A.5), Meilenstein 3 für
 `node/test/behaviors`.
 
 ### A.4 Phase 15: der `Clock`-Port und das öffentliche Testpaket `fabrictest`
@@ -209,12 +210,83 @@ PASE/CASE-Provider, Fenster, Health), `im/subscription/engine.go:39`, `node/`,
 
 ### A.5 Phase 16: die Protokoll-Ports
 
-`packages/protocol/test` (114) und `packages/node/test/node` (49) als Go-Tests
-gegen diesen Stack, auf `fabrictest`. Reihenfolge nach Register: zuerst die
-Dateien, deren Gegenstand wir haben (MRP, MessageExchange, SessionManager,
-PASE/CASE, MessageCodec, Certificates, DeviceAttestationValidator, Bdx, Btp,
-Mdns, FailsafeContext), dann `node/test/node`. Was `excluded` ist, bleibt es
-mit Klasse und Frist.
+**Entscheidungen des Owners (2026-10-18, nach `v0.7.2`).**
+
+- 0.9 **Zwei Wellen wie geplant:** BH = ganz `packages/protocol/test`,
+  BI = ganz `packages/node/test/node`. Je Welle ein Branch und ein PR;
+  innerhalb der Welle arbeiten die Agenten nacheinander auf demselben
+  Branch, in Tranchen nach Gebiet (unten).
+- 0.10 **`planned` mit `until`:** ein `planned`-Eintrag, dessen Gegenstand
+  Arbeit einer späteren Phase ist, trägt `until` (Meilenstein, mit oder
+  ohne Phase; der Guard prüft die Form `M5`, `M5 phase 23`). Die
+  100-%-Regel der beiden Bäume lautet damit: jeder Eintrag ist `ported`
+  oder trägt `until`; `excluded` bleibt mit Klasse. Sieben Einträge tragen
+  es heute (die sechs ICD-Dateien → `M5 phase 23`, die Geräte-ICD-Rolle;
+  `PeerConnectionSocketOwnershipTest` → `M5 phase 24`). Der Ratchet zählt
+  sie weiter: Zielwert nach Phase 16 für die beiden Bäume ist 7, nicht 0.
+- 0.11 **Kleine Fixes in der Welle:** deckt ein Port eine Verhaltenslücke
+  auf, behebt der Agent sie in derselben Welle, wenn die matter.js-Stelle
+  eindeutig ist und der portierte Test sie beweist, mit Zitat; der Report
+  führt jeden Fix mit den matter.js-Zeilen, der Review prüft jedes Zitat.
+  Unklares oder Größeres wird `missing` mit Grund und von mir registriert.
+- 0.12 **Zwei Agenten parallel** auf disjunkten Pfaden: BH und BI laufen
+  nebeneinander; die chip-tool-Harness benutzt nur BI (Geräteseite).
+
+**Befund (Register am Pin 862ad75f, Stand `v0.7.2`).**
+
+| Baum | Dateien | `planned` | `partial` | `ported` | `excluded` | offene `it`-Fälle |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `protocol/test` | 114 | 48 (7 mit `until`) | 46 | 2 | 18 | ≈ 1 520 |
+| `node/test/node` | 49 | 32 | 12 | 1 | 19 (4 `test-infrastructure`/`js-runtime-only` Helper) | ≈ 690 |
+
+Offene Fälle = jeder `it` einer `planned`-Datei plus die `missing` einer
+`partial`-Datei (gezählt am Pin). Die größten Posten: `node/test/node` 681,
+`protocol/test/dcl` 331, `peer` 148, `certificate` 152, `protocol` 139.
+
+**Tranchen.** Reihenfolge nach Nähe zum vorhandenen Code; jede Tranche
+endet mit grünen Guards, einem Push und einem Report-Abschnitt, so dass ein
+nächster Agent auf dem Branch weitermacht, wenn der Kontext eines Agenten
+nicht reicht.
+
+| Welle | Tranche | Verzeichnisse (`packages/<baum>/test/…`) | Dateien | Fälle |
+| --- | --- | --- | --- | ---: |
+| BH | BH-1 Wire-Kern | `codec`, `session`, `session/secure`, `securechannel`, `protocol`, `protocol/interaction`, `interaction`, `events`, `transport/tcp` | 26 | ≈ 345 |
+| BH | BH-2 Credentials und Transfer | `certificate`, `fabric`, `groups`, `bdx`, `ota`, `thread`, `advertisement`, `common` | 27 | ≈ 390 |
+| BH | BH-3 Controller-Seite | `peer`, `mdns`, `action/client`, `action/client/subscription`, `action/request` | 27 | ≈ 390 |
+| BH | BH-4 DCL | `dcl` | 10 | ≈ 330 |
+| BI | BI-1 Geräteseite | die Antwort-, Commissioning- und Subscription-Tests (`Attribute*Response`, `CommandInvokeResponse`, `EventReadResponse`, `BitmapWriteValidation`, `DotQualifiedConstraint`, `DelayReportData`, `ServerNode`, `ServerSubscription`, `*Commissioning*`, `SetRegulatoryConfigSideEffect`, `ReportedSessionParameters`) | ≈ 17 | ≈ 400 |
+| BI | BI-2 Controller-Seite | `Client*`, `Peers*`, `Decommission`, `NodeLifecycleSeeded`, `NodePhysicalProperties`, `PeerBehavior`, `PeerDescriptor`, `ReceivedStatus`, `CaseConnectionTimeout`, `node/client/*` | ≈ 27 | ≈ 290 |
+
+**Bauweise eines Ports.**
+
+- Eine Go-Datei je matter.js-Datei, `<gegenstand>_parity_matterjs_test.go`
+  im Paket des Gegenstands (BH) bzw. unter `node/` auf `fabrictest` für die
+  Geräteseite und `controller/client` für die Controller-Seite (BI); Kopf
+  „A port of matter.js `packages/…/XTest.ts` at 862ad75f“. Ein Go-Test je
+  `describe`-Gruppe mit Subtests, die die `it`-Namen tragen, oder ein Test
+  je `it`; die Zuordnung steht im Register (`go`), nicht nur im Kopf.
+- Vektoren und Erwartungswerte kommen aus der matter.js-Datei am Pin, nie
+  aus dem Go-Code; eine Erwartung, die unser Code nicht erfüllt, ist ein
+  Fix (0.11) oder ein `missing` mit Grund — nie eine angepasste Zahl.
+- Was eine Node und einen Controller braucht, läuft auf `fabrictest`
+  (Site, In-Memory-Netz, Fake-Uhr); was ein Baustein allein prüft, bleibt
+  ein Unit-Test des Pakets. Zeit läuft auf `clocktest.Fake`.
+- `excluded` bleibt, mit Klasse. Ein Port, der die Klasse widerlegt, meldet
+  das im Report; die Umklassifizierung ist meine.
+- Jede Tranche: Register nachgeführt (`status`, `go`, `missing`,
+  `snapshotSha`), `make testparity`, Ratchet im selben Commit; `make ci`,
+  `make race`, `make cite-check`, `make reachability-check`,
+  `make cover-check`; chip-tool nur, wenn ein Fix das Geräteverhalten
+  bewegt hat.
+
+**Konfliktflächen** der beiden Branches: `CHANGELOG.md` `[Unreleased]`,
+`script/testparity/register.json` samt generierter Seite und Ratchet,
+`script/coverfloor/floors.go`, `script/reachability/`; Fixes können in
+`im/` und `bridge/` beide Wellen berühren. Löse ich beim Rebase der zweiten
+Welle (Fable-Zeile).
+
+**Versionen.** Die zuerst gemergte Welle wird `v0.7.3`; die zweite schließt
+Phase 16 und Meilenstein 2 und wird `v0.8.0`.
 
 ## Teil B: Phasen und Wellen
 
@@ -225,7 +297,8 @@ mit Klasse und Frist.
 | 14c | ich | Fix-Delta klassifiziert: `notes/parity/pin-lifts.md`, Register-Einträge | `notes/parity/` | `v0.7.1` nach 14a–c |
 | 15a | BF | `clock` + `clocktest.Fake`, alle Zeitstellen umgestellt, die 20 Fakes ersetzt, der Guard | `clock/`, `bridge/`, `im/`, `node/`, `secure/`, `mdns/`, `cluster/`, `controller/exchange` (Alias) | — |
 | 15b | BG | `fabrictest` (Site, In-Memory-Netz, Paar, Wire-Helfer), Migration der Controller-Testhelfer, Guide | `fabrictest/`, `controller/*_test.go`, `docs/guides/` | `v0.7.2` |
-| 16 | BH, BI | Ports protocol/test, node/test/node | `*_test.go` | `v0.8.0` |
+| 16 | BH (Opus, Tranchen BH-1…BH-4 nacheinander auf `m2/phase-16-protocol`) | Port `packages/protocol/test`: Wire-Kern, Credentials/Transfer, Controller-Seite, DCL | `*_parity_matterjs_test.go` in `transport/`, `secure/`, `bridge/`, `mdns/`, `bdx/`, `groups/`, `commissioning/`, `controller/{peer,discovery,attestation,ca,dcl,interaction,exchange}` | `v0.7.3` oder `v0.8.0` |
+| 16 | BI (Opus, parallel, Tranchen BI-1, BI-2 auf `m2/phase-16-node`) | Port `packages/node/test/node`: Geräteseite auf `fabrictest`, Controller-Seite | `node/*_parity_matterjs_test.go`, `controller/client/*_parity_matterjs_test.go` | `v0.7.3` oder `v0.8.0` |
 
 `Makefile` und `ci.yml` berühren 14a und 14b beide; den Merge-Konflikt löse
 ich (Fable-Zeile). Beide Briefs lesen die Sonnet-Reads, nicht den Baum.
