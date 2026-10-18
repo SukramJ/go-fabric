@@ -3010,41 +3010,15 @@
       "go": [
         "controller/dcl:TestRevocationPAISignedCRL",
         "controller/dcl:TestRevocationLookupFailures",
-        "controller/dcl:TestRevocationPartitioned"
+        "controller/dcl:TestRevocationPartitioned",
+        "controller/dcl:TestDclCertificateServiceRevocationOutsideTheDCL",
+        "controller/dcl:TestDclCertificateServiceRevocationOffline",
+        "controller/dcl:TestDclCertificateServiceRevocationParseRevocationSet"
       ],
       "missing": [
-        "installs what the constructor was given",
-        "passes a serial the set does not name to the DCL, which here knows nothing",
-        "answers a serial the set does name without asking the DCL",
-        "keeps one authority's two issuers apart, each with its own serials",
-        "installs the same set twice without stacking it up",
-        "matches a serial whose top bit is set, which a certificate states with a leading zero",
-        "matches on the key identifier alone where an entry states an empty issuer name",
-        "installs nothing when an entry hands in a serial that is not hex",
-        "installs nothing when an entry states an issuer name that is not base64",
-        "matches on the key identifier alone where an entry names no issuer",
-        "matches an entry that names an issuer even where the caller states none",
-        "reads a serial stated with separators, and one stated as bytes",
-        "asks the DCL nothing, neither for certificates nor for a CRL",
-        "answers a CD signer it does not hold without asking the DCL",
-        "still updates nothing when asked to",
-        "reads the set as the revocation-set tool writes it",
-        "refuses text that is not JSON",
-        "refuses a set that is not a list of entries",
-        "refuses an entry that names no issuer key identifier",
-        "refuses an entry that is not an object at all",
-        "refuses an entry whose key identifier is not hex, which would match nothing",
-        "refuses a serial that is not hex, which would match nothing",
-        "refuses hex that does not divide into bytes",
-        "refuses an issuer name that is not base64",
-        "refuses an entry stating a type other than a revocation set",
-        "refuses a list where an entry should be",
-        "reads a set that revokes nothing",
-        "refuses an entry whose serial numbers are not a list",
-        "refuses an entry whose issuer name is not a string",
-        "refuses an entry whose serial numbers are not a list of strings"
+        "installs what the constructor was given"
       ],
-      "reason": "Revocation lookups by issuer are covered; installed sets outside the DCL, serial encodings and stacking are not ported case by case.",
+      "reason": "Installed revocation sets (CertificateStore.InstallRevocations, InstalledRevocations, the canonical serial and the issuer-name matching), the offline store and ParseRevocationSet are ported case by case through the Go surface; the constructor's revocations option is missing because CertificateOptions (certstore.go) has no Revocations field yet, so the cases that pass it install the set right after OpenCertificateStore.",
       "snapshotSha": "6b158ccb0336eef76953f5e6515049142720ed35"
     },
     {
