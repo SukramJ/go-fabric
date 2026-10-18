@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `secure/mattercert`: the X.509 TBSCertificate rebuilt for signature verification now emits the extensions in their TLV arrival order and writes an explicit `pathLenConstraint` of 0 when the certificate carries one. Both mirror matter.js (`Certificate.ts` `extensionsToAsn1`, `X509.ts` `BasicConstraints`) and chip (`CHIPCertToX509.cpp`). Before, the order was fixed to tag order and a zero path-len was dropped, so every Amazon (Alexa) and SmartThings root failed `AddTrustedRootCertificate` with `RCAC self-signature invalid: mattercert: signature invalid`, and their ICACs would have failed `AddNOC`. The matter.js fixtures of both commissioners (`TestCertificates.ts`) are now parity cases: TBS bytes, root self-signature and the root → ICAC → NOC chain.
+
 ## [0.7.2] — 2026-10-18
 
 Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.

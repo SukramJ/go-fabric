@@ -114,7 +114,8 @@ type Certificate struct {
 //
 // X.509 DER reconstruction (used by signature verification per
 // matter.js Certificate.verifyChain) requires every extension to ride
-// in the rebuilt TBS in the SAME order they appeared in the source TLV.
+// in the rebuilt TBS in the SAME order they appeared in the source TLV;
+// Order carries that sequence.
 type CertificateExtensions struct {
 	HasBasicConstraints        bool
 	BasicConstraintsIsCA       bool
@@ -129,6 +130,16 @@ type CertificateExtensions struct {
 	HasAuthorityKeyID          bool
 	AuthorityKeyID             []byte // 20 bytes
 	FutureExtensions           [][]byte
+	// Order records the extension tags in their original TLV arrival
+	// sequence, one entry per extension (tag 6 repeats once per future
+	// extension). TBSToDER emits the X.509 extension list in this
+	// order: matter.js's extensionsToAsn1 (Certificate.ts:208) iterates
+	// Object.entries(extensions), whose insertion order is the wire
+	// order TlvObject.decodeTlvInternalValue assigned the fields in.
+	// Amazon's and SmartThings' commissioner certificates carry
+	// basic-constraints, subject-key-id, key-usage, authority-key-id —
+	// not tag order — and a fixed order fails their signatures.
+	Order []uint8
 }
 
 // DistinguishedName captures the Matter-specific DN attributes that
@@ -448,6 +459,9 @@ func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 			return ext, fmt.Errorf("%w: extension entry with non-context tag", ErrMalformed)
 		}
 		tag := uint8(el.Tag.Number & 0xFF)
+		if tag >= extTagBasicConstraints && tag <= extTagFutureExtension {
+			ext.Order = append(ext.Order, tag)
+		}
 		switch tag {
 		case extTagBasicConstraints:
 			if !el.IsContainer {
