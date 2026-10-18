@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5416,
+  "entry_points": 5419,
   "entry_packages": [
     ".",
     "bdx",
@@ -224,9 +224,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12888,
+    "total_exported": 12891,
     "reachable": 9050,
-    "whitelisted": 3833,
+    "whitelisted": 3836,
     "unreachable": 5
   },
   "by_package": [
@@ -23489,6 +23489,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/tbs_der_apple_test.go",
       "line": 25
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestTBSToDER_MatchesMatterJSCommissionerFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/tbs_der_parity_matterjs_test.go",
+      "line": 71
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestValidateRCAC_MatterJSCommissionerRoots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/tbs_der_parity_matterjs_test.go",
+      "line": 113
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestVerifier_MatterJSCommissionerChains",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/tbs_der_parity_matterjs_test.go",
+      "line": 132
     },
     {
       "package": "secure/operational",
