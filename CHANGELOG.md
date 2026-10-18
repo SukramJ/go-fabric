@@ -31,6 +31,8 @@ pseudo-version of `main`.
 - `cluster/core`: `WiFiNetworkCommissioning`, NetworkCommissioning with the Wi-Fi feature over a host `contract.WiFiDriver` (scan and connect) — the commands, statuses and list rules of connectedhomeip's NetworkCommissioningCluster and Linux Wi-Fi driver (matter.js's server is a generated stub); `node.Network.WiFiCommissioning` mounts it instead of the Ethernet server. TESTING ONLY so far: the reference daemon's `--wifi-sim`. The Ethernet-only default is unchanged.
 - `bridge/bridgetest`: `ServeConn` serves a node's messages over a connection of a transport the bridge does not listen on (a test's BTP peripheral).
 
+- `ble/bluez`: a Go module of its own (`github.com/SukramJ/go-fabric/ble/bluez`, ADR 0024 decision 3) — `NewCentral(adapter)`, a `controller/ble.Central` over BlueZ on the D-Bus system bus in pure Go: discovery filtered to the Matter service with every advertisement reported, `Device1.Connect`, the Matter `GattService1` with C1 (write with response), C2 (notifications) and C3, the ATT_MTU from BlueZ's `MTU` property, and the connection ending on `Connected=false`. Every D-Bus failure is a `*bluez.Error` that names the D-Bus error (`org.freedesktop.DBus.Error.AccessDenied`, `org.bluez.Error.NotReady` …). Linux only (`ErrUnsupported` elsewhere); its one dependency, `github.com/godbus/dbus/v5` (BSD-2-Clause), is recorded in the module's own `THIRD-PARTY-NOTICES.md`. The main module's dependencies do not change. CI checks the module in a job of its own (`make bluez-check`).
+
 ### Documentation
 
 - `README.md`: a status table after the opening paragraph — device and controller side, BLE, Thread, ICD, certification, verified ecosystems — each row linked to the roadmap, the comparison or the certifiability page.

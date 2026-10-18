@@ -297,5 +297,20 @@ update-dcl-snapshot: ## refetch controller/dcl/snapshot/data (PAAs, CD signers, 
 	@# controller trusts. The CRL check stays online (controller/dcl).
 	$(GO) run ./script/dclsnapshot -out controller/dcl/snapshot/data
 
+# ble/bluez is a Go module of its own (ADR 0024 decision 3): the main
+# module's ./... does not reach it, so it has its own leg. The !linux stub
+# is built for darwin as well.
+BLUEZ_DIR ?= ble/bluez
+
+.PHONY: bluez-check
+bluez-check: ## the ble/bluez sub-module: build (Linux and the stub), vet, test, golangci-lint, go mod tidy -diff
+	cd $(BLUEZ_DIR) && $(GO) build ./...
+	cd $(BLUEZ_DIR) && GOOS=darwin $(GO) build ./...
+	cd $(BLUEZ_DIR) && $(GO) vet ./...
+	cd $(BLUEZ_DIR) && $(GO) test -count=1 ./...
+	cd $(BLUEZ_DIR) && $(GOLANGCI_LINT) run --timeout=5m ./...
+	cd $(BLUEZ_DIR) && $(GO) mod tidy -diff
+	cd $(BLUEZ_DIR) && $(GO) mod verify
+
 .PHONY: ci
-ci: build vet test lint cover-check ## everything the pipeline runs
+ci: build vet test lint cover-check bluez-check ## everything the pipeline runs
