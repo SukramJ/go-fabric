@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 13 |
-| partial | 99 |
-| planned | 125 |
+| partial | 100 |
+| planned | 124 |
 | excluded | 87 |
 | total | 324 |
 
@@ -97,7 +97,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 1 | 1 | 3 | 0 |
 | [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
-| [protocol/test/common](#protocoltestcommon) | 8 | 2 | 1 | 2 | 3 |
+| [protocol/test/common](#protocoltestcommon) | 8 | 2 | 2 | 1 | 3 |
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
@@ -751,7 +751,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | DiscoveryDataTest.ts | 128 | ported | `controller/discovery:TestParityDiscovery_TXTParameters`<br>`controller/discovery:TestParityDiscovery_TXTData`<br>`controller/discovery:TestDiscoveryDataCaseInsensitiveKeys`<br>`controller/discovery:TestDiscoveryDataSessionIntervals`<br>`controller/discovery:TestDiscoveryDataIdentity`<br>`controller/discovery:TestDiscoveryDataTransports` | Every it case runs against ParseTXTData: case-insensitive keys (on a hand-built and on a discovered Name's parameters) and the SII/SAI/SAT, VP/DT/PH and T/ICD accept and drop vectors. |
 | ExpandedPathTest.ts | 134 | excluded | `js-runtime-only` | Log rendering of attribute and event paths. |
 | ExpandedStatusTest.ts | 59 | excluded | `js-runtime-only` | Log rendering of status codes. |
-| FailsafeContextTest.ts | 117 | planned | ‚Äî | The fail-safe context dropping its listener on close and refusing an admin subject that is a CAT of version 0 or neither node ID nor CAT. |
+| FailsafeContextTest.ts | 117 | partial | `cluster/core:TestFailsafeContextBuildFabric` | The admin subject check of buildFabric (CAT version 0, CAT version 1, a subject that is neither node ID nor CAT) is ported through AddNOC; the closedByPeer listener has no Go counterpart, as the Go fail-safe is not attached to the arming session and does not expire when its PASE peer closes it. Missing: ‚Äúdetaches its closedByPeer listener on close‚Äù. |
 | FailsafeTimerTest.ts | 84 | ported | `cluster/core:TestGenComm_ArmFailSafeForArmsThenExpires`<br>`cluster/core:TestGencomm_ArmFailSafe_OnExpired_Hook`<br>`cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow`<br>`cluster/core:TestFailsafeTimerVerifyExpiryHandling` | The fail-safe expiry, re-arming (extended and with 0), the cumulative limit expiring it and completion suppressing the callback are ported through the General Commissioning server on a fake clock, the cumulative vector scaled to the server's 900 s floor. |
 | PathErrorTest.ts | 53 | excluded | `js-runtime-only` | The TypeScript PathError class. |
 
@@ -1156,7 +1156,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### protocol/test/common
 
 - `BleListeningClockTest.ts` ‚Äî The commissioner's BLE listening clock that ages scanned peripherals by time spent scanning.
-- `FailsafeContextTest.ts` ‚Äî The fail-safe context dropping its listener on close and refusing an admin subject that is a CAT of version 0 or neither node ID nor CAT.
 
 ### protocol/test/dcl
 

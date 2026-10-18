@@ -2879,8 +2879,14 @@
     },
     {
       "path": "packages/protocol/test/common/FailsafeContextTest.ts",
-      "status": "planned",
-      "reason": "The fail-safe context dropping its listener on close and refusing an admin subject that is a CAT of version 0 or neither node ID nor CAT.",
+      "status": "partial",
+      "go": [
+        "cluster/core:TestFailsafeContextBuildFabric"
+      ],
+      "missing": [
+        "detaches its closedByPeer listener on close"
+      ],
+      "reason": "The admin subject check of buildFabric (CAT version 0, CAT version 1, a subject that is neither node ID nor CAT) is ported through AddNOC; the closedByPeer listener has no Go counterpart, as the Go fail-safe is not attached to the arming session and does not expire when its PASE peer closes it.",
       "snapshotSha": "14ec78a082cf5f073b5cd8a2a1a6de1c0e06c191"
     },
     {
