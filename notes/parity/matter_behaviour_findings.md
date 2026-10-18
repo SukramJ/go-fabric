@@ -345,6 +345,20 @@ FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 rules below that matter.js does not carry and that were taken from memory
 of connectedhomeip are marked unverified:
 
+- **Wi-Fi NetworkCommissioning (TESTING ONLY) does not persist its
+  committed networks across a restart.** TC-CNET-4.1, 4.4 and 4.9 find no
+  connected network after the daemon restarts; chip's Linux driver stores
+  the committed network and reconnects at `Init`
+  (`src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:77-118, :135-138`
+  at the harness pin). Fix: persist the committed `Networks` entry through
+  the node's store and re-issue `Connect` on start; class (a) in the
+  CNETWIFI row of `docs/certifiability.md`. (Phase 13, report BB §4.)
+- **The simulated Wi-Fi driver connects to any SSID.** TC-CNET-4.23
+  expects a wrong SSID to fail; `--wifi-sim` accepts every network.
+  Fix: a configurable SSID list for the simulated driver
+  (`--wifi-sim-ssid`), so 4.23 moves from class (c) to a pass. (Phase 13,
+  report BB §4.)
+
 - **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the
   accessing fabric.** `core.WiFiNetworkCommissioning` gates its commands
   on `GeneralCommissioning.FailSafeArmed()` (any fabric), chip on

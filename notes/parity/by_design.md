@@ -3232,3 +3232,45 @@ through opaque. Report BA §3.
 
 By design until a consumer reads more of it (the Thread border-router
 client is roadmap milestone 5).
+
+### BD-Controller-BluezWithoutNobleRetries — `ble/bluez` ports the sequence, not noble's recovery
+
+matter.js's node platform drives BLE through noble/bleno over raw HCI
+(`packages/nodejs-ble/src/NobleBleClient.ts`, `NobleBleChannel.ts` at
+`0ceb202d`); this module's `ble/bluez` drives BlueZ over D-Bus. The
+sequence and the timeouts are noble's (`NobleBleChannel.ts:203` connect
+2 min, :220 interview 1 min, :38 stop 5 s); not ported are the reconnect on
+a disconnect during connect (:273-297), the 2 s MTU settle wait (:526-560)
+and the `connectable` check (`NobleBleClient.ts:184-187`), which BlueZ
+either does itself or has no property for. Report BB §1 (phase 13,
+2026-10-18).
+
+By design. A different stack under the same seam; what BlueZ guarantees is
+not re-implemented above it.
+
+### BD-Controller-BleNodeLocatedByChannel — a BLE-found node is located by its commissioning channel
+
+matter.js records a peripheral as a `NetworkAddress` of type `"ble"` in the
+node's addresses (`CommissioningClient.ts:883-895`), which passes the
+"has the node been located" check (:220-223). `client.Record`'s addresses
+are IP only; `Registry.Commission` therefore accepts a node without
+addresses when `Options.Channel` (the BTP channel) is set, and the
+operational address arrives through DNS-SD after the network steps as it
+does in matter.js. Report BB §2.
+
+By design. The record keeps one address type; the channel carries the
+BLE case.
+
+### BD-chip-CnetWifiProvisionedAfterIP — the CNETWIFI harness run provisions the Wi-Fi network after IP commissioning
+
+chip's test harness commissions a Wi-Fi DUT over BLE and configures the
+network in the flow (`AutoCommissioner.cpp:780-797` at `6170af84`: no
+network is configured when commissioning over IP). The harness here
+commissions the reference daemon (`--wifi-sim`) over IP and then adds the
+cases' PIXIT network (`zigbeehome` / `password123`) with the same commands
+the flow would send (`testdata/provision_wifi.py`, four chip-tool commands
+for the YAML cases), so the CNET Wi-Fi cases see the state a BLE-Wi-Fi
+commissioning leaves. Report BB §4.
+
+By design. The harness image has no CHIPoBLE; the DUT state, not the
+transport, is what the cases judge.
