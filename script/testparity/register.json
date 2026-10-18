@@ -3188,8 +3188,12 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclConfigTest.ts",
-      "status": "planned",
-      "reason": "The DCL production/test URLs and the GitHub certificate source defaults.",
+      "status": "ported",
+      "go": [
+        "controller/dcl:TestDclConfig",
+        "controller/dcl:TestDclConfigDclGithubConfig"
+      ],
+      "reason": "The production and test-net ledger URLs (ProductionURL, TestNetURL, a custom Client.BaseURL) and the GitHub certificate source defaults (DefaultGitHubConfig, a custom GitHubConfig) are ported.",
       "snapshotSha": "3875760a2b9106df46a9810f637a864ea490a887"
     },
     {
