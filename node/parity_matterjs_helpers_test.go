@@ -15,11 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // mockVendorName is MockServerNode's BasicInformation.vendorName, the value
@@ -114,4 +117,66 @@ func listLen(r *interaction.Report, ep uint16, cluster, attr uint32) (int, bool)
 		return 0, false
 	}
 	return len(v.Children), true
+}
+
+// strVal, boolVal and uintVal are values a write or a command field sends.
+func strVal(v string) spec.Encodable {
+	return interaction.Raw(spec.Node{El: tlv.Element{Type: tlv.TypeUTF8Str1, String: v}})
+}
+
+func boolVal(v bool) spec.Encodable {
+	typ := tlv.TypeBoolFalse
+	if v {
+		typ = tlv.TypeBoolTrue
+	}
+	return interaction.Raw(spec.Node{El: tlv.Element{Type: typ, Bool: v}})
+}
+
+func uintVal(v uint64) spec.Encodable {
+	return interaction.Raw(spec.Node{El: tlv.Element{Type: tlv.TypeUnsignedInt8, Uint: v}})
+}
+
+// rawAnswer is the device's answer to a raw request: the decoded response,
+// or the status of a StatusResponse in its place.
+type rawAnswer[T any] struct {
+	resp   T
+	status *im.StatusCode
+}
+
+// rawWrite sends req as it stands — matter.js writeAttrRaw /
+// writeAttrRawAsAdmin (AttributeWriteResponseTest.ts:392-409) — past the
+// controller's own formulation, over fabrictest.Exchange.
+func rawWrite(t *testing.T, m *mockPair, req im.WriteRequest) rawAnswer[im.WriteResponse] {
+	t.Helper()
+	enc := tlv.NewEncoder()
+	req.MarshalTLV(enc, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
+		if value, ok := v.Value.(spec.Encodable); ok {
+			value.EncodeTLV(e, tag)
+		}
+	})
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := fabrictest.Exchange(parityCtx(t), m.pair, im.OpcodeWriteRequest, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out rawAnswer[im.WriteResponse]
+	switch msg.Opcode {
+	case im.OpcodeStatusResponse:
+		sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(msg.Payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out.status = &sr.Status
+	case im.OpcodeWriteResponse:
+		out.resp, err = im.UnmarshalWriteResponseTLV(tlv.NewDecoder(msg.Payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+		t.Fatalf("answer opcode 0x%02x", msg.Opcode)
+	}
+	return out
 }

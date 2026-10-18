@@ -1705,18 +1705,15 @@
         "endpoint:TestHandleWriteRequest_EnforcesElevatedWritePrivilege",
         "endpoint:TestWrite_ConcreteReadOnlyAttributeRejected",
         "endpoint:TestWrite_WildcardSkipsReadOnlyAttribute",
-        "endpoint:TestWrite_ConstraintMaps"
+        "endpoint:TestWrite_ConstraintMaps",
+        "node:TestAttributeWriteResponseParity",
+        "im:TestWriteParity_DataVersion_WildcardEndpoint_Ignored"
       ],
       "missing": [
-        "writes model-known absent high-privilege attribute as unsupported attribute for view-only subject",
-        "writes endpoint wildcard attribute with ACL issue",
-        "writes version mismatch concrete attribute with error",
-        "writes version mismatch wildcard attribute where mismatch got ignored",
-        "writes wildcard attribute with constraint error",
         "writes with invalid wildcard combination",
         "${group ? \"group\" : \"wildcard\"} write skips an attribute that another write interaction holds"
       ],
-      "reason": "Concrete and wildcard writes, the ACL error, read-only attributes and constraint errors are covered; data-version mismatches, the view-only subject and wildcard constraint errors are not.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeWriteResponseParity; three fixes: the View pass before existence, the DataVersion ignored on a wildcard path, NodeLabel CONSTRAINT_ERROR). Missing: the invalid wildcard combination — matter.js answers the whole interaction with a StatusResponse of InvalidAction (AttributeWriteResponse.ts:279-285), the Go server an AttributeStatus per path, a response-shape change; the two held-write cases — AttributeWriteResponse's isHeldByOtherWrite lock across write interactions (:355), which the Go server does not have.",
       "snapshotSha": "8364800f12a8ec2f1484b142f3bc82fe033f75ac"
     },
     {

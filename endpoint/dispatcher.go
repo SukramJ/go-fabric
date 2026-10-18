@@ -876,22 +876,35 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 // so an Operate subject could write BridgedDeviceBasicInformation.NodeLabel,
 // OnOff.StartUpOnOff or the Thermostat setpoint limits ("RW VM") —
 // TC-ACE-2.2.
+//
+// A path that does not resolve — no such endpoint, no such cluster on it,
+// an attribute the cluster does not list — needs View only: matter.js
+// authorizes a concrete write at View first, answers the existence
+// statuses next, and checks the write privilege only for an attribute that
+// exists (packages/protocol/src/action/server/AttributeWriteResponse.ts:200-241
+// at 862ad75f, core spec §8.7.3.2), so a View subject learns that an
+// attribute is absent, as it does on a read. The dispatcher's Write then
+// answers UNSUPPORTED_ENDPOINT, _CLUSTER or _ATTRIBUTE.
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
+	const privilegeView uint8 = 1
 	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return want
+		return privilegeView
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
+		}
+		if !isGlobalAttribute(attrID) && !attributeListed(srv, attrID) {
+			return privilegeView
 		}
 		if priv, ok := srv.(contract.ClusterAttributeWritePrivilege); ok {
 			want = max(want, priv.MinWritePrivilege(attrID))
 		}
 		return want
 	}
-	return want
+	return privilegeView
 }
 
 // MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]: the

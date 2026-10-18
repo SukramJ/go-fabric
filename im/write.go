@@ -317,23 +317,21 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 				continue
 			}
 		}
-		// A write that carries a DataVersion MUST target a concrete endpoint;
-		// a DataVersion is meaningless against a wildcard-endpoint path.
-		// Mirrors matter.js packages/protocol/src/action/request/Write.ts:33
-		// (#3988, Matter §8.9.2.8.1): reject with InvalidAction rather than
-		// resolving the version against endpoint 0.
-		if w.HasDataVersion && !w.Path.HasEndpoint {
-			wr.Responses = append(wr.Responses, AttributeStatus{
-				Path:   w.Path,
-				Status: StatusIB{Status: StatusInvalidAction},
-			})
-			continue
-		}
-		// DataVersion mismatch check. Mirrors matter.js InteractionServer.ts
-		// version check and chip WriteHandler.cpp DataVersion guard. A zero
-		// DataVersion in the request means "caller does not constrain the
-		// version" — skip.
-		if hasDV && w.HasDataVersion && w.DataVersion != 0 {
+		// A DataVersion on a wildcard-endpoint path is ignored: Matter
+		// §8.9.2.8.1 forbids a client to send one (the controller refuses
+		// to, controller/interaction/write.go formulateWrite), and the
+		// server stays lenient — matter.js writes a wildcard path without
+		// looking at the version (packages/protocol/src/action/server/AttributeWriteResponse.ts:67-71
+		// at 862ad75f, "dataVersion silently ignored for Wildcard";
+		// AttributeWriteResponseTest.ts "writes version mismatch wildcard
+		// attribute where mismatch got ignored"). It used to be refused with
+		// InvalidAction, after the client-side guard.
+		//
+		// DataVersion mismatch check on a concrete endpoint. Mirrors
+		// matter.js AttributeWriteResponse.ts:254-257 and chip
+		// WriteHandler.cpp DataVersion guard. A zero DataVersion in the
+		// request means "caller does not constrain the version" — skip.
+		if hasDV && w.HasDataVersion && w.DataVersion != 0 && w.Path.HasEndpoint {
 			if current, ok := dvReader.CurrentDataVersion(ctx, w.Path.Endpoint, w.Path.Cluster); ok && current != 0 {
 				if current != w.DataVersion {
 					wr.Responses = append(wr.Responses, AttributeStatus{

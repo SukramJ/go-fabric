@@ -10,6 +10,19 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node` onto `fabrictest`.
+
+### Added
+
+- `fabrictest.Pair.Grant(ctx, privilege)`: replaces the device's access control list on the pair's fabric with one CASE entry for the controller at that privilege — matter.js `MockServerNode.online`'s access level, over the wire.
+- `fabrictest.Exchange(ctx, pair, opcode, payload)`: sends one Interaction Model message as it stands over the pair's session and returns the device's first answer, for a request the controller refuses to formulate.
+
+### Fixed
+
+- A write of an attribute, cluster or endpoint that does not exist answers UNSUPPORTED_ATTRIBUTE, _CLUSTER or _ENDPOINT to a subject with View privilege, as a read does; it answered UNSUPPORTED_ACCESS when the subject lacked the attribute's model write privilege. The View pass precedes the existence checks (matter.js `AttributeWriteResponse.ts:200-241`, chip `WriteHandler.cpp`; `endpoint.TopologyDispatcher.MinWritePrivilege` returns View for a path that does not resolve).
+- A write whose wildcard-endpoint path carries a DataVersion is written with the version ignored, as matter.js's server does (`AttributeWriteResponse.ts:67-71`); it was refused with INVALID_ACTION.
+- A write of BasicInformation NodeLabel longer than 32 bytes, or of a Location that is not two bytes, answers CONSTRAINT_ERROR; it answered FAILURE.
+
 ## [0.7.2] — 2026-10-18
 
 Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
