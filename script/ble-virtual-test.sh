@@ -220,7 +220,11 @@ our_leg() {
 		{ ours="the peripheral never saw AddOrUpdateWiFiNetwork for ssid lab (see peripheral-ours.log)" && return; }
 	ctl read "$NODE_ID" 0/BasicInformation/VendorID 0/NetworkCommissioning/0xFFFC >"$LOG_DIR/read.log" 2>&1 ||
 		{ ours="the read over the operational session failed after pairing (see read.log)" && return; }
-	grep -q 'VendorID' "$LOG_DIR/read.log" || { ours="the read returned no VendorID (see read.log)" && return; }
+	# One JSON line per attribute, named as matter.js names it (VendorId).
+	grep -q '"attribute":"VendorId".*"value":65521' "$LOG_DIR/read.log" ||
+		{ ours="the read returned no VendorID 0xFFF1 (see read.log)" && return; }
+	grep -q '"cluster":"NetworkCommissioning","attribute":"0xFFFC".*"value":1}' "$LOG_DIR/read.log" ||
+		{ ours="NetworkCommissioning's FeatureMap is not Wi-Fi (see read.log)" && return; }
 	# Bonus: an enhanced commissioning window over the same session.
 	if ctl window open "$NODE_ID" --timeout 180 >"$LOG_DIR/window.log" 2>&1; then
 		notes+=("window open: ok")
