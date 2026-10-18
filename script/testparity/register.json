@@ -4146,8 +4146,17 @@
     },
     {
       "path": "packages/protocol/test/securechannel/SecureChannelMessengerTest.ts",
-      "status": "planned",
-      "reason": "Busy and CloseSession sent without the reliability flag, and decode errors of the secure channel messenger.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestSecureChannelMessengerStatusReportsThatMustNotBeReliable"
+      ],
+      "missing": [
+        "sends Busy with the R flag clear",
+        "returns the decoded payload",
+        "reports a schema violation as UnexpectedDataError naming message and field",
+        "passes other decode errors through unchanged"
+      ],
+      "reason": "CloseSession leaving the controller's exchange manager without the R flag is ported; no Go path sends Busy (matter.js defines sendBusy but no protocol path calls it), and there is no generic schema-bound decode — each Go handshake decoder wraps every decode failure, a read error included, in its own ErrUnexpectedData.",
       "snapshotSha": "75e7b7b0399f0ad3b344d723b851b6785c15b0fd"
     },
     {

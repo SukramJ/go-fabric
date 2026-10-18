@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 10 |
-| partial | 100 |
-| planned | 127 |
+| partial | 101 |
+| planned | 126 |
 | excluded | 87 |
 | total | 324 |
 
@@ -109,7 +109,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 7 | 1 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
-| [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
+| [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 1 | 0 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 4 | 0 | 0 |
 | [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/thread](#protocoltestthread) | 3 | 0 | 0 | 3 | 0 |
@@ -875,7 +875,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| SecureChannelMessengerTest.ts | 108 | planned | — | Busy and CloseSession sent without the reliability flag, and decode errors of the secure channel messenger. |
+| SecureChannelMessengerTest.ts | 108 | partial | `controller/exchange:TestSecureChannelMessengerStatusReportsThatMustNotBeReliable` | CloseSession leaving the controller's exchange manager without the R flag is ported; no Go path sends Busy (matter.js defines sendBusy but no protocol path calls it), and there is no generic schema-bound decode — each Go handshake decoder wraps every decode failure, a read error included, in its own ErrUnexpectedData. Missing: “sends Busy with the R flag clear”; “returns the decoded payload”; “reports a schema violation as UnexpectedDataError naming message and field”; “passes other decode errors through unchanged”. |
 | SecureChannelProtocolTest.ts | 99 | excluded | `controller-stage` until M5 phase 24 | Routing an ICD Check-In to the owning fabric peer on the controller. |
 
 ## protocol/test/session
@@ -1198,10 +1198,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### protocol/test/protocol
 
 - `MessageChannelTest.ts` — A message channel reporting a changed address after a socket swap, and releasing its transport channel.
-
-### protocol/test/securechannel
-
-- `SecureChannelMessengerTest.ts` — Busy and CloseSession sent without the reliability flag, and decode errors of the secure channel messenger.
 
 ### protocol/test/thread
 
