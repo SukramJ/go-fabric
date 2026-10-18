@@ -3653,29 +3653,13 @@
     },
     {
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/discovery:TestParityDiscovery_CommissionableDevice",
-        "controller/discovery:TestNames_ExpiryRemovesRecordsAndTheName"
+        "controller/discovery:TestNames_ExpiryRemovesRecordsAndTheName",
+        "controller/discovery:TestCommissionableMdnsScanner"
       ],
-      "missing": [
-        "ignores a device whose discriminator or commissioning mode is out of range",
-        "ignores TTL=0 goodbye within protection window",
-        "removes a device whose goodbye follows a re-announcement, and finds it again when it returns",
-        "re-discovers device after TTL expiry eviction",
-        "concurrent discoveries time out with empty results when no device is present",
-        "two concurrent discoveries both resolve when device is found",
-        "finds devices by long discriminator",
-        "reports the host its SRV record names",
-        "reports the host of an SRV record that arrives after the device was cached",
-        "reports no host while two SRV records disagree about it, rather than the one it left",
-        "reports the host where the device answers on two ports of it",
-        "defers delivery until A/AAAA records arrive",
-        "PTR-follow solicits SRV/TXT when PTR arrives without additional records",
-        "discovers device when A/AAAA arrives before SRV in separate messages",
-        "re-solicits A/AAAA when cached entry's addresses expired before next discovery"
-      ],
-      "reason": "Discovering a commissionable device and TTL expiry are covered; the range filter, goodbye protection and concurrent discoveries are not ported case by case.",
+      "reason": "Every case is ported against the Scanner on the in-memory query connection and the fake clock: the D/CM range filter, the goodbye eviction delay and re-announcement, TTL eviction and re-discovery, concurrent searches (the matter.js timeouts as caller contexts cancelled on the fake clock), the reported host, deferred delivery, PTR-follow, staged addresses and the address re-solicit.",
       "snapshotSha": "40364c02024c3a8f779f299934da5775c9c63f09"
     },
     {
