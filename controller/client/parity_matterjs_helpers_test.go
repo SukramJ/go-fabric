@@ -34,18 +34,25 @@ func parityCtx(t *testing.T) context.Context {
 	return ctx
 }
 
-// siteSlots bounds the sites the parity ports run at once. A fake site
+// siteSlots runs the package's fabrictest sites one at a time. A fake site
 // clock moves only while the whole test process is quiet (fabrictest
-// Site.Run), so many busy sites in parallel starve each other's clocks —
-// under the race detector past the ports' wall-clock budget.
-var siteSlots = make(chan struct{}, 4)
+// Site.Run, the docs' "Limits"), so busy sites in parallel starve each
+// other's clocks — under the race detector past the tests' wall-clock
+// budgets; one at a time, every site reaches its quiet points at once.
+var siteSlots = make(chan struct{}, 1)
 
-// quietSite is a site whose hosts log nowhere; it holds one of the
-// siteSlots until the test ends.
-func quietSite(t *testing.T) *fabrictest.Site {
+// holdSite takes the package's site slot until the test ends.
+func holdSite(t *testing.T) {
 	t.Helper()
 	siteSlots <- struct{}{}
 	t.Cleanup(func() { <-siteSlots })
+}
+
+// quietSite is a site whose hosts log nowhere; it holds the site slot
+// until the test ends.
+func quietSite(t *testing.T) *fabrictest.Site {
+	t.Helper()
+	holdSite(t)
 	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 }
 

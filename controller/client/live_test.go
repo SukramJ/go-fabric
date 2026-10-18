@@ -40,6 +40,7 @@ type pairLive struct {
 
 func newPairLive(t *testing.T) *pairLive {
 	t.Helper()
+	holdSite(t)
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, TimeSource: site.Clock()})
 	if err != nil {
