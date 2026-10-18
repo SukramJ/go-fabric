@@ -417,7 +417,7 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
 // not list (a server without an event lister answers for itself), Success
 // otherwise — the existence checks of matter.js
-// packages/protocol/src/action/server/EventReadResponse.ts:213-221 at
+// packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
 // 862ad75f (#addConcrete), in their order.
 func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
 	ep := d.topology.FindByID(path.Endpoint)

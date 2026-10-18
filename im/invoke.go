@@ -601,7 +601,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 // existence), and every endpoint a wildcard path expands to. A path that
 // fails a check contributes nothing, and nothing runs. It is matter.js's
 // dispatch-endpoint set, collected in CommandInvokeResponse's validation
-// pass and handed to beforeDispatch before any command runs
+// pass and handed to its dispatch hook before any command runs
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
 // and :297 at 862ad75f), the endpoints a DelayReportData defers.
 func DispatchEndpoints(ctx context.Context, d Dispatcher, req InvokeRequest) map[uint16]bool {
@@ -738,7 +738,7 @@ func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
 // wildcardTarget is the [CommandAuthorizer] of a wildcard path's
 // endpoints: the command's privilege, its fabric scope and its timed
 // quality at the endpoint (#wildcardTargetOf,
-// CommandInvokeResponse.ts:384-412 at 862ad75f).
+// CommandInvokeResponse.ts:367-412 at 862ad75f).
 func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
 	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
 	if g.hasACL && !g.pase && g.fabricIndex != 0 {

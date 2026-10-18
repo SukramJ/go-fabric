@@ -932,7 +932,7 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // UNSUPPORTED_ENDPOINT, UNSUPPORTED_CLUSTER or UNSUPPORTED_EVENT — to a
 // subject that passes the View pass, which comes first; the event's own
 // read privilege is checked for an event that exists. Mirrors matter.js
-// packages/protocol/src/action/server/EventReadResponse.ts:189-224 at
+// packages/protocol/src/action/server/EventReadResponse.ts:158-224 at
 // 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
 // answered with nothing.
 func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, paths []ConcreteEventPath) []EventReport {
