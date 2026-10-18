@@ -3428,8 +3428,18 @@
     },
     {
       "path": "packages/protocol/test/groups/MessagingStateTest.ts",
-      "status": "planned",
-      "reason": "Group messaging state: storage, reception state per source and key, the legacy data-counter migration.",
+      "status": "partial",
+      "go": [
+        "groups:TestMessagingStateReceptionStateFor"
+      ],
+      "missing": [
+        "allows setting storage once when constructed without it",
+        "rejects setting storage a second time",
+        "returns the max across legacy *-data entries, ignoring others",
+        "returns undefined when there are no legacy entries",
+        "clears only the legacy *-data entries"
+      ],
+      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
       "snapshotSha": "8ee0caea698f3cd0993ea8a0a23bb649e2c2f41c"
     },
     {
