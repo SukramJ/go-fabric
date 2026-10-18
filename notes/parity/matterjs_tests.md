@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 9 |
-| partial | 100 |
+| ported | 10 |
+| partial | 99 |
 | planned | 128 |
 | excluded | 87 |
 | total | 324 |
@@ -111,7 +111,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 4 | 0 | 0 |
-| [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 0 | 2 | 0 | 0 |
+| [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/thread](#protocoltestthread) | 3 | 0 | 0 | 3 | 0 |
 | [protocol/test/transport/tcp](#protocoltesttransporttcp) | 2 | 0 | 2 | 0 | 0 |
 
@@ -891,7 +891,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| CasePairingTest.ts | 131 | partial | `secure:TestParityMatterJS_CasePairing_Sigma2_KeyMaterial`<br>`secure:TestParityMatterJS_CasePairing_Sigma3_KeySchedule`<br>`secure:TestParityMatterJS_CasePairing_HexPinned_IPK` | The Sigma2 and Sigma3 key material against matter.js's pinned bytes is covered; the signature vector is not. Missing: “generates the right signature”. |
+| CasePairingTest.ts | 131 | ported | `secure:TestParityMatterJS_CasePairing_Sigma2_KeyMaterial`<br>`secure:TestParityMatterJS_CasePairing_Sigma3_KeySchedule`<br>`secure:TestParityMatterJS_CasePairing_HexPinned_IPK`<br>`secure/sigma:TestParityMatterJS_Sigma_Vectors`<br>`secure/sigma:TestCasePairingSignature` | The Sigma2 and Sigma3 key material against matter.js's pinned bytes and the fabric signature over the pinned signed-data bytes (raw r\|\|s, the unpacking verifyTranscript uses) are ported. |
 | PasePairingTest.ts | 316 | partial | `secure:TestParityMatterJS_PasePairing_PasscodeRange`<br>`secure:TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion`<br>`secure:TestParityMatterJS_PasePairing_IterationsValidation`<br>`secure:TestParityMatterJS_PasePairing_LeadingZeroW0_PBKDF`<br>`secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF` | Passcode generation, the PBKDF iteration bounds and the PBKDF vectors are covered; cancelPairing and the PBKDFParamResponse callback are not. Missing: “does not throw when sending the error status report fails”; “does not attempt to send the error status report when a sent message is still unacked”; “calls onPbkdfParamResponse once the responder answers the PBKDFParamRequest”; “does not call onPbkdfParamResponse when the responder does not answer”; “do special successful pase process”. |
 
 ## protocol/test/thread

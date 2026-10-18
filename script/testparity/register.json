@@ -4247,16 +4247,15 @@
     },
     {
       "path": "packages/protocol/test/session/secure/CasePairingTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure:TestParityMatterJS_CasePairing_Sigma2_KeyMaterial",
         "secure:TestParityMatterJS_CasePairing_Sigma3_KeySchedule",
-        "secure:TestParityMatterJS_CasePairing_HexPinned_IPK"
+        "secure:TestParityMatterJS_CasePairing_HexPinned_IPK",
+        "secure/sigma:TestParityMatterJS_Sigma_Vectors",
+        "secure/sigma:TestCasePairingSignature"
       ],
-      "missing": [
-        "generates the right signature"
-      ],
-      "reason": "The Sigma2 and Sigma3 key material against matter.js's pinned bytes is covered; the signature vector is not.",
+      "reason": "The Sigma2 and Sigma3 key material against matter.js's pinned bytes and the fabric signature over the pinned signed-data bytes (raw r||s, the unpacking verifyTranscript uses) are ported.",
       "snapshotSha": "771af26c9e5c0402a2c8a285339fac06ec35f0d4"
     },
     {
