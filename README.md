@@ -111,8 +111,9 @@ device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
 ahead.
 
-`bridge/bridgetest`, `endpoint/endpointtest` and `controller/ble/bletest` are
-public API on the same terms as the rest, not a lower tier. They exist for the reason
+`bridge/bridgetest`, `endpoint/endpointtest`, `controller/ble/bletest`,
+`clock/clocktest` and `fabrictest` are public API on the same terms as the
+rest, not a lower tier. They exist for the reason
 `net/http/httptest` exists — a consumer's tests need to place a bridge in a
 state the production API is not shaped to reach — and a consumer's test suite
 is as expensive to break as its production code.

@@ -84,6 +84,7 @@ nav:
       - Host ports: guides/ports.md
       - Concurrency: guides/concurrency.md
       - Persistence: guides/persistence.md
+      - Testing in process: guides/testing-in-process.md
       - Security: security.md
   - Reference:
       - Architecture decisions:

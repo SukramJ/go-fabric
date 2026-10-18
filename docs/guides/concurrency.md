@@ -38,9 +38,18 @@ code outside the `clock` package reads the time package's clock
 [`clocktest.Fake`](https://github.com/SukramJ/go-fabric/blob/main/clock/clocktest/fake.go)
 moves the ACK pump, the engine tick, the reapers, the commissioning window
 and the cluster timers only when it calls `Advance`. `AfterFunc` callbacks
-run in their own goroutine on either clock.
+run in their own goroutine on either clock. The node's assembler hands the
+same clock to the Identify server of every bridged endpoint
+(`endpoint.Config.Clock`) and to the Aggregator's; a device the host builds
+with the device layer takes it as `device.Options.Clock`.
 
-*Source: `transport/udp/listener.go:147-212`, `bridge/bridge.go:784-840`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:184-185`, `im/subscription/manager.go:229-235`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:223-227`, `secure/operational/manager.go:1145-1160`, `node/security.go:308-355`, `node/node.go:38-40`, `node/node.go:486-494`, `node/reannounce.go:15-31`, `node/config.go:175-179`, `bridge/securechannel.go:1268-1290`, `bridge/bdx_responder.go:93-110`, `binding/manager.go:238-244`, `node/client.go:96-106`, `node/node.go:95-108`, `clock/clock.go`, `node/config.go` (`Config.Clock`).*
+[`fabrictest`](https://github.com/SukramJ/go-fabric/tree/main/fabrictest)
+runs whole nodes and the module's controller on one `clocktest.Fake` and an
+in-memory network, and moves the clock only while no datagram is in flight
+and no goroutine of the process is working — the
+[Testing in process](testing-in-process.md) guide.
+
+*Source: `transport/udp/listener.go:147-212`, `bridge/bridge.go:784-840`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:184-185`, `im/subscription/manager.go:229-235`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:223-227`, `secure/operational/manager.go:1145-1160`, `node/security.go:308-355`, `node/node.go:38-40`, `node/node.go:486-494`, `node/reannounce.go:15-31`, `node/config.go:175-179`, `bridge/securechannel.go:1268-1290`, `bridge/bdx_responder.go:93-110`, `binding/manager.go:238-244`, `node/client.go:96-106`, `node/node.go:95-108`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
