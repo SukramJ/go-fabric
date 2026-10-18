@@ -1,0 +1,2402 @@
+[
+  {
+    "file": "bdx/messages.go",
+    "line": 287,
+    "citation": "BdxAcceptMessagesSchema.ts:66-80",
+    "resolved": "packages/protocol/src/bdx/schema/BdxAcceptMessagesSchema.ts",
+    "identifier": "SendAccept",
+    "nearest": 50,
+    "occurrences": 1
+  },
+  {
+    "file": "bdx/outbound.go",
+    "line": 58,
+    "citation": "OutboundFlow.ts:93-110",
+    "resolved": "packages/protocol/src/bdx/flow/OutboundFlow.ts",
+    "identifier": "readDataChunk",
+    "nearest": 70,
+    "occurrences": 1
+  },
+  {
+    "file": "bdx/responder.go",
+    "line": 174,
+    "citation": "BdxProtocol.ts:204-211",
+    "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
+    "identifier": "SessionFor",
+    "nearest": 84,
+    "occurrences": 0
+  },
+  {
+    "file": "bdx/responder.go",
+    "line": 294,
+    "citation": "BdxProtocol.ts:159-164",
+    "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
+    "identifier": "onNewExchange",
+    "nearest": 110,
+    "occurrences": 1
+  },
+  {
+    "file": "bdx/send.go",
+    "line": 39,
+    "citation": "bdx-session-initiator.ts:155-165",
+    "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
+    "identifier": "MaxBlockSize",
+    "nearest": 200,
+    "occurrences": 0
+  },
+  {
+    "file": "bdx/send_serve_test.go",
+    "line": 79,
+    "citation": "bdx-session-initiator.ts:126-153",
+    "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
+    "identifier": "SendInit",
+    "nearest": 57,
+    "occurrences": 1
+  },
+  {
+    "file": "bdx/session.go",
+    "line": 139,
+    "citation": "bdx-session-initiator.ts:155-178",
+    "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
+    "identifier": "buildInitMessage",
+    "nearest": 114,
+    "occurrences": 3
+  },
+  {
+    "file": "binding/manager.go",
+    "line": 82,
+    "citation": "BindingManager.ts:333",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "forAddress",
+    "nearest": 317,
+    "occurrences": 2
+  },
+  {
+    "file": "binding/manager.go",
+    "line": 388,
+    "citation": "BindingManager.ts:147-157",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "sourceEndpoint",
+    "nearest": 120,
+    "occurrences": 5
+  },
+  {
+    "file": "binding/manager.go",
+    "line": 470,
+    "citation": "BindingManager.ts:513-520",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "#scheduleGroupRecheck",
+    "nearest": 497,
+    "occurrences": 2
+  },
+  {
+    "file": "binding/resolve.go",
+    "line": 65,
+    "citation": "BindingManager.ts:255-353",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "#resolveAndEmit",
+    "nearest": 239,
+    "occurrences": 5
+  },
+  {
+    "file": "binding/resolve.go",
+    "line": 304,
+    "citation": "BindingManager.ts:585-627",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "#establishClientKind",
+    "nearest": 569,
+    "occurrences": 2
+  },
+  {
+    "file": "binding/resolve.go",
+    "line": 344,
+    "citation": "BindingManager.ts:629-643",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "#clearPending",
+    "nearest": 613,
+    "occurrences": 3
+  },
+  {
+    "file": "ble/bluez/central_linux.go",
+    "line": 410,
+    "citation": "NobleBleChannel.ts:299-440",
+    "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
+    "identifier": "openChannel",
+    "nearest": 178,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/ackpump_test.go",
+    "line": 524,
+    "citation": "MessageExchange.ts:428-433",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "requiresAck",
+    "nearest": 464,
+    "occurrences": 10
+  },
+  {
+    "file": "bridge/bridge.go",
+    "line": 617,
+    "citation": "ExchangeManager.ts:425-431",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "CloseSession",
+    "nearest": 693,
+    "occurrences": 0
+  },
+  {
+    "file": "bridge/bridge.go",
+    "line": 1280,
+    "citation": "Fabric.ts:408-415",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "initiateForceClose",
+    "nearest": 437,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/bridge.go",
+    "line": 1585,
+    "citation": "Session.ts:248",
+    "resolved": "packages/protocol/src/session/Session.ts",
+    "identifier": "initiateClose",
+    "nearest": 292,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/fabric_session_close_test.go",
+    "line": 43,
+    "citation": "Fabric.ts:408-415",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "initiateClose",
+    "nearest": 434,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/fabric_session_close_test.go",
+    "line": 44,
+    "citation": "ExchangeManager.ts:716-726",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "gracefulClose",
+    "nearest": 693,
+    "occurrences": 1
+  },
+  {
+    "file": "bridge/fabric_session_close_test.go",
+    "line": 170,
+    "citation": "Fabric.ts:408-415",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "UpdateNOC",
+    "nearest": 574,
+    "occurrences": 1
+  },
+  {
+    "file": "bridge/fields_reader.go",
+    "line": 138,
+    "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
+    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
+    "identifier": "TlvSchema",
+    "nearest": 549,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/fields_reader.go",
+    "line": 172,
+    "citation": "LevelControlServer.ts:596",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "#optionsAllowExecution",
+    "nearest": 483,
+    "occurrences": 5
+  },
+  {
+    "file": "bridge/fields_reader_range_test.go",
+    "line": 22,
+    "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
+    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
+    "identifier": "requestTlv",
+    "nearest": 483,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/fields_reader_test.go",
+    "line": 927,
+    "citation": "LevelControlServer.ts:596",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "ExecuteIfOff",
+    "nearest": 494,
+    "occurrences": 1
+  },
+  {
+    "file": "bridge/handlers.go",
+    "line": 355,
+    "citation": "PaseServer.ts:155-157",
+    "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
+    "identifier": "SessionParameters",
+    "nearest": 194,
+    "occurrences": 0
+  },
+  {
+    "file": "bridge/handlers.go",
+    "line": 950,
+    "citation": "MRP.ts:129",
+    "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "identifier": "retransmissionIntervalOf",
+    "nearest": 147,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/im_gate.go",
+    "line": 32,
+    "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:240",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "ReadRequest",
+    "nearest": 280,
+    "occurrences": 7
+  },
+  {
+    "file": "bridge/invoke_batch_dispatch_test.go",
+    "line": 13,
+    "citation": "InteractionServer.ts:1043-1074",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "suppressedBuffer",
+    "nearest": 1165,
+    "occurrences": 6
+  },
+  {
+    "file": "bridge/invoke_batch_dispatch_test.go",
+    "line": 151,
+    "citation": "InteractionServer.ts:950-955",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "invokeRequests",
+    "nearest": 976,
+    "occurrences": 6
+  },
+  {
+    "file": "bridge/outbound_reliable.go",
+    "line": 24,
+    "citation": "InteractionMessenger.ts:721",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataReport",
+    "nearest": 807,
+    "occurrences": 12
+  },
+  {
+    "file": "bridge/outbound_reliable_test.go",
+    "line": 201,
+    "citation": "MRP.ts:129",
+    "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "identifier": "retransmissionIntervalOf",
+    "nearest": 147,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/receive.go",
+    "line": 197,
+    "citation": "MessageExchange.ts:428-433",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "requiresAck",
+    "nearest": 464,
+    "occurrences": 10
+  },
+  {
+    "file": "bridge/receive.go",
+    "line": 242,
+    "citation": "MessageCodec.ts:377",
+    "resolved": "packages/protocol/src/codec/MessageCodec.ts",
+    "identifier": "protocolId",
+    "nearest": 458,
+    "occurrences": 11
+  },
+  {
+    "file": "bridge/receive_dispatch.go",
+    "line": 253,
+    "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:679",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "suppressResponse",
+    "nearest": 802,
+    "occurrences": 25
+  },
+  {
+    "file": "bridge/receive_dispatch.go",
+    "line": 301,
+    "citation": "InteractionMessenger.ts:719-721",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "sendDataReportMessage",
+    "nearest": 795,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/receive_dispatch.go",
+    "line": 412,
+    "citation": "MessageExchange.ts:602",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "requiresAck",
+    "nearest": 537,
+    "occurrences": 10
+  },
+  {
+    "file": "bridge/receive_dispatch.go",
+    "line": 454,
+    "citation": "CommandInvokeResponse.ts:292-295",
+    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
+    "identifier": "InvokeResponse",
+    "nearest": 403,
+    "occurrences": 0
+  },
+  {
+    "file": "bridge/receive_dispatch.go",
+    "line": 531,
+    "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "suppressedBuffer",
+    "nearest": 1165,
+    "occurrences": 6
+  },
+  {
+    "file": "bridge/receive_test.go",
+    "line": 218,
+    "citation": "MessageCodec.ts:377",
+    "resolved": "packages/protocol/src/codec/MessageCodec.ts",
+    "identifier": "vendorId",
+    "nearest": 457,
+    "occurrences": 6
+  },
+  {
+    "file": "bridge/receive_test.go",
+    "line": 478,
+    "citation": "InteractionServer.ts:409-412",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "TimedRequest",
+    "nearest": 50,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/reply_doorlock_event_test.go",
+    "line": 95,
+    "citation": "DoorLockServer.ts:1017-1022",
+    "resolved": "packages/node/src/behaviors/door-lock/DoorLockServer.ts",
+    "identifier": "FabricIndex",
+    "nearest": 935,
+    "occurrences": 4
+  },
+  {
+    "file": "bridge/securechannel.go",
+    "line": 1141,
+    "citation": "ExchangeManager.ts:663-671",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "#sendCloseSession",
+    "nearest": 693,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/securechannel.go",
+    "line": 1180,
+    "citation": "ExchangeManager.ts:663-671",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "#sendCloseSession",
+    "nearest": 693,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/securechannel_close_parity_test.go",
+    "line": 168,
+    "citation": "ExchangeManager.ts:716-726",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "requiresAck",
+    "nearest": 441,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/status_response_decode_test.go",
+    "line": 116,
+    "citation": "InteractionMessenger.ts:721",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "waitForSuccess",
+    "nearest": 844,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 607,
+    "citation": "ServerSubscription.ts:866-876",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "InvalidSubscription",
+    "nearest": 939,
+    "occurrences": 1
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 718,
+    "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "sendDataReport",
+    "nearest": 369,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 798,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:764",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#sendUpdateMessage",
+    "nearest": 893,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 1073,
+    "citation": "ServerSubscription.ts:610-614",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "InvalidAction",
+    "nearest": 710,
+    "occurrences": 1
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 1158,
+    "citation": "ThermostatServer.ts:451",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "reactTo",
+    "nearest": 480,
+    "occurrences": 13
+  },
+  {
+    "file": "bridge/subscribe.go",
+    "line": 1245,
+    "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
+    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
+    "identifier": "onChange",
+    "nearest": 737,
+    "occurrences": 9
+  },
+  {
+    "file": "bridge/subscribe_dispatch.go",
+    "line": 461,
+    "citation": "InteractionMessenger.ts:721",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "waitForSuccess",
+    "nearest": 844,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/subscribe_encryption_test.go",
+    "line": 27,
+    "citation": "ServerSubscription.ts:764",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#sendUpdateMessage",
+    "nearest": 893,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/subscribe_establish_test.go",
+    "line": 35,
+    "citation": "InteractionMessenger.ts:719-721",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "waitForSuccess",
+    "nearest": 844,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/subscribe_report_chunking_test.go",
+    "line": 243,
+    "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "sendDataReport",
+    "nearest": 369,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/subscribe_report_routing_test.go",
+    "line": 73,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:823",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "initiateExchange",
+    "nearest": 900,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/timed_conformance_test.go",
+    "line": 82,
+    "citation": "CommandInvokeResponse.ts:291",
+    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
+    "identifier": "StatusResponse",
+    "nearest": 560,
+    "occurrences": 2
+  },
+  {
+    "file": "bridge/write_chunked_dispatch_test.go",
+    "line": 203,
+    "citation": "InteractionServer.ts:521-532",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "WriteResponse",
+    "nearest": 563,
+    "occurrences": 4
+  },
+  {
+    "file": "cluster/closure/closurecontrol_payload_shapes_test.go",
+    "line": 142,
+    "citation": "closure-control.element.ts:80-81",
+    "resolved": "packages/model/src/standard/elements/closure-control.element.ts",
+    "identifier": "MotionLatching",
+    "nearest": 26,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/access_control.go",
+    "line": 197,
+    "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
+    "resolved": "packages/model/src/standard/elements/access-control.element.ts",
+    "identifier": "ChangeTypeEnum",
+    "nearest": 82,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/core/access_control.go",
+    "line": 1076,
+    "citation": "packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33",
+    "resolved": "packages/types/src/datatype/CaseAuthenticatedTag.ts",
+    "identifier": "getVersion",
+    "nearest": 76,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/basic_information_parity_test.go",
+    "line": 534,
+    "citation": "basic-information.element.ts:51",
+    "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
+    "identifier": "SerialNumber",
+    "nearest": 75,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/basic_information_test.go",
+    "line": 672,
+    "citation": "packages/model/src/standard/elements/basic-information.element.ts:165-169",
+    "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
+    "identifier": "CapabilityMinima",
+    "nearest": 88,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/binding.go",
+    "line": 96,
+    "citation": "packages/node/src/behaviors/binding/BindingManager.ts:714-718",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "entryKey",
+    "nearest": 697,
+    "occurrences": 8
+  },
+  {
+    "file": "cluster/core/binding_change_test.go",
+    "line": 57,
+    "citation": "BindingManager.ts:714-718",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "entryKey",
+    "nearest": 697,
+    "occurrences": 8
+  },
+  {
+    "file": "cluster/core/descriptor.go",
+    "line": 158,
+    "citation": "DescriptorServer.ts:241-250",
+    "resolved": "packages/node/src/behaviors/descriptor/DescriptorServer.ts",
+    "identifier": "#serverList",
+    "nearest": 275,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/core/descriptor.go",
+    "line": 298,
+    "citation": "packages/node/src/behaviors/descriptor/DescriptorServer.ts:241-250",
+    "resolved": "packages/node/src/behaviors/descriptor/DescriptorServer.ts",
+    "identifier": "#serverList",
+    "nearest": 275,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/core/descriptor_test.go",
+    "line": 258,
+    "citation": "DescriptorServer.ts:241-250",
+    "resolved": "packages/node/src/behaviors/descriptor/DescriptorServer.ts",
+    "identifier": "#serverList",
+    "nearest": 275,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/core/general_commissioning.go",
+    "line": 944,
+    "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
+    "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
+    "identifier": "CommissioningComplete",
+    "nearest": 247,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/general_diagnostics_test.go",
+    "line": 184,
+    "citation": "GeneralDiagnosticsServer.ts:99",
+    "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
+    "identifier": "#validateTestEnabledKey",
+    "nearest": 145,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/core/group_key_management_failure_test.go",
+    "line": 121,
+    "citation": "packages/model/src/standard/elements/group-key-management.element.ts:58",
+    "resolved": "packages/model/src/standard/elements/group-key-management.element.ts",
+    "identifier": "GroupKeyMap",
+    "nearest": 29,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/group_key_management_test.go",
+    "line": 346,
+    "citation": "packages/types/src/tlv/TlvObject.ts:306-310",
+    "resolved": "packages/types/src/tlv/TlvObject.ts",
+    "identifier": "fabricIndex",
+    "nearest": 124,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/groupcast.go",
+    "line": 554,
+    "citation": "GroupcastServer.ts:268-277",
+    "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
+    "identifier": "GroupKeyMap",
+    "nearest": 41,
+    "occurrences": 5
+  },
+  {
+    "file": "cluster/core/groupcast.go",
+    "line": 667,
+    "citation": "GroupcastServer.ts:269",
+    "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
+    "identifier": "retainedSenderOnly",
+    "nearest": 289,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/core/groupcast_parity_matterjs_test.go",
+    "line": 244,
+    "citation": "GroupcastServer.ts:206-209",
+    "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
+    "identifier": "groupProperties",
+    "nearest": 107,
+    "occurrences": 16
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 241,
+    "citation": "Fabric.ts:548",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "UpdateNOC",
+    "nearest": 574,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 337,
+    "citation": "OperationalCredentialsServer.ts:247-252",
+    "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
+    "identifier": "addNoc",
+    "nearest": 272,
+    "occurrences": 4
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 1315,
+    "citation": "OperationalCredentialsServer.ts:110",
+    "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
+    "identifier": "AttestationNonce",
+    "nearest": 64,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 1859,
+    "citation": "Fabric.ts:557-559",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "PublicKeyError",
+    "nearest": 615,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 1899,
+    "citation": "Fabric.ts:557-559",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "PublicKeyError",
+    "nearest": 615,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 2023,
+    "citation": "Fabric.ts:548",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "nodeId",
+    "nearest": 512,
+    "occurrences": 24
+  },
+  {
+    "file": "cluster/core/operational_credentials.go",
+    "line": 2204,
+    "citation": "DeviceAdvertiser.ts:84-86",
+    "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
+    "identifier": "cancelAll",
+    "nearest": 111,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/operational_credentials_nocvalidation_test.go",
+    "line": 28,
+    "citation": "Fabric.ts:557-559",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "PublicKeyError",
+    "nearest": 615,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/operational_credentials_nocvalidation_test.go",
+    "line": 236,
+    "citation": "Fabric.ts:548",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "nodeId",
+    "nearest": 512,
+    "occurrences": 24
+  },
+  {
+    "file": "cluster/core/ota_provider.go",
+    "line": 584,
+    "citation": "SoftwareUpdateManager.ts:1219-1232",
+    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
+    "identifier": "NotifyUpdateApplied",
+    "nearest": 1429,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/scenes_attributes.go",
+    "line": 287,
+    "citation": "OnOffServer.ts:97-100",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/core/scenes_management.go",
+    "line": 362,
+    "citation": "ScenesManagementServer.ts:77-80",
+    "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
+    "identifier": "OnOff",
+    "nearest": 552,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/core/scenes_management.go",
+    "line": 373,
+    "citation": "OnOffServer.ts:114-117",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/core/scenes_onoff_test.go",
+    "line": 26,
+    "citation": "OnOffServer.ts:159-165",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "ScenesManagement",
+    "nearest": 267,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/core/scenes_onoff_test.go",
+    "line": 31,
+    "citation": "OnOffServer.ts:119-122",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
+    "line": 361,
+    "citation": "window-covering-cluster.element.ts:72",
+    "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "identifier": "GoToLiftPercentage",
+    "nearest": 92,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/cover/windowcovering_payload_shapes_test.go",
+    "line": 114,
+    "citation": "window-covering-cluster.element.ts:71",
+    "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "identifier": "LiftPercent100thsValue",
+    "nearest": 95,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/cover/windowcovering_payload_shapes_test.go",
+    "line": 199,
+    "citation": "window-covering-cluster.element.ts:71",
+    "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "identifier": "CurrentPositionLiftPercentage",
+    "nearest": 47,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/cover/windowcovering_server.go",
+    "line": 208,
+    "citation": "window-covering-cluster.element.ts:130-131",
+    "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "identifier": "OperationalStatus",
+    "nearest": 55,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/cover/windowcovering_server.go",
+    "line": 707,
+    "citation": "window-covering-cluster.element.ts:128-131",
+    "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "identifier": "OperationalStatus",
+    "nearest": 55,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/levelcontrol/levelcontrol_server.go",
+    "line": 37,
+    "citation": "LevelControlServer.ts:114-120",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "LevelControl",
+    "nearest": 62,
+    "occurrences": 34
+  },
+  {
+    "file": "cluster/levelcontrol/levelcontrol_server_test.go",
+    "line": 243,
+    "citation": "LevelControlServer.ts:114-120",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "LevelControl",
+    "nearest": 62,
+    "occurrences": 34
+  },
+  {
+    "file": "cluster/levelcontrol/native.go",
+    "line": 64,
+    "citation": "LevelControlServer.ts:529-550",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "#turnOnForLevel",
+    "nearest": 590,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/levelcontrol/native.go",
+    "line": 272,
+    "citation": "LevelControlServer.ts:186-195",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "MoveMode",
+    "nearest": 389,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/levelcontrol/native.go",
+    "line": 472,
+    "citation": "LevelControlServer.ts:624-627",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "targetValue",
+    "nearest": 543,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
+    "line": 757,
+    "citation": "LevelControlServer.ts:624-627",
+    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
+    "identifier": "preCommit",
+    "nearest": 694,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/light/colorcontrol_set.go",
+    "line": 30,
+    "citation": "packages/node/src/behavior/Transitions.ts:455-534",
+    "resolved": "packages/node/src/behavior/Transitions.ts",
+    "identifier": "RemainingTime",
+    "nearest": 431,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/light/colorcontrol_set_parity_matterjs_test.go",
+    "line": 182,
+    "citation": "Transitions.ts:455-534",
+    "resolved": "packages/node/src/behavior/Transitions.ts",
+    "identifier": "RemainingTime",
+    "nearest": 431,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/lock/doorlock_server.go",
+    "line": 124,
+    "citation": "DoorLockServer.ts:69",
+    "resolved": "packages/node/src/behaviors/door-lock/DoorLockServer.ts",
+    "identifier": "alwaysSet",
+    "nearest": 119,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/matter_negative_write_parity_test.go",
+    "line": 314,
+    "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "occupiedHeatingSetpoint",
+    "nearest": 762,
+    "occurrences": 4
+  },
+  {
+    "file": "cluster/matter_negative_write_parity_test.go",
+    "line": 328,
+    "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:614",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "systemMode",
+    "nearest": 781,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/matter_negative_write_parity_test.go",
+    "line": 646,
+    "citation": "thermostat-cluster.element.ts:511",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLowerModeEnum",
+    "nearest": 531,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/media/playback.go",
+    "line": 69,
+    "citation": "media-playback.element.ts:96-98",
+    "resolved": "packages/model/src/standard/elements/media-playback.element.ts",
+    "identifier": "MediaPlayback",
+    "nearest": 20,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/onoff/server.go",
+    "line": 81,
+    "citation": "OnOffServer.ts:97-100",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/onoff/server.go",
+    "line": 613,
+    "citation": "OnOffServer.ts:97-100",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/onoff/server_internal_test.go",
+    "line": 75,
+    "citation": "OnOffServer.ts:62",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "cluster/spec/conformance.go",
+    "line": 103,
+    "citation": "packages/model/src/aspects/Conformance.ts:995-997",
+    "resolved": "packages/model/src/aspects/Conformance.ts",
+    "identifier": "computeApplicability",
+    "nearest": 913,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/spec/instance.go",
+    "line": 483,
+    "citation": "conformance-compiler.ts:857-858",
+    "resolved": "packages/node/src/behavior/state/validation/conformance-compiler.ts",
+    "identifier": "addEnumMemberValidation",
+    "nearest": 763,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_parity_test.go",
+    "line": 198,
+    "citation": "packages/model/src/standard/elements/thermostat-cluster.element.ts:510-514",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLowerModeEnum",
+    "nearest": 531,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_parity_test.go",
+    "line": 276,
+    "citation": "thermostat-cluster.element.ts:510-514",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLowerModeEnum",
+    "nearest": 531,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_payload_shapes_test.go",
+    "line": 29,
+    "citation": "thermostat-cluster.element.ts:322-323",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLower",
+    "nearest": 340,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/thermo/thermostat_payload_shapes_test.go",
+    "line": 127,
+    "citation": "thermostat-cluster.element.ts:509-513",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLowerModeEnum",
+    "nearest": 531,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_payload_shapes_test.go",
+    "line": 374,
+    "citation": "thermostat-cluster.element.ts:517-521",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "ControlSequenceOfOperationEnum",
+    "nearest": 538,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 136,
+    "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "systemMode",
+    "nearest": 781,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 173,
+    "citation": "ThermostatServer.ts:219-220",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "SetpointRaiseLower",
+    "nearest": 185,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 578,
+    "citation": "ThermostatServer.ts:614",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "at": "0ceb202d",
+    "identifier": "systemMode",
+    "nearest": 781,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 789,
+    "citation": "thermostat-cluster.element.ts:510-514",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLowerModeEnum",
+    "nearest": 531,
+    "occurrences": 2
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 914,
+    "citation": "ThermostatServer.ts:219-220",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "at": "0ceb202d",
+    "identifier": "SetpointRaiseLower",
+    "nearest": 185,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/thermo/thermostat_server.go",
+    "line": 957,
+    "citation": "thermostat-cluster.element.ts:322-323",
+    "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
+    "identifier": "SetpointRaiseLower",
+    "nearest": 340,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/wire/fancontrol.go",
+    "line": 11,
+    "citation": "fan-control.element.ts:69-74",
+    "resolved": "packages/model/src/standard/elements/fan-control.element.ts",
+    "identifier": "FanControl",
+    "nearest": 19,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/wire/modebase.go",
+    "line": 23,
+    "citation": "mode-base.element.ts:44-56",
+    "resolved": "packages/model/src/standard/elements/mode-base.element.ts",
+    "identifier": "ModeBase",
+    "nearest": 19,
+    "occurrences": 3
+  },
+  {
+    "file": "cluster/wire/operationalstate.go",
+    "line": 22,
+    "citation": "operational-state.element.ts:57-80",
+    "resolved": "packages/model/src/standard/elements/operational-state.element.ts",
+    "identifier": "OperationalState",
+    "nearest": 40,
+    "occurrences": 4
+  },
+  {
+    "file": "contract/matter.go",
+    "line": 645,
+    "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
+    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "identifier": "reactTo",
+    "nearest": 480,
+    "occurrences": 13
+  },
+  {
+    "file": "controller/attestation/cert.go",
+    "line": 95,
+    "citation": "Certificate.ts:587-596",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "identifier": "parseDate",
+    "nearest": 559,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/ca/ca.go",
+    "line": 580,
+    "citation": "kinds/definitions/operational.ts:109-110",
+    "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
+    "at": "0ceb202d",
+    "identifier": "keyUsage",
+    "nearest": 44,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/client/addresses.go",
+    "line": 24,
+    "citation": "Peers.ts:959-966",
+    "resolved": "packages/node/src/node/client/Peers.ts",
+    "identifier": "expirationOf",
+    "nearest": 998,
+    "occurrences": 5
+  },
+  {
+    "file": "controller/client/addresses_internal_test.go",
+    "line": 45,
+    "citation": "Peers.ts:615-634",
+    "resolved": "packages/node/src/node/client/Peers.ts",
+    "identifier": "#cullExpiredNodesAndAddresses",
+    "nearest": 669,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/cache.go",
+    "line": 86,
+    "citation": "DatasourceCache.ts:199-201",
+    "resolved": "packages/node/src/storage/client/DatasourceCache.ts",
+    "identifier": "invalidateVersion",
+    "nearest": 314,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/client/cache_internal_test.go",
+    "line": 160,
+    "citation": "DatasourceCache.ts:161-163",
+    "resolved": "packages/node/src/storage/client/DatasourceCache.ts",
+    "identifier": "externalSet",
+    "nearest": 139,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/client/cluster.go",
+    "line": 53,
+    "citation": "ClientStructure.ts:1613-1629",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "ClusterStructure",
+    "nearest": 1823,
+    "occurrences": 20
+  },
+  {
+    "file": "controller/client/cluster.go",
+    "line": 101,
+    "citation": "ClientStructure.ts:762-808",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "#synchronizeCluster",
+    "nearest": 701,
+    "occurrences": 5
+  },
+  {
+    "file": "controller/client/config.go",
+    "line": 36,
+    "citation": "NetworkClient.ts:432-439",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "AutoSubscribe",
+    "nearest": 130,
+    "occurrences": 0
+  },
+  {
+    "file": "controller/client/config.go",
+    "line": 41,
+    "citation": "NetworkClient.ts:412-421",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "DefaultSubscription",
+    "nearest": 468,
+    "occurrences": 0
+  },
+  {
+    "file": "controller/client/endpoint.go",
+    "line": 45,
+    "citation": "ClientStructure.ts:1020-1033",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "#endpointFor",
+    "nearest": 1096,
+    "occurrences": 8
+  },
+  {
+    "file": "controller/client/endpoint.go",
+    "line": 57,
+    "citation": "ClientStructure.ts:858-905",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "DeviceType",
+    "nearest": 995,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/endpoint.go",
+    "line": 73,
+    "citation": "packages/node/src/node/client/ClientStructure.ts:871-897",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "#node",
+    "nearest": 940,
+    "occurrences": 17
+  },
+  {
+    "file": "controller/client/fabricops.go",
+    "line": 124,
+    "citation": "CommissioningClient.ts:775-779",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "DiscoveryData",
+    "nearest": 591,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/client/fabricops.go",
+    "line": 183,
+    "citation": "CommissioningClient.ts:883-895",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "NetworkAddress",
+    "nearest": 915,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/client/fabricops.go",
+    "line": 203,
+    "citation": "CommissioningClient.ts:664-680",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "#catsChanged",
+    "nearest": 696,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/fabricops.go",
+    "line": 373,
+    "citation": "CommissioningClient.ts:406-408",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "PeerInitiatedCloseError",
+    "nearest": 440,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/label.go",
+    "line": 27,
+    "citation": "NetworkClient.ts:259-307",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "#reconcileFabricLabel",
+    "nearest": 426,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/network.go",
+    "line": 185,
+    "citation": "NetworkClient.ts:215-238",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "#recomputeConnectionState",
+    "nearest": 107,
+    "occurrences": 9
+  },
+  {
+    "file": "controller/client/node.go",
+    "line": 44,
+    "citation": "NetworkClient.ts:385-391",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "isNewlyCommissioned",
+    "nearest": 568,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/client/node.go",
+    "line": 52,
+    "citation": "NetworkClient.ts:268-273",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "fabricLabelReconciled",
+    "nearest": 427,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/client/node.go",
+    "line": 254,
+    "citation": "NetworkClient.ts:60-102",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "ClientNode",
+    "nearest": 12,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/node_test.go",
+    "line": 66,
+    "citation": "NetworkClient.ts:331-372",
+    "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
+    "identifier": "autoSubscribe",
+    "nearest": 516,
+    "occurrences": 9
+  },
+  {
+    "file": "controller/client/reactions.go",
+    "line": 144,
+    "citation": "Peers.ts:837-858",
+    "resolved": "packages/node/src/node/client/Peers.ts",
+    "identifier": "#onShutdown",
+    "nearest": 876,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/reactions_test.go",
+    "line": 65,
+    "citation": "Peers.ts:812-824",
+    "resolved": "packages/node/src/node/client/Peers.ts",
+    "identifier": "startUp",
+    "nearest": 756,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/client/record.go",
+    "line": 130,
+    "citation": "CommissioningClient.ts:836-845",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "AdvertisedIntervals",
+    "nearest": 868,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/client/record.go",
+    "line": 462,
+    "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
+    "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
+    "identifier": "toLongForm",
+    "nearest": 167,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/client/record.go",
+    "line": 489,
+    "citation": "RemoteDescriptor.ts:91-143",
+    "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
+    "identifier": "fromLongForm",
+    "nearest": 52,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/client/record.go",
+    "line": 657,
+    "citation": "CommissioningClient.ts:586",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "peerAddress",
+    "nearest": 618,
+    "occurrences": 18
+  },
+  {
+    "file": "controller/client/registry_test.go",
+    "line": 347,
+    "citation": "CommissioningClient.ts:353-357",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "OperationalCredentials",
+    "nearest": 383,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/client/structure.go",
+    "line": 181,
+    "citation": "ClientStructure.ts:1674-1692",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "AttributeList",
+    "nearest": 1846,
+    "occurrences": 9
+  },
+  {
+    "file": "controller/client/structure.go",
+    "line": 195,
+    "citation": "ClientStructure.ts:1601-1605",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "AttributeUpdates",
+    "nearest": 1814,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/dcl/cert.go",
+    "line": 31,
+    "citation": "DclCertificateService.ts:2089",
+    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
+    "identifier": "CertificateKind",
+    "nearest": 2107,
+    "occurrences": 9
+  },
+  {
+    "file": "controller/dcl/crl.go",
+    "line": 55,
+    "citation": "DclCertificateService.ts:235-241",
+    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
+    "identifier": "parseCrl",
+    "nearest": 1592,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/dcl/github.go",
+    "line": 29,
+    "citation": "packages/general/src/util/Github.ts:131-133",
+    "resolved": "packages/general/src/util/Github.ts",
+    "identifier": "GitHub",
+    "nearest": 37,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/discovery/parity_matterjs_test.go",
+    "line": 47,
+    "citation": "DnssdName.ts:25",
+    "resolved": "packages/general/src/net/dns-sd/DnssdName.ts",
+    "identifier": "installedAt",
+    "nearest": 87,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/exchange/exchange.go",
+    "line": 52,
+    "citation": "MessageExchange.ts:1272-1273",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "suppressPeerLoss",
+    "nearest": 1304,
+    "occurrences": 10
+  },
+  {
+    "file": "controller/exchange/exchange_test.go",
+    "line": 244,
+    "citation": "MessageExchange.ts:894-918",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "PeerUnresponsiveError",
+    "nearest": 781,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/exchange/manager.go",
+    "line": 178,
+    "citation": "ExchangeManager.ts:391-440",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "addProtocolHandler",
+    "nearest": 126,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/exchange/manager.go",
+    "line": 185,
+    "citation": "SecureChannelProtocol.ts:146-148",
+    "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
+    "identifier": "CaseServer",
+    "nearest": 99,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/handshake/case.go",
+    "line": 61,
+    "citation": "PeerConnection.ts:829-860",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "identifier": "CaseClient",
+    "nearest": 555,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/handshake/pase_test.go",
+    "line": 101,
+    "citation": "PaseClient.ts:192-197",
+    "resolved": "packages/protocol/src/session/pase/PaseClient.ts",
+    "identifier": "InvalidParam",
+    "nearest": 111,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/handshake/server_test.go",
+    "line": 211,
+    "citation": "CaseServer.ts:309",
+    "resolved": "packages/protocol/src/session/case/CaseServer.ts",
+    "identifier": "InvalidParam",
+    "nearest": 93,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/handler.go",
+    "line": 49,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "readDataReports",
+    "nearest": 1012,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/interaction.go",
+    "line": 43,
+    "citation": "InteractionMessenger.ts:186-190",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "MatterFlowError",
+    "nearest": 20,
+    "occurrences": 7
+  },
+  {
+    "file": "controller/interaction/interaction.go",
+    "line": 53,
+    "citation": "ControllerCommissioningFlow.ts:519-523",
+    "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
+    "identifier": "StatusResponseError",
+    "nearest": 460,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/interaction/interaction.go",
+    "line": 55,
+    "citation": "InteractionMessenger.ts:201-214",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "ReceivedStatusResponseError",
+    "nearest": 268,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/interaction.go",
+    "line": 140,
+    "citation": "ClientInteraction.ts:1249-1251",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "maximumPeerResponseTime",
+    "nearest": 1333,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/interaction.go",
+    "line": 165,
+    "citation": "InteractionMessenger.ts:148-161",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 208,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/interaction/invoke.go",
+    "line": 66,
+    "citation": "InteractionMessenger.ts:1082-1105",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/interaction/parity_matterjs_test.go",
+    "line": 53,
+    "citation": "ClientSubscription.ts:104",
+    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscription.ts",
+    "identifier": "SubscriptionId",
+    "nearest": 55,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/provider.go",
+    "line": 177,
+    "citation": "ClientInteraction.ts:1112",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "verifyReachability",
+    "nearest": 1159,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/read.go",
+    "line": 29,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/read.go",
+    "line": 111,
+    "citation": "InteractionMessenger.ts:1006-1009",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "dataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/interaction/read.go",
+    "line": 116,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "#shortenDataVersionFilters",
+    "nearest": 1163,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/interaction/report.go",
+    "line": 75,
+    "citation": "ClientSubscriptionHandler.ts:89",
+    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
+    "identifier": "reportStarted",
+    "nearest": 112,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/report.go",
+    "line": 449,
+    "citation": "InteractionMessenger.ts:914-931",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataReport",
+    "nearest": 974,
+    "occurrences": 12
+  },
+  {
+    "file": "controller/interaction/report_internal_test.go",
+    "line": 159,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/interaction/scripted_test.go",
+    "line": 85,
+    "citation": "InteractionMessenger.ts:1082-1105",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/interaction/scripted_test.go",
+    "line": 86,
+    "citation": "ClientInteraction.ts:457-464",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "commandRef",
+    "nearest": 510,
+    "occurrences": 34
+  },
+  {
+    "file": "controller/interaction/scripted_test.go",
+    "line": 175,
+    "citation": "ClientInteraction.ts:438-440",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "TimedRequest",
+    "nearest": 422,
+    "occurrences": 0
+  },
+  {
+    "file": "controller/interaction/scripted_test.go",
+    "line": 296,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "TlvReadRequest",
+    "nearest": 1140,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/interaction/subscribe.go",
+    "line": 112,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "SubscribeResponse",
+    "nearest": 1108,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/subscribe.go",
+    "line": 224,
+    "citation": "InteractionMessenger.ts:1052-1055",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "#encodeReadingRequest",
+    "nearest": 1140,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/subscribe_test.go",
+    "line": 65,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "SubscribeResponse",
+    "nearest": 1108,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/write.go",
+    "line": 25,
+    "citation": "Write.ts:204-218",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "identifier": "WriteRequest",
+    "nearest": 29,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/interaction/write.go",
+    "line": 48,
+    "citation": "ClientInteraction.ts:369-371",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "TimedRequest",
+    "nearest": 422,
+    "occurrences": 0
+  },
+  {
+    "file": "controller/interaction/write_test.go",
+    "line": 114,
+    "citation": "Write.ts:74",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "identifier": "AccessControl",
+    "nearest": 16,
+    "occurrences": 4
+  },
+  {
+    "file": "controller/interaction/write_test.go",
+    "line": 167,
+    "citation": "InteractionMessenger.ts:1138-1162",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "controller/peer/connection.go",
+    "line": 52,
+    "citation": "types/src/protocol/definitions/general.ts:33",
+    "resolved": "packages/types/src/protocol/definitions/general.ts",
+    "identifier": "GeneralStatusCode",
+    "nearest": 7,
+    "occurrences": 1
+  },
+  {
+    "file": "controller/peer/connection.go",
+    "line": 786,
+    "citation": "PeerConnection.ts:674-696",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "identifier": "handleConnectionError",
+    "nearest": 656,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/peer/observer.go",
+    "line": 26,
+    "citation": "Peer.ts:190-195",
+    "resolved": "packages/protocol/src/peer/Peer.ts",
+    "at": "0ceb202d",
+    "identifier": "#save",
+    "nearest": 105,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/peer/probe.go",
+    "line": 36,
+    "citation": "interaction/InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 991,
+    "occurrences": 6
+  },
+  {
+    "file": "device/device.go",
+    "line": 529,
+    "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
+    "resolved": "packages/node/src/endpoints/bridged-node.ts",
+    "identifier": "BridgedNode",
+    "nearest": 135,
+    "occurrences": 1
+  },
+  {
+    "file": "device/type.go",
+    "line": 62,
+    "citation": "RequirementGenerator.ts:188",
+    "resolved": "support/codegen/src/endpoints/RequirementGenerator.ts",
+    "identifier": "mandatory",
+    "nearest": 208,
+    "occurrences": 9
+  },
+  {
+    "file": "device/type.go",
+    "line": 169,
+    "citation": "packages/node/src/node/client/ClientStructure.ts:871",
+    "resolved": "packages/node/src/node/client/ClientStructure.ts",
+    "identifier": "#node",
+    "nearest": 940,
+    "occurrences": 17
+  },
+  {
+    "file": "endpoint/dispatcher.go",
+    "line": 272,
+    "citation": "AttributeWriteResponse.ts:329-331",
+    "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
+    "identifier": "UnsupportedWrite",
+    "nearest": 233,
+    "occurrences": 1
+  },
+  {
+    "file": "endpoint/materialize.go",
+    "line": 532,
+    "citation": "OnOffServer.ts:97-122",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "endpoint/types.go",
+    "line": 657,
+    "citation": "OnOffServer.ts:97-100",
+    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
+    "identifier": "OnOff",
+    "nearest": 45,
+    "occurrences": 6
+  },
+  {
+    "file": "examples/reference-bridge/ota.go",
+    "line": 54,
+    "citation": "OtaRequestorTestInstance.ts:166-168",
+    "resolved": "support/chip-testing/src/OtaRequestorTestInstance.ts",
+    "identifier": "CanConsent",
+    "nearest": 338,
+    "occurrences": 0
+  },
+  {
+    "file": "examples/reference-controller/cli/self.go",
+    "line": 223,
+    "citation": "packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:243-250",
+    "resolved": "packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts",
+    "at": "0ceb202d",
+    "identifier": "ApplyUpdate",
+    "nearest": 405,
+    "occurrences": 1
+  },
+  {
+    "file": "examples/reference-controller/cli/window.go",
+    "line": 31,
+    "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:454",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "commissioningTimeout",
+    "nearest": 486,
+    "occurrences": 7
+  },
+  {
+    "file": "examples/reference-controller/cli/window.go",
+    "line": 35,
+    "citation": "CommissioningClient.ts:492",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "randomBytes",
+    "nearest": 524,
+    "occurrences": 1
+  },
+  {
+    "file": "examples/reference-controller/cli/window.go",
+    "line": 140,
+    "citation": "CommissioningClient.ts:538-549",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "#revokeStaleCommissioningWindow",
+    "nearest": 518,
+    "occurrences": 3
+  },
+  {
+    "file": "examples/reference-controller/cli/window.go",
+    "line": 170,
+    "citation": "CommissioningClient.ts:788",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "EnhancedCommissioningWindow",
+    "nearest": 820,
+    "occurrences": 2
+  },
+  {
+    "file": "examples/reference-controller/cli/window.go",
+    "line": 203,
+    "citation": "CommissioningClient.ts:454-465",
+    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
+    "identifier": "openBasicCommissioningWindow",
+    "nearest": 486,
+    "occurrences": 2
+  },
+  {
+    "file": "groups/request_chunk_test.go",
+    "line": 30,
+    "citation": "Write.ts:149-171",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "at": "0ceb202d",
+    "identifier": "AccessControl",
+    "nearest": 16,
+    "occurrences": 4
+  },
+  {
+    "file": "im/client.go",
+    "line": 104,
+    "citation": "interaction/InteractionMessenger.ts:1036-1037",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "TlvDataVersionFilter",
+    "nearest": 1171,
+    "occurrences": 4
+  },
+  {
+    "file": "im/client.go",
+    "line": 146,
+    "citation": "interaction/InteractionMessenger.ts:1124-1136",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "sendTimedRequest",
+    "nearest": 1440,
+    "occurrences": 1
+  },
+  {
+    "file": "im/invoke.go",
+    "line": 152,
+    "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
+    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
+    "identifier": "requestTlv",
+    "nearest": 483,
+    "occurrences": 3
+  },
+  {
+    "file": "im/invoke.go",
+    "line": 387,
+    "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "suppressedBuffer",
+    "nearest": 1165,
+    "occurrences": 6
+  },
+  {
+    "file": "im/invoke.go",
+    "line": 407,
+    "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "invokeRequests",
+    "nearest": 976,
+    "occurrences": 6
+  },
+  {
+    "file": "im/invoke_batch_test.go",
+    "line": 117,
+    "citation": "InteractionServer.ts:950-955",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "invokeRequests",
+    "nearest": 976,
+    "occurrences": 6
+  },
+  {
+    "file": "im/invoke_batch_test.go",
+    "line": 135,
+    "citation": "InteractionServer.ts:1043-1074",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "SuppressResponse",
+    "nearest": 1162,
+    "occurrences": 4
+  },
+  {
+    "file": "im/read.go",
+    "line": 442,
+    "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
+    "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
+    "identifier": "addConcrete",
+    "nearest": 202,
+    "occurrences": 2
+  },
+  {
+    "file": "im/subscription/handler_parity_test.go",
+    "line": 294,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:301-311",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#addOutstandingAttributes",
+    "nearest": 346,
+    "occurrences": 3
+  },
+  {
+    "file": "im/subscription/handler_parity_test.go",
+    "line": 343,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:314-337",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#handleClusterStateChanges",
+    "nearest": 359,
+    "occurrences": 2
+  },
+  {
+    "file": "im/subscription/handler_parity_test.go",
+    "line": 352,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:320-322",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#isClosed",
+    "nearest": 365,
+    "occurrences": 13
+  },
+  {
+    "file": "im/subscription/handler_parity_test.go",
+    "line": 416,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:666-668",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#isClosed",
+    "nearest": 622,
+    "occurrences": 13
+  },
+  {
+    "file": "im/subscription/handler_parity_test.go",
+    "line": 447,
+    "citation": "packages/node/src/node/server/InteractionServer.ts:549-566",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "keepSubscriptions",
+    "nearest": 616,
+    "occurrences": 4
+  },
+  {
+    "file": "im/subscription/subscription.go",
+    "line": 245,
+    "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
+    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
+    "identifier": "#sendUpdatesActivated",
+    "nearest": 429,
+    "occurrences": 4
+  },
+  {
+    "file": "im/write.go",
+    "line": 41,
+    "citation": "InteractionServer.ts:521-532",
+    "resolved": "packages/node/src/node/server/InteractionServer.ts",
+    "identifier": "WriteResponse",
+    "nearest": 563,
+    "occurrences": 4
+  },
+  {
+    "file": "im/write_parity_test.go",
+    "line": 355,
+    "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:32",
+    "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
+    "identifier": "WriteResult",
+    "nearest": 10,
+    "occurrences": 10
+  },
+  {
+    "file": "node/client.go",
+    "line": 32,
+    "citation": "BindingManager.ts:333",
+    "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
+    "identifier": "PeerSet",
+    "nearest": 584,
+    "occurrences": 3
+  },
+  {
+    "file": "node/config.go",
+    "line": 31,
+    "citation": "packages/node/src/node/ServerNode.ts:107-127",
+    "resolved": "packages/node/src/node/ServerNode.ts",
+    "identifier": "commissioning",
+    "nearest": 8,
+    "occurrences": 1
+  },
+  {
+    "file": "node/config.go",
+    "line": 35,
+    "citation": "NetworkServer.ts:202-222",
+    "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
+    "identifier": "network",
+    "nearest": 239,
+    "occurrences": 2
+  },
+  {
+    "file": "node/config.go",
+    "line": 142,
+    "citation": "NetworkServer.ts:202-222",
+    "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
+    "identifier": "network",
+    "nearest": 239,
+    "occurrences": 2
+  },
+  {
+    "file": "node/observers.go",
+    "line": 46,
+    "citation": "FabricManager.ts:253",
+    "resolved": "packages/protocol/src/fabric/FabricManager.ts",
+    "identifier": "deleted",
+    "nearest": 272,
+    "occurrences": 4
+  },
+  {
+    "file": "node/ota.go",
+    "line": 55,
+    "citation": "OtaRequestorTestInstance.ts:166-168",
+    "resolved": "support/chip-testing/src/OtaRequestorTestInstance.ts",
+    "identifier": "CanConsent",
+    "nearest": 338,
+    "occurrences": 0
+  },
+  {
+    "file": "node/security.go",
+    "line": 550,
+    "citation": "CaseServer.ts:210",
+    "resolved": "packages/protocol/src/session/case/CaseServer.ts",
+    "identifier": "SessionManager",
+    "nearest": 56,
+    "occurrences": 3
+  },
+  {
+    "file": "schema/fabric_scoped.go",
+    "line": 21,
+    "citation": "operational-credentials.element.ts:104",
+    "resolved": "packages/model/src/standard/elements/operational-credentials.element.ts",
+    "identifier": "SetVidVerificationStatement",
+    "nearest": 142,
+    "occurrences": 1
+  },
+  {
+    "file": "schema/fabric_scoped.go",
+    "line": 31,
+    "citation": "scenes-management.element.ts:37-156",
+    "resolved": "packages/model/src/standard/elements/scenes-management.element.ts",
+    "identifier": "ScenesManagement",
+    "nearest": 19,
+    "occurrences": 3
+  },
+  {
+    "file": "secure/channel/session.go",
+    "line": 313,
+    "citation": "Session.ts:248",
+    "resolved": "packages/protocol/src/session/Session.ts",
+    "identifier": "initiateClose",
+    "nearest": 292,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/mattercert/validate_rcac_test.go",
+    "line": 112,
+    "citation": "Certificate.ts:101",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "identifier": "signEcdsa",
+    "nearest": 139,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/mattercert/validate_rcac_test.go",
+    "line": 427,
+    "citation": "Certificate.ts:101",
+    "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
+    "identifier": "signEcdsa",
+    "nearest": 139,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 50,
+    "citation": "packages/protocol/src/session/NodeSession.ts:368",
+    "resolved": "packages/protocol/src/session/NodeSession.ts",
+    "identifier": "gracefulClose",
+    "nearest": 403,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 104,
+    "citation": "NodeSession.ts:368",
+    "resolved": "packages/protocol/src/session/NodeSession.ts",
+    "identifier": "gracefulClose",
+    "nearest": 403,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 313,
+    "citation": "SessionManager.ts:484",
+    "resolved": "packages/protocol/src/session/SessionManager.ts",
+    "identifier": "getPaseSession",
+    "nearest": 570,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 789,
+    "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
+    "resolved": "packages/protocol/src/session/SessionManager.ts",
+    "identifier": "getNextAvailableSessionId",
+    "nearest": 537,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 815,
+    "citation": "packages/protocol/src/session/SessionManager.ts:513",
+    "resolved": "packages/protocol/src/session/SessionManager.ts",
+    "identifier": "getSession",
+    "nearest": 542,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/operational/manager.go",
+    "line": 918,
+    "citation": "Session.ts:248",
+    "resolved": "packages/protocol/src/session/Session.ts",
+    "identifier": "initiateClose",
+    "nearest": 292,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/operational/manager_close_parity_test.go",
+    "line": 9,
+    "citation": "packages/protocol/src/session/Session.ts:248",
+    "resolved": "packages/protocol/src/session/Session.ts",
+    "identifier": "initiateClose",
+    "nearest": 292,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/operational/manager_close_parity_test.go",
+    "line": 11,
+    "citation": "packages/protocol/src/session/NodeSession.ts:368",
+    "resolved": "packages/protocol/src/session/NodeSession.ts",
+    "identifier": "gracefulClose",
+    "nearest": 403,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager_session_id_lifecycle_test.go",
+    "line": 37,
+    "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
+    "resolved": "packages/protocol/src/session/SessionManager.ts",
+    "identifier": "getNextAvailableSessionId",
+    "nearest": 537,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/operational/manager_session_seed_test.go",
+    "line": 10,
+    "citation": "SessionManager.ts:213",
+    "resolved": "packages/protocol/src/session/SessionManager.ts",
+    "identifier": "randomUint16",
+    "nearest": 264,
+    "occurrences": 1
+  },
+  {
+    "file": "secure/sigma/protocol.go",
+    "line": 292,
+    "citation": "MRP.ts:129",
+    "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "identifier": "retransmissionIntervalOf",
+    "nearest": 147,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/sigma/sigma.go",
+    "line": 250,
+    "citation": "MRP.ts:129",
+    "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "identifier": "retransmissionIntervalOf",
+    "nearest": 147,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/sigma/sigma1_session_params_test.go",
+    "line": 13,
+    "citation": "MRP.ts:129",
+    "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "identifier": "retransmissionIntervalOf",
+    "nearest": 147,
+    "occurrences": 2
+  },
+  {
+    "file": "secure/spake2/session_params_test.go",
+    "line": 16,
+    "citation": "PaseServer.ts:151",
+    "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
+    "identifier": "SessionParameters",
+    "nearest": 194,
+    "occurrences": 0
+  },
+  {
+    "file": "store/fabric.go",
+    "line": 222,
+    "citation": "Fabric.ts:548",
+    "resolved": "packages/protocol/src/fabric/Fabric.ts",
+    "identifier": "nodeId",
+    "nearest": 512,
+    "occurrences": 24
+  },
+  {
+    "file": "tlv/codec_parity_test.go",
+    "line": 245,
+    "citation": "packages/types/test/tlv/TlvStringTest.ts:86",
+    "resolved": "packages/types/test/tlv/TlvStringTest.ts",
+    "identifier": "TlvByteString",
+    "nearest": 102,
+    "occurrences": 8
+  },
+  {
+    "file": "transport/message/fuzz_message_test.go",
+    "line": 114,
+    "citation": "MessageCodec.ts:481-504",
+    "resolved": "packages/protocol/src/codec/MessageCodec.ts",
+    "identifier": "encodePacket",
+    "nearest": 440,
+    "occurrences": 1
+  },
+  {
+    "file": "transport/message/message.go",
+    "line": 93,
+    "citation": "packages/protocol/src/protocol/ExchangeManager.ts:196-197",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "applicationPayload",
+    "nearest": 228,
+    "occurrences": 1
+  },
+  {
+    "file": "transport/mrp/ack.go",
+    "line": 219,
+    "citation": "MessageExchange.ts:428-433",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "requiresAck",
+    "nearest": 464,
+    "occurrences": 10
+  },
+  {
+    "file": "transport/mrp/ack_test.go",
+    "line": 233,
+    "citation": "MessageExchange.ts:428-433",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "requiresAck",
+    "nearest": 464,
+    "occurrences": 10
+  },
+  {
+    "file": "transport/mrp/counter.go",
+    "line": 17,
+    "citation": "NodeSession.ts:115",
+    "resolved": "packages/protocol/src/session/NodeSession.ts",
+    "identifier": "initiateClose",
+    "nearest": 349,
+    "occurrences": 3
+  },
+  {
+    "file": "transport/tcp/frame_test.go",
+    "line": 116,
+    "citation": "TcpChannel.ts:211-218",
+    "resolved": "packages/protocol/src/transport/tcp/TcpChannel.ts",
+    "identifier": "maxPayloadSize",
+    "nearest": 116,
+    "occurrences": 7
+  }
+]

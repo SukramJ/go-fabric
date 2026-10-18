@@ -194,6 +194,7 @@
     "node",
     "parity",
     "schema",
+    "script/citecheck",
     "script/clustergen",
     "script/coverfloor",
     "script/devicegen",
@@ -219,9 +220,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12768,
+    "total_exported": 12769,
     "reachable": 9005,
-    "whitelisted": 3758,
+    "whitelisted": 3759,
     "unreachable": 5
   },
   "by_package": [
@@ -18143,6 +18144,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
       "line": 170
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBridgedNodePartsListIsFullFamily",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/parts_test.go",
+      "line": 166
     },
     {
       "package": "endpoint",

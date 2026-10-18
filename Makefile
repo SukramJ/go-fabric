@@ -150,6 +150,28 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale or planned is off its ratchet
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
 
+.PHONY: cite-report
+cite-report: ## regenerate script/citecheck/drift.json and summary.md — the matter.js citations checked at the pin
+	@# Reads MATTERJS_DIR through git plumbing only (the clone may stand at any
+	@# commit that has the pin). Exit 2 when the clone or the pin is missing.
+	$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR) -report
+
+.PHONY: cite-check
+cite-check: ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
+	@$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR); rc=$$?; \
+	if [ $$rc -eq 2 ]; then exit 2; fi; \
+	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md || { \
+		echo ""; \
+		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
+		echo "Run 'make cite-report', read the diff, and commit it with the change that moved"; \
+		echo "it — adjusting citecheckDriftRatchet in the same commit if the drift count moved."; \
+		echo ""; \
+		git --no-pager diff --stat -- script/citecheck/; \
+		exit 1; \
+	}; \
+	if [ $$rc -ne 0 ]; then echo "cite-check: hard errors (summary.md lists them)"; exit $$rc; fi
+	$(GO) test -count=1 -run 'Citecheck' ./script/citecheck/
+
 # --- the real-commissioner guard ----------------------------------------
 #
 # CHIP_TEST_IMAGE (below) is the SINGLE SOURCE for the commissioner, the CSA

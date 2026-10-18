@@ -167,6 +167,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
+	{
+		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
+		min: 68,
+		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree; the git plumbing (rev-parse, ls-tree, cat-file --batch) and main need the matter.js clone, which make cite-check and its CI job provide",
+	},
 	// This tool. Its parser and comparison are covered; main() — flag
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the

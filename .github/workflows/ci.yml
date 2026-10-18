@@ -143,6 +143,9 @@ jobs:
 
   testparity:
     name: testparity
+
+  cite-check:
+    name: matter.js citations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,6 +161,34 @@ jobs:
       # exactly on its ratchet. No matter.js clone: the snapshot is committed.
       - name: testparity
         run: make testparity-check
+
+      # script/citecheck (concept v4 §A.2) checks every `<file>.ts:<line>`
+      # the Go code cites against matter.js at the pin, parity/schema.json →
+      # matter.sourceCommit, and fails on a hard error (a file that does not
+      # resolve, a line beyond its end) and on a drift list that moved off the
+      # committed script/citecheck/drift.json.
+      #
+      # It is on the merge path although it needs the network, for the same
+      # reason the chipdm job is: the commit is fixed, so the content it reads
+      # is deterministic, and a citation that went stale is a defect of this
+      # change, not of the environment. A clone that fails leaves the check
+      # without its tree; citecheck then exits 2 and the job is red — a check
+      # that did not run was not green.
+      #
+      # A blob-filtered clone without checkout, sparse on the three source
+      # roots citecheck reads (examples, packages, support): the trees of the
+      # whole history (for a citation's own `at <sha>`), the blobs of the pin.
+      - name: clone matter.js at the pin
+        env:
+          MATTERJS_DIR: ${{ runner.temp }}/matter.js
+        run: |
+          PIN=$(sed -n 's/^ *"sourceCommit": *"\([0-9a-f]*\)".*/\1/p' parity/schema.json | head -1)
+          test -n "$PIN"
+          git clone -q --filter=blob:none --no-checkout https://github.com/matter-js/matter.js.git "$MATTERJS_DIR"
+          git -C "$MATTERJS_DIR" sparse-checkout set examples packages support
+          git -C "$MATTERJS_DIR" -c advice.detachedHead=false checkout -q "$PIN"
+      - name: cite-check
+        run: make cite-check MATTERJS_DIR="${{ runner.temp }}/matter.js"
 
   chipdm:
     name: chip data model cross-check

@@ -1,0 +1,26 @@
+package sample
+
+// Run mirrors matter.js Widget.runFast (Widget.ts:40-42). Nothing else here.
+func Run() {}
+
+// Stop is `stop` (packages/core/src/Widget.ts:3), cut short.
+func Stop() {}
+
+// Tied is the gadget's #tie, e.g. its knot (src/Gadget.ts:2). The next
+// sentence names nothing (Gadget.ts:3).
+func Tied() {}
+
+// Broken paths join again: packages/core/src/
+// Gadget.ts:1 (`knot`).
+func Broken() {}
+
+// Ambiguous: index.ts:1 (`any`). Beyond: Widget.ts:99.
+func Odd() {}
+
+// Historic: Widget.ts:2 (`run`) at 0123abcd, and the harness at 6170af84.
+func Old() {}
+
+// Sinks: Widget.ts:1, then `reportStarted` (:40) and widget.go:12.
+func Sinks() {}
+
+var msg = "a message (Gadget.ts:2)" + Odd // Widget.ts:1 trails

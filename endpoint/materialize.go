@@ -561,7 +561,7 @@ func descriptorDeviceTypes(ep *Endpoint) []mattercore.DeviceTypeStruct {
 	ids := listedDeviceTypes(ep)
 	out := make([]mattercore.DeviceTypeStruct, 0, len(ids))
 	for _, id := range ids {
-		out = append(out, mattercore.DeviceTypeStruct{DeviceType: id, Revision: deviceTypeRevision(uint16(id))})
+		out = append(out, mattercore.DeviceTypeStruct{DeviceType: uint32(id), Revision: deviceTypeRevision(id)})
 	}
 	return out
 }

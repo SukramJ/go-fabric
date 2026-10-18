@@ -14,14 +14,15 @@ import (
 // alone, a bridged endpoint its primary device type (when it has one) and
 // BridgedNode. [ClusterServers] builds the list from it, and the assembly
 // reads its composition from it, so the two cannot disagree.
-func listedDeviceTypes(ep *Endpoint) []uint32 {
+func listedDeviceTypes(ep *Endpoint) []uint16 {
+	const bridgedNode = uint16(matterDeviceTypeBridgedNode)
 	if ep.Part {
-		return []uint32{uint32(ep.DeviceType)}
+		return []uint16{ep.DeviceType}
 	}
 	if ep.DeviceType == 0 {
-		return []uint32{matterDeviceTypeBridgedNode}
+		return []uint16{bridgedNode}
 	}
-	return []uint32{uint32(ep.DeviceType), matterDeviceTypeBridgedNode}
+	return []uint16{ep.DeviceType, bridgedNode}
 }
 
 // composesFullFamily reports whether one of ep's listed device types
@@ -33,7 +34,7 @@ func listedDeviceTypes(ep *Endpoint) []uint32 {
 // effectiveComposition is EndpointComposition.FullFamily).
 func composesFullFamily(ep *Endpoint) bool {
 	for _, id := range listedDeviceTypes(ep) {
-		if dt, ok := schema.DeviceTypeDefinitionOf(id); ok && dt.Composition == schema.CompositionFullFamily {
+		if dt, ok := schema.DeviceTypeDefinitionOf(uint32(id)); ok && dt.Composition == schema.CompositionFullFamily {
 			return true
 		}
 	}

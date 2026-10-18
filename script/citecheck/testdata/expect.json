@@ -1,0 +1,34 @@
+{
+  "comment": "What sample.go.txt yields against the test's in-memory tree. Kept out of the Go test so the guard does not read these citations as the module's own.",
+  "citations": [
+    {"line": 3, "text": "Widget.ts:40-42", "idents": ["runFast"], "attached": ["runFast"]},
+    {"line": 6, "text": "packages/core/src/Widget.ts:3", "idents": ["stop"], "attached": ["stop"]},
+    {"line": 9, "text": "src/Gadget.ts:2", "idents": ["#tie"], "why": "e.g. ends no sentence; #tie is not tied by parentheses"},
+    {"line": 10, "text": "Gadget.ts:3"},
+    {"line": 14, "text": "packages/core/src/Gadget.ts:1", "idents": ["knot"], "attached": ["knot"], "why": "rejoined after the '/'"},
+    {"line": 17, "text": "index.ts:1", "idents": ["any"], "attached": ["any"]},
+    {"line": 17, "text": "Widget.ts:99"},
+    {"line": 20, "text": "Widget.ts:2", "idents": ["run"], "attached": ["run"], "shas": ["0123abcd", "6170af84"]},
+    {"line": 23, "text": "Widget.ts:1", "why": "reportStarted is the bare line part's"},
+    {"line": 26, "text": "Gadget.ts:2", "why": "the message is the sentence"},
+    {"line": 26, "text": "Widget.ts:1"}
+  ],
+  "results": {
+    "basename": "3 Widget.ts:40-42",
+    "exact": "6 packages/core/src/Widget.ts:3",
+    "suffix": "9 src/Gadget.ts:2",
+    "ambiguous": "10 Gadget.ts:3",
+    "beyond": "17 Widget.ts:99",
+    "unnamed": "23 Widget.ts:1"
+  },
+  "fixes": {
+    "3 Widget.ts:40-42": "Widget.ts:60-62",
+    "10 Gadget.ts:3": "src/Gadget.ts:3",
+    "26 Gadget.ts:2": "src/Gadget.ts:2"
+  },
+  "owner": [
+    "17 Widget.ts:99 line beyond end of file",
+    "17 index.ts:1 ambiguous",
+    "9 src/Gadget.ts:2 drift"
+  ]
+}
