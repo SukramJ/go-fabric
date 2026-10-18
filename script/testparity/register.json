@@ -2350,7 +2350,7 @@
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
       "status": "planned",
-      "reason": "The controller's subscribe under abort and close, including an open BDX exchange.",
+      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix.",
       "snapshotSha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3"
     },
     {

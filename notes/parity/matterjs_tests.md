@@ -671,7 +671,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ClientInteractionInvokeTest.ts | 902 | planned | — | The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1). |
-| ClientInteractionSubscribeTest.ts | 352 | planned | — | The controller's subscribe under abort and close, including an open BDX exchange. |
+| ClientInteractionSubscribeTest.ts | 352 | planned | — | Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. |
 | InputChunkTest.ts | 672 | ported | `controller/interaction:TestInputChunkAttributes`<br>`controller/interaction:TestInputChunkEvents`<br>`controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents`<br>`controller/interaction:TestInputChunkRelaxedIntegerTypeChecks` | All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. |
 | LargeMessageTransportTest.ts | 106 | excluded | `controller-stage` until M5 phase 25 | The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25. |
 | ReadScopeTest.ts | 60 | planned | — | The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI. |
@@ -1123,7 +1123,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### protocol/test/action/client
 
 - `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
-- `ClientInteractionSubscribeTest.ts` — The controller's subscribe under abort and close, including an open BDX exchange.
+- `ClientInteractionSubscribeTest.ts` — Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix.
 - `ReadScopeTest.ts` — The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.
 
 ### protocol/test/action/request
