@@ -14,7 +14,7 @@
 // line; it cites the BlueZ API documents
 // (https://github.com/bluez/bluez/tree/master/doc) by file and section:
 //
-//   - org.bluez.Adapter.rst — SetDiscoveryFilter (UUIDs, Transport,
+//   - org.bluez.Adapter.rst — SetDiscoveryFilter (Transport,
 //     DuplicateData), StartDiscovery, StopDiscovery, the Discovering
 //     property;
 //   - org.bluez.Device.rst — Connect, Disconnect, the Address, Connected,
