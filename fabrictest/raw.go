@@ -44,3 +44,19 @@ func Exchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*exch
 	})
 	return msg, err
 }
+
+// Send sends one Interaction Model message on a new exchange over the
+// pair's session and waits for no answer — a request the device answers
+// with nothing (a SuppressResponse invoke or write). The exchange stays
+// open for the message's acknowledgement and closes itself
+// (exchange.Exchange.Close).
+func Send(ctx context.Context, p *Pair, opcode uint8, payload []byte) error {
+	return run(ctx, p, func(ctx context.Context) error {
+		x, err := p.Interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
+		if err != nil {
+			return err
+		}
+		defer x.Close()
+		return x.Send(ctx, opcode, payload, exchange.SendOptions{})
+	})
+}

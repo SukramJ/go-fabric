@@ -915,22 +915,35 @@ func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrI
 // packages/model/src/standard/elements/*.element.ts; a server without the
 // optional interface (Identify) used to fall back to Operate and let an
 // Operate subject identify a device (TC-ACE-2.3).
+//
+// A path that does not resolve — no such endpoint, no such cluster on it,
+// a command its server does not accept — needs Operate only: matter.js
+// authorizes a concrete invoke at Operate first, answers the existence
+// statuses next, and checks the command's privilege only for a command
+// that exists (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
+// at 862ad75f, core spec §8.8.3.2), so an Operate subject learns that a
+// Manage command's cluster is absent. The existence check then answers
+// UNSUPPORTED_ENDPOINT, _CLUSTER or _COMMAND.
 func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8 {
+	const privilegeOperate uint8 = 3
 	want := schema.InvokePrivilege(clusterID, cmdID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return want
+		return min(want, privilegeOperate)
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
+		}
+		if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+			return min(want, privilegeOperate)
 		}
 		if priv, ok := srv.(contract.ClusterCommandInvokePrivilege); ok {
 			want = max(want, priv.MinInvokePrivilege(cmdID))
 		}
 		return want
 	}
-	return want
+	return min(want, privilegeOperate)
 }
 
 // IsTimedCommand implements [im.TimedCommandProvider]: the cluster server

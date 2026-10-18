@@ -1949,26 +1949,10 @@
       "go": [
         "endpoint:TestInvoke_SuccessAndUnknownCommand",
         "endpoint:TestInvokeUnsupportedCommandMapsTo0x81",
-        "endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege"
+        "endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
+        "node:TestCommandInvokeResponseParity"
       ],
       "missing": [
-        "invokes existing endpoint wildcard commands",
-        "produces results regardless of suppressResponse",
-        "invokes non-existing endpoint wildcard command",
-        "invokes model-known absent high-privilege command as existence status for operate-only subject",
-        "does not invoke a command on a client cluster declared via withClientClusters",
-        "does not invoke a command on a client cluster added via require",
-        "counts an existing command denied at the actual-privilege ACL pass as existent",
-        "clamps the outer status to FAILURE when a handler reports a cluster-specific status",
-        "reports an error with no defined status code as a per-command FAILURE",
-        "reports a plain Error escaping a handler as a per-command FAILURE",
-        "keeps sibling results and continues the batch when one command throws",
-        "reports an unimplemented mandatory command as UNSUPPORTED_COMMAND and omits it from AcceptedCommandList",
-        "reports a payload that does not match the command schema as INVALID_COMMAND",
-        "refuses a fabric-scoped command over a PASE session with UNSUPPORTED_ACCESS",
-        "the framework fabric-scoped guard refuses invocation before the handler runs, even without a handler-level guard",
-        "invokes a command that is not fabric-scoped over the same PASE session",
-        "skips a fabric-scoped command on a wildcard path over a PASE session rather than reporting it",
         "names the endpoint of a concrete path",
         "names every endpoint a wildcard path expands to",
         "leaves out a concrete path that fails validation",
@@ -1977,7 +1961,7 @@
         "names only the group's endpoints for a group invoke",
         "leaves out endpoints a wildcard path may not invoke on"
       ],
-      "reason": "A concrete invoke and an unknown command are covered; wildcard invokes, client clusters, privilege-pass existence and status clamping are not.",
+      "reason": "Every top-level case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload). The dispatch-endpoint group is ported with DelayReportDataTest, where its endpoints become observable.",
       "snapshotSha": "1ff5c131ac0cbf5b4f620b77a9af7db32a97617d"
     },
     {

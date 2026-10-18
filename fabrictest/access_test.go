@@ -72,3 +72,23 @@ func TestExchange(t *testing.T) {
 		t.Fatalf("answer to garbage: %+v, %v", msg, err)
 	}
 }
+
+func TestControllerPASE(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	ctx := testContext(t)
+	u := site.UncommissionedPair(fabrictest.PairOptions{})
+	p, err := u.Controller.PASE(ctx, u.Device)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Commissioned() || p.PASESession == nil || p.Interaction == nil {
+		t.Fatalf("PASE pair %+v", p)
+	}
+	if d, err := fabrictest.Read(ctx, p, rootAttr(basicinfo.ClusterID, basicinfo.AttrNodeLabel)); err != nil || d.Value.El.String == "" {
+		t.Fatalf("read over PASE: %+v, %v", d, err)
+	}
+	if ix, err := fabrictest.Connect(ctx, p); err != nil || ix != p.Interaction {
+		t.Fatalf("Connect over PASE: %v", err)
+	}
+}

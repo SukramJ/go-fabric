@@ -282,8 +282,12 @@ type Pair struct {
 	// session; nil before commissioning.
 	Peer *peer.Peer
 	// Interaction is the controller's interaction with the device over
-	// Peer; nil before commissioning.
+	// Peer; nil before commissioning. A pair of [Controller.PASE] speaks
+	// over PASESession instead.
 	Interaction *interaction.Interaction
+	// PASESession is the PASE session of a pair of [Controller.PASE]; nil
+	// otherwise.
+	PASESession *exchange.Session
 }
 
 // Commissioned reports whether the pair's device is commissioned.

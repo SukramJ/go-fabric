@@ -216,11 +216,13 @@ func TestTopologyDispatcher_MinInvokePrivilege(t *testing.T) {
 		{"GeneralCommissioning unmapped command defaults to Operate", 0, generalCommID, gcUnmappedCmd, 3},
 		{"plain cluster command defaults to Operate", 0, plainClusterID, 0x00, 3},
 		{"unmounted cluster on a real endpoint defaults to Operate", 0, 0x9999, 0x00, 3},
-		// The model's privilege applies even where the cluster is not
-		// mounted, as matter.js resolves limits from the model for a path
-		// that does not exist (CommandInvokeResponse.ts).
-		{"unmounted endpoint keeps the model privilege", 42, opCredsID, opCredsRemoveFab, 5},
-		{"Identify.Identify requires Manage without a server override", 42, 0x0003, 0x00, 4},
+		// A path that does not resolve needs Operate only: matter.js
+		// resolves the model's limits for it, but the Operate pass and the
+		// existence checks come first, so the model's privilege is never
+		// reached (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
+		// at 862ad75f).
+		{"unmounted endpoint needs Operate", 42, opCredsID, opCredsRemoveFab, 3},
+		{"unmounted endpoint needs Operate for Identify.Identify", 42, 0x0003, 0x00, 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

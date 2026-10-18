@@ -301,6 +301,22 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				}
 				continue
 			}
+			// CommandFields is a structure (Matter §10.6.12); a payload of
+			// another type cannot decode against any command's schema and
+			// is the command's INVALID_COMMAND, the rest of the batch
+			// unaffected. Mirrors matter.js
+			// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
+			// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
+			// reader read past it and the request failed as a whole.
+			if !el.IsContainer || el.Type != tlv.TypeStructure {
+				if el.IsContainer {
+					if err := skipContainer(dec); err != nil {
+						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+					}
+				}
+				inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
+				continue
+			}
 			f, err := fieldsReader(inv.Path, dec, el)
 			if err != nil {
 				// A typed reject is a per-command outcome, not a malformed
@@ -573,7 +589,37 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// intent governs whether the bridge sends the InvokeResponse at all (handled at the
 	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
 	// value of this wire field — so it stays at its zero value here.
+	timed, timedKnown := TimedInteractionFromContext(ctx)
 	for _, inv := range req.Invokes {
+		// A wildcard-endpoint command runs on every endpoint that serves
+		// the cluster, accepts the command and on which the session may
+		// invoke it; an endpoint it may not is skipped, not reported.
+		// Mirrors matter.js
+		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-170
+		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
+		// #wildcardTargetOf: the command's privilege, its fabric scope,
+		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
+		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint && inv.DecodeStatus.IsSuccess() {
+			results := wild.InvokeAuthorized(ctx, inv.Path, inv.Fields, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+				at := CommandInvocation{Path: ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}}
+				if hasACL && !pase && fabricIndex != 0 {
+					if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, invokePrivilege(at)); !status.IsSuccess() {
+						return status
+					}
+				}
+				if fabricIndex == 0 && schema.IsFabricScopedInvoke(clusterID, commandID) {
+					return StatusUnsupportedAccess
+				}
+				if timedKnown && !timed && isTimed(at) {
+					return StatusNeedsTimedInteraction
+				}
+				return StatusSuccess
+			})
+			for _, res := range results {
+				ir.Responses = append(ir.Responses, resultEntry(inv, res))
+			}
+			continue
+		}
 		// ACL gate. PASE skips ACL: commissioning invokes arrive before
 		// the fabric's ACL entry exists (fabricIndex==0) and continue
 		// over the same PASE channel after AddNOC adopted it onto the
@@ -616,7 +662,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// fabric checks — matter.js CommandInvokeResponse.ts:292-295. The
 		// resolved server answers from its model first ([TimedCommandProvider]),
 		// the generated schema table otherwise.
-		if timed, known := TimedInteractionFromContext(ctx); known && !timed && isTimed(inv) {
+		if timedKnown && !timed && isTimed(inv) {
 			ir.Responses = append(ir.Responses, InvokeResponseEntry{
 				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
 				CommandRef:    inv.CommandRef,
@@ -648,24 +694,37 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue
 		}
-		res := d.Invoke(ctx, inv.Path, inv.Fields)
-		ent := InvokeResponseEntry{
-			Path:          res.Path,
-			CommandRef:    inv.CommandRef,
-			HasCommandRef: inv.HasCommandRef,
-		}
-		if res.Status != StatusSuccess {
-			ent.IsStatus = true
-			ent.Status = StatusIB{Status: res.Status, ClusterStatus: res.ClusterStatus, HasClusterStatus: res.HasClusterStatus}
-		} else if res.Response != nil {
-			ent.Response = res.Response
-			ent.HasResponse = true
-		} else {
-			// Status-only success path: explicit StatusIB(Success).
-			ent.IsStatus = true
-			ent.Status = StatusIB{Status: StatusSuccess}
-		}
-		ir.Responses = append(ir.Responses, ent)
+		ir.Responses = append(ir.Responses, resultEntry(inv, d.Invoke(ctx, inv.Path, inv.Fields)))
 	}
 	return ir
+}
+
+// resultEntry is the InvokeResponse entry of a dispatched command's
+// result: its response, or its status. A cluster-specific status goes out
+// under an outer FAILURE whatever the handler named — Matter §7.10.7,
+// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:448-451
+// at 862ad75f (#addStatus); it went out under the handler's status.
+func resultEntry(inv CommandInvocation, res InvokeResult) InvokeResponseEntry {
+	ent := InvokeResponseEntry{
+		Path:          res.Path,
+		CommandRef:    inv.CommandRef,
+		HasCommandRef: inv.HasCommandRef,
+	}
+	switch {
+	case res.Status != StatusSuccess:
+		status := res.Status
+		if res.HasClusterStatus {
+			status = StatusFailure
+		}
+		ent.IsStatus = true
+		ent.Status = StatusIB{Status: status, ClusterStatus: res.ClusterStatus, HasClusterStatus: res.HasClusterStatus}
+	case res.Response != nil:
+		ent.Response = res.Response
+		ent.HasResponse = true
+	default:
+		// Status-only success path: explicit StatusIB(Success).
+		ent.IsStatus = true
+		ent.Status = StatusIB{Status: StatusSuccess}
+	}
+	return ent
 }

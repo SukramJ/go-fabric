@@ -180,3 +180,86 @@ func rawWrite(t *testing.T, m *mockPair, req im.WriteRequest) rawAnswer[im.Write
 	}
 	return out
 }
+
+// encodeInvoke encodes req as a client sends it — every field
+// im.MarshalInvokeRequestTLV writes, plus DelayReportData (tag 3) when
+// set. A nil command field is an empty structure, matter.js's encoding of
+// a command without arguments.
+func encodeInvoke(t *testing.T, req im.InvokeRequest) []byte {
+	t.Helper()
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutBool(tlv.ContextTag(0), req.SuppressResponse)
+	enc.PutBool(tlv.ContextTag(1), req.TimedRequest)
+	enc.StartArray(tlv.ContextTag(2))
+	for _, inv := range req.Invokes {
+		enc.StartStruct(tlv.AnonymousTag())
+		inv.Path.MarshalTLV(enc, tlv.ContextTag(0))
+		if f, ok := inv.Fields.(spec.Encodable); ok {
+			f.EncodeTLV(enc, tlv.ContextTag(1))
+		} else {
+			enc.StartStruct(tlv.ContextTag(1))
+			_ = enc.EndContainer()
+		}
+		if inv.HasCommandRef {
+			enc.PutUint(tlv.ContextTag(2), uint64(inv.CommandRef))
+		}
+		_ = enc.EndContainer()
+	}
+	_ = enc.EndContainer()
+	if d := req.DelayReportData; d != nil {
+		enc.StartStruct(tlv.ContextTag(3))
+		enc.PutUint(tlv.ContextTag(0), uint64(d.DelayMinMs))
+		enc.PutUint(tlv.ContextTag(1), uint64(d.DelayJitterWindowMs))
+		_ = enc.EndContainer()
+	}
+	enc.PutUint(tlv.ContextTag(0xFF), uint64(im.MatterInteractionModelRevision))
+	_ = enc.EndContainer()
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// rawInvoke sends req over p — matter.js invokeCmdRaw
+// (CommandInvokeResponseTest.ts:830-865), on the wire — and returns the
+// InvokeResponse or the status of a StatusResponse in its place.
+func rawInvoke(t *testing.T, p *fabrictest.Pair, req im.InvokeRequest) rawAnswer[im.InvokeResponse] {
+	t.Helper()
+	msg, err := fabrictest.Exchange(parityCtx(t), p, im.OpcodeInvokeRequest, encodeInvoke(t, req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out rawAnswer[im.InvokeResponse]
+	switch msg.Opcode {
+	case im.OpcodeStatusResponse:
+		sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(msg.Payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out.status = &sr.Status
+	case im.OpcodeInvokeResponse:
+		out.resp, err = im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), func(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+			if !el.IsContainer {
+				return el, nil
+			}
+			return spec.ReadContainer(dec, el)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+		t.Fatalf("answer opcode 0x%02x", msg.Opcode)
+	}
+	return out
+}
+
+// cmdPath is a concrete command path; wildcardCmd one without endpoint.
+func cmdPath(ep uint16, cluster, cmd uint32) im.ConcreteCommandPath {
+	return im.ConcreteCommandPath{Endpoint: ep, Cluster: cluster, Command: cmd, HasEndpoint: true, HasCluster: true, HasCommand: true}
+}
+
+func wildcardCmd(cluster, cmd uint32) im.ConcreteCommandPath {
+	return im.ConcreteCommandPath{Cluster: cluster, Command: cmd, HasCluster: true, HasCommand: true}
+}

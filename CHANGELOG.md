@@ -16,12 +16,18 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 
 - `fabrictest.Pair.Grant(ctx, privilege)`: replaces the device's access control list on the pair's fabric with one CASE entry for the controller at that privilege — matter.js `MockServerNode.online`'s access level, over the wire.
 - `fabrictest.Exchange(ctx, pair, opcode, payload)`: sends one Interaction Model message as it stands over the pair's session and returns the device's first answer, for a request the controller refuses to formulate.
+- `fabrictest.Send(ctx, pair, opcode, payload)`: the same without waiting for an answer, for a request the device answers with nothing.
+- `fabrictest.Controller.PASE(ctx, device)`: a PASE session to a device in its commissioning window, as a `Pair` whose `Interaction` speaks over `Pair.PASESession` — the session without fabric matter.js's tests build; the wire helpers accept it.
 
 ### Fixed
 
 - A write of an attribute, cluster or endpoint that does not exist answers UNSUPPORTED_ATTRIBUTE, _CLUSTER or _ENDPOINT to a subject with View privilege, as a read does; it answered UNSUPPORTED_ACCESS when the subject lacked the attribute's model write privilege. The View pass precedes the existence checks (matter.js `AttributeWriteResponse.ts:200-241`, chip `WriteHandler.cpp`; `endpoint.TopologyDispatcher.MinWritePrivilege` returns View for a path that does not resolve).
 - A write whose wildcard-endpoint path carries a DataVersion is written with the version ignored, as matter.js's server does (`AttributeWriteResponse.ts:67-71`); it was refused with INVALID_ACTION.
 - A write of BasicInformation NodeLabel longer than 32 bytes, or of a Location that is not two bytes, answers CONSTRAINT_ERROR; it answered FAILURE.
+- An invoke whose path names no endpoint runs on every endpoint that serves the cluster, accepts the command and on which the session may invoke it, skipping the others without a status (matter.js `CommandInvokeResponse.ts:131-170`, `:337-412`); it answered UNSUPPORTED_ENDPOINT.
+- An invoke of a command, cluster or endpoint that does not exist answers UNSUPPORTED_COMMAND, _CLUSTER or _ENDPOINT to a subject with Operate privilege; it answered UNSUPPORTED_ACCESS when the command's model privilege was higher. The Operate pass precedes the existence checks (`CommandInvokeResponse.ts:241-278`; `endpoint.TopologyDispatcher.MinInvokePrivilege` returns at most Operate for a path that does not resolve).
+- A command status that carries a cluster-specific status goes out under the outer status FAILURE, whatever the handler named (Matter §7.10.7, `CommandInvokeResponse.ts:448-451`).
+- A command whose fields are not a structure answers INVALID_COMMAND for that command, the rest of the batch unaffected (`CommandInvokeResponse.ts:551-562`); the whole request failed.
 
 ## [0.7.2] — 2026-10-18
 

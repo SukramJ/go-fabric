@@ -33,7 +33,7 @@ var ErrNotCommissioned = errors.New("fabrictest: the pair is not commissioned")
 
 // run runs fn under the pair's site's clock.
 func run(ctx context.Context, p *Pair, fn func(ctx context.Context) error) error {
-	if p == nil || !p.Commissioned() {
+	if p == nil || (!p.Commissioned() && p.PASESession == nil) {
 		return ErrNotCommissioned
 	}
 	return p.Controller.site.Run(ctx, fn)
@@ -45,7 +45,7 @@ func run(ctx context.Context, p *Pair, fn func(ctx context.Context) error) error
 // session on the node.
 func Connect(ctx context.Context, p *Pair) (*interaction.Interaction, error) {
 	err := run(ctx, p, func(ctx context.Context) error {
-		if p.Peer.HasSession() {
+		if p.Peer == nil || p.Peer.HasSession() {
 			return nil
 		}
 		_, err := p.Peer.Connect(ctx, peer.ConnectOptions{})
