@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // RetrySchedule configures the retries of a sustained subscription —
@@ -80,6 +81,64 @@ type sustainedState struct {
 	inner   *Subscription
 	active  bool
 	trusted bool
+	// maxEvent is the highest event number delivered, valid once hasEvent.
+	maxEvent uint64
+	hasEvent bool
+}
+
+// MaxEventNumber is the highest event number of the reports a sustained
+// subscription delivered to its Updated callback, false before the first
+// event; it never decreases. A plain subscription reports none. Mirrors
+// matter.js SustainedSubscription.maxEventNumber
+// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:105-114)
+// at 862ad75f.
+func (s *Subscription) MaxEventNumber() (uint64, bool) {
+	if s.sustained == nil {
+		return 0, false
+	}
+	s.sustained.mu.Lock()
+	defer s.sustained.mu.Unlock()
+	return s.sustained.maxEvent, s.sustained.hasEvent
+}
+
+// deliver hands r to the consumer and counts its events once the consumer
+// returned. Mirrors matter.js SustainedSubscription.#deliver and
+// #raiseMaxEventNumber
+// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-364)
+// at 862ad75f; the maxEventNumberChanged hook and the failure of a
+// consumer have no Go counterpart.
+func (st *sustainedState) deliver(r *Report, consumer func(*Report)) {
+	consumer(r)
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for i := range r.Events {
+		if n := r.Events[i].Number; !st.hasEvent || n > st.maxEvent {
+			st.maxEvent, st.hasEvent = n, true
+		}
+	}
+}
+
+// delivering is the consumer reached through deliver, nil without one
+// (SustainedSubscription.ts:120-121 at 862ad75f).
+func (st *sustainedState) delivering(consumer func(*Report)) func(*Report) {
+	if consumer == nil {
+		return nil
+	}
+	return func(r *Report) { st.deliver(r, consumer) }
+}
+
+// requestNewEvents asks for the events above the highest one delivered,
+// the request's filters kept until then. Mirrors matter.js
+// SustainedSubscription.#requestNewEvents
+// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
+// at 862ad75f.
+func (st *sustainedState) requestNewEvents(req SubscribeRequest) SubscribeRequest {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.hasEvent {
+		req.EventFilters = []im.EventMinimumNumber{{EventMin: st.maxEvent + 1}}
+	}
+	return req
 }
 
 func (st *sustainedState) current() *Subscription {
@@ -156,6 +215,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		close(st.finished)
 	}()
 	bootstrap := outer.request.BootstrapRead
+	updated := st.delivering(outer.request.Updated)
 	// needRefresh is false only for the very first attempt
 	// (SustainedSubscription.ts:104, :182-186).
 	needRefresh := false
@@ -163,6 +223,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		closed := make(chan struct{})
 		var closeOnce sync.Once
 		req := outer.request
+		req.Updated = updated
 		req.Sustain, req.BootstrapRead, req.ActiveChanged = false, nil, nil
 		req.Closed = func() {
 			closeOnce.Do(func() {
@@ -190,7 +251,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		}
 		schedule := newRetries(DefaultSustainRetries, c.rand)
 		for {
-			inner, err := c.sustainAttempt(ctx, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
+			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
 				st.mu.Lock()
 				st.inner = inner
@@ -232,10 +293,12 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 // sustainAttempt is one attempt (SustainedSubscription.ts:180-211): the
 // request refreshed unless this is the very first attempt (:182-186), the
 // bootstrap read while it has not succeeded and the request refreshed
-// after it (:187-204), then the subscription.
-func (c *Interaction) sustainAttempt(ctx context.Context, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
+// after it (:187-204), then the subscription. Each refresh asks for the
+// events above the highest one delivered (SustainedSubscription.ts:125-126
+// at 862ad75f).
+func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
 	if *needRefresh {
-		*req = refreshed(*req)
+		*req = st.requestNewEvents(refreshed(*req))
 	}
 	*needRefresh = true
 	if *bootstrap != nil {
@@ -243,7 +306,7 @@ func (c *Interaction) sustainAttempt(ctx context.Context, peer exchange.PeerAddr
 			return nil, err
 		}
 		*bootstrap = nil
-		*req = refreshed(*req)
+		*req = st.requestNewEvents(refreshed(*req))
 	}
 	return c.subscribeOnce(ctx, peer, *req, floor, ceiling, ExchangeOptions{ConnectionTimeout: -1})
 }

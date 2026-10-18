@@ -2419,19 +2419,17 @@
         "controller/interaction:TestSustainedSubscription",
         "controller/interaction:TestSustainedCloseWhileRetrying",
         "controller/interaction:TestSustainedRefreshRequest",
-        "controller/interaction:TestSustainedRefreshAfterBootstrap"
+        "controller/interaction:TestSustainedRefreshAfterBootstrap",
+        "controller/interaction:TestSustainedSubscriptionClose",
+        "controller/interaction:TestSustainedSubscriptionNonICD",
+        "controller/interaction:TestSustainedSubscriptionEventNumbers"
       ],
       "missing": [
-        "close() resolves done() even when peer never fires request.closed",
-        "never reports active when closed while the subscribe is in flight and then succeeds",
-        "reports not live when closed while the active observers run",
         "never reports active when an inactive observer closes the subscription while going live",
         "ends not live and rejects done when an inactive observer throws while going live",
         "still reports inactive when an active observer throws during the final not-live update",
         "treats a wakefulness with requiresAwait===false as non-ICD (timed retry, probe)",
         "parks on the next loss once its wakefulness flips to requiresAwait===true",
-        "reports maxInterval in seconds, using a seconds fallback before a subscription is established",
-        "forwards a caller-provided keepaliveReceived",
         "parks while asleep and subscribes only after a wake signal",
         "leaves a subscribed LIT peer's availability to the subscription",
         "fires checkInMissed for a parked LIT peer that never subscribes and misses its Check-In",
@@ -2458,15 +2456,11 @@
         "keeps its subscription when the peer's wakefulness is suspended",
         "stops observing the peer's mode once closed",
         "ignores a feed signal for a different peer",
-        "keeps the caller's event filters until it delivered an event",
         "resubscribes for events above the highest one it delivered",
-        "counts a result only once its consumer resolved",
         "requests events above the bootstrap read's highest event",
         "does not lower its number when a later result carries lower event numbers",
-        "counts events of reports with asynchronous chunks",
         "keeps its number when a report without events follows",
         "settles the delivery of a report only after maxEventNumberChanged settled",
-        "replaces the event filters a refreshRequest returns with its own once it delivered an event",
         "keeps a subscription whose priming report fails to process and counts its events",
         "keeps a subscription whose live report fails to process and counts its events",
         "warns only for the first failure of its own processing",
@@ -2474,7 +2468,7 @@
         "keeps the failure of the report",
         "passes a failure while ${failure} on and counts the events received before it"
       ],
-      "reason": "The non-ICD sustained subscription (returned at once, active once established, the timed retry, close during the backoff, the reachability check before a resubscribe, the refreshed request) is covered by controller/interaction; the observer, maxInterval and keepalive cases, the ICD await mode of milestone 5 phase 24 and the event-number cases are not.",
+      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking are covered; missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), the ICD await mode (no controller-side wakefulness before milestone 5 phase 24), the maxEventNumberChanged hook (no SubscribeRequest field), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
       "snapshotSha": "5452d36b2dc08104d60de241f6ee35269f7fdcb5"
     },
     {
