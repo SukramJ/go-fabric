@@ -136,6 +136,8 @@ product is the owner's manual test plan.
 
 ### Milestone 2: The test foundation
 
+**Detail:** [concept v4](./concept-v4-test-foundation.md) (German), written 2026-10-18 when the milestone opened.
+
 | Phase | Content | Proof |
 | --- | --- | --- |
 | 14 | pin lift to matter.js HEAD (snapshot diff classified, generators, citations re-checked, `chipdm-check` green); the **test-porting register** `notes/parity/matterjs_tests.md`: every `*Test.ts` under `packages/node/test` and `packages/protocol/test` mapped to the Go test(s) that port it or to a classified exclusion (controller-only at this stage, JS-runtime-only, Joint Fabric), with a ratchet guard like `reachability-check` | the guard fails when a matter.js test file is unmapped |

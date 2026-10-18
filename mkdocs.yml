@@ -23,6 +23,7 @@ validation:
 exclude_docs: |
   history/
   concept-v3-*.md
+  concept-v4-*.md
   requirements.txt
 
 theme:
