@@ -3523,12 +3523,13 @@
         "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestRoundTrip",
-        "im:TestMessengerParity_ReadRequestFitsPayload"
+        "im:TestMessengerParity_ReadRequestFitsPayload",
+        "controller/interaction:TestInteractionClientMessengerRead",
+        "controller/interaction:TestInteractionClientMessengerSubscribe",
+        "controller/interaction:TestInteractionClientMessengerWrites"
       ],
       "missing": [
-        "reads attributes",
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
-        "subscribes attributes",
         "does not block report iteration on final status ack and waits on close",
         "answers a report it has not answered yet with INVALID_SUBSCRIPTION",
         "answers the next report with INVALID_SUBSCRIPTION when asked to await it",
@@ -3541,22 +3542,16 @@
         "sends nothing when no report waits for a status and it is not asked to await one",
         "does not consider a report with SuppressResponse as waiting for a status",
         "does not consider a report waiting for a status once it was answered",
-        "sends a write that fits one message unchanged, with MoreChunkedMessages encoded as false",
         "chunks a write that does not fit one message and merges the statuses of all chunks",
         "chunks a write whose statuses would not fit one WriteResponse although the request does",
-        "refuses a timed write whose statuses would not fit one WriteResponse",
         "sends a whole list that does not fit one message as an empty REPLACE followed by ADDs",
         "sends a whole ACL that does not fit one message as a filled REPLACE followed by ADDs",
-        "refuses to chunk a write with ${Object.keys(flags)[0]}",
-        "refuses a whole list at a wildcard path that does not fit one message",
-        "refuses a single value that does not fit one message",
         "sends the ADDs of a versioned list write without DataVersion once its REPLACE succeeded",
         "keeps the DataVersion on the ADDs of a list write whose REPLACE failed",
         "keeps the DataVersion on the ADDs of a repeated list write whose second REPLACE failed",
-        "sends a timed versioned list write that fits one message unchanged",
         "stops sending chunks when the peer answers a chunk with an error status"
       ],
-      "reason": "Trimming data version filters to the payload is ported; the messenger's exchange handling (status responses, abandoned subscriptions, acks) is not.",
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137) and write chunking across messages (InteractionMessenger.ts:1269-1460), which the one-message Go write refuses instead.",
       "snapshotSha": "89392f25092ecabc32ce49513ea6c3f0bc0add26"
     },
     {

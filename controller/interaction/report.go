@@ -481,9 +481,27 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 	}
 }
 
-// nextReport is IncomingInteractionClientMessenger.waitFor("DataReport")
-// (InteractionMessenger.ts:914-931): a StatusResponse in place of the
-// report is a *StatusError, any other message an ErrUnexpectedMessage.
+// nextReport is IncomingInteractionClientMessenger.waitFor("DataReport"):
+// a StatusResponse in place of the report is a *StatusError, Success
+// included, any other message an ErrUnexpectedMessage. Mirrors matter.js
+// packages/protocol/src/interaction/InteractionMessenger.ts:985-1000.
 func (m *messenger) nextReport(ctx context.Context) (*exchange.Message, error) {
-	return m.next(ctx, im.OpcodeReportData, 0)
+	msg, err := m.x.Next(ctx, exchange.ReceiveOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if msg.ProtocolID == im.InteractionModelProtocolID && msg.Opcode == im.OpcodeStatusResponse {
+		sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(msg.Payload))
+		if err != nil {
+			return nil, fmt.Errorf("%w: StatusResponse: %w", ErrUnexpectedMessage, err)
+		}
+		return nil, &StatusError{Status: sr.Status}
+	}
+	if msg.ProtocolID != im.InteractionModelProtocolID {
+		return nil, fmt.Errorf("%w: protocol 0x%04X", ErrUnexpectedMessage, msg.ProtocolID)
+	}
+	if msg.Opcode != im.OpcodeReportData {
+		return nil, fmt.Errorf("%w: message type 0x%02X, expected 0x%02X", ErrUnexpectedMessage, msg.Opcode, im.OpcodeReportData)
+	}
+	return msg, nil
 }
