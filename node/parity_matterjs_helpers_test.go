@@ -10,7 +10,6 @@ package node_test
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -40,14 +39,14 @@ func parityCtx(t *testing.T) context.Context {
 // quietSite is a site whose hosts log nowhere.
 func quietSite(t *testing.T) *fabrictest.Site {
 	t.Helper()
-	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 }
 
 // steppedSite is a quiet site whose settle period is short, for a test
 // that steps the clock deadline by deadline itself.
 func steppedSite(t *testing.T) *fabrictest.Site {
 	t.Helper()
-	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Settle: 2 * time.Millisecond})
+	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler), Settle: 2 * time.Millisecond})
 }
 
 // mockOptions shapes a mock pair.
@@ -108,7 +107,8 @@ func newLight(t *testing.T, site *fabrictest.Site, key string) *device.OnOffLigh
 // per endpoint and cluster.
 func countAttrs(r *interaction.Report) map[uint16]map[uint32]int {
 	out := map[uint16]map[uint32]int{}
-	for _, a := range r.Attributes {
+	for i := range r.Attributes {
+		a := &r.Attributes[i]
 		if out[a.Path.Endpoint] == nil {
 			out[a.Path.Endpoint] = map[uint32]int{}
 		}

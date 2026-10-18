@@ -34,11 +34,11 @@ import (
 // acceptingWiFi is a Wi-Fi driver that finds and joins every network.
 type acceptingWiFi struct{}
 
-func (acceptingWiFi) ScanNetworks(_ context.Context, ssid []byte) (uint8, string, []contract.WiFiScanResult) {
+func (acceptingWiFi) ScanNetworks(_ context.Context, ssid []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
 	return 0, "", []contract.WiFiScanResult{{SSID: append([]byte(nil), ssid...), BSSID: make([]byte, 6), Channel: 6}}
 }
 
-func (acceptingWiFi) ConnectNetwork(context.Context, []byte, []byte) (uint8, string, int32) {
+func (acceptingWiFi) ConnectNetwork(context.Context, []byte, []byte) (status uint8, debugText string, errorValue int32) {
 	return 0, "", 0
 }
 

@@ -305,7 +305,8 @@ func oneEventStatus(t *testing.T, r *interaction.Report, p im.ConcreteEventPath,
 // countEvents is matter.js countEvents (EventReadResponseTest.ts:481-496).
 func countEvents(r *interaction.Report) map[uint16]map[uint32]int {
 	out := map[uint16]map[uint32]int{}
-	for _, e := range r.Events {
+	for i := range r.Events {
+		e := &r.Events[i]
 		if out[e.Path.Endpoint] == nil {
 			out[e.Path.Endpoint] = map[uint32]int{}
 		}

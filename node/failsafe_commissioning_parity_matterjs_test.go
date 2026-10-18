@@ -71,18 +71,13 @@ func (a *adSpy) arm() {
 
 // commissionable reports whether a commissionable record is published.
 func (a *adSpy) commissionable() bool {
-	for _, svc := range a.Active() {
-		if svc.ServiceType == mdns.ServiceTypeCommissionable {
+	active := a.Active()
+	for i := range active {
+		if active[i].ServiceType == mdns.ServiceTypeCommissionable {
 			return true
 		}
 	}
 	return false
-}
-
-func (a *adSpy) announcements() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.count
 }
 
 func TestFailsafeCommissioningParity(t *testing.T) {

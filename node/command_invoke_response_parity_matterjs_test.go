@@ -432,10 +432,10 @@ type invokeHost struct {
 	lights map[string]*onoff.Server
 }
 
-func buildEndpoints(t *testing.T, site *fabrictest.Site, specs []endpointSpec) ([]node.Endpoint, map[string]*onoff.Server) {
+func buildEndpoints(t *testing.T, site *fabrictest.Site, specs []endpointSpec) (eps []node.Endpoint, lights map[string]*onoff.Server) {
 	t.Helper()
-	var eps []node.Endpoint
-	lights := map[string]*onoff.Server{}
+	eps = make([]node.Endpoint, 0, len(specs))
+	lights = map[string]*onoff.Server{}
 	for _, s := range specs {
 		ep, err := s.build(site)
 		if err != nil {

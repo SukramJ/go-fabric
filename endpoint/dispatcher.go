@@ -466,8 +466,9 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 // [TopologyDispatcher.InvokeAuthorized] would run the wildcard-endpoint
 // command path on, in ascending order, without running it.
 func (d *TopologyDispatcher) CommandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []uint16 {
-	var out []uint16
-	for _, t := range d.commandTargets(path, authorize) {
+	targets := d.commandTargets(path, authorize)
+	out := make([]uint16, 0, len(targets))
+	for _, t := range targets {
 		out = append(out, t.ep.ID)
 	}
 	return out

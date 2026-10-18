@@ -287,61 +287,83 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			inv.Path = p
 		case tagCmdDataFields:
-			if fieldsReader == nil {
-				// No cluster-native reader wired — skip the container.
-				// The dispatcher fan-out can still route on path alone
-				// (ArmFailSafe / disarm flows, where the path uniquely
-				// identifies the command and fields carry only optional
-				// arguments). Without this branch the nil-reader call
-				// below panics.
-				if el.IsContainer {
-					if err := skipContainer(dec); err != nil {
-						return CommandInvocation{}, fmt.Errorf("%w: skip fields: %w", ErrInvalidInvokeRequest, err)
-					}
-				}
-				continue
+			if err := readCommandFields(dec, el, fieldsReader, &inv); err != nil {
+				return CommandInvocation{}, err
 			}
-			// CommandFields is a structure (Matter §10.6.12); a payload of
-			// another type cannot decode against any command's schema and
-			// is the command's INVALID_COMMAND, the rest of the batch
-			// unaffected. Mirrors matter.js
-			// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
-			// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
-			// reader read past it and the request failed as a whole.
-			if !el.IsContainer || el.Type != tlv.TypeStructure {
-				if el.IsContainer {
-					if err := skipContainer(dec); err != nil {
-						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
-					}
-				}
-				inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
-				continue
-			}
-			f, err := fieldsReader(inv.Path, dec, el)
-			if err != nil {
-				// A typed reject is a per-command outcome, not a malformed
-				// request: drain the rest of the fields container so the
-				// remaining commands of the batch still decode, and carry
-				// the status to the dispatcher.
-				var sce StatusCodeError
-				if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
-					return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
-				}
-				if el.IsContainer && !fieldsContainerConsumed(err) {
-					if err := skipContainer(dec); err != nil {
-						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
-					}
-				}
-				inv.Fields = nil
-				inv.DecodeStatus = sce.MatterStatusCode()
-				continue
-			}
-			inv.Fields = f
 		case tagCmdDataRef:
 			inv.CommandRef = uint16(el.Uint & 0xFFFF)
 			inv.HasCommandRef = true
 		}
 	}
+}
+
+// readCommandFields reads the CommandFields element el of inv: the
+// cluster-native fields, or the per-command status a refused payload
+// carries.
+func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFieldsReader, inv *CommandInvocation) error {
+	if fieldsReader == nil {
+		// No cluster-native reader wired — skip the container.
+		// The dispatcher fan-out can still route on path alone
+		// (ArmFailSafe / disarm flows, where the path uniquely
+		// identifies the command and fields carry only optional
+		// arguments). Without this branch the nil-reader call
+		// below panics.
+		if el.IsContainer {
+			if err := skipContainer(dec); err != nil {
+				return fmt.Errorf("%w: skip fields: %w", ErrInvalidInvokeRequest, err)
+			}
+		}
+		return nil
+	}
+	// CommandFields is a structure (Matter §10.6.12); a payload of
+	// another type cannot decode against any command's schema and
+	// is the command's INVALID_COMMAND, the rest of the batch
+	// unaffected. Mirrors matter.js
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
+	// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
+	// reader read past it and the request failed as a whole.
+	if notStruct, err := skipNonStructFields(dec, el); notStruct || err != nil {
+		if err != nil {
+			return err
+		}
+		inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
+		return nil
+	}
+	f, err := fieldsReader(inv.Path, dec, el)
+	if err != nil {
+		// A typed reject is a per-command outcome, not a malformed
+		// request: drain the rest of the fields container so the
+		// remaining commands of the batch still decode, and carry
+		// the status to the dispatcher.
+		var sce StatusCodeError
+		if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
+			return fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+		}
+		if el.IsContainer && !fieldsContainerConsumed(err) {
+			if err := skipContainer(dec); err != nil {
+				return fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+			}
+		}
+		inv.Fields = nil
+		inv.DecodeStatus = sce.MatterStatusCode()
+		return nil
+	}
+	inv.Fields = f
+	return nil
+}
+
+// skipNonStructFields reports whether the CommandFields element el is
+// something other than a structure, consuming it when it is a container.
+func skipNonStructFields(dec *tlv.Decoder, el tlv.Element) (bool, error) {
+	if el.IsContainer && el.Type == tlv.TypeStructure {
+		return false, nil
+	}
+	if el.IsContainer {
+		if err := skipContainer(dec); err != nil {
+			return true, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+		}
+	}
+	return true, nil
 }
 
 func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {

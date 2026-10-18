@@ -1978,7 +1978,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 403,
+    "line": 425,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1987,7 +1987,7 @@
   },
   {
     "file": "im/invoke.go",
-    "line": 423,
+    "line": 445,
     "citation": "packages/node/src/node/server/InteractionServer.ts:950-955",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "invokeRequests",

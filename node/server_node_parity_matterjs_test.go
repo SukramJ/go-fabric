@@ -333,7 +333,7 @@ func TestServerNodeParity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var out []uint64
+			out := make([]uint64, 0, len(d.Value.Children))
 			for _, c := range d.Value.Children {
 				out = append(out, c.El.Uint)
 			}
@@ -350,7 +350,7 @@ func TestServerNodeParity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var servers []uint64
+		servers := make([]uint64, 0, len(d.Value.Children))
 		for _, c := range d.Value.Children {
 			servers = append(servers, c.El.Uint)
 		}

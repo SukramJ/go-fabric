@@ -370,7 +370,7 @@ func (i *Instance) satisfies(c Constraint, v float64, peers Peers) bool {
 }
 
 func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {
-	ref := ""
+	var ref string
 	switch {
 	case b == nil:
 		return 0, false

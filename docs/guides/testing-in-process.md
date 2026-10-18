@@ -90,12 +90,26 @@ subscribed.
 | `Write`, `WriteTimed` | one attribute; timed sends a TimedRequest first | nil |
 | `Invoke`, `InvokeTimed` | one command | the `interaction.Result` |
 | `Subscribe` | an `interaction.SubscribeRequest` | the subscription, once the device answered |
+| `Exchange` | one IM message as it stands (opcode, TLV payload) — a request the controller refuses to formulate | the device's first answer |
+| `Send` | the same | nothing; for a request the device answers with nothing |
+
+Three helpers shape the pair the requests go over. `Pair.Grant(ctx,
+privilege)` replaces the device's access control list on the pair's fabric
+with one CASE entry for the controller at that privilege — a View or
+Operate subject, as matter.js's `MockServerNode.online({ accessLevel })`.
+`Controller.PASE(ctx, device)` opens a PASE session to a device in its
+commissioning window and returns a `Pair` whose `Interaction` speaks over
+`Pair.PASESession` — the session without fabric of a commissioner before
+AddNOC; the wire helpers accept it. `Device.OpenWindow(ctx, timeout)` opens
+a basic commissioning window with the device's own passcode, so a second
+controller commissions it onto another fabric.
 
 A status other than Success is an `*interaction.StatusError`: the IM status,
 the cluster status when the device sent one, and the attribute path for an
 attribute. An uncommissioned pair returns `fabrictest.ErrNotCommissioned`.
 
-*Source: `fabrictest/wire.go`.*
+*Source: `fabrictest/wire.go`, `fabrictest/raw.go`, `fabrictest/access.go`,
+`fabrictest/pase.go`, `fabrictest/window.go`.*
 
 ## Time
 

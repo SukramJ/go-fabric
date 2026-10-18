@@ -56,24 +56,24 @@ func TestAttributeSubscriptionResponseParity(t *testing.T) {
 		{
 			name:   "reads wildcard endpoint attribute when in filter",
 			paths:  []im.ConcreteAttributePath{wild(nodeLabel)},
-			change: func(t *testing.T, s *subscribed) { s.write(t, nodeLabel, strVal("changed")) },
+			change: func(t *testing.T, s *subscribed) { t.Helper(); s.write(t, nodeLabel, strVal("changed")) },
 			want:   []im.ConcreteAttributePath{nodeLabel},
 		},
 		{
 			name:   "reads no wildcard endpoint attribute when not in filter",
 			paths:  []im.ConcreteAttributePath{wild(nodeLabel)},
-			change: func(t *testing.T, s *subscribed) { s.write(t, location, strVal("DE")) },
+			change: func(t *testing.T, s *subscribed) { t.Helper(); s.write(t, location, strVal("DE")) },
 		},
 		{
 			name:   "reads concrete path when attribute is dirty",
 			paths:  []im.ConcreteAttributePath{nodeLabel},
-			change: func(t *testing.T, s *subscribed) { s.write(t, nodeLabel, strVal("changed")) },
+			change: func(t *testing.T, s *subscribed) { t.Helper(); s.write(t, nodeLabel, strVal("changed")) },
 			want:   []im.ConcreteAttributePath{nodeLabel},
 		},
 		{
 			name:   "ignores concrete path when only a sibling attribute of the same cluster is dirty",
 			paths:  []im.ConcreteAttributePath{nodeLabel},
-			change: func(t *testing.T, s *subscribed) { s.write(t, location, strVal("DE")) },
+			change: func(t *testing.T, s *subscribed) { t.Helper(); s.write(t, location, strVal("DE")) },
 		},
 		{
 			// The probe's cluster is the other cluster with a change.
@@ -84,7 +84,7 @@ func TestAttributeSubscriptionResponseParity(t *testing.T) {
 		{
 			name:   "reads only the dirty attributes of a cluster with several concrete paths",
 			paths:  []im.ConcreteAttributePath{location, nodeLabel},
-			change: func(t *testing.T, s *subscribed) { s.write(t, nodeLabel, strVal("changed")) },
+			change: func(t *testing.T, s *subscribed) { t.Helper(); s.write(t, nodeLabel, strVal("changed")) },
 			want:   []im.ConcreteAttributePath{nodeLabel},
 		},
 	}
@@ -109,7 +109,7 @@ func TestAttributeSubscriptionResponseParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		s.flipProbe(t)
-		var want []im.ConcreteAttributePath
+		want := make([]im.ConcreteAttributePath, 0, len(five))
 		for id := range five {
 			want = append(want, attrPath(s.ep, levelcontrol.ClusterID, id))
 		}
@@ -191,8 +191,8 @@ func (s *subscribed) assertReport(t *testing.T, want []im.ConcreteAttributePath)
 			got = append(got, r.Attributes...)
 		default:
 		}
-		for _, a := range got {
-			if samePath(a.Path, probe) {
+		for i := range got {
+			if samePath(got[i].Path, probe) {
 				return true
 			}
 		}
@@ -206,8 +206,8 @@ func (s *subscribed) assertReport(t *testing.T, want []im.ConcreteAttributePath)
 	}
 	for _, w := range want {
 		found := false
-		for _, a := range got {
-			found = found || samePath(a.Path, w)
+		for i := range got {
+			found = found || samePath(got[i].Path, w)
 		}
 		if !found {
 			t.Fatalf("report %+v lacks %d/%d/%d", got, w.Endpoint, w.Cluster, w.Attribute)
