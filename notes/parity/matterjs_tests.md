@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 21 |
-| partial | 102 |
-| planned | 114 |
+| partial | 103 |
+| planned | 113 |
 | excluded | 87 |
 | total | 324 |
 
@@ -100,7 +100,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/common](#protocoltestcommon) | 8 | 2 | 2 | 1 | 3 |
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
-| [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
+| [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/groups](#protocoltestgroups) | 5 | 3 | 2 | 0 | 0 |
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
@@ -782,7 +782,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| FabricAuthorityTest.ts | 470 | planned | — | The controller's fabric authority: admin vendor checks, persistence, NOC keypair rotation. |
+| FabricAuthorityTest.ts | 470 | partial | `controller/commissioner:TestFabricAuthorityCreateFabric`<br>`controller/commissioner:TestFabricAuthorityDefaultAdminVendorID`<br>`controller/commissioner:TestFabricAuthorityKeypairRotation`<br>`controller/commissioner:TestFabricAuthorityFabricCreation` | createFabric/defaultFabric are commissioner.NewFabric over a ca.FabricStore: the reserved-vendor refusal, persistence before completion, a failing store, the created fabric and the no-rotation path are ported; the Go controller never rotates its NOC key (no rotateNoc, no FabricBuilder.updateOperationalCert, no group or ICD state on its fabric), has no fabricAdded event, and its zero VendorID means unset (DEFAULT_ADMIN_VENDOR_ID), so an explicit 0 cannot be expressed. Missing: “refuses the Matter Standard vendor ID as admin vendor ID”; “rotates NOC keypair when getting default fabric with rotateNoc=true”; “rotated fabric sends to a group at once with the keys of the previous fabric”; “rotated fabric keeps receiving Check-Ins of the ICD peers of the previous fabric”; “rotation occurs exactly once per runtime per fabric”; “rotatedFabricIndices Set correctly prevents duplicate rotations”; “new fabric is properly persisted after rotation”; “preserves fabricId from operational certificate during rotation”; “preserves nodeId from operational certificate during rotation”; “preserves caseAuthenticatedTags during rotation”; “handles fabric without caseAuthenticatedTags during rotation”; “rotation works with multiple fabrics”; “emits fabricAdded event when creating fabric”; “refuses a NOC for another fabric ID and takes over nothing”. |
 | FabricManagerTest.ts | 281 | partial | `cluster/core:TestParityFabricManager_AddFabricNotPersistedDirectly`<br>`cluster/core:TestParityFabricManager_AddDuplicateIndexFails`<br>`cluster/core:TestParityFabricManager_PersistAndRestore`<br>`cluster/core:TestParityFabricManager_RemoveFabric`<br>`cluster/core:TestParityFabricManager_AllocateIndexInitially`<br>`cluster/core:TestParityFabricManager_AllocateIndexAfterAdd`<br>`cluster/core:TestParityFabricManager_AllocateIndexMonotonicAfterRemove`<br>`cluster/core:TestParityFabricManager_AllocateIndexSkipsAfterMultiRemove`<br>`cluster/core:TestParityFabricManager_AllocateTableFull` | The FabricManager parity tests port adding, persistence, removal and index allocation; the remaining lookup and event cases are not. Missing: “shares groups, access control and ICD state with the replacement before it reports it”; “keeps group changes made while replaced when the previous fabric is restored”; “forwards the events of a replaced and restored fabric once and those of a replaced object never”; “releases the ICD state only when the fabric in the table is deleted”; “releases the ICD state when the fabrics are cleared”; “refuses a replacement from another root”; “refuses a replacement with another IPK”; “get next fabric index initially”; “get next fabric index after adding fabric”; “get next fabric index after adding fabric and removing it”; “get next fabric index after adding fabric and revoking it”; “get jumps over one fabric index after adding fabric and revoking it”; “it find first open slot for next index”; “it find first open slot for next index id including overflow”; “throws when table is full”. |
 | FabricTest.ts | 265 | partial | `cluster/core:TestParityMatterJS_CompressedFabricID_HKDF`<br>`secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector`<br>`secure/sigma:TestFabricGetDestinationID`<br>`cluster/core:TestFabricSetLabel`<br>`bridge:TestFabricRemoveFromSession` | Destination IDs 1 and 3 against the matter.js vectors, the label length constraint through UpdateFabricLabel and the session teardown of a fabric removal are ported; destination ID 2 needs the root key of TestFabric, which matter.js's MockCrypto certificate authority generates and the test file does not state, and deleteSession has no Go counterpart, as a Go fabric holds no session set. Missing: “generates the correct destination ID 2”; “removes one sessions without doing anything”. |
 
@@ -1152,10 +1152,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `DclConfigTest.ts` — The DCL production/test URLs and the GitHub certificate source defaults.
 - `DclVendorInfoServiceSeedTest.ts` — Seeding the DCL vendor information from a bundled snapshot.
 - `DclVendorInfoServiceTest.ts` — The DCL vendor information service: fetch, storage, field normalisation, built-in vendors.
-
-### protocol/test/fabric
-
-- `FabricAuthorityTest.ts` — The controller's fabric authority: admin vendor checks, persistence, NOC keypair rotation.
 
 ### protocol/test/icd
 
