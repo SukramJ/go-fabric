@@ -202,7 +202,8 @@ func dclCrlIssue(t *testing.T, name string, o dclCrlIssueOptions) dclCrlIssued {
 }
 
 // The signature algorithm identifiers: X962.EcdsaWithSHA256, ecdsa-with-
-// SHA384 (:462) and MlDsa.AlgorithmIdentifier (MlDsa.ts:30-35, :73).
+// SHA384 (:462) and MlDsa.AlgorithmIdentifier (MlDsa.ts:68-76). Its OIDs
+// are the PARAMETERS table (MlDsa.ts:30-35).
 var (
 	dclCrlECDSAWithSHA256 = dclCrlSeq(dclCrlOID("2a8648ce3d040302"))
 	dclCrlECDSAWithSHA384 = dclCrlSeq(dclCrlOID("2a8648ce3d040303"))
