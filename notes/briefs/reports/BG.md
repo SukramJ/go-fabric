@@ -221,6 +221,27 @@ in `fabrictest` name only those three files and MockTime
 4. The process-wide goroutine reading in `Site.Run` — acceptable, or should
    a step also be bounded by a per-site budget?
 
+## Decisions (owner review, 2026-10-18)
+
+1. The `controller/commissioner` startNode stays: the cycle is structural
+   (`fabrictest` imports the commissioner) and its tests are internal to
+   `package commissioner`. Phase 16 revisits it only if the
+   `packages/protocol/test` port needs a device there.
+2. `bridgetest.Dial` is not deprecated and no `Site.AddBridge` is added:
+   decision 0.8 keeps `bridgetest` and `endpointtest` stable for a host
+   that builds its bridge itself (loom).
+3. `registry_live_test.go`'s wiring moves in phase 16 with the port of
+   `packages/node/test/node` (brief BI).
+4. The process-wide goroutine reading in `Site.Run` is accepted as the Go
+   reading of MockTime's empty task queue; a per-site budget would
+   reintroduce the race the first version showed under `-race`. The cost
+   is named in the guide's Limits.
+5. The event-status observation is a real gap (matter.js
+   `EventReadResponse.ts:210-218` answers UnsupportedEndpoint /
+   UnsupportedCluster / UnsupportedEvent; `im/read.go:598-640` answers
+   nothing): registered in `notes/parity/matter_behaviour_findings.md`
+   under the 862ad75f open items, for phase 16.
+
 ## by_design candidates
 
 None. The in-memory network and the clock steps are test support; no
