@@ -50,6 +50,7 @@ func TestGroupsMulticastAddress(t *testing.T) {
 	}
 
 	t.Run("derives a stable per-group multicast address for the fabric", func(t *testing.T) {
+		t.Parallel()
 		a, err := m.MulticastAddressFor(ctx, 1, 5)
 		if err != nil {
 			t.Fatal(err)
@@ -64,6 +65,7 @@ func TestGroupsMulticastAddress(t *testing.T) {
 	})
 
 	t.Run("rejects an invalid group id", func(t *testing.T) {
+		t.Parallel()
 		if a, err := m.MulticastAddressFor(ctx, 1, 0); !errors.Is(err, ErrInvalidGroupID) {
 			t.Fatalf("multicastAddress(0) = %s, %v; want ErrInvalidGroupID", a, err)
 		}

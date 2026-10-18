@@ -49,7 +49,7 @@ func newFailsafeTimerFixture(t *testing.T, maxSeconds, cumulativeSeconds uint16)
 
 // arm sends ArmFailSafe on ctx and waits until the expiry watcher it
 // starts has armed its timer, so a following Advance reaches it.
-func (f *failsafeTimerFixture) arm(t *testing.T, ctx context.Context, seconds uint16, watchers int) {
+func (f *failsafeTimerFixture) arm(ctx context.Context, t *testing.T, seconds uint16, watchers int) {
 	t.Helper()
 	resp, err := f.gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: seconds})
 	if err != nil {
@@ -94,7 +94,7 @@ func TestFailsafeTimerVerifyExpiryHandling(t *testing.T) {
 		// FailsafeTimerTest.ts:45-56: armed for 3 s, re-armed with 0 after 1.5 s.
 		f := newFailsafeTimerFixture(t, 900, 900)
 		ctx := context.Background()
-		f.arm(t, ctx, 3, 1)
+		f.arm(ctx, t, 3, 1)
 		f.clk.Advance(1500 * time.Millisecond)
 		f.wantNotExpired(t)
 		resp, err := f.gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 0})
@@ -121,10 +121,10 @@ func TestFailsafeTimerVerifyExpiryHandling(t *testing.T) {
 		// first window is the 900 s ceiling, as 1350 s is above it.
 		f := newFailsafeTimerFixture(t, 900, 900)
 		ctx := context.Background()
-		f.arm(t, ctx, 900, 1)
+		f.arm(ctx, t, 900, 1)
 		f.clk.Advance(675 * time.Second)
 		f.wantNotExpired(t)
-		f.arm(t, ctx, 450, 2)
+		f.arm(ctx, t, 450, 2)
 		f.wantNotExpired(t)
 		f.clk.Advance(225*time.Second - time.Nanosecond)
 		f.wantNotExpired(t)
@@ -139,7 +139,7 @@ func TestFailsafeTimerVerifyExpiryHandling(t *testing.T) {
 		// CommissioningComplete over the CASE session of the arming fabric.
 		f := newFailsafeTimerFixture(t, 900, 900)
 		ctx := im.WithFabricFilter(context.Background(), false, 1)
-		f.arm(t, ctx, 3, 1)
+		f.arm(ctx, t, 3, 1)
 		f.clk.Advance(1500 * time.Millisecond)
 		f.wantNotExpired(t)
 		resp, err := f.gc.MatterInvoke(ctx, 0x04, nil)

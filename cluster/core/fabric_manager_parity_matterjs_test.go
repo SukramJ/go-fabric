@@ -121,7 +121,7 @@ type fabricManagerGroupState struct {
 	address   string
 }
 
-func (r *fabricManagerReplaceable) groupState(t *testing.T, ctx context.Context) fabricManagerGroupState {
+func (r *fabricManagerReplaceable) groupState(ctx context.Context, t *testing.T) fabricManagerGroupState {
 	t.Helper()
 	if err := r.mgr.Reload(ctx, r.idx); err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestFabricManagerReplacingFabrics(t *testing.T) {
 		var seen *fabricManagerGroupState
 		var aclSeen []mstore.ACLEntry
 		r.oc.SetOnFabricUpdated(func(ctx context.Context, idx uint8) {
-			s := r.groupState(t, ctx)
+			s := r.groupState(ctx, t)
 			seen = &s
 			aclSeen, _ = r.fs.ListACL(ctx, idx)
 		})

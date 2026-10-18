@@ -19,8 +19,9 @@ import (
 	"testing"
 )
 
+// The subtests run in order on one fabric, as the matter.js describe's
+// before() shares it, so neither the test nor its subtests are parallel.
 func TestGroupsMulticastPolicy(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	st := newMemStore()
 	st.addFabric(1, 0x456789ABCDEF1234, [8]byte{}) // GroupsMulticastPolicyTest.ts:22
