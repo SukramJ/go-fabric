@@ -179,6 +179,8 @@ func (r *Register) check(snap *Snapshot) error {
 				errs = append(errs, fmt.Errorf("%s: %s against blob %s, the snapshot pins %s — re-check the mapping", e.Path, e.Status, e.SnapshotSHA, f.SHA))
 			case StatusExcluded:
 				errs = append(errs, fmt.Errorf("%s: excluded against blob %s, the snapshot pins %s — re-check the exclusion", e.Path, e.SnapshotSHA, f.SHA))
+			case StatusPlanned:
+				// A record only: a planned entry claims nothing a change could falsify.
 			}
 		}
 	}
