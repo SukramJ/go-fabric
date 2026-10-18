@@ -52,8 +52,9 @@ jobs:
         run: |
           sudo apt-get update
           # make and g++: packages/nodejs-ble/README.md (node-gyp builds bleno and noble).
-          sudo apt-get install -y --no-install-recommends bluez bluez-tests make g++
+          sudo apt-get install -y --no-install-recommends bluez bluez-test-tools make g++
           bluetoothctl --version
+          command -v btvirt || dpkg -L bluez-test-tools | grep /bin/
           node --version
       - name: pair over btvirt
         env:

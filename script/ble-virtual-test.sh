@@ -14,7 +14,7 @@
 #
 # Linux only. Needs sudo (btvirt, the vhci module, bluetoothd, the HCI user
 # channel, BlueZ's D-Bus policy for the controller), BlueZ with its test
-# tools (Debian/Ubuntu: bluez bluez-tests), Go, and Node.js in the range
+# tools (Debian/Ubuntu: bluez bluez-test-tools), Go, and Node.js in the range
 # @matter/nodejs-ble declares (>=20.19 <21 or >=22.13) with npm, make and
 # g++ (packages/nodejs-ble/README.md: node-gyp builds bleno and noble).
 #

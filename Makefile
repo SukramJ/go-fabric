@@ -298,7 +298,7 @@ update-dcl-snapshot: ## refetch controller/dcl/snapshot/data (PAAs, CD signers, 
 	$(GO) run ./script/dclsnapshot -out controller/dcl/snapshot/data
 
 .PHONY: ble-virtual-test
-ble-virtual-test: ## BLE end to end over btvirt: the BLE build pairs a matter.js node on bleno (Linux; sudo, bluez + bluez-tests, Node.js, make, g++)
+ble-virtual-test: ## BLE end to end over btvirt: the BLE build pairs a matter.js node on bleno (Linux; sudo, bluez + bluez-test-tools, Node.js, make, g++)
 	@# The same script .github/workflows/ble-virtual.yml runs. Exit 2 is the
 	@# environment (btvirt, BlueZ, Node.js, the bleno build, the HCI claim),
 	@# exit 1 a defect.
