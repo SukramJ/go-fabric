@@ -138,7 +138,7 @@ product is the owner's manual test plan.
 
 **Detail:** [concept v4](./concept-v4-test-foundation.md) (German), written 2026-10-18 when the milestone opened.
 
-**Status 2026-10-18.** Phase 14 done, released as `v0.7.1` (pull requests 151–154): pin `862ad75f`, the upstream fixes classified, the test-porting register (134 `planned` on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phases 15–16 open.
+**Status 2026-10-18.** Phase 14 done, released as `v0.7.1` (pull requests 151–154): pin `862ad75f`, the upstream fixes classified, the test-porting register (134 `planned` on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phase 15 done, released as `v0.7.2` (pull requests 157, 158, 160): every time source of the module behind `clock.Clock`, `clocktest.Fake` after `MockTime` and the no-raw-time guard; the public `fabrictest` package — in-process devices and controllers on an in-memory network and one clock, after `MockSite` — with the controller's own tests on it and the testing-in-process guide. Phase 16 open.
 
 | Phase | Content | Proof |
 | --- | --- | --- |
