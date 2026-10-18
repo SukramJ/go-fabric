@@ -210,9 +210,12 @@ speaks BlueZ over the D-Bus system bus, without cgo, on Linux only.
   `pair --ble` fails with `org.freedesktop.DBus.Error.AccessDenied` in the
   message; an adapter that is off fails with `org.bluez.Error.NotReady`
   (`bluetoothctl power on`).
-- **BlueZ.** Verified with BlueZ 5.72 (Ubuntu 24.04, the `ble-virtual`
-  workflow over `btvirt`). The ATT_MTU comes from the characteristic's `MTU`
-  property; a BlueZ without it runs BTP at the 20-byte minimum segment.
+- **BlueZ.** Not yet verified against a live BlueZ: the module's tests run
+  over an in-process bus, and the live path is the manually started
+  `ble-virtual` workflow (Ubuntu 24.04, `btvirt`), which needs a CHIP image
+  whose `chip-all-clusters-app` is built with BLE — the pinned one is not.
+  The ATT_MTU comes from the characteristic's `MTU` property; a BlueZ
+  without it runs BTP at the 20-byte minimum segment.
 - **Adapter.** `--ble-adapter` names the adapter as BlueZ does (`hci0`,
   `hci1`, …; `bluetoothctl list`).
 
