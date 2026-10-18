@@ -56,6 +56,8 @@
 // has an entry and every entry a path, every go reference resolves to a Test
 // function in the named package's _test.go files, a ported or partial entry
 // whose snapshotSha differs from the snapshot fails ("re-check the mapping"),
+// an excluded one too ("re-check the exclusion": its reason may no longer
+// hold),
 // the committed page is what rendering produces, and the number of planned
 // entries sits exactly on testparityPlannedRatchet. It needs no matter.js
 // clone: the snapshot is committed.

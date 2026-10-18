@@ -153,8 +153,8 @@ jobs:
       # Holds the matter.js test-porting register (script/testparity) against
       # the committed snapshot of matter.js's test files at the schema pin: no
       # file without an entry, no entry without a file, every Go test an entry
-      # names exists, a ported or partial mapping was checked against the blob
-      # now pinned, the rendered page is current, and the planned count sits
+      # names exists, a ported, partial or excluded verdict was checked against
+      # the blob now pinned, the rendered page is current, and the planned count sits
       # exactly on its ratchet. No matter.js clone: the snapshot is committed.
       - name: testparity
         run: make testparity-check

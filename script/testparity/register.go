@@ -155,7 +155,9 @@ func (e *Entry) validate() error {
 }
 
 // check holds the register against the snapshot: the same paths, both ways,
-// and a ported or partial mapping checked against the blob now pinned.
+// and a ported, partial or excluded verdict checked against the blob now
+// pinned. A planned entry's snapshotSha is a record only: nothing is claimed
+// about the file that a change could falsify.
 func (r *Register) check(snap *Snapshot) error {
 	var errs []error
 	byPath := make(map[string]SnapshotFile, len(snap.Files))
@@ -171,8 +173,13 @@ func (r *Register) check(snap *Snapshot) error {
 			errs = append(errs, fmt.Errorf("%s: in the register but not in the snapshot — the file is gone upstream; remove the entry", e.Path))
 			continue
 		}
-		if (e.Status == StatusPorted || e.Status == StatusPartial) && e.SnapshotSHA != f.SHA {
-			errs = append(errs, fmt.Errorf("%s: %s against blob %s, the snapshot pins %s — re-check the mapping", e.Path, e.Status, e.SnapshotSHA, f.SHA))
+		if e.SnapshotSHA != f.SHA {
+			switch e.Status {
+			case StatusPorted, StatusPartial:
+				errs = append(errs, fmt.Errorf("%s: %s against blob %s, the snapshot pins %s — re-check the mapping", e.Path, e.Status, e.SnapshotSHA, f.SHA))
+			case StatusExcluded:
+				errs = append(errs, fmt.Errorf("%s: excluded against blob %s, the snapshot pins %s — re-check the exclusion", e.Path, e.SnapshotSHA, f.SHA))
+			}
 		}
 	}
 	var missing []string

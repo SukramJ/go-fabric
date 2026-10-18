@@ -10,10 +10,10 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 8 |
-| partial | 94 |
-| planned | 133 |
-| excluded | 89 |
+| ported | 7 |
+| partial | 96 |
+| planned | 134 |
+| excluded | 87 |
 | total | 324 |
 
 ## Per directory
@@ -63,7 +63,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
+| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
@@ -89,7 +89,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/tsconfigs/nonstrict](#nodetesttsconfigsnonstrict) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 0 | 0 | 4 | 1 |
-| [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 0 | 1 | 1 |
+| [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
 | [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 0 | 0 | 2 | 0 |
@@ -106,7 +106,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
-| [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 2 | 4 |
+| [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 0 | 5 | 4 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 1 | 2 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
@@ -428,7 +428,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ScenesManagementServerTest.ts | 99 | ported | `cluster/core:TestScenesAddAndRecallOnOff` | The one case, adding and recalling an OnOff scene value, is ported. |
+| ScenesManagementServerTest.ts | 99 | partial | `cluster/core:TestScenesAddAndRecallOnOff` | The one it is covered in part: adding a scene and recalling it on is ported with a zero transition, but the second scene at the 60 000 000 ms transition-time maximum and the recall running its 1 s transition are not. Missing: “add and recall onoff boolean scene value”. |
 
 ## node/test/behaviors/service-area
 
@@ -681,7 +681,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ClientSubscriptionsTest.ts | 150 | planned | — | The controller's subscription timers across clock steps and the report-started observers. |
-| SustainedSubscriptionTest.ts | 1712 | excluded | `controller-stage` until M5 phase 24 | The sustained subscription that parks on a LIT peer and resubscribes when it wakes, which milestone 5 phase 24 builds. |
+| SustainedSubscriptionTest.ts | 1712 | partial | `controller/interaction:TestSustainedSubscription`<br>`controller/interaction:TestSustainedCloseWhileRetrying`<br>`controller/interaction:TestSustainedRefreshRequest`<br>`controller/interaction:TestSustainedRefreshAfterBootstrap` | The non-ICD sustained subscription (returned at once, active once established, the timed retry, close during the backoff, the reachability check before a resubscribe, the refreshed request) is covered by controller/interaction; the observer, maxInterval and keepalive cases, the ICD await mode of milestone 5 phase 24 and the event-number cases are not. Missing: “close() resolves done() even when peer never fires request.closed”; “never reports active when closed while the subscribe is in flight and then succeeds”; “reports not live when closed while the active observers run”; “never reports active when an inactive observer closes the subscription while going live”; “ends not live and rejects done when an inactive observer throws while going live”; “still reports inactive when an active observer throws during the final not-live update”; “treats a wakefulness with requiresAwait===false as non-ICD (timed retry, probe)”; “parks on the next loss once its wakefulness flips to requiresAwait===true”; “reports maxInterval in seconds, using a seconds fallback before a subscription is established”; “forwards a caller-provided keepaliveReceived”; “parks while asleep and subscribes only after a wake signal”; “leaves a subscribed LIT peer's availability to the subscription”; “fires checkInMissed for a parked LIT peer that never subscribes and misses its Check-In”; “goes inactive immediately on a subscription loss, regardless of the availability window”; “parks on subscribe failure instead of running a timed retry”; “retries a flipped SIT peer after a bounded delay instead of stranding on a wake edge”; “close() resolves done cleanly while parked”; “closes the active peer subscription on abort”; “honors a wakefulness provider that returns undefined until the peer registers”; “recreates the subscription immediately on a LIT->SIT runtime flip”; “recreates after the next check-in on a SIT->LIT runtime flip”; “does not emit an active dip across an instant mode-flip recreate”; “reports not live when closed while a mode-flip recreate tears down the old subscription”; “recreates on the icdLit network profile, then reverts to the default on a later loss”; “keeps a runtime SIT→LIT peer on icdLit for a post-loss resubscribe, not just the flip recreate”; “keeps active live across a report-driven SIT→LIT flip when the recreate lands in-window”; “drops to not-live when a mode-flip recreate parks for a peer that never wakes”; “recreates on the first registration-induced feed while the subscription was established unfed”; “does not double-recreate: a stray feed signal after the peer is fed is a no-op, later flips use the observer”; “has no Check-In deadline while subscribed”; “releases its hold when closed”; “releases its hold when the subscription is lost”; “releases its hold when the recreate after a mode change fails”; “keeps its subscription when the peer's wakefulness is suspended”; “stops observing the peer's mode once closed”; “ignores a feed signal for a different peer”; “keeps the caller's event filters until it delivered an event”; “resubscribes for events above the highest one it delivered”; “counts a result only once its consumer resolved”; “requests events above the bootstrap read's highest event”; “does not lower its number when a later result carries lower event numbers”; “counts events of reports with asynchronous chunks”; “keeps its number when a report without events follows”; “settles the delivery of a report only after maxEventNumberChanged settled”; “replaces the event filters a refreshRequest returns with its own once it delivered an event”; “keeps a subscription whose priming report fails to process and counts its events”; “keeps a subscription whose live report fails to process and counts its events”; “warns only for the first failure of its own processing”; “logs it and delivers the report”; “keeps the failure of the report”; “passes a failure while ${failure} on and counts the events received before it”. |
 
 ## protocol/test/action/request
 
@@ -842,7 +842,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | PeerConnectionErrorHandlerTest.ts | 213 | partial | `controller/peer:TestHandleErrorOverrideAndFatal`<br>`controller/peer:TestConnectionErrorDelays` | The handler's delay override is covered; handler precedence and the rediscovery gate are not ported case by case. Missing: “prefers per-connection handler over context handler”; “falls back to context handler when no per-connection handler”; “returns undefined when neither handler is set”; “signals abort when handler throws”; “keeps default delay when no handler is set”; “flags unreachable for NetworkUnreachableError (ENETUNREACH)”; “flags unreachable for AddressUnreachableError (EHOSTUNREACH)”; “flags unreachable when a network error is wrapped as a cause”; “does not flag unreachable for transient peer errors (handled by MRP retransmission path)”; “does not flag unreachable for generic errors”; “returns 15s for NoSharedTrustRoots”; “returns undefined for other ChannelStatusResponseErrors”; “returns undefined for non-ChannelStatusResponseError”; “overrides default peer error delay in full flow”; “does not override delay for unrelated errors in commissioning”. |
 | PeerConnectionFallbackRetirementTest.ts | 253 | partial | `controller/peer:TestFallbackRetiredAfterStabilization`<br>`controller/peer:TestFallbackOnlyAndNotFirst`<br>`controller/peer:TestParityTimingDefaults` | Retiring the fallback address after stabilization is covered; the supersession decisions and the keep-alive guard are not. Missing: “does not retire a fallback that discovery re-advertises during the debounce”; “does not retire while no discovered alternative exists”; “is superseded with a discovered alternative that is not the fallback”; “is not superseded once promoted (fallback flag cleared)”; “is not superseded when no discovered address exists”; “is not superseded when the fallback is itself re-advertised (matched ignoring transport)”; “is not superseded when the fallback is re-advertised alongside other addresses”; “keeps the operational address alive when it is the last attempt (unforced)”; “deletes when a non-operational attempt still remains”; “force bypasses the keep-alive so a superseded fallback is actually dropped”; “staggers a second real address behind the first”; “starts immediately once retirement resets lastAttemptAt”. |
 | PeerConnectionKickTest.ts | 441 | partial | `controller/peer:TestParityTimingDefaults`<br>`controller/peer:TestKickRestartsTheExchange`<br>`controller/peer:TestDiscoverKick` | The kick defaults and the restart on a kick are covered; overrides, the quiet observable and the restart conditions are not ported case by case. Missing: “has correct default for kickMinRetransmissions”; “allows overriding kick restart cooldowns”; “keeps the untouched members of a partially overridden group”; “keeps the untouched members of a group when merging onto a custom base”; “passes 'discover' origin to observer”; “passes 'connect' origin to observer”; “suppresses rapid-fire kicks within minimumEmitInterval”; “allows kick after minimumEmitInterval has elapsed”; “accepts the first kick unconditionally”; “suppresses a second 'discover' kick within 30 minutes”; “accepts a second 'discover' kick after 30 minutes”; “suppresses a second 'connect' kick within 10 minutes”; “accepts a second 'connect' kick after 10 minutes”; “uses independent thresholds for different origins”; “shares lastRestartAt across concurrent handlers”; “allows custom thresholds via PeerTimingParameters override”; “suppresses while the exchange has not retransmitted enough”; “suppresses when a restart would save too little time (e.g. idle/sleepy peer)”; “restarts once both retransmission count and restart saving clear their thresholds”; “firing localAbort causes AbortedError via Abort.attempt”; “addressAbort propagates to localAbort”; “localAbort on already-aborted signal is harmless”; “connect loop restarts after localAbort fires”; “Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>”; “use() returns disposable that unregisters observer”. |
-| PeerConnectionSocketOwnershipTest.ts | 142 | excluded | `controller-stage` until M5 phase 25 | Ownership of the channel a controller opens for pairing, which matters for the TCP initiator of milestone 5 phase 25. |
+| PeerConnectionSocketOwnershipTest.ts | 142 | planned | — | Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25. |
 | PeerDescriptorTest.ts | 82 | excluded | `js-runtime-only` | matter.js's observable peer descriptor objects (interning, change notification). |
 | PeerEstablishmentProgressTest.ts | 148 | partial | `controller/peer:TestParityUnresponsiveDetector`<br>`controller/peer:TestEstablishmentUnresponsive` | The unresponsive-establishment latch is ported; the per-instance latch independence is not. Missing: “keeps an independent latch per detector instance”. |
 | PhysicalDevicePropertiesTest.ts | 308 | planned | — | Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch). |
@@ -1192,6 +1192,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### protocol/test/peer
 
 - `NetworkProfileTest.ts` — The controller's network profiles and their additional MRP delay per medium, BDX margin and sub-profiles.
+- `PeerConnectionSocketOwnershipTest.ts` — Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.
 - `PhysicalDevicePropertiesTest.ts` — Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch).
 
 ### protocol/test/protocol

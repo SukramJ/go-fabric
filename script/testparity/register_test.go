@@ -4,7 +4,7 @@
 // The tests in this file are the guard on the COMMITTED register: the
 // snapshot is the pin's, every snapshot path has exactly one entry, every Go
 // test an entry names exists, a ported or partial mapping was checked against
-// the blob now pinned, the page is what rendering produces, and the number of
+// the blob now pinned (an exclusion too), the page is what rendering produces, and the number of
 // planned files sits exactly on its ratchet. None of them needs a matter.js
 // clone; regenerating the snapshot (make testparity-snapshot) is a pin lift's
 // job, and its diff is what tells the next mapping check where to look.
@@ -31,12 +31,12 @@ import (
 // so; a DROP has to be locked in by lowering it, so a file ported once cannot
 // slide back to planned under a ceiling that was never tightened.
 //
-// Set to 133 by the initial fill (brief BE) at matter.js 862ad75f: 324 test
+// Set to 134 by the initial fill (brief BE) at matter.js 862ad75f: 324 test
 // files, every one decided from the seed read and then checked against its
 // describe/it names and the Go tests' Test and t.Run names. Phase 16 brings
 // the protocol/test and node/test/node share of it to zero, milestone 3 the
 // node/test/behaviors share.
-const testparityPlannedRatchet = 133
+const testparityPlannedRatchet = 134
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."
@@ -206,19 +206,24 @@ func TestTestparityEntryValidation(t *testing.T) {
 
 func TestTestparityCheckReportsDrift(t *testing.T) {
 	sha, other := strings.Repeat("a", 40), strings.Repeat("b", 40)
-	snap := &Snapshot{Files: []SnapshotFile{{Path: "a", SHA: sha}, {Path: "b", SHA: sha}}}
+	snap := &Snapshot{Files: []SnapshotFile{{Path: "a", SHA: sha}, {Path: "b", SHA: sha}, {Path: "d", SHA: sha}, {Path: "e", SHA: sha}}}
 	reg := &Register{Entries: []Entry{
 		{Path: "a", Status: StatusPorted, Go: []string{"im:TestX"}, Reason: "r", SnapshotSHA: other},
+		{Path: "b", Status: StatusExcluded, Class: ClassJSRuntimeOnly, Reason: "r", SnapshotSHA: other},
 		{Path: "c", Status: StatusPlanned, Reason: "r", SnapshotSHA: sha},
+		{Path: "d", Status: StatusPlanned, Reason: "r", SnapshotSHA: other},
 	}}
 	err := reg.check(snap)
 	if err == nil {
 		t.Fatal("check accepted a register that does not match the snapshot")
 	}
-	for _, want := range []string{"a: ported against blob", "re-check the mapping", "c: in the register but not in the snapshot", "b: in the snapshot but not in the register"} {
+	for _, want := range []string{"a: ported against blob", "re-check the mapping", "b: excluded against blob", "re-check the exclusion", "c: in the register but not in the snapshot", "e: in the snapshot but not in the register"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("check error lacks %q:\n%v", want, err)
 		}
+	}
+	if strings.Contains(err.Error(), "d: ") {
+		t.Errorf("check reported a planned entry's changed blob:\n%v", err)
 	}
 }
 
