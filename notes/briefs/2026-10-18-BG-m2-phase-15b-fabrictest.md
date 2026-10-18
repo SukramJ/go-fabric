@@ -62,6 +62,18 @@ subscribe :465, `seedPeerCache` :520).
    chip-tool and no radio, every claim checkable; the concurrency guide
    names the package; `mkdocs.yml` nav; CHANGELOG Added.
 
+6. **The rest of the device side on the node clock** (from report BF,
+   decision 4 of the owner): `device.New` builds its servers (`onoff.New`
+   and the others with a `TimeSource`/`Clock` field) without a clock, and
+   the bridged endpoints' and the Aggregator's Identify servers stay on
+   `clock.System`. Thread `node.Config.Clock` through the device options and
+   the endpoint registry so that a `fabrictest` device runs entirely on the
+   site's `clocktest.Fake` (an Identify timer or a timed-off that fires on
+   the wall clock would make a stepped test flaky). Field names: `Clock`
+   where the name is free, `TimeSource` where an old `Clock` field holds the
+   deprecated shape (the BF convention; the rename back to `Clock` happens
+   when the deprecated fields go, v0.10.0 at the earliest).
+
 ## Guards
 
 `make ci`, `make race`, `make reachability-check`, `make cite-check`,
