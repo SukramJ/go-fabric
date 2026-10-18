@@ -613,6 +613,13 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	extending := g.failSafeArmed
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = now.Add(time.Duration(req.ExpiryLengthSeconds) * time.Second)
+	// The cumulative limit is a timer of its own that expires the fail-safe,
+	// so no re-arm carries the deadline past it. Mirrors matter.js
+	// packages/protocol/src/common/FailsafeTimer.ts:33-35 (the max cumulative
+	// timer, started with the context, calls expire()).
+	if g.failSafeExpiresAt.After(g.failSafeCumulativeDeadline) {
+		g.failSafeExpiresAt = g.failSafeCumulativeDeadline
+	}
 	g.breadcrumb = req.Breadcrumb
 	// Capture the requesting fabric so CommissioningComplete can verify
 	// that the *same* CASE fabric closes the window the PASE/CASE

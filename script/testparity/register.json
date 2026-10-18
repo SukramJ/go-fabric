@@ -2895,18 +2895,14 @@
     },
     {
       "path": "packages/protocol/test/common/FailsafeTimerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestGenComm_ArmFailSafeForArmsThenExpires",
         "cluster/core:TestGencomm_ArmFailSafe_OnExpired_Hook",
-        "cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow"
+        "cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow",
+        "cluster/core:TestFailsafeTimerVerifyExpiryHandling"
       ],
-      "missing": [
-        "Expiry callback is called directly when failsafe expires after being rearmed (with 0)",
-        "Expiry callback is called when max cumulative failsafe expires",
-        "Expiry callback is not called when failsafe was completed"
-      ],
-      "reason": "Expiry and re-arming are covered; re-arming with 0, the cumulative limit and completion are not ported case by case.",
+      "reason": "The fail-safe expiry, re-arming (extended and with 0), the cumulative limit expiring it and completion suppressing the callback are ported through the General Commissioning server on a fake clock, the cumulative vector scaled to the server's 900 s floor.",
       "snapshotSha": "d0ae50e074347215ae3f3dac23c9b356b1ffacba"
     },
     {

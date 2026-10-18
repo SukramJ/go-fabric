@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 11 |
-| partial | 101 |
+| ported | 12 |
+| partial | 100 |
 | planned | 125 |
 | excluded | 87 |
 | total | 324 |
@@ -97,7 +97,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 0 | 2 | 3 | 0 |
 | [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
-| [protocol/test/common](#protocoltestcommon) | 8 | 1 | 2 | 2 | 3 |
+| [protocol/test/common](#protocoltestcommon) | 8 | 2 | 1 | 2 | 3 |
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
@@ -752,7 +752,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ExpandedPathTest.ts | 134 | excluded | `js-runtime-only` | Log rendering of attribute and event paths. |
 | ExpandedStatusTest.ts | 59 | excluded | `js-runtime-only` | Log rendering of status codes. |
 | FailsafeContextTest.ts | 117 | planned | — | The fail-safe context dropping its listener on close and refusing an admin subject that is a CAT of version 0 or neither node ID nor CAT. |
-| FailsafeTimerTest.ts | 84 | partial | `cluster/core:TestGenComm_ArmFailSafeForArmsThenExpires`<br>`cluster/core:TestGencomm_ArmFailSafe_OnExpired_Hook`<br>`cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow` | Expiry and re-arming are covered; re-arming with 0, the cumulative limit and completion are not ported case by case. Missing: “Expiry callback is called directly when failsafe expires after being rearmed (with 0)”; “Expiry callback is called when max cumulative failsafe expires”; “Expiry callback is not called when failsafe was completed”. |
+| FailsafeTimerTest.ts | 84 | ported | `cluster/core:TestGenComm_ArmFailSafeForArmsThenExpires`<br>`cluster/core:TestGencomm_ArmFailSafe_OnExpired_Hook`<br>`cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow`<br>`cluster/core:TestFailsafeTimerVerifyExpiryHandling` | The fail-safe expiry, re-arming (extended and with 0), the cumulative limit expiring it and completion suppressing the callback are ported through the General Commissioning server on a fake clock, the cumulative vector scaled to the server's 900 s floor. |
 | PathErrorTest.ts | 53 | excluded | `js-runtime-only` | The TypeScript PathError class. |
 
 ## protocol/test/dcl
