@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5317,
+  "entry_points": 5322,
   "entry_packages": [
     ".",
     "bdx",
@@ -191,6 +191,7 @@
     "im/subscription",
     "internal/chipdm",
     "internal/chiptool",
+    "internal/clockvar",
     "internal/paritytest",
     "mdns",
     "node",
@@ -222,9 +223,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12785,
+    "total_exported": 12787,
     "reachable": 9016,
-    "whitelisted": 3764,
+    "whitelisted": 3766,
     "unreachable": 5
   },
   "by_package": [
@@ -5399,6 +5400,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/coerce_test.go",
       "line": 30
+    },
+    {
+      "package": "cluster",
+      "identifier": "TestQuieterStaleFlushDoesNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/attribute_changes_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/alarm",
@@ -18026,35 +18034,42 @@
       "identifier": "TestACapacityBelowOneStillProducesAUsableRing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 88
+      "line": 91
     },
     {
       "package": "diagevent",
       "identifier": "TestAnUnwiredRingIsSilentRatherThanFatal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 48
+      "line": 51
     },
     {
       "package": "diagevent",
       "identifier": "TestRecordingIsSafeUnderConcurrentWireTraffic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 65
+      "line": 68
+    },
+    {
+      "package": "diagevent",
+      "identifier": "TestSetClockStampsUnstampedEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 123
     },
     {
       "package": "diagevent",
       "identifier": "TestSnapshotIsACopy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 104
+      "line": 107
     },
     {
       "package": "diagevent",
       "identifier": "TestTheRingKeepsTheNewestAndDropsTheOldest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 21
+      "line": 24
     },
     {
       "package": "eligibility",
