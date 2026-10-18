@@ -138,6 +138,8 @@ product is the owner's manual test plan.
 
 **Detail:** [concept v4](./concept-v4-test-foundation.md) (German), written 2026-10-18 when the milestone opened.
 
+**Status 2026-10-18.** Phase 14 done, released as `v0.7.1` (pull requests 151–154): pin `862ad75f`, the upstream fixes classified, the test-porting register (134 `planned` on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phases 15–16 open.
+
 | Phase | Content | Proof |
 | --- | --- | --- |
 | 14 | pin lift to matter.js HEAD (snapshot diff classified, generators, citations re-checked, `chipdm-check` green); the **test-porting register** `notes/parity/matterjs_tests.md`: every `*Test.ts` under `packages/node/test` and `packages/protocol/test` mapped to the Go test(s) that port it or to a classified exclusion (controller-only at this stage, JS-runtime-only, Joint Fabric), with a ratchet guard like `reachability-check` | the guard fails when a matter.js test file is unmapped |
