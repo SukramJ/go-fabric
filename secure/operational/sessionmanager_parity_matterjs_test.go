@@ -94,7 +94,7 @@ func TestSessionManagerMaybeSessionFor(t *testing.T) {
 		m.SetClock(clk)
 		ours := sessionManagerOpen(t, m, 0x0300, peer, 0x0021, true)
 		sessionManagerStamp(clk, ours) // the oldest
-		var theirs []uint16
+		theirs := make([]uint16, 0, 6)
 		for i := range uint16(6) {
 			e := sessionManagerOpen(t, m, 0x0301+i, peer, 0x0031+i, false)
 			sessionManagerStamp(clk, e)
@@ -164,7 +164,7 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
 		m.SetClock(clk)
 		sessionManagerOpen(t, m, 0x0100, 0x1234, 0x0100, false)
-		clk.Set(clk.Now().Add(time.Hour)) // stepWallClock(Hours(1))
+		clk.Set(clk.Now().Add(time.Hour)) // the wall clock steps one hour forward
 		infos := m.Sessions()
 		if len(infos) != 1 || !infos[0].LastPeerActivity.IsZero() {
 			t.Fatalf("sessions = %+v, want one with a zero last peer activity", infos)
