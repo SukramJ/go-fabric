@@ -95,3 +95,16 @@ func noMessage(t *testing.T) func([]byte) error {
 	t.Helper()
 	return func([]byte) error { t.Helper(); t.Error("Message should not be called"); return nil }
 }
+
+// TestDeprecatedSystemClockFires: the deprecated SystemClock keeps running
+// its timers on the system clock for its window.
+func TestDeprecatedSystemClockFires(t *testing.T) {
+	t.Parallel()
+	var c Clock = SystemClock{}
+	done := make(chan struct{})
+	c.AfterFunc(time.Millisecond, func() { close(done) })
+	<-done
+	if (portClock{newFakeClock()}).AfterFunc(time.Second, func() {}).Stop() != true {
+		t.Fatal("a port clock's timer did not stop")
+	}
+}

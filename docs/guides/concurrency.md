@@ -29,7 +29,18 @@ gate for these paths.
 `node.New` starts the engine and the reapers before `Start`. Call `Stop`
 on every node `New` returned, even one you never started.
 
-*Source: `transport/udp/listener.go:147-212`, `bridge/bridge.go:784-840`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:184-185`, `im/subscription/manager.go:229-235`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:223-227`, `secure/operational/manager.go:1145-1160`, `node/security.go:308-355`, `node/node.go:38-40`, `node/node.go:486-494`, `node/reannounce.go:15-31`, `node/config.go:175-179`, `bridge/securechannel.go:1268-1290`, `bridge/bdx_responder.go:93-110`, `binding/manager.go:238-244`, `node/client.go:96-106`, `node/node.go:95-108`.*
+Every cadence in the table runs on one clock: `node.Config.Clock`
+(`bridge.Config.Clock` for a host that builds the bridge itself), a
+[`clock.Clock`](https://github.com/SukramJ/go-fabric/blob/main/clock/clock.go)
+— the module's one time port, `clock.System` when unset. No production
+code outside the `clock` package reads the time package's clock
+(`clock/noraw_test.go` fails the build on one), so a test that passes a
+[`clocktest.Fake`](https://github.com/SukramJ/go-fabric/blob/main/clock/clocktest/fake.go)
+moves the ACK pump, the engine tick, the reapers, the commissioning window
+and the cluster timers only when it calls `Advance`. `AfterFunc` callbacks
+run in their own goroutine on either clock.
+
+*Source: `transport/udp/listener.go:147-212`, `bridge/bridge.go:784-840`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:184-185`, `im/subscription/manager.go:229-235`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:223-227`, `secure/operational/manager.go:1145-1160`, `node/security.go:308-355`, `node/node.go:38-40`, `node/node.go:486-494`, `node/reannounce.go:15-31`, `node/config.go:175-179`, `bridge/securechannel.go:1268-1290`, `bridge/bdx_responder.go:93-110`, `binding/manager.go:238-244`, `node/client.go:96-106`, `node/node.go:95-108`, `clock/clock.go`, `node/config.go` (`Config.Clock`).*
 
 ## Dispatch and ordering
 

@@ -10,6 +10,35 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
+
+**What a host must do.** Nothing, unless it implements `controller/exchange.Clock` or `exchange.Timer` itself (see Changed). A host that wants to drive the device side's timers in its tests sets `node.Config.Clock` (or `bridge.Config.Clock`) to a `clocktest.Fake`.
+
+### Added
+
+- `clock`: the module's time port — `Clock` (`Now`, `AfterFunc`, `NewTimer`, `NewTicker`), `Timer` (`Stop`, `Reset`, `C`), `Ticker` (`Stop`, `Reset`, `C`), `System` (the standard library), and the helpers `Or`, `Sleep`, `After`, `Since`, `Until`. Stdlib only. Every package of the module reads its time from it.
+- `clock/clocktest`: `Fake`, the test clock after matter.js `MockTime` (`packages/testing/src/mocks/time.ts`) — `New(start)`, `Now`, `Set`, `Advance` (fires every timer and ticker tick due in time order, each `AfterFunc` callback in its own goroutine, and returns when they returned), `Yield`, `Pending`, `Armed`, `Next`, `Resolve(ctx, wait)`. Goroutine-safe; `Stop`/`Reset` behave as the standard library's since Go 1.23.
+- A `Clock clock.Clock` beside each owner's time source, nil meaning `clock.System`: `node.Config.Clock` (handed to the bridge, the session table, the subscription engine, the PASE/CASE providers, the operational resolver, an advertiser with `SetClock`, the group sender, the root's cluster servers, OTA, the persist loop and the reopen poll), `bridge.Config.Clock` (and `Bridge.Clock`), `subscription.Config.Clock`, `tcp.Config.Clock`, `ca.Config.Clock`, `commissioning.AttestationInput.Clock`, `cluster.Quieter.Clock`, and the `Clock` field of the configs of `core.GeneralCommissioning`, `core.Groupcast`, `core.OTAProvider`, `core.CommissionerControl`, `closure.DimensionConfig`, `energy.CommodityTariffConfig`, `energy.DeviceEnergyConfig`, `energy.EvseConfig`, `cover.Config`, `levelcontrol.Transitions`, `levelcontrol.NativeConfig`, `light.ColorControlServerConfig`, `transition.Config`, `servicearea.Config` and `opstate.Config`; `TimeSource` where the name `Clock` is taken by the old shape (`btp.Options.TimeSource`, `onoff.Config.TimeSource`, `core.OTARequestorConfig.TimeSource`). Where an owner has no config, a `SetClock` method: `operational.Manager`, `bridge.CommissioningWindow` (the bridge sets its own on attach), `bridge.PerExchangePaseProvider`, `bridge.PerExchangeCaseProvider`, `mdns.Zeroconf`, `mdns.SubtypeResponder`, `mdns.OperationalResolver`, `groups.Manager`, `bdx.Responder`, `im.EventLog`, `diagevent.Ring`, `core.GeneralDiagnostics`, `core.DiagnosticLogs`, `core.Identify`, `core.TimeSynchronization`. And `bridge.StartHealthProbeWithClock`, `attestation.BuildTestChainAt`, `snapshot.LoadAt`.
+- `clock/noraw_test.go`: a guard that fails the build on a call of — or a reference to — `time.Now`, `time.AfterFunc`, `time.NewTimer`, `time.NewTicker`, `time.Sleep`, `time.After`, `time.Tick`, `time.Since` or `time.Until` in any production file outside `clock/`, `examples/` and `script/`; its one exception (the socket read deadlines of `mdns/subtype_responder.go`, which the kernel judges against the wall clock) is listed with its reason and count. `docs/matter-parity-contract.md` lists it.
+
+### Changed
+
+- `controller/exchange.Clock`, `exchange.Timer` and `exchange.SystemClock` are now aliases of `clock.Clock`, `clock.Timer` and `clock.System`. Every caller compiles unchanged; a host that implements `exchange.Clock` itself adds `NewTimer` and `NewTicker`, and its timers `Reset` and `C` — or uses `clocktest.Fake`.
+- The module's twenty hand-written test clocks are replaced by `clocktest.Fake`.
+
+### Deprecated
+
+All removable in `v0.10.0` at the earliest; the README's deprecation table lists them with their replacements.
+
+- `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock` and `btp.Options.Clock` — use `btp.Options.TimeSource` with a `clock.Clock`.
+- `cluster/onoff.Clock` and `onoff.Config.Clock` — use `onoff.Config.TimeSource`.
+- `cluster/core.OtaClock` and `core.OTARequestorConfig.Clock` — use `core.OTARequestorConfig.TimeSource`.
+- `cluster/core.OTAProviderConfig.Now` and `core.CommissionerControlConfig.Now` — use their `Clock`.
+- `cluster.Quieter.Now` and `cluster.Quieter.AfterFunc` — use `cluster.Quieter.Clock`.
+- `cluster/closure.DimensionConfig.Now`, `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now` and `energy.EvseConfig.Now` — use the `Clock` beside each.
+- `secure/mattercert.TimeSource` and `mattercert.SystemTime` — pass a `clock.Clock` (it satisfies `TimeSource`) or `clock.System`.
+- `controller/ca.Config.Now` — use `ca.Config.Clock`.
+
 ## [0.7.1] — 2026-10-18
 
 Milestone 2, phase 14 ([the roadmap](./docs/roadmap.md), [concept v4](./docs/concept-v4-test-foundation.md)): the matter.js pin lifted from `0ceb202d` to `862ad75f` (57 upstream commits; the one model change is BridgedNode composing its full family, the 41 upstream fixes classified in `notes/parity/pin-lifts.md` — 12 register entries), two new standing guards (the test-porting register and the citation check), and the PartsList change that follows from the model. No API change; the store schema is unchanged.
