@@ -85,7 +85,21 @@ CHANGELOG `[Unreleased]` names every fix under Fixed.
 
 ### Guards
 
-Filled in below at the final HEAD.
+| Guard | HEAD | Result |
+| --- | --- | --- |
+| `make ci` | d5fb1a9 | exit 0 |
+| `make race` | 8f3cfa7 (d5fb1a9 changes one test file's lint only) | exit 0 |
+| `make testparity-check` | f62621c | exit 0 |
+| `make cite-check` | f62621c | exit 0 (hard errors 0, drift 266, unchanged) |
+| `make reachability-check` | f62621c | exit 0 |
+| `make cover-check` | 8f3cfa7 | exit 0 (`fabrictest` floor 85 kept; `cluster/spec` and `im` new unit tests for the fixes) |
+| `make chiptool-test` | 722a659 (after every device-behaviour fix; later commits change tests only) | exit 0 |
+
+All guards ran with `MATTERJS_DIR=/home/markus/Dokumente/GitHub/matter.js`
+(the worktree's `../matter.js` does not exist). An earlier race run failed
+two ports that waited for the fake clock deadline by deadline under load
+(the fail-safe and recommission cases); they now step the clock
+explicitly.
 
 ### Differences to the brief
 
