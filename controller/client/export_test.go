@@ -3,7 +3,10 @@
 
 package client
 
-import "github.com/SukramJ/go-fabric/controller/interaction"
+import (
+	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/im"
+)
 
 // ConnectionStateFor exposes the connection-state decision to the tests.
 var ConnectionStateFor = connectionStateFor
@@ -51,4 +54,21 @@ func SaveSettingsAutoSubscribe(n *Node) error {
 	n.settings.autoSubscribe = true
 	n.saveSettingsLocked()
 	return nil
+}
+
+// KnownVersions is the version filters a read of req sends — matter.js
+// clientStructureOf(peer).injectVersionFilters(request)
+// (node/src/testing/node-helpers.ts:540, ClientStructure.ts:286-323).
+func KnownVersions(n *Node, req interaction.ReadRequest) []im.DataVersionFilter {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.s.withKnownVersions(newScope(req.Attributes, req.NoFabricFilter), req.DataVersionFilters, false)
+}
+
+// CacheFabricFiltered is the fabric filter of the interactions the cache
+// takes data from — matter.js clientStructureOf(peer).cacheFabricFiltered.
+func CacheFabricFiltered(n *Node) bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.s.subscribedFabricFiltered
 }

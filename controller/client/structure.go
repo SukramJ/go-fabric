@@ -175,6 +175,34 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 	return out
 }
 
+// withKnownVersions is the version filters a read or subscription sends —
+// the caller's own, kept as given and first, then the injected ones.
+// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
+// (injectVersionFilters at 862ad75f): a request with the other fabric
+// filter than the cache's gets none injected (:288), and a cluster the
+// caller filters gets no injected filter (:293-295, :312), so the peer
+// sees exactly the caller's filter for it. caller is not modified.
+func (s *structure) withKnownVersions(sc scope, caller []im.DataVersionFilter, refreshChangesOmitted bool) []im.DataVersionFilter {
+	out := slices.Clone(caller)
+	if sc.fabricFiltered != s.subscribedFabricFiltered {
+		return out
+	}
+	type key struct {
+		ep      uint16
+		cluster uint32
+	}
+	filtered := make(map[key]bool, len(caller))
+	for _, f := range caller {
+		filtered[key{f.Endpoint, f.Cluster}] = true
+	}
+	for _, f := range s.injectVersionFilters(sc, refreshChangesOmitted) {
+		if !filtered[key{f.Endpoint, f.Cluster}] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // hasChangesOmittedAttribute: the peer has an attribute with the
 // changes-omitted quality in the cluster — every such attribute of the
 // model without the peer's AttributeList, the listed ones with it

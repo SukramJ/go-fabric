@@ -19,6 +19,8 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - `fabrictest.Send(ctx, pair, opcode, payload)`: the same without waiting for an answer, for a request the device answers with nothing.
 - `fabrictest.Device.OpenWindow(ctx, timeout)`: opens a basic commissioning window on the device with its own passcode and discriminator, so a second controller commissions it onto another fabric.
 - `fabrictest.Controller.PASE(ctx, device)`: a PASE session to a device in its commissioning window, as a `Pair` whose `Interaction` speaks over `Pair.PASESession` — the session without fabric matter.js's tests build; the wire helpers accept it.
+- `fabrictest.Controller.Restart(ctx)`: stops the controller and starts it again on its stores — certificate authority, fabric, CASE resumption records and the client node registry's store — so the registry restores its nodes, as matter.js's controller ServerNode restarted on its storage. `fabrictest.ControllerOptions.Registry` edits the registry's configuration (hooks, AutoStart, store) on every start.
+- `fabrictest.Controller.Discover(ctx, id, timeout)` finds commissionable devices on the site, the timeout on the site's clock; `fabrictest.Controller.CommissionNode(ctx, device, opts)` commissions a device through the controller's client node registry as matter.js `controller.peers.commission` does — discovered by its discriminator, the registry's node commissioned and started.
 
 ### Fixed
 
@@ -36,6 +38,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - When a fabric is removed — RemoveFabric or a fail-safe rollback — the event log drops the records of fabric-sensitive events that belong to it (matter.js `FabricScopedDataHandler.ts:114-170`); they stayed and were readable as history. `im.EventLog.DropFabric`.
 - A subscription whose MinIntervalFloor exceeds the publisher's MaxInterval limit (3600 s) is accepted with a MaxInterval of the floor (Matter §8.5.3.2; matter.js `ServerSubscription.ts:324-343`, chip `ReadHandler.cpp`); it was refused as a cadence inverted by the clamp.
 - An InvokeRequest's DelayReportData defers only the subscriptions that select an endpoint a command is dispatched to — a command that fails its access, fabric-scope, timed or existence check defers nothing, and a wildcard-endpoint command defers the endpoints it runs on (matter.js `CommandInvokeResponse.ts:159-165`, `:297`). Every concrete path deferred its endpoint. `im.DispatchEndpoints` returns the set; `endpoint.TopologyDispatcher.CommandTargets` (`im.CommandTargeter`) the endpoints of a wildcard command.
+- `controller/client`: a read or subscription through a client node sends the caller's data version filters first and injects none for a cluster the caller filters, so the caller's filter wins; a subscription with the other fabric filter than the cache's gets none injected, as a read; a sustained subscription's replacement starts from the caller's own filters, runs the caller's RefreshRequest (it was never called) and applies its reports by the refreshed request's fabric filter (matter.js `ClientStructure.ts:286-323`, `ClientNodeInteraction.ts:119-181`). The replacement sent only the injected filters, dropping the caller's.
 
 ## [0.7.2] — 2026-10-18
 
