@@ -94,13 +94,29 @@ verdict() { # class what
 	esac
 }
 
-# start_peripheral TAG HCI — a fresh matter.js peripheral on HCI (an index),
-# waiting for its "ready manual=<code>" line; sets MANUAL. Returns 1 when
-# it exits or stays silent.
+# hci_down HCI — the HCI user channel binds only a controller that is down
+# (bluetooth-hci-socket README, "User Channel"; EBUSY otherwise); BlueZ then
+# drops it. hciconfig names the controller itself: btmgmt 5.72 ignored
+# --index and switched hci0 (run 39099786146).
+hci_down() {
+	local i
+	for i in 1 2 3 4 5; do
+		sudo hciconfig "$1" down >>"$LOG_DIR/hciconfig.log" 2>&1
+		sleep 0.5
+		hciconfig "$1" 2>/dev/null | grep -q DOWN && return 0
+	done
+	hciconfig "$1" >>"$LOG_DIR/hciconfig.log" 2>&1
+	return 1
+}
+
+# start_peripheral TAG HCI — a fresh matter.js peripheral claiming HCI
+# (hciN), waiting for its "ready manual=<code>" line; sets MANUAL. Returns 1
+# when it exits or stays silent.
 start_peripheral() {
 	local tag=$1 hci=$2 out=$LOG_DIR/peripheral-$1.log
 	mkdir -p "$LOG_DIR/storage-$tag"
-	sudo env HCI_CHANNEL_USER=1 BLE_HCI_ID="$hci" \
+	hci_down "$hci" || return 1
+	sudo env HCI_CHANNEL_USER=1 BLE_HCI_ID="${hci#hci}" \
 		PERIPHERAL_STORAGE="$LOG_DIR/storage-$tag" PERIPHERAL_LOGFILE="$LOG_DIR/peripheral-$tag-debug.log" \
 		"$NODE_BIN" "$PKG/peripheral.mjs" >"$out" 2>&1 &
 	peripheral_pid=$!
@@ -122,7 +138,7 @@ start_peripheral() {
 
 # --- environment ------------------------------------------------------------
 
-for tool in sudo btvirt btmgmt bluetoothctl go node npm make g++; do
+for tool in sudo btvirt hciconfig bluetoothctl go node npm make g++; do
 	command -v "$tool" >/dev/null || verdict environment "$tool is not installed"
 done
 NODE_BIN=$(command -v node)
@@ -149,11 +165,10 @@ done
 [ "$(echo "$controllers" | grep -c hci)" -ge 2 ] || verdict environment "btvirt -l2 did not create two controllers (see btvirt.log)"
 CENTRAL=$(echo "$controllers" | sed -n 1p)
 PERIPHERAL=$(echo "$controllers" | sed -n 2p)
-sudo btmgmt --index "${CENTRAL#hci}" power on >>"$LOG_DIR/btmgmt.log" 2>&1 ||
-	verdict environment "$CENTRAL does not power on (see btmgmt.log)"
-# The HCI user channel needs the controller down; BlueZ then leaves it alone
-# (bluetooth-hci-socket README, "User Channel").
-sudo btmgmt --index "${PERIPHERAL#hci}" power off >>"$LOG_DIR/btmgmt.log" 2>&1 || true
+sudo hciconfig "$CENTRAL" up >>"$LOG_DIR/hciconfig.log" 2>&1 ||
+	verdict environment "$CENTRAL does not power on (see hciconfig.log)"
+hci_down "$PERIPHERAL" || verdict environment "$PERIPHERAL does not go down for the HCI user channel (see hciconfig.log)"
+hciconfig -a >>"$LOG_DIR/hciconfig.log" 2>&1
 echo "ble-virtual: central $CENTRAL (BlueZ), peripheral $PERIPHERAL (bleno)"
 
 (cd "$PKG" && npm ci --no-audit --no-fund) >"$LOG_DIR/npm.log" 2>&1 ||
@@ -171,7 +186,7 @@ BIN="$(mktemp -d)/reference-controller"
 (cd "$ROOT/ble/bluez" && go build -o "$BIN" ./cmd/reference-controller) >"$LOG_DIR/build.log" 2>&1 ||
 	verdict defect "the BLE build does not compile (see build.log)"
 
-start_peripheral ours "${PERIPHERAL#hci}" ||
+start_peripheral ours "$PERIPHERAL" ||
 	verdict environment "the matter.js peripheral did not come up on $PERIPHERAL (bleno build or HCI claim; see peripheral-ours.log)"
 notes+=("manual code: \`$MANUAL\`")
 
