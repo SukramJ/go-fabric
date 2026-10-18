@@ -3757,7 +3757,7 @@
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "status": "planned",
-      "reason": "The controller's network profiles and their additional MRP delay per medium, BDX margin and sub-profiles.",
+      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: controller/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix.",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
     {
@@ -3932,7 +3932,7 @@
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
       "status": "planned",
-      "reason": "Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch).",
+      "reason": "The subject (PhysicalDeviceProperties: computeProperties, isLongIdleTimeOperating, intervalBounds) lives in controller/client, brief BI's path, which this tranche does not touch; the cases wait for BI.",
       "snapshotSha": "05a12bae66a0294e57cd4b483431f04ee23c4004"
     },
     {
