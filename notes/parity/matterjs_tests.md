@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 31 |
-| partial | 104 |
-| planned | 102 |
+| partial | 105 |
+| planned | 101 |
 | excluded | 87 |
 | total | 324 |
 
@@ -88,7 +88,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/storage](#nodeteststorage) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/tsconfigs/nonstrict](#nodetesttsconfigsnonstrict) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
-| [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
+| [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 1 | 2 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 2 | 0 | 0 |
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 2 | 3 | 0 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
@@ -670,7 +670,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ClientInteractionInvokeTest.ts | 902 | planned | — | The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1). |
+| ClientInteractionInvokeTest.ts | 902 | partial | `controller/interaction:TestClientInteractionInvokeCommandRefWireHandling`<br>`controller/interaction:TestClientInteractionInvokeDelayReportData`<br>`controller/interaction:TestClientInteractionInvokeResponseWithoutInteractionModelRevision`<br>`controller/interaction:TestClientInteractionInvokeStatusOrigin` | 14 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses); missing are the multi-command/batched invoke cases (reconciliation, stray entries, splitting by maxPathsPerInvoke), ClientInteraction.close, largeMessage inference and DelayReportData sending, none of which the Go Invoke has (one concrete command per exchange, no Close, no forward features). Missing: “synthesizes NO_COMMAND_RESPONSE for a request command that received no response”; “does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)”; “discards a stray CommandDataIB that matches no sent command instead of throwing”; “passes a stray CommandStatusIB up to the caller (spec submits all status entries)”; “splits a multi-command invoke for a maxPathsPerInvoke=1 peer into ref-less single invokes”; “refuses to split an invoke for a provider reporting no usable path limit”; “aborts an in-flight batch on close instead of awaiting its response”; “rejects commands queued behind an in-flight batch with the close reason”; “does not mutate the caller's request when inferring largeMessage”; “sends DelayReportData in its own message”; “refuses a request with DelayReportData before anything is sent”. |
 | ClientInteractionSubscribeTest.ts | 352 | planned | — | Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. |
 | InputChunkTest.ts | 672 | ported | `controller/interaction:TestInputChunkAttributes`<br>`controller/interaction:TestInputChunkEvents`<br>`controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents`<br>`controller/interaction:TestInputChunkRelaxedIntegerTypeChecks` | All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. |
 | LargeMessageTransportTest.ts | 106 | excluded | `controller-stage` until M5 phase 25 | The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25. |
@@ -1122,7 +1122,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/action/client
 
-- `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
 - `ClientInteractionSubscribeTest.ts` — Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix.
 - `ReadScopeTest.ts` — The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.
 

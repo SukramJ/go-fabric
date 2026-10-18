@@ -5,11 +5,13 @@ package interaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -30,6 +32,9 @@ type InvokeOptions struct {
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout] (:439).
 	TimedTimeout time.Duration
+	// SuppressResponse asks the peer for no InvokeResponse: the send
+	// expects an acknowledgement only and Invoke returns the zero Result.
+	SuppressResponse bool
 }
 
 // Result is the peer's answer to the command — the "cmd-response" or
@@ -90,7 +95,7 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 	}
 	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{TimedRequest: opts.Timed, Invokes: []im.CommandInvocation{{Path: path}}},
+	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: opts.Timed, Invokes: []im.CommandInvocation{{Path: path}}},
 		func(e *tlv.Encoder, tag tlv.Tag, _ any) {
 			if fields == nil {
 				e.StartStruct(tag)
@@ -104,6 +109,20 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 		return Result{}, err
 	}
 	c.log.Debug("matter.controller.interaction.invoke", slog.Uint64("endpoint", uint64(path.Endpoint)), slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("command", uint64(path.Command)))
+	if opts.SuppressResponse {
+		// A suppressed invoke expects an acknowledgement only; a message in
+		// its place is tolerated unless it is a StatusResponse with an
+		// error, and there is no result. Mirrors matter.js
+		// packages/protocol/src/interaction/InteractionMessenger.ts:1210-1218
+		// with requestWithSuppressedResponse (:1454-1478) and
+		// packages/protocol/src/action/client/ClientInteraction.ts:528.
+		err := m.x.Send(ctx, im.OpcodeInvokeRequest, req, exchange.SendOptions{ExpectAckOnly: true, ExpectedProcessingTime: ept})
+		var unexpected *exchange.UnexpectedMessageError
+		if errors.As(err, &unexpected) {
+			return Result{}, statusOf(unexpected.Message)
+		}
+		return Result{}, err
+	}
 	if err := m.send(ctx, im.OpcodeInvokeRequest, req, ept); err != nil {
 		return Result{}, err
 	}
