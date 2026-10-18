@@ -1692,8 +1692,11 @@
     },
     {
       "path": "packages/node/test/node/AttributeSubscriptionResponseTest.ts",
-      "status": "planned",
-      "reason": "Which paths a subscription's dirty-attribute report reads; the Go handler parity test names its one case untranslatable as written, so nothing is ported yet.",
+      "status": "ported",
+      "go": [
+        "node:TestAttributeSubscriptionResponseParity"
+      ],
+      "reason": "Which attributes a subscription's data report carries after a change, over the wire on fabrictest: the writable BasicInformation attributes stand in for the fixed ones matter.js marks dirty, a probe attribute proves the absent data, five LevelControl attributes the five-attribute case.",
       "snapshotSha": "97d57dadbd480fb2cc28677a90efcc1e53dc54f4"
     },
     {

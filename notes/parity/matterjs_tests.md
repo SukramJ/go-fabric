@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 7 |
+| ported | 8 |
 | partial | 96 |
-| planned | 134 |
+| planned | 133 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 1 | 12 | 27 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 2 | 12 | 26 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -568,7 +568,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | AttributeReadResponseTest.ts | 309 | partial | `endpoint:TestRead_ConcreteHit`<br>`endpoint:TestRead_WildcardEndpointFansOut`<br>`im:TestRead_DataVersionFilterMatching_SkipsCluster`<br>`endpoint:TestRead_UnknownEndpoint`<br>`endpoint:TestRead_AttributeNotImplemented`<br>`node:TestAttributeReadResponseParity` | Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave. Missing: “reads attributeList global Attribute full wildcard excluding attributerList via WildcardPath Filter”. |
-| AttributeSubscriptionResponseTest.ts | 218 | planned | — | Which paths a subscription's dirty-attribute report reads; the Go handler parity test names its one case untranslatable as written, so nothing is ported yet. |
+| AttributeSubscriptionResponseTest.ts | 218 | ported | `node:TestAttributeSubscriptionResponseParity` | Which attributes a subscription's data report carries after a change, over the wire on fabrictest: the writable BasicInformation attributes stand in for the fixed ones matter.js marks dirty, a probe attribute proves the absent data, five LevelControl attributes the five-attribute case. |
 | AttributeWriteResponseTest.ts | 409 | partial | `endpoint:TestWrite_Success`<br>`endpoint:TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint`<br>`endpoint:TestHandleWriteRequest_EnforcesElevatedWritePrivilege`<br>`endpoint:TestWrite_ConcreteReadOnlyAttributeRejected`<br>`endpoint:TestWrite_WildcardSkipsReadOnlyAttribute`<br>`endpoint:TestWrite_ConstraintMaps`<br>`node:TestAttributeWriteResponseParity`<br>`im:TestWriteParity_DataVersion_WildcardEndpoint_Ignored` | Every other case runs over the wire on fabrictest (node:TestAttributeWriteResponseParity; three fixes: the View pass before existence, the DataVersion ignored on a wildcard path, NodeLabel CONSTRAINT_ERROR). Missing: the invalid wildcard combination — matter.js answers the whole interaction with a StatusResponse of InvalidAction (AttributeWriteResponse.ts:279-285), the Go server an AttributeStatus per path, a response-shape change; the two held-write cases — AttributeWriteResponse's isHeldByOtherWrite lock across write interactions (:355), which the Go server does not have. Missing: “writes with invalid wildcard combination”; “${group ? "group" : "wildcard"} write skips an attribute that another write interaction holds”. |
 | BitmapWriteValidationTest.ts | 82 | partial | `cluster/cover:TestWindowCoveringServer_WriteModeConstraint` | The reserved-bit write is ported; the defined bit and the motor direction bit on a covering without lift are not. Missing: “accepts a defined bit”; “accepts the motor direction bit on a covering with no lift”. |
 | CaseConnectionTimeoutTest.ts | 111 | planned | — | The controller's CASE connection budget failing commissioning and deleting the peer, and refusing a non-finite budget. |
@@ -1084,7 +1084,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/node
 
-- `AttributeSubscriptionResponseTest.ts` — Which paths a subscription's dirty-attribute report reads; the Go handler parity test names its one case untranslatable as written, so nothing is ported yet.
 - `CaseConnectionTimeoutTest.ts` — The controller's CASE connection budget failing commissioning and deleting the peer, and refusing a non-finite budget.
 - `ClientBridgeStructureTest.ts` — How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits).
 - `ClientChunkedListTest.ts` — The controller reassembling a list attribute chunked across reports, by subscription and by read.
