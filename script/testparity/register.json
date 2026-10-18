@@ -1731,8 +1731,11 @@
     },
     {
       "path": "packages/node/test/node/CaseConnectionTimeoutTest.ts",
-      "status": "planned",
-      "reason": "The controller's CASE connection budget failing commissioning and deleting the peer, and refusing a non-finite budget.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestCaseConnectionTimeoutParity"
+      ],
+      "reason": "The CASE connection budget after AddNOC (Sigma1 to the device dropped on fabrictest's network): commissioning through the registry fails before 60 s with a peer.UnreachableError naming the budget and the peer is deleted; a non-finite budget is refused (controller/client:TestCaseConnectionTimeoutParity).",
       "snapshotSha": "4b4dd0e33775a00065001e755f1ff1b6bfa29482"
     },
     {
@@ -1786,8 +1789,11 @@
     },
     {
       "path": "packages/node/test/node/ClientChunkedListTest.ts",
-      "status": "planned",
-      "reason": "The controller reassembling a list attribute chunked across reports, by subscription and by read.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientChunkedListParity"
+      ],
+      "reason": "A 50-channel ChannelList chunked across reports, reassembled through the default subscription and through a read (controller/client:TestClientChunkedListParity, a Channel server on the bridged light).",
       "snapshotSha": "5cae8c1538f3b9be0529ee877624e3c900cd08a9"
     },
     {
@@ -1864,14 +1870,23 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeConfigurationVersionTest.ts",
-      "status": "planned",
-      "reason": "The controller emitting configurationVersionChanged when a peer bumps ConfigurationVersion.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientNodeConfigurationVersionParity"
+      ],
+      "reason": "A ConfigurationVersion bump on the device signalled by the client node (controller/client:TestClientNodeConfigurationVersionParity; fix: client.Hooks.ConfigurationVersionChanged, Peers.ts:757, :803-814).",
       "snapshotSha": "60eef13b9fe3d856d15f527ff30dcd5d074a218e"
     },
     {
       "path": "packages/node/test/node/ClientNodePhysicalPropertiesTest.ts",
-      "status": "planned",
-      "reason": "The controller retaining and re-evaluating a peer's physical properties across teardown and reconnect.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientNodePhysicalPropertiesParity"
+      ],
+      "missing": [
+        "detaches the snapshot from live behavior state at freeze"
+      ],
+      "reason": "The properties kept after the node closes and re-evaluated after Stop and Start run on fabrictest (controller/client:TestClientNodePhysicalPropertiesParity). Missing: the snapshot's array identity at freeze — client.Node.Properties returns a value, so there is no live accessor whose array could be detached.",
       "snapshotSha": "4e0bec609a35936dadc889c13dbaa3a781e59947"
     },
     {
@@ -2011,14 +2026,22 @@
     },
     {
       "path": "packages/node/test/node/ClientStartUpTest.ts",
-      "status": "planned",
-      "reason": "The controller's handling of a peer's StartUp event against its sessions.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientStartUpParity",
+        "controller/client:TestReactionsNeedSubscription",
+        "controller/client:TestReactionStartUp"
+      ],
+      "reason": "A StartUp the device reports while the default subscription is active keeps the live session (controller/client:TestClientStartUpParity on fabrictest); a StartUp without an active subscription is ignored (TestReactionsNeedSubscription) and sessions older than the newest are closed (TestReactionStartUp), on the registry's scripted peer: matter.js emits the event on the peer locally and injects a mock session, which fabrictest cannot.",
       "snapshotSha": "2d1de94216bbfe2670fc201f2cb7d5aec49743fd"
     },
     {
       "path": "packages/node/test/node/ClientStructureOffloadTest.ts",
-      "status": "planned",
-      "reason": "The controller applying a multi-cluster priming report and events of the same interaction.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientStructureOffloadParity"
+      ],
+      "reason": "The priming report's values on the light and the root, and an InitialPress event of the same interaction delivered to Hooks.Event, run on fabrictest (controller/client:TestClientStructureOffloadParity); the switch is a bridged GenericSwitch where matter.js mounts it on the root (the Go root serves no Switch).",
       "snapshotSha": "8132391c19d2618d96a60a30ecc065605214dc94"
     },
     {
@@ -2245,8 +2268,18 @@
     },
     {
       "path": "packages/node/test/node/ReceivedStatusTest.ts",
-      "status": "planned",
-      "reason": "How the controller surfaces a status the device sent, as opposed to a local refusal.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestReceivedStatusParity"
+      ],
+      "missing": [
+        "throws a received specialization for a status the device sent",
+        "throws a local error when validation rejects the request before sending",
+        "returns undefined when the device rejects the signing request",
+        "rethrows the local error for a response with a foreign fabric index",
+        "keeps the device's status in the cause of the CommissioningError"
+      ],
+      "reason": "A read of an endpoint the device removed reports the device's UNSUPPORTED_ENDPOINT per path (controller/client:TestReceivedStatusParity; matter.js's EndpointReadFailedError is the report's Statuses). Missing: the received/local status class distinction itself (every interaction.StatusError is received in Go; no ReceivedStatusResponse hierarchy) with its rejecting Identify server (the endpoint assembler mounts Identify, no host replacement) and the local validation refusal (Node.Invoke does no client-side field validation); controller-side VendorIdVerification (none in Go); the CommissioningError caused by a scripted CertificateChainRequest failure (no scripted OperationalCredentials server on a fabrictest root).",
       "snapshotSha": "b39c57afa3dc45d8c5a7adbc5f155aea3baab88e"
     },
     {

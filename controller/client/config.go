@@ -127,6 +127,12 @@ type Hooks struct {
 	// emitted after the record and settings are saved and before the node
 	// starts.
 	Commissioned func()
+	// ConfigurationVersionChanged: a report changed the ConfigurationVersion
+	// of the node's BasicInformation (ep the root) or of a bridged
+	// endpoint's BridgedDeviceBasicInformation — matter.js
+	// lifecycle.configurationVersionChanged (node/client/Peers.ts:757,
+	// :803-814). The first value the image takes is no change.
+	ConfigurationVersionChanged func(ep *Endpoint)
 }
 
 // ConnectionState is a node's connection state — matter.js

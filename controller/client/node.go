@@ -134,13 +134,65 @@ func newNode(cfg Config) (*Node, error) {
 // the callbacks after the lock).
 func (n *Node) apply(sc scope, r *interaction.Report) {
 	n.mu.Lock()
+	before := n.configurationVersionsLocked()
 	n.s.mutate(sc, r)
 	em := n.s.takeEmissions()
 	if !n.frozen {
 		n.props = nil
 	}
+	changed := n.changedConfigurationVersionsLocked(before)
 	n.mu.Unlock()
 	n.deliver(em)
+	if h := n.cfg.Hooks.ConfigurationVersionChanged; h != nil {
+		for _, ep := range changed {
+			n.structureHook("configuration_version_changed", func() { h(ep) })
+		}
+	}
+}
+
+// Clusters whose ConfigurationVersion (0x0018) [Hooks.ConfigurationVersionChanged]
+// follows: the node's BasicInformation and a bridged endpoint's
+// BridgedDeviceBasicInformation.
+const (
+	basicInformationCluster        uint32 = 0x0028
+	bridgedBasicInformationCluster uint32 = 0x0039
+	attrConfigurationVersion       uint32 = 0x0018
+)
+
+// configurationVersionsLocked is every endpoint's ConfigurationVersion in
+// the image. The caller holds the lock.
+func (n *Node) configurationVersionsLocked() map[uint16]uint64 {
+	out := map[uint16]uint64{}
+	for no, ep := range n.s.endpoints {
+		for _, id := range []uint32{basicInformationCluster, bridgedBasicInformationCluster} {
+			if c := ep.clusters[id]; c != nil {
+				if v, ok := c.cache.values[attrConfigurationVersion]; ok {
+					out[no] = v.El.Uint
+				}
+			}
+		}
+	}
+	return out
+}
+
+// changedConfigurationVersionsLocked is the endpoints whose
+// ConfigurationVersion the image held before and holds changed now —
+// matter.js Peers #instrumentBasicInformation and
+// #instrumentBridgedConfigurationVersion, configurationVersion$Changed
+// emitting the endpoint's lifecycle.configurationVersionChanged
+// (packages/node/src/node/client/Peers.ts:757, :803-814 at 862ad75f).
+// The caller holds the lock.
+func (n *Node) changedConfigurationVersionsLocked(before map[uint16]uint64) []*Endpoint {
+	var out []*Endpoint
+	for no, v := range n.configurationVersionsLocked() {
+		if old, ok := before[no]; ok && old != v {
+			if ep := n.s.endpoints[no]; ep != nil && ep.installed {
+				out = append(out, ep)
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b *Endpoint) int { return int(a.number) - int(b.number) })
+	return out
 }
 
 // Properties are the node's physical properties, computed from the image
