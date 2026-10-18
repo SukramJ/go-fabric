@@ -144,7 +144,7 @@ func (s *Site) onClose(fn func()) {
 
 // Close closes every host of the site, the last added first: controllers
 // and devices stop, their sockets close. It is idempotent and runs when
-// the test ends — MockSite.close (mock-site.ts:182).
+// the test ends — the matter.js site's close (mock-site.ts:182).
 func (s *Site) Close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
