@@ -396,3 +396,169 @@ Nothing of the tranche's scope.
 - **Wall-clock steps** (`BleScannerTest.ts:775-796`, and BH-1's
   SessionManager/ExchangeManager cases): `clocktest.Fake` has one reading;
   either a by_design entry or a `clocktest` wall-only step.
+
+## BH-3 — controller side
+
+24 files, 382 open `it` cases before the tranche: 236 ported, 146 left
+(`missing` or, for four files, the whole file still `planned`). 8 files
+`ported`, 12 `partial`, 4 stay `planned`; `testparityPlannedRatchet`
+108 → 101.
+
+| matter.js file | status | Go test files | ported | missing |
+| --- | --- | --- | ---: | ---: |
+| `action/client/ClientInteractionInvokeTest.ts` | partial | `controller/interaction/client_interaction_invoke_parity_matterjs_test.go` | 14 | 11 |
+| `action/client/ClientInteractionSubscribeTest.ts` | planned |  | 0 | 7 |
+| `action/client/InputChunkTest.ts` | ported | `controller/interaction/input_chunk_parity_matterjs_test.go` | 18 | 0 |
+| `action/client/ReadScopeTest.ts` | planned |  | 0 | 6 |
+| `action/client/subscription/ClientSubscriptionsTest.ts` | partial | `controller/interaction/client_subscriptions_parity_matterjs_test.go` | 4 | 2 |
+| `action/client/subscription/SustainedSubscriptionTest.ts` | partial | `controller/interaction/sustained_eventnumber_parity_matterjs_test.go`, `controller/interaction/sustained_parity_matterjs_test.go` | 18 | 37 |
+| `action/request/InvokeTest.ts` | partial | `controller/interaction/invoke_request_parity_matterjs_test.go` | 10 | 5 |
+| `action/request/ReadAttributePathsTest.ts` | ported | `im/read_attribute_paths_parity_matterjs_test.go` | 6 | 0 |
+| `action/request/ReadTest.ts` | partial | `controller/interaction/read_request_parity_matterjs_test.go` | 16 | 4 |
+| `action/request/SubscribeTest.ts` | ported | `controller/interaction/subscribe_request_parity_matterjs_test.go` | 21 | 0 |
+| `action/request/WriteTest.ts` | partial | `controller/interaction/write_request_parity_matterjs_test.go` | 16 | 2 |
+| `mdns/CommissionableMdnsScannerTest.ts` | ported | `controller/discovery/scanner_parity_matterjs_test.go` | 17 | 0 |
+| `mdns/MdnsServerTest.ts` | partial | `mdns/host_responder_parity_matterjs_test.go` | 35 | 10 |
+| `mdns/MdnsTest.ts` | partial |  | 1 | 6 |
+| `peer/CommissioningConnectionTest.ts` | ported | `controller/commissioner/connection_parity_matterjs_test.go` | 27 | 0 |
+| `peer/NetworkProfileTest.ts` | planned |  | 0 | 12 |
+| `peer/PeerAddressMonitorTest.ts` | partial | `controller/peer/peer_address_monitor_parity_matterjs_test.go` | 13 | 8 |
+| `peer/PeerConnectTimeoutTest.ts` | partial | `controller/peer/peer_connect_timeout_parity_matterjs_test.go` | 4 | 1 |
+| `peer/PeerConnectionErrorHandlerTest.ts` | partial | `controller/peer/peer_connection_error_handler_parity_matterjs_test.go`, `controller/peer/helpers_test.go` | 12 | 5 |
+| `peer/PeerConnectionFallbackRetirementTest.ts` | ported | `controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go` | 14 | 0 |
+| `peer/PeerConnectionKickTest.ts` | partial | `controller/peer/peer_connection_kick_parity_matterjs_test.go` | 27 | 1 |
+| `peer/PeerEstablishmentProgressTest.ts` | ported | `controller/peer/peer_establishment_progress_parity_matterjs_test.go` | 5 | 0 |
+| `peer/PhysicalDevicePropertiesTest.ts` | planned |  | 0 | 29 |
+| `peer/ThreadNetworkNameResolutionTest.ts` | ported | `controller/commissioner/threadnetworkname_parity_matterjs_test.go` | 7 | 0 |
+| **total** | | | **285** | **146** |
+
+**Four files stay `planned`** (no Go test could be written inside BH's
+paths; each register `reason` says why):
+
+- `peer/PhysicalDevicePropertiesTest.ts` (29) and `action/client/ReadScopeTest.ts`
+  (6): the only Go subjects are `controller/client/properties.go` and
+  `controller/client/scope.go`, brief BI's path. Test-only ports there
+  would need no production change.
+- `peer/NetworkProfileTest.ts` (12): matter.js `NetworkProfiles`
+  (throttle semaphores, per-medium MRP margins, connect/probe
+  sub-profiles; 372 lines) has no Go counterpart — `controller/peer/doc.go`
+  and `controller/exchange/mrp.go:62-65` scope the controller to one LAN.
+  Together with BH-1's 20 margin cases this is one feature.
+- `action/client/ClientInteractionSubscribeTest.ts` (7): every case needs
+  `ClientInteraction.close` over the in-flight set, the abandoned-subscribe
+  termination or the client BDX (`ClientInteraction.ts:264-297,1096,1185-1215,1260-1300`).
+
+### Fixes
+
+| Production file | matter.js (pin lines) | What |
+| --- | --- | --- |
+| `transport/mrp/retransmit.go` | `protocol/MRP.ts:162-190` | `BackoffDuration` saturates instead of overflowing to `MinInt64` from transmission 52 on; `controller/exchange`'s `min()` against the cap then gave a negative wait and an unbounded attempt retransmitted in a tight loop after about 100 minutes. Found by the PeerConnectTimeoutTest port; `TestBackoffDurationSaturates`. Device side: `bridge` uses the same function, bounded by MaxRetransmissions. |
+| `controller/interaction/sustained.go`, `subscribe.go` | `action/client/subscription/SustainedSubscription.ts:105-126,339-384` | A sustained subscription counts the highest delivered event number (`Subscription.MaxEventNumber`, new) and resubscribes above it, replacing the request's and its RefreshRequest's filters; new `SubscribeRequest.MaxEventNumberChanged`, called after Updated and before the report's StatusResponse, its error logged (warn once, then debug, `#logLocalFailure` :366-377). The hook half was added by the implementing agent after the porting agent named it a candidate. |
+| `controller/interaction/invoke.go` | `action/request/Invoke.ts:114`; `interaction/InteractionMessenger.ts:1210-1218,1454-1478`, `action/client/ClientInteraction.ts:528` | A `TimedTimeout` alone marks the invoke timed; new `InvokeOptions.SuppressResponse` (ack-only invoke). |
+| `controller/interaction/handler.go` | `action/client/subscription/ClientSubscriptions.ts:156-158` | A panic in the `ReportStarted` callback is logged and contained instead of crashing the inbound report handler. |
+| `mdns/service.go` | `mdns/MdnsServer.ts:328-351` | The MAC-derived default host name stays while its interface still carries the MAC, skips a zero MAC, and is kept when the interfaces cannot be listed (about 50 lines). Device behaviour only when interfaces reorder or come and go. |
+| `controller/commissioner/connection.go` | `peer/CommissioningConnection.ts:64` | `connectionConfig.delay` is a pointer (nil = the 10 s default, 0 = no stagger), so the ported stagger cases can set 0. Production never sets it; no CHANGELOG line. |
+| `controller/peer/connection.go` | `peer/PeerConnection.ts:568-584,698-702` | Pure refactors (`flagsUnreachable`, `kickGate`, `restartAllowedLocked`) so the cases reach the gates; no behaviour change. |
+
+### Register candidates
+
+1. **`ClientInteraction.close`, in-flight tracking, abandoned-subscribe
+   termination, client BDX** (`ClientInteraction.ts:264-297,1096,1185-1215,1260-1370`)
+   — ClientInteractionSubscribeTest (7) and two invoke cases.
+2. **Multi-command batched invoke** with commandRef reconciliation,
+   NoCommandResponse synthesis and splitting by maxPathsPerInvoke
+   (`ClientInteraction.ts:520-640,745-1000`) — 8 cases.
+3. **Custom interaction model revision** on Read/Write/Invoke
+   (`Read.ts:40`, `Write.ts:67`, `Invoke.ts:102`).
+4. **DelayReportData sending** (forward feature; 2 cases).
+5. **Network profiles** (`peer/NetworkProfile.ts:78-245,347-371`) — 12 + BH-1's 20 cases.
+6. **Sleeping-LIT-ICD branches** — `PeerAddressMonitor.ts:143-172` (4),
+   SustainedSubscription's ICD await mode (milestone 5 phase 24).
+7. **Commissioning NoSharedTrustRoots handler** — an inline closure in
+   `controller/commissioner/commissioner.go:549-557`; a named function
+   would make its 5 PeerConnectionErrorHandler cases portable.
+8. **Thread dataset rejection in `threadNetworkNameOf`** — matter.js
+   `ControllerCommissioningFlow.ts:264-288` falls back to the supplied name
+   when `OperationalDataset.decode` throws; Go walks without validating
+   (dataset `0101ff03054d794e6574` with "OtherNet": matter.js "OtherNet",
+   Go a mismatch error). About ten lines onto `controller/thread`; no
+   ported case shows it.
+9. **Late-session close cause race** in `controller/commissioner/connection.go`
+   `launch` (`CommissioningConnection.ts:140-151`): a three-line fix, no
+   deterministic test.
+10. **Bootstrap read events** (`SustainedSubscription.ts:187-204`): the
+    host hook hands no reports back.
+11. **mDNS** — TC continuation merge (`MdnsServer.ts:446-503`); subtype
+    PTR answers without SRV/TXT additionals and unsplit oversized
+    announcements (grandcat/zeroconf builds those).
+12. **`ForgetCommissioned`** wiring (BH-2 candidate 15) stays open.
+
+### Guards (HEAD df01098, clean tree)
+
+| Guard | Exit |
+| --- | --- |
+| `make ci` | 0 |
+| `make race` | 0 |
+| `make testparity-check` | 0 |
+| `make cite-check` | 0 (drift 265) |
+| `make reachability-check` | 0 (unreached 5) |
+| `make cover-check` | 0 |
+| `make chiptool-test` | skipped: harness is BI's (decision 0.12); the device-side moves (mDNS host-name choice, MRP backoff saturation past transmission 52) are covered by the PR's chip-tool jobs |
+
+### Differences to the brief
+
+- Four entries stay `planned` (above); the protocol tree therefore ends
+  BH-3 above the brief's "ported or until" goal for these files.
+- `transport/mrp` and `controller/interaction/subscribe.go` were changed by
+  the implementing agent after their porting agents finished (the backoff
+  overflow, the hook field).
+
+### Decisions for the owner
+
+- `controller/interaction` uses the scripted peer, not `fabrictest`, for
+  the sustained and request-builder ports (unit tests of the loop and the
+  wire request, as the package's existing tests are).
+- `RefreshRequest`'s node-wide `EventMin` (from `controller/client`) is
+  replaced by the subscription's own max+1 once it delivered an event, as
+  matter.js does; it can drop below the node's number if the host read
+  higher events another way.
+- Invoke sends interaction model revision 12; matter.js's `Invoke()`
+  defaults to `SessionParameters.fallbacks.interactionModelRevision` = 11
+  (`Invoke.ts:102`, `SessionParameters.ts:131`; Read/Write use 12,
+  `Specification.ts:124`). No matter.js test pins it; not changed.
+- `ConnectOptions.ConnectionTimeout`: 0 = default, negative = forever; no
+  Instant (`Peer.ts:466-475`, one case missing).
+- The status origin "local error" maps to `ErrNoResponse`; the two abort
+  cases share Go's single context.
+- The "settles the delivery … after maxEventNumberChanged settled" case
+  asserts that no StatusResponse leaves while the hook runs.
+- `PeerAddressMonitor` coalescing cases count goroutines blocked in
+  `(*monitor).verify` through `runtime.Stack` (non-parallel test).
+- Eight existing `TestParityMdnsServer_*` tests in the MdnsServerTest
+  entry's `go` list are `t.Skip` anchors that cover nothing.
+
+### Left out
+
+The `until` entry `PeerConnectionSocketOwnershipTest.ts`; the four
+`planned` files above.
+
+### Questions
+
+1. May the PhysicalDeviceProperties (29) and ReadScope (6) ports go into
+   `controller/client` as test-only files (this wave or BI's), or do they
+   get an `until`?
+2. Network profiles: a feature brief, `until`, or `excluded`?
+
+### by_design candidates
+
+- **One network on the controller** (`peer/NetworkProfile.ts:78-245`;
+  `controller/peer/doc.go:15-17`, `controller/exchange/mrp.go:62-65`):
+  additive MRP and BDX margins are 0, no per-medium exchange semaphore.
+- **Connection timeout without Instant** (`PeerConnectTimeoutTest.ts:58-63`,
+  `Peer.ts:466-475`): Go's zero value means "unset".
+- **Single-command, numeric request builders** (`InvokeTest.ts:178`,
+  `ReadTest.ts:286`, `WriteTest.ts:284`): no zero-argument or name-based forms.
+- **Report as one value per kind** (`action/client/InputChunk.ts:166-432`)
+  and **one ReportStarted / ActiveChanged callback** instead of observables
+  (`ClientSubscriptions.ts:156-158`).
+- **No `_matterd._udp` commissioner advertisement** (`MdnsTest.ts:546-713`).
