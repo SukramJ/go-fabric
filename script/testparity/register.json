@@ -3834,16 +3834,14 @@
         "controller/peer:TestConnectionErrorDelays",
         "controller/peer:TestPeerConnectionErrorHandlerSelection",
         "controller/peer:TestPeerConnectionErrorHandlerDelayContract",
-        "controller/peer:TestPeerConnectionErrorHandlerRediscoveryGate"
+        "controller/peer:TestPeerConnectionErrorHandlerRediscoveryGate",
+        "controller/commissioner:TestPeerConnectionErrorHandlerNoSharedTrustRoots"
       ],
       "missing": [
-        "returns 15s for NoSharedTrustRoots",
-        "returns undefined for other ChannelStatusResponseErrors",
-        "returns undefined for non-ChannelStatusResponseError",
         "overrides default peer error delay in full flow",
         "does not override delay for unrelated errors in commissioning"
       ],
-      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler is an inline closure in controller/commissioner's transitionToCase that no test can reach without extracting it there.",
+      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler, now the commissioner method handleNoSharedTrustRoots, is ported in controller/commissioner; its two full-flow cases are missing because the commissioner cannot be driven through controller/peer.s connection harness (an import cycle), the delay contract itself being TestPeerConnectionErrorHandlerDelayContract.",
       "snapshotSha": "0c50761bbbb22c729a1df590be8c1285b0661bc5"
     },
     {
