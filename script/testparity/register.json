@@ -2376,7 +2376,7 @@
     {
       "path": "packages/protocol/test/action/client/ReadScopeTest.ts",
       "status": "planned",
-      "reason": "Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter).",
+      "reason": "The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.",
       "snapshotSha": "eef880b90358e4fc34c70657b7cdf3752b6489e2"
     },
     {

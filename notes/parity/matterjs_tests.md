@@ -674,7 +674,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ClientInteractionSubscribeTest.ts | 352 | planned | — | The controller's subscribe under abort and close, including an open BDX exchange. |
 | InputChunkTest.ts | 672 | ported | `controller/interaction:TestInputChunkAttributes`<br>`controller/interaction:TestInputChunkEvents`<br>`controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents`<br>`controller/interaction:TestInputChunkRelaxedIntegerTypeChecks` | All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice. |
 | LargeMessageTransportTest.ts | 106 | excluded | `controller-stage` until M5 phase 25 | The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25. |
-| ReadScopeTest.ts | 60 | planned | — | Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter). |
+| ReadScopeTest.ts | 60 | planned | — | The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI. |
 
 ## protocol/test/action/client/subscription
 
@@ -1124,7 +1124,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
 - `ClientInteractionSubscribeTest.ts` — The controller's subscribe under abort and close, including an open BDX exchange.
-- `ReadScopeTest.ts` — Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter).
+- `ReadScopeTest.ts` — The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.
 
 ### protocol/test/action/request
 
