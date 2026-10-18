@@ -750,7 +750,7 @@ func (c *connection) onKickLocked(origin kickOrigin, att *attempt, restart conte
 func (c *connection) handleConnectionError(err error, att *attempt) {
 	p := c.p
 	delay, hasDelay, category := classifyError(err, c.timing, p.set.rand, c.deleteResumptionRecord)
-	if errors.Is(err, exchange.ErrNetwork) {
+	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}
 	log := p.log.With(slog.String("address", att.addr.String()))
@@ -781,6 +781,14 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	}
 	c.sleep(att.ctx, delay, nil)
 }
+
+// flagsUnreachable is the rediscovery gate of handleConnectionError: a
+// failure of the socket to send (ENETUNREACH, EHOSTUNREACH), also as the
+// cause of another error, may mean the address no longer routes, so the
+// service is marked unreachable for DNS-SD to look again; a transient
+// peer error is left to the MRP path. Mirrors matter.js
+// packages/protocol/src/peer/PeerConnection.ts:698-702.
+func flagsUnreachable(err error) bool { return errors.Is(err, exchange.ErrNetwork) }
 
 // classifyError is the delay table of handleConnectionError
 // (PeerConnection.ts:674-696): the pause, whether there is one, and the

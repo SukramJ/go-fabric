@@ -3880,26 +3880,19 @@
       "status": "partial",
       "go": [
         "controller/peer:TestHandleErrorOverrideAndFatal",
-        "controller/peer:TestConnectionErrorDelays"
+        "controller/peer:TestConnectionErrorDelays",
+        "controller/peer:TestPeerConnectionErrorHandlerSelection",
+        "controller/peer:TestPeerConnectionErrorHandlerDelayContract",
+        "controller/peer:TestPeerConnectionErrorHandlerRediscoveryGate"
       ],
       "missing": [
-        "prefers per-connection handler over context handler",
-        "falls back to context handler when no per-connection handler",
-        "returns undefined when neither handler is set",
-        "signals abort when handler throws",
-        "keeps default delay when no handler is set",
-        "flags unreachable for NetworkUnreachableError (ENETUNREACH)",
-        "flags unreachable for AddressUnreachableError (EHOSTUNREACH)",
-        "flags unreachable when a network error is wrapped as a cause",
-        "does not flag unreachable for transient peer errors (handled by MRP retransmission path)",
-        "does not flag unreachable for generic errors",
         "returns 15s for NoSharedTrustRoots",
         "returns undefined for other ChannelStatusResponseErrors",
         "returns undefined for non-ChannelStatusResponseError",
         "overrides default peer error delay in full flow",
         "does not override delay for unrelated errors in commissioning"
       ],
-      "reason": "The handler's delay override is covered; handler precedence and the rediscovery gate are not ported case by case.",
+      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler is an inline closure in controller/commissioner's transitionToCase that no test can reach without extracting it there.",
       "snapshotSha": "0c50761bbbb22c729a1df590be8c1285b0661bc5"
     },
     {
