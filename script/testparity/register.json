@@ -1950,18 +1950,13 @@
         "endpoint:TestInvoke_SuccessAndUnknownCommand",
         "endpoint:TestInvokeUnsupportedCommandMapsTo0x81",
         "endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
-        "node:TestCommandInvokeResponseParity"
+        "node:TestCommandInvokeResponseParity",
+        "node:TestCommandInvokeResponseDispatchEndpointsParity"
       ],
       "missing": [
-        "names the endpoint of a concrete path",
-        "names every endpoint a wildcard path expands to",
-        "leaves out a concrete path that fails validation",
-        "leaves out a concrete path that needs a timed interaction it lacks",
-        "leaves out a fabric-scoped concrete path on a session without fabric",
-        "names only the group's endpoints for a group invoke",
-        "leaves out endpoints a wildcard path may not invoke on"
+        "names only the group's endpoints for a group invoke"
       ],
-      "reason": "Every top-level case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload). The dispatch-endpoint group is ported with DelayReportDataTest, where its endpoints become observable.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload); the dispatch-endpoint group is observed through the DelayReportData deferral (node:TestCommandInvokeResponseDispatchEndpointsParity; fix: only dispatchable endpoints are deferred). Missing: the group invoke — fabrictest's network carries no group messages.",
       "snapshotSha": "1ff5c131ac0cbf5b4f620b77a9af7db32a97617d"
     },
     {
@@ -1980,27 +1975,13 @@
       "path": "packages/node/test/node/DelayReportDataTest.ts",
       "status": "partial",
       "go": [
-        "im/subscription:TestDeferReports"
+        "im/subscription:TestDeferReports",
+        "node:TestDelayReportDataParity"
       ],
       "missing": [
-        "adds a random jitter below DelayJitterWindowMs",
-        "defers whether or not the command succeeds",
-        "applies a new deferral after an earlier one ended",
-        "holds a report that is already waiting for its send delay",
-        "defers for a wildcard invoke on the endpoints it expands to",
-        "defers a subscription of another fabric",
-        "still reports after the send delay under a stream of invokes without delay",
-        "reschedules a held report when a later invoke shortens the deferral",
-        "sends no extra report after a deferred one",
-        "does not hold a report past the subscription's next scheduled report",
-        "defers only the next report",
-        "defers a subscription whose path selects every endpoint",
-        "defers a subscription whose event path selects a targeted endpoint",
-        "does not defer when no command of the invoke can be dispatched",
-        "does not defer a subscription of every endpoint when no command can be dispatched",
         "ignores DelayReportData"
       ],
-      "reason": "The deferral, its shortening, the send-interval bound and the untargeted subscription are ported; jitter, the wildcard and event-path cases and the feature switch are not.",
+      "reason": "Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData).",
       "snapshotSha": "613143fd04bb2ce7a3cc44fe052f9347b076ff00"
     },
     {

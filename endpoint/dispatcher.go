@@ -425,6 +425,42 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		return []im.InvokeResult{d.Invoke(ctx, path, fields)}
 	}
 	var results []im.InvokeResult
+	for _, t := range d.commandTargets(path, authorize) {
+		ePath := path
+		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
+		resp, err := t.srv.MatterInvoke(ctx, path.Command, fields)
+		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
+		if err != nil {
+			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
+		}
+		results = append(results, res)
+	}
+	return results
+}
+
+// CommandTargets implements [im.CommandTargeter]: the endpoints
+// [TopologyDispatcher.InvokeAuthorized] would run the wildcard-endpoint
+// command path on, in ascending order, without running it.
+func (d *TopologyDispatcher) CommandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []uint16 {
+	var out []uint16
+	for _, t := range d.commandTargets(path, authorize) {
+		out = append(out, t.ep.ID)
+	}
+	return out
+}
+
+// commandTarget is an endpoint a wildcard command runs on and its server.
+type commandTarget struct {
+	ep  *Endpoint
+	srv contract.ClusterServer
+}
+
+// commandTargets selects the endpoints of a wildcard-endpoint command:
+// every endpoint hosting the cluster whose server accepts the command (a
+// server that lists no accepted commands answers for itself) and that
+// authorize admits — matter.js CommandInvokeResponse #wildcardTargetOf.
+func (d *TopologyDispatcher) commandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []commandTarget {
+	var out []commandTarget
 	for _, ep := range d.resolveEndpoints(im.ConcreteAttributePath{}) {
 		for _, srv := range ClusterServers(ep) {
 			if srv == nil || srv.MatterClusterID() != path.Cluster {
@@ -436,18 +472,11 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 			if authorize != nil && !authorize(ep.ID, path.Cluster, path.Command).IsSuccess() {
 				break
 			}
-			ePath := path
-			ePath.Endpoint, ePath.HasEndpoint = ep.ID, true
-			resp, err := srv.MatterInvoke(ctx, path.Command, fields)
-			res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
-			if err != nil {
-				res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
-			}
-			results = append(results, res)
+			out = append(out, commandTarget{ep: ep, srv: srv})
 			break
 		}
 	}
-	return results
+	return out
 }
 
 // resolveEndpoints expands the wildcard-aware endpoint selector. A

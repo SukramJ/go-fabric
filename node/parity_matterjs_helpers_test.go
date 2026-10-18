@@ -43,6 +43,13 @@ func quietSite(t *testing.T) *fabrictest.Site {
 	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 }
 
+// steppedSite is a quiet site whose settle period is short, for a test
+// that steps the clock deadline by deadline itself.
+func steppedSite(t *testing.T) *fabrictest.Site {
+	t.Helper()
+	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Settle: 2 * time.Millisecond})
+}
+
 // mockOptions shapes a mock pair.
 type mockOptions struct {
 	// light adds an OnOffLight — MockServerNode.createOnline's default

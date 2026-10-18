@@ -17,6 +17,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - `fabrictest.Pair.Grant(ctx, privilege)`: replaces the device's access control list on the pair's fabric with one CASE entry for the controller at that privilege — matter.js `MockServerNode.online`'s access level, over the wire.
 - `fabrictest.Exchange(ctx, pair, opcode, payload)`: sends one Interaction Model message as it stands over the pair's session and returns the device's first answer, for a request the controller refuses to formulate.
 - `fabrictest.Send(ctx, pair, opcode, payload)`: the same without waiting for an answer, for a request the device answers with nothing.
+- `fabrictest.Device.OpenWindow(ctx, timeout)`: opens a basic commissioning window on the device with its own passcode and discriminator, so a second controller commissions it onto another fabric.
 - `fabrictest.Controller.PASE(ctx, device)`: a PASE session to a device in its commissioning window, as a `Pair` whose `Interaction` speaks over `Pair.PASESession` — the session without fabric matter.js's tests build; the wire helpers accept it.
 
 ### Fixed
@@ -28,6 +29,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - An invoke of a command, cluster or endpoint that does not exist answers UNSUPPORTED_COMMAND, _CLUSTER or _ENDPOINT to a subject with Operate privilege; it answered UNSUPPORTED_ACCESS when the command's model privilege was higher. The Operate pass precedes the existence checks (`CommandInvokeResponse.ts:241-278`; `endpoint.TopologyDispatcher.MinInvokePrivilege` returns at most Operate for a path that does not resolve).
 - A command status that carries a cluster-specific status goes out under the outer status FAILURE, whatever the handler named (Matter §7.10.7, `CommandInvokeResponse.ts:448-451`).
 - A command whose fields are not a structure answers INVALID_COMMAND for that command, the rest of the batch unaffected (`CommandInvokeResponse.ts:551-562`); the whole request failed.
+- An InvokeRequest's DelayReportData defers only the subscriptions that select an endpoint a command is dispatched to — a command that fails its access, fabric-scope, timed or existence check defers nothing, and a wildcard-endpoint command defers the endpoints it runs on (matter.js `CommandInvokeResponse.ts:159-165`, `:297`). Every concrete path deferred its endpoint. `im.DispatchEndpoints` returns the set; `endpoint.TopologyDispatcher.CommandTargets` (`im.CommandTargeter`) the endpoints of a wildcard command.
 
 ## [0.7.2] — 2026-10-18
 

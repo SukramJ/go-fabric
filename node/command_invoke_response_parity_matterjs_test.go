@@ -28,9 +28,11 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	admincomm "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/chime"
 	"github.com/SukramJ/go-fabric/cluster/spec/groups"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
@@ -456,7 +458,11 @@ func buildEndpoints(t *testing.T, site *fabrictest.Site, specs []endpointSpec) (
 // controller privilege on it.
 func newInvokeHost(t *testing.T, privilege store.Privilege, specs ...endpointSpec) *invokeHost {
 	t.Helper()
-	site := quietSite(t)
+	return newInvokeHostOn(t, quietSite(t), privilege, specs...)
+}
+
+func newInvokeHostOn(t *testing.T, site *fabrictest.Site, privilege store.Privilege, specs ...endpointSpec) *invokeHost {
+	t.Helper()
 	eps, lights := buildEndpoints(t, site, specs)
 	p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: eps}})
 	if err := p.Grant(parityCtx(t), privilege); err != nil {
@@ -517,4 +523,130 @@ type rawElement struct{ el tlv.Element }
 
 func (r rawElement) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.PutUint(tag, r.el.Uint)
+}
+
+// TestCommandInvokeResponseDispatchEndpointsParity ports the describe group
+// "reports the endpoints it dispatches to before any command runs"
+// (CommandInvokeResponseTest.ts:665-806). matter.js reads the set its
+// beforeDispatch hook receives; on the wire the set is what an
+// InvokeRequest's DelayReportData defers, so each case invokes with a
+// 1 s deferral and asserts which subscription's next report is held
+// (deferHost, DelayReportDataTest's port).
+func TestCommandInvokeResponseDispatchEndpointsParity(t *testing.T) {
+	t.Parallel()
+
+	delay := &im.DelayReportData{DelayMinMs: 1000}
+	// deferred asserts whether r's next report, caused by change, is held
+	// by the invoke that ran before it.
+	deferred := func(t *testing.T, d *deferHost, r *reports, start time.Time, change func(), held bool) {
+		t.Helper()
+		change()
+		if held {
+			d.expectReportAt(t, r, start, time.Second, time.Second+sendDelay)
+		} else {
+			d.expectReportAt(t, r, start, 0, sendDelay)
+		}
+	}
+	invoke := func(t *testing.T, p *fabrictest.Pair, path im.ConcreteCommandPath, fields any) {
+		t.Helper()
+		if a := rawInvoke(t, p, im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: path, Fields: fields}}, DelayReportData: delay}); a.status != nil {
+			t.Fatalf("invoke: StatusResponse 0x%02x", uint8(*a.status))
+		}
+	}
+	// pase opens a PASE session from a second controller to the
+	// commissioned device — matter.js paseExchange (:676-686).
+	pase := func(t *testing.T, d *deferHost) *fabrictest.Pair {
+		t.Helper()
+		ctx := parityCtx(t)
+		if err := d.pair.Device.OpenWindow(ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+		p, err := d.site.AddController(fabrictest.ControllerOptions{FabricID: 2, NodeID: 0x2222}).PASE(ctx, d.pair.Device)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	t.Run("names the endpoint of a concrete path", func(t *testing.T) {
+		t.Parallel()
+		d := newDeferHost(t)
+		r := d.subscribe(t, d.onOffPath(), 60)
+		start := d.now()
+		invoke(t, d.pair, cmdPath(d.lightEP, onoff.ClusterID, onoff.CmdOn), nil)
+		deferred(t, d, r, start, func() {}, true)
+	})
+
+	t.Run("names every endpoint a wildcard path expands to", func(t *testing.T) {
+		t.Parallel()
+		d := newDeferHost(t, lightSpec("light:2"))
+		second := d.ep("light:2")
+		r1 := d.subscribe(t, d.onOffPath(), 60)
+		r2 := d.subscribe(t, attrPath(second, onoff.ClusterID, onoff.AttrOnOff), 60)
+		start := d.now()
+		invoke(t, d.pair, wildcardCmd(onoff.ClusterID, onoff.CmdOn), nil)
+		d.expectReportAt(t, r1, start, time.Second, time.Second+sendDelay)
+		if got := r2.times(); len(got) != 1 || got[0].Sub(start) < time.Second {
+			t.Fatalf("the second light's reports %v, want one held past 1 s", got)
+		}
+	})
+
+	t.Run("leaves out a concrete path that fails validation", func(t *testing.T) {
+		t.Parallel()
+		// OnOff on endpoint 0, which serves no OnOff.
+		d := newDeferHost(t)
+		r := d.subscribe(t, wildNodeLabel(), 60)
+		start := d.now()
+		invoke(t, d.pair, cmdPath(0, onoff.ClusterID, onoff.CmdOn), nil)
+		deferred(t, d, r, start, func() { d.relabel(t) }, false)
+		// Groups.AddGroup on the light, which an Operate subject may not
+		// invoke.
+		d = newDeferHost(t)
+		r = d.subscribe(t, d.onOffPath(), 60)
+		if err := d.pair.Grant(parityCtx(t), store.PrivilegeOperate); err != nil {
+			t.Fatal(err)
+		}
+		start = d.now()
+		invoke(t, d.pair, cmdPath(d.lightEP, groups.ClusterID, groups.CmdAddGroup), nil)
+		deferred(t, d, r, start, func() { d.setOnOff(t, true) }, false)
+	})
+
+	t.Run("leaves out a concrete path that needs a timed interaction it lacks", func(t *testing.T) {
+		t.Parallel()
+		d := newDeferHost(t)
+		p := pase(t, d)
+		r := d.subscribe(t, nodeLabelAt(0), 60)
+		start := d.now()
+		invoke(t, p, cmdPath(0, admincomm.ClusterID, admincomm.CmdRevokeCommissioning), nil)
+		deferred(t, d, r, start, func() { d.relabel(t) }, false)
+	})
+
+	t.Run("leaves out a fabric-scoped concrete path on a session without fabric", func(t *testing.T) {
+		t.Parallel()
+		var ran atomic.Bool
+		d := newDeferHost(t, requestorSpec("ota:1", &ran, false))
+		ota := d.ep("ota:1")
+		p := pase(t, d)
+		r := d.subscribe(t, wildNodeLabel(), 60)
+		start := d.now()
+		invoke(t, p, cmdPath(ota, otareq.ClusterID, otareq.CmdAnnounceOtaProvider), otareq.AnnounceOtaProviderRequest{
+			ProviderNodeId: 1, VendorId: 1, AnnouncementReason: otareq.AnnouncementReasonSimpleAnnouncement,
+		})
+		deferred(t, d, r, start, func() { d.relabel(t) }, false)
+		if ran.Load() {
+			t.Fatal("the handler ran")
+		}
+	})
+
+	t.Run("leaves out endpoints a wildcard path may not invoke on", func(t *testing.T) {
+		t.Parallel()
+		d := newDeferHost(t)
+		r := d.subscribe(t, d.onOffPath(), 60)
+		if err := d.pair.Grant(parityCtx(t), store.PrivilegeOperate); err != nil {
+			t.Fatal(err)
+		}
+		start := d.now()
+		invoke(t, d.pair, wildcardCmd(groups.ClusterID, groups.CmdAddGroup), nil)
+		deferred(t, d, r, start, func() { d.setOnOff(t, true) }, false)
+	})
 }
