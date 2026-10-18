@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 29 |
+| ported | 30 |
 | partial | 104 |
-| planned | 104 |
+| planned | 103 |
 | excluded | 87 |
 | total | 324 |
 
@@ -90,7 +90,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 2 | 0 | 0 |
-| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 1 | 2 | 2 | 1 |
+| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 2 | 2 | 1 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
 | [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/bdx](#protocoltestbdx) | 2 | 1 | 1 | 0 | 0 |
@@ -691,7 +691,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ReadAttributePathsTest.ts | 62 | ported | `im:TestPathParity_InsertionOrderPreserved`<br>`im:TestPathParity_DedupeByFullKey`<br>`im:TestReadAttributePathsWildcardDedupe` | Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases run against im.DedupAttributePaths, the Go counterpart of Read.AttributePaths. |
 | ReadTest.ts | 311 | partial | `controller/interaction:TestReadRequestBuildAttributes`<br>`controller/interaction:TestReadRequestBuildFabricFiltering`<br>`controller/interaction:TestReadRequestBuildDataVersionFilters`<br>`controller/interaction:TestReadRequestBuildEvents`<br>`controller/interaction:TestReadRequestBuildCombined`<br>`controller/interaction:TestReadRequestBuildValidation`<br>`controller/interaction:TestReadRequestBuildInteractionModelRevision` | The ReadRequest read off the wire of Interaction.ReadWith (attribute and event paths with every wildcard, fabric filtering, data version and event filters, the empty request, the revision) is ported; missing are the TypeScript type guards Read.containsAttribute/containsEvent (no Go counterpart, a Go caller reads len()), the call without an argument (ReadWith always takes a ReadRequest value; the empty one is ported) and a custom revision (Go always stamps its own). Missing: “validates request has attributes using containsAttribute”; “validates request has events using containsEvent”; “throws when called with no arguments”; “uses custom interaction model revision when specified”. |
 | SpecifierTest.ts | 163 | excluded | `js-runtime-only` | Resolution of TypeScript cluster, attribute and command specifiers by name or object. |
-| SubscribeTest.ts | 341 | planned | — | Building a subscribe request: keepSubscriptions default, intervals, event paths. |
+| SubscribeTest.ts | 341 | ported | `controller/interaction:TestSubscribeRequestBuildBasic`<br>`controller/interaction:TestSubscribeRequestBuildKeepSubscriptions`<br>`controller/interaction:TestSubscribeRequestBuildIntervals`<br>`controller/interaction:TestSubscribeRequestBuildIntervalValidation`<br>`controller/interaction:TestSubscribeRequestBuildWildcards`<br>`controller/interaction:TestSubscribeRequestBuildFabricFiltering`<br>`controller/interaction:TestSubscribeRequestBuildDataVersionFilters`<br>`controller/interaction:TestSubscribeRequestBuildEventFilters` | Every case runs against the SubscribeRequest Interaction.Subscribe sends (paths and wildcards, keepSubscriptions, interval bounds with the ClientInteraction defaults for unset ones, fabric filtering, data version and event filters) or the out-of-range refusal it returns before sending. |
 | WriteTest.ts | 327 | planned | — | Building a write request: timed writes, schema encoding, data versions. |
 
 ## protocol/test/action/response
@@ -1128,7 +1128,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/action/request
 
-- `SubscribeTest.ts` — Building a subscribe request: keepSubscriptions default, intervals, event paths.
 - `WriteTest.ts` — Building a write request: timed writes, schema encoding, data versions.
 
 ### protocol/test/dcl

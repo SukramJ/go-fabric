@@ -2518,8 +2518,18 @@
     },
     {
       "path": "packages/protocol/test/action/request/SubscribeTest.ts",
-      "status": "planned",
-      "reason": "Building a subscribe request: keepSubscriptions default, intervals, event paths.",
+      "status": "ported",
+      "go": [
+        "controller/interaction:TestSubscribeRequestBuildBasic",
+        "controller/interaction:TestSubscribeRequestBuildKeepSubscriptions",
+        "controller/interaction:TestSubscribeRequestBuildIntervals",
+        "controller/interaction:TestSubscribeRequestBuildIntervalValidation",
+        "controller/interaction:TestSubscribeRequestBuildWildcards",
+        "controller/interaction:TestSubscribeRequestBuildFabricFiltering",
+        "controller/interaction:TestSubscribeRequestBuildDataVersionFilters",
+        "controller/interaction:TestSubscribeRequestBuildEventFilters"
+      ],
+      "reason": "Every case runs against the SubscribeRequest Interaction.Subscribe sends (paths and wildcards, keepSubscriptions, interval bounds with the ClientInteraction defaults for unset ones, fabric filtering, data version and event filters) or the out-of-range refusal it returns before sending.",
       "snapshotSha": "1ae482b1028184daed89da56401c1b4c4ff7cb93"
     },
     {
