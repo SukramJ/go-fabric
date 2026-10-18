@@ -1681,17 +1681,13 @@
         "endpoint:TestRead_WildcardEndpointFansOut",
         "im:TestRead_DataVersionFilterMatching_SkipsCluster",
         "endpoint:TestRead_UnknownEndpoint",
-        "endpoint:TestRead_AttributeNotImplemented"
+        "endpoint:TestRead_AttributeNotImplemented",
+        "node:TestAttributeReadResponseParity"
       ],
       "missing": [
-        "reads model-known absent high-privilege attribute as unsupported attribute for view-only subject",
-        "reads wildcard endpoint & attributes",
-        "reads full wildcard",
-        "reads full wildcard with adding and removing endpoint",
-        "reads attributeList global Attribute full wildcard",
         "reads attributeList global Attribute full wildcard excluding attributerList via WildcardPath Filter"
       ],
-      "reason": "Concrete, endpoint-wildcard, version-filtered and non-existent reads are covered on the dispatcher; the full wildcards, the view-only subject and the AttributeList filter cases are not.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave.",
       "snapshotSha": "a8a94c17d633ea6c6aa79b8ebb98c021443867b2"
     },
     {
