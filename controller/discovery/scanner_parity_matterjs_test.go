@@ -191,7 +191,7 @@ func TestCommissionableMdnsScanner(t *testing.T) {
 	t.Run("re-discovers device after TTL expiry eviction", func(t *testing.T) {
 		t.Parallel()
 		n, _, clk := testNames(t)
-		onLoop(t, n, func() { n.minTTL = 0 }) // minTtl: Millis(0), :417
+		onLoop(t, n, func() { n.minTTL = 0 }) // minTtl: Millis(0), :422
 		s := NewScanner(n)
 		defer s.Close()
 		deliver(t, n, 0, cmsRecords(2))
@@ -216,7 +216,7 @@ func TestCommissionableMdnsScanner(t *testing.T) {
 		n, _, clk := testNames(t)
 		s := NewScanner(n)
 		defer s.Close()
-		// The matter.js timeouts (500 ms, 1000 ms, :485-486) are the
+		// The matter.js timeouts (500 ms, 1000 ms, :488-489) are the
 		// caller's context in Go; they run on the fake clock.
 		id := ByLongDiscriminator(1234)
 		shortCtx, shortCancel := context.WithCancel(t.Context())
@@ -364,7 +364,7 @@ func TestCommissionableMdnsScanner(t *testing.T) {
 		if search.found.len() != 0 || len(s.Discovered(byLong)) != 0 {
 			t.Fatal("delivered without an address")
 		}
-		// The A rides along a filtered PTR, :917-935.
+		// The A rides along a filtered PTR, :915-935.
 		deliver(t, n, 0, []dns.RR{ptrRR("_matterc._udp.local", cmsInstanceQ, 120)}, aRR(cmsHostname, cmsServerIPv4, 120, false))
 		clk.advance(n, 10*time.Millisecond)
 		waitFor(t, func() bool { return search.found.len() == 1 })
@@ -431,7 +431,7 @@ func TestCommissionableMdnsScanner(t *testing.T) {
 	t.Run("re-solicits A/AAAA when cached entry's addresses expired before next discovery", func(t *testing.T) {
 		t.Parallel()
 		n, conn, clk := testNames(t)
-		onLoop(t, n, func() { n.minTTL = 0 }) // minTtl: Millis(0), :1149
+		onLoop(t, n, func() { n.minTTL = 0 }) // minTtl: Millis(0), :1156
 		s := NewScanner(n)
 		defer s.Close()
 		deliver(t, n, 0, []dns.RR{

@@ -458,7 +458,7 @@ func TestMdnsServerAnswerSuppression(t *testing.T) {
 	t.Parallel()
 	t.Run("suppress some answers in an ANY query", func(t *testing.T) {
 		t.Parallel()
-		// Two of three answers known, as the TXT and PTR of :519.
+		// Two of three answers known, as the TXT and PTR of :521.
 		h, _ := newTestAnswerer("fe80::1", "fd00::1", "1.2.3.4")
 		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false, aRecord("fe80::1", 120, false), aRecord("fd00::1", 120, false)), 1)
 		expectRRs(t, "answers", r.msg.Answer, aRecord("1.2.3.4", 120, true))
@@ -571,7 +571,7 @@ func TestMdnsServerHostName(t *testing.T) {
 		}
 		return hostNameIface{flags: up, mac: hw, addrs: addrs}
 	}
-	// beforeEach, :1752-1757.
+	// beforeEach, :1749-1754.
 	lo, eth0, docker0 := iface("00:00:00:00:00:00", 1), iface("aa:bb:cc:dd:ee:01", 1), iface("aa:bb:cc:dd:ee:02", 1)
 	standard := func() []hostNameIface { return []hostNameIface{lo, eth0, docker0} }
 
