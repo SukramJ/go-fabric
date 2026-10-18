@@ -121,7 +121,6 @@ func dclRevLabels(points []RevocationPoint) []string {
 // "fetchRevocationDistributionPoints" and "… schema versions" (:146-263),
 // through Client.RevocationPoints.
 func TestDclClientRevocationFetchRevocationDistributionPoints(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	list := func(t *testing.T, routes ...dclRevRoute) []RevocationPoint {
 		t.Helper()
@@ -212,7 +211,6 @@ func TestDclClientRevocationFetchRevocationDistributionPoints(t *testing.T) {
 // describe "fetchRevocationDistributionPointsByIssuer" (:265-396), through
 // Client.RevocationPointsByIssuer.
 func TestDclClientRevocationFetchRevocationDistributionPointsByIssuer(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	const path1 = "/dcl/pki/revocation-points/" + dclRevAKID1
 

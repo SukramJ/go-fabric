@@ -107,9 +107,8 @@ func dclRevWantRefusal(t *testing.T, err error, part string) {
 // TestDclCertificateServiceRevocationOutsideTheDCL is the describe
 // "DclCertificateService revocation outside the DCL" (:31-257).
 func TestDclCertificateServiceRevocationOutsideTheDCL(t *testing.T) {
-	t.Parallel()
-	revoked := func(t *testing.T) []byte { return dclRevBytes(t, dclRevRevokedSerial) }
-	other := func(t *testing.T) []byte { return dclRevBytes(t, dclRevOtherSerial) }
+	revoked := func(t *testing.T) []byte { t.Helper(); return dclRevBytes(t, dclRevRevokedSerial) }
+	other := func(t *testing.T) []byte { t.Helper(); return dclRevBytes(t, dclRevOtherSerial) }
 
 	t.Run("reports a serial an installed set names as revoked", func(t *testing.T) {
 		s, _ := dclRevService(t, nil)
@@ -266,8 +265,6 @@ func TestDclCertificateServiceRevocationOutsideTheDCL(t *testing.T) {
 // .Client nil), so it has no request path at all; the cases assert what it
 // answers.
 func TestDclCertificateServiceRevocationOffline(t *testing.T) {
-	t.Parallel()
-
 	t.Run("asks the DCL nothing, neither for certificates nor for a CRL", func(t *testing.T) {
 		s := dclRevOpen(t, CertificateOptions{UpdateInterval: -1})
 		if err := s.InstallRevocations([]RevocationSetEntry{{IssuerSubjectKeyID: dclRevPAIAKID, RevokedSerialNumbers: []string{dclRevRevokedSerial}}}); err != nil {
@@ -303,8 +300,6 @@ func TestDclCertificateServiceRevocationOffline(t *testing.T) {
 // "parseRevocationSet()" (:301-419). ImplementationError is
 // ErrInvalidRevocationSet.
 func TestDclCertificateServiceRevocationParseRevocationSet(t *testing.T) {
-	t.Parallel()
-
 	t.Run("reads the set as the revocation-set tool writes it", func(t *testing.T) {
 		got, err := ParseRevocationSet([]byte(`[{"type":"revocation_set","issuer_subject_key_id":"` + dclRevPAIAKID +
 			`","issuer_name":"` + dclRevPAIName + `","revoked_serial_numbers":["` + dclRevRevokedSerial + `"],"crl_signer_cert":"MIIB..."}]`))
