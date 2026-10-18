@@ -46,9 +46,9 @@ func refusedThenPause(t *testing.T, h *harness, d time.Duration) {
 
 // startRefused starts a process at addr1 with the set's handler ctxHandler
 // and the connection's handler optHandler.
-func startRefused(t *testing.T, ctxHandler, optHandler ErrorHandler) (*harness, <-chan connectResult) {
+func startRefused(t *testing.T, ctxHandler, optHandler ErrorHandler) (h *harness, res <-chan connectResult) {
 	t.Helper()
-	h := newHarness(t, func(c *Context) { c.HandleError = ctxHandler })
+	h = newHarness(t, func(c *Context) { c.HandleError = ctxHandler })
 	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
 	return h, connectAsync(p, ConnectOptions{ConnectionTimeout: -1, HandleError: optHandler})
 }

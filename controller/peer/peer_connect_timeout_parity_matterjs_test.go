@@ -19,9 +19,9 @@ import (
 
 // connectWith runs Connect on ctx in the background against a peer whose
 // only address never answers.
-func connectWith(ctx context.Context, t *testing.T, opts ConnectOptions) (*harness, <-chan connectResult) {
+func connectWith(ctx context.Context, t *testing.T, opts ConnectOptions) (h *harness, res <-chan connectResult) {
 	t.Helper()
-	h := newHarness(t, nil)
+	h = newHarness(t, nil)
 	p, _ := h.set.AddKnownPeer(Descriptor{Address: testAddr, OperationalAddress: udpAddr(addr1)})
 	out := make(chan connectResult, 1)
 	go func() {

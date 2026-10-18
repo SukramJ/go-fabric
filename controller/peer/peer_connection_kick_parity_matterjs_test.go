@@ -165,26 +165,43 @@ func TestPeerConnectionKickRateLimiting(t *testing.T) {
 		restarts []string
 	}{
 		{"accepts the first kick unconditionally", nil, []step{{0, kickDiscover, true}}, []string{"discover"}},
-		{"suppresses a second 'discover' kick within 30 minutes", nil,
-			[]step{{0, kickDiscover, true}, {29 * time.Minute, kickDiscover, false}}, []string{"discover"}},
-		{"accepts a second 'discover' kick after 30 minutes", nil,
-			[]step{{0, kickDiscover, true}, {30 * time.Minute, kickDiscover, true}}, []string{"discover", "discover"}},
-		{"suppresses a second 'connect' kick within 10 minutes", nil,
-			[]step{{0, kickConnect, true}, {9 * time.Minute, kickConnect, false}}, []string{"connect"}},
-		{"accepts a second 'connect' kick after 10 minutes", nil,
-			[]step{{0, kickConnect, true}, {10 * time.Minute, kickConnect, true}}, []string{"connect", "connect"}},
+		{
+			"suppresses a second 'discover' kick within 30 minutes", nil,
+			[]step{{0, kickDiscover, true}, {29 * time.Minute, kickDiscover, false}},
+			[]string{"discover"},
+		},
+		{
+			"accepts a second 'discover' kick after 30 minutes", nil,
+			[]step{{0, kickDiscover, true}, {30 * time.Minute, kickDiscover, true}},
+			[]string{"discover", "discover"},
+		},
+		{
+			"suppresses a second 'connect' kick within 10 minutes", nil,
+			[]step{{0, kickConnect, true}, {9 * time.Minute, kickConnect, false}},
+			[]string{"connect"},
+		},
+		{
+			"accepts a second 'connect' kick after 10 minutes", nil,
+			[]step{{0, kickConnect, true}, {10 * time.Minute, kickConnect, true}},
+			[]string{"connect", "connect"},
+		},
 		{"uses independent thresholds for different origins", nil, []step{ // :236-254
 			{0, kickDiscover, true},
 			{10 * time.Minute, kickConnect, true},
 			{20 * time.Minute, kickDiscover, false},
 			{10 * time.Minute, kickDiscover, true},
 		}, []string{"discover", "connect", "discover"}},
-		{"shares lastRestartAt across concurrent handlers", nil,
-			[]step{{0, kickDiscover, true}, {0, kickDiscover, false}}, []string{"discover"}},
-		{"allows custom thresholds via PeerTimingParameters override",
+		{
+			"shares lastRestartAt across concurrent handlers", nil,
+			[]step{{0, kickDiscover, true}, {0, kickDiscover, false}},
+			[]string{"discover"},
+		},
+		{
+			"allows custom thresholds via PeerTimingParameters override",
 			&Timing{KickRestartCooldown: KickRestartCooldown{AddressChange: 60 * time.Second, Connect: 10 * time.Second}}, // :274-279
 			[]step{{0, kickDiscover, true}, {30 * time.Second, kickDiscover, false}, {30 * time.Second, kickDiscover, true}},
-			[]string{"discover", "discover"}},
+			[]string{"discover", "discover"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
