@@ -434,10 +434,10 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		// TC-DGGEN-2.4 fails a node that reports one without it.
 		resp := TimeSnapshotResponse{SystemTimeMs: systemMs}
 		g.mu.RLock()
-		clock := g.utcClock
+		utcClock := g.utcClock
 		g.mu.RUnlock()
-		if clock != nil {
-			if now, ok := clock(); ok && now.UnixMilli() >= 0 {
+		if utcClock != nil {
+			if now, ok := utcClock(); ok && now.UnixMilli() >= 0 {
 				posix := uint64(now.UnixMilli()) //nolint:gosec // non-negative, checked above
 				resp.PosixTimeMs = &posix
 			}
@@ -490,9 +490,9 @@ func (g *GeneralDiagnostics) upTimeFrom(mono, wall time.Duration) time.Duration 
 // clock (no TimeSynchronization on the node) PosixTimeMs stays null, as
 // matter.js GeneralDiagnosticsServer.timeSnapshot leaves it. Pass
 // [TimeSynchronization.UTC] when both are mounted.
-func (g *GeneralDiagnostics) SetUTCClock(clock func() (time.Time, bool)) {
+func (g *GeneralDiagnostics) SetUTCClock(utc func() (time.Time, bool)) {
 	g.mu.Lock()
-	g.utcClock = clock
+	g.utcClock = utc
 	g.mu.Unlock()
 }
 

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -212,7 +213,7 @@ func commissionedFabricOffline(t *testing.T) (*bridgetest.Commissioner, handshak
 	t.Helper()
 	c := bridgetest.Dial(t, "127.0.0.1:9", bridgetest.Options{Passcode: testPasscode, FabricID: testFabricID, NodeID: testNodeID, Seed: 7})
 	id := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
-	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

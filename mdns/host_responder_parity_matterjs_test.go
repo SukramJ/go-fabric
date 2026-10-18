@@ -27,7 +27,7 @@ type fakeClock = clocktest.Fake
 
 // newTestAnswerer answers for testHost with addrs on interface 1 and none
 // elsewhere — interface 2 stands for an interface the policy excludes.
-func newTestAnswerer(addrs ...string) (*hostAnswerer, *fakeClock) {
+func newTestAnswerer(addrs ...string) (ans *hostAnswerer, clk *fakeClock) {
 	h := newHostAnswerer()
 	// More than two minutes past the zero time, as MdnsServerTest's
 	// beforeEach advances MockTime past the 120 s TTL.

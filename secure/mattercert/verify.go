@@ -172,7 +172,7 @@ func bytesEqual(a, b []byte) bool {
 // NewVerifier returns a verifier rooted at rootPubKey. The key must be
 // a P-256 public key in uncompressed (0x04 prefix, 65 bytes) form —
 // the canonical Matter root-CA public-key shape.
-func NewVerifier(rootPubKey []byte, clock TimeSource) (*Verifier, error) {
+func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 	if len(rootPubKey) != 65 || rootPubKey[0] != 0x04 {
 		return nil, fmt.Errorf("%w: root pub key length=%d prefix=%#x", ErrMalformed, len(rootPubKey), rootPubKey[0])
 	}
@@ -180,12 +180,12 @@ func NewVerifier(rootPubKey []byte, clock TimeSource) (*Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: root pub key off-curve: %w", ErrMalformed, err)
 	}
-	if clock == nil {
-		clock = SystemTime{}
+	if ts == nil {
+		ts = clock.System{}
 	}
 	return &Verifier{
 		root: root,
-		now:  clock,
+		now:  ts,
 	}, nil
 }
 

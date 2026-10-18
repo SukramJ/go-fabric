@@ -17,6 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
@@ -141,7 +142,7 @@ func commissioned(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node,
 	s.Close()
 	id := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
 	id.FabricIndex = 1
-	v, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(c.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -230,6 +230,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		}
 	}
 	n.caseIDs = newCaseIdentities(n.logger)
+	n.caseIDs.clock = n.cfg.Clock
 	n.root, err = buildRoot(ctx, rootDeps{
 		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled:       n.observedFabricInstalled,

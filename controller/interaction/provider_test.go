@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
@@ -85,7 +86,7 @@ func peerSet(t *testing.T, s *scripted) *peer.Set {
 	c := bridgetest.Dial(t, "127.0.0.1:9", bridgetest.Options{Passcode: 20202021, FabricID: 0x0F0B, NodeID: 0x2222, Seed: 3})
 	id := c.ControllerIdentity(0x1111)
 	id.FabricIndex = 1
-	v, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(c.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

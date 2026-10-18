@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/im"
@@ -49,7 +50,7 @@ func fabricOf(t *testing.T, c *bridgetest.Commissioner, nodeID uint64, index uin
 	t.Helper()
 	id := c.ControllerIdentity(nodeID)
 	id.FabricIndex = index
-	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	verifier, err := mattercert.NewVerifier(c.RootPublicKey(), clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -60,15 +60,15 @@ func TestTickHoldsAt0xFFFF(t *testing.T) {
 // changes nothing.
 func TestStaleTickDoesNothing(t *testing.T) {
 	t.Parallel()
-	clock := newRaceClock()
-	s, err := New(Config{Features: FeatureLT, TimeSource: clock})
+	rc := newRaceClock()
+	s, err := New(Config{Features: FeatureLT, TimeSource: rc})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.MatterInvoke(t.Context(), CmdOnWithTimedOff, timedOffReq(50)); err != nil {
 		t.Fatal(err)
 	}
-	stale := clock.f
+	stale := rc.f
 	s.MatterQuiesce()
 	stale()
 	if v, _ := s.MatterRead(AttrOnTime); v != uint16(50) {
@@ -85,13 +85,13 @@ func timedOffReq(onTime uint16) any {
 // :291-297) changes nothing when it runs.
 func TestDelayedSceneApplyStaleRun(t *testing.T) {
 	t.Parallel()
-	clock := newRaceClock()
-	s, err := New(Config{Features: FeatureLT, TimeSource: clock})
+	rc := newRaceClock()
+	s, err := New(Config{Features: FeatureLT, TimeSource: rc})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.MatterApplySceneValues(t.Context(), map[uint32]uint64{AttrOnOff: 1}, 500)
-	due := clock.f
+	due := rc.f
 	s.Set(true) // drops the pending value
 	s.Set(false)
 	due()
