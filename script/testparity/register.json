@@ -1958,8 +1958,11 @@
     },
     {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
-      "status": "planned",
-      "reason": "The PASE session closed when the commissioning flow cannot be created.",
+      "status": "ported",
+      "go": [
+        "node:TestCommissioningPaseLifetimeParity"
+      ],
+      "reason": "On fabrictest: the step between PASE and the flow (ClaimNodeIDAfterPASE) refuses in place of matter.js's unconstructable flow class, and the controller holds no session the attempt opened (node:TestCommissioningPaseLifetimeParity).",
       "snapshotSha": "f0d47ddd295a239f55020671bc3f3b0a2eb5fe0e"
     },
     {
@@ -2074,8 +2077,11 @@
     },
     {
       "path": "packages/node/test/node/RegulatoryConfigCommissioningTest.ts",
-      "status": "planned",
-      "reason": "The default and explicit country code the commissioner sends in SetRegulatoryConfig.",
+      "status": "ported",
+      "go": [
+        "node:TestRegulatoryConfigCommissioningParity"
+      ],
+      "reason": "A Wi-Fi device commissioned to the end on fabrictest with the default and an explicit country code (node:TestRegulatoryConfigCommissioningParity); the device dropping CountryCode on decode is a register candidate.",
       "snapshotSha": "4d7ac664ddc68db7b290ff9ac464826a8da8bbf5"
     },
     {
@@ -2157,8 +2163,11 @@
     },
     {
       "path": "packages/node/test/node/SetRegulatoryConfigSideEffectTest.ts",
-      "status": "planned",
-      "reason": "SetRegulatoryConfig leaving BasicInformation.Location alone when validation fails.",
+      "status": "ported",
+      "go": [
+        "node:TestSetRegulatoryConfigSideEffectParity"
+      ],
+      "reason": "Over a PASE session on fabrictest: Outdoor on an Indoor-only node answers ValueOutsideRange and Location stays (node:TestSetRegulatoryConfigSideEffectParity).",
       "snapshotSha": "7b57d30a4213f7b04da9d529d901d4ee5d1f06be"
     },
     {

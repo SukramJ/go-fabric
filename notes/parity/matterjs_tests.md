@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 11 |
+| ported | 14 |
 | partial | 95 |
-| planned | 131 |
+| planned | 128 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 5 | 11 | 24 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 8 | 11 | 21 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -592,7 +592,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ClientSubscribeTest.ts | 1333 | planned | — | The controller's subscribe: data version filter injection, sustained subscriptions, fabric filters. |
 | ClientTuningTest.ts | 395 | partial | `controller/peer:TestParityTimingDefaults`<br>`controller/peer:TestParityTimingMerge` | Default and configured connection timing are covered; the network profiles and MRP margins are not. Missing: “ethernet-operational peers use the fast profile with no MRP margin”; “wifi-operational peers use the wifi profile with a 1s MRP margin”; “exposes the peer's MRP margin on the session so peer-initiated exchanges inherit it”; “adopts sessions that predate its construction”; “custom profiles propagate to NetworkProfiles”; “a configured bdxAdditionalMrpDelay propagates to NetworkProfiles”; “ownNetworkProfileId sets the sender-side MRP margin”; “ownNetworkProfileId defaults to fast (no sender-side margin)”; “connection timeout limits retransmission packets”; “connect concurrency 1 serializes peer connections”; “thread devices on different channels use independent profiles”. |
 | CommandInvokeResponseTest.ts | 865 | partial | `endpoint:TestInvoke_SuccessAndUnknownCommand`<br>`endpoint:TestInvokeUnsupportedCommandMapsTo0x81`<br>`endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege`<br>`node:TestCommandInvokeResponseParity`<br>`node:TestCommandInvokeResponseDispatchEndpointsParity` | Every other case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload); the dispatch-endpoint group is observed through the DelayReportData deferral (node:TestCommandInvokeResponseDispatchEndpointsParity; fix: only dispatchable endpoints are deferred). Missing: the group invoke — fabrictest's network carries no group messages. Missing: “names only the group's endpoints for a group invoke”. |
-| CommissioningPaseLifetimeTest.ts | 65 | planned | — | The PASE session closed when the commissioning flow cannot be created. |
+| CommissioningPaseLifetimeTest.ts | 65 | ported | `node:TestCommissioningPaseLifetimeParity` | On fabrictest: the step between PASE and the flow (ClaimNodeIDAfterPASE) refuses in place of matter.js's unconstructable flow class, and the controller holds no session the attempt opened (node:TestCommissioningPaseLifetimeParity). |
 | DecommissionTest.ts | 698 | planned | — | The controller decommissioning a peer: RemoveFabric, lost responses, leave events. |
 | DelayReportDataTest.ts | 533 | partial | `im/subscription:TestDeferReports`<br>`node:TestDelayReportDataParity` | Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData). Missing: “ignores DelayReportData”. |
 | DotQualifiedConstraintTest.ts | 265 | ported | `node:TestDotQualifiedConstraintParity` | Writes over the wire on fabrictest, local sets and server construction against the generated servers (node:TestDotQualifiedConstraintParity); fix: dot-qualified bounds resolved and initial values re-checked with their siblings in place. |
@@ -608,12 +608,12 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | PeerDescriptorTest.ts | 438 | planned | — | The controller's persisted peer descriptor: session parameters, intervals, migrated older records. |
 | PluginsTest.ts | 77 | excluded | `js-runtime-only` | matter.js's plugin loading. |
 | ReceivedStatusTest.ts | 214 | planned | — | How the controller surfaces a status the device sent, as opposed to a local refusal. |
-| RegulatoryConfigCommissioningTest.ts | 121 | planned | — | The default and explicit country code the commissioner sends in SetRegulatoryConfig. |
+| RegulatoryConfigCommissioningTest.ts | 121 | ported | `node:TestRegulatoryConfigCommissioningParity` | A Wi-Fi device commissioned to the end on fabrictest with the default and an explicit country code (node:TestRegulatoryConfigCommissioningParity); the device dropping CountryCode on decode is a register candidate. |
 | ReportedSessionParametersTest.ts | 77 | planned | — | The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller. |
 | ScanNetworksRejectionCommissioningTest.ts | 389 | partial | `controller/commissioner:TestNetworkWiFiScanRejectedThenAddFails`<br>`controller/commissioner:TestNetworkThreadFailures`<br>`controller/commissioner:TestFlowRearmsBeforeNetworkStep`<br>`controller/commissioner:TestBLERearmInterval` | The rejected scan, the failure that names it and the fail-safe re-arming are covered; the Thread rejection, the late answer and the unacknowledged scan are not. Missing: “continues Thread setup when the device rejects the scan with a status”; “continues WiFi setup when the device answers the scan too late”; “ends commissioning when the device does not acknowledge the scan”; “commissions over a PASE session that suppresses peer loss”. |
 | ServerNodeTest.ts | 1969 | planned | — | The server node end to end: lifecycle, announcement, operational port, commissioning, factory reset. |
 | ServerSubscriptionTest.ts | 1321 | partial | `im/subscription:TestHandlerParity_PeerCancel_RemovesSubscriptionFromActive`<br>`im/subscription:TestHandlerParity_SendInterval_ClampedToMinIntervalFloor`<br>`im/subscription:TestHandlerParity_SendInterval_HalfUnder60s_Uses80Percent`<br>`im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed` | Peer cancel and the non-ICD interval negotiation are ported; the LIT ICD intervals, shutdown closes and keep-alive statuses are not. Missing: “grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a higher ceiling”; “grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a lower ceiling”; “terminates on close() but not on closeForShutdown()”; “terminates when the peer refuses a report sent during a shutdown close”; “keeps a subscription that joins a session closing for shutdown”; “terminates when the peer answers a report with an error status”; “ends the subscription when the peer answers INVALID_SUBSCRIPTION on a session without MRP”; “waits for the status and keeps the subscription when the peer answers SUCCESS on a session without MRP”; “requests a status on an MRP session and ends the subscription on INVALID_SUBSCRIPTION”; “closes subscription even when in-flight exchange close throws”; “abandons the subscription after repeated MRP exhaustion, leaving the session alone”; “completes a flushing close triggered from inside an in-flight update”; “holds a report queued behind a report being sent until its deferral ends”; “sends the keep-alive queued behind a slow report within the send interval despite a deferral”; “sends the keep-alive that fell due while a report was in flight when that report completes”; “sends nothing for a queued pass with only unselected changes when no keep-alive is owed”; “sends nothing for a later queued pass with only unselected changes once the owed keep-alive went out”; “does not send the keep-alive that fell due while a report was in flight once closed”; “sends a change held by the min interval floor when the floor ends although the wall clock stepped backwards”; “sends the keep-alive at the send interval although the wall clock stepped backwards”; “sends a change held by a deferral when the deferral ends although the wall clock stepped backwards”; “holds a change inside the min interval floor after the wall clock stepped forwards”; “holds a change until its deferral ends after the wall clock stepped forwards”; “holds a report queued behind a report being sent until its deferral ends after the wall clock stepped forwards”; “keeps the deferral bound set at activation when the wall clock stepped backwards before it”; “sends a change at the end of a deferral requested after the wall clock stepped backwards”; “keeps the keep-alive on time after a report sent after the wall clock stepped forwards”; “keeps the min interval floor after the initial report when the wall clock stepped forwards before it”; “flushes a report queued behind a report being sent on close despite a deferral”; “selects endpoints by its event paths when it has no attribute paths”; “reports only the changed attribute when several attributes of one cluster are subscribed”; “completes session force-close triggered from inside an in-flight update”; “suppresses peer loss on the exchanges it opens to push subscription reports”. |
-| SetRegulatoryConfigSideEffectTest.ts | 57 | planned | — | SetRegulatoryConfig leaving BasicInformation.Location alone when validation fails. |
+| SetRegulatoryConfigSideEffectTest.ts | 57 | ported | `node:TestSetRegulatoryConfigSideEffectParity` | Over a PASE session on fabrictest: Outdoor on an Indoor-only node answers ValueOutsideRange and Location stays (node:TestSetRegulatoryConfigSideEffectParity). |
 | SettledTest.ts | 60 | excluded | `js-runtime-only` | matter.js's settled() helper waiting for node activity to go idle. |
 | ShutdownActivityTest.ts | 26 | excluded | `js-runtime-only` | Shutdown of a matter.js node whose activity never settles. |
 | SplitCommissioningTest.ts | 394 | planned | — | A second controller completing a PASE-only commissioning a first one started, and its failure paths. |
@@ -1095,7 +1095,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ClientStartUpTest.ts` — The controller's handling of a peer's StartUp event against its sessions.
 - `ClientStructureOffloadTest.ts` — The controller applying a multi-cluster priming report and events of the same interaction.
 - `ClientSubscribeTest.ts` — The controller's subscribe: data version filter injection, sustained subscriptions, fabric filters.
-- `CommissioningPaseLifetimeTest.ts` — The PASE session closed when the commissioning flow cannot be created.
 - `DecommissionTest.ts` — The controller decommissioning a peer: RemoveFabric, lost responses, leave events.
 - `FailsafeCommissioningTest.ts` — Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete.
 - `NodeLifecycleSeededTest.ts` — When the controller considers a peer's structure seeded, and its warnings for root-only nodes.
@@ -1103,10 +1102,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `PeerBehaviorTest.ts` — The schema the controller builds for a peer's clusters from AttributeList and revision.
 - `PeerDescriptorTest.ts` — The controller's persisted peer descriptor: session parameters, intervals, migrated older records.
 - `ReceivedStatusTest.ts` — How the controller surfaces a status the device sent, as opposed to a local refusal.
-- `RegulatoryConfigCommissioningTest.ts` — The default and explicit country code the commissioner sends in SetRegulatoryConfig.
 - `ReportedSessionParametersTest.ts` — The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller.
 - `ServerNodeTest.ts` — The server node end to end: lifecycle, announcement, operational port, commissioning, factory reset.
-- `SetRegulatoryConfigSideEffectTest.ts` — SetRegulatoryConfig leaving BasicInformation.Location alone when validation fails.
 - `SplitCommissioningTest.ts` — A second controller completing a PASE-only commissioning a first one started, and its failure paths.
 
 ### node/test/node/client
