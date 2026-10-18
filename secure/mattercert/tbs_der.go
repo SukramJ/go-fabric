@@ -68,6 +68,9 @@ var (
 	oidMatterRCACID      = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 4}
 	oidMatterFabricID    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 5}
 	oidMatterCASEAuthTag = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 6}
+	// oidDomainComponent is domainComponent (0.9.2342.19200300.100.1.25),
+	// an IA5String — matter.js X520.DomainComponent.
+	oidDomainComponent = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}
 
 	oidEcdsaWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	oidEcPublicKey     = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
@@ -104,11 +107,40 @@ func TBSToDER(c *Certificate) ([]byte, error) {
 	return out, nil
 }
 
-// rdnAttribute is one (OID, UTF8String value) pair. It marshals as
-// the AttributeTypeAndValue SEQUENCE described in RFC 5280 §4.1.2.4.
+// rdnAttribute is one (OID, string value) pair; the value carries its own
+// ASN.1 string type (UTF8String, PrintableString or IA5String). It
+// marshals as the AttributeTypeAndValue SEQUENCE described in RFC 5280
+// §4.1.2.4.
 type rdnAttribute struct {
 	Type  asn1.ObjectIdentifier
-	Value string `asn1:"utf8"`
+	Value asn1.RawValue
+}
+
+// x520AttributeTypes are the 2.5.4.n attribute types of the DN TLV tags
+// 1-15 in tag order: commonName, surName, serialNumber, countryName,
+// localityName, stateOrProvinceName, organizationName,
+// organizationalUnitName, title, name, givenName, initials,
+// generationQualifier, dnQualifier, pseudonym. Mirrors matter.js
+// packages/general/src/crypto/X520.ts:46-76 at 862ad75f.
+var x520AttributeTypes = [...]int{3, 4, 5, 6, 7, 8, 10, 11, 12, 41, 42, 43, 44, 46, 65}
+
+// standardDNAttribute maps a standard X.520 DN TLV tag to its OID and its
+// ASN.1 string tag: 1-15 are 2.5.4.n as UTF8String, 16 is domainComponent
+// as IA5String, 129-143 are the attributes 1-15 as PrintableString; ok is
+// false for any other tag. Mirrors matter.js
+// packages/protocol/src/certificate/kinds/Certificate.ts:895-964 at
+// 862ad75f (astOfDistinguishedName with the X520 encoders,
+// packages/general/src/crypto/X520.ts:28-79).
+func standardDNAttribute(tag uint8) (oid asn1.ObjectIdentifier, asn1Tag int, ok bool) {
+	switch {
+	case tag == dnTagStandardLast:
+		return oidDomainComponent, asn1.TagIA5String, true
+	case tag >= dnTagStandardFirst && tag < dnTagStandardLast:
+		return asn1.ObjectIdentifier{2, 5, 4, x520AttributeTypes[tag-dnTagStandardFirst]}, asn1.TagUTF8String, true
+	case tag >= dnTagPrintableFirst && tag <= dnTagPrintableLast:
+		return asn1.ObjectIdentifier{2, 5, 4, x520AttributeTypes[tag-dnTagPrintableFirst]}, asn1.TagPrintableString, true
+	}
+	return nil, 0, false
 }
 
 // buildDN encodes a Matter Distinguished Name as an X.509 RDNSequence
@@ -117,21 +149,25 @@ type rdnAttribute struct {
 // one SET per present field.
 //
 // Matter IDs 64-bit are uppercase hex (16 chars). The 32-bit
-// case-authenticated-tags are uppercase hex (8 chars).
+// case-authenticated-tags are uppercase hex (8 chars). The standard
+// X.520 attributes go out in their arrival position with their own string
+// type ([standardDNAttribute]) — matter.js
+// packages/protocol/src/certificate/kinds/Certificate.ts:895-964 at
+// 862ad75f (astOfDistinguishedName); they used to be left out, which
+// failed every chain whose DNs carry them (Google's roots).
 func buildDN(dn DistinguishedName) []asn1.RawValue {
 	var rdns []asn1.RawValue
-	emit := func(oid asn1.ObjectIdentifier, value string) {
+	emitValue := func(oid asn1.ObjectIdentifier, value asn1.RawValue) {
 		attr := rdnAttribute{Type: oid, Value: value}
 		// SET OF AttributeTypeAndValue — single attribute, but still
 		// in a SET container per RFC 5280.
 		raw, err := asn1.Marshal(attr)
 		if err != nil {
-			// invariant: buildDN only ever encodes the bridge's own
-			// locally-formatted hex identifiers (Matter node/fabric IDs,
-			// CATs) into a fixed rdnAttribute shape — never a value
-			// parsed from a peer's wire bytes — so a marshal failure
-			// here can only be a code defect (e.g. a bad OID/type
-			// pairing), not remote-triggerable.
+			// invariant: buildDN encodes the bridge's own hex identifiers
+			// and, as a RawValue whose bytes asn1.Marshal copies without
+			// looking at them, a peer's attribute strings into a fixed
+			// rdnAttribute shape, so a marshal failure here can only be a
+			// code defect (e.g. a bad OID), not remote-triggerable.
 			panic(fmt.Sprintf("matter cert: buildDN attr marshal: %v", err))
 		}
 		set := asn1.RawValue{
@@ -156,12 +192,15 @@ func buildDN(dn DistinguishedName) []asn1.RawValue {
 		}
 		rdns = append(rdns, setRaw)
 	}
+	emit := func(oid asn1.ObjectIdentifier, value string) {
+		emitValue(oid, asn1.RawValue{Class: asn1.ClassUniversal, Tag: asn1.TagUTF8String, Bytes: []byte(value)})
+	}
 	// Walk the DN in the original TLV arrival order — matter.js's
 	// `Object.entries(data).forEach(...)` iterates insertion order
 	// and a re-ordered DN produces a different TBS-DER, so this
 	// loop is part of signature-verification correctness, not just
 	// canonicalisation.
-	catIdx := 0
+	catIdx, attrIdx := 0, 0
 	for _, tag := range dn.Order {
 		switch tag {
 		case dnTagMatterRCACID:
@@ -176,6 +215,13 @@ func buildDN(dn DistinguishedName) []asn1.RawValue {
 			if catIdx < len(dn.CASEAuthTags) {
 				emit(oidMatterCASEAuthTag, hex8(dn.CASEAuthTags[catIdx]))
 				catIdx++
+			}
+		default:
+			// A standard X.520 attribute in its arrival position; decodeDN
+			// collected Attributes in the same sequence as Order.
+			if oid, asn1Tag, ok := standardDNAttribute(tag); ok && attrIdx < len(dn.Attributes) {
+				emitValue(oid, asn1.RawValue{Class: asn1.ClassUniversal, Tag: asn1Tag, Bytes: []byte(dn.Attributes[attrIdx].Value)})
+				attrIdx++
 			}
 		}
 	}

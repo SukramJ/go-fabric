@@ -3351,8 +3351,8 @@ and re-encodes. The recode and round-trip cases of CertificatesTest are
 
 By design. A re-encoded attestation certificate has no consumer here; the
 vendor-id read happens on the parsed name. The operational-certificate
-side is different: there the TBS is rebuilt, and the X.520 gap is in the
-findings register.
+side is different: there the TBS is rebuilt from every DN attribute the
+TLV carries (the X.520 gap closed after PR #164).
 
 ### BD-Matter-NoLegacyGroupCounters — no legacy group counter layout to migrate
 
