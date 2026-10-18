@@ -397,6 +397,11 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		n.br.WithdrawFabric(ctx, compressedID, nodeID)
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
+	// The removed fabric's fabric-sensitive events leave the log
+	// (FabricScopedDataHandler.ts:114-170 at 862ad75f).
+	if log := n.br.EventLog(); log != nil {
+		log.DropFabric(fabricIndex)
+	}
 	n.removeFabricBindings(fabricIndex)
 	n.reopenWhenIdle()
 }
