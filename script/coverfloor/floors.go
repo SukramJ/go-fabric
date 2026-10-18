@@ -178,6 +178,11 @@ var floors = []packageFloor{
 		why: "main only, asking the production ledger; snapshot.Fetch, which it calls, is covered against a fake ledger in controller/dcl/snapshot",
 	},
 	{
+		pkg: "github.com/SukramJ/go-fabric/script/testparity",
+		min: 67,
+		why: "the register guard and the snapshot parsers are covered; writeSnapshot and main, which shell out to git against a matter.js clone, are not, because the guard must run without one",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/script/reachability",
 		min: 0,
 		why: "the analyzer's own tests read the committed inventory rather than running the analysis, so none of its statements execute under go test",
