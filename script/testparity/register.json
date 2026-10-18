@@ -3994,26 +3994,18 @@
         "transport/mrp:TestNewCounter_SeedsWithin28BitRange",
         "transport/mrp:TestCounterMonotonic",
         "transport/mrp:TestCounterWrap",
-        "transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling"
+        "transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling",
+        "groups:TestMessageCounterPersisted",
+        "groups:TestMessageCounterRollover"
       ],
       "missing": [
-        "persistent initialization of counter with no persisted value",
-        "persistent initialization of counter with persisted value",
-        "persisted counter increases by 1",
         "persisted counter constructor throws in negative value in storage",
-        "persisted counter constructor throws in too large value in storage",
-        "emits 0xFFFFFFFF before rolling over to 0",
-        "Message counter rolls over if allowed and calls callback on increase once",
-        "Message counter rolls over if allowed and calls callback already on init once",
-        "reserves a block ahead and does not write storage within the block",
-        "never rolls back across a restart when reserving",
         "seeds the initial value when nothing is persisted",
         "ignores the seed when a value is already persisted",
         "rejects an invalid reserve",
-        "re-reserves after a rollover so wrapped values are not re-issued",
         "rejects a non-numeric persisted value"
       ],
-      "reason": "Seeding, increment, rollover and its refusal are covered; the persisted counter cases are not.",
+      "reason": "The persisted counter is ported against the group data counter (groups.dataCounter, matter.js's only persisted counter as SessionManager configures it: reserve 1000, rollover warning at 100 000); a negative or non-numeric stored value is unrepresentable in the uint64 CounterStore, and the seed and reserve options do not exist because the Go counter has the one fixed configuration (no legacy per-key counters to seed from).",
       "snapshotSha": "17b1fb8728fd817d91291a442c5ab808c6f98465"
     },
     {
