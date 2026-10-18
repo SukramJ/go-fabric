@@ -151,7 +151,7 @@ func TestTcpChannelName(t *testing.T) {
 func TestTcpChannelOversizedMessageHandling(t *testing.T) {
 	t.Run("rejects message at the size limit", func(t *testing.T) {
 		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)
-		// 64000 exceeds the 63996-byte message limit (TcpChannelTest.ts:243).
+		// 64000 exceeds the 63996-byte message limit (TcpChannelTest.ts:238).
 		tcpChannelWrite(t, client, tcpChannelLengthHeader(DefaultMaxPayloadSize))
 		tcpChannelAwaitClosed(t, c)
 		tcpChannelNoMsg(t, msgs)
@@ -161,7 +161,7 @@ func TestTcpChannelOversizedMessageHandling(t *testing.T) {
 	})
 	t.Run("accepts message just under the size limit", func(t *testing.T) {
 		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)
-		size := DefaultMaxPayloadSize - 4 - 1 // 63995, TcpChannelTest.ts:263
+		size := DefaultMaxPayloadSize - 4 - 1 // 63995, TcpChannelTest.ts:258
 		payload := make([]byte, size)
 		for i := range payload {
 			payload[i] = byte(i)

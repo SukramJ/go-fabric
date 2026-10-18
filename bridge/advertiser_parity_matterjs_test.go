@@ -40,9 +40,9 @@ func (r *deviceAdvertiserRecorder) operational() []mdns.Service {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var out []mdns.Service
-	for _, svc := range r.calls {
-		if svc.ServiceType == mdns.ServiceTypeOperational {
-			out = append(out, svc)
+	for i := range r.calls {
+		if r.calls[i].ServiceType == mdns.ServiceTypeOperational {
+			out = append(out, r.calls[i])
 		}
 	}
 	return out
