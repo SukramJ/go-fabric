@@ -11,7 +11,7 @@ included); "missing" is what the register still lists.
 
 ## BH-1 — wire core
 
-27 files, 345 open `it` cases before the tranche: 215 ported, 130 left as
+26 files, 345 open `it` cases before the tranche: 215 ported, 130 left as
 `missing` with a reason in the register. 4 files `ported`, 23 `partial`;
 `testparityPlannedRatchet` 134 → 125.
 
@@ -562,3 +562,137 @@ The `until` entry `PeerConnectionSocketOwnershipTest.ts`; the four
   and **one ReportStarted / ActiveChanged callback** instead of observables
   (`ClientSubscriptions.ts:156-158`).
 - **No `_matterd._udp` commissioner advertisement** (`MdnsTest.ts:546-713`).
+
+## BH-4 — DCL
+
+10 files, 331 open `it` cases before the tranche: 238 ported, 93 left (45
+of them the OTA image store, 39 the vendor information service). 4 files
+`ported`, 4 `partial`, 2 stay `planned`; `testparityPlannedRatchet`
+101 → 99.
+
+| matter.js file | status | Go test files | ported | missing |
+| --- | --- | --- | ---: | ---: |
+| `dcl/DclCertificateServiceRevocationTest.ts` | ported | `controller/dcl/revocation_parity_matterjs_test.go` | 32 | 0 |
+| `dcl/DclCertificateServiceSeedTest.ts` | partial | `controller/dcl/snapshot/seed_parity_matterjs_test.go` | 11 | 2 |
+| `dcl/DclCertificateServiceTest.ts` | partial | `controller/dcl/certstore_parity_matterjs_test.go` | 82 | 2 |
+| `dcl/DclClientRevocationTest.ts` | ported | `controller/dcl/client_revocation_parity_matterjs_test.go` | 13 | 0 |
+| `dcl/DclClientTest.ts` | ported | `controller/dcl/client_parity_matterjs_test.go` | 25 | 0 |
+| `dcl/DclConfigTest.ts` | ported | `controller/dcl/config_parity_matterjs_test.go` | 9 | 0 |
+| `dcl/DclCrlAuthenticationTest.ts` | partial | `controller/dcl/crlauthentication_parity_matterjs_test.go` | 53 | 5 |
+| `dcl/DclOtaUpdateServiceTest.ts` | partial | `controller/dcl/ota_parity_matterjs_test.go` | 30 | 45 |
+| `dcl/DclVendorInfoServiceSeedTest.ts` | planned |  | 0 | 10 |
+| `dcl/DclVendorInfoServiceTest.ts` | planned |  | 0 | 29 |
+| **total** | | | **255** | **93** |
+
+Two vendor-information files stay `planned`: matter.js
+`dcl/DclVendorInfoService.ts` (497 lines) with `SeedTypes.ts` has no Go
+counterpart (`eligibility/vendor_name.go` is an embedded name table, not a
+port). The ledger read it would build on, `Client.Vendors`, now exists.
+
+**Late addition to BH-3** (cab4f5c): the commissioner's CASE error handler
+is the method `handleNoSharedTrustRoots` (`ControllerCommissioner.ts:701-708`),
+so three of PeerConnectionErrorHandlerTest's five commissioning cases are
+ported (`controller/commissioner:TestPeerConnectionErrorHandlerNoSharedTrustRoots`);
+the entry is 15 ported / 2 missing (the full-flow pair cannot reach
+`controller/peer`'s harness without an import cycle).
+
+### Fixes and added API
+
+| Production file | matter.js (pin lines) | What |
+| --- | --- | --- |
+| `controller/dcl/revocation.go` | `dcl/DclCertificateService.ts:706-710` | `IsRevoked` refuses with `ErrStoreClosed` while and after the store closes, instead of answering "not revoked" for a lookup it never ran. Added by the implementing agent after the porting agent named it. |
+| `controller/dcl/revocation.go`, `certstore.go` | `DclCertificateService.ts:328-330,640-687,713-724,1767-1800` | Revocation information from outside the DCL: `InstallRevocations`, `InstalledRevocations`, `ParseRevocationSet`, `CertificateOptions.Revocations`, `ErrInvalidRevocationSet`; consulted by `IsRevoked` before the ledger and in an offline store; serials matched without leading zeros. About 230 lines, in memory only. |
+| `controller/dcl/certstore.go` | `DclCertificateService.ts:387-394,400-407,433-480,556-559,604-617,747-812` | `Certificate`, `CertificatePEM`, `CertificateDER` (with the self-heal `PAA` now uses), `GetOrFetchCertificate`, `DeleteCertificate`, `GetCertificateOptions.ConsiderTestCertificates`, `ErrCertificateNotFound`. About 180 lines. |
+| `controller/dcl/client.go`, `types.go` | `dcl/DclClient.ts:229-265,305-321,360-381` | `Client.ComplianceInfo` (vid/pid/version/program checked, schema 0 and 1) and `Client.Vendors` (paginated, schema 0) with their records. About 90 lines. |
+| `controller/dcl/ota.go` | `dcl/DclOtaUpdateService.ts:747-752,771-781` | An applicable update carries the specification version of its "matter" compliance record (the version record's when it states none); one more ledger GET per applicable version, a failed lookup logged at debug. Goes through `Client.ComplianceInfo` (979b837 removed the porting agent's second parser). |
+
+No change in `crl.go`: every CRL-authentication expectation already held.
+
+### Register candidates
+
+1. **DCL vendor information service** (`DclVendorInfoService.ts`, 497
+   lines; 39 cases).
+2. **OTA image store** (`DclOtaUpdateService.ts`: blob storage "ota", file
+   names, find/delete, force download, `PersistedFileDesignator`, stored
+   specification version, migration, offline; 45 cases) — or a by_design
+   entry, below.
+3. **PQC Phase 1 for CRLs** (5 ML-DSA cases; BH-2 candidate 9).
+4. **Asynchronous store construction** — `OpenCertificateStore` returns
+   after its first update, so "closed during the startup fetch" has no handle.
+5. **Seed test kind** — the snapshot is production-only; no
+   `fetchTestCertificates` for seeded test entries (2 cases).
+
+### Guards
+
+HEAD 32d54ed: `make race`, `make testparity-check`, `make cite-check` (drift 265), `make reachability-check` (unreached 5) and `make cover-check` exit 0; `make ci` exit 2 on `TestLiveLivenessTimeout`'s "TempDir RemoveAll cleanup: directory not empty" — a `fabrictest` cleanup-order race (about 1 in 30 runs, the same at d401168): the device stores lived in a `t.TempDir()` made after `NewSite` registered `Close`, so the removal ran while a node still wrote. Fixed in 800fc6b (one store directory per site, made before `Close` is registered; 100 runs clean); then at HEAD 800fc6b (report and CHANGELOG uncommitted):
+
+| Guard | Exit |
+| --- | --- |
+| `make ci` | 0 |
+| `make race` | 0 |
+| `make cover-check` | 0 |
+| `make testparity-check`, `cite-check`, `reachability-check` | 0 at 32d54ed; 800fc6b changes no register entry, citation or exported identifier |
+| `make chiptool-test` | skipped: harness is BI's (decision 0.12); BH-4 moved no device behaviour |
+
+The `fabrictest` change is in brief BI's path; it changes no API (named here as the brief asks).
+
+### Differences to the brief
+
+- New API in `controller/dcl` (about 500 lines over three files) rather
+  than "a few dozen lines": each piece is a public matter.js method its test
+  file exercises, with no wire, store-schema or `secure/` change. The owner
+  may prefer to split it out or to keep the cases `missing`.
+
+### Decisions for the owner
+
+- Offline is `Client == nil`; "asks the DCL nothing" holds by construction.
+- A whitespace-only issuer name in an installed set decodes to no issuer
+  and so matches every issuer (revokes more); matter.js keeps issuer `""`,
+  which matches nothing.
+- "Bytes" key-id cases go through lowercase hex strings (the Go getters
+  take strings; the attestation surface takes bytes).
+- Where matter.js's GitHub default is on, the tests set
+  `FetchGitHubCertificates: true` (by_design BD-Matter-DCL-OptIn).
+- The two OTA download cases that also check the stored file name are
+  counted as ported without that check (the store is the host's).
+- ML-DSA CRL cases with pqc-phase-1 on stay missing even where Go refuses
+  as matter.js does, since Go refuses all ML-DSA.
+
+### Left out
+
+Nothing beyond the two `planned` vendor files.
+
+### Questions
+
+1. The vendor information service and the OTA image store: port as
+   features, or by_design?
+
+### by_design candidates
+
+- **BD-Matter-DclOta-HostStore**: matter.js `DclOtaUpdateService` keeps its
+  own image store on blob storage "ota"; Go's `dcl.OTAVersions` answers the
+  ledger questions only, the catalogue stays with the host behind
+  `cluster/core.OTAImageSource` (as `BD-Matter-OTAProvider-HostPorts`).
+- **Production-only seed**: the snapshot is a separate reviewed PAA set
+  layered by `attestation.Trust`, not seeded into the online store
+  (`DclCertificateService.ts:1370-1393`).
+- **ML-DSA CRL signer refusal reason**: matter.js
+  `MlDsaAttestationDisabledError` while pqc-phase-1 is off
+  (`AttestationCertificates.ts:30-38`); Go refuses through the 600-byte
+  `parseCert` limit and the ecdsa-only `verifyCRLSignature`.
+
+## Summary of the wave
+
+| Tranche | Files | Open before | Ported | Left | Planned after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| BH-1 wire core | 26 | 345 | 215 | 130 | 0 |
+| BH-2 credentials and transfer | 27 | 390 | 295 | 95 | 0 |
+| BH-3 controller side | 24 | 382 | 239 | 143 | 4 |
+| BH-4 DCL | 10 | 331 | 238 | 93 | 2 |
+| **total** | **87** | **1 448** | **987** | **461** | **6** |
+
+Register for `packages/protocol/test` after the wave: 32 `ported`, 51
+`partial`, 18 `excluded`, 13 `planned` (the 7 with `until` plus the 6
+above); `testparityPlannedRatchet` 134 → 99 overall (the node trees are
+untouched). The brief's target of 7 `planned` in this tree is missed by
+the six files named in BH-3 and BH-4, each waiting on an owner decision.
