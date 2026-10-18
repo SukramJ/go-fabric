@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,10 +34,26 @@ const (
 	RecordMaxAge = 15 * time.Minute
 	// DefaultDiscoveryTimeout is [Scanner.Find]'s timeout when none is given.
 	DefaultDiscoveryTimeout = 10 * time.Second
+	// ScanTransitionTimeout is how long a client's StartScanning or
+	// StopScanning may take before it counts as failed with
+	// [ErrScanTransitionTimeout]: a radio that powers off may never settle
+	// the call. Mirrors matter.js
+	// packages/protocol/src/common/BleScanner.ts:110-114
+	// (SCAN_TRANSITION_TIMEOUT).
+	ScanTransitionTimeout = 10 * time.Second
 )
 
-// ErrScannerClosed is returned by a discovery on a closed scanner.
+// ErrScannerClosed was returned by a discovery on a closed scanner.
+//
+// Deprecated: a discovery on a closed scanner returns the stored devices
+// without scanning and without an error, as matter.js's does
+// (common/BleScanner.ts:213-225, :565, :615); nothing returns this error.
 var ErrScannerClosed = errors.New("ble: scanner closed")
+
+// ErrScanTransitionTimeout is a client's scan start or stop that did not
+// settle within [ScanTransitionTimeout] — matter.js's PromiseTimeoutError
+// of withTimeout (common/BleScanner.ts:186-188, :662).
+var ErrScanTransitionTimeout = errors.New("ble: scan transition timed out")
 
 // ErrNoDevice is [Scanner.Device] without a usable record — matter.js's
 // BleError of getDiscoveredDevice (common/BleScanner.ts:145-154).
@@ -104,9 +121,10 @@ type Scanner struct {
 	clock  exchange.Clock
 	log    *slog.Logger
 
-	// scanMu serializes the client's scan transitions, so no start and
-	// stop overlap (#enqueueScanTransition, :160-172).
-	scanMu sync.Mutex
+	// scans serializes the client's scan transitions in the order they
+	// were queued, so no start and stop overlap (#enqueueScanTransition,
+	// :160-172).
+	scans scanQueue
 
 	mu                sync.Mutex
 	records           map[string]*record
@@ -115,6 +133,29 @@ type Scanner struct {
 	scanning          bool
 	closed            bool
 	lastScanEndedAt   time.Time
+}
+
+// scanQueue runs scan transitions one after another in the order they
+// were queued — #enqueueScanTransition's promise chain (:160-172), which a
+// mutex would not order: a Close queued while a start is in flight must
+// run before the stop a discovery queues once that start returned.
+type scanQueue struct {
+	mu   sync.Mutex
+	tail chan struct{}
+}
+
+// enqueue waits for every transition queued before it and returns the
+// function that ends this one.
+func (q *scanQueue) enqueue() func() {
+	q.mu.Lock()
+	prev := q.tail
+	next := make(chan struct{})
+	q.tail = next
+	q.mu.Unlock()
+	if prev != nil {
+		<-prev
+	}
+	return func() { close(next) }
 }
 
 // NewScanner returns a scanner over client and installs its discovery
@@ -285,8 +326,7 @@ func (s *Scanner) Device(address string) (Device, error) {
 // scan the discoveries need; a failed start fails every waiting
 // discovery and is returned to a starting caller.
 func (s *Scanner) reconcileScan(ctx context.Context, starting bool) error {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	defer s.scans.enqueue()()
 	s.mu.Lock()
 	wanted := s.activeDiscoveries > 0 && !s.closed
 	scanning := s.scanning
@@ -294,9 +334,9 @@ func (s *Scanner) reconcileScan(ctx context.Context, starting bool) error {
 	var err error
 	switch {
 	case wanted:
-		err = s.client.StartScanning(ctx)
+		err = s.transition(ctx, s.client.StartScanning)
 	case scanning:
-		err = s.client.StopScanning(ctx)
+		err = s.transition(ctx, s.client.StopScanning)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -319,13 +359,32 @@ func (s *Scanner) reconcileScan(ctx context.Context, starting bool) error {
 	return nil
 }
 
-// startDiscovering is #startDiscovering (:213-225).
+// transition runs one client scan call, failing it with
+// [ErrScanTransitionTimeout] when it has not settled within
+// [ScanTransitionTimeout]; the call's context is canceled then. Mirrors
+// matter.js packages/protocol/src/common/BleScanner.ts:186-188 and :662
+// (withTimeout(SCAN_TRANSITION_TIMEOUT, …)).
+func (s *Scanner) transition(ctx context.Context, call func(context.Context) error) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- call(ctx) }()
+	expired := make(chan struct{})
+	t := s.clock.AfterFunc(ScanTransitionTimeout, func() { close(expired) })
+	defer t.Stop()
+	select {
+	case err := <-done:
+		return err
+	case <-expired:
+		return ErrScanTransitionTimeout
+	}
+}
+
+// startDiscovering is #startDiscovering (:213-225). On a closed scanner
+// the discovery counts but the scan is not wanted, so no client call is
+// made (:181).
 func (s *Scanner) startDiscovering(ctx context.Context) error {
 	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return ErrScannerClosed
-	}
 	s.activeDiscoveries++
 	s.mu.Unlock()
 	if err := s.reconcileScan(ctx, true); err != nil {
@@ -504,6 +563,51 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 	return devicesOf(s.devicesLocked(id, false)), nil
 }
 
+// CommissionedIdentity identifies a commissioned device independently of
+// the transport that discovered it — matter.js CommissionableDeviceIdentity
+// (packages/protocol/src/common/Scanner.ts:222-239): the long
+// discriminator and "<vendor>+<product>" or only "<vendor>".
+type CommissionedIdentity struct {
+	D  uint16
+	VP string
+}
+
+// ForgetCommissioned forgets the records of a device that was
+// commissioned: its advertisement described a commissioning window that is
+// now closed. peripheralAddresses are the BLE addresses it was reached
+// at (a device commissioned over another transport has none); with an
+// identity, every record of its discriminator and vendor (and product,
+// when the identity names one) is forgotten too. A device that advertises
+// again is discovered again. Mirrors matter.js
+// packages/protocol/src/common/BleScanner.ts:298-320 (forgetCommissionedDevice)
+// and :116-122 (matchesVendorProduct).
+func (s *Scanner) ForgetCommissioned(peripheralAddresses []string, identity *CommissionedIdentity) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, addr := range peripheralAddresses {
+		if _, ok := s.records[addr]; ok {
+			s.log.Debug("matter.ble.scan.forget_commissioned", slog.String("address", addr))
+			delete(s.records, addr)
+		}
+	}
+	if identity == nil {
+		return
+	}
+	for addr, r := range s.records {
+		d := r.device
+		vp := strconv.Itoa(int(d.VendorID)) + "+" + strconv.Itoa(int(d.ProductID))
+		matches := vp == identity.VP
+		if !strings.Contains(identity.VP, "+") {
+			matches = strconv.Itoa(int(d.VendorID)) == identity.VP
+		}
+		if d.Discriminator != identity.D || !matches {
+			continue
+		}
+		s.log.Debug("matter.ble.scan.forget_identity", slog.String("address", addr))
+		delete(s.records, addr)
+	}
+}
+
 // Cancel ends every discovery waiting for the identifier
 // (cancelCommissionableDeviceDiscovery, :374-382).
 func (s *Scanner) Cancel(id discovery.Identifier) {
@@ -517,16 +621,22 @@ func (s *Scanner) Cancel(id discovery.Identifier) {
 	}
 }
 
-// Close stops the scan and ends every discovery (close, :660-673).
+// Close stops the scan and ends every discovery (close, :654-673): the
+// stop queues behind a transition still running and fails with
+// [ErrScanTransitionTimeout] when it does not settle in time.
 func (s *Scanner) Close(ctx context.Context) error {
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
-	s.scanMu.Lock()
-	err := s.client.StopScanning(ctx)
-	s.scanMu.Unlock()
+	release := s.scans.enqueue()
+	err := s.transition(ctx, s.client.StopScanning)
+	// No stop is sent after close: the flag is reset inside the
+	// transition, before a queued one can read it (:663-666).
 	s.mu.Lock()
 	s.scanning = false
+	s.mu.Unlock()
+	release()
+	s.mu.Lock()
 	for w := range s.waiters {
 		w.canceled = true
 		s.finishLocked(w, nil)
