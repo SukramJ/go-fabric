@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 15 |
+| ported | 16 |
 | partial | 100 |
-| planned | 122 |
+| planned | 121 |
 | excluded | 87 |
 | total | 324 |
 
@@ -101,7 +101,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
-| [protocol/test/groups](#protocoltestgroups) | 5 | 0 | 1 | 4 | 0 |
+| [protocol/test/groups](#protocoltestgroups) | 5 | 1 | 1 | 3 | 0 |
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
@@ -790,7 +790,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| FabricGroupsManagerTest.ts | 42 | planned | — | The group IPv6 multicast address of a fabric and group against a fixed vector. |
+| FabricGroupsManagerTest.ts | 42 | ported | `groups:TestFabricGroupsManagerGroupIPv6AddressCalculation` | The group IPv6 multicast address of fabric 0x456789ABCDEF1234 and group 0x1234 is ported against the matter.js vector through Manager.MulticastAddressFor. |
 | GroupsMulticastPolicyTest.ts | 74 | partial | `groups:TestGroupcastPolicyMovesTheMulticastMembership` | The IANA policy moving the membership is covered; the per-group default, reverting and independent policies are not ported case by case. Missing: “derives a per-group IPv6 address by default (PerGroupId policy)”; “reverts to per-group derivation after policy removal”; “different groups can have different policies independently”. |
 | GroupsTest.ts | 148 | planned | — | The fabric's group state: multicast address, ID map replacement, subject resolution for a group message. |
 | KeySetsTest.ts | 174 | planned | — | The fabric's group key sets: lookup, replacement, current and all operational keys. |
@@ -1165,7 +1165,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/groups
 
-- `FabricGroupsManagerTest.ts` — The group IPv6 multicast address of a fabric and group against a fixed vector.
 - `GroupsTest.ts` — The fabric's group state: multicast address, ID map replacement, subject resolution for a group message.
 - `KeySetsTest.ts` — The fabric's group key sets: lookup, replacement, current and all operational keys.
 - `MessagingStateTest.ts` — Group messaging state: storage, reception state per source and key, the legacy data-counter migration.

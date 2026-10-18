@@ -3407,8 +3407,11 @@
     },
     {
       "path": "packages/protocol/test/groups/FabricGroupsManagerTest.ts",
-      "status": "planned",
-      "reason": "The group IPv6 multicast address of a fabric and group against a fixed vector.",
+      "status": "ported",
+      "go": [
+        "groups:TestFabricGroupsManagerGroupIPv6AddressCalculation"
+      ],
+      "reason": "The group IPv6 multicast address of fabric 0x456789ABCDEF1234 and group 0x1234 is ported against the matter.js vector through Manager.MulticastAddressFor.",
       "snapshotSha": "1c53515df212fbf503dec294be72a04eb31456dd"
     },
     {
