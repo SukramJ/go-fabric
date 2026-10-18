@@ -217,7 +217,7 @@ func TestSetpointRaiseLowerCoolOnlyRejectsHeatMode(t *testing.T) {
 
 // TestThermostatUnknownCommandIsUnsupported covers the default arm of the
 // command dispatch. Only SetpointRaiseLower (id 0x0,
-// thermostat-cluster.element.ts:319) is implemented; the weekly-schedule
+// thermostat-cluster.element.ts:340) is implemented; the weekly-schedule
 // commands sit behind the SCH feature this server does not advertise, so
 // they must answer UnsupportedCommand.
 func TestThermostatUnknownCommandIsUnsupported(t *testing.T) {

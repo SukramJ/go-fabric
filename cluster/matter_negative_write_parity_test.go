@@ -338,7 +338,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusFailure,
 		},
 		{
-			// Mirrors matter.js packages/node/src/standard/elements/window-covering-cluster.element.ts:72
+			// Mirrors matter.js packages/model/src/standard/elements/window-covering-cluster.element.ts:70-73
 			// liftPercent100thsValue constraint "max 10000".
 			name: "WindowCovering/GoToLiftPercentage liftPercent100ths > 10000 → ConstraintError",
 			build: func() interface {
@@ -355,7 +355,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/standard/elements/window-covering-cluster.element.ts:79
+			// Mirrors matter.js packages/model/src/standard/elements/window-covering-cluster.element.ts:78-80
 			// Mode attribute constraint "max 15".
 			name: "WindowCovering/Mode write > 15 → ConstraintError",
 			build: func() interface {
@@ -670,8 +670,8 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusFailure,
 		},
 		{
-			// Mirrors matter.js packages/node/src/standard/elements/window-covering-cluster.element.ts:72
-			// GoToLiftPercentage liftPercent100thsValue constraint "max 10000".
+			// Mirrors matter.js packages/model/src/standard/elements/window-covering-cluster.element.ts:90-96
+			// GoToLiftPercentage LiftPercent100thsValue: constraint "desc", its percent100ths type bounds it at 10000.
 			name: "WindowCovering/GoToLiftPercentage liftPercent100ths > 10000 → ConstraintError",
 			build: func() interface {
 				MatterInvoke(context.Context, uint32, any) (any, error)

@@ -157,7 +157,7 @@ func readFields(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any
 
 // timed sends a TimedRequest and waits for its Success — matter.js
 // InteractionClientMessenger.sendTimedRequest
-// (InteractionMessenger.ts:1124-1136, TlvTimedRequest: [0] timeout in
+// (InteractionMessenger.ts:1440-1452, TlvTimedRequest: [0] timeout in
 // milliseconds, [255] InteractionModelRevision).
 func (m *messenger) timed(ctx context.Context, timeout time.Duration) error {
 	enc := tlv.NewEncoder()

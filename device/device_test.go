@@ -42,7 +42,7 @@ var _ contract.ChangeNotifier = (*hostServer)(nil)
 
 // TestFeatureSelection: a selection must pass the cluster's feature
 // conformance and keep the features the device type mandates
-// (OnOffServer.with("Lighting"), dimmable-light.ts:52).
+// (OnOffServer.with("Lighting"), src/devices/dimmable-light.ts:52).
 func TestFeatureSelection(t *testing.T) {
 	t.Parallel()
 	opts := testOptions("lamp")
@@ -144,9 +144,9 @@ func TestOptionsRefused(t *testing.T) {
 }
 
 // TestOptionalClusterWithItsAlterations: LevelControl is optional on an
-// OnOffLight and not mounted by default (on-off-light.ts:111, 126-131);
+// OnOffLight and not mounted by default (src/devices/on-off-light.ts:111, 126-131);
 // opted in, it carries the features the type mandates
-// (on-off-light.ts:83-91) and the host's initial values.
+// (src/devices/on-off-light.ts:83-91) and the host's initial values.
 func TestOptionalClusterWithItsAlterations(t *testing.T) {
 	t.Parallel()
 	d, err := NewOnOffLight(testOptions("l"))

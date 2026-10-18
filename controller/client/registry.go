@@ -487,7 +487,7 @@ func (r *Registry) Size() int {
 }
 
 // fabricByIndex is the fabric of our index, nil when we have none —
-// FabricManager.maybeFor (NetworkClient.ts:285).
+// FabricManager.maybeFor (NetworkClient.ts:443).
 func (r *Registry) fabricByIndex(index uint8) *commissioner.Fabric {
 	for _, f := range r.cfg.Fabrics {
 		if f.FabricIndex == index {

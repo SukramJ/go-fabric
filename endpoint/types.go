@@ -162,10 +162,12 @@ type Endpoint struct {
 	// of its own (no BridgedNode device type, no
 	// BridgedDeviceBasicInformation).
 	Part bool
-	// PartIDs are the ids of the endpoint's parts ([Spec.Parts]),
-	// ascending — its Descriptor PartsList. matter.js DescriptorServer
-	// #currentPartsListNumbers lists the direct parts of an endpoint whose
-	// device type does not compose its full family.
+	// PartIDs are the endpoint's Descriptor PartsList, ascending: every
+	// descendant ([Spec.Parts], recursively) when one of its listed device
+	// types composes its full family — a bridged node, BridgedNode being
+	// full-family — and its direct parts otherwise. Mirrors matter.js
+	// packages/node/src/behaviors/descriptor/DescriptorServer.ts:227-254
+	// (#currentPartsListNumbers).
 	PartIDs []uint16
 
 	// DeviceConditions are the device-type conditions the host states for

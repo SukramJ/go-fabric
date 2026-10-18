@@ -70,7 +70,7 @@ func TestParitySubscriptionConstants(t *testing.T) {
 }
 
 // TestParitySustainRetries: SustainedSubscription.DefaultRetrySchedule
-// (SustainedSubscription.ts:483-499): 15 s initial, an hour at most, no
+// (SustainedSubscription.ts:614-630): 15 s initial, an hour at most, no
 // timeout, ×2, jitter 0.25.
 func TestParitySustainRetries(t *testing.T) {
 	t.Parallel()

@@ -39,12 +39,12 @@ const (
 var ErrScannerClosed = errors.New("ble: scanner closed")
 
 // ErrNoDevice is [Scanner.Device] without a usable record — matter.js's
-// BleError of getDiscoveredDevice (BleScanner.ts:145-154).
+// BleError of getDiscoveredDevice (common/BleScanner.ts:145-154).
 var ErrNoDevice = errors.New("ble: no device")
 
 // Device is a commissionable device a BLE advertisement describes —
 // matter.js CommissionableDeviceData with its DiscoveredBleDevice
-// (BleScanner.ts:66-75, built at :388-399).
+// (common/BleScanner.ts:66-75, built at :388-399).
 type Device struct {
 	// Peripheral is the advertising peripheral; its address is the
 	// device identifier.
@@ -96,7 +96,7 @@ type ScannerOptions struct {
 }
 
 // Scanner finds commissionable devices by their BLE advertisements —
-// matter.js BleScanner (BleScanner.ts:124-674) at 0ceb202d. One radio
+// matter.js BleScanner (packages/protocol/src/common/BleScanner.ts:124-674) at 0ceb202d. One radio
 // serves every discovery: the scan starts with the first and stops with
 // the last. It is safe for concurrent use.
 type Scanner struct {
@@ -266,7 +266,7 @@ func (s *Scanner) Discovered(id discovery.Identifier) []Device {
 }
 
 // Device is the stored record of a peripheral — getDiscoveredDevice
-// (BleScanner.ts:145-154): an error when there is none or the client
+// (common/BleScanner.ts:145-154): an error when there is none or the client
 // cannot reach the peripheral now.
 func (s *Scanner) Device(address string) (Device, error) {
 	s.mu.Lock()

@@ -85,7 +85,7 @@ func closeParityKeys(seed byte) sigma.SessionKeys {
 
 // TestReapIdle_NotifiesPeerBeforeKeyZeroise verifies the reaper fires
 // the graceful-close notifier while the session can still encrypt
-// (matter.js NodeSession.ts:368 emits gracefulClose before state is
+// (matter.js NodeSession.ts:403 emits gracefulClose before state is
 // dropped; ExchangeManager.ts:716-726 seals the CloseSession report under
 // the live keys) and only then zeroises + cascades the close hook.
 func TestReapIdle_NotifiesPeerBeforeKeyZeroise(t *testing.T) {

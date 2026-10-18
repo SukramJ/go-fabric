@@ -281,9 +281,9 @@ func TestRunStopsWithTheContext(t *testing.T) {
 // complete set, and a restart on the same database. An endpoint kept
 // across the restart keeps its number (BD-Matter-EndpointID-Persistent);
 // one removed and added again gets a fresh one, as the allocator never
-// reissues a released number (BD-Matter-EndpointNumber-Monotonic) and
-// matter.js's Endpoint.delete() erases the endpoint's storage
-// (Endpoint.ts:985).
+// reissues a released number (BD-Matter-EndpointNumber-Monotonic). In
+// matter.js, delete() erases the endpoint's storage
+// (packages/node/src/endpoint/Endpoint.ts:987-990).
 func TestAggregatorAcrossRestart(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "node.db")

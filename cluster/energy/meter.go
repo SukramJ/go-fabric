@@ -39,7 +39,7 @@ type MeterConfig struct {
 // PowerThreshold feature. It is the generated server as it stands:
 // matter.js's MeterIdentificationServer adds nothing to the generated
 // behavior (packages/node/src/behaviors/meter-identification/
-// MeterIdentificationServer.ts:15). A later change of the identification
+// MeterIdentificationServer.ts:14). A later change of the identification
 // is the server's [spec.Server.Set].
 func NewMeterIdentification(cfg MeterConfig) (*spec.Server, error) {
 	opts := spec.Options{}

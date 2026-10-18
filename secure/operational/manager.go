@@ -233,7 +233,7 @@ const SessionIdleTimeout = 5 * time.Minute
 //
 // matter.js has no equivalent because it never reserves an id ahead of
 // the session: `getNextAvailableSessionId`
-// (packages/protocol/src/session/SessionManager.ts:490) is called at
+// (packages/protocol/src/session/SessionManager.ts:537) is called at
 // the moment the secure session is created. Our CASE responder must
 // announce the id in Sigma2, one round-trip earlier, so an aborted
 // handshake leaves an id behind and something has to reclaim it —
@@ -660,7 +660,7 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 	// (Session==nil) that is overwritten here. A LIVE session can hold
 	// the slot too; it goes through the graceful close cascade rather
 	// than being dropped silently. Tell its peer BEFORE zeroising the
-	// keys — matter.js emits gracefulClose (NodeSession.ts:368) while
+	// keys — matter.js emits gracefulClose (NodeSession.ts:403) while
 	// the session can still encrypt, and the exchange layer ships the
 	// CloseSession StatusReport (ExchangeManager.ts:716-726).
 	var occupied []*Entry
@@ -981,7 +981,7 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 // PASE nature). Matter §11.10.6.6 step 4 requires the server to clear
 // any still-established PASE session on a successful
 // CommissioningComplete, and the fail-safe expiry path does the same.
-// Mirrors matter.js FailsafeContext.ts:153 (completeCommission) and
+// Mirrors matter.js FailsafeContext.ts:134 (completeCommission) and
 // :280 (fail-safe expired) → closePaseSession. Returns the number of
 // sessions closed.
 func (m *Manager) ClosePASESessions() int {
@@ -1258,7 +1258,7 @@ func GenerateResumptionID() ([]byte, error) {
 // staked for a handshake that never completed — rather than refusing
 // the allocation, so a burst of aborted handshakes cannot lock out
 // every later CASE exchange. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:504
+// packages/protocol/src/session/SessionManager.ts:537
 // (`getNextAvailableSessionId` falls back to `findOldestInactiveSession`
 // and reuses its id). We stop at placeholders and never evict a live
 // session here: closing one has to run its graceful-close cascade

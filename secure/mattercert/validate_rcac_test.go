@@ -421,7 +421,7 @@ func fixedP256RCACKey(t *testing.T) *ecdsa.PrivateKey {
 // self-signature must verify when the TBS-DER that gets hashed is the
 // TBS-DER that was actually signed.
 //
-// Mirrors matter.js packages/.../Rcac.ts:140
+// Mirrors matter.js packages/protocol/src/certificate/kinds/Rcac.ts:140
 // verifyEcdsa(PublicKey(...), this.asUnsignedDer(), this.signature),
 // which checks the self-signature against the same in-memory
 // certificate object that Certificate.ts:101 signEcdsa(key,

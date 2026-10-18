@@ -611,7 +611,7 @@ func TestBleScannerDiscoveriesAskingDifferently(t *testing.T) {
 	for range ids {
 		want(t, <-results, addrA)
 	}
-	// BLE cannot select by instance id or device type (BleScanner.ts:476-496).
+	// BLE cannot select by instance id or device type (packages/protocol/src/common/BleScanner.ts:476-496).
 	for _, id := range []discovery.Identifier{discovery.ByInstanceID(addrA), discovery.ByDeviceType(0x100)} {
 		if d, err := s.Find(context.Background(), id, time.Second, false); err != nil || d != nil {
 			t.Fatalf("Find(%v) = %v, %v", id, d, err)

@@ -160,7 +160,7 @@ func (id Identifier) SupportedOverBLE() bool {
 // MatchesBLE reports whether id selects d, a device a BLE advertisement
 // describes (controller/ble): as [Identifier] does over DNS-SD, and
 // never for an identifier [Identifier.SupportedOverBLE] refuses. Mirrors
-// BleScanner.ts:497-541 (#getCommissionableDevices).
+// common/BleScanner.ts:497-541 (#getCommissionableDevices).
 func (id Identifier) MatchesBLE(d *Device) bool {
 	return id.SupportedOverBLE() && id.matches(d)
 }

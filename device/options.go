@@ -97,7 +97,7 @@ func WithFeatures(clusterID, features uint32) Option {
 
 // WithOptional mounts an optional cluster of the device type with its
 // default server — matter.js's `Device.with(LevelControlServer)` for a
-// cluster in `server.optional` (devices/on-off-light.ts:111, 126-131).
+// cluster in `server.optional` (src/devices/on-off-light.ts:111, 126-131).
 // For Groups (0x0004) and ScenesManagement (0x0062), whose server is the
 // stack's, it opts the endpoint in ([endpoint.Spec.OptIn]) and the
 // assembler mounts them, as `MutableEndpoint.with(GroupsServer)` extends
@@ -206,7 +206,7 @@ func WithClientClusters(clusterIDs ...uint32) Option {
 // WithInitial sets initial attribute values of a cluster's default server
 // (attribute id → value), over the defaults the device type states —
 // matter.js's initial state keyed by behavior id
-// (Endpoint.ts:1385-1438).
+// (endpoint/Endpoint.ts:1385-1438).
 func WithInitial(clusterID uint32, values map[uint32]any) Option {
 	return func(s *settings) {
 		m := s.initial[clusterID]

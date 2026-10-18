@@ -251,7 +251,7 @@ func (x *Exchange) RetransmissionCount() int {
 // shorten the wait until the next (re)transmission: the interval of the
 // retransmission timer armed last minus the backoff of transmission 0,
 // never negative, and 0 before the exchange armed a timer. Mirrors
-// matter.js MessageExchange.ts:1227-1235 (retransmissionRestartSaving),
+// matter.js MessageExchange.ts:1258-1266 (retransmissionRestartSaving),
 // which reads the last timer's interval whether or not it still runs.
 func (x *Exchange) RetransmissionRestartSaving() time.Duration {
 	x.mu.Lock()

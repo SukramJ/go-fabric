@@ -326,7 +326,7 @@ func (m *Manager) Attach(endpoint uint16, b *mattercore.Binding) {
 
 // Detach stops resolving the entries of endpoint's Binding server and
 // emits removed for each of its established bindings — matter.js
-// BindingManager.disposeServer (BindingManager.ts:207-244), which the
+// BindingManager.disposeServer (BindingManager.ts:191-228), which the
 // server's disposal calls.
 func (m *Manager) Detach(endpoint uint16) {
 	m.mu.Lock()

@@ -34,7 +34,7 @@ const (
 
 // ignoredEntryReason is why an entry resolves to no client of the source
 // endpoint, phrased for the developer reading the log — matter.js
-// ignoredEntryReason (BindingManager.ts:721-737), its four messages
+// ignoredEntryReason (BindingManager.ts:707-720), its four messages
 // verbatim. unbindable are the clients the entry matches that are left
 // out as not bindable; cluster names come from the schema, as matter.js's
 // from its model.
@@ -56,7 +56,7 @@ func ignoredEntryReason(sourceEndpoint uint16, filterCluster uint32, hasFilter b
 }
 
 // clusterName is the cluster's model name, else its id as matter.js prints
-// it (`0x${id.toString(16)}`, BindingManager.ts:735).
+// it (`0x${id.toString(16)}`, BindingManager.ts:718).
 func clusterName(id uint32) string {
 	if n, ok := schema.ClusterName(id); ok {
 		return n

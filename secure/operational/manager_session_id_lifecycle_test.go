@@ -155,7 +155,7 @@ func TestReapIdle_ReclaimsAbandonedPlaceholderIDs(t *testing.T) {
 // last-resort reclaim: with every id staked by a handshake that never
 // completed, a fresh allocation takes the oldest placeholder's slot
 // instead of failing the CASE exchange outright. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:504
+// packages/protocol/src/session/SessionManager.ts:537
 // (`getNextAvailableSessionId` → `findOldestInactiveSession`).
 func TestAllocateID_EvictsOldestPlaceholderWhenExhausted(t *testing.T) {
 	t.Parallel()

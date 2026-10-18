@@ -22,7 +22,7 @@ const GroupSecurityInfo = "GroupKey v1.0"
 // It is matter.js's `CRYPTO_SYMMETRIC_KEY_LENGTH`
 // (packages/general/src/crypto/Crypto.ts:31 = 16), which is the default
 // output length of `createHkdfKey`
-// (packages/general/src/crypto/StandardCrypto.ts:156-160) — and
+// (packages/general/src/crypto/StandardCrypto.ts:176-180) — and
 // `Fabric.create` takes that default rather than passing a length
 // (packages/protocol/src/fabric/Fabric.ts:140-144).
 const OperationalIPKSize = 16
