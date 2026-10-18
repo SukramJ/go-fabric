@@ -298,10 +298,11 @@ update-dcl-snapshot: ## refetch controller/dcl/snapshot/data (PAAs, CD signers, 
 	$(GO) run ./script/dclsnapshot -out controller/dcl/snapshot/data
 
 .PHONY: ble-virtual-test
-ble-virtual-test: ## BLE end to end over btvirt: the BLE build pairs chip's all-clusters app (Linux; sudo, Docker, avahi, bluez + bluez-tests)
+ble-virtual-test: ## BLE end to end over btvirt: the BLE build pairs a matter.js node on bleno (Linux; sudo, bluez + bluez-tests, Node.js, make, g++)
 	@# The same script .github/workflows/ble-virtual.yml runs. Exit 2 is the
-	@# environment (btvirt, BlueZ, the image), exit 1 a defect.
-	CHIP_TEST_IMAGE=$(CHIP_TEST_IMAGE) script/ble-virtual-test.sh
+	@# environment (btvirt, BlueZ, Node.js, the bleno build, the HCI claim),
+	@# exit 1 a defect.
+	script/ble-virtual-test.sh
 
 # ble/bluez is a Go module of its own (ADR 0024 decision 3): the main
 # module's ./... does not reach it, so it has its own leg. The !linux stub
