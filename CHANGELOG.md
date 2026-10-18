@@ -10,6 +10,24 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5, brief BH): the port of matter.js `packages/protocol/test` at `862ad75f` — one `*_parity_matterjs_test.go` per matter.js file, the register `script/testparity/register.json` naming every Go test and every `it` still missing. The ports found the gaps below; each fix cites the matter.js lines it mirrors.
+
+### Added
+
+- `transport/message.ProtocolHeader.MarshalPayload` and `message.ErrEncodeSecuredExtensions`: the checked protocol-header encoder, which refuses Secured Extensions as matter.js `MessageCodec.encodePayload` does (`ProtocolHeader.Marshal` is unchanged).
+- `controller/exchange.SendOptions.AckWaitAbort`: ends only the wait for the acknowledgement — the message is sent once, `Send` returns, and it is never retransmitted again (matter.js `MessageExchange` `abortAckWait`).
+- `secure/channel.ErrSourceNodeMismatch`: `EncryptGroup` refuses a sender node id that disagrees with the header's Source Node ID.
+
+### Fixed
+
+- `transport/tcp`: a connection the peer closes (end of stream, read error, framing violation) hands every message completed before the close to the handler before it reports closed; it could drop them (matter.js `TcpChannel.ts:85-98,183-185,281-296`).
+- `bridge`: a dropped TCP connection logs one debug line per evicted session (`matter.tcp.evict.session`) beside the connection's eviction line (matter.js `ExchangeManager.ts:655`).
+- `secure/channel`: `EncryptGroup` builds the group nonce from the header's Source Node ID (matter.js `GroupSession.ts:260-269`).
+- `secure/operational`: only a session the peer established runs the per-peer cap check, so opening a session we initiate no longer evicts one of the peer's (matter.js `SessionManager.ts:272-277`).
+- `im`: `EventLog.DropBuffered` persists the current numbering as the ceiling before it drops the events, so a restart continues right after the last event number instead of past the rest of the reserved epoch (matter.js `BaseEventStore.ts:62-67,141-147`).
+- `controller/exchange`: a BDX exchange caps its retransmission interval at 7.4 s (matter.js `MessageExchange.ts:63-77,1234-1251`); a duplicate of the message a pending BDX reply answers retransmits that reply at once instead of a standalone acknowledgement (`MessageExchange.ts:485-495,564-617`).
+- `controller/interaction`: the report assembler grows a list by a chunk at the list's length index, ignores a null chunk past the end, and resolves repeated non-list values of one path to the highest data version instead of dropping the attribute (matter.js `TlvArray.ts:146-150`, `AttributeDataDecoder.ts:337-343`); a StatusResponse Success in place of a data report is a `*StatusError` like any other status (`InteractionMessenger.ts:985-1000`); a write that does not fit one message, or a timed write whose WriteResponse might not, is refused with `ErrRequestTooLarge` before anything is sent, where an oversized message went out (`InteractionMessenger.ts:103-106,1335-1354,1388-1392`).
+
 ## [0.7.2] — 2026-10-18
 
 Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
