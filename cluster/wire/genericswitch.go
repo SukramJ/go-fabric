@@ -93,10 +93,10 @@ type GenericSwitchMultiPressSource interface {
 
 // GenericSwitchActionSource is the optional source capability for an
 // action switch (AS): true makes the materialised server advertise AS
-// instead of MSR — one InitialPress per press cycle, no ShortRelease and no
-// MultiPressOngoing (matter.js SwitchServer.ts:246-251, :337-339) — and
-// MSM, which AS makes mandatory (switch.element.ts conformance "AS, [MS &
-// MSR]").
+// instead of MSR — one press reported per press cycle, with no short
+// release and no count while the sequence runs (matter.js
+// SwitchServer.ts:248-251, :337-339) — and MSM, which AS makes mandatory
+// (switch.element.ts conformance "AS, [MS & MSR]").
 type GenericSwitchActionSource interface {
 	MatterSwitchActionSwitch() bool
 }
