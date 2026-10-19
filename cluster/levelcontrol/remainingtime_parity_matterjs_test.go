@@ -25,8 +25,9 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 )
 
-// transitioningLight is RemainingTimeTest.ts:11-32: a light that is on at
-// level 1, moving to 254 over 15 s.
+// transitioningLight is
+// packages/node/test/behaviors/level-control/RemainingTimeTest.ts:11-32:
+// a light that is on at level 1, moving to 254 over 15 s.
 func transitioningLight(t *testing.T) *nodeLight {
 	t.Helper()
 	l := newNodeLight(t, nodeLightOptions{level: 1, on: true})

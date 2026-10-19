@@ -69,7 +69,7 @@ func TestParityMatterJS_WindowCoveringServerTest(t *testing.T) {
 				u, _ := v.(uint8)
 				return u
 			}
-			// The three operationalStatus$Changed events
+			// The committed values of the three $Changed events
 			// (WindowCoveringServerTest.ts:64-68, :79-83, :94-98).
 			for _, step := range []struct {
 				name     string
