@@ -464,6 +464,13 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 			t.Fatalf("group state before = %+v, want %+v", got, expectedGroupState(g.ep))
 		}
 		previous := identity(t, dev, g.fabric)
+		// recordMembershipChanges and network.isMemberOf
+		// (OperationalCredentialsServerTest.ts:260-261, :272-273): the
+		// socket's memberships on fabrictest's multicast model.
+		changes := watchMemberships(t, g.site)
+		if !holdsGroup(dev, groups.IANAGroupcastAddress) {
+			t.Fatalf("before UpdateNOC the device holds %v, want the IANA address", dev.MulticastGroups())
+		}
 
 		if got := updateNOC(t, g.pair, g.pair.Controller.Fabric().FabricID, g.nodeID); got != uint64(core.NOCStatusOK) {
 			t.Fatalf("UpdateNOC StatusCode %d, want Ok", got)
@@ -480,6 +487,15 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 		}
 		if got := groupStateOf(t, dev.Node(), g.fabric, g.ep); !got.equal(expectedGroupState(g.ep)) {
 			t.Errorf("group state after = %+v", got)
+		}
+		if err := g.site.Settle(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if got := changes(); len(got) != 0 {
+			t.Errorf("UpdateNOC changed the multicast memberships: %v, want none", got)
+		}
+		if !holdsGroup(dev, groups.IANAGroupcastAddress) {
+			t.Errorf("after UpdateNOC the device holds %v, want the IANA address", dev.MulticastGroups())
 		}
 	})
 
