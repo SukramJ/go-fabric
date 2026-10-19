@@ -74,7 +74,7 @@ func TestTilt_ConfigStatusAndAttributes(t *testing.T) {
 		{cover.ServedTiltFeatureMap, 1<<0 | 1<<4, false, true},
 		{cover.ServedLiftTiltFeatureMap, 1<<0 | 1<<3 | 1<<4, true, true},
 	} {
-		srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: c.fm, InitialPositionPercent100ths: 1000, InitialTiltPositionPercent100ths: 2000})
+		srv := cover.NewWindowCoveringServer(cover.Config{Type: uint8(wcdef.TypeUnknown), EndProductType: uint8(wcdef.EndProductTypeUnknown), FeatureMap: c.fm, InitialPositionPercent100ths: 1000, InitialTiltPositionPercent100ths: 2000})
 		if v, _ := srv.MatterRead(wcdef.AttrConfigStatus); v != c.configBits {
 			t.Errorf("0x%X: ConfigStatus %v, want 0x%02X", c.fm, v, c.configBits)
 		}
@@ -114,7 +114,7 @@ func TestTilt_ConfigStatusAndAttributes(t *testing.T) {
 func TestTilt_CommandsMoveBothAxes(t *testing.T) {
 	t.Parallel()
 	m := &axesMover{}
-	srv, err := cover.New(cover.Config{FeatureMap: cover.ServedLiftTiltFeatureMap, InitialPositionPercent100ths: 5000, InitialTiltPositionPercent100ths: 5000, Mover: m})
+	srv, err := cover.New(cover.Config{Type: uint8(wcdef.TypeTiltBlindLift), EndProductType: uint8(wcdef.EndProductTypeInteriorVenetianBlind), FeatureMap: cover.ServedLiftTiltFeatureMap, InitialPositionPercent100ths: 5000, InitialTiltPositionPercent100ths: 5000, Mover: m})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestTilt_CommandsMoveBothAxes(t *testing.T) {
 // server is UNSUPPORTED_COMMAND, and GoToTiltPercentage on a lift-only one.
 func TestTilt_OnlyServerRefusesLiftCommand(t *testing.T) {
 	t.Parallel()
-	tilt := cover.NewWindowCoveringServer(cover.Config{FeatureMap: cover.ServedTiltFeatureMap})
+	tilt := cover.NewWindowCoveringServer(cover.Config{Type: uint8(wcdef.TypeTiltBlindTiltOnly), EndProductType: uint8(wcdef.EndProductTypeTiltOnlyInteriorBlind), FeatureMap: cover.ServedTiltFeatureMap})
 	lift := cover.NewWindowCoveringServer(cover.Config{})
 	for _, c := range []struct {
 		srv *cover.WindowCoveringServer
@@ -182,7 +182,7 @@ func TestTilt_OnlyServerRefusesLiftCommand(t *testing.T) {
 // #handleOperationalStatusChanging, WindowCoveringServer.ts:203-214).
 func TestTilt_SelfContainedTravelAndGlobalStatus(t *testing.T) {
 	t.Parallel()
-	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: cover.ServedLiftTiltFeatureMap, InitialPositionPercent100ths: 0, InitialTiltPositionPercent100ths: 10000, MoveStep: time.Hour})
+	srv := cover.NewWindowCoveringServer(cover.Config{Type: uint8(wcdef.TypeTiltBlindLift), EndProductType: uint8(wcdef.EndProductTypeInteriorVenetianBlind), FeatureMap: cover.ServedLiftTiltFeatureMap, InitialPositionPercent100ths: 0, InitialTiltPositionPercent100ths: 10000, MoveStep: time.Hour})
 	ctx := context.Background()
 	if _, err := srv.MatterInvoke(ctx, wcdef.CmdGoToTiltPercentage, wcdef.GoToTiltPercentageRequest{TiltPercent100thsValue: 0}); err != nil {
 		t.Fatal(err)
@@ -204,7 +204,7 @@ func TestTilt_SelfContainedTravelAndGlobalStatus(t *testing.T) {
 	if v, _ := srv.MatterRead(wcdef.AttrOperationalStatus); v != uint8(0) {
 		t.Fatalf("OperationalStatus after stop %v, want 0", v)
 	}
-	srv2 := cover.NewWindowCoveringServer(cover.Config{FeatureMap: cover.ServedTiltFeatureMap, InitialTiltPositionPercent100ths: 10000})
+	srv2 := cover.NewWindowCoveringServer(cover.Config{Type: uint8(wcdef.TypeTiltBlindTiltOnly), EndProductType: uint8(wcdef.EndProductTypeTiltOnlyInteriorBlind), FeatureMap: cover.ServedTiltFeatureMap, InitialTiltPositionPercent100ths: 10000})
 	if _, err := srv2.MatterInvoke(ctx, wcdef.CmdUpOrOpen, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestSetTargetPosition_DuringAFailingMoverStands(t *testing.T) {
 // target it moved.
 func TestTilt_GoToTiltPercentageAcceptsEveryPayloadShape(t *testing.T) {
 	t.Parallel()
-	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: cover.ServedTiltFeatureMap})
+	srv := cover.NewWindowCoveringServer(cover.Config{Type: uint8(wcdef.TypeTiltBlindTiltOnly), EndProductType: uint8(wcdef.EndProductTypeTiltOnlyInteriorBlind), FeatureMap: cover.ServedTiltFeatureMap})
 	ctx := context.Background()
 	for i, req := range []any{
 		wcdef.GoToTiltPercentageRequest{TiltPercent100thsValue: 100},
@@ -326,7 +326,7 @@ func TestTilt_GoToTiltPercentageAcceptsEveryPayloadShape(t *testing.T) {
 		}
 	}
 	m := &axesMover{err: errors.New("drive refused")}
-	moved, _ := cover.New(cover.Config{FeatureMap: cover.ServedLiftTiltFeatureMap, InitialTiltPositionPercent100ths: 5000, Mover: m})
+	moved, _ := cover.New(cover.Config{Type: uint8(wcdef.TypeTiltBlindLift), EndProductType: uint8(wcdef.EndProductTypeInteriorVenetianBlind), FeatureMap: cover.ServedLiftTiltFeatureMap, InitialTiltPositionPercent100ths: 5000, Mover: m})
 	if _, err := moved.MatterInvoke(ctx, wcdef.CmdGoToTiltPercentage, uint16(1)); err == nil {
 		t.Fatal("GoToTiltPercentage succeeded, want the Mover's failure")
 	}

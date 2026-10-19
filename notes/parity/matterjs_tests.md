@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 55 |
+| ported | 56 |
 | partial | 115 |
-| planned | 67 |
+| planned | 66 |
 | excluded | 87 |
 | total | 324 |
 
@@ -72,7 +72,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/devices](#nodetestdevices) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/endpoint](#nodetestendpoint) | 8 | 0 | 0 | 1 | 7 |
 | [node/test/endpoint/properties](#nodetestendpointproperties) | 5 | 0 | 0 | 0 | 5 |
@@ -487,7 +487,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| WindowCoveringServerTest.ts | 145 | planned | â€” | OperationalStatus change events on a target change and the lift/tilt type checks of a shutter. |
+| WindowCoveringServerTest.ts | 145 | ported | `cluster/cover:TestParityMatterJS_WindowCoveringServerTest` | The five cases run on the Go server in its package: the operationalStatus$Changed sequence as the committed OperationalStatus around each command of a travelling lift-and-tilt blind on a clock the test never moves (the $Changing events have no Go observer), and the Type / EndProductType conformance checks of a shutter as cover.ErrEnumValue from cover.New. |
 
 ## node/test/devices
 
@@ -1047,10 +1047,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/web-rtc-transport-requestor
 
 - `WebRtcTransportRequestorServerTest.ts` â€” The WebRTC transport requestor server, which milestone 6 phase 26 builds.
-
-### node/test/behaviors/window-covering
-
-- `WindowCoveringServerTest.ts` â€” OperationalStatus change events on a target change and the lift/tilt type checks of a shutter.
 
 ### node/test/endpoint
 

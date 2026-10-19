@@ -16,6 +16,10 @@ Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/beh
 
 - `fabrictest.Endpoint(key, deviceType, servers...)`: a bridged endpoint for `Topology.Bridged` serving cluster servers the test built itself — a feature selection or an initial state no device-layer constructor offers, as matter.js's tests add a `MutableEndpoint(…).with(…Server)` to a `MockServerNode`.
 
+### Fixed
+
+- `cluster/cover`: `New` refuses a `Type` or `EndProductType` whose enum-value conformance the FeatureMap disallows — a shutter that lifts and tilts, a roller shade on a covering that tilts too — with the new `cover.ErrEnumValue`; `NewWindowCoveringServer` panics on it, as on a FeatureMap it refuses. matter.js validates the behavior's initial state against the schema and throws `EnumValueConformanceError` (`ServerBehaviorBacking.ts:60-63`, `conformance-compiler.ts:735-747`, `window-covering-cluster.element.ts:150-191`). A tilt-only host that left `Type` at its zero value (Rollershade, lift only) now fails at construction: set `TiltBlindTiltOnly` or `Unknown`.
+
 ## [0.8.0] — 2026-10-19
 
 Closes milestone 2 (the test foundation) of the [roadmap](./docs/roadmap.md). Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node` (and the two `packages/protocol/test` files whose subject lives in `controller/client`) onto `fabrictest`.

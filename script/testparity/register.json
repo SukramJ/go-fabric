@@ -1214,8 +1214,11 @@
     },
     {
       "path": "packages/node/test/behaviors/window-covering/WindowCoveringServerTest.ts",
-      "status": "planned",
-      "reason": "OperationalStatus change events on a target change and the lift/tilt type checks of a shutter.",
+      "status": "ported",
+      "go": [
+        "cluster/cover:TestParityMatterJS_WindowCoveringServerTest"
+      ],
+      "reason": "The five cases run on the Go server in its package: the operationalStatus$Changed sequence as the committed OperationalStatus around each command of a travelling lift-and-tilt blind on a clock the test never moves (the $Changing events have no Go observer), and the Type / EndProductType conformance checks of a shutter as cover.ErrEnumValue from cover.New.",
       "snapshotSha": "0f106520ca8434ae8540d188e02bcb7a8ecaa0d5"
     },
     {
