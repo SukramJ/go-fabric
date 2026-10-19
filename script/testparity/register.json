@@ -1124,8 +1124,20 @@
     },
     {
       "path": "packages/node/test/behaviors/switch/SwitchServerTest.ts",
-      "status": "planned",
-      "reason": "The Switch server's validators, debounce and the latching and momentary press state machines, which milestone 3 phase 17 ports.",
+      "status": "ported",
+      "go": [
+        "cluster/switch:TestSwitchServerCustomValidators",
+        "cluster/switch:TestSwitchServerDebounce",
+        "cluster/switch:TestSwitchServerLS",
+        "cluster/switch:TestSwitchServerMSMSRMSL",
+        "cluster/switch:TestSwitchServerMSMSRNotMSL",
+        "cluster/switch:TestSwitchServerMSNotMSRNotMSL",
+        "cluster/switch:TestSwitchServerMSMSRMSLMSM",
+        "cluster/switch:TestSwitchServerMSASMSLMSM",
+        "cluster/switch:TestSwitchServerMSMSRNotMSLMSM",
+        "cluster/switch:TestSwitchServerResetState"
+      ],
+      "reason": "All 69 cases in the ten describes are ported one to one onto cluster/switch on a clocktest.Fake: the validators, debounce, the latching switch, the momentary switch with and without release, long press and multi press, the action switch, and resetState with the switch state lock.",
       "snapshotSha": "2d2fce0f4c31c1f2382221e0f30e9033d1babefd"
     },
     {

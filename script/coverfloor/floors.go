@@ -73,6 +73,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/onoff", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/opstate", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/pump", min: 98},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/switch", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 95},
 	{
 		pkg: "github.com/SukramJ/go-fabric/cluster/transition",

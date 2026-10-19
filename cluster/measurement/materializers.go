@@ -30,6 +30,7 @@ package measurement
 // the same seam.
 
 import (
+	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -153,21 +154,64 @@ func powerSourceServers(src any, mc contract.MeasurementContext) []contract.Clus
 }
 
 // genericSwitchServers materialises Switch (0x003B) for a momentary
-// press source. Unlike every other built-in it needs mc.EndpointID at
-// construction rather than after it: [wire.GenericSwitch] emits events,
-// and a Matter event carries the endpoint as its routing key, so the
-// cluster must know the endpoint before it can fire its first press.
+// press source: the cluster/switch server, the port of matter.js
+// SwitchServer.ts. Unlike every other built-in it needs mc.EndpointID at
+// construction rather than after it: the server emits events, and a Matter
+// event carries the endpoint as its routing key, so the cluster must know
+// the endpoint before it can report its first press.
 //
 // The source shape is cluster/wire's, not one of the value-reading
 // interfaces the other built-ins assert, because this cluster is
-// event-driven rather than attribute-driven: it reports positions and
-// long-press capability, and the readings arrive as Fire* calls.
+// event-driven rather than attribute-driven: the source states what the
+// switch can tell (positions, long press, multi press, action switch), and
+// the readings arrive as positions (the source's WireMatterSwitchPositions)
+// or as narrated gestures (WireMatterSwitchHandler), both wired by the
+// bridge at assembly.
 func genericSwitchServers(src any, mc contract.MeasurementContext) []contract.ClusterServer {
 	s, ok := src.(wire.GenericSwitchSource)
 	if !ok {
 		return nil
 	}
-	return []contract.ClusterServer{wire.NewGenericSwitch(mc.EndpointID, s)}
+	srv, err := switchserver.New(switchConfig(mc.EndpointID, s))
+	if err != nil {
+		// switchConfig only builds selections inside the model.
+		return nil
+	}
+	return []contract.ClusterServer{srv}
+}
+
+// switchConfig is the server configuration a source states. MS always; AS
+// when the source is an action switch, MSR otherwise (the two exclude each
+// other: MSR is "[MS & !AS]"); MSL when it tells a long press from a short
+// one; MSM when it counts presses (MultiPressMax 2 or more), and always
+// with AS, which makes it mandatory ("AS, [MS & MSR]", matter.js
+// switch.element.ts). Two positions at the least ("min 2"); the start
+// position is the source's live one, when it has one in range.
+func switchConfig(endpoint uint16, s wire.GenericSwitchSource) switchserver.Config {
+	features := switchserver.FeatureMS
+	action := false
+	if a, ok := s.(wire.GenericSwitchActionSource); ok && a.MatterSwitchActionSwitch() {
+		action = true
+		features |= switchserver.FeatureAS
+	} else {
+		features |= switchserver.FeatureMSR
+	}
+	if s.MatterSwitchSupportsLongPress() {
+		features |= switchserver.FeatureMSL
+	}
+	var multiPressMax uint8
+	if m, ok := s.(wire.GenericSwitchMultiPressSource); ok && m.MatterSwitchMultiPressMax() >= 2 {
+		multiPressMax = m.MatterSwitchMultiPressMax()
+	}
+	if multiPressMax >= 2 || action {
+		features |= switchserver.FeatureMSM
+	}
+	n := max(s.MatterSwitchPositions(), 2)
+	cfg := switchserver.Config{Features: features, Endpoint: endpoint, NumberOfPositions: n, MultiPressMax: multiPressMax}
+	if p, ok := s.(wire.GenericSwitchPositionSource); ok && p.MatterSwitchCurrentPosition() < n {
+		cfg.CurrentPosition = p.MatterSwitchCurrentPosition()
+	}
+	return cfg
 }
 
 // electricalSensorServers materialises the ElectricalSensor endpoint's

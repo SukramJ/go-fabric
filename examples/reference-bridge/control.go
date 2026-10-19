@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
@@ -55,8 +56,16 @@ type pipeCommand struct {
 	Event      string  `json:"Event"`
 	Jammed     bool    `json:"Jammed"`
 	NumPresses *uint8  `json:"MultiPressNumPresses"`
-	Unmounted  *uint8  `json:"Unmounted"`
-	DoorOpen   *uint8  `json:"DoorOpen"`
+	// ButtonID and the four times are the switch simulation's
+	// (SimulateLongPress, SimulateMultiPress; matter.js
+	// packages/testing/src/device/backchannel.ts:33-60).
+	ButtonID                *uint8 `json:"ButtonId"`
+	LongPressDelayMillis    uint32 `json:"LongPressDelayMillis"`
+	LongPressDurationMillis uint32 `json:"LongPressDurationMillis"`
+	PressedTimeMillis       uint32 `json:"MultiPressPressedTimeMillis"`
+	ReleasedTimeMillis      uint32 `json:"MultiPressReleasedTimeMillis"`
+	Unmounted               *uint8 `json:"Unmounted"`
+	DoorOpen                *uint8 `json:"DoorOpen"`
 	// SoilMoistureValue is SetSimulatedSoilMoisture's new reading (percent).
 	SoilMoistureValue *uint8 `json:"SoilMoistureValue"`
 	// Action and the event fields are WiFiDiagnostics' (wifi.go); the
@@ -126,14 +135,15 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	switch cmd.Name {
 	// --- CHIP's own names ---
 	case "SimulateLongPress":
-		return f.pressButton(true)
+		return f.button.simulateLongPress(cmd.buttonPosition(), millis(cmd.LongPressDelayMillis), millis(cmd.LongPressDurationMillis))
 	case "SimulateMultiPress":
-		// The button has no multi-press (MSM) feature; one press is the
-		// whole of what it can narrate.
-		if cmd.NumPresses != nil && *cmd.NumPresses != 1 {
-			return fmt.Errorf("SimulateMultiPress with %d presses: the button has no MSM feature", *cmd.NumPresses)
+		n := 1
+		if cmd.NumPresses != nil {
+			n = int(*cmd.NumPresses)
 		}
-		return f.pressButton(false)
+		return f.button.simulateMultiPress(cmd.buttonPosition(), n, millis(cmd.PressedTimeMillis), millis(cmd.ReleasedTimeMillis))
+	case "SimulateSwitchIdle":
+		return f.button.simulateIdle()
 	case "LongPress":
 		// CHIP's smoke-co-alarm app: a long press of the test button starts
 		// the self-test (TC-SMOKECO-2.4 step 37).
@@ -259,12 +269,17 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	return fmt.Errorf("%q: %w", cmd.Name, errUnknownPipeCommand)
 }
 
-func (f *fleet) pressButton(long bool) error {
-	if !f.button.press(long) {
-		return fmt.Errorf("button %s has no emitter yet (not mounted)", f.button.name)
+// buttonPosition is the pressed position a switch command names (ButtonId),
+// 1 when it names none.
+func (cmd pipeCommand) buttonPosition() uint8 {
+	if cmd.ButtonID == nil {
+		return 1
 	}
-	return nil
+	return *cmd.ButtonID
 }
+
+// millis is a command's millisecond field as a duration.
+func millis(ms uint32) time.Duration { return time.Duration(ms) * time.Millisecond }
 
 // washerOperation is CHIP's OperationalStateChange for the "Generic"
 // operational-state device — the washer here. Operations and the OnFault

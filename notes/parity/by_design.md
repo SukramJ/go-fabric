@@ -331,7 +331,25 @@ InitialPress; LongRelease only after a LongPress). Guarded by
 (`cluster/wire`) and the ButtonGroup suite
 (`internal/model/generic`).
 
+Amended 2026-10-19 (brief BK, PR #171): `cluster/switch` is now the port
+of `SwitchServer.ts` at `862ad75f` with matter.js's position input
+(`contract.SwitchPositionSink`: `SetRawPosition` = `rawPosition`
+:128-151, `SetCurrentPosition` = a written `currentPosition` :177-190,
+the decision machine :230-326, SwitchServerTest.ts 69 of 69 cases). The
+gesture input of this entry (`contract.SwitchEventEmitter`) stays as the
+second input: a gesture is emitted as narrated, without the decision
+machine, and moves CurrentPosition (`cluster/switch/server.go` `gesture`),
+because a bus that reports finished gestures cannot be turned back into
+positions without inventing their timing. `wire.GenericSwitch` is a
+deprecated wrapper over the server (removable from v0.10.0).
+
 ### BD-Matter-ButtonGroupCurrentPositionReporting — Switch.CurrentPosition answered on read, not proactively reported
+
+**Superseded 2026-10-19 (brief BK, PR #171).** The materialised
+`cluster/switch.Server` owns CurrentPosition and reports its changes:
+a gesture moves it 0→1→0 and a position source reports through
+`contract.SwitchPositionSink`; a host's `MatterSwitchCurrentPosition` is
+the start position only. Kept for the history of the wrapper's behaviour.
 
 matter.js's reactive state proactively reports Switch.CurrentPosition
 (quality N) changes to subscribers whenever `state.currentPosition` moves.
@@ -3456,6 +3474,25 @@ assert the Go composition as it is. Report BI (phase 16, 2026-10-19).
 By design. The fallback stays until the interop record says Apple Home no
 longer needs it.
 
+### BD-Matter-Switch-LockAsMutexAndOutbox — the switch state lock is a mutex with a deferred apply
+
+matter.js's `SwitchBaseServer` runs its input reactors synchronously and
+unlocked and applies the decided results (`#applyQueuedResults`) and
+`resetState` under the behavior's transaction lock
+(`behaviors/switch/SwitchServer.ts:88-95`, `:104-105` at `862ad75f`);
+a `state.rawPosition` set while another transaction holds the lock
+waits. `cluster/switch` decides every input under one mutex at the moment
+it occurs and delivers the events and CurrentPosition writes through one
+outbox with no lock held, in input order; the lock is the unexported
+`hold`/`release` seam of the parity tests (SwitchServerTest.ts:98-104
+`holdingSwitchLock`), during which queued results and `ResetState` wait
+while `SetRawPosition` and `SetCurrentPosition` never wait. Delivery is
+synchronous before an input or a timer returns. Report BK (phase 17b,
+2026-10-19).
+
+By design. Observables, microtasks and `MaybePromise` have no Go
+counterpart; the order of what leaves the server is what matter.js's
+tests check, and the 69 cases hold it.
 ### BD-Matter-Identify-TriggerEffectEverywhere — TriggerEffect is accepted on every bridged endpoint
 
 matter.js's `IdentifyServer` withdraws the optional TriggerEffect command

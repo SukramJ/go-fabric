@@ -22,7 +22,7 @@ not a claim.
 
 ## Status
 
-As of `v0.8.1` (2026-10-19); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+As of `v0.8.2` (2026-10-19); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
 
 | Area | State |
 | --- | --- |
@@ -169,6 +169,7 @@ port `clock` landed (`[Unreleased]` in the changelog), removable in
 | `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
 | `controller/ca.Config.Now` | `ca.Config.Clock` |
 | `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error |
+| `cluster/wire.GenericSwitch`, `wire.NewGenericSwitch` (marked by brief BK) | `cluster/switch` (`switchserver.New`), which the MomentarySwitch materialiser builds |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
