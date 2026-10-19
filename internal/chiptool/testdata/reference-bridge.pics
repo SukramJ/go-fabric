@@ -221,15 +221,17 @@ DGETH.C=0
 DGWIFI.C=0
 
 # --- Door lock writable attributes (cluster/lock) ---------------------------
-# The lock serves LockState, LockType, ActuatorEnabled, OperatingMode
-# (writable) and SupportedOperatingModes; the optional settings attributes
-# below are not served, so none of them is writable. CHIP's ci-pics-values
-# declares them writable for its sample lock.
+# The lock serves AutoRelockTime (R[W] VM), WrongCodeEntryLimit,
+# UserCodeTemporaryDisableTime and RequirePINforRemoteOperation (R[W] VA),
+# which it accepts writes of, as matter.js's DoorLockServer keeps them as
+# writable state; Language, LEDSettings, SoundVolume and
+# LocalProgrammingFeatures are not served, so not writable. CHIP's
+# ci-pics-values declares all eight writable for its sample lock.
 DRLK.S.M.LanguageAttributeWritable=0
 DRLK.S.M.LEDSettingsAttributeWritable=0
-DRLK.S.M.AutoRelockTimeAttributeWritable=0
+DRLK.S.M.AutoRelockTimeAttributeWritable=1
 DRLK.S.M.SoundVolumeAttributeWritable=0
 DRLK.S.M.LocalProgrammingFeaturesAttributeWritable=0
-DRLK.S.M.WrongCodeEntryLimitAttributeWritable=0
-DRLK.S.M.UserCodedTemporaryDisableTimeAttributeWritable=0
-DRLK.S.M.RequirePINForRemoteOperationAttributeWritable=0
+DRLK.S.M.WrongCodeEntryLimitAttributeWritable=1
+DRLK.S.M.UserCodedTemporaryDisableTimeAttributeWritable=1
+DRLK.S.M.RequirePINForRemoteOperationAttributeWritable=1

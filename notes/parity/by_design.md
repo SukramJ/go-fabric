@@ -3560,3 +3560,38 @@ and cannot rewrite in flight. The host's seams are the explicit ports of
 `contract/` and the server's methods, not observers on internal state
 (`BD-Matter-HostPort-OutsideTheSetterLock`); the five observer cases are
 `missing` in the register with that reason.
+
+### BD-Matter-DoorLock-CredentialCipher — credential data is encrypted with AES-128-GCM, not CCM
+
+matter.js encrypts stored credential data with AES-128-CCM under a
+16-byte random key it generates once and keeps as nonvolatile state
+(`DoorLockServer.ts:153-164`, `:245-250`, `:1569-1573`;
+`LockAuth.ts:129-278`). The Go server encrypts with AES-128-GCM
+(`cluster/lock/auth.go` `gcmCipher`: a random 12-byte nonce ahead of the
+sealed data) under the same kind of key, generated once per node and kept
+in `matter_settings` (`store.SettingDoorLockCredentialKey`); a host may
+supply its own `lock.Cipher`. The standard library has no CCM and the
+module takes no dependency for one; the format is at rest only and never
+on the wire, so the two stacks differ in nothing a controller sees. Initial
+credentials of a `DoorLockConfig` are plain text and encrypted at the
+first start, where matter.js encrypts existing state only when no key
+exists yet (`:156-163`).
+
+### BD-Matter-DoorLock-HostLockState — with a StateSource the host owns LockState
+
+matter.js's DoorLockServer owns `lockState` and moves the hardware through
+`handleLockOperation` (`DoorLockServer.ts:218-236`, `:1040`). The Go
+server keeps that mode for a server without `StateSource`
+(`DoorLockConfig.Hardware`, `lock.LockOperationHandler`); with a
+`StateSource` it answers LockState from the host and moves the lock
+through `LockInvoke`, reporting the attribute after the host moved — the
+rich-model rule of `contract/`: the host's device model is the truth of
+the lock's position.
+
+### BD-Matter-DoorLock-ScheduleZone — schedules are read in a configured location
+
+`LockSchedule.localInstant` reads a JS `Date` in the runtime's local zone
+(`LockSchedule.ts:97-112`). The Go server reads `DoorLockConfig.Location`,
+`time.Local` when nil (`cluster/lock/schedules.go` `LocalInstantOf`): the
+same default, with a host override for a lock whose zone is not the
+process's.

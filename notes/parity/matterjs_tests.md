@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 62 |
-| partial | 117 |
-| planned | 58 |
+| partial | 118 |
+| planned | 57 |
 | excluded | 87 |
 | total | 324 |
 
@@ -45,7 +45,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 0 | 2 | 0 | 0 |
-| [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 0 | 1 | 1 | 0 |
@@ -315,7 +315,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| DoorLockServerTest.ts | 1946 | planned | ‚Äî | Credential and user management (SetCredential, DUPLICATE/OCCUPIED, programming PIN) and schedule-restricted access of DoorLockServer, which milestone 3 phase 17 ports. |
+| DoorLockServerTest.ts | 1946 | partial | `cluster/lock:TestDoorLockServerParity`<br>`cluster/lock:TestDoorLockServerScheduleRestrictedAccessParity`<br>`cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity`<br>`cluster/lock:TestDoorLockServerAutoRelockParity`<br>`cluster/lock:TestDoorLockServerAutoRelockLargestTimeParity`<br>`cluster/lock:TestDoorLockServerExpiringUserTimeoutParity`<br>`cluster/lock:TestDoorLockServerAuthorizationParity`<br>`cluster/lock:TestDoorLockServerWrongCodeLockoutParity`<br>`cluster/lock:TestDoorLockServerOperatingModeParity`<br>`cluster/lock:TestDoorLockServerLockHardwareParity`<br>`cluster/lock:TestDoorLockServerLockOperationEventsParity`<br>`cluster/lock:TestDoorLockServerLockUserChangeParity` | 67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Missing: ‚Äúmeasures the lockout on the monotonic clock‚Äù. |
 
 ## node/test/behaviors/energy-evse-mode
 
@@ -966,10 +966,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/commodity-tariff
 
 - `CommodityTariffServerTest.ts` ‚Äî Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it.
-
-### node/test/behaviors/door-lock
-
-- `DoorLockServerTest.ts` ‚Äî Credential and user management (SetCredential, DUPLICATE/OCCUPIED, programming PIN) and schedule-restricted access of DoorLockServer, which milestone 3 phase 17 ports.
 
 ### node/test/behaviors/energy-evse-mode
 

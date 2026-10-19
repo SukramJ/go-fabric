@@ -592,8 +592,13 @@ var chipFamilies = []family{
 	},
 	{
 		name: "DRLK", deviceType: dtDoorLock,
-		exclude: map[string]gap{
-			"2.6": {classHarness, "TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final \"Cleanup the created user\" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0)", false},
+		edits: map[string][]edit{
+			// TC_DRLK_2_5.py and TC_DRLK_2_9.py address the lock as endpoint 1
+			// (src/python_testing/TC_DRLK_2_5.py:184, TC_DRLK_2_9.py:363 at
+			// the image commit) rather than the case's --endpoint; the
+			// daemon's lock is a bridged endpoint.
+			"2.5": {{"self.app_cluster_endpoint = 1\n", "self.app_cluster_endpoint = {ep:0x000A}\n", "the lock is the daemon's bridged door lock, not endpoint 1"}},
+			"2.9": {{"self.app_cluster_endpoint = 1\n", "self.app_cluster_endpoint = {ep:0x000A}\n", "the lock is the daemon's bridged door lock, not endpoint 1"}},
 		},
 	},
 	// EPREF runs on the thermostat, which serves EnergyPreference (BALA).

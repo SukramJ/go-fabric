@@ -61,7 +61,7 @@ var floors = []packageFloor{
 	// other — CI measured 85.9 where a local run measured 86.1.
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/media", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},

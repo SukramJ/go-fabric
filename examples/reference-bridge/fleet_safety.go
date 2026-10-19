@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/lock"
+	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -167,12 +168,16 @@ func (a *demoSmokeAlarm) update(change func(*alarm.State)) {
 
 // --- device: a front-door lock ---------------------------------------------------
 
-// demoLock is a motorised door lock. The DoorLock server emits LockOperation
-// after every successful remote command; the device reports a jam on its own
+// demoLock is a motorised door lock with a user database: the DoorLock
+// server serves users with PIN credentials, the three schedule kinds, PINs
+// over the air and Unbolting, with the limits matter.js's CHIP test lock
+// states (support/chip-testing/src/AllClustersTestInstance.ts:704-724 at
+// 862ad75f), and keeps its users, credentials and schedules in the node's
+// store. It emits LockOperation after every successful remote command and
+// LockOperationError for a refused one; the device reports a jam on its own
 // (control hook `lock jam`), which the server reads back as LockState
-// NotFullyLocked. (DoorLockAlarm has no emission path without PIN
-// credentials, in the module's server as in matter.js.) A jammed bolt
-// refuses LockDoor / UnlockDoor, which the controller sees as FAILURE.
+// NotFullyLocked. A jammed bolt refuses LockDoor / UnlockDoor, which the
+// controller sees as FAILURE.
 type demoLock struct {
 	name string
 	notifier
@@ -182,9 +187,13 @@ type demoLock struct {
 	locked bool
 	jammed bool
 
+	// auth is the node's store, set before the server is built
+	// (restoreLock); nil keeps the records in memory.
+	auth lock.AuthStore
+
 	// srv is built once: the bridge asks for the cluster servers on every
-	// dispatch, and the server holds OperatingMode and the event emitter
-	// the bridge wired at reassembly (TC-DRLK-2.1).
+	// dispatch, and the server holds OperatingMode, the records and the
+	// event emitter the bridge wired at reassembly (TC-DRLK-2.1).
 	srvOnce sync.Once
 	srv     *lock.DoorLockServer
 }
@@ -193,10 +202,46 @@ var _ lock.StateSource = (*demoLock)(nil)
 
 func newDemoLock(name string) *demoLock { return &demoLock{name: name, locked: true} }
 
+// lockAuthKey names the lock's records in the store: the endpoint's
+// StableKey (fleet.endpoints, bridged("lock", …)).
+const lockAuthKey = "demo:lock:1"
+
+// config is the lock's server configuration.
+func (l *demoLock) config() lock.DoorLockConfig {
+	autoRelock := uint32(60)
+	return lock.DoorLockConfig{
+		Source:      l,
+		DataVersion: &l.version,
+		Features: lock.FeatureUSR | lock.FeaturePIN | lock.FeatureCOTA | lock.FeatureWDSCH |
+			lock.FeatureYDSCH | lock.FeatureHDSCH | lock.FeatureUBOLT,
+		NumberOfTotalUsersSupported:              10,
+		NumberOfPinUsersSupported:                10,
+		NumberOfCredentialsSupportedPerUser:      5,
+		CredentialRulesSupport:                   lockdef.CredentialRulesSingle,
+		MaxPinCodeLength:                         8,
+		MinPinCodeLength:                         4,
+		NumberOfWeekDaySchedulesSupportedPerUser: 10,
+		NumberOfYearDaySchedulesSupportedPerUser: 10,
+		NumberOfHolidaySchedulesSupported:        10,
+		WrongCodeEntryLimit:                      3,
+		UserCodeTemporaryDisableTime:             10,
+		AutoRelockTime:                           &autoRelock,
+		Auth:                                     l.auth,
+		AuthKey:                                  lockAuthKey,
+	}
+}
+
 // servers are the cluster servers the device supplies.
 func (l *demoLock) servers() []contract.ClusterServer {
 	l.srvOnce.Do(func() {
-		l.srv = lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})
+		srv, err := lock.New(l.config())
+		if err != nil {
+			// The configuration is fixed; a store that cannot be read leaves
+			// the lock without its users rather than without the lock.
+			slog.Error("lock.config", slog.String("device", l.name), slog.String("err", err.Error()))
+			srv = lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})
+		}
+		l.srv = srv
 	})
 	return []contract.ClusterServer{l.srv}
 }

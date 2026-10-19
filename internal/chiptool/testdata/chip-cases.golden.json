@@ -636,36 +636,49 @@
       "stepsSkipped": 0
     },
     "DRLK/2.1": {
-      "steps": 29,
-      "stepsSkipped": 161
+      "steps": 75,
+      "stepsSkipped": 115
     },
     "DRLK/2.12": {
       "tests": 1,
-      "steps": 3,
+      "steps": 30,
       "stepsSkipped": 0
     },
     "DRLK/2.2": {
       "tests": 1,
-      "steps": 3,
+      "steps": 27,
       "stepsSkipped": 0
     },
     "DRLK/2.3": {
       "tests": 1,
-      "steps": 3,
+      "steps": 30,
       "stepsSkipped": 0
     },
     "DRLK/2.4": {
-      "steps": 1,
-      "stepsSkipped": 16
+      "steps": 11,
+      "stepsSkipped": 6
+    },
+    "DRLK/2.5": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.6": {
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.7": {
+      "steps": 17,
+      "stepsSkipped": 0
     },
     "DRLK/2.8": {
-      "steps": 1,
-      "stepsSkipped": 14
+      "steps": 15,
+      "stepsSkipped": 0
     },
     "DRLK/2.9": {
       "tests": 1,
       "steps": 54,
-      "stepsSkipped": 104
+      "stepsSkipped": 28
     },
     "DT/1.1": {
       "tests": 1,
@@ -3026,8 +3039,6 @@
     "DGWIFI/3.2.Simulated": "DGWIFI.C",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
-    "DRLK/2.5": "DRLK.S \u0026 DRLK.S.F04",
-    "DRLK/2.7": "DRLK.S \u0026 DRLK.S.F08",
     "FAN/2.3": "FAN.S.F02",
     "FAN/2.4": "FAN.S.F03",
     "FAN/2.5": "FAN.S \u0026 FAN.S.F05",

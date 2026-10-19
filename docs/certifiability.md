@@ -169,7 +169,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
 | CLDIM | 11 | 6 | 0 | 0 | 5 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
-| DRLK | 14 | 7 | 0 | 0 | 4 | 3 | 0 |
+| DRLK | 14 | 10 | 0 | 0 | 2 | 2 | 0 |
 | EPREF | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | EWATERHTR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -227,7 +227,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **692** | **388** | **0** | **4** | **128** | **167** | **5** |
+| **all** | **692** | **391** | **0** | **4** | **126** | **166** | **5** |
 
 ### Cases not run
 
@@ -409,9 +409,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK/2.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.11 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F00 & DRLK.S.F01 & DRLK.S.F02` is false for the reference DUT |
 | DRLK/2.13 | (b) not supported | not applicable: the case's PICS `DRLK.S.F0d` is false for the reference DUT |
-| DRLK/2.5 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F04` is false for the reference DUT |
-| DRLK/2.6 | (c) harness | TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final "Cleanup the created user" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0) |
-| DRLK/2.7 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F08` is false for the reference DUT |
 | DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ECOINFO/2.1 | (c) harness | TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | ECOINFO/2.2 | (c) harness | TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |

@@ -578,6 +578,25 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-17d DoorLock port (brief BM, PR #176, 2026-10-19).
+Line numbers at `862ad75f`.
+
+- **`clock.Clock` has no monotonic reading.** matter.js measures the
+  wrong-code lockout on `Time.nowUs` (`DoorLockServer.ts:1184`, `:1192-1195`)
+  and its tests step the wall clock apart from the timers
+  (`DoorLockServerTest.ts:1366` "measures the lockout on the monotonic
+  clock", register `missing`); `clocktest.Fake` has one reading, so a
+  wall-clock step moves a deadline kept as `time.Time` too, and the case
+  has no in-process port. Under `clock.System` the comparison is monotonic.
+  Fix: a monotonic reading on `clock.Clock` and `clocktest.Fake`.
+  (Milestone 4, the embedding layer.)
+- **An ExpiringUser provisioned without ExpiringUserTimeout logs no
+  warning.** `#warnIfExpiryUnbounded` (`DoorLockServer.ts:1233-1240`, run
+  by SetUser Add and Modify, `:291`, `:328`, `:480`) warns that the user's PIN is
+  denied until the attribute is set; `cluster/lock/users.go`
+  `setUserLocked` denies as matter.js does (`authorizeUserLocked`) but
+  logs nothing. (Milestone 3, next lock change.)
+
 Found by the phase-17c Thermostat port (brief BL, PR #175, 2026-10-19).
 Line numbers at `862ad75f`.
 

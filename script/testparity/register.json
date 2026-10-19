@@ -816,8 +816,25 @@
     },
     {
       "path": "packages/node/test/behaviors/door-lock/DoorLockServerTest.ts",
-      "status": "planned",
-      "reason": "Credential and user management (SetCredential, DUPLICATE/OCCUPIED, programming PIN) and schedule-restricted access of DoorLockServer, which milestone 3 phase 17 ports.",
+      "status": "partial",
+      "go": [
+        "cluster/lock:TestDoorLockServerParity",
+        "cluster/lock:TestDoorLockServerScheduleRestrictedAccessParity",
+        "cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity",
+        "cluster/lock:TestDoorLockServerAutoRelockParity",
+        "cluster/lock:TestDoorLockServerAutoRelockLargestTimeParity",
+        "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity",
+        "cluster/lock:TestDoorLockServerAuthorizationParity",
+        "cluster/lock:TestDoorLockServerWrongCodeLockoutParity",
+        "cluster/lock:TestDoorLockServerOperatingModeParity",
+        "cluster/lock:TestDoorLockServerLockHardwareParity",
+        "cluster/lock:TestDoorLockServerLockOperationEventsParity",
+        "cluster/lock:TestDoorLockServerLockUserChangeParity"
+      ],
+      "missing": [
+        "measures the lockout on the monotonic clock"
+      ],
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {

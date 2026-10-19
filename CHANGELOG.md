@@ -10,6 +10,24 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 3, phase 17d, brief BM: the DoorLock server after matter.js `DoorLockServer.ts`, `LockAuth.ts` and `LockSchedule.ts`, and the port of `DoorLockServerTest.ts` (67 of 68 cases).
+
+### Added
+
+- `cluster/lock`: the DoorLock server serves matter.js's full scope, each part behind its feature bit (`DoorLockConfig.Features`: PIN, RID, FGP, COTA, USR, WDSCH, YDSCH, HDSCH, DPS, UBOLT; ALIRO, ALBU and FACE stay out) — SetUser/GetUser/ClearUser, SetCredential/GetCredentialStatus/ClearCredential with every status matter.js answers (DUPLICATE, OCCUPIED, INVALID_COMMAND, RESOURCE_EXHAUSTED, the programming PIN at index 0, the per-user limit, index 0xFFFE clearing all), the week-day, year-day and holiday schedules, and the LockUserChange events with the requester's fabric and node.
+- `cluster/lock`: lock operations pass matter.js's authorization before the lock moves — the operating mode, the wrong-code lockout (WrongCodeEntryLimit, UserCodeTemporaryDisableTime, the DoorLockAlarm), RequirePINforRemoteOperation, the user a PIN identifies, disabled and schedule-restricted users, NonAccessUser, ForcedUser (with the silent alarm), DisposableUser — and report the user and credential in LockOperation and LockOperationError. Auto-relock (AutoRelockTime, UnlockWithTimeout) and ExpiringUser timeouts run on `DoorLockConfig.Clock`; `MatterQuiesce` stops their timers.
+- `cluster/lock`: `lock.New(cfg)` returns the configuration error (`lock.ErrConfig`); a server without `Source` keeps LockState itself and moves the lock through `DoorLockConfig.Hardware` (`lock.LockOperationHandler`, matter.js `handleLockOperation`), whose `lock.LockOperationFailedError` names the reason LockOperationError reports. A `StateSource` that implements `LockOperationHandler` is told the operation's actuation, source and user. `Users`, `User`, `SetLockState`, `SetDoorState` (DPS) and `ReportAlarm` are the host's side; `lock.IsAccessGranted` and `lock.LocalInstantOf` are matter.js's `LockSchedule` functions.
+- `cluster/lock`: `lock.AuthStore` persists a lock's users, credentials and schedules; `*store.Store` implements it. Credential data is stored encrypted with AES-128-GCM under a random 16-byte key the server generates once and keeps under `store.SettingDoorLockCredentialKey` (`lock.Cipher` replaces the cipher, `lock.NewCredentialCipher` is the default). Without an AuthStore the records stay in memory.
+- `store`: `LoadDoorLockAuth` / `SaveDoorLockAuth` on the new tables `matter_doorlock_users`, `matter_doorlock_credentials` and `matter_doorlock_schedules` — migration `v6` (`store.Migrations()` now has 5 steps, the last `v6`; `v5` is the Thermostat presets' step of the same milestone). The schema fingerprint after `store.Apply` is now `61dbbe675b39511055520c3127b19a0a7736ac6b0ad1ee8f3c8b2da203a0c6cc`.
+- The reference daemon's lock serves users with PIN credentials, the three schedule kinds, PINs over the air and Unbolting with the limits of matter.js's CHIP test lock, AutoRelockTime 60 s, and keeps its records in the node's store.
+
+### Fixed
+
+- A DoorLock SetUser, GetUser, ClearUser, SetCredential or schedule Set/Clear request whose fields the schema refuses answers INVALID_COMMAND, and GetWeekDaySchedule, GetYearDaySchedule and GetHolidaySchedule answer an index out of range in their response (matter.js `DoorLockServer.ts:1491-1521`); the bridge answered CONSTRAINT_ERROR (TC-DRLK-2.7, TC-DRLK-2.8).
+
+### Changed
+
+- `cluster/lock`: `DoorLockServer` embeds the generated `spec.Server`. A `DoorLockConfig` that names no feature serves the former selection — Unbolting alone, without UnlockWithTimeout — so a host that does not opt in sees no change on the wire.
 - CI: the chip-tool workflow runs the DGGEN family in its own group `long`,
   which only the nightly run and a manual dispatch run. TC-DGGEN-2.1 sits
   through 3 h 10 min of literal waits for TotalOperationalHours
