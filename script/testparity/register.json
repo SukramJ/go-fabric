@@ -1141,8 +1141,14 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "status": "planned",
-      "reason": "Writing presets through an atomic write.",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_PresetsAtomicWriteTest"
+      ],
+      "missing": [
+        "refuses a commit whose settled presets an observer stripped the handle from"
+      ],
+      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged; the observer case is missing: it rewrites the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have (the host refuses through its PresetStore).",
       "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
     },
     {
