@@ -2423,7 +2423,8 @@
       "path": "packages/node/test/node/ReportedSessionParametersTest.ts",
       "status": "planned",
       "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller. Left planned in BI-2: both cases assert both ends with configured intervals; fabrictest sets neither the controller's exchange.Config.LocalParameters nor the device's session intervals, and the device's record of what the controller sent has no accessor.",
-      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85"
+      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/ScanNetworksRejectionCommissioningTest.ts",
@@ -2592,7 +2593,8 @@
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
       "status": "planned",
       "reason": "A second controller completing a PASE-only commissioning a first one started, and its failure paths. Left planned in BI-2: controller/client has no completeCommissioning (only the first half exists: commissioner Options.FinalizeCommissioning) and fabrictest cannot share a CA and fabric between two controllers.",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
+      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -2639,7 +2641,8 @@
       "path": "packages/node/test/node/client/PeersCommissionedTest.ts",
       "status": "planned",
       "reason": "The controller's list of commissioned peers excluding discoveries and groups. Left planned in BI-2: the one case needs group nodes (peers.forAddress of a group id, nodeType \"group\"), which controller/client does not have (doc 'Not here: Groups'); the commissioned/discovered/forAddress split holds in TestRegistryRestore.",
-      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44"
+      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/PeersForDescriptorTest.ts",
@@ -2673,7 +2676,8 @@
       "path": "packages/node/test/node/client/PeersLoadFailureTest.ts",
       "status": "planned",
       "reason": "Keeping a fabric's other peers usable when one cannot load from storage. Left planned in BI-2: the Go registry drops a node that fails to load (logged once, registry.go NewRegistry; TestRegistryRestore) where matter.js keeps it with a rejected construction and a typed cause — a decision for the owner, not a port.",
-      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547"
+      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/WireChangeKeysTest.ts",

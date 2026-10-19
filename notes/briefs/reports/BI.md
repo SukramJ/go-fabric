@@ -276,3 +276,11 @@ lifecycle (DecommissionTest), conformance and custom models
 
 - **No write-through cache on the client node.** matter.js's RemoteWriter applies an accepted write to the client cache and its transactions roll back a declined one (`node/src/node/client/RemoteWriter.ts`, ClientNodeTest.ts:1137-2853); `controller/client` writes to the peer and leaves the image to the next report (`controller/client/doc.go` "Not here") — one write surface, no local transaction state to keep consistent with the peer.
 - **One command per InvokeRequest.** matter.js batches invokes up to the peer's maxPathsPerInvoke (`ClientInvokeTest.ts:163-545`); `controller/interaction` sends one (`Interaction.Invoke`) — simpler, and a host that wants a batch formulates it.
+
+## Decided in review (2026-10-19)
+
+- The six BI-2 fixes and the BI-1 fixes stand as cited; merged as PR #168.
+- `fabrictest.Exchange`/`Send` stay public; the site bound stays a test helper of `node`; the two-file ports stand, both files named in the register.
+- `PeersLoadFailure`, `AutoStart`, `Cluster.Revision`/`Supports`, `Node.Disable`, `includeKnownVersions`, the priming-report status and the BI-1 device items are findings (`matter_behaviour_findings.md`, block "brief BI"); the four planned files carry `until M5 phase 25`.
+- Write-through writes are `missing` under `BD-Matter-ClientNode-WriteNotThroughCache`; invoke batching and write chunking under the BH finding (`until M5 phase 25`); SerialNumber is `BD-Matter-BasicInfo-SerialNumberAlwaysServed`; no node erase is `BD-Matter-LastFabricReopenWithoutErase`.
+- The SetRegulatoryConfig CountryCode revert stays an open finding for the owner (re-audit with Apple Home).

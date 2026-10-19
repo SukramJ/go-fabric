@@ -285,10 +285,13 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// reserves wildcards for Read/Subscribe; a wildcard-attribute write
 		// has no per-attribute privilege to gate on, so it would apply one
 		// value — under one flat Operate check — to every attribute the
-		// cluster exposes, AccessControl.ACL included. Mirrors matter.js
-		// packages/protocol/src/action/server/AttributeWriteResponse.ts:278-283
-		// ("Wildcard path write must specify a clusterId and attributeId")
-		// and :308-311 ("Wildcard path write must specify an attributeId").
+		// cluster exposes, AccessControl.ACL included. matter.js refuses
+		// such a path with a StatusResponse of INVALID_ACTION for the whole
+		// write (packages/protocol/src/action/server/AttributeWriteResponse.ts:278-285
+		// "Wildcard path write must specify a clusterId and attributeId",
+		// :305-312 "Wildcard path write must specify an attributeId"); this
+		// side answers the path alone and goes on — an open finding
+		// (notes/parity/matter_behaviour_findings.md, brief BI).
 		if !w.Path.HasCluster || !w.Path.HasAttribute {
 			wr.Responses = append(wr.Responses, AttributeStatus{
 				Path:   w.Path,
