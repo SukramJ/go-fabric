@@ -382,7 +382,8 @@ func (f *lockFixture) eventsSince(mark uint64) lockEvents {
 		f.t.Fatalf("read events: %v", err)
 	}
 	var out lockEvents
-	for _, e := range got {
+	for i := range got {
+		e := &got[i]
 		if e.Number <= mark || !e.HasValue {
 			continue
 		}
@@ -402,7 +403,7 @@ func (f *lockFixture) eventsSince(mark uint64) lockEvents {
 
 // eventPaths are the lock's four events the cases observe.
 func (f *lockFixture) eventPaths() []im.ConcreteEventPath {
-	var paths []im.ConcreteEventPath
+	paths := make([]im.ConcreteEventPath, 0, 4)
 	for _, id := range []uint32{lockdef.EventDoorLockAlarm, lockdef.EventLockOperation, lockdef.EventLockOperationError, lockdef.EventLockUserChange} {
 		paths = append(paths, im.ConcreteEventPath{
 			Endpoint: f.ep, Cluster: lockdef.ClusterID, Event: id,
@@ -419,15 +420,15 @@ func (f *lockFixture) markEvents() {
 	if err != nil {
 		f.t.Fatalf("read events: %v", err)
 	}
-	for _, e := range got {
-		f.mark = max(f.mark, e.Number)
+	for i := range got {
+		f.mark = max(f.mark, got[i].Number)
 	}
 }
 
 func decodeEvent[T any, P interface {
 	*T
 	DecodeTLV(spec.Node) error
-}](t *testing.T, e interaction.EventData) T {
+}](t *testing.T, e *interaction.EventData) T {
 	t.Helper()
 	v, err := spec.DecodeStruct[T, P](e.Value)
 	if err != nil {
@@ -438,7 +439,7 @@ func decodeEvent[T any, P interface {
 
 // operationErrors is operationErrorsOf (DoorLockServerTest.ts:280-282).
 func (ev lockEvents) operationErrors() []lockdef.OperationErrorEnum {
-	out := []lockdef.OperationErrorEnum{}
+	out := make([]lockdef.OperationErrorEnum, 0, len(ev.errors))
 	for _, e := range ev.errors {
 		out = append(out, e.OperationError)
 	}

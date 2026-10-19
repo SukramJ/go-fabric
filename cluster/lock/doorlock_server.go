@@ -163,6 +163,8 @@ func (a Actuation) String() string {
 
 // LockOperation is one movement of the lock hardware and who asked for
 // it: matter.js DoorLockBaseServer.LockOperation (DoorLockServer.ts:1528-1536).
+//
+//nolint:revive // LockOperation mirrors matter.js DoorLockBaseServer.LockOperation.
 type LockOperation struct {
 	Actuation Actuation
 	// Source is Remote for a command, Auto for auto-relock.
@@ -181,6 +183,8 @@ type LockOperation struct {
 // Unspecified for any other error; a failed command is answered with the
 // error's IM status if it carries one, FAILURE otherwise, and a failed
 // auto-relock is not retried.
+//
+//nolint:revive // LockOperationHandler mirrors matter.js handleLockOperation.
 type LockOperationHandler interface {
 	HandleLockOperation(ctx context.Context, op LockOperation) error
 }
@@ -188,6 +192,8 @@ type LockOperationHandler interface {
 // LockOperationFailedError is the error a [LockOperationHandler] returns
 // to name the reason the LockOperationError event reports: matter.js
 // LockOperationFailedError (DoorLockServer.ts:76-84).
+//
+//nolint:revive // LockOperationFailedError mirrors the matter.js error class.
 type LockOperationFailedError struct {
 	Reason  lockdef.OperationErrorEnum
 	Message string
@@ -327,7 +333,8 @@ type DoorLockServer struct {
 	data     store.DoorLockAuth
 	dirty    bool
 	queue    []queuedEvent
-	quiesced bool
+	// base is the context of the timer actions, which no request carries.
+	base context.Context
 
 	// Internal (DoorLockServer.ts:1576-1583).
 	wrongCodeCount int
@@ -409,6 +416,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 		hdsch:        features&FeatureHDSCH != 0,
 		dps:          features&FeatureDPS != 0,
 		expiryTimers: map[uint16]*serverTimer{},
+		base:         context.Background(),
 	}
 	if s.tracker == nil {
 		s.tracker = &cluster.DataVersionTracker{}
@@ -441,6 +449,37 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 	if full {
 		opts.Commands = []uint32{lockdef.CmdUnlockWithTimeout}
 	}
+	initial := s.initialAttributes(cfg, mode, supported, &opts)
+	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()}
+	if s.src != nil {
+		srvCfg.Source = sourceAdapter{s.src}
+	}
+	srv, err := spec.NewServer(lockdef.Definition, opts, srvCfg)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+	}
+	s.Server = srv
+
+	if err := s.loadRecords(s.base, cfg.Initial); err != nil {
+		return nil, err
+	}
+	// Re-arm the deadline of every ExpiringUser that is still running
+	// (DoorLockServer.ts:166-176).
+	for _, u := range s.data.Users {
+		if lockdef.UserTypeEnum(u.UserType) == lockdef.UserTypeExpiringUser &&
+			lockdef.UserStatusEnum(u.UserStatus) != lockdef.UserStatusOccupiedDisabled &&
+			u.ExpiringUserExpiresAt != nil {
+			s.armExpiryTimer(u.UserIndex, *u.ExpiringUserExpiresAt)
+		}
+	}
+	return s, nil
+}
+
+// initialAttributes are the values the server starts with, and the
+// optional attributes the configuration serves.
+func (s *DoorLockServer) initialAttributes(cfg DoorLockConfig, mode lockdef.OperatingModeEnum,
+	supported lockdef.OperatingModesBitmap, opts *spec.Options,
+) map[uint32]any {
 	initial := map[uint32]any{
 		lockdef.AttrLockType:                uint8(cfg.LockType),
 		lockdef.AttrActuatorEnabled:         true,
@@ -492,29 +531,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 	if s.dps {
 		initial[lockdef.AttrDoorState] = nullableEnum(cfg.DoorState)
 	}
-	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()}
-	if s.src != nil {
-		srvCfg.Source = sourceAdapter{s.src}
-	}
-	srv, err := spec.NewServer(lockdef.Definition, opts, srvCfg)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
-	}
-	s.Server = srv
-
-	if err := s.loadRecords(context.Background(), cfg.Initial); err != nil {
-		return nil, err
-	}
-	// Re-arm the deadline of every ExpiringUser that is still running
-	// (DoorLockServer.ts:166-176).
-	for _, u := range s.data.Users {
-		if lockdef.UserTypeEnum(u.UserType) == lockdef.UserTypeExpiringUser &&
-			lockdef.UserStatusEnum(u.UserStatus) != lockdef.UserStatusOccupiedDisabled &&
-			u.ExpiringUserExpiresAt != nil {
-			s.armExpiryTimer(u.UserIndex, *u.ExpiringUserExpiresAt)
-		}
-	}
-	return s, nil
+	return initial
 }
 
 // loadRecords reads the credential key and the records: from the
@@ -725,7 +742,7 @@ func (s *DoorLockServer) SetDoorState(state lockdef.DoorStateEnum) error {
 		return err
 	}
 	s.emit([]queuedEvent{{lockdef.EventDoorStateChange, lockdef.DoorStateChangeEvent{DoorState: state}}})
-	counter := uint32(0)
+	var counter uint32
 	switch state {
 	case lockdef.DoorStateDoorOpen:
 		counter = lockdef.AttrDoorOpenEvents
@@ -968,7 +985,7 @@ func (s *DoorLockServer) runAutoRelock(t *serverTimer) {
 	s.autoRelock = nil
 	s.mu.Unlock()
 
-	ctx := context.Background()
+	ctx := s.base
 	op := LockOperation{Actuation: ActuationLock, Source: lockdef.OperationSourceAuto}
 	if err := s.moveHardware(ctx, op); err != nil {
 		s.emitAuto(lockdef.EventLockOperationError, hardwareFailureReason(err))
@@ -1260,7 +1277,7 @@ func (s *DoorLockServer) emitLockOperationErrorLocked(ctx context.Context, opTyp
 
 // emitLockUserChangeLocked mirrors matter.js DoorLockServer.ts:1322-1341
 // (#emitLockUserChange).
-func (s *DoorLockServer) emitLockUserChangeLocked(ctx context.Context, dataType lockdef.LockDataTypeEnum, op lockdef.DataOperationTypeEnum, userIndex *uint16, dataIndex *uint16) {
+func (s *DoorLockServer) emitLockUserChangeLocked(ctx context.Context, dataType lockdef.LockDataTypeEnum, op lockdef.DataOperationTypeEnum, userIndex, dataIndex *uint16) {
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	ev := lockdef.LockUserChangeEvent{
 		LockDataType:      dataType,

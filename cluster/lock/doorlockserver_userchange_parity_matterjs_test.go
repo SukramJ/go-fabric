@@ -29,7 +29,7 @@ func (f *lockFixture) changeSummary(all bool) []change {
 	if all {
 		ev = f.allEvents()
 	}
-	out := []change{}
+	out := make([]change, 0, len(ev.userChanges))
 	for _, c := range ev.userChanges {
 		out = append(out, change{c.LockDataType, c.DataOperationType, c.UserIndex, c.DataIndex})
 	}
@@ -69,15 +69,15 @@ func TestDoorLockServerLockUserChangeParity(t *testing.T) {
 		})
 		f.must(lockdef.CmdClearHolidaySchedule, lockdef.ClearHolidayScheduleRequest{HolidayIndex: 4})
 
-		add, clear := lockdef.DataOperationTypeAdd, lockdef.DataOperationTypeClear
+		add, clr := lockdef.DataOperationTypeAdd, lockdef.DataOperationTypeClear
 		checkChanges(t, f.changeSummary(true), []change{
 			{lockdef.LockDataTypeWeekDaySchedule, add, idx(1), idx(2)},
-			{lockdef.LockDataTypeWeekDaySchedule, clear, idx(1), idx(2)},
-			{lockdef.LockDataTypeWeekDaySchedule, clear, idx(1), idx(0xFE)},
+			{lockdef.LockDataTypeWeekDaySchedule, clr, idx(1), idx(2)},
+			{lockdef.LockDataTypeWeekDaySchedule, clr, idx(1), idx(0xFE)},
 			{lockdef.LockDataTypeYearDaySchedule, add, idx(1), idx(3)},
-			{lockdef.LockDataTypeYearDaySchedule, clear, idx(1), idx(3)},
+			{lockdef.LockDataTypeYearDaySchedule, clr, idx(1), idx(3)},
 			{lockdef.LockDataTypeHolidaySchedule, add, null, idx(4)},
-			{lockdef.LockDataTypeHolidaySchedule, clear, null, idx(4)},
+			{lockdef.LockDataTypeHolidaySchedule, clr, null, idx(4)},
 		})
 	})
 

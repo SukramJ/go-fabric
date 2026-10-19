@@ -94,8 +94,8 @@ func TestDoorLockServerScheduleRestrictedAccessParity(t *testing.T) {
 }
 
 func userTypeName(u lockdef.UserTypeEnum) string {
-	for _, v := range lockdef.UserTypeEnumDef.Values {
-		if v.Value == uint64(u) {
+	for i := range lockdef.UserTypeEnumDef.Values {
+		if v := &lockdef.UserTypeEnumDef.Values[i]; v.Value == uint64(u) {
 			return v.Name
 		}
 	}

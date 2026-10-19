@@ -52,11 +52,11 @@ func newMemoryAuth() *memoryAuth {
 	return &memoryAuth{settings: map[string]string{}, saved: map[string]store.DoorLockAuth{}}
 }
 
-func (m *memoryAuth) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (m *memoryAuth) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	v, ok := m.settings[key]
-	return v, ok, nil
+	value, ok = m.settings[key]
+	return value, ok, nil
 }
 
 func (m *memoryAuth) SetSetting(_ context.Context, key, value string) error {

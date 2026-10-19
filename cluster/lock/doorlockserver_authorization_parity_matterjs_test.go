@@ -161,8 +161,8 @@ func TestDoorLockServerAuthorizationParity(t *testing.T) {
 }
 
 func operatingModeName(m lockdef.OperatingModeEnum) string {
-	for _, v := range lockdef.OperatingModeEnumDef.Values {
-		if v.Value == uint64(m) {
+	for i := range lockdef.OperatingModeEnumDef.Values {
+		if v := &lockdef.OperatingModeEnumDef.Values[i]; v.Value == uint64(m) {
 			return v.Name
 		}
 	}

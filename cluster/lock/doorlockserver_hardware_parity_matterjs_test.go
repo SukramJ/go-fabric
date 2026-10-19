@@ -32,8 +32,9 @@ type call struct {
 }
 
 func (h *testHardware) summary() []call {
-	out := []call{}
-	for _, c := range h.snapshot() {
+	calls := h.snapshot()
+	out := make([]call, 0, len(calls))
+	for _, c := range calls {
 		out = append(out, call{actuation: c.op.Actuation, source: c.op.Source, userIndex: c.op.UserIndex, lockState: c.lockState})
 	}
 	return out
@@ -50,7 +51,7 @@ func sameCall(a, b call) bool {
 }
 
 func actuationsOf(calls []call) []lock.Actuation {
-	out := []lock.Actuation{}
+	out := make([]lock.Actuation, 0, len(calls))
 	for _, c := range calls {
 		out = append(out, c.actuation)
 	}

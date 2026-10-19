@@ -34,6 +34,7 @@ func newLocal(t *testing.T, edit func(*lock.DoorLockConfig)) (*lock.DoorLockServ
 	return srv, em
 }
 
+//nolint:revive // t first, as every helper of the package
 func invokeStatus(t *testing.T, srv *lock.DoorLockServer, ctx context.Context, cmd uint32, req any) (any, im.StatusCode) {
 	t.Helper()
 	res, err := srv.MatterInvoke(ctx, cmd, req)
@@ -382,7 +383,7 @@ func TestDoorStateAndAlarms(t *testing.T) {
 	if v, _ := srv.MatterRead(lockdef.AttrLockState); v != uint8(lockdef.LockStateNotFullyLocked) {
 		t.Errorf("LockState %v", v)
 	}
-	var ids []uint32
+	ids := make([]uint32, 0, len(em.calls))
 	for _, c := range em.calls {
 		ids = append(ids, c.event)
 	}

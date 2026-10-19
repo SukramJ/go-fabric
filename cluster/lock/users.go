@@ -42,12 +42,12 @@ var _ im.MatterClusterStatusError = occupiedError{}
 // requestAs reads a command's decoded fields as T.
 func requestAs[T any](fields any) (T, error) {
 	switch v := fields.(type) {
-	case T:
-		return v, nil
 	case *T:
 		if v != nil {
 			return *v, nil
 		}
+	case T:
+		return v, nil
 	}
 	var zero T
 	return zero, spec.Errorf(im.StatusInvalidCommand, "doorlock: command fields %T, want %T", fields, zero)
@@ -376,7 +376,7 @@ func (s *DoorLockServer) stopExpiryTimerLocked(userIndex uint16) {
 func (s *DoorLockServer) runExpireUser(userIndex uint16, t *serverTimer) {
 	s.op.Lock()
 	defer s.op.Unlock()
-	_ = s.commit(context.Background(), func() error {
+	_ = s.commit(s.base, func() error {
 		if s.expiryTimers[userIndex] == t {
 			delete(s.expiryTimers, userIndex)
 		}

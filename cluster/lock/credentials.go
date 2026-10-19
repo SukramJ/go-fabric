@@ -79,13 +79,6 @@ func (s *DoorLockServer) setCredentialLocked(ctx context.Context, req lockdef.Se
 	respond := func(status lockdef.Status, userIndex *uint16) (lockdef.SetCredentialResponse, error) {
 		return lockdef.SetCredentialResponse{Status: status, UserIndex: nullable(userIndex), NextCredentialIndex: &next}, nil
 	}
-	const (
-		success           = lockdef.StatusSuccess
-		invalidCommand    = lockdef.StatusInvalidCommand
-		resourceExhausted = lockdef.StatusResourceExhausted
-		duplicate         = lockdef.Status(lockdef.StatusCodeDuplicate)
-		occupied          = lockdef.Status(lockdef.StatusCodeOccupied)
-	)
 
 	if !credentialIndexValid(req.Credential.CredentialType, credIndex, maxIndex) {
 		return respond(invalidCommand, nil)
@@ -103,56 +96,7 @@ func (s *DoorLockServer) setCredentialLocked(ctx context.Context, req lockdef.Se
 	ref := store.DoorLockCredentialRef{Type: credType, Index: credIndex}
 	switch req.OperationType {
 	case lockdef.DataOperationTypeAdd:
-		if s.findCredential(credType, credIndex) != nil {
-			return respond(occupied, nil)
-		}
-		if err := s.addCredentialLocked(credType, credIndex, req.CredentialData, fabricIndex); err != nil {
-			return lockdef.SetCredentialResponse{}, err
-		}
-		var created *uint16
-		owner := req.UserIndex.Value
-		if req.UserIndex.Null {
-			maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported)
-			newIndex, ok := s.findAvailableUserIndex(maxUsers)
-			if !ok {
-				s.removeCredentialLocked(credType, credIndex)
-				return respond(occupied, nil)
-			}
-			user := store.DoorLockUser{
-				UserIndex:               newIndex,
-				UserStatus:              uint8(lockdef.UserStatusOccupiedEnabled),
-				UserType:                uint8(lockdef.UserTypeUnrestrictedUser),
-				CredentialRule:          uint8(lockdef.CredentialRuleSingle),
-				Credentials:             []store.DoorLockCredentialRef{ref},
-				CreatorFabricIndex:      fabricIndex,
-				LastModifiedFabricIndex: fabricIndex,
-			}
-			if !req.UserStatus.Null {
-				user.UserStatus = uint8(req.UserStatus.Value)
-			}
-			if !req.UserType.Null {
-				user.UserType = uint8(req.UserType.Value)
-			}
-			s.addUserLocked(user)
-			created, owner = &newIndex, newIndex
-			s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeAdd, &newIndex, &newIndex)
-		} else {
-			user := s.findUser(req.UserIndex.Value)
-			if user == nil || fabricIndex != user.CreatorFabricIndex {
-				s.removeCredentialLocked(credType, credIndex)
-				return respond(invalidCommand, nil)
-			}
-			if perUser, _ := s.uint8Attr(lockdef.AttrNumberOfCredentialsSupportedPerUser); len(user.Credentials) >= int(perUser) {
-				s.removeCredentialLocked(credType, credIndex)
-				return respond(resourceExhausted, nil)
-			}
-			user.Credentials = append(user.Credentials, ref)
-			user.LastModifiedFabricIndex = fabricIndex
-			s.dirty = true
-		}
-		s.emitLockUserChangeLocked(ctx, credentialTypeToLockDataType(req.Credential.CredentialType), lockdef.DataOperationTypeAdd, &owner, &credIndex)
-		return respond(success, created)
-
+		return s.addCredentialCaseLocked(ctx, req, fabricIndex, ref, respond)
 	case lockdef.DataOperationTypeModify:
 		existing := s.findCredential(credType, credIndex)
 		if existing == nil || fabricIndex != existing.CreatorFabricIndex {
@@ -173,8 +117,76 @@ func (s *DoorLockServer) setCredentialLocked(ctx context.Context, req lockdef.Se
 		}
 		s.emitLockUserChangeLocked(ctx, credentialTypeToLockDataType(req.Credential.CredentialType), lockdef.DataOperationTypeModify, owner, &credIndex)
 		return respond(success, nil)
+	case lockdef.DataOperationTypeClear:
 	}
 	return respond(invalidCommand, nil)
+}
+
+// The statuses of a SetCredential response.
+const (
+	success           = lockdef.StatusSuccess
+	invalidCommand    = lockdef.StatusInvalidCommand
+	resourceExhausted = lockdef.StatusResourceExhausted
+	duplicate         = lockdef.Status(lockdef.StatusCodeDuplicate)
+	occupied          = lockdef.Status(lockdef.StatusCodeOccupied)
+)
+
+// addCredentialCaseLocked is the Add branch of the handler above: the
+// credential is added, then its user created or extended
+// (auth.addCredential and auth.addUser, DoorLockServer.ts:448-524).
+func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockdef.SetCredentialRequest, fabricIndex uint8,
+	ref store.DoorLockCredentialRef, respond func(lockdef.Status, *uint16) (lockdef.SetCredentialResponse, error),
+) (lockdef.SetCredentialResponse, error) {
+	credType, credIndex := ref.Type, ref.Index
+	if s.findCredential(credType, credIndex) != nil {
+		return respond(occupied, nil)
+	}
+	if err := s.addCredentialLocked(credType, credIndex, req.CredentialData, fabricIndex); err != nil {
+		return lockdef.SetCredentialResponse{}, err
+	}
+	var created *uint16
+	owner := req.UserIndex.Value
+	if req.UserIndex.Null {
+		maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported)
+		newIndex, ok := s.findAvailableUserIndex(maxUsers)
+		if !ok {
+			s.removeCredentialLocked(credType, credIndex)
+			return respond(occupied, nil)
+		}
+		user := store.DoorLockUser{
+			UserIndex:               newIndex,
+			UserStatus:              uint8(lockdef.UserStatusOccupiedEnabled),
+			UserType:                uint8(lockdef.UserTypeUnrestrictedUser),
+			CredentialRule:          uint8(lockdef.CredentialRuleSingle),
+			Credentials:             []store.DoorLockCredentialRef{ref},
+			CreatorFabricIndex:      fabricIndex,
+			LastModifiedFabricIndex: fabricIndex,
+		}
+		if !req.UserStatus.Null {
+			user.UserStatus = uint8(req.UserStatus.Value)
+		}
+		if !req.UserType.Null {
+			user.UserType = uint8(req.UserType.Value)
+		}
+		s.addUserLocked(user)
+		created, owner = &newIndex, newIndex
+		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeAdd, &newIndex, &newIndex)
+	} else {
+		user := s.findUser(req.UserIndex.Value)
+		if user == nil || fabricIndex != user.CreatorFabricIndex {
+			s.removeCredentialLocked(credType, credIndex)
+			return respond(invalidCommand, nil)
+		}
+		if perUser, _ := s.uint8Attr(lockdef.AttrNumberOfCredentialsSupportedPerUser); len(user.Credentials) >= int(perUser) {
+			s.removeCredentialLocked(credType, credIndex)
+			return respond(resourceExhausted, nil)
+		}
+		user.Credentials = append(user.Credentials, ref)
+		user.LastModifiedFabricIndex = fabricIndex
+		s.dirty = true
+	}
+	s.emitLockUserChangeLocked(ctx, credentialTypeToLockDataType(req.Credential.CredentialType), lockdef.DataOperationTypeAdd, &owner, &credIndex)
+	return respond(success, created)
 }
 
 func (s *DoorLockServer) handleGetCredentialStatus(_ context.Context, fields any) (any, error) {
@@ -349,7 +361,7 @@ func (s *DoorLockServer) maxCredentialIndexForType(t lockdef.CredentialTypeEnum)
 // validateCredentialDataLength mirrors matter.js DoorLockServer.ts:1429-1445;
 // a length attribute the selection does not serve admits no data.
 func (s *DoorLockServer) validateCredentialDataLength(t lockdef.CredentialTypeEnum, data []byte) bool {
-	minAttr, maxAttr := uint32(0), uint32(0)
+	var minAttr, maxAttr uint32
 	switch t {
 	case lockdef.CredentialTypePin, lockdef.CredentialTypeProgrammingPin:
 		minAttr, maxAttr = lockdef.AttrMinPinCodeLength, lockdef.AttrMaxPinCodeLength
@@ -396,8 +408,8 @@ func (s *DoorLockServer) findCredential(credType uint8, index uint16) *store.Doo
 // findNextAvailableCredentialIndex is LockAuth.Store :195-203.
 func (s *DoorLockServer) findNextAvailableCredentialIndex(credType uint8, after, maxIndex uint16) *uint16 {
 	for i := uint32(after) + 1; i <= uint32(maxIndex); i++ {
-		if s.findCredential(credType, uint16(i)) == nil {
-			idx := uint16(i)
+		if s.findCredential(credType, uint16(i)) == nil { //nolint:gosec // i <= maxIndex, a uint16
+			idx := uint16(i) //nolint:gosec // as above
 			return &idx
 		}
 	}

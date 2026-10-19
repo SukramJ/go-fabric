@@ -16,7 +16,7 @@ import (
 // reads it back on every start — matter.js keeps the same key as
 // nonvolatile state (DoorLockServer.ts:153-164 initialize, :1569-1573
 // State.credentialKey). One key serves every lock endpoint of the node.
-const SettingDoorLockCredentialKey = "door_lock.credential_key"
+const SettingDoorLockCredentialKey = "door_lock.credential_key" //nolint:gosec // the name of a settings key, not a credential
 
 // settingDoorLockSaved prefixes the matter_settings key that records that
 // a lock endpoint's records were saved at least once, so a lock whose
@@ -121,8 +121,8 @@ func (s *Store) LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth 
 	if auth.Credentials, err = s.loadDoorLockCredentials(ctx, endpointKey); err != nil {
 		return DoorLockAuth{}, false, err
 	}
-	if err = s.loadDoorLockSchedules(ctx, endpointKey, &auth); err != nil {
-		return DoorLockAuth{}, false, err
+	if lerr := s.loadDoorLockSchedules(ctx, endpointKey, &auth); lerr != nil {
+		return DoorLockAuth{}, false, lerr
 	}
 	return auth, true, nil
 }
@@ -239,7 +239,7 @@ func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth D
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, table := range []string{"matter_doorlock_users", "matter_doorlock_credentials", "matter_doorlock_schedules"} {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE endpoint_key = ?`, endpointKey); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE endpoint_key = ?`, endpointKey); err != nil { //nolint:gosec // table is one of the three constants above
 			return fmt.Errorf("matter store: save door lock: clear %s: %w", table, err)
 		}
 	}
