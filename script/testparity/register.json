@@ -1067,8 +1067,19 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "status": "planned",
-      "reason": "AddNOC admin vendor and certificate checks, SetVidVerificationStatement, UpdateNOC keeping the group state, and fabric changes under a bare fail-safe.",
+      "status": "partial",
+      "go": [
+        "node:TestOperationalCredentialsAddNOCAdminVendor",
+        "node:TestOperationalCredentialsAddNOCCertificateChecks",
+        "node:TestOperationalCredentialsSetVIDVerificationStatementVendor",
+        "node:TestOperationalCredentialsUpdateNOC"
+      ],
+      "missing": [
+        "keeps group keys, endpoints, multicast policy and group ACL of the fabric",
+        "treats UpdateFabricLabel as a final fabric change",
+        "treats SetVIDVerificationStatement as a final fabric change"
+      ],
+      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping the group state across a fail-safe expiry and the refused NOC of another fabric are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). Missing: the group-state UpdateNOC case's legs run in TestOperationalCredentialsUpdateNOC, but its unchanged socket multicast memberships need fabrictest's multicast model (wave 18c); the two final-fabric-change cases assert the fabricsChanged event \"1 updated\" (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582), and the Go node raises no fabric event for a label or vendor ID change (Observers.OnFabricUpdated follows UpdateNOC).",
       "snapshotSha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b"
     },
     {
