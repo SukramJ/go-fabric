@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 68 |
-| partial | 114 |
+| ported | 69 |
+| partial | 113 |
 | planned | 55 |
 | excluded | 87 |
 | total | 324 |
@@ -44,7 +44,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 1 | 1 | 0 | 0 |
+| [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 2 | 0 | 0 | 0 |
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
@@ -309,7 +309,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | DescriptorServerClientListTest.ts | 37 | ported | `device:TestClientListCarriesTheMandatoryClientClusters`<br>`cluster/core:TestDescriptor_ReadClientList`<br>`device:TestDescriptorServerClientList` | The empty ClientList of a type without client clusters, an explicit client cluster (WithClientClusters), the mandatory client clusters of a device type and the same cluster in ServerList and ClientList (DimmerSwitch / Identify) are ported on the device-layer types through the assembler's Descriptor. |
-| DescriptorServerTest.ts | 648 | partial | `cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_DoesNotAddDeviceTypeWhenUnnecessary`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsServersAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes`<br>`cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision`<br>`cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild` | The descriptor parity tests port the endpoint-type, device-type, server, parts and TagList cases; tag edits, full-family composition, the manual-ID hierarchy orders and PartsList ordering are not ported. Missing: “stops watching a removed part”; “adds a tag that is already listed only once”; “does not add a listed tag again when the label is the same”; “replaces the label of a listed tag”; “keeps the label when a listed tag is added without one”; “lists every descendant for an aggregator and a bridged node and only children for a light”; “lists every descendant once a full-family device type is added at runtime”; “lists only children once the full-family device type is replaced at runtime”; “when constructed with full hierarchy (manual ID)”; “when child is added before parent (auto ID)”; “when child is added before parent (manual ID)”; “when parent is added before child (auto ID)”; “when parent is added before child (manual ID)”; “when additional child is added (manual ID)”; “updates ${name}”; “orders PartsList numerically”. |
+| DescriptorServerTest.ts | 648 | ported | `cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_DoesNotAddDeviceTypeWhenUnnecessary`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsServersAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes`<br>`cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision`<br>`cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild`<br>`endpoint:TestDescriptorServerStopsWatchingARemovedPart`<br>`endpoint:TestDescriptorServerAddTags`<br>`endpoint:TestDescriptorServerComposition`<br>`endpoint:TestDescriptorServerIndexedHierarchy`<br>`endpoint:TestDescriptorServerMembershipChangesThatKeepTheCount`<br>`endpoint:TestDescriptorServerOrdersPartsListNumerically` | The endpoint-type, device-type, server and parts cases run on the Descriptor; the removed part, full-family composition (also after a device-type change, a reassembly), the hierarchy orders (a manual ID is a number the store holds, the order of additions the order of snapshots), the membership change keeping the count (one assembly, so matter.js's four timing windows are its two parent types) and the numeric PartsList order run through the assembler on a fabrictest device, read through the dispatcher; the tag edits on Descriptor.EnableTagList and AddTags. |
 
 ## node/test/behaviors/door-lock
 

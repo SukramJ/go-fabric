@@ -38,6 +38,10 @@ type Descriptor struct {
 	partsList          []uint16
 	partsListProvider  func() []uint16
 	serverListProvider func() []uint32
+	// tagList is TagList, served only with the TagList feature selected
+	// (tagListOn, [Descriptor.EnableTagList]).
+	tagListOn bool
+	tagList   []SemanticTag
 
 	// version is the cluster's DataVersion, bumped whenever an observed
 	// ServerList / PartsList differs from the last one; lastLists is that
@@ -93,6 +97,17 @@ const (
 // descriptorInst is the definition bound to what the server serves: no
 // feature, so TagList (conformance TAGLIST) is not served.
 var descriptorInst = mustInstance(descdef.Definition, spec.Options{})
+
+// descriptorInstTagList is the definition with the TagList feature, for a
+// Descriptor [Descriptor.EnableTagList] opted in.
+var descriptorInstTagList = mustInstance(descdef.Definition, spec.Options{Features: uint32(descdef.FeatureTagList)})
+
+// SemanticTag is a TagList entry, the generated semtag struct.
+type SemanticTag = descdef.Semtag
+
+// ErrTagListNotEnabled is [Descriptor.AddTags] on a Descriptor without the
+// TagList feature. Mirrors matter.js DescriptorServer.ts:124-126.
+var ErrTagListNotEnabled = errors.New(`matter: you must enable the descriptor "TagList" feature to set tags`)
 
 // errDescriptorReadOnly is returned for any write attempt — the
 // Descriptor cluster has no writable attributes.
@@ -200,6 +215,11 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		}
 		return out, true
 	case descriptorAttrTagList:
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+		if d.tagListOn {
+			return cloneTags(d.tagList), true
+		}
 		// TagList (Matter 1.4 §9.5.6.5) is conformance "TAGLIST" —
 		// only present when the TAGLIST feature bit is set in the
 		// FeatureMap. We advertise FeatureMap=0 (no TAGLIST), so the
@@ -211,9 +231,71 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		// tolerate the absence; re-enable when we surface tags.
 		return nil, false
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return descriptorInst.ReadGlobal(attrID)
+		return d.def().ReadGlobal(attrID)
 	}
 	return nil, false
+}
+
+// def is the definition bound to the server's feature selection.
+func (d *Descriptor) def() *spec.Instance {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if d.tagListOn {
+		return descriptorInstTagList
+	}
+	return descriptorInst
+}
+
+// EnableTagList selects the TagList feature and sets the initial TagList —
+// matter.js DescriptorServer.with("TagList") with a tagList state. FeatureMap
+// then carries TAGLIST and TagList is served. Without it neither is (the
+// default: Apple's Matter stack rejects a Descriptor serving TagList, see
+// MatterAttributes).
+func (d *Descriptor) EnableTagList(tags ...SemanticTag) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.tagListOn = true
+	d.tagList = cloneTags(tags)
+}
+
+// AddTags adds semantic tags to TagList, deduplicated: a tag with the
+// manufacturer code, namespace and tag of a listed one is not added again;
+// a non-null label given with it replaces the listed label, a null or
+// missing label keeps it. It fails with [ErrTagListNotEnabled] without the
+// TagList feature. Mirrors matter.js DescriptorServer.ts addTags (:122-147).
+func (d *Descriptor) AddTags(tags ...SemanticTag) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if !d.tagListOn {
+		return ErrTagListNotEnabled
+	}
+next:
+	for _, t := range tags {
+		for i := range d.tagList {
+			listed := &d.tagList[i]
+			if listed.MfgCode == t.MfgCode && listed.NamespaceId == t.NamespaceId && listed.Tag == t.Tag {
+				if t.Label != nil && !t.Label.Null && (listed.Label == nil || listed.Label.Null || listed.Label.Value != t.Label.Value) {
+					listed.Label = &spec.Nullable[string]{Value: t.Label.Value}
+				}
+				continue next
+			}
+		}
+		d.tagList = append(d.tagList, cloneTags([]SemanticTag{t})...)
+	}
+	return nil
+}
+
+// cloneTags copies tags, labels included.
+func cloneTags(tags []SemanticTag) []SemanticTag {
+	out := make([]SemanticTag, len(tags))
+	for i, t := range tags {
+		if t.Label != nil {
+			l := *t.Label
+			t.Label = &l
+		}
+		out[i] = t
+	}
+	return out
 }
 
 // MatterWrite always rejects — Descriptor has no writable attributes: a
@@ -221,7 +303,7 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 // UNSUPPORTED_ATTRIBUTE, as the definition judges them; the error still
 // matches errDescriptorReadOnly.
 func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := descriptorInst.ValidateWrite(attrID, value, nil)
+	_, err := d.def().ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errDescriptorReadOnly, attrID), status: err}
 }
 
@@ -259,7 +341,7 @@ func (d *Descriptor) MatterAttributes() []uint32 {
 	// `semtag` struct schema and rejects the whole Descriptor cluster
 	// when TagList shows up in the wildcard expansion → HAP build
 	// fails with Code=14.
-	return append(descriptorInst.MatterAttributes(), cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision)
+	return append(d.def().MatterAttributes(), cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision)
 }
 
 // SetPartsList replaces the parts list under a copy. Used by the

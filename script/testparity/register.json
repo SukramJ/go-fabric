@@ -772,7 +772,7 @@
     },
     {
       "path": "packages/node/test/behaviors/descriptor/DescriptorServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType",
         "cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically",
@@ -784,27 +784,15 @@
         "cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision",
         "cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap",
         "cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy",
-        "cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild"
+        "cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild",
+        "endpoint:TestDescriptorServerStopsWatchingARemovedPart",
+        "endpoint:TestDescriptorServerAddTags",
+        "endpoint:TestDescriptorServerComposition",
+        "endpoint:TestDescriptorServerIndexedHierarchy",
+        "endpoint:TestDescriptorServerMembershipChangesThatKeepTheCount",
+        "endpoint:TestDescriptorServerOrdersPartsListNumerically"
       ],
-      "missing": [
-        "stops watching a removed part",
-        "adds a tag that is already listed only once",
-        "does not add a listed tag again when the label is the same",
-        "replaces the label of a listed tag",
-        "keeps the label when a listed tag is added without one",
-        "lists every descendant for an aggregator and a bridged node and only children for a light",
-        "lists every descendant once a full-family device type is added at runtime",
-        "lists only children once the full-family device type is replaced at runtime",
-        "when constructed with full hierarchy (manual ID)",
-        "when child is added before parent (auto ID)",
-        "when child is added before parent (manual ID)",
-        "when parent is added before child (auto ID)",
-        "when parent is added before child (manual ID)",
-        "when additional child is added (manual ID)",
-        "updates ${name}",
-        "orders PartsList numerically"
-      ],
-      "reason": "The descriptor parity tests port the endpoint-type, device-type, server, parts and TagList cases; tag edits, full-family composition, the manual-ID hierarchy orders and PartsList ordering are not ported.",
+      "reason": "The endpoint-type, device-type, server and parts cases run on the Descriptor; the removed part, full-family composition (also after a device-type change, a reassembly), the hierarchy orders (a manual ID is a number the store holds, the order of additions the order of snapshots), the membership change keeping the count (one assembly, so matter.js's four timing windows are its two parent types) and the numeric PartsList order run through the assembler on a fabrictest device, read through the dispatcher; the tag edits on Descriptor.EnableTagList and AddTags.",
       "snapshotSha": "d8f64b6ffdee1a721fac42d2b509aecb59592464"
     },
     {

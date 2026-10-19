@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - `cluster/core`: a GeneralDiagnostics feature selection of the host's own — `NewGeneralDiagnosticsWith(bootReason, GeneralDiagnosticsFeatures{DataModelTest: …})`, matter.js `GeneralDiagnosticsServer.with(…)`; without DataModelTest the server drops PayloadTestRequest/Response and FeatureMap reads 0. `GeneralDiagnostics.CheckDataModelTest(maxPathsPerInvoke, logger)` holds the selection against the node's MaxPathsPerInvoke: an error above one without the feature, an INFO advisory with it at one (`GeneralDiagnosticsServer.ts:125-143`). `NewGeneralDiagnostics` keeps DataModelTest.
+- `cluster/core`: the Descriptor's TagList, opt-in — `Descriptor.EnableTagList(tags...)` selects the TagList feature (FeatureMap TAGLIST, TagList served) and `Descriptor.AddTags(tags...)` adds semantic tags as matter.js `DescriptorServer.addTags` does (`DescriptorServer.ts:122-147`): a listed tag is not added again, a non-null label replaces the listed one, a null or missing label keeps it; without the feature it fails with `ErrTagListNotEnabled`. A Descriptor that does not opt in serves neither, as before.
 
 ### Fixed
 
