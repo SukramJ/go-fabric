@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 69 |
+| ported | 70 |
 | partial | 114 |
-| planned | 54 |
+| planned | 53 |
 | excluded | 87 |
 | total | 324 |
 
@@ -28,7 +28,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 0 | 1 | 1 | 1 |
 | [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 0 | 1 | 4 | 1 |
+| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 1 | 1 | 3 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 0 | 1 | 0 |
@@ -188,7 +188,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| CommissioningRestartTest.ts | 43 | planned | — | A node taken offline and started again stays commissionable when uncommissioned and can open a window when commissioned; the Go node's restart path must show the same. |
+| CommissioningRestartTest.ts | 43 | ported | `node:TestCommissioningRestart` | A device stopped and started again on its store is commissioned by the controller when it was not, and opens the administrator's enhanced window (revoke, then OpenCommissioningWindow over a new CASE session) when it was (node/commissioning_restart_parity_matterjs_test.go on fabrictest). |
 | CommissioningWindowLifetimeTest.ts | 332 | partial | `bridge:TestOwnWindow_DefaultTimeoutFollowsFabricCount`<br>`bridge:TestOwnWindow_TimerClosesIt`<br>`bridge:TestOwnWindow_AdministratorReplacesIt`<br>`bridge:TestOwnWindow_RevokeCommissioningClosesIt`<br>`bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy`<br>`bridge:TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen`<br>`bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed`<br>`node:TestCommissioningWindowLifetime` | The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). Missing: the Go AdministratorCommissioning has no Basic feature (BC), so there is no administrator's basic window; js-runtime-only, the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node). Missing: “replaces a window the node opened itself with an administrator's basic window”; “refuses a window the node opens while an administrator's window is still opening”; “opens no window once the commissioner closes during the open”; “ignores a close after the commissioner closed”. |
 | CommissioningWindowTest.ts | 209 | planned | — | The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case. |
 | FabricBeforeStartTest.ts | 172 | planned | — | A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order. |
@@ -929,7 +929,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behavior/system/commissioning
 
-- `CommissioningRestartTest.ts` — A node taken offline and started again stays commissionable when uncommissioned and can open a window when commissioned; the Go node's restart path must show the same.
 - `CommissioningWindowTest.ts` — The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case.
 - `FabricBeforeStartTest.ts` — A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order.
 - `RemoteDescriptorTest.ts` — The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters).

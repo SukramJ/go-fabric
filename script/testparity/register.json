@@ -319,8 +319,11 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/CommissioningRestartTest.ts",
-      "status": "planned",
-      "reason": "A node taken offline and started again stays commissionable when uncommissioned and can open a window when commissioned; the Go node's restart path must show the same.",
+      "status": "ported",
+      "go": [
+        "node:TestCommissioningRestart"
+      ],
+      "reason": "A device stopped and started again on its store is commissioned by the controller when it was not, and opens the administrator's enhanced window (revoke, then OpenCommissioningWindow over a new CASE session) when it was (node/commissioning_restart_parity_matterjs_test.go on fabrictest).",
       "snapshotSha": "acdf772580a5c842f9da7d24766649e46fb468d7"
     },
     {
