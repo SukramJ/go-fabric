@@ -3455,3 +3455,36 @@ assert the Go composition as it is. Report BI (phase 16, 2026-10-19).
 
 By design. The fallback stays until the interop record says Apple Home no
 longer needs it.
+
+### BD-Matter-Identify-TriggerEffectEverywhere — TriggerEffect is accepted on every bridged endpoint
+
+matter.js's `IdentifyServer` withdraws the optional TriggerEffect command
+from the Matter view of an endpoint whose device type does not require it
+and whose server does not implement it (`suppressTriggerEffect`,
+`behaviors/identify/IdentifyServer.ts:60`, `:78-90` at `862ad75f`;
+IdentifyServerTest "is unsupported on a device type that does not
+require it" and three more cases, `missing` under this entry). The
+bridged endpoint's Identify of `endpoint/materialize.go` (`core.Identify`)
+accepts the command on every device type and answers Success without an
+effect (`cluster/core/identify.go:49-52`), because Apple Home's HAP
+rebuild step invokes it and treats UnsupportedCommand as a failed pair.
+Report BJ (phase 17a, 2026-10-19).
+
+By design, from interop. The missing host hook (`effectTriggered`) is a
+finding, not part of this entry.
+
+### BD-Matter-Server-NoCallerTransaction — a transaction covers one command
+
+matter.js runs the commands of one `node.act`/`online` callback in one
+transaction: a later command's override decides what the transaction
+commits, and a rollback lifts a coupling block a command set
+(`OnOffCouplingTest.ts:14-39`, `ColorTemperatureCouplingTest.ts:154-175`
+at `862ad75f`). A Go server commits each command as it returns; there is
+no caller-level transaction to roll back or to let a later command
+override an earlier one in. The two cases are `missing` under this entry;
+the coupling cases that need no transaction are ported. Report BJ (phase
+17a, 2026-10-19).
+
+By design. The Go servers have no transaction object a host could hold
+across commands; the `Act` of `fabrictest` runs one local change, not a
+transaction.

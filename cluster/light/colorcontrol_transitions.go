@@ -346,7 +346,13 @@ func (s *ColorControlServer) SyncColorTemperatureWithLevel(_ context.Context, le
 	if st := s.state(); st.mode != ColorModeColorTemperature && st.enhancedMode != ColorModeColorTemperature {
 		return nil
 	}
-	coupleMin := float64(s.minimumMireds()) // CoupleColorTempToLevelMinMireds reads the physical minimum
+	// Mirrors matter.js
+	// packages/node/src/behaviors/color-control/ColorControlServer.ts:1582
+	// (tempCoupleMin: coupleColorTempToLevelMinMireds, else the minimum).
+	coupleMin := float64(s.minimumMireds())
+	if m := s.cfg.CoupleColorTempToLevelMinMireds; m != 0 {
+		coupleMin = float64(m)
+	}
 	physMax := float64(s.maximumMireds())
 	var mireds float64
 	switch {

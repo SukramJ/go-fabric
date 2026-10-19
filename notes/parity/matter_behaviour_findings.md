@@ -583,6 +583,29 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
+Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
+2026-10-19). Line numbers at `862ad75f`.
+
+- **TriggerEffect has no host hook.** `cluster/core/identify.go:49-52`
+  answers Success and does nothing; matter.js emits
+  `events.effectTriggered` with the request so the host performs the
+  effect (`behaviors/identify/IdentifyServer.ts:26`, `:134`, `:150`). The
+  acceptance on every endpoint is `BD-Matter-Identify-TriggerEffectEverywhere`;
+  the missing hook is this item. (Milestone 4, the embedding layer.)
+- **ColorControl serves no primaries.** Primary1X … Primary6Intensity and
+  NumberOfPrimaries are absent from `cluster/light`, so a light cannot
+  supply one (ColorControlServerTest "accepts a primary a light supplies
+  without stating the number of primaries"). Optional attributes; low.
+  (Milestone 3, when a consumer asks.)
+- **ColorControl `MatterQuiesce` leaves the quieter's pending-report
+  timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
+  only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held
+  report with its timer, `LevelControlServer.ts:765-770`,
+  `Observable.ts:1276-1280`) applies to the colour attributes' quieters
+  too. No matter.js test checks it. (Milestone 3, with brief BL's
+  in-wave fixes or the next lights wave.)
+
 ## Application cluster servers — open items
 
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
