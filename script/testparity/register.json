@@ -590,15 +590,16 @@
       "status": "partial",
       "go": [
         "bridge:TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode",
-        "cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne"
+        "cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne",
+        "cluster/core:TestConfigurationVersionRunsTheChangeThenIncrements",
+        "cluster/core:TestConfigurationVersionRefusesADecrease",
+        "cluster/core:TestConfigurationVersionGroupsBridgedChanges",
+        "bridge:TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce"
       ],
       "missing": [
-        "runs the change callback and increments afterwards",
-        "rejects a decrease of configurationVersion",
-        "bumps the bridge once when grouping bridged-node changes via a shared context",
         "throws when increasing a bridged node's ConfigurationVersion that is not enabled"
       ],
-      "reason": "A bridged-node change raising the bridge's ConfigurationVersion is covered; the callback order, the refused decrease and the grouped bump are not.",
+      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
       "snapshotSha": "b255a8bb62d2df742a723bc6c3c231b13ac323aa"
     },
     {

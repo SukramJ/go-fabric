@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `bridge`: a configuration change that groups several bridged devices raises the node's BasicInformation ConfigurationVersion once — `Bridge.IncreaseNodeConfigurationVersionWith(change)` runs the change, in which `ConfigurationChange.IncreaseConfigurationVersion(scope, deviceAddress)` raises each device's own version, and increments the node's afterwards, as matter.js `BasicInformationServer.increaseConfigurationVersion` does with the bridged nodes' shared context (`BasicInformationServer.ts:132-138`, `BridgedDeviceBasicInformationServer.ts:72-90`). Before, every bridged device raised the node again.
+
 ## [0.8.4] — 2026-10-19
 
 Milestone 3, phase 17d, brief BM: the DoorLock server after matter.js `DoorLockServer.ts`, `LockAuth.ts` and `LockSchedule.ts`, and the port of `DoorLockServerTest.ts` (67 of 68 cases).

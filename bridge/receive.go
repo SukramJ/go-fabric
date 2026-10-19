@@ -721,25 +721,78 @@ type ConfigurationVersions struct {
 // (TC-BRBINFO-3.2).
 func (b *Bridge) IncreaseConfigurationVersion(scope, deviceAddress string) ConfigurationVersions {
 	out := ConfigurationVersions{Bridged: map[uint16]uint32{}}
+	if b.increaseBridgedConfigurationVersion(scope, deviceAddress, out.Bridged) > 0 {
+		out.Node = b.IncreaseNodeConfigurationVersion()
+	}
+	return out
+}
+
+// ConfigurationChange is the shared change
+// [Bridge.IncreaseNodeConfigurationVersionWith] hands its callback: the
+// bridged devices raised through it raise their own ConfigurationVersion
+// and leave the node's to the enclosing call, which raises it once.
+type ConfigurationChange struct {
+	b       *Bridge
+	bridged map[uint16]uint32
+}
+
+// IncreaseConfigurationVersion raises the BridgedDeviceBasicInformation
+// ConfigurationVersion of every bridged endpoint backed by the device, as
+// [Bridge.IncreaseConfigurationVersion] does, but not the node's, and
+// returns the endpoints it raised with their new versions.
+// Mirrors matter.js BridgedDeviceBasicInformationServer.ts:79 (no root
+// increment under a shared context).
+func (c *ConfigurationChange) IncreaseConfigurationVersion(scope, deviceAddress string) map[uint16]uint32 {
+	raised := map[uint16]uint32{}
+	c.b.increaseBridgedConfigurationVersion(scope, deviceAddress, raised)
+	for id, v := range raised {
+		c.bridged[id] = v
+	}
+	return raised
+}
+
+// IncreaseNodeConfigurationVersionWith runs change, then raises the node's
+// BasicInformation ConfigurationVersion once, however many bridged devices
+// change raised through its [ConfigurationChange] — one logical change of
+// the bridge, one increment — and returns every version raised for the
+// host to persist. A nil change raises the node's version alone. Mirrors
+// matter.js BasicInformationServer.increaseConfigurationVersion
+// (BasicInformationServer.ts:132-138: the callback first, the increment
+// afterwards) and BridgedDeviceBasicInformationServer.increaseConfigurationVersion
+// with the shared context (BridgedDeviceBasicInformationServer.ts:72-90).
+func (b *Bridge) IncreaseNodeConfigurationVersionWith(change func(*ConfigurationChange)) ConfigurationVersions {
+	out := ConfigurationVersions{Bridged: map[uint16]uint32{}}
 	if b == nil {
 		return out
 	}
+	if change != nil {
+		change(&ConfigurationChange{b: b, bridged: out.Bridged})
+	}
+	out.Node = b.IncreaseNodeConfigurationVersion()
+	return out
+}
+
+// increaseBridgedConfigurationVersion raises the device's bridged
+// endpoints into raised, marks each dirty and returns how many it raised.
+func (b *Bridge) increaseBridgedConfigurationVersion(scope, deviceAddress string, raised map[uint16]uint32) int {
+	if b == nil {
+		return 0
+	}
 	topo := b.Topology()
 	if topo == nil {
-		return out
+		return 0
 	}
 	mgr := b.subscriptionManagerLocked()
+	n := 0
 	for _, ep := range topo.Bridged() {
 		if ep == nil || ep.Scope != scope || ep.DeviceAddress != deviceAddress {
 			continue
 		}
-		out.Bridged[ep.ID] = ep.IncreaseConfigurationVersion()
+		raised[ep.ID] = ep.IncreaseConfigurationVersion()
 		markConfigurationVersionDirty(mgr, ep.ID, core.BridgedDeviceBasicInformationClusterID)
+		n++
 	}
-	if len(out.Bridged) > 0 {
-		out.Node = b.IncreaseNodeConfigurationVersion()
-	}
-	return out
+	return n
 }
 
 // IncreaseNodeConfigurationVersion raises the root BasicInformation
