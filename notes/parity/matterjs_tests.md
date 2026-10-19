@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 54 |
-| partial | 114 |
-| planned | 69 |
+| partial | 115 |
+| planned | 68 |
 | excluded | 87 |
 | total | 324 |
 
@@ -45,7 +45,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 0 | 2 | 0 | 0 |
-| [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 0 | 1 | 1 | 0 |
@@ -315,7 +315,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| DoorLockServerTest.ts | 1946 | planned | — | Credential and user management (SetCredential, DUPLICATE/OCCUPIED, programming PIN) and schedule-restricted access of DoorLockServer, which milestone 3 phase 17 ports. |
+| DoorLockServerTest.ts | 1946 | partial | `cluster/lock:TestDoorLockServerParity` | Ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go); the port continues describe by describe (brief BM). Missing: “denies a ${UserType[userType]} with no schedules configured”; “grants a WeekDayScheduleUser inside a matching schedule and denies outside it”; “grants a YearDayScheduleUser inside a matching time window and denies outside it”; “requires both WeekDay AND YearDay schedules to match for a ScheduleRestrictedUser once both are set”; “includes the start minute and excludes the end minute”; “includes the whole of 23:59 when the window ends there”; “relocks once AutoRelockTime has passed since the latest unlock”; “unlocks and stays unlocked”; “keeps granting access before the timeout elapses”; “disables the user when the timeout elapses after first use, without a further access attempt”; “does not arm the timeout before the first successful use”; “keeps the deadline when a modification changes neither status nor type”; “starts a new cycle when an expired user is enabled again”; “denies and disables once the wall clock passes the deadline, before the timer fires”; “re-arms for the remaining time when the timer fires early after the wall clock stepped back”; “denies an ExpiringUser while ExpiringUserTimeout is not set”; “disables at startup a user whose stored deadline has passed”; “starts with a deadline beyond the timer range and still disables once it passes”; “restores deadlines at startup from an overridden auth store”; “disables a user when a deadline that was still pending at startup passes”; “refuses ${name} in ${OperatingMode[mode]}”; “refuses a NonAccessUser and reports the access attempt”; “keeps a DisposableUser enabled when it locks the door”; “disables a DisposableUser after one use”; “reports a ForcedUser operation and raises the silent alarm”; “reports the user and credential when refusing a disabled user”; “refuses every lock operation during the lockout, with or without PIN, and reports none”; “ends the lockout after UserCodeTemporaryDisableTime with a fresh attempt count”; “measures the lockout on the monotonic clock”; “does not count PINs refused by the operating mode”; “starts the attempt count again after a correct code”; “counts an omitted PIN as a wrong code when a PIN is required”; “refuses a write of an unsupported mode and accepts a supported one”; “switches a stored mode SupportedOperatingModes does not support to Normal”; “refuses SupportedOperatingModes without Normal”; “accepts every mode SupportedOperatingModes supports”; “moves the hardware after authorization and before the lock state changes”; “refuses a lock command invoked locally before the hardware moves”; “starts the attempt count again only after the hardware succeeds”; “keeps the attempt count through an operation without PIN”; “refuses a PIN that belongs to no user as a wrong code”; “runs one lock operation at a time”; “does not relock for a timer an unlock replaced while the relock waited”; “fails the operation when the hardware fails”; “reports the reason the hardware gives for a failure”; “relocks through the hardware and keeps the state when it fails”; “reports UnboltDoor as Unlock and leaves the latch alone”; “reports schedule changes”; “reports the user index as DataIndex for user changes”; “reports the owning user when the programming PIN is modified”; “reports the owning user for credential changes”. |
 
 ## node/test/behaviors/energy-evse-mode
 
@@ -966,10 +966,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/commodity-tariff
 
 - `CommodityTariffServerTest.ts` — Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it.
-
-### node/test/behaviors/door-lock
-
-- `DoorLockServerTest.ts` — Credential and user management (SetCredential, DUPLICATE/OCCUPIED, programming PIN) and schedule-restricted access of DoorLockServer, which milestone 3 phase 17 ports.
 
 ### node/test/behaviors/energy-evse-mode
 
