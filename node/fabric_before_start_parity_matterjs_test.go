@@ -55,8 +55,9 @@ type operationalSpy struct {
 func (s *operationalSpy) Publish(ctx context.Context, svc mdns.Service) error {
 	if svc.ServiceType == mdns.ServiceTypeOperational {
 		commissionable := false
-		for _, a := range s.Active() {
-			if a.ServiceType == mdns.ServiceTypeCommissionable {
+		active := s.Active()
+		for i := range active {
+			if active[i].ServiceType == mdns.ServiceTypeCommissionable {
 				commissionable = true
 			}
 		}
@@ -167,8 +168,9 @@ func (f *fabricBeforeStart) commissioned(t *testing.T) bool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, a := range f.current().Active() {
-		if a.ServiceType == mdns.ServiceTypeCommissionable {
+	active := f.current().Active()
+	for i := range active {
+		if active[i].ServiceType == mdns.ServiceTypeCommissionable {
 			return false
 		}
 	}

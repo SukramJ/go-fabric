@@ -67,11 +67,13 @@ func TestGroupKeyManagementProvisionalGroupcast(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("rejects the provisional Groupcast feature", func(t *testing.T) {
+		t.Parallel()
 		if v, ok := gkm.MatterRead(cluster.AttrGlobalFeatureMap); !ok || v.(uint32)&0x2 != 0 {
 			t.Errorf("FeatureMap = %v, %v; want no Groupcast (GCAST, bit 1)", v, ok)
 		}
 	})
 	t.Run("does not implement the provisional GroupcastAdoption attribute by default", func(t *testing.T) {
+		t.Parallel()
 		if v, ok := gkm.MatterRead(0x0004); ok {
 			t.Errorf("GroupcastAdoption served: %v", v)
 		}

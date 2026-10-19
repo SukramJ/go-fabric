@@ -98,13 +98,14 @@ func newOpenWindowRequest(t *testing.T) openWindowRequest {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w0 := make([]byte, spake2.VerifierW0Size)
-	vc.W0.FillBytes(w0)
 	l, err := vc.L.Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return openWindowRequest{timeout: 180, verifier: append(w0, l...), iterations: iterations, salt: salt}
+	verifier := make([]byte, spake2.VerifierW0Size, spake2.VerifierW0Size+len(l))
+	vc.W0.FillBytes(verifier)
+	verifier = append(verifier, l...)
+	return openWindowRequest{timeout: 180, verifier: verifier, iterations: iterations, salt: salt}
 }
 
 func (r openWindowRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
