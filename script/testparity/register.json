@@ -823,15 +823,10 @@
         "cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity",
         "cluster/lock:TestDoorLockServerAutoRelockParity",
         "cluster/lock:TestDoorLockServerAutoRelockLargestTimeParity",
-        "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity"
+        "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity",
+        "cluster/lock:TestDoorLockServerAuthorizationParity"
       ],
       "missing": [
-        "refuses ${name} in ${OperatingMode[mode]}",
-        "refuses a NonAccessUser and reports the access attempt",
-        "keeps a DisposableUser enabled when it locks the door",
-        "disables a DisposableUser after one use",
-        "reports a ForcedUser operation and raises the silent alarm",
-        "reports the user and credential when refusing a disabled user",
         "refuses every lock operation during the lockout, with or without PIN, and reports none",
         "ends the lockout after UserCodeTemporaryDisableTime with a fresh attempt count",
         "measures the lockout on the monotonic clock",

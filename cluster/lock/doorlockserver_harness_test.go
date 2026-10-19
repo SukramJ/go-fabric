@@ -366,11 +366,7 @@ type lockEvents struct {
 // event log; markEvents moves the mark (matter.js's `.length = 0`).
 func (f *lockFixture) events() lockEvents {
 	f.t.Helper()
-	paths := []im.ConcreteEventPath{}
-	for _, id := range []uint32{lockdef.EventDoorLockAlarm, lockdef.EventLockOperation, lockdef.EventLockOperationError, lockdef.EventLockUserChange} {
-		paths = append(paths, im.ConcreteEventPath{Endpoint: f.ep, Cluster: lockdef.ClusterID, Event: id})
-	}
-	got, err := fabrictest.Events(f.ctx, f.pair, paths...)
+	got, err := fabrictest.Events(f.ctx, f.pair, f.eventPaths()...)
 	if err != nil {
 		f.t.Fatalf("read events: %v", err)
 	}
@@ -393,14 +389,22 @@ func (f *lockFixture) events() lockEvents {
 	return out
 }
 
+// eventPaths are the lock's four events the cases observe.
+func (f *lockFixture) eventPaths() []im.ConcreteEventPath {
+	var paths []im.ConcreteEventPath
+	for _, id := range []uint32{lockdef.EventDoorLockAlarm, lockdef.EventLockOperation, lockdef.EventLockOperationError, lockdef.EventLockUserChange} {
+		paths = append(paths, im.ConcreteEventPath{
+			Endpoint: f.ep, Cluster: lockdef.ClusterID, Event: id,
+			HasEndpoint: true, HasCluster: true, HasEvent: true,
+		})
+	}
+	return paths
+}
+
 // markEvents moves the mark past every event the device logged so far.
 func (f *lockFixture) markEvents() {
 	f.t.Helper()
-	paths := []im.ConcreteEventPath{{Endpoint: f.ep, Cluster: lockdef.ClusterID, Event: lockdef.EventDoorLockAlarm}}
-	for _, id := range []uint32{lockdef.EventLockOperation, lockdef.EventLockOperationError, lockdef.EventLockUserChange} {
-		paths = append(paths, im.ConcreteEventPath{Endpoint: f.ep, Cluster: lockdef.ClusterID, Event: id})
-	}
-	got, err := fabrictest.Events(f.ctx, f.pair, paths...)
+	got, err := fabrictest.Events(f.ctx, f.pair, f.eventPaths()...)
 	if err != nil {
 		f.t.Fatalf("read events: %v", err)
 	}
