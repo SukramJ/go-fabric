@@ -26,6 +26,9 @@ Milestone 3, phase 17b, brief BK: the Switch server after matter.js `SwitchServe
 ### Deprecated
 
 - `github.com/SukramJ/go-fabric/cluster/wire.GenericSwitch` and `wire.NewGenericSwitch`: replaced by `github.com/SukramJ/go-fabric/cluster/switch` (`switchserver.New`); now a thin wrapper over it with unchanged reads. Removable in `v0.10.0` at the earliest.
+
+## [0.8.1] — 2026-10-19
+
 Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/behaviors` for OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea.
 
 ### Added
@@ -4258,7 +4261,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...v0.7.2
