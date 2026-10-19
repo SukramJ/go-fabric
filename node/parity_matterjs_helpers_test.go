@@ -11,6 +11,8 @@ package node_test
 import (
 	"context"
 	"log/slog"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,9 +38,52 @@ func parityCtx(t *testing.T) context.Context {
 	return ctx
 }
 
-// quietSite is a site whose hosts log nowhere.
+// siteSlots runs the package's fabrictest sites one at a time. A fake site
+// clock moves only while the whole test process is quiet (fabrictest
+// Site.Run, the docs' "Limits"), so busy sites in parallel starve each
+// other's clocks — under the race detector past parityCtx's budget; one at
+// a time, every site reaches its quiet points at once. The slot belongs to
+// a test and its subtests: a test that builds several sites, or a parent
+// whose subtests build their own, takes it once.
+var siteSlots = struct {
+	mu     sync.Mutex
+	free   *sync.Cond
+	holder string
+}{}
+
+func init() { siteSlots.free = sync.NewCond(&siteSlots.mu) }
+
+// holdSite takes the package's site slot until the test ends; a test inside
+// the holder's tree goes ahead.
+func holdSite(t *testing.T) {
+	t.Helper()
+	name := t.Name()
+	siteSlots.mu.Lock()
+	defer siteSlots.mu.Unlock()
+	inTree := func() bool {
+		h := siteSlots.holder
+		return name == h || strings.HasPrefix(name, h+"/")
+	}
+	for siteSlots.holder != "" && !inTree() {
+		siteSlots.free.Wait()
+	}
+	if siteSlots.holder != "" {
+		return
+	}
+	siteSlots.holder = name
+	t.Cleanup(func() {
+		siteSlots.mu.Lock()
+		siteSlots.holder = ""
+		siteSlots.mu.Unlock()
+		siteSlots.free.Broadcast()
+	})
+}
+
+// quietSite is a site whose hosts log nowhere; it holds the site slot
+// until the test ends.
 func quietSite(t *testing.T) *fabrictest.Site {
 	t.Helper()
+	holdSite(t)
 	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 }
 
@@ -46,6 +91,7 @@ func quietSite(t *testing.T) *fabrictest.Site {
 // that steps the clock deadline by deadline itself.
 func steppedSite(t *testing.T) *fabrictest.Site {
 	t.Helper()
+	holdSite(t)
 	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler), Settle: 2 * time.Millisecond})
 }
 
