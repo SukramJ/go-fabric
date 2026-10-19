@@ -235,8 +235,13 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			return nil, fmt.Errorf("node: unique id: %w", err)
 		}
 	}
-	n.caseIDs = newCaseIdentities(n.logger)
+	n.caseIDs = newCaseIdentities(n.logger, n.groups)
 	n.caseIDs.clock = n.cfg.Clock
+	// A KeySetWrite or KeySetRemove reloads the fabric's group state; the
+	// CASE identity follows key set 0 (matter.js Fabric.destinationIdsFor
+	// reads the fabric's KeySets, which GroupKeyManagementServer.keySetWrite
+	// replaced in place).
+	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
 	n.root, err = buildRoot(ctx, rootDeps{
 		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled:       n.observedFabricInstalled,

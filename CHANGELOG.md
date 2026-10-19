@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `groups`: `Manager.IPKKeys` and `Manager.CurrentIPK` expose key set 0, the Identity Protection Key set, which the manager now holds apart from the operational key sets as matter.js's `KeySets` does (`FabricGroups.ts:35-50`, `KeySets.ts:113-121`): every key for a responder, the second-newest of three for an initiator (§4.14.2.6.1).
+
+### Fixed
+
+- `node`: a rotated IPK reaches CASE. The responder resolves a Sigma1 under every key of key set 0 and keys Sigma2 and Sigma3 on the key that matched (`Fabric.ts:399-403`, `FabricManager.ts:325-331`; chip `CASESession.cpp:973-990`); the node's own identity keys on the current key of key set 0 (`Fabric.ts:391-393`); a KeySetWrite or KeySetRemove of key set 0 rotates both. The identity used to stay on the IPK of AddNOC, so an administrator rotating the IPK lost CASE to the node. The AddNOC key stays a candidate.
+
 ## [0.8.6] — 2026-10-19
 
 Milestone 3, phase 18b, brief BO: the behaviour-test ports of AccessControl Auxiliary, OperationalCredentials, GroupKeyManagement and the system commissioning tests (CommissioningWindowLifetime, CommissioningRestart, FabricBeforeStart) against matter.js at `862ad75f` — 30 of 42 open cases, two fixes the ports and the GeneralCommissioning audit found, the node wirings left by 18a, the GeneralCommissioning and AdministratorCommissioning audit.

@@ -3610,3 +3610,21 @@ left this file with brief BO (2026-10-19): `handleArmFailSafe` gates the
 re-arm and the disarm on the arming fabric, as chip
 `GeneralCommissioningCluster.cpp:420` and matter.js `FailsafeTimer.ts:53-57`
 do, so the divergence it described no longer exists.
+
+### BD-Matter-CASE-SaltOnMatchedIPK — Sigma2 and Sigma3 are salted with the IPK that matched the destination identifier
+
+matter.js resolves a Sigma1 under every key of the fabric's key set 0
+(`Fabric.ts:399-403` destinationIdsFor, `FabricManager.ts:325-331`) but
+salts Sigma2 and Sigma3 with the fabric's fixed
+`operationalIdentityProtectionKey`, the IPK of AddNOC (`CaseServer.ts:240-284`;
+`Fabric.ts:72`, `:114`), and as initiator takes the second-newest key of
+key set 0 for the destination identifier and the fixed key for the salts
+(`CaseClient.ts:121-138`). After a KeySetWrite of key set 0 an initiator
+that salts on the rotated key cannot finish a handshake with it. The Go
+node (`node/security.go` `ResolveSigma1Destination`, `ipkCandidates`)
+keys the salts on the key that matched, as chip caches the matched epoch
+key for the session (`CASESession.cpp:973-990`, `:603-607`) and uses the
+second-newest for both as initiator (`:641-671`): the key the peer used
+for the destination identifier is the key it salts with (§4.14.2.5,
+§4.14.2.6.1). The deviation is the salt's key only; the candidate set and
+the current-key rule are matter.js's.

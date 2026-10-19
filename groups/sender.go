@@ -141,9 +141,10 @@ func (s *Sender) NodeID() uint64 { return s.nodeID }
 //     after Time.nowMs, the last of them; none: GroupKeyNotStartedError —
 //     [ErrKeyNotStarted].
 //
-// Key set 0, the IPK, never reaches here: the manager does not hold it
-// (loadFabric), so a group mapped to it has no key set the fabric holds —
-// in matter.js it has no session id and SessionManager.ts:719-723 fails.
+// Key set 0, the IPK, never reaches here: the manager holds it apart from
+// the operational key sets (fabricGroups.ipk), so a group mapped to it has
+// no key set the fabric holds — in matter.js it has no session id and
+// SessionManager.ts:719-723 fails.
 // Called with m.mu held.
 func (f *fabricGroups) currentKey(groupID uint16, nowMs int64) (uint16, epochKey, error) {
 	ksID, ok := f.idMap[groupID]

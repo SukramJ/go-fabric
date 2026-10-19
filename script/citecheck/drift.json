@@ -2131,7 +2131,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 563,
+    "line": 662,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",

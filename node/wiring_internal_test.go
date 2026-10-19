@@ -26,7 +26,7 @@ func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
 	st := testStore(t)
 	sessions := operational.NewManager(st)
 	before := sessions.Occupancy()
-	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default()), slog.Default())
+	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default(), nil), slog.Default())
 	if init, err := provider(ctx, 1, 0xC0FFEE); err == nil || init != nil {
 		t.Fatalf("provider(unknown fabric) = %v, %v; want an error", init, err)
 	}
@@ -41,7 +41,7 @@ func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
 // index or as the latest identity.
 func TestCaseIdentitiesResolveAndForget(t *testing.T) {
 	t.Parallel()
-	c := newCaseIdentities(nil)
+	c := newCaseIdentities(nil, nil)
 	one := &caseFabric{identity: &sigma.Identity{FabricIndex: 1, NodeID: 11}}
 	two := &caseFabric{identity: &sigma.Identity{FabricIndex: 2, NodeID: 22}}
 	c.byIdx[1], c.byIdx[2], c.latest = one, two, two

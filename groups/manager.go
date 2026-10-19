@@ -91,8 +91,12 @@ type fabricGroups struct {
 	nodeID uint64
 
 	keySets map[uint16]*keySet
-	idMap   map[uint16]uint16
-	table   map[uint16]*TableEntry
+	// ipk is key set 0, the Identity Protection Key set, held apart from
+	// the operational key sets: never in the session index, the CASE
+	// destination identifier's keys (ipk.go).
+	ipk   *keySet
+	idMap map[uint16]uint16
+	table map[uint16]*TableEntry
 	// props is the Groupcast cluster's per-group state (matter.js
 	// GroupcastServer groupProperties): existence of a Groupcast
 	// membership beyond the group table, its multicast address policy and
@@ -268,16 +272,18 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 		return nil, fmt.Errorf("groups: load key sets of fabric %d: %w", idx, err)
 	}
 	for _, s := range sets {
-		// Key set 0 is the IPK. matter.js keeps it in KeySets but never
-		// in the session index (KeySets.ts:#updateSessions skips id 0),
-		// so it cannot authenticate a group message.
-		if s.GroupKeySetID == 0 {
-			continue
-		}
 		ks, err := deriveKeySet(s, rec.CompressedID)
 		if err != nil {
 			m.logger.Warn("groups.keyset.derive_failed",
 				slog.Int("fabric_index", int(idx)), slog.Int("key_set", int(s.GroupKeySetID)), slog.String("err", err.Error()))
+			continue
+		}
+		// Key set 0 is the IPK. matter.js keeps it in KeySets but never
+		// in the session index (KeySets.ts:#updateSessions skips id 0),
+		// so it cannot authenticate a group message; its keys are the
+		// CASE destination identifier's (ipk.go).
+		if s.GroupKeySetID == 0 {
+			f.ipk = ks
 			continue
 		}
 		f.keySets[s.GroupKeySetID] = ks
