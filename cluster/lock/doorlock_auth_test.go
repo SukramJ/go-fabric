@@ -60,7 +60,7 @@ func TestNewRefusesAFeatureItDoesNotServe(t *testing.T) {
 // TestRecordsPersistEncrypted: a lock on a store keeps its users and
 // credentials across a new server on the same store, under the node's
 // credential key, with no credential stored in clear (matter.js
-// DoorLockServer.ts:153-164, LockAuth.Store :129-278).
+// DoorLockServer.ts:153-164 and LockAuth.ts:129-278).
 func TestRecordsPersistEncrypted(t *testing.T) {
 	t.Parallel()
 	st, db := openStore(t)

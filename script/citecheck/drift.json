@@ -190,7 +190,7 @@
   },
   {
     "file": "bridge/fields_reader.go",
-    "line": 138,
+    "line": 140,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "TlvSchema",
@@ -199,7 +199,7 @@
   },
   {
     "file": "bridge/fields_reader.go",
-    "line": 172,
+    "line": 174,
     "citation": "LevelControlServer.ts:596",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "#optionsAllowExecution",
@@ -934,15 +934,6 @@
     "identifier": "RemainingTime",
     "nearest": 431,
     "occurrences": 1
-  },
-  {
-    "file": "cluster/lock/doorlock_server.go",
-    "line": 124,
-    "citation": "DoorLockServer.ts:69",
-    "resolved": "packages/node/src/behaviors/door-lock/DoorLockServer.ts",
-    "identifier": "alwaysSet",
-    "nearest": 119,
-    "occurrences": 3
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",

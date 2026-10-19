@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5721,
+  "entry_points": 5744,
   "entry_packages": [
     ".",
     "bdx",
@@ -225,9 +225,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13139,
-    "reachable": 9131,
-    "whitelisted": 4003,
+    "total_exported": 13174,
+    "reachable": 9165,
+    "whitelisted": 4004,
     "unreachable": 5
   },
   "by_package": [
@@ -6816,6 +6816,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
       "line": 71
+    },
+    {
+      "package": "cluster/lock",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/lock/doorlock_server.go",
+      "line": 59
     },
     {
       "package": "cluster/measurement",
