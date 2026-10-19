@@ -307,7 +307,10 @@ model, and the work a guard checks may use a cheaper one.
 
 Sonnet never writes a fact about matter.js or chip into the repo, and never
 touches the security-relevant paths named in the first row. When in doubt
-about which row a task is in, it is in the first.
+about which row a task is in, it is in the first. One owner-decided
+exception: the behaviour-test ports of phase 18 (concept v5, E.0 18.1,
+2026-10-19) are Opus work on those paths too, with Fable reading every
+cited fix line against the pin before the pull request merges.
 
 ## Token use
 

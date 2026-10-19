@@ -10,8 +10,8 @@ großen Protokoll-Ports. Meilenstein 3 nutzt es für das, woran die
 Ökosysteme eine Bridge messen: die 25 matter.js-Server mit handgeschriebener
 Logik, jeder gegen sein Go-Gegenstück geprüft, mit der portierten
 matter.js-Testdatei als Beweis ([Roadmap, Meilenstein 3](./roadmap.md#milestone-3-behaviour-depth)).
-Dieses Dokument plant **Phase 17**; Phasen 18 und 19 bekommen ihren
-Abschnitt, wenn sie dran sind.
+Dieses Dokument plant **Phase 17** (Teil A–D, abgeschlossen mit `v0.8.4`)
+und **Phase 18** (Teil E); Phase 19 bekommt ihren Abschnitt, wenn sie dran ist.
 
 ## 0. Entscheidungen des Owners (2026-10-19)
 
@@ -182,3 +182,113 @@ beim Merge der zweiten Welle eines Paars.
 - **Umfang der großen Posten.** 215 Fälle in drei Wellen; stoppt ein Agent
   an einer Dateigrenze, führt der nächste auf dem Branch weiter (Konzept
   v4, Tranchenregel).
+
+## Teil E: Phase 18 — das System-Set
+
+Stand 2026-10-19, go-fabric `v0.8.4`. Quelle:
+`notes/briefs/reads/read-m3-phase-18-system-set.md` (Sonnet-Read am Pin,
+von mir stichprobengeprüft: Harness-Importe jeder Testdatei, die
+Register-Einträge, die ADR-0013-Liste). Zeilen sind matter.js-Zeilen am
+Pin; Fälle sind `it(`.
+
+### E.0 Entscheidungen des Owners (Phase 18, 2026-10-19)
+
+| # | Frage | Empfehlung | Entscheidung |
+| --- | --- | --- | --- |
+| 18.1 | Wer implementiert die vier Server, die ADR 0013 auslässt (AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast; `CLAUDE.md` „Which model does which work", erste Zeile) und die Commissioning-Tests? | **Fable selbst**, in zwei eigenen Wellen (18b, 18c); Opus die übrigen zwei (18a, 18d). Die Regel ist bewusst: jede Erwartung in diesen Ports ist ein Satz über Sicherheit und wird später als Fakt zitiert. | **Opus implementiert, Fable prüft.** Alle vier Wellen an Opus-Agenten; ich reviewe jeden PR und verifiziere jede Zitatzeile der Sicherheitsserver gegen den Pin, bevor sie gemergt wird. `CLAUDE.md` trägt die Ausnahme. |
+| 18.2 | `AccessControlCustomExtensionTest.ts` (7 Fälle): eine herstellerspezifische Erweiterung eines Standard-Clusters (eigenes Attribut, eigener Befehl auf AccessControl, über den Draht und vom Controller gelesen). | **Verschieben auf Meilenstein 4** (`planned`, `until: M4`): das ist kein Verhalten des Servers, sondern eine Fähigkeit der `cluster/spec`-Laufzeit und des Controllers, die go-fabric nicht hat; sie gehört zur Einbettungsschicht. | **Verschoben auf Meilenstein 4.** Register `planned`, `until: M4`. |
+| 18.3 | Wellen und Versionen | **Vier Wellen, je zwei parallel**: 18a ∥ 18b, dann 18c ∥ 18d; `v0.8.5`–`v0.8.8`; jeder PR trägt `needs-chiptool` (seit der DD-Korrektur wieder per Auto-Merge). | **Vier Wellen nacheinander.** 18a, 18b, 18c, 18d; `v0.8.5`–`v0.8.8`; keine Paare, also keine Merge-Konflikte zwischen Wellen; ein Brief je Welle, wenn sie dran ist. |
+
+### E.1 Befund
+
+Register heute (`script/testparity/register.json`): 62 Fälle portiert, 150 in
+`partial`-Einträgen offen, dazu vier `planned`-Dateien ohne Go-Zeile
+(27 Fälle). Zwei Server haben am Pin keine Testdatei.
+
+| Cluster | matter.js-Server | Tests (Fälle, Harness) | Go heute | Register (portiert / offen) |
+| --- | --- | --- | --- | --- |
+| Descriptor | `DescriptorServer.ts` 303 | `DescriptorServerTest.ts` 685 (31, `MockEndpoint` + `MockServerNode`), `…ClientListTest.ts` (6, `MockEndpoint`) | `cluster/core/descriptor.go` 307, 13 Parity-Funktionen | 13 / 19 (Tag-Edits, Voll-Familien-Komposition, Hierarchie-Reihenfolgen, PartsList-Ordnung; ClientList explizit/beidseitig) |
+| GeneralDiagnostics | `GeneralDiagnosticsServer.ts` 631 | `…OperationalHoursTest.ts` (10, `MockServerNode`), `…FeaturesTest.ts` (5, `MockServerNode`) | `cluster/core/general_diagnostics.go` 964, kein Parity-Test | 3 / 6 + 5 `planned` (DataModelTest-Feature gegen das Pfad-pro-Invoke-Limit) |
+| AccessControl | `AccessControlServer.ts` 775 | `…AuxiliaryTest.ts` (13, `MockServerNode`/`MockSite`), `…CustomExtensionTest.ts` (7) | `cluster/core/access_control.go` 1 229, `_auxiliary.go` 246; 16 Parity-Funktionen | 4 / 9 + 7 `planned` (18.2) |
+| OperationalCredentials | `…Server.ts` 632 + `VendorIdVerification` 325 | `…ServerTest.ts` 360 (12, `MockServerNode`/`MockSite`/`TestFabric`) | `cluster/core/operational_credentials.go` 2 425, `vid_verification.go`; 16 + 11 Parity-Funktionen (Fabric-Manager, Store) | 0 / 12 `planned` (AddNOC-Vendor-Prüfungen, Zertifikatsprüfungen, SetVidVerificationStatement, UpdateNOC behält Gruppenzustand, finale Fabric-Änderung unter bloßem Fail-Safe) |
+| GroupKeyManagement | `…Server.ts` 618 | `…ServerTest.ts` 209 (7, `MockServerNode`/`MockSite`) | `cluster/core/group_key_management.go` 1 018; 1 Parity-Funktion | 2 / 6 (Groupcast-Feature-Ablehnung, Schlüssel-Limit, Multicast-Policy-Fälle) |
+| Groups | `GroupsServer.ts` 232 | `GroupsServerSchemaTest.ts` 100 (3, `MockServerNode`); `protocol/test/groups/` (6 Dateien) | `cluster/core/groups.go` 390; 4 Parity-Funktionen; `groups/` | 7 / 7 + 3 `planned` (gelockerte AddGroup-Constraints; KeySets 2, MessagingState 5) |
+| Groupcast | `GroupcastServer.ts` 938 | `GroupcastServerTest.ts` 2 243 (65 in 20 `describe`, `MockServerNode`/`MockNetwork`/`MockSite`) | `cluster/core/groupcast.go` 1 025, `groups/groupcast.go`; 8 Parity-Funktionen | 6 / 49 (GKM- und Endpoint-Spiegel, Legacy-Prune, Quota, Policy-Reihenfolge, Multicast-Mitgliedschaft und -Fehler, Testing-Ereignisse, abgeleitete Membership, Persistenz) |
+| Binding | `BindingServer.ts` 214 + `BindingManager.ts` 720 | `BindingManagerTest.ts` (66 gesamt in drei Dateien: Manager, Integration, Server; `MockServerNode`/`MockNetwork`) | `cluster/core/binding.go` 495, `binding/` 1 111, `node/client.go`; Ports in `binding/manager_test.go`, `node/binding_live_test.go` | 12 / 47 (Client-Auswahl, Warteschlange vor online, Fabric-Ersatz, Gruppen-Sendungen und ihre Ablehnungen, Dormant-Fälle) |
+| BasicInformation | `…Server.ts` 213 + Validatoren 57 | drei Dateien, 214 (13, `MockServerNode`) | `cluster/core/basic_information.go` 1 068; 18 + 13 Parity-Funktionen | 9 / 6 (Bridged-Gerät ohne VID/PID, Caller-Werte über CapabilityMinima, ConfigurationVersion: Callback-Reihenfolge, abgelehnte Senkung, gebündelter Bump) |
+| GeneralCommissioning | `…Server.ts` 285 + `ServerNodeFailsafeContext.ts` 135 | **keine Testdatei am Pin**; Beweis sind `packages/node/test/behavior/system/commissioning/` (`CommissioningWindowLifetimeTest.ts` 16, `CommissioningRestartTest.ts` 2, `FabricBeforeStartTest.ts` 4) und die Familien CGEN, CADMIN | `cluster/core/general_commissioning.go` 976, 55 Tests | Lifetime 7 / 9, Restart und FabricBeforeStart `planned` |
+| AdministratorCommissioning | `…Server.ts` 267 | **keine Testdatei am Pin**; wie oben | `bridge/commissioning_window.go` 1 111, `cluster/wire/admincommissioning.go` 644; 55 Tests | s. o. |
+| ScenesManagement | `…Server.ts` 1 109 | `…ServerTest.ts` 99 (1, `MockSite`) | `cluster/core/scenes_management.go` 886, `scenes_attributes.go` 376; 10 Tests | 1 / 1 (Boolean-Szenenwert über OnOff) |
+
+Was das Register nicht zeigt: Groupcast und Binding sind in matter.js
+Node-Tests mit `MockNetwork` (Multicast-Beitritt, Fehlerserien, Peer-Verlust
+über Subscription-Timeout). Ihr Go-Port läuft auf `fabrictest`; wo
+`fabrictest` kein Multicast-Netz stellt, ist das eine Erweiterung des
+In-Process-Netzes (Teil C), kein `excluded`.
+
+### E.2 Was ein Port hier ist
+
+A.2 gilt. Dazu:
+
+- **Sicherheitsserver.** AccessControl, OperationalCredentials,
+  GroupKeyManagement und Groupcast (ADR 0013 „skipped") und alles unter
+  `commissioning/`, `secure/` und der Commissioning-Fenster-Logik der Bridge
+  implementiert Opus nach Brief, und ich prüfe (18.1): jeder Fix dort ist
+  ein eigener Commit mit Zitat, den ich gegen den Pin lese, bevor der PR
+  gemergt wird; eine Erwartung, die der Agent nicht belegen kann, bleibt
+  `missing` mit Grund, nie ein stiller Fix.
+- **Runtime-Interna** von matter.js (Env-Lazy-Install, Transaktionskonflikte,
+  Reaktor-Reihenfolge wie „sets policy before `groupKeyIdMap.added` fires",
+  Storage-Setter) sind `excluded js-runtime-only`, je Fall mit Grund.
+  Verhalten, das ein Controller sieht (Membership, GKM-Tabellen, Adressen,
+  Ereignisse, Persistenz über Neustart), ist nie `excluded`.
+- **Zwei Server ohne Test.** GeneralCommissioning und
+  AdministratorCommissioning bekommen keinen erfundenen Test: ihr Beweis
+  sind die drei System-Commissioning-Dateien (22 Fälle) und CGEN/CADMIN.
+  Ein Audit der beiden Server gegen `…Server.ts` am Pin gehört in den
+  Bericht von 18b (Unterschiede nach Zeile), nicht ins Register.
+
+### E.3 Die vier Posten
+
+| Welle | Inhalt | Fälle offen | Pfade (disjunkt) | Modell |
+| --- | --- | ---: | --- | --- |
+| 18a | Descriptor (19 + `ClientList`), GeneralDiagnostics (6 + Features 5), BasicInformation (6), Groups-Schema (3), ScenesManagement (1), `protocol/test/groups` KeySets + MessagingState (7) | 47 | `cluster/core/{descriptor,general_diagnostics,basic_information,groups,scenes_*}.go`, `groups/` (KeySets), `bridge/` (ConfigurationVersion), `device/`, `endpoint/` | Opus |
+| 18b | AccessControl Auxiliary (9), OperationalCredentials (12), GroupKeyManagement (6), System-Commissioning (Lifetime 9, Restart 2, FabricBeforeStart 4); Audit GeneralCommissioning und AdministratorCommissioning | 42 | `cluster/core/{access_control*,operational_credentials*,group_key_management*,general_commissioning*}.go`, `bridge/commissioning_window*.go`, `node/`, `secure/` | Opus, Fable-Review Zeile für Zeile |
+| 18c | Groupcast (49) | 49 | `cluster/core/groupcast.go`, `groups/groupcast.go`, `groups/manager.go`, `internal/fabrictest` (Multicast-Netz) | Opus, Fable-Review Zeile für Zeile |
+| 18d | Binding (34 + 12 + 1) | 47 | `binding/`, `cluster/core/binding.go`, `node/client.go`, `endpoint/binding_mount.go` | Opus |
+
+Die Wellen laufen nacheinander (18.3); jede beginnt auf dem main der
+vorigen, Konfliktflächen entfallen. Briefe: BN (18a), BO (18b), BP (18c),
+BQ (18d), jeder geschrieben, wenn seine Welle dran ist, mit dem Befund der
+vorigen.
+
+### E.4 chip-tool
+
+Die Familien der Phase (Roadmap: ACL, ACE, DESC, DGGEN, OPCREDS) laufen
+heute grün in den `core-*`-Gruppen jedes PRs. Ein Fix, der die PICS eines
+Endpunkts bewegt, regeneriert Slices und Goldens in der Welle
+(Harness-Regel); sonst bleibt der Daemon unverändert, und der
+`needs-chiptool`-Lauf ist die Probe, kein Gegenstand.
+
+### E.5 Versionen
+
+Jede Welle ein Patch (`v0.8.5`–`v0.8.8`), nacheinander; Phase 18 schließt
+mit der vierten. `v0.9.0` schließt Meilenstein 3 nach Phase 19 (unverändert A.6).
+
+### E.6 Risiken
+
+- **Groupcast-Netz.** 49 Fälle, davon rund ein Drittel auf
+  `MockNetwork` (Multicast-Beitritt, IANA-Adresse über Fabrics, Join-Fehler
+  mit Wiederholung). `fabrictest` braucht dafür ein Multicast-Modell mit
+  Fehlerinjektion; ohne es bleiben diese Fälle `missing`, nicht
+  `excluded`.
+- **Binding-Clients.** matter.js installiert deklarierte Client-Behaviors
+  auf dem materialisierten Endpunkt; go-fabric kennt Clients als
+  `node/client.go`-Pfad. Die Client-Auswahl-Fälle (`BindingManagerTest.ts`
+  „client selection") sind der Teil, der am ehesten eine Grenze von
+  `contract/` berührt; 18d meldet das als Frage, bevor es baut.
+- **OperationalCredentials.** Zertifikats- und Vendor-ID-Prüfungen sind
+  Pflichtverhalten (TC-OPCREDS); ein Fix dort läuft mit `make race` und der
+  OPCREDS-Familie vor dem Push.
+- **Umfang.** 185 offene Fälle in vier Wellen; Tranchenregel wie Teil D.
+
