@@ -193,10 +193,15 @@ shape each other.
 | 21 | observability and persistence as ports: `slog` attribute conventions, a metrics hook, the diagnostic event ring; the `Store` seam proved by a second implementation (in-memory, for tests and small daemons); hardening a daemon in the field needs (session and subscription limits documented, PASE attempt limit after §5.5, fuzz targets for the controller decoders) | the persistence and concurrency guides describe the ports; `make fuzz` covers the new targets |
 | 22 | packaging and the cookbook: container image and systemd unit for the reference apps, arm64, the "embed in a daemon" guide written against a `go-*2mqtt` project; the concept documents of the go-ha-matter-bridge and the adapter module | a 2mqtt daemon exposes one device type end to end on the kit |
 
-**Value.** The diamond-standard claim lives here: matter.js asks a host to
-learn behaviours, agents and transactions; this module should ask for a
-device type and a handful of callbacks. Consumers: every one; the HA bridge
-and the 2mqtt family cannot start before it.
+**Value.** The diamond-standard claim lives here, and it is a claim about
+embedding and operation, not about Matter semantics: **ahead of matter.js
+in embedding and operation, equal in semantics** (owner, 2026-10-19).
+matter.js asks a host to learn behaviours, agents and transactions; this
+module should ask for a device type and a handful of callbacks, and ship
+as one static binary with a small footprint. On the wire it is a port of
+matter.js and can be as correct as its source, not more; the ecosystem
+exceptions stay matter.js's. Consumers: every one; the HA bridge and the
+2mqtt family cannot start before it.
 
 **Done when.** The comparison's "device model" and "runtime" sections have
 no ◐ left except the behaviour-layer idiom row; loom and one 2mqtt daemon
