@@ -106,7 +106,7 @@ Coverage `cluster/lock`: 92.2 % (floor 86 → 90).
   "all cleared"); `store.SettingDoorLockCredentialKey` holds the 16-byte key,
   hex.
 - Pins: `len(Migrations())` 5, last `v6`; 17 matter_* tables; fingerprint
-  `b50fe661e4bdb70e9bdaf5f9841e744c48eab9b434b2471e6940da06942d506f`.
+  `61dbbe675b39511055520c3127b19a0a7736ac6b0ad1ee8f3c8b2da203a0c6cc`.
   When BL's v5 lands, the pin becomes 6 and the fingerprint moves again.
 
 ## chip-tool
@@ -238,3 +238,20 @@ the run at 678bb96 passed. After the chip-tool runs the branch merged
   local zone (`LockSchedule.ts:97-112`); the Go server reads
   `DoorLockConfig.Location`, `time.Local` when nil — the same default, with a
   host override.
+
+## Decided in review (2026-10-19)
+
+- `NewDoorLockServer` stays (it panics on a configuration `New` refuses);
+  a deprecation follows the API window of README §API stability, not this
+  wave. The optional settings attributes (Language, LEDSettings,
+  SoundVolume, …) wait for a host that needs them.
+- The daemon keeps UBOLT and RequirePINforRemoteOperation false; records
+  keyed by the endpoint's StableKey.
+- The register candidates are in `notes/parity/matter_behaviour_findings.md`
+  (BM block): the monotonic clock reading (milestone 4) and the missing
+  ExpiringUser warning. The request-schema remap as a definition option is
+  a design idea, not a parity gap: no entry.
+- by_design: `BD-Matter-DoorLock-CredentialCipher`,
+  `BD-Matter-DoorLock-HostLockState`, `BD-Matter-DoorLock-ScheduleZone`.
+- The DRLK goldens are regenerated once more on the merged branch (BL's
+  PICS and goldens landed first).

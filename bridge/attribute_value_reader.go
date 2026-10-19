@@ -10,6 +10,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -62,6 +63,11 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, false)
 		return im.AttributeValue{Value: v}, err
+	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrPresets && el.IsContainer:
+		// Thermostat Presets (0x0201:0x0050) is a list of PresetStruct the
+		// generated definition decodes (brief BL), as matter.js decodes it
+		// with the attribute's TlvSchema.
+		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, false)
 	}
 	return primitiveAttributeValue(el, dec)
 }
@@ -511,6 +517,8 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, true)
 		return im.AttributeValue{Value: v}, err
+	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrPresets && el.IsContainer:
+		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, true)
 	}
 	v, err := primitiveAttributeValue(el, dec)
 	if err != nil {

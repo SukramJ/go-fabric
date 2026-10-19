@@ -39,6 +39,7 @@ func TestSchemaCreatesEveryTableThePackageQueries(t *testing.T) {
 		// stays so every database keeps the same schema (schema.sql).
 		"matter_persistent_subscriptions",
 		"matter_server_subscriptions",
+		"matter_thermostat_presets",
 	} {
 		if !strings.Contains(ddl, "CREATE TABLE IF NOT EXISTS "+table) {
 			t.Errorf("Schema() does not create %s", table)

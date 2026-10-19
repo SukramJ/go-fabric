@@ -36,3 +36,24 @@ func AuthorityAt(ctx context.Context, endpoint uint16, clusterID uint32, privile
 	}
 	return fn(endpoint, clusterID, privilege)
 }
+
+type commandPathCtxKey struct{}
+
+// WithCommandPath stamps the concrete path of the command ctx belongs to:
+// the endpoint dispatcher stamps it before a cluster server's MatterInvoke
+// runs, so a server that checks a privilege for part of its request
+// ([AuthorityAt]) names the location the command runs at.
+//
+// Mirrors the location matter.js builds from the invoking endpoint for
+// `context.authorityAt(writeLevel, location)` (packages/node/src/behaviors/
+// thermostat/AtomicWriteHandler.ts:187-193 at 862ad75f).
+func WithCommandPath(ctx context.Context, path ConcreteCommandPath) context.Context {
+	return context.WithValue(ctx, commandPathCtxKey{}, path)
+}
+
+// CommandPathFromContext returns the path [WithCommandPath] stamped; ok is
+// false outside a dispatched command.
+func CommandPathFromContext(ctx context.Context) (path ConcreteCommandPath, ok bool) {
+	path, ok = ctx.Value(commandPathCtxKey{}).(ConcreteCommandPath)
+	return path, ok
+}

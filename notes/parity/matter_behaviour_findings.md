@@ -383,11 +383,6 @@ Device side:
   marks them `assertedAtRoot`, never refuses, logs at debug
   (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
   (With the previous item.)
-- **KeypadLockout is reset on every start.**
-  `cluster/thermo/thermostatuserinterfaceconfiguration.go:31-32`; matter.js
-  #4775 assigns NoLockout only when the state is undefined
-  (`ThermostatUserInterfaceConfigurationServer.ts:30-32`; "keeps a written
-  KeypadLockout across a restart"). (Milestone 3, thermostat servers.)
 - **OTA provider applies the requestor's `NewVersion` unchecked against the
   token.** `cluster/core/ota_provider.go:558-563` checks consent on the raw
   value; matter.js #4736 rewrites `NewVersion 0` under a known token to the
@@ -583,6 +578,50 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-17d DoorLock port (brief BM, PR #176, 2026-10-19).
+Line numbers at `862ad75f`.
+
+- **`clock.Clock` has no monotonic reading.** matter.js measures the
+  wrong-code lockout on `Time.nowUs` (`DoorLockServer.ts:1184`, `:1192-1195`)
+  and its tests step the wall clock apart from the timers
+  (`DoorLockServerTest.ts:1366` "measures the lockout on the monotonic
+  clock", register `missing`); `clocktest.Fake` has one reading, so a
+  wall-clock step moves a deadline kept as `time.Time` too, and the case
+  has no in-process port. Under `clock.System` the comparison is monotonic.
+  Fix: a monotonic reading on `clock.Clock` and `clocktest.Fake`.
+  (Milestone 4, the embedding layer.)
+- **An ExpiringUser provisioned without ExpiringUserTimeout logs no
+  warning.** `#warnIfExpiryUnbounded` (`DoorLockServer.ts:1233-1240`, run
+  by SetUser Add and Modify, `:291`, `:328`, `:480`) warns that the user's PIN is
+  denied until the attribute is set; `cluster/lock/users.go`
+  `setUserLocked` denies as matter.js does (`authorizeUserLocked`) but
+  logs nothing. (Milestone 3, next lock change.)
+
+Found by the phase-17c Thermostat port (brief BL, PR #175, 2026-10-19).
+Line numbers at `862ad75f`.
+
+- **A staged Presets write bumps the DataVersion and is re-reported.** A
+  controller's write of Presets inside an atomic write is staged in the
+  write's state and answers SUCCESS (`cluster/thermo/atomic.go`
+  `writeAtomicAttribute`); the dispatcher then treats it as a stored
+  write, bumps the Thermostat's DataVersion and announces Presets, though
+  the stored presets did not change. In matter.js the setter hands the
+  value to the `AtomicWriteHandler` (`ThermostatServer.ts:1702-1716`,
+  `AtomicWriteHandler.ts:243-266`) and the write's transaction has nothing
+  to commit, so neither the version nor a report moves until CommitWrite.
+  Fix: a cluster server's write reports "staged, not stored" and the
+  dispatcher skips the bump. (Milestone 3, with the next `im` write-path
+  change.)
+- **The OccupancySensing coupling is not built.** matter.js's
+  `#setupOccupancyIntegration` follows the Occupancy attribute of an
+  OccupancySensing server on the endpoint `localOccupancyMeasurementEndpoint`
+  names, preferring it over `externallyMeasuredOccupancy`
+  (`ThermostatServer.ts:538-558`); the Go server takes occupancy from the
+  host only (`ThermostatServer.SetOccupied`, matter.js's
+  `externallyMeasuredOccupancy`, `:559-575`). A host that composes a
+  thermostat with an occupancy sensor wires the two itself. (Milestone 4,
+  the embedding layer.)
+
 Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
 
 - **The materialised Switch server runs on the system clock.**
@@ -601,6 +640,7 @@ Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
   `ep3`) would move the composition and the IDM goldens. Harness note, not
   a parity gap; `internal/chiptool/families_table_test.go` classifies it.
   (With the next CHIP image lift, if at all.)
+
 Found by the phase-17a port of the OnOff, LevelControl, ColorControl,
 Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 2026-10-19). Line numbers at `862ad75f`.

@@ -280,6 +280,21 @@ CREATE TABLE IF NOT EXISTS matter_ota_default_providers (
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 
+-- matter_thermostat_presets persists a Thermostat endpoint's presets and
+-- its active preset handle, both nonvolatile in matter.js
+-- (packages/node/src/behaviors/thermostat/ThermostatServer.ts persistedPresets,
+-- quality "N"; thermostat-cluster.element.ts ActivePresetHandle "X N").
+-- endpoint_key names the endpoint as the host does (its StableKey); presets
+-- is the TLV encoding of the Presets list (thermo.EncodePresets), so the
+-- stored value is the attribute's own; active_preset_handle is NULL for no
+-- active preset. New in brief BL; `IF NOT EXISTS` is its migration (v5).
+CREATE TABLE IF NOT EXISTS matter_thermostat_presets (
+    endpoint_key            TEXT       PRIMARY KEY,
+    presets                 BLOB       NOT NULL,
+    active_preset_handle    BLOB,
+    updated_at              TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- matter_doorlock_users, matter_doorlock_credentials and
 -- matter_doorlock_schedules hold the DoorLock server's user database, its
 -- credentials and its week-day, year-day and holiday schedules

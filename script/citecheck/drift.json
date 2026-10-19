@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1356,
+    "line": 1363,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1671,
+    "line": 1688,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -1063,7 +1063,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 136,
+    "line": 196,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1072,7 +1072,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 173,
+    "line": 234,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1081,7 +1081,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 578,
+    "line": 785,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1091,7 +1091,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 789,
+    "line": 1012,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1100,7 +1100,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 914,
+    "line": 1144,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1110,7 +1110,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 957,
+    "line": 1308,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",

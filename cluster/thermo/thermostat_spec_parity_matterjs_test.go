@@ -17,7 +17,7 @@ import (
 // TestServerMatchesTheGeneratedDefinition holds every selection the server
 // serves against matter.js thermostat-cluster.element.ts
 // (spectest.CheckServer): HEAT, COOL, HEAT+COOL and HEAT+COOL+AUTO, each
-// with and without LTNE.
+// with and without LTNE, OCC and PRES.
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
 	for _, base := range []uint32{
@@ -26,9 +26,14 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 		thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL,
 		thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL | thermo.ThermostatFeatureAUTO,
 	} {
-		for _, f := range []uint32{base, base | thermo.ThermostatFeatureLTNE} {
+		for _, f := range []uint32{
+			base, base | thermo.ThermostatFeatureLTNE, base | thermo.ThermostatFeatureOCC,
+			base | thermo.ThermostatFeaturePRES, base | thermo.ThermostatFeatureOCC | thermo.ThermostatFeaturePRES,
+		} {
 			cfg := thermo.DefaultThermostatConfig()
 			cfg.Features = f
+			cfg.NumberOfPresets = 1
+			cfg.PresetTypes = []thermo.PresetType{{PresetScenario: tdef.PresetScenarioOccupied, NumberOfPresets: 1}}
 			srv, err := thermo.New(cfg)
 			if err != nil {
 				t.Fatalf("features 0x%X: %v", f, err)
@@ -39,12 +44,13 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 }
 
 // TestFeaturesTheServerDoesNotServeAreRefused pins the refusal of a
-// feature whose elements the server does not serve — Occupancy's
-// Unoccupied setpoints, the schedule and preset attributes and commands —
-// New with ErrFeatures, NewThermostatServer with a panic.
+// feature whose elements the server does not serve — the schedules
+// (MatterScheduleConfiguration, "not yet implemented" in matter.js),
+// Setback, which matter.js refuses, the events and the suggestions — New with
+// ErrFeatures, NewThermostatServer with a panic.
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {
 	t.Parallel()
-	for _, f := range []tdef.Feature{tdef.FeatureOccupancy, tdef.FeatureMatterScheduleConfiguration, tdef.FeaturePresets} {
+	for _, f := range []tdef.Feature{tdef.FeatureMatterScheduleConfiguration, tdef.FeatureSetback, tdef.FeatureEvents, tdef.FeatureThermostatSuggestions} {
 		cfg := thermo.DefaultThermostatConfig()
 		cfg.Features |= uint32(f)
 		if _, err := thermo.New(cfg); !errors.Is(err, thermo.ErrFeatures) {
