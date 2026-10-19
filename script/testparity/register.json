@@ -818,15 +818,11 @@
       "path": "packages/node/test/behaviors/door-lock/DoorLockServerTest.ts",
       "status": "partial",
       "go": [
-        "cluster/lock:TestDoorLockServerParity"
+        "cluster/lock:TestDoorLockServerParity",
+        "cluster/lock:TestDoorLockServerScheduleRestrictedAccessParity",
+        "cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity"
       ],
       "missing": [
-        "denies a ${UserType[userType]} with no schedules configured",
-        "grants a WeekDayScheduleUser inside a matching schedule and denies outside it",
-        "grants a YearDayScheduleUser inside a matching time window and denies outside it",
-        "requires both WeekDay AND YearDay schedules to match for a ScheduleRestrictedUser once both are set",
-        "includes the start minute and excludes the end minute",
-        "includes the whole of 23:59 when the window ends there",
         "relocks once AutoRelockTime has passed since the latest unlock",
         "unlocks and stays unlocked",
         "keeps granting access before the timeout elapses",

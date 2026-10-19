@@ -486,9 +486,20 @@ func (f *lockFixture) stepWallClock(d time.Duration) {
 // now is Time.nowMs as the lock reads it.
 func (f *lockFixture) now() time.Time { return f.site.Clock().Now() }
 
-// currentLocal is DoorLockServerTest.ts:156-164.
+// currentLocal is DoorLockServerTest.ts:156-164 before a site exists:
+// every site's clock starts at fabrictest.DefaultStart, as every matter.js
+// case starts at MockTime's.
+func currentLocal() (day time.Weekday, hour int, epochS int64) {
+	return localAt(fabrictest.DefaultStart)
+}
+
+// currentLocal is DoorLockServerTest.ts:156-164 on the fixture's clock.
 func (f *lockFixture) currentLocal() (day time.Weekday, hour int, epochS int64) {
-	now := f.now().In(time.Local)
+	return localAt(f.now())
+}
+
+func localAt(t time.Time) (day time.Weekday, hour int, epochS int64) {
+	now := t.In(time.Local)
 	return now.Weekday(), now.Hour(), lock.LocalInstantOf(now).EpochS
 }
 
