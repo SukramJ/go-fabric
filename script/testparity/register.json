@@ -1109,8 +1109,11 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat-user-interface-configuration/ThermostatUserInterfaceConfgurationServerTest.ts",
-      "status": "planned",
-      "reason": "KeypadLockout default, configuration and persistence across a restart.",
+      "status": "ported",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_ThermostatUserInterfaceConfigurationServerTest"
+      ],
+      "reason": "Every case runs on a fabrictest device; KeypadLockout is configured through ThermostatUIConfig.KeypadLockout and persists through its Settings (the node's store), the restart adding a new server on the restarted node's store.",
       "snapshotSha": "b698a21e1442c6249feaf8d3ab791eb14abaa2f7"
     },
     {

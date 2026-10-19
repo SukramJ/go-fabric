@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 56 |
+| ported | 57 |
 | partial | 117 |
-| planned | 64 |
+| planned | 63 |
 | excluded | 87 |
 | total | 324 |
 
@@ -67,7 +67,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
-| [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
@@ -457,7 +457,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ThermostatUserInterfaceConfgurationServerTest.ts | 68 | planned | â€” | KeypadLockout default, configuration and persistence across a restart. |
+| ThermostatUserInterfaceConfgurationServerTest.ts | 68 | ported | `cluster/thermo:TestParityMatterJS_ThermostatUserInterfaceConfigurationServerTest` | Every case runs on a fabrictest device; KeypadLockout is configured through ThermostatUIConfig.KeypadLockout and persists through its Settings (the node's store), the restart adding a new server on the restarted node's store. |
 
 ## node/test/behaviors/thread-network-diagnostics
 
@@ -1031,10 +1031,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/switch
 
 - `SwitchServerTest.ts` â€” The Switch server's validators, debounce and the latching and momentary press state machines, which milestone 3 phase 17 ports.
-
-### node/test/behaviors/thermostat-user-interface-configuration
-
-- `ThermostatUserInterfaceConfgurationServerTest.ts` â€” KeypadLockout default, configuration and persistence across a restart.
 
 ### node/test/behaviors/thread-network-diagnostics
 
