@@ -3827,7 +3827,7 @@
         "returns the only key for the default key set",
         "returns the second-newest key for the IPK key set (§4.14.2.6)"
       ],
-      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0.",
+      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go CASE destination identifier takes the fabric identity's IPK installed at AddNOC, not the second-newest key of key set 0, although KeySetWrite of key set 0 is accepted and stored (findings BO: a rotated IPK does not reach CASE; wave 18c).",
       "snapshotSha": "63ab34a45d0cbe4b2da1181f1f6556c27356ec6c"
     },
     {

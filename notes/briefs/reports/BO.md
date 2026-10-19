@@ -239,3 +239,31 @@ candidates, no fix but fix 2).
   is not gated on the arming fabric; `handleArmFailSafe` (b)+(c) gates both
   re-arm and disarm on it, as chip `GeneralCommissioningCluster.cpp:420` and
   matter.js `FailsafeTimer.ts:53-57` do. The entry should go.
+
+## Decided in review (2026-10-19)
+
+- Every cited fix line and node-wiring citation read against the pin: fix 1
+  (`VendorId.isOperational`, VendorId.ts:44), fix 2
+  (GeneralCommissioningServer.ts:92-104 → FailsafeTimer.ts:61-65 →
+  FailsafeContext.ts:314 → ServerNodeFailsafeContext.ts:84-90; chip
+  GeneralCommissioningCluster.cpp:429-435), InteractionServer.ts:198/:1017,
+  GeneralDiagnosticsServer.ts:51-52/:125-143/:352,
+  BasicInformationServer.ts:132-138,
+  BridgedDeviceBasicInformationServer.ts:72-90. All hold.
+- Key set 0 (owner, wizard): wave 18c, a `secure/` change by the owner. The
+  report's premise that KeySetWrite refuses key set 0 is wrong —
+  `handleKeySetWrite` checks the epoch fields, not the id — so the gap is a
+  rotated IPK not reaching CASE (findings BO); the register reason is
+  corrected.
+- `node.Config.MaxPathsPerInvoke` stays unbounded, as matter.js's
+  `basicInformation.maxPathsPerInvoke`; 0 is the default, the DataModelTest
+  check covers the rest.
+- The OpCreds "keeps group keys …" case stays `missing` until 18c's multicast
+  model runs its last leg; a case counts as ported when every leg runs.
+- by_design: `BD-Matter-AccessControl-AuxiliaryEntriesTyped` added,
+  `BD-Matter-FailSafeDisarmOwnership` removed (stale, noted in the new entry).
+- Findings (BO block): the rotated IPK, the delayed ACL apply, the extension
+  hook (M4), the fabric event for label/VID, the AdministratorCommissioning
+  check order, the BC feature (M4), FailSafeExpiryLengthSeconds 900 vs 60.
+  SetRegulatoryConfig CountryCode is already open there (batch 1); the
+  NetworkCommissioning snapshot waits for Wi-Fi to leave testing (no entry).

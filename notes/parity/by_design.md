@@ -1366,23 +1366,6 @@ on a 36-device central produced enough events to evict the BasicInformation
 StartUp and GeneralDiagnostics BootReason events that a controller reads
 out-of-band right after CASE.
 
-### BD-Matter-FailSafeDisarmOwnership — ArmFailSafe(0) disarm is not gated on the arming fabric
-
-chip `GeneralCommissioningCluster.cpp:420` gates the whole ArmFailSafe body —
-including the `ExpiryLengthSeconds==0` disarm branch — on
-`!IsFailSafeArmed() || MatchesFabricIndex(accessingFabricIndex)`, so only the
-fabric that armed the failsafe may disarm it. go-fabric
-(`cluster/core/general_commissioning.go`) lets any CASE
-fabric send ArmFailSafe(0).
-
-By design (low impact): a foreign fabric disarming another fabric's failsafe
-window mid-commission is already an abnormal flow that cannot be reached in a
-normal single-commissioner pairing, and the disarm now runs the full revert
-path (re-audit finding F1) so a stray disarm cleans up rather than corrupts.
-The ownership guard is a defence-in-depth refinement, not a correctness fix; it
-is tracked here rather than implemented to keep the disarm path simple. (Re-audit
-2026-05-31, finding F5.)
-
 ### BD-Matter-TimedAndQuotaDeferred — per-attribute timed-write enforcement is unbuilt; subscribe-quota eviction mirrors matter.js
 
 Status 2026-10-11 (#47): the command half of this entry is closed. A request
@@ -3611,3 +3594,19 @@ when it is absent (the comment at the attribute's constant). The
 matter.js case "throws when increasing a bridged node's ConfigurationVersion
 that is not enabled" therefore has no Go counterpart and stays `missing`
 in the register with this entry as its reason.
+
+### BD-Matter-AccessControl-AuxiliaryEntriesTyped — an auxiliary ACL entry always carries its type
+
+matter.js's auxiliary providers are free observables, and `#auxiliaryAclFor`
+drops an entry without AuxiliaryType with an error log
+(`AccessControlServer.ts:666-690`; `AccessControlAuxiliaryTest.ts:216-231`
+"ignores provider entries without AuxiliaryType"). The Go
+`AuxiliaryACLSource` yields `store.ACLEntry`, whose auxiliary type is the
+source's (`cluster/core/access_control_auxiliary.go` `auxiliaryACLRead`
+serves every entry as Groupcast), so an untyped entry cannot be built and
+the filter has nothing to drop. The matter.js case stays `missing` in the
+register with this entry as its reason. `BD-Matter-FailSafeDisarmOwnership`
+left this file with brief BO (2026-10-19): `handleArmFailSafe` gates the
+re-arm and the disarm on the arming fabric, as chip
+`GeneralCommissioningCluster.cpp:420` and matter.js `FailsafeTimer.ts:53-57`
+do, so the divergence it described no longer exists.
