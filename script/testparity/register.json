@@ -3842,7 +3842,7 @@
         "returns undefined when there are no legacy entries",
         "clears only the legacy *-data entries"
       ],
-      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
+      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the five missing cases are js-runtime-only: the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
       "snapshotSha": "8ee0caea698f3cd0993ea8a0a23bb649e2c2f41c"
     },
     {
