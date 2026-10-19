@@ -133,3 +133,64 @@ func TestSendMulticastReachesAJoinedListener(t *testing.T) {
 		t.Skip("multicast loopback delivered nothing on this host")
 	}
 }
+
+// memberConn is an in-memory socket with its own membership model, as
+// fabrictest's network socket is: it records joins and leaves and fails
+// the joins err names.
+type memberConn struct {
+	joined []string
+	left   []string
+	err    error
+	closed chan struct{}
+}
+
+func (c *memberConn) ReadFromUDP([]byte) (int, *net.UDPAddr, error) {
+	<-c.closed
+	return 0, nil, net.ErrClosed
+}
+func (*memberConn) WriteToUDP(b []byte, _ *net.UDPAddr) (int, error) { return len(b), nil }
+func (*memberConn) LocalAddr() net.Addr                              { return &net.UDPAddr{IP: net.IPv6loopback, Port: MatterPort} }
+func (c *memberConn) Close() error                                   { close(c.closed); return nil }
+
+func (c *memberConn) JoinGroup(group net.IP) error {
+	if c.err != nil {
+		return c.err
+	}
+	c.joined = append(c.joined, group.String())
+	return nil
+}
+
+func (c *memberConn) LeaveGroup(group net.IP) error {
+	c.left = append(c.left, group.String())
+	return nil
+}
+
+// TestMembershipDelegatesToTheSocketModel pins the seam fabrictest's
+// multicast model rests on: a socket that is no kernel socket but carries
+// JoinGroup/LeaveGroup holds the membership itself — the address checks
+// and the closed check still come first, and its error is the listener's.
+func TestMembershipDelegatesToTheSocketModel(t *testing.T) {
+	c := &memberConn{closed: make(chan struct{})}
+	l := newListener(c)
+	group := net.ParseIP("ff05::fa")
+	if err := l.JoinGroup(group); err != nil {
+		t.Fatalf("JoinGroup: %v", err)
+	}
+	if err := l.LeaveGroup(group); err != nil {
+		t.Fatalf("LeaveGroup: %v", err)
+	}
+	if len(c.joined) != 1 || c.joined[0] != "ff05::fa" || len(c.left) != 1 || c.left[0] != "ff05::fa" {
+		t.Fatalf("socket saw joins %v, leaves %v", c.joined, c.left)
+	}
+	if err := l.JoinGroup(net.ParseIP("2001:db8::1")); err == nil || len(c.joined) != 1 {
+		t.Errorf("a unicast address reached the socket model: %v, joins %v", err, c.joined)
+	}
+	c.err = errors.New("simulated join failure")
+	if err := l.JoinGroup(group); !errors.Is(err, c.err) {
+		t.Errorf("JoinGroup error %v, want the socket model's", err)
+	}
+	_ = l.Close()
+	if err := l.JoinGroup(group); !errors.Is(err, ErrListenerClosed) {
+		t.Errorf("JoinGroup after Close: %v, want ErrListenerClosed", err)
+	}
+}

@@ -33,6 +33,18 @@ var multicastInterfaces = func() []net.Interface {
 	return out
 }
 
+// multicastMember is the optional membership surface of a socket that is
+// no kernel socket — the in-memory socket of fabrictest's network, handed
+// in through internal/udpseam. [Listener.JoinGroup] and
+// [Listener.LeaveGroup] delegate to it before they demand a
+// *net.UDPConn, so the socket's own model decides which groups it holds
+// (matter.js MockUdpSocket.addMembership / dropMembership, which hand the
+// membership to the host's MockNetwork).
+type multicastMember interface {
+	JoinGroup(group net.IP) error
+	LeaveGroup(group net.IP) error
+}
+
 // JoinGroup makes the listener's socket a member of the IPv6 multicast
 // group on every up, multicast-capable interface, so group messages sent
 // to it on the listener's port arrive through [Listener.Serve]. A failure
@@ -55,6 +67,12 @@ func (l *Listener) membership(group net.IP, join bool) error {
 	}
 	if l.isClosed() {
 		return ErrListenerClosed
+	}
+	if mc, ok := l.conn.(multicastMember); ok {
+		if join {
+			return mc.JoinGroup(group)
+		}
+		return mc.LeaveGroup(group)
 	}
 	uc, ok := l.conn.(*net.UDPConn)
 	if !ok {
