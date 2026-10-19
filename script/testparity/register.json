@@ -1055,8 +1055,11 @@
     },
     {
       "path": "packages/node/test/behaviors/on-off/OnOffServerTest.ts",
-      "status": "planned",
-      "reason": "OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports.",
+      "status": "ported",
+      "go": [
+        "cluster/onoff:TestParityMatterJS_OnOffServerTest"
+      ],
+      "reason": "Every case runs on a fabrictest device (the OffOnly case over the wire from a commissioned pair): the async observer, the ten OnWithTimedOff countdown cases on the site's fake clock (timerCountFor is onoff.TimersRunning) and the OffOnly command statuses; the type-only extension case is a compile-time Sink assertion.",
       "snapshotSha": "14a81e94ac361ddfc4916fef611beaf6d3421c19"
     },
     {

@@ -10,6 +10,12 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/behaviors` for OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea.
+
+### Added
+
+- `fabrictest.Endpoint(key, deviceType, servers...)`: a bridged endpoint for `Topology.Bridged` serving cluster servers the test built itself — a feature selection or an initial state no device-layer constructor offers, as matter.js's tests add a `MutableEndpoint(…).with(…Server)` to a `MockServerNode`.
+
 ## [0.8.0] — 2026-10-19
 
 Closes milestone 2 (the test foundation) of the [roadmap](./docs/roadmap.md). Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node` (and the two `packages/protocol/test` files whose subject lives in `controller/client`) onto `fabrictest`.

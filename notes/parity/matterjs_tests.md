@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 54 |
+| ported | 55 |
 | partial | 114 |
-| planned | 69 |
+| planned | 68 |
 | excluded | 87 |
 | total | 324 |
 
@@ -58,7 +58,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 0 | 4 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
@@ -398,7 +398,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OnOffServerTest.ts | 352 | planned | â€” | OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports. |
+| OnOffServerTest.ts | 352 | ported | `cluster/onoff:TestParityMatterJS_OnOffServerTest` | Every case runs on a fabrictest device (the OffOnly case over the wire from a commissioned pair): the async observer, the ten OnWithTimedOff countdown cases on the site's fake clock (timerCountFor is onoff.TimersRunning) and the OffOnly command statuses; the type-only extension case is a compile-time Sink assertion. |
 
 ## node/test/behaviors/operational-credentials
 
@@ -1003,10 +1003,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/occupancy-sensing
 
 - `OccupancySensingServerTest.ts` â€” OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature.
-
-### node/test/behaviors/on-off
-
-- `OnOffServerTest.ts` â€” OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports.
 
 ### node/test/behaviors/operational-credentials
 
