@@ -19,6 +19,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `cluster/core`: SetVIDVerificationStatement refuses the Matter Standard vendor ID 0x0000 with ConstraintError, as it refuses the reserved ones — the VendorID must be operational, not merely valid (`OperationalCredentialsServer.ts:516-518`, `VendorId.ts:44`). It used to set a fabric's vendor ID to 0.
+- `cluster/core`: ArmFailSafe with ExpiryLengthSeconds 0 no longer takes the request's Breadcrumb: an armed fail-safe expires and its expiry resets the Breadcrumb to 0, a fail-safe not armed is left unchanged (`GeneralCommissioningServer.ts:92-104`, `ServerNodeFailsafeContext.ts:84-91`; chip `GeneralCommissioningCluster.cpp:429-435`).
 
 ## [0.8.5] — 2026-10-19
 
