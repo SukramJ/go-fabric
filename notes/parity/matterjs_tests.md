@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 54 |
+| ported | 55 |
 | partial | 114 |
-| planned | 69 |
+| planned | 68 |
 | excluded | 87 |
 | total | 324 |
 
@@ -66,7 +66,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
+| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 1 | 1 | 4 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
@@ -447,7 +447,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | AtomicWriteHandlerTest.ts | 519 | planned | — | Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets. |
-| AtomicWriteStateTest.ts | 41 | planned | — | The atomic-write state emitting closed once, built with the atomic writes. |
+| AtomicWriteStateTest.ts | 41 | ported | `cluster/thermo:TestAtomicWriteStateParity` | The one case runs on the package's atomic-write state (cluster/thermo/atomic.go, the port of AtomicWriteState.ts) on a clocktest.Fake: closed emits once. |
 | PresetsAtomicWriteTest.ts | 215 | planned | — | Writing presets through an atomic write. |
 | PresetsConfigurationTest.ts | 150 | planned | — | Presets seeded from configuration and the write rules without configured presets. |
 | PresetsLocalWriteTest.ts | 460 | planned | — | Local writes of presets: handles, persistence, validation per transaction. |
@@ -1035,7 +1035,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/thermostat
 
 - `AtomicWriteHandlerTest.ts` — Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets.
-- `AtomicWriteStateTest.ts` — The atomic-write state emitting closed once, built with the atomic writes.
 - `PresetsAtomicWriteTest.ts` — Writing presets through an atomic write.
 - `PresetsConfigurationTest.ts` — Presets seeded from configuration and the write rules without configured presets.
 - `PresetsLocalWriteTest.ts` — Local writes of presets: handles, persistence, validation per transaction.

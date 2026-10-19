@@ -1121,8 +1121,11 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteStateTest.ts",
-      "status": "planned",
-      "reason": "The atomic-write state emitting closed once, built with the atomic writes.",
+      "status": "ported",
+      "go": [
+        "cluster/thermo:TestAtomicWriteStateParity"
+      ],
+      "reason": "The one case runs on the package's atomic-write state (cluster/thermo/atomic.go, the port of AtomicWriteState.ts) on a clocktest.Fake: closed emits once.",
       "snapshotSha": "f01d33cb27c29ad3a8e130d3a4b8e62d2bccadea"
     },
     {
