@@ -156,3 +156,12 @@ primaries (1); plus the non-deterministic `it.only`.
   `ColorTemperatureCouplingTest.ts:154-175`): the coupling block rolls back
   with it, the colour temperature couples once on its commit. A Go command
   commits when it returns and couples then; there is no caller transaction.
+
+## Decided in review (2026-10-19)
+
+- The three fixes stand as cited; merged as PR #170 after the labelled chip-tool jobs.
+- The commented-out `it.only` is not a case at the pin: removed from the register's `missing` (LevelControlServerTest is `ported`), the reason keeps the note.
+- Identify's TriggerEffect acceptance is `BD-Matter-Identify-TriggerEffectEverywhere`; the missing `effectTriggered` host hook, the primaries and the ColorControl quiesce timers are findings (block "brief BJ").
+- The caller-level transaction is `BD-Matter-Server-NoCallerTransaction`.
+- `fabrictest.Endpoint` stays; replacing the hand-rolled endpoint types in `node` and `fabrictest` tests is a later tidy-up, not this wave's.
+- The cover construction check is a mirror of matter.js and stays; the CHANGELOG names the host-visible consequence. loom's `coverEndProductTypeFor` maps a plain Cover with VariantBlind to InteriorBlind ("LF & TL") under the lift-only FeatureMap — the owner checks loom before it upgrades.

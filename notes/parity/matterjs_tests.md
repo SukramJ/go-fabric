@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 57 |
-| partial | 115 |
+| ported | 58 |
+| partial | 114 |
 | planned | 65 |
 | excluded | 87 |
 | total | 324 |
@@ -55,7 +55,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 0 | 4 | 0 | 0 |
+| [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
@@ -378,7 +378,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ColorTemperatureCouplingTest.ts | 289 | partial | `cluster/levelcontrol:TestColorTemperatureCoupling`<br>`cluster/levelcontrol:TestParityMatterJS_ColorTemperatureCouplingTest` | Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits. Missing: “leaves the color temperature where a later command in the transaction overrides the coupling off”. |
-| LevelControlServerTest.ts | 315 | partial | `cluster/transition:TestStepCadenceRoundingAndFinish`<br>`cluster/transition:TestRemainingTimeReportsOnCommandChanges`<br>`cluster/levelcontrol:TestExecuteIfOff`<br>`cluster/levelcontrol:TestParityMatterJS_LevelControlServerTest` | The six it cases are ported: the transition to off, RemainingTime on command changes and the two stop cases locally, the timer teardown on a fabrictest node's Stop (the server's own fake clock counts the transition and deferred-report timers) and the anonymous-class server on a fabrictest DimmableLight. Missing is the case matter.js keeps commented out as non-deterministic (:24-53): its vector reports the first CurrentLevel 300 ms after RemainingTime, the Go server at the first step (100 ms), so every later level is sampled at another phase of the quiet interval. Missing: “emits CurrentLevel and RemainingTime updates quietly”. |
+| LevelControlServerTest.ts | 315 | ported | `cluster/transition:TestStepCadenceRoundingAndFinish`<br>`cluster/transition:TestRemainingTimeReportsOnCommandChanges`<br>`cluster/levelcontrol:TestExecuteIfOff`<br>`cluster/levelcontrol:TestParityMatterJS_LevelControlServerTest` | The six it cases are ported: the transition to off, RemainingTime on command changes and the two stop cases locally, the timer teardown on a fabrictest node's Stop (the server's own fake clock counts the transition and deferred-report timers) and the anonymous-class server on a fabrictest DimmableLight. Not counted (no `it` at the pin): the case matter.js keeps commented out as non-deterministic (:24-53); its vector reports the first CurrentLevel 300 ms after RemainingTime, the Go server at the first step (100 ms), so every later level is sampled at another phase of the quiet interval. |
 | OnOffCouplingTest.ts | 145 | partial | `cluster/levelcontrol:TestOnOffCoupling`<br>`cluster/levelcontrol:TestNativeSourceOnOffCoupling`<br>`cluster/levelcontrol:TestParityMatterJS_OnOffCouplingTest` | The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns. Missing: “lifts the on/off coupling block when its transaction rolls back”. |
 | RemainingTimeTest.ts | 195 | partial | `cluster/transition:TestCancelReportsZero`<br>`cluster/levelcontrol:TestParityMatterJS_LevelControlRemainingTimeTest` | The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup. Missing: “reads zero after a stop, although the application stated a remaining time”; “reads zero after a stop, although the application stated a later end time”. |
 
