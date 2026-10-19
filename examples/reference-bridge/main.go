@@ -321,6 +321,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 		applier.requestor = func() *mattercore.OTASoftwareUpdateRequestor { return n.Root().OTARequestor }
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
+	devices.lock.auth = n.Store()
 
 	eps, err := devices.endpoints()
 	if err != nil {
