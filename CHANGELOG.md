@@ -10,6 +10,17 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node`: `Config.GeneralDiagnosticsFeatures` selects the root GeneralDiagnostics' features (nil keeps DataModelTest, matter.js's default) and `Config.MaxPathsPerInvoke` sets the node's batch limit (0 is 10): BasicInformation advertises it, the PASE and CASE session parameters carry it, and the invoke path refuses a larger batch with InvalidAction (`InteractionServer.ts:198`, `:1017`). `Node.Start` runs the DataModelTest check matter.js runs when the node comes online and fails without the feature above one path per invoke (`GeneralDiagnosticsServer.ts:125-143`, `:352`). `bridge.Config.MaxPathsPerInvoke` and `im.ValidateInvokeBatchWithin` carry the limit.
+- `node`: `Config.CapabilityMinima` reaches the root BasicInformation; a zero field keeps the default, a value the host sets wins (`CapabilityMinimaTest.ts`).
+- `node`: `Aggregator.IncreaseConfigurationVersions(keys...)` raises several bridged devices' ConfigurationVersion and the node's once, as one change, and persists them in one pass (`BasicInformationServer.ts:132-138`, `BridgedDeviceBasicInformationServer.ts:72-90`).
+
+### Fixed
+
+- `cluster/core`: SetVIDVerificationStatement refuses the Matter Standard vendor ID 0x0000 with ConstraintError, as it refuses the reserved ones — the VendorID must be operational, not merely valid (`OperationalCredentialsServer.ts:516-518`, `VendorId.ts:44`). It used to set a fabric's vendor ID to 0.
+- `cluster/core`: ArmFailSafe with ExpiryLengthSeconds 0 no longer takes the request's Breadcrumb: an armed fail-safe expires and its expiry resets the Breadcrumb to 0, a fail-safe not armed is left unchanged (`GeneralCommissioningServer.ts:92-104`, `ServerNodeFailsafeContext.ts:84-91`; chip `GeneralCommissioningCluster.cpp:429-435`).
+
 ## [0.8.5] — 2026-10-19
 
 Milestone 3, phase 18a, brief BN: the behaviour-test ports of Descriptor, GeneralDiagnostics, BasicInformation, Groups, ScenesManagement and the protocol group tests against matter.js at `862ad75f` — 38 of 47 open cases, four fixes the ports found.

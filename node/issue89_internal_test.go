@@ -39,13 +39,16 @@ func TestResponderSessionParamsCarryTCP(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			p := responderSessionParams(tc.tcp)
+			p := responderSessionParams(tc.tcp, 0)
 			if p.SupportedTransports != tc.want {
 				t.Fatalf("SupportedTransports %#x, want %#x", p.SupportedTransports, tc.want)
 			}
 			d := bridge.DefaultSessionParameters()
 			if p.SessionIdleInterval != d.SessionIdleInterval || p.SessionActiveInterval != d.SessionActiveInterval || p.MaxPathsPerInvoke != d.MaxPathsPerInvoke {
 				t.Errorf("the MRP intervals and MaxPathsPerInvoke moved: %+v", *p)
+			}
+			if got := responderSessionParams(tc.tcp, 1).MaxPathsPerInvoke; got != 1 {
+				t.Errorf("MaxPathsPerInvoke %d with the node's 1, want 1", got)
 			}
 			if tc.want != 0 && p.MaxTCPMessageSize != sessionparams.DefaultMaxTCPMessageSize {
 				t.Errorf("MaxTCPMessageSize %d with TCP, want %d", p.MaxTCPMessageSize, sessionparams.DefaultMaxTCPMessageSize)

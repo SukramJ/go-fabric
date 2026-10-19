@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
 
@@ -161,6 +162,49 @@ func (a *Aggregator) IncreaseConfigurationVersion(key endpoint.SourceKey) error 
 		}
 	}
 	return fmt.Errorf("%w: %v", ErrUnknownKey, key)
+}
+
+// IncreaseConfigurationVersions raises, as one change of the node, the
+// ConfigurationVersion of the bridged endpoints with keys — each physical
+// device once — and the node's own once, after them, and persists every
+// version raised in one pass. With no key it raises the node's alone. An
+// unknown key fails with [ErrUnknownKey] before anything is raised. Mirrors
+// matter.js BasicInformationServer.increaseConfigurationVersion(change)
+// (BasicInformationServer.ts:132-138: the change first, one increment
+// afterwards) with the bridged devices raised under the shared context
+// (BridgedDeviceBasicInformationServer.ts:72-90); the bridge's
+// IncreaseNodeConfigurationVersionWith does the raising.
+func (a *Aggregator) IncreaseConfigurationVersions(keys ...endpoint.SourceKey) error {
+	topo := a.n.br.Topology()
+	if topo == nil {
+		return errors.New("node: no topology yet")
+	}
+	type device struct{ scope, address string }
+	var devices []device
+	for _, key := range keys {
+		found := false
+		for _, ep := range topo.Bridged() {
+			if ep.SourceKey == nil || key == nil || ep.SourceKey.String() != key.String() {
+				continue
+			}
+			found = true
+			d := device{ep.Scope, ep.DeviceAddress}
+			if !slices.Contains(devices, d) {
+				devices = append(devices, d)
+			}
+			break
+		}
+		if !found {
+			return fmt.Errorf("%w: %v", ErrUnknownKey, key)
+		}
+	}
+	versions := a.n.br.IncreaseNodeConfigurationVersionWith(func(c *bridge.ConfigurationChange) {
+		for _, d := range devices {
+			c.IncreaseConfigurationVersion(d.scope, d.address)
+		}
+	})
+	a.n.persisted.storeConfigVersions(topo, versions)
+	return nil
 }
 
 func (a *Aggregator) indexLocked(key string) int {

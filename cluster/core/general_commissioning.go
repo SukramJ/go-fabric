@@ -562,7 +562,19 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		g.failSafeArmed = false
 		g.failSafeFabricIndex = 0
 		g.failSafeCumulativeStarted = false
-		g.breadcrumb = req.Breadcrumb
+		// The request's Breadcrumb is not taken: an armed fail-safe expires,
+		// and its expiry resets the Breadcrumb to 0; a fail-safe not armed
+		// is left without side effect. Mirrors matter.js
+		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:100-104
+		// (`if (expiryLengthSeconds === 0) return SuccessResponse` when not
+		// armed) and :92-97 → packages/protocol/src/common/FailsafeTimer.ts:61-65
+		// (an armed fail-safe expires) → FailsafeContext.ts:314
+		// restoreBreadcrumb → ServerNodeFailsafeContext.ts:84-91 (breadcrumb
+		// 0); chip GeneralCommissioningCluster.cpp:429-435 ("Don't set the
+		// breadcrumb, since expiring the failsafe should reset it anyway").
+		if wasArmed {
+			g.breadcrumb = 0
+		}
 		// Bump DataVersion on disarm so Apple's MTRDevice sees a version
 		// change and invalidates its cached DataVersion=0.
 		// Mirrors chip MarkAttributeDirty(Breadcrumb).

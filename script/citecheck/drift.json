@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 632,
+    "line": 640,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1363,
+    "line": 1371,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1688,
+    "line": 1696,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -622,7 +622,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 958,
+    "line": 970,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -2104,7 +2104,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 152,
+    "line": 174,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2131,7 +2131,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 556,
+    "line": 563,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",

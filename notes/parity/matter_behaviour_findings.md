@@ -578,6 +578,59 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-18b security and commissioning port (brief BO, PR #184, 2026-10-19).
+Line numbers at `862ad75f`.
+
+- **A rotated IPK does not reach CASE.** A KeySetWrite of key set 0 is
+  accepted and stored (`cluster/core/group_key_management.go`
+  `handleKeySetWrite` checks the epoch fields, not the id); the CASE
+  destination identifier takes the fabric identity's IPK installed at AddNOC
+  (`secure/sigma/initiator.go:197`, `ComputeDestinationID`), where matter.js
+  takes the second-newest operational key of key set 0, the only one when
+  there is one (`KeySets.ts:113-121`, §4.14.2.6.1). An administrator
+  rotating the IPK loses CASE to the node. The two key-set-0 cases of
+  `KeySetsTest.ts` are `missing` for this. (Wave 18c, a `secure/` change by
+  the owner; decided 2026-10-19.)
+- **The effective ACL is applied entry by entry.** matter.js applies a
+  written ACL to the manager when the interaction ends
+  (`AccessControlServer.ts:545-560` `#handleInteractionBegin`/`End`,
+  `:598-602` `#applyDelayedAclUpdateFor`); a chunked Go write is in force
+  per entry, so a concurrent request can meet a partly written list. One
+  `AccessControlAuxiliaryTest.ts` case is `missing` for this. (Milestone 3,
+  phase 19; security path, the owner's read.)
+- **No extension access-check hook.** `extensionEntryAccessCheck`
+  (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
+  has none. (Milestone 4, with `AccessControlCustomExtensionTest.ts`.)
+- **A fabric label or vendor-ID change raises no fabric event.** matter.js
+  emits `fabricsChanged(index, "updated")` for every updated fabric
+  (`OperationalCredentialsServer.ts:579-582` →
+  `CommissioningServer.ts:118-141`); the Go `Observers.OnFabricUpdated`
+  follows UpdateNOC only and its facade handler closes sessions, so
+  UpdateFabricLabel and SetVIDVerificationStatement notify nothing. The two
+  "final fabric change" cases of `OperationalCredentialsServerTest.ts` are
+  `missing` for this. (Milestone 3, phase 19.)
+- **AdministratorCommissioning checks in another order.** matter.js: an open
+  window → Busy, a timeout outside 180–900 s → InvalidCommand, an armed
+  fail-safe → Busy (`AdministratorCommissioningServer.ts:191-212`), then a
+  session without fabric → UnsupportedAccess (`:154-157`);
+  `bridge/commissioning_window.go` checks the fail-safe and the fabric
+  first, so an armed fail-safe with an invalid timeout gets Busy, and a PASE
+  session without fabric Busy instead of UnsupportedAccess. Needs a read
+  against chip's order and the CADMIN cases before a change. (Milestone 3,
+  phase 19.)
+- **No Basic commissioning window (BC).** `openBasicCommissioningWindow`
+  (`AdministratorCommissioningServer.ts:106-116`) answers
+  UnsupportedCommand; the window code carries `IsBasicWindow` without a
+  feature to reach it. One `CommissioningWindowLifetimeTest.ts` case is
+  `missing` for this. (Milestone 4, a node option.)
+- **FailSafeExpiryLengthSeconds is 900 where matter.js seeds 60.**
+  `GeneralCommissioningServer.ts:39-41` seeds 60 s (900 s for
+  MaxCumulativeFailsafeSeconds, `:44-46`); `NewGeneralCommissioning` floors
+  `FailSafeMaxSeconds` at 900 (`cluster/core/general_commissioning.go:226-232`)
+  and refuses a longer ArmFailSafe with ValueOutsideRange (`:594-599`), a
+  check matter.js has not. (Milestone 3, phase 19; decide together with the
+  SetRegulatoryConfig CountryCode item below.)
+
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
 Line numbers at `862ad75f`.
 

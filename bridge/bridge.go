@@ -286,6 +286,14 @@ type Config struct {
 	// [clock.System]. A [github.com/SukramJ/go-fabric/node] hands its
 	// own clock in here.
 	Clock clock.Clock
+	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry;
+	// a larger batch is refused with InvalidAction. 0 is
+	// [im.DefaultMaxPathsPerInvoke]. The host advertises the same value
+	// (BasicInformation MaxPathsPerInvoke, the CASE and PASE session
+	// parameters); [github.com/SukramJ/go-fabric/node] sets all three.
+	// Mirrors matter.js InteractionServer.ts:198, which takes it from the
+	// node's BasicInformation state.
+	MaxPathsPerInvoke uint16
 }
 
 // validate reports whether the config carries every required field.

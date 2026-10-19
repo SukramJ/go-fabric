@@ -124,6 +124,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		SoftwareVersionStr: bi.SoftwareVersionString,
 		SerialNumber:       bi.SerialNumber,
 		UniqueID:           bi.UniqueID,
+		CapabilityMinima:   cfg.CapabilityMinima,
+		MaxPathsPerInvoke:  cfg.MaxPathsPerInvoke,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
@@ -132,7 +134,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 	// RebootCount and the operational time carry over from the previous
 	// boots (wiring.go:118-128).
-	r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
+	if f := cfg.GeneralDiagnosticsFeatures; f != nil {
+		r.GeneralDiagnostics = mattercore.NewGeneralDiagnosticsWith(d.bootReason, *f)
+	} else {
+		r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
+	}
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {

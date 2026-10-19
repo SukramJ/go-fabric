@@ -1220,3 +1220,40 @@ func TestGencomm_ArmFailSafe_HookRunsUnlocked(t *testing.T) {
 		t.Fatalf("ArmFailSafe: %v", err)
 	}
 }
+
+// TestGencomm_ArmFailSafeZeroLeavesTheBreadcrumb: ArmFailSafe with
+// ExpiryLengthSeconds 0 never takes the request's Breadcrumb — an armed
+// fail-safe expires and the expiry resets it to 0, a fail-safe not armed is
+// left without side effect (matter.js GeneralCommissioningServer.ts:92-104,
+// ServerNodeFailsafeContext.ts:84-91; chip GeneralCommissioningCluster.cpp:429-435).
+func TestGencomm_ArmFailSafeZeroLeavesTheBreadcrumb(t *testing.T) {
+	t.Parallel()
+	gc := defaultGencomm(t)
+	breadcrumb := func() uint64 {
+		v, _ := gc.MatterRead(0x0000)
+		return v.(uint64)
+	}
+	arm := func(seconds uint16, crumb uint64) {
+		t.Helper()
+		resp, err := gc.MatterInvoke(context.Background(), 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: seconds, Breadcrumb: crumb})
+		if err != nil || resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+			t.Fatalf("ArmFailSafe(%d, %d) = %+v, %v", seconds, crumb, resp, err)
+		}
+	}
+
+	arm(0, 7)
+	if got := breadcrumb(); got != 0 {
+		t.Errorf("not armed, ArmFailSafe(0, 7): Breadcrumb %d, want 0 (no side effect)", got)
+	}
+	arm(60, 1)
+	if got := breadcrumb(); got != 1 {
+		t.Fatalf("ArmFailSafe(60, 1): Breadcrumb %d, want 1", got)
+	}
+	arm(0, 5)
+	if got := breadcrumb(); got != 0 {
+		t.Errorf("armed, ArmFailSafe(0, 5): Breadcrumb %d, want 0 (reset by the expiry)", got)
+	}
+	if gc.FailSafeArmed() {
+		t.Error("the fail-safe is still armed")
+	}
+}

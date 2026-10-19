@@ -319,8 +319,11 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/CommissioningRestartTest.ts",
-      "status": "planned",
-      "reason": "A node taken offline and started again stays commissionable when uncommissioned and can open a window when commissioned; the Go node's restart path must show the same.",
+      "status": "ported",
+      "go": [
+        "node:TestCommissioningRestart"
+      ],
+      "reason": "A device stopped and started again on its store is commissioned by the controller when it was not, and opens the administrator's enhanced window (revoke, then OpenCommissioningWindow over a new CASE session) when it was (node/commissioning_restart_parity_matterjs_test.go on fabrictest).",
       "snapshotSha": "acdf772580a5c842f9da7d24766649e46fb468d7"
     },
     {
@@ -333,20 +336,16 @@
         "bridge:TestOwnWindow_RevokeCommissioningClosesIt",
         "bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy",
         "bridge:TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen",
-        "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed"
+        "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed",
+        "node:TestCommissioningWindowLifetime"
       ],
       "missing": [
-        "restarts a window the node opened itself when the node opens it again",
-        "keeps a window the node restarted while the timer of the one it replaced fired",
         "replaces a window the node opened itself with an administrator's basic window",
-        "answers Busy to a second window opened while the first is still opening",
         "refuses a window the node opens while an administrator's window is still opening",
         "opens no window once the commissioner closes during the open",
-        "lets a close callback open the next window",
-        "ignores a close after the commissioner closed",
-        "keeps an administrator's window when the node tries to open its own"
+        "ignores a close after the commissioner closed"
       ],
-      "reason": "The node's own window, its timeouts, replacement by an administrator's enhanced window and revoke are covered; the reopen, opening-race and close-callback cases are not.",
+      "reason": "The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). Missing: the Go AdministratorCommissioning has no Basic feature (BC), so there is no administrator's basic window; js-runtime-only, the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node).",
       "snapshotSha": "0eca265225f836d304af49c6a2bcb0a0872e638f"
     },
     {
@@ -357,8 +356,14 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/FabricBeforeStartTest.ts",
-      "status": "planned",
-      "reason": "A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order.",
+      "status": "partial",
+      "go": [
+        "node:TestFabricBeforeStart"
+      ],
+      "missing": [
+        "waits for another transaction that holds the commissioning state"
+      ],
+      "reason": "A node started on a store holding a fabric (commissioned, stopped, started again: a Go node creates no fabric of its own) counts as commissioned, advertises the fabric operationally once and only when no commissionable record is out, logs no error and raises no fabric event (node/fabric_before_start_parity_matterjs_test.go). matter.js's lifecycle.commissioned count has no Go counterpart at start (BD-Matter-Node-CommissioningCompletePerCommand), and its gated fabric write has none either (the Go store writes before the command answers). Missing, js-runtime-only: the commissioning-state transaction lock (FabricChangeLockTest.ts).",
       "snapshotSha": "f30dc72eb7eef72c5b1fdff10969937c8d50a5aa"
     },
     {
@@ -538,25 +543,25 @@
         "bridge:TestACLWriteWithAuxiliaryTypeOverTheWire",
         "groups:TestAuxiliaryACLEntries",
         "cluster/core:TestGroupcastAuxiliaryACLParityMatterJS",
-        "endpoint:TestCheckACLWithTheAuxiliaryFeature"
+        "endpoint:TestCheckACLWithTheAuxiliaryFeature",
+        "cluster/core:TestAccessControlAuxiliaryEventsPerChangedFabric",
+        "cluster/core:TestAccessControlAuxiliarySplitsProviderEntries",
+        "cluster/core:TestAccessControlAuxiliaryRestart",
+        "cluster/core:TestAccessControlAuxiliaryLocalWrite",
+        "cluster/core:TestAccessControlAuxiliaryControllerWrite"
       ],
       "missing": [
-        "installs unchanged provider entries after a restart",
-        "reports AuxiliaryAccessUpdated only for fabrics whose entries changed",
-        "keeps auxiliary entries when the ACL is written locally",
-        "rejects a local ACL write with an entry that includes AuxiliaryType with FAILURE",
-        "splits provider entries to the per-entry subject and target limits",
         "ignores provider entries without AuxiliaryType",
-        "keeps auxiliary entries across a controller ACL write",
         "keeps the applied real entries when auxiliary entries change during a controller ACL write",
         "applies an overridden extension access check to a fabric commissioned after startup"
       ],
-      "reason": "Auxiliary ACL entries from Groupcast, the feature gate and the refused AuxiliaryType write are covered; restart, AuxiliaryAccessUpdated, local writes and the per-entry split are not.",
+      "reason": "Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: an untyped provider entry cannot exist (AuxiliaryACLSource yields store.ACLEntry, served as Groupcast); the Go ACL write lands in the store at once where matter.js delays the effective list to the interaction's end (AccessControlServer.ts:545-605); the Go AccessControl has no overridable extensionEntryAccessCheck (:441-450).",
       "snapshotSha": "9ccf261c72c458d1aa3728439f626ea3b892e21e"
     },
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlCustomExtensionTest.ts",
       "status": "planned",
+      "until": "M4",
       "reason": "A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.",
       "snapshotSha": "4ee3a54035ed20ee81b0e0687711943b476254c5"
     },
@@ -580,9 +585,10 @@
       "go": [
         "cluster/core:TestCapabilityMinimaRev6Defaults",
         "cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum",
-        "cluster/core:TestCapabilityMinimaPreservesCallerValues"
+        "cluster/core:TestCapabilityMinimaPreservesCallerValues",
+        "node:TestConfigCapabilityMinima"
       ],
-      "reason": "The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima, the server state node.Config does not carry.",
+      "reason": "The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima and on node.Config.CapabilityMinima, which the node hands to the root BasicInformation (node:TestConfigCapabilityMinima, brief BO).",
       "snapshotSha": "14c20ec658d9c76822d6e05950a7cd9a6992b721"
     },
     {
@@ -594,12 +600,13 @@
         "cluster/core:TestConfigurationVersionRunsTheChangeThenIncrements",
         "cluster/core:TestConfigurationVersionRefusesADecrease",
         "cluster/core:TestConfigurationVersionGroupsBridgedChanges",
-        "bridge:TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce"
+        "bridge:TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce",
+        "node:TestAggregatorIncreaseConfigurationVersions"
       ],
       "missing": [
         "throws when increasing a bridged node's ConfigurationVersion that is not enabled"
       ],
-      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
+      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and through the node facade's Aggregator.IncreaseConfigurationVersions (persisted once, kept across a restart), and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
       "snapshotSha": "b255a8bb62d2df742a723bc6c3c231b13ac323aa"
     },
     {
@@ -834,9 +841,10 @@
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
       "status": "ported",
       "go": [
-        "cluster/core:TestGeneralDiagnosticsFeatures"
+        "cluster/core:TestGeneralDiagnosticsFeatures",
+        "node:TestStartChecksDataModelTest"
       ],
-      "reason": "The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; node.Config carries neither the selection nor MaxPathsPerInvoke.",
+      "reason": "The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; the node runs it at Start from node.Config.GeneralDiagnosticsFeatures and MaxPathsPerInvoke (node:TestStartChecksDataModelTest, brief BO).",
       "snapshotSha": "c7221dfacafc1c25b8907cda1d5cf89dbed79b4f"
     },
     {
@@ -864,17 +872,15 @@
       "status": "partial",
       "go": [
         "store:TestRemoveGroupKeySet_DropsOnlyItsMappings",
-        "bridge:TestGroupKeyManagementCommandsOverTheWire"
+        "bridge:TestGroupKeyManagementCommandsOverTheWire",
+        "cluster/core:TestGroupKeyManagementProvisionalGroupcast",
+        "cluster/core:TestGroupKeyManagementTooManyGroupKeys",
+        "cluster/core:TestGroupKeyManagementMulticastPolicy"
       ],
       "missing": [
-        "rejects the provisional Groupcast feature",
-        "does not implement the provisional GroupcastAdoption attribute by default",
-        "prevents too many group keys",
-        "accepts a key set whose multicast policy is not PerGroupID and does not store the policy",
-        "reports PerGroupID for a written key set and for the IPK key set",
         "drops the policy from key sets stored by earlier versions"
       ],
-      "reason": "Pruning GroupKeyMap entries of a removed key set is covered; the Groupcast feature refusal, the key-count limit and the multicast policy cases are not.",
+      "reason": "The provisional Groupcast feature (the Go server has no feature selection: FeatureMap without GCAST) and GroupcastAdoption absent, the key-count limit at maxGroupKeysPerFabric 3 (on the server: node.Config carries no such option), the AllNodes policy accepted and not stored and KeySetRead reporting PerGroupID for key sets 1 and 0 over the wire, and the pruning of a removed key set's GroupKeyMap entries are ported (cluster/core/group_key_management_server_parity_matterjs_test.go). Missing, js-runtime-only: matter.js's persisted behavior state of earlier matter.js versions carried the policy; the Go key-set table has no policy column and never had one.",
       "snapshotSha": "0e0ef7a3c5c58a2d2acbff018c1d1a0be8db1c8e"
     },
     {
@@ -1067,8 +1073,19 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "status": "planned",
-      "reason": "AddNOC admin vendor and certificate checks, SetVidVerificationStatement, UpdateNOC keeping the group state, and fabric changes under a bare fail-safe.",
+      "status": "partial",
+      "go": [
+        "node:TestOperationalCredentialsAddNOCAdminVendor",
+        "node:TestOperationalCredentialsAddNOCCertificateChecks",
+        "node:TestOperationalCredentialsSetVIDVerificationStatementVendor",
+        "node:TestOperationalCredentialsUpdateNOC"
+      ],
+      "missing": [
+        "keeps group keys, endpoints, multicast policy and group ACL of the fabric",
+        "treats UpdateFabricLabel as a final fabric change",
+        "treats SetVIDVerificationStatement as a final fabric change"
+      ],
+      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping the group state across a fail-safe expiry and the refused NOC of another fabric are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). Missing: the group-state UpdateNOC case's legs run in TestOperationalCredentialsUpdateNOC, but its unchanged socket multicast memberships need fabrictest's multicast model (wave 18c); the two final-fabric-change cases assert the fabricsChanged event \"1 updated\" (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582), and the Go node raises no fabric event for a label or vendor ID change (Observers.OnFabricUpdated follows UpdateNOC).",
       "snapshotSha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b"
     },
     {
@@ -3810,7 +3827,7 @@
         "returns the only key for the default key set",
         "returns the second-newest key for the IPK key set (§4.14.2.6)"
       ],
-      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0.",
+      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go CASE destination identifier takes the fabric identity's IPK installed at AddNOC, not the second-newest key of key set 0, although KeySetWrite of key set 0 is accepted and stored (findings BO: a rotated IPK does not reach CASE; wave 18c).",
       "snapshotSha": "63ab34a45d0cbe4b2da1181f1f6556c27356ec6c"
     },
     {
