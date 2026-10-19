@@ -3,7 +3,7 @@
 - **Status**: Accepted (2026-10-16; concept v3, decision 0.1)
 - **Date**: 2026-10-16
 - **Related**: [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md),
-  [concept v3](../concept-v3-commissioner-in-the-field.md) §A.1,
+  [concept v3](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) §A.1,
   `docs/matterjs-comparison.md` (the BLE row and non-goal 2)
 
 ## Context

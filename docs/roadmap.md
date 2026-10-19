@@ -109,7 +109,7 @@ seen what Switch, Thermostat and ICD need from it.
 
 ### Milestone 1: The commissioner in the field
 
-**Detail:** [concept v3](./concept-v3-commissioner-in-the-field.md) (German) and
+**Detail:** [concept v3](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) (German, in the history since the milestone closed) and
 [ADR 0024](./adr/0024-ble-commissioning-in-the-controller.md).
 
 | Phase | Content | Proof |
@@ -136,9 +136,9 @@ product is the owner's manual test plan.
 
 ### Milestone 2: The test foundation
 
-**Detail:** [concept v4](./concept-v4-test-foundation.md) (German), written 2026-10-18 when the milestone opened.
+**Detail:** [concept v4](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v4-test-foundation.md) (German), written 2026-10-18 when the milestone opened, in the history since it closed.
 
-**Status 2026-10-18.** Phase 14 done, released as `v0.7.1` (pull requests 151–154): pin `862ad75f`, the upstream fixes classified, the test-porting register (134 `planned` on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phase 15 done, released as `v0.7.2` (pull requests 157, 158, 160): every time source of the module behind `clock.Clock`, `clocktest.Fake` after `MockTime` and the no-raw-time guard; the public `fabrictest` package — in-process devices and controllers on an in-memory network and one clock, after `MockSite` — with the controller's own tests on it and the testing-in-process guide. Phase 16, first wave (brief BH, pull request 164), released as `v0.7.3`: the port of `packages/protocol/test` — 987 cases in Go, every missing case with its reason, 13 files `planned` with an `until`, the fixes the ports found and the X.520 DN gap registered first among eighteen findings; the second wave (brief BI, `packages/node/test/node`) open.
+**Status 2026-10-18.** Phase 14 done, released as `v0.7.1` (pull requests 151–154): pin `862ad75f`, the upstream fixes classified, the test-porting register (134 `planned` on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phase 15 done, released as `v0.7.2` (pull requests 157, 158, 160): every time source of the module behind `clock.Clock`, `clocktest.Fake` after `MockTime` and the no-raw-time guard; the public `fabrictest` package — in-process devices and controllers on an in-memory network and one clock, after `MockSite` — with the controller's own tests on it and the testing-in-process guide. Phase 16, first wave (brief BH, pull request 164), released as `v0.7.3`: the port of `packages/protocol/test` — 987 cases in Go, every missing case with its reason, 13 files `planned` with an `until`, the fixes the ports found and the X.520 DN gap registered first among eighteen findings; the second wave (brief BI, pull request 168), released as `v0.8.0`: the port of `packages/node/test/node` onto `fabrictest` — device side and controller side, every missing case with its reason, 69 files `planned` on the ratchet (the four node files left with `until M5 phase 25`), 22 fixes the ports found, the controller's `Restart`/`CommissionNode`/`Discover` in `fabrictest`. **Milestone 2 is closed with `v0.8.0` (2026-10-19).**
 
 | Phase | Content | Proof |
 | --- | --- | --- |
