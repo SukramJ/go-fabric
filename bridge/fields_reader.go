@@ -97,6 +97,8 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 		// (notes/parity/by_design.md, the permissive command-field
 		// decoding; BD-Matter-LevelControl-LenientDecoders).
 		return decodeGenericTagMap(dec)
+	case 0x0101: // DoorLock
+		return decodeDoorLockFields(path.Command, dec, el)
 	case 0x0300: // ColorControl
 		// These four keep their hand-written decoders and cluster/wire
 		// structs, the shape host ColorControl servers were written
