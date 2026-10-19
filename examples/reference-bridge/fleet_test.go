@@ -384,15 +384,15 @@ func TestAirQualitySensorMountsEveryConcentrationCluster(t *testing.T) {
 
 // TestButtonPressWiringThroughTheDeviceLayer: the button is a
 // device.NewGenericSwitch with device.WithMeasurement, and the bridge still
-// hands its reading the Switch cluster's emitter (bridge/bridge.go reads
-// endpoint.Spec.Measurement), so a press fires.
+// hands its reading the Switch server's position input (bridge/bridge.go
+// reads endpoint.Spec.Measurement), so a press lands.
 func TestButtonPressWiringThroughTheDeviceLayer(t *testing.T) {
 	f, br := startFleetBridge(t)
 	ep := mountedEndpoint(t, br, "demo-button-1")
 	if ep.Measurement != f.button {
 		t.Fatalf("button endpoint %d carries Measurement %T, want the button", ep.ID, ep.Measurement)
 	}
-	if !f.button.press(false) {
-		t.Fatal("the button has no Switch emitter wired: a press reaches no controller")
+	if err := f.button.simulateMultiPress(1, 1, 0, 0); err != nil {
+		t.Fatalf("the button has no Switch position input wired: a press reaches no controller (%v)", err)
 	}
 }

@@ -5,7 +5,7 @@ package contract
 
 // SwitchEventEmitter is the press-event sink of the Matter §1.13
 // GenericSwitch cluster (0x003B), as seen from the model side. The
-// bridge's `cluster/wire.GenericSwitch` implements the four Fire*
+// bridge's `cluster/switch.Server` implements the four Fire*
 // methods; the model's button group calls them while narrating one
 // physical HM press as the ordered Matter gesture sequence
 // (InitialPress → ShortRelease, or InitialPress → LongPress →

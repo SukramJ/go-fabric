@@ -7,59 +7,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// GenericSwitch implements Matter cluster 0x003B (Switch) per Matter
-// Application Cluster Specification 1.5.1 §1.13. The bridge surfaces
-// it for HM Button / Action DPs that fire press events.
+// The Switch cluster (0x003B) of the bridge's first releases. The server
+// itself is now cluster/switch ([switchserver.Server]), the port of
+// matter.js SwitchServer.ts; [GenericSwitch] stays as a thin wrapper over
+// it for hosts that construct it directly, and the measurement materialiser
+// builds the new server.
 //
-// Attributes:
-//
-//   - 0x0000 NumberOfPositions    (uint8, mandatory)
-//   - 0x0001 CurrentPosition       (uint8, mandatory; readable)
-//   - 0x0002 MultiPressMax         (uint8, optional)
-//   - 0xFFFC FeatureMap            (uint32)
-//   - 0xFFFD ClusterRevision       (uint16)
-//
-// Events (cluster-emitted via [contract.EventEmitter]):
-//
-//   - 0x00 SwitchLatched          (LS feature)
-//   - 0x01 InitialPress           (MS / MSL / MSR / AS feature)
-//   - 0x02 LongPress              (MSL feature)
-//   - 0x03 ShortRelease           (MSR feature)
-//   - 0x04 LongRelease            (MSL feature)
-//   - 0x05 MultiPressOngoing      (MSM feature)
-//   - 0x06 MultiPressComplete     (MSM feature)
-//
-// Bridge default features: MS (Momentary Switch) + MSR (Momentary
-// Switch Release) — covers HM short-press handling. MSL (Long
-// Press) flips on when the source DP advertises long-press
-// recognition. AS / MSM / LS are off in v1.1.
-//
-// The cluster is event-driven: attribute reads return spec-mandated
-// constants (CurrentPosition additionally reads live through the
-// optional [GenericSwitchPositionSource] capability), and HM events
-// arrive via [GenericSwitch.Fire*] methods fed from the model layer;
-// the cluster forwards them to the bridge-injected
-// [contract.EventEmitter].
-//
-// The cluster's identity is its generated definition (cluster/spec/
-// switchcluster, ADR 0013, from matter.js switch.element.ts): ids,
-// revision, the feature bits, the attribute and event lists the feature
-// selection yields, the write statuses and the event payloads. The
-// projection of the host's presses stays here.
+// The constants below name the cluster's identity from its generated
+// definition (cluster/spec/switchcluster, ADR 0013, from matter.js
+// switch.element.ts).
 const (
 	matterClusterGenericSwitch = swdef.ClusterID
 
 	matterAttrSwitchNumberOfPositions = swdef.AttrNumberOfPositions
 	matterAttrSwitchCurrentPosition   = swdef.AttrCurrentPosition
 	matterAttrSwitchMultiPressMax     = swdef.AttrMultiPressMax
-	matterAttrSwitchFeatureMap        = spec.AttrFeatureMap
-	matterAttrSwitchClusterRevision   = spec.AttrClusterRevision
 
 	// MatterEventSwitchLatched fires when a latching switch flips
 	// position (LS feature).
@@ -83,28 +51,7 @@ const (
 	// switchClusterRevision is the definition's (Switch bumped 1→2 in
 	// Matter 1.4 with the action-button (AS) feature codification).
 	switchClusterRevision = swdef.Revision
-
-	// The FeatureMap bits the server serves: MS + MSR always, MSL when
-	// the source recognises long presses. LS, MSM and AS stay off.
-	switchFeatureMS  = uint32(swdef.FeatureMomentarySwitch)
-	switchFeatureMSR = uint32(swdef.FeatureMomentarySwitchRelease)
-	switchFeatureMSL = uint32(swdef.FeatureMomentarySwitchLongPress)
-	switchFeatureMSM = uint32(swdef.FeatureMomentarySwitchMultiPress)
 )
-
-// The two feature selections a GenericSwitch serves, bound once.
-var (
-	switchInst          = mustSwitchInstance(switchFeatureMS | switchFeatureMSR)
-	switchLongPressInst = mustSwitchInstance(switchFeatureMS | switchFeatureMSR | switchFeatureMSL)
-)
-
-func mustSwitchInstance(features uint32) *spec.Instance {
-	inst, err := spec.New(swdef.Definition, spec.Options{Features: features})
-	if err != nil {
-		panic(fmt.Sprintf("wire: Switch: %v", err))
-	}
-	return inst
-}
 
 // GenericSwitchSource is the model-side surface a HM button source
 // (the per-channel press group, or a lone Button / Action DP) exposes.
@@ -135,21 +82,62 @@ type GenericSwitchPositionSource interface {
 	MatterSwitchCurrentPosition() uint8
 }
 
-// GenericSwitch is the cluster-server. Implements
-// [contract.ClusterServer] (read/write/invoke/reportable) and
-// [contract.EventReceiver] (bridge injects emitter at
-// topology assembly).
+// GenericSwitchMultiPressSource is the optional source capability for
+// multi-press recognition: MatterSwitchMultiPressMax returns the
+// MultiPressMax attribute (Matter §1.13.5.3, "min 2"). A value of 2 or more
+// makes the materialised server advertise MSM and count presses up to it
+// (matter.js SwitchServer.ts:328-340); 0 (or 1) is no MSM.
+type GenericSwitchMultiPressSource interface {
+	MatterSwitchMultiPressMax() uint8
+}
+
+// GenericSwitchActionSource is the optional source capability for an
+// action switch (AS): true makes the materialised server advertise AS
+// instead of MSR — one InitialPress per press cycle, no ShortRelease and no
+// MultiPressOngoing (matter.js SwitchServer.ts:246-251, :337-339) — and
+// MSM, which AS makes mandatory (switch.element.ts conformance "AS, [MS &
+// MSR]").
+type GenericSwitchActionSource interface {
+	MatterSwitchActionSwitch() bool
+}
+
+// GenericSwitch is the cluster server of the bridge's first releases: MS
+// and MSR, MSL when the source recognises long presses, the gestures a
+// host narrates through [contract.SwitchEventEmitter]. It is a thin wrapper
+// over [switchserver.Server] that keeps its reads as they were —
+// NumberOfPositions and, with a [GenericSwitchPositionSource],
+// CurrentPosition read live from the source; MultiPressMax answers 0.
+//
+// Deprecated: use cluster/switch ([switchserver.New]), which the
+// measurement materialiser builds for a [GenericSwitchSource]: positions
+// as well as gestures, and the LS, MSM and AS features. GenericSwitch may
+// be removed in v0.10.0.
 type GenericSwitch struct {
-	src      GenericSwitchSource
-	endpoint uint16
-	emitter  contract.EventEmitter
+	src GenericSwitchSource
+	srv *switchserver.Server
 }
 
 // NewGenericSwitch wires the cluster-server against a model-side
 // source on the given endpoint. The endpoint is captured so events
 // can be addressed without the source needing to know its own ID.
+//
+// Deprecated: use [switchserver.New]; NewGenericSwitch may be removed in
+// v0.10.0.
 func NewGenericSwitch(endpoint uint16, src GenericSwitchSource) *GenericSwitch {
-	return &GenericSwitch{src: src, endpoint: endpoint}
+	features := switchserver.FeatureMS | switchserver.FeatureMSR
+	if src.MatterSwitchSupportsLongPress() {
+		features |= switchserver.FeatureMSL
+	}
+	n := src.MatterSwitchPositions()
+	if n < 2 {
+		n = 2
+	}
+	srv, err := switchserver.New(switchserver.Config{Features: features, Endpoint: endpoint, NumberOfPositions: n})
+	if err != nil {
+		// MS + MSR (+ MSL) with two or more positions is in the model.
+		panic(fmt.Sprintf("wire: Switch: %v", err))
+	}
+	return &GenericSwitch{src: src, srv: srv}
 }
 
 // Endpoint returns the endpoint this switch addresses its events to.
@@ -158,7 +146,7 @@ func NewGenericSwitch(endpoint uint16, src GenericSwitchSource) *GenericSwitch {
 // endpoint is captured at construction and used only when an event fires, so
 // a materialiser that dropped it would go unnoticed until a press event was
 // delivered to the wrong Matter path.
-func (s *GenericSwitch) Endpoint() uint16 { return s.endpoint }
+func (s *GenericSwitch) Endpoint() uint16 { return s.srv.Endpoint() }
 
 // MatterClusterID identifies the Switch cluster (0x003B).
 func (s *GenericSwitch) MatterClusterID() uint32 { return matterClusterGenericSwitch }
@@ -167,7 +155,7 @@ func (s *GenericSwitch) MatterClusterID() uint32 { return matterClusterGenericSw
 // Called by the bridge during topology assembly so the cluster can
 // fire events outside the request/response cycle.
 func (s *GenericSwitch) SetMatterEventEmitter(emitter contract.EventEmitter) {
-	s.emitter = emitter
+	s.srv.SetMatterEventEmitter(emitter)
 }
 
 // MatterRead resolves attribute reads.
@@ -180,32 +168,22 @@ func (s *GenericSwitch) MatterRead(attrID uint32) (any, bool) {
 		}
 		return n, true
 	case matterAttrSwitchCurrentPosition:
-		// Live position when the source tracks its press cycle
-		// (see [GenericSwitchPositionSource]): 1 while a long press
-		// is held, back to the neutral 0 after release. Short presses
-		// arrive as a single CCU event (press + release in one
-		// dispatch), so reads only observe 1 during a held long press.
-		// Sources without press-cycle tracking stay at the constant
-		// idle position.
+		// Live position when the source tracks its press cycle (see
+		// [GenericSwitchPositionSource]); otherwise the position the
+		// narrated gestures moved the server to.
 		if pos, ok := s.src.(GenericSwitchPositionSource); ok {
 			return pos.MatterSwitchCurrentPosition(), true
 		}
-		return uint8(0), true
+		return s.srv.CurrentPosition(), true
 	case matterAttrSwitchMultiPressMax:
-		// MSM feature is off — return 0 (no multi-press support
-		// advertised). MultiPressMax carries the constraint "min 2"
-		// (matter.js packages/model/src/standard/elements/
-		// Switch.element.ts), so a bridge without multi-press
-		// recognition must drop the MSM feature instead of
-		// advertising max=1; the attribute is likewise omitted from
-		// MatterAttributes below. Reading it is optional unless MSM
-		// is in the FeatureMap; answering the read keeps controllers
-		// that probe optional attributes happy.
+		// MSM is off, so MultiPressMax is not served (MatterAttributes
+		// omits it); the read answers 0 for controllers that probe
+		// optional attributes. MultiPressMax carries "min 2" (matter.js
+		// switch.element.ts), which is why the feature is dropped rather
+		// than advertised with max=1.
 		return uint8(0), true
-	case matterAttrSwitchFeatureMap, matterAttrSwitchClusterRevision:
-		return s.inst().ReadGlobal(attrID)
 	default:
-		return nil, false
+		return s.srv.MatterRead(attrID)
 	}
 }
 
@@ -213,9 +191,8 @@ func (s *GenericSwitch) MatterRead(attrID uint32) (any, bool) {
 // read-only (access "R V"), so a served one answers UNSUPPORTED_WRITE and
 // any other UNSUPPORTED_ATTRIBUTE, as the definition judges them (matter.js
 // AttributeWriteResponse).
-func (s *GenericSwitch) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := s.inst().ValidateWrite(attrID, value, nil)
-	return err
+func (s *GenericSwitch) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
 // MatterInvoke rejects all commands — Switch cluster has no commands.
@@ -223,78 +200,37 @@ func (s *GenericSwitch) MatterInvoke(_ context.Context, cmdID uint32, _ any) (an
 	return nil, im.UnsupportedCommandf("matter: GenericSwitch has no command 0x%02X", cmdID)
 }
 
-// MatterReportable lists the attributes that emit reports.
-// CurrentPosition is the only value-bearing attribute; FeatureMap +
-// ClusterRevision are static.
-func (s *GenericSwitch) MatterReportable() []uint32 {
-	return []uint32{matterAttrSwitchCurrentPosition}
-}
+// MatterReportable lists the attributes that emit reports: CurrentPosition,
+// the only value-bearing attribute.
+func (s *GenericSwitch) MatterReportable() []uint32 { return s.srv.MatterReportable() }
 
 // MatterAttributes lists the Switch (0x003B) attributes the feature
 // selection makes mandatory: NumberOfPositions and CurrentPosition.
-// MultiPressMax (0x0002) has conformance MSM, which the server never
-// advertises, so it stays out (MatterRead still answers it).
-func (s *GenericSwitch) MatterAttributes() []uint32 { return s.inst().MatterAttributes() }
+func (s *GenericSwitch) MatterAttributes() []uint32 { return s.srv.MatterAttributes() }
 
 // MatterEvents returns the event IDs this cluster may emit, enabling the
 // dispatcher to populate EventList (0xFFFA) for wildcard reads: the
 // definition's for the feature selection — InitialPress (MS),
 // ShortRelease (MSR), LongPress and LongRelease (MSL).
-func (s *GenericSwitch) MatterEvents() []uint32 { return s.inst().MatterEvents() }
+func (s *GenericSwitch) MatterEvents() []uint32 { return s.srv.MatterEvents() }
 
-// inst is the definition bound to the features the source supports.
-func (s *GenericSwitch) inst() *spec.Instance {
-	if s.src.MatterSwitchSupportsLongPress() {
-		return switchLongPressInst
-	}
-	return switchInst
-}
-
-// FireInitialPress emits the Matter §1.13.6.1 InitialPress event.
-// Called by the model layer when the source DP fires PRESS_SHORT or
-// the equivalent first-press signal. Priority INFO per matter.js HEAD
-// packages/model/src/standard/elements/switch.element.ts:48 — every
-// event of the Switch cluster carries "info" there, which is also what
-// the sibling ShortRelease / LongRelease emitters below already use.
-func (s *GenericSwitch) FireInitialPress(newPosition uint8) {
-	if s.emitter == nil {
-		return
-	}
-	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventInitialPress,
-		SwitchInitialPressEvent{NewPosition: newPosition},
-		contract.EventPriorityInfo)
-}
+// FireInitialPress emits the Matter §1.13.6.1 InitialPress event (priority
+// INFO, as every Switch event in matter.js switch.element.ts).
+func (s *GenericSwitch) FireInitialPress(newPosition uint8) { s.srv.FireInitialPress(newPosition) }
 
 // FireShortRelease emits the §1.13.6.3 ShortRelease event.
 func (s *GenericSwitch) FireShortRelease(previousPosition uint8) {
-	if s.emitter == nil {
-		return
-	}
-	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventShortRelease,
-		SwitchShortReleaseEvent{PreviousPosition: previousPosition},
-		contract.EventPriorityInfo)
+	s.srv.FireShortRelease(previousPosition)
 }
 
 // FireLongPress emits the §1.13.6.2 LongPress event. No-op when the
 // source does not advertise long-press support.
-func (s *GenericSwitch) FireLongPress(newPosition uint8) {
-	if s.emitter == nil || !s.src.MatterSwitchSupportsLongPress() {
-		return
-	}
-	// Priority INFO per matter.js HEAD switch.element.ts:52.
-	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongPress,
-		SwitchLongPressEvent{NewPosition: newPosition},
-		contract.EventPriorityInfo)
-}
+func (s *GenericSwitch) FireLongPress(newPosition uint8) { s.srv.FireLongPress(newPosition) }
 
-// FireLongRelease emits the §1.13.6.4 LongRelease event.
+// FireLongRelease emits the §1.13.6.4 LongRelease event; a no-op without
+// long-press support.
 func (s *GenericSwitch) FireLongRelease(previousPosition uint8) {
-	if s.emitter == nil || !s.src.MatterSwitchSupportsLongPress() {
-		return
-	}
-	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongRelease,
-		SwitchLongReleaseEvent{PreviousPosition: previousPosition},
-		contract.EventPriorityInfo)
+	s.srv.FireLongRelease(previousPosition)
 }
 
 // The Switch{event}Event types are the event payloads the Fire*
@@ -303,8 +239,8 @@ func (s *GenericSwitch) FireLongRelease(previousPosition uint8) {
 // carry NewPosition, ShortRelease / LongRelease PreviousPosition. They
 // encode themselves (spec.Encodable).
 //
-// MultiPressOngoing / MultiPressComplete have no alias here: the server
-// never advertises MSM, so neither event is in EventList or ever emitted.
+// MultiPressOngoing / MultiPressComplete have no alias here: their payloads
+// are cluster/spec/switchcluster's, which cluster/switch emits.
 
 // SwitchInitialPressEvent is the InitialPress (0x01) payload.
 type SwitchInitialPressEvent = swdef.InitialPressEvent

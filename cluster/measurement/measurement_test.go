@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -2258,15 +2260,15 @@ func TestFromMeasurementClass_MomentarySwitch_MountsTheSwitchCluster(t *testing.
 		t.Fatalf("FromMeasurementClass(MomentarySwitch, switch source) = %v, want one server", got)
 	}
 	// The endpoint id is the whole reason MomentarySwitch takes a context:
-	// wire.NewGenericSwitch needs it AT CONSTRUCTION so FireInitialPress can
-	// address a Matter path. Passing it and never asserting it would leave
-	// the one thing this refactor exists for unguarded.
-	if sw, ok := got[0].(*wire.GenericSwitch); ok {
+	// the Switch server needs it AT CONSTRUCTION so a press can address a
+	// Matter path. Passing it and never asserting it would leave the one
+	// thing this refactor exists for unguarded.
+	if sw, ok := got[0].(*switchserver.Server); ok {
 		if ep := sw.Endpoint(); ep != 7 {
 			t.Errorf("generic switch endpoint = %d, want 7 — the materialiser dropped the context", ep)
 		}
 	} else {
-		t.Fatalf("server type %T, want *wire.GenericSwitch", got[0])
+		t.Fatalf("server type %T, want *switchserver.Server", got[0])
 	}
 	if id := got[0].MatterClusterID(); id != 0x003B {
 		t.Errorf("cluster = 0x%04X, want 0x003B (Switch)", id)
@@ -2344,4 +2346,65 @@ func TestPowerSourceServer_EndpointList(t *testing.T) {
 			t.Errorf("EndpointList = %v, want empty after SetEndpoint(0)", list)
 		}
 	})
+}
+
+// richSwitch states every optional capability of a switch source.
+type richSwitch struct {
+	positions     uint8
+	long, action  bool
+	multiPressMax uint8
+	current       uint8
+}
+
+func (r richSwitch) MatterSwitchPositions() uint8        { return r.positions }
+func (r richSwitch) MatterSwitchSupportsLongPress() bool { return r.long }
+func (r richSwitch) MatterSwitchMultiPressMax() uint8    { return r.multiPressMax }
+func (r richSwitch) MatterSwitchActionSwitch() bool      { return r.action }
+func (r richSwitch) MatterSwitchCurrentPosition() uint8  { return r.current }
+
+var (
+	_ wire.GenericSwitchMultiPressSource = richSwitch{}
+	_ wire.GenericSwitchActionSource     = richSwitch{}
+	_ wire.GenericSwitchPositionSource   = richSwitch{}
+)
+
+// TestMomentarySwitchFeaturesFollowTheSource: the FeatureMap is what the
+// source states — MSR or AS, MSL, MSM with MultiPressMax 2 or more and
+// always with AS — and NumberOfPositions, MultiPressMax and the start
+// position are the source's.
+func TestMomentarySwitchFeaturesFollowTheSource(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		src         wire.GenericSwitchSource
+		featureMap  uint32
+		positions   uint8
+		multiPress  any
+		currentWant uint8
+	}{
+		{"plain", fakeSwitch{}, 0x06, 2, nil, 0},
+		{"long and multi press", richSwitch{positions: 2, long: true, multiPressMax: 3}, 0x1E, 2, uint8(3), 0},
+		{"multi press max 1 is none", richSwitch{positions: 3, multiPressMax: 1, current: 2}, 0x06, 3, nil, 2},
+		{"action switch", richSwitch{positions: 2, long: true, action: true}, 0x3A, 2, uint8(2), 0},
+		{"one position is two", richSwitch{positions: 1, current: 1}, 0x06, 2, nil, 1},
+		{"start out of range", richSwitch{positions: 2, current: 5}, 0x06, 2, nil, 0},
+	} {
+		got := measurement.FromMeasurementClass(contract.MeasurementMomentarySwitch, tc.src, contract.MeasurementContext{EndpointID: 3})
+		if len(got) != 1 {
+			t.Fatalf("%s: %d servers, want one", tc.name, len(got))
+		}
+		srv := got[0]
+		if fm, _ := srv.MatterRead(0xFFFC); fm != tc.featureMap {
+			t.Errorf("%s: FeatureMap = %v, want 0x%02X", tc.name, fm, tc.featureMap)
+		}
+		if n, _ := srv.MatterRead(swdef.AttrNumberOfPositions); n != tc.positions {
+			t.Errorf("%s: NumberOfPositions = %v, want %d", tc.name, n, tc.positions)
+		}
+		if m, _ := srv.MatterRead(swdef.AttrMultiPressMax); m != tc.multiPress {
+			t.Errorf("%s: MultiPressMax = %v, want %v", tc.name, m, tc.multiPress)
+		}
+		if c, _ := srv.MatterRead(swdef.AttrCurrentPosition); c != tc.currentWant {
+			t.Errorf("%s: CurrentPosition = %v, want %d", tc.name, c, tc.currentWant)
+		}
+	}
 }
