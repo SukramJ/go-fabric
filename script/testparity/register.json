@@ -333,20 +333,16 @@
         "bridge:TestOwnWindow_RevokeCommissioningClosesIt",
         "bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy",
         "bridge:TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen",
-        "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed"
+        "bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed",
+        "node:TestCommissioningWindowLifetime"
       ],
       "missing": [
-        "restarts a window the node opened itself when the node opens it again",
-        "keeps a window the node restarted while the timer of the one it replaced fired",
         "replaces a window the node opened itself with an administrator's basic window",
-        "answers Busy to a second window opened while the first is still opening",
         "refuses a window the node opens while an administrator's window is still opening",
         "opens no window once the commissioner closes during the open",
-        "lets a close callback open the next window",
-        "ignores a close after the commissioner closed",
-        "keeps an administrator's window when the node tries to open its own"
+        "ignores a close after the commissioner closed"
       ],
-      "reason": "The node's own window, its timeouts, replacement by an administrator's enhanced window and revoke are covered; the reopen, opening-race and close-callback cases are not.",
+      "reason": "The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). Missing: the Go AdministratorCommissioning has no Basic feature (BC), so there is no administrator's basic window; js-runtime-only, the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node).",
       "snapshotSha": "0eca265225f836d304af49c6a2bcb0a0872e638f"
     },
     {
