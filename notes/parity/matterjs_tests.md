@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 70 |
-| partial | 114 |
-| planned | 53 |
+| partial | 115 |
+| planned | 52 |
 | excluded | 87 |
 | total | 324 |
 
@@ -28,7 +28,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 0 | 1 | 1 | 1 |
 | [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 1 | 1 | 3 | 1 |
+| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 1 | 2 | 2 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 0 | 1 | 0 |
@@ -191,7 +191,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | CommissioningRestartTest.ts | 43 | ported | `node:TestCommissioningRestart` | A device stopped and started again on its store is commissioned by the controller when it was not, and opens the administrator's enhanced window (revoke, then OpenCommissioningWindow over a new CASE session) when it was (node/commissioning_restart_parity_matterjs_test.go on fabrictest). |
 | CommissioningWindowLifetimeTest.ts | 332 | partial | `bridge:TestOwnWindow_DefaultTimeoutFollowsFabricCount`<br>`bridge:TestOwnWindow_TimerClosesIt`<br>`bridge:TestOwnWindow_AdministratorReplacesIt`<br>`bridge:TestOwnWindow_RevokeCommissioningClosesIt`<br>`bridge:TestCommissioningWindow_OpenWindow_Twice_ReturnsBusy`<br>`bridge:TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen`<br>`bridge:TestCommissioningWindow_RevokeWindow_OnOpenWindow_StatusReturnsToClosed`<br>`node:TestCommissioningWindowLifetime` | The node's own window, its timeouts, restart (also across the replaced window's deadline), replacement by an administrator's enhanced window, two concurrent administrator opens (one Busy), a close callback opening the next window, the administrator's window kept against the node's own, and revoke are ported (node/commissioning_window_lifetime_parity_matterjs_test.go on fabrictest). Missing: the Go AdministratorCommissioning has no Basic feature (BC), so there is no administrator's basic window; js-runtime-only, the window still opening and the commissioner closing during it (DeviceCommissioner's asynchronous #open; the Go window opens and closes atomically under its lock) and the terminal DeviceCommissioner.close (the Go window ends with the node). Missing: “replaces a window the node opened itself with an administrator's basic window”; “refuses a window the node opens while an administrator's window is still opening”; “opens no window once the commissioner closes during the open”; “ignores a close after the commissioner closed”. |
 | CommissioningWindowTest.ts | 209 | planned | — | The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case. |
-| FabricBeforeStartTest.ts | 172 | planned | — | A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order. |
+| FabricBeforeStartTest.ts | 172 | partial | `node:TestFabricBeforeStart` | A node started on a store holding a fabric (commissioned, stopped, started again: a Go node creates no fabric of its own) counts as commissioned, advertises the fabric operationally once and only when no commissionable record is out, logs no error and raises no fabric event (node/fabric_before_start_parity_matterjs_test.go). matter.js's lifecycle.commissioned count has no Go counterpart at start (BD-Matter-Node-CommissioningCompletePerCommand), and its gated fabric write has none either (the Go store writes before the command answers). Missing, js-runtime-only: the commissioning-state transaction lock (FabricChangeLockTest.ts). Missing: “waits for another transaction that holds the commissioning state”. |
 | FabricChangeLockTest.ts | 95 | excluded | `js-runtime-only` | The commissioned-state update waiting for another transaction to release matter.js's commissioning-state lock. |
 | RemoteDescriptorTest.ts | 229 | planned | — | The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters). |
 
@@ -930,7 +930,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behavior/system/commissioning
 
 - `CommissioningWindowTest.ts` — The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case.
-- `FabricBeforeStartTest.ts` — A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order.
 - `RemoteDescriptorTest.ts` — The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters).
 
 ### node/test/behavior/system/controller/discovery

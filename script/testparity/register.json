@@ -356,8 +356,14 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/FabricBeforeStartTest.ts",
-      "status": "planned",
-      "reason": "A fabric created before the node starts counts it as commissioned and advertises it operationally once online, in that order.",
+      "status": "partial",
+      "go": [
+        "node:TestFabricBeforeStart"
+      ],
+      "missing": [
+        "waits for another transaction that holds the commissioning state"
+      ],
+      "reason": "A node started on a store holding a fabric (commissioned, stopped, started again: a Go node creates no fabric of its own) counts as commissioned, advertises the fabric operationally once and only when no commissionable record is out, logs no error and raises no fabric event (node/fabric_before_start_parity_matterjs_test.go). matter.js's lifecycle.commissioned count has no Go counterpart at start (BD-Matter-Node-CommissioningCompletePerCommand), and its gated fabric write has none either (the Go store writes before the command answers). Missing, js-runtime-only: the commissioning-state transaction lock (FabricChangeLockTest.ts).",
       "snapshotSha": "f30dc72eb7eef72c5b1fdff10969937c8d50a5aa"
     },
     {
