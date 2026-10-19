@@ -369,7 +369,19 @@ var chipFamilies = []family{
 			"--string-arg=cd_cert_dir:/credentials/development/cd-certs",
 		}},
 	},
-	{name: "DD"},
+	{
+		name: "DD",
+		// TC_DD_1_16_17.py is a MatterTestUncommissionedDevice case: it
+		// parses the onboarding payload and checks the commissionable
+		// advertisement of a factory-new device, without commissioning
+		// (TC_DD_1_16_17.py:75, :136-138; chip's CI runs it with
+		// factory-reset: true and no commissioning method, header lines
+		// 21-61). Against the harness's commissioned snapshot the device no
+		// longer advertises and the case fails, so both run on a
+		// factory-fresh daemon with its own QR and manual code, as TC-SC-7.1
+		// does (matter.js test/core/SC.test.ts chip("SC/7.1").uncommissioned()).
+		uncommissioned: map[string]bool{"1.16": true, "1.17": true},
+	},
 	{name: "DESC"},
 	{
 		name: "DGGEN",
