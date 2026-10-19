@@ -824,19 +824,12 @@
         "cluster/lock:TestDoorLockServerAutoRelockParity",
         "cluster/lock:TestDoorLockServerAutoRelockLargestTimeParity",
         "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity",
-        "cluster/lock:TestDoorLockServerAuthorizationParity"
+        "cluster/lock:TestDoorLockServerAuthorizationParity",
+        "cluster/lock:TestDoorLockServerWrongCodeLockoutParity",
+        "cluster/lock:TestDoorLockServerOperatingModeParity"
       ],
       "missing": [
-        "refuses every lock operation during the lockout, with or without PIN, and reports none",
-        "ends the lockout after UserCodeTemporaryDisableTime with a fresh attempt count",
         "measures the lockout on the monotonic clock",
-        "does not count PINs refused by the operating mode",
-        "starts the attempt count again after a correct code",
-        "counts an omitted PIN as a wrong code when a PIN is required",
-        "refuses a write of an unsupported mode and accepts a supported one",
-        "switches a stored mode SupportedOperatingModes does not support to Normal",
-        "refuses SupportedOperatingModes without Normal",
-        "accepts every mode SupportedOperatingModes supports",
         "moves the hardware after authorization and before the lock state changes",
         "refuses a lock command invoked locally before the hardware moves",
         "starts the attempt count again only after the hardware succeeds",

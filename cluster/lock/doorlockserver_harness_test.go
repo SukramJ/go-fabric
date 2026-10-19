@@ -366,13 +366,24 @@ type lockEvents struct {
 // event log; markEvents moves the mark (matter.js's `.length = 0`).
 func (f *lockFixture) events() lockEvents {
 	f.t.Helper()
+	return f.eventsSince(f.mark)
+}
+
+// allEvents are the lock's events since the case started.
+func (f *lockFixture) allEvents() lockEvents {
+	f.t.Helper()
+	return f.eventsSince(0)
+}
+
+func (f *lockFixture) eventsSince(mark uint64) lockEvents {
+	f.t.Helper()
 	got, err := fabrictest.Events(f.ctx, f.pair, f.eventPaths()...)
 	if err != nil {
 		f.t.Fatalf("read events: %v", err)
 	}
 	var out lockEvents
 	for _, e := range got {
-		if e.Number <= f.mark || !e.HasValue {
+		if e.Number <= mark || !e.HasValue {
 			continue
 		}
 		switch e.Path.Event {
