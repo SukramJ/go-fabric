@@ -595,7 +595,7 @@
   },
   {
     "file": "cluster/core/descriptor.go",
-    "line": 158,
+    "line": 173,
     "citation": "DescriptorServer.ts:241-250",
     "resolved": "packages/node/src/behaviors/descriptor/DescriptorServer.ts",
     "identifier": "#serverList",
@@ -604,7 +604,7 @@
   },
   {
     "file": "cluster/core/descriptor.go",
-    "line": 298,
+    "line": 380,
     "citation": "packages/node/src/behaviors/descriptor/DescriptorServer.ts:241-250",
     "resolved": "packages/node/src/behaviors/descriptor/DescriptorServer.ts",
     "identifier": "#serverList",

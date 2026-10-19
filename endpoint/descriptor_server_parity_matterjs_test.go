@@ -32,6 +32,7 @@ package endpoint_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -165,8 +166,10 @@ func expectPartsList(t *testing.T, topo *endpoint.Topology, ep uint16, want ...u
 
 // TestDescriptorServerStopsWatchingARemovedPart ports "stops watching a
 // removed part" (DescriptorServerTest.ts:133-144): parent 1 with child 2,
-// the child closed, the parent's PartsList empty and the child's destroyed
-// event no longer observed. The Go PartsList is the topology's: a removed
+// the child closed, the parent's parts list empty and the child's destroyed
+// event no longer observed.
+//
+// The Go PartsList is the topology's: a removed
 // part is gone from it, and no observer of the part outlives the assembly
 // it was in, so the Go assertion is the PartsList and the part's absence
 // from the topology.
@@ -213,8 +216,9 @@ func tagsOf(t *testing.T, d *core.Descriptor) []dsTagLabel {
 	if !ok {
 		t.Fatal("TagList not served")
 	}
-	var out []dsTagLabel
-	for _, tg := range v.([]core.SemanticTag) {
+	tags, _ := v.([]core.SemanticTag)
+	out := make([]dsTagLabel, 0, len(tags))
+	for _, tg := range tags {
 		l := ""
 		if tg.Label != nil && !tg.Label.Null {
 			l = tg.Label.Value
@@ -287,7 +291,7 @@ func TestDescriptorServerAddTags(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.AddTags(dsTag(1)); err != core.ErrTagListNotEnabled { //nolint:errorlint // the sentinel itself
+		if err := d.AddTags(dsTag(1)); !errors.Is(err, core.ErrTagListNotEnabled) {
 			t.Errorf("AddTags without the feature = %v, want ErrTagListNotEnabled", err)
 		}
 		if fm, _ := createTagged(t).MatterRead(0xFFFC); fm != uint32(1) {
@@ -485,7 +489,7 @@ func TestDescriptorServerMembershipChangesThatKeepTheCount(t *testing.T) {
 func TestDescriptorServerOrdersPartsListNumerically(t *testing.T) {
 	t.Parallel()
 	d := newDSTree(t)
-	var specs []endpoint.Spec
+	specs := make([]endpoint.Spec, 0, 6)
 	for _, n := range []uint16{10, 9, 8, 6, 4, 2} {
 		key := "light" + string(rune('0'+n%10)) + string(rune('0'+n/10))
 		d.number(key, dsDtOnOffLight, n)

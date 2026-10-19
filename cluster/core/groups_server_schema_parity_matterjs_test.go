@@ -61,7 +61,7 @@ func encodeNode(t *testing.T, v spec.Encodable) spec.Node {
 // on the light's endpoint over a commissioned pair; it returns the
 // response's Status and GroupId, failing when the device answered with a
 // bare status instead of a command response.
-func invokeAddGroup(t *testing.T, groupID uint16, groupName string) (im.StatusCode, uint16) {
+func invokeAddGroup(t *testing.T, groupID uint16, groupName string) (status im.StatusCode, respGroupID uint16) {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light", Clock: site.Clock()})
@@ -84,15 +84,14 @@ func invokeAddGroup(t *testing.T, groupID uint16, groupName string) (im.StatusCo
 	}
 	// The response's GroupId is relaxed too (GroupsServer.ts:41), so it is
 	// read without the generated decoder's "min 1".
-	var status groupsdef.Status
-	var gid uint16
+	var st groupsdef.Status
 	if err := spec.DecodeFields(res.Fields, "AddGroupResponse",
-		spec.Bind(0, "Status", true, &status, spec.DecodeUint[groupsdef.Status](8)),
-		spec.Bind(1, "GroupId", true, &gid, spec.DecodeUint[uint16](16)),
+		spec.Bind(0, "Status", true, &st, spec.DecodeUint[groupsdef.Status](8)),
+		spec.Bind(1, "GroupId", true, &respGroupID, spec.DecodeUint[uint16](16)),
 	); err != nil {
 		t.Fatalf("AddGroupResponse: %v", err)
 	}
-	return im.StatusCode(status), gid
+	return im.StatusCode(st), respGroupID
 }
 
 // TestGroupsServerSchemaRelaxation ports the three cases of "GroupsServer

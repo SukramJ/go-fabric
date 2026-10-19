@@ -98,7 +98,8 @@ func persistedOperationalMs(t *testing.T, d *fabrictest.Device) uint64 {
 func onlineDevice(t *testing.T) (*fabrictest.Site, *fabrictest.Device) {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	return site, site.AddDevice(fabrictest.Topology{})
+	d := site.AddDevice(fabrictest.Topology{})
+	return site, d
 }
 
 // TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep ports
