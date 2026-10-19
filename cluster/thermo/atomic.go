@@ -174,9 +174,10 @@ func (w *atomicWrites) forPeer(now time.Time, peer atomicPeer) *atomicWriteState
 	return nil
 }
 
-// forAttribute is the state that holds attrID, whoever its peer
-// (AtomicWriteHandler.ts:405-420; BeginWrite answers BUSY for an attribute
-// a state holds, so there is at most one).
+// forAttribute is the state that holds attrID, whoever its peer — matter.js
+// #pendingWriteStateForAttribute (AtomicWriteHandler.ts:405-420). An
+// attribute a state holds is answered BUSY to every other peer, so there
+// is at most one.
 func (w *atomicWrites) forAttribute(now time.Time, attrID uint32) *atomicWriteState {
 	for _, s := range w.live(now) {
 		if s.holds(attrID) {

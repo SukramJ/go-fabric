@@ -1253,10 +1253,9 @@ func (s *ThermostatServer) SetOccupied(occupied bool) {
 // SetAbsoluteSetpointLimit changes an absolute setpoint limit
 // (AbsMin/AbsMax Heat/Cool SetpointLimit) as the device's own change: the
 // user limits must stay within it, or the change is refused with
-// CONSTRAINT_ERROR — matter.js #assertUserSetpointLimits on
-// absMin*/absMax*SetpointLimit$Changing (ThermostatServer.ts:586-593,
-// :708-742, :830-853 at 862ad75f). The attributes are read-only to a
-// controller.
+// CONSTRAINT_ERROR — matter.js #assertUserSetpointLimits
+// (ThermostatServer.ts:830-853 at 862ad75f), which the absolute limits'
+// change reactors run. The attributes are read-only to a controller.
 func (s *ThermostatServer) SetAbsoluteSetpointLimit(attrID uint32, v int16) error {
 	heat := attrID == thermoAttrAbsMinHeatSetpointLimit || attrID == thermoAttrAbsMaxHeatSetpointLimit
 	if !heat && attrID != thermoAttrAbsMinCoolSetpointLimit && attrID != thermoAttrAbsMaxCoolSetpointLimit {

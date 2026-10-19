@@ -42,9 +42,8 @@ var ErrPresets = errors.New("thermostat: preset configuration refused")
 const presetHandleLength = 16
 
 // PresetStore persists one thermostat endpoint's presets — matter.js's
-// persistedPresets and activePresetHandle, both quality N
-// (ThermostatServer.ts:64-74, :1662; thermostat-cluster.element.ts
-// ActivePresetHandle "X N"). The presets travel as the TLV encoding of the
+// PersistedPresets, quality N (ThermostatServer.ts:64-74), and the
+// ActivePresetHandle, "X N" in thermostat-cluster.element.ts. The presets travel as the TLV encoding of the
 // Presets list; the active handle is nil for null. Load reports ok=false
 // when nothing was saved, and the server then seeds from
 // [ThermostatConfig.Presets]. store.ThermostatPresetStore implements it on
