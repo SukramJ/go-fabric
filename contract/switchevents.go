@@ -35,3 +35,26 @@ type SwitchEventEmitter interface {
 	// FireLongRelease closes a long-press gesture.
 	FireLongRelease(previousPosition uint8)
 }
+
+// SwitchPositionSink is the position input of the Matter §1.13 Switch
+// cluster (0x003B), as seen from the model side: a source that knows its
+// switch's position — rather than the gestures a press makes — reports
+// each position, and the server derives every event from that stream.
+// The bridge's `cluster/switch.Server` implements it and hands it to a
+// source that implements `WireMatterSwitchPositions` at every reassembly,
+// the way it hands a gesture source its [SwitchEventEmitter].
+//
+// Mirrors matter.js packages/node/src/behaviors/switch/SwitchServer.ts at
+// 862ad75f: SetRawPosition is the `rawPosition` state (debounced by the
+// server's debounce delay, :128-151), SetCurrentPosition a write of
+// `currentPosition` by an application that debounced the position itself
+// (:177-190). Report positions through one of the two, not both (:63-64).
+// A position outside 0..NumberOfPositions-1 is refused with an error that
+// answers CONSTRAINT_ERROR (:122-126).
+type SwitchPositionSink interface {
+	// SetRawPosition reports a raw, not yet debounced position.
+	SetRawPosition(position uint8) error
+
+	// SetCurrentPosition reports a debounced position.
+	SetCurrentPosition(position uint8) error
+}
