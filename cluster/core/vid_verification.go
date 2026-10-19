@@ -105,12 +105,9 @@ func (o *OperationalCredentials) forgetVidVerification(ctx context.Context, fabr
 	_ = o.storeVidVerification(context.WithoutCancel(ctx), fabricIndex, vidData{})
 }
 
-// isValidVendorID is matter.js VendorId.isValid: 0..0xFFF4.
-func isValidVendorID(v uint16) bool { return v <= 0xFFF4 }
-
 // handleSetVidVerificationStatement is matter.js setVidVerificationStatement
 // with Fabric.updateVendorVerificationData, for the accessing fabric: at
-// least one field (InvalidCommand), a valid VendorID (ConstraintError), a
+// least one field (InvalidCommand), an operational VendorID (ConstraintError), a
 // VVSC only on a fabric without ICAC (InvalidCommand), a statement of 0
 // (clears) or 85 bytes (ConstraintError otherwise), an empty VVSC clears.
 func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.Context, fields any) (any, error) {
@@ -125,7 +122,15 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	if !req.HasVendorID && !req.HasVidVerificationStatement && !req.HasVvsc {
 		return nil, opcredsInvalidCommandErr{"matter: SetVIDVerificationStatement: at least one of VendorID, VIDVerificationStatement or VVSC must be provided"}
 	}
-	if req.HasVendorID && !isValidVendorID(req.VendorID) {
+	// The VendorID must be operational — valid and not the Matter Standard
+	// vendor ID 0x0000 — not merely valid. Mirrors matter.js
+	// packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:516-518
+	// (`if (vendorId !== undefined && !VendorId.isOperational(vendorId))
+	// throw new StatusResponse.ConstraintErrorError(…)`) with
+	// packages/types/src/datatype/VendorId.ts:44 isOperational (`v !== 0 &&
+	// isValid(v)`, isValid being 0..0xFFF4 at :21-26), which is
+	// isOperationalAdminVendorID.
+	if req.HasVendorID && !isOperationalAdminVendorID(req.VendorID) {
 		return nil, opcredsConstraintErr{msg: fmt.Sprintf("matter: SetVIDVerificationStatement: invalid VendorID 0x%04X", req.VendorID)}
 	}
 	if req.HasVvsc {

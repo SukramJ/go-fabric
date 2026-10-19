@@ -72,6 +72,9 @@ func TestSetVidVerificationStatementParityMatterJS(t *testing.T) {
 	if got := vidStatusOf(t, set(fctx, core.SetVidVerificationStatementRequest{HasVendorID: true, VendorID: 0xFFF5})); got != im.StatusConstraintError {
 		t.Errorf("VendorID 0xFFF5: %v, want ConstraintError", got)
 	}
+	if got := vidStatusOf(t, set(fctx, core.SetVidVerificationStatementRequest{HasVendorID: true, VendorID: 0})); got != im.StatusConstraintError {
+		t.Errorf("the Matter Standard VendorID 0x0000: %v, want ConstraintError (VendorId.isOperational)", got)
+	}
 	if got := vidStatusOf(t, set(fctx, core.SetVidVerificationStatementRequest{HasVidVerificationStatement: true, VidVerificationStatement: make([]byte, 10)})); got != im.StatusConstraintError {
 		t.Errorf("10-byte statement: %v, want ConstraintError", got)
 	}

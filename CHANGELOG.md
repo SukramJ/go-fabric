@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cluster/core`: SetVIDVerificationStatement refuses the Matter Standard vendor ID 0x0000 with ConstraintError, as it refuses the reserved ones — the VendorID must be operational, not merely valid (`OperationalCredentialsServer.ts:516-518`, `VendorId.ts:44`). It used to set a fabric's vendor ID to 0.
+
 ## [0.8.5] — 2026-10-19
 
 Milestone 3, phase 18a, brief BN: the behaviour-test ports of Descriptor, GeneralDiagnostics, BasicInformation, Groups, ScenesManagement and the protocol group tests against matter.js at `862ad75f` — 38 of 47 open cases, four fixes the ports found.
