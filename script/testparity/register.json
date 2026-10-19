@@ -1153,8 +1153,14 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsConfigurationTest.ts",
-      "status": "planned",
-      "reason": "Presets seeded from configuration and the write rules without configured presets.",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_PresetsConfigurationTest"
+      ],
+      "missing": [
+        "seeds from configuration, not from presets a device stored before the accessor existed"
+      ],
+      "reason": "The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. The seed case is missing: it plants a value under the attribute's pre-accessor storage key, and the Go server never stored presets anywhere but its PresetStore.",
       "snapshotSha": "e95224b86692e0d1e33d3f2b69063b6dd3c87f46"
     },
     {
