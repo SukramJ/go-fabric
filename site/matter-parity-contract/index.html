@@ -1,0 +1,2403 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.">
+      
+      
+      
+        <link rel="canonical" href="https://sukramj.github.io/go-fabric/matter-parity-contract/">
+      
+      
+        <link rel="prev" href="../matterjs-comparison/">
+      
+      
+        <link rel="next" href="../certifiability/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Parity contract - go-fabric</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#matter-behavioural-parity-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="go-fabric" class="md-header__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            go-fabric
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Parity contract
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="go-fabric" class="md-nav__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    go-fabric
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/device/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The device side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The controller side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/concurrency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/persistence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/testing-in-process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing in process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../adr/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture decisions
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-matter-commissioning-bring-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001 — Matter wire-protocol design rules from chip-tool bring-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-im-opcode-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002 — Extract a testable gate + per-opcode seam from `handleIMOpcode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-sigma-resume-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003 — Sigma resumption extraction: already satisfied (finding corrected)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-groups-cluster-stays-stub/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004 — Minimal in-memory Groups cluster: rejected (stub is a deliberate, matter.js-conformant divergence)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-bridge-decomposition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005 — Matter `Bridge`: defer the CommissioningSession/IMEngine facade split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-subscribe-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006 — Extract cohesive sub-helpers from `handleSubscribeRequest`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-chiptool-send-receive-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007 — Hermetic per-DP-type Matter send/receive suite (chip-tool ↔ godevccu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0008-subscription-resumption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0008 — Server-side subscription persistence and re-establishment after restart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0009-groups-and-group-messaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0009 — A real Groups server and group message delivery, as matter.js builds them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0010-groupcast-and-auxiliary-acl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0010 — Groupcast and the AccessControl Auxiliary ACL on the root, as matter.js installs them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0011-certifiability-is-a-goal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0011 — Certifiability is a goal; certification is not pursued
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0012-scenesmanagement-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0012 — A real ScenesManagement server on the bridged lights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0013-generated-cluster-definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0013 — Cluster definitions generated from the matter.js model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0014-transitions-optional-per-endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0014 — Attribute transitions run in the module, optional per endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0015-chip-data-model-read-at-run-time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0015 — The CHIP data model cross-check reads connectedhomeip at test time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0016-device-type-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0016 — Assembled topologies are validated against their device types, as matter.js validates a server node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0017-generated-default-cluster-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0017 — A generated default cluster server, so that a cluster without matter.js logic costs no hand-written server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0018-device-layer-and-node-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0019-tcp-bdx-and-the-ota-requestor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0019 — TCP, BDX and the OTA Software Update Requestor enter the scope; DiagnosticLogs stays without BDX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0020-commissioner-and-controller-role/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0021-ota-provider-and-diagnosticlogs-over-bdx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0021 — The OTA Software Update Provider and DiagnosticLogs over BDX enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0022-media-and-content-clusters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0022 — The media and content clusters and the three media device types enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0023-apache-2-and-the-cla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0023 — Apache License 2.0 and a contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0024-ble-commissioning-in-the-controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0024 — BLE commissioning in the controller role
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matterjs-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    matter.js comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parity contract
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parity contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The principle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-matterjs-chip-and-why-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why matter.js / chip, and why behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-workflow-for-every-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The workflow for every change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-standing-guards-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The standing guards (enforcement)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. The standing guards (enforcement)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sweeping-a-pin-bump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sweeping a pin bump
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-where-the-hosts-own-parity-obligation-begins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Where the host's own parity obligation begins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-non-negotiable-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The non-negotiable checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../certifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Certifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chip-datamodel-crosscheck/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CHIP data-model cross-check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matter-ecosystem-observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystem observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CLA.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/LICENSE" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The principle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-matterjs-chip-and-why-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why matter.js / chip, and why behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-workflow-for-every-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The workflow for every change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-standing-guards-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The standing guards (enforcement)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. The standing guards (enforcement)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sweeping-a-pin-bump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sweeping a pin bump
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-where-the-hosts-own-parity-obligation-begins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Where the host's own parity obligation begins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-non-negotiable-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The non-negotiable checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/SukramJ/go-fabric/edit/main/docs/matter-parity-contract.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="matter-behavioural-parity-contract">Matter Behavioural-Parity Contract<a class="headerlink" href="#matter-behavioural-parity-contract" title="Permanent link">&para;</a></h1>
+<p><strong>Audience:</strong> every contributor and AI agent that touches code in this module.
+This is a standing contract, not an audit you run once. Read it before your
+first change here and treat it as binding.</p>
+<p><code>go-fabric</code> is a deliberate, behaviour-level port of
+<a href="https://github.com/matter-js/matter.js">matter.js</a> HEAD. This page defines
+what "parity" means in practice and which standing guards keep the port
+honest, so that a change which merely <em>looks</em> right but drifts from the gold
+standard cannot land unnoticed.</p>
+<p>It complements the
+<a href="https://github.com/SukramJ/go-fabric/blob/main/CLAUDE.md"><code>matter.js is the gold standard</code></a> section of this repository's
+<code>CLAUDE.md</code>: that one tells you matter.js HEAD is the gold standard and how to
+regenerate the schema; this one tells you what <em>parity</em> means, why
+<strong>behaviour</strong> parity (not just schema parity) is the bar, and which standing
+guards enforce it. What the ecosystems themselves do with the result is
+collected in
+<a href="../matter-ecosystem-observations/">Matter Ecosystem Observations</a>.</p>
+<hr />
+<h2 id="1-the-principle">1. The principle<a class="headerlink" href="#1-the-principle" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Think for yourself, and always verify against matter.js / connectedhomeip.
+Mirror behaviour, not just shape.</strong></p>
+</blockquote>
+<p>Two halves, both mandatory:</p>
+<ol>
+<li><strong>Reason about the change.</strong> Understand the cluster, the command, the state
+   machine, the failure modes. Do not cargo-cult.</li>
+<li><strong>Verify against the gold standard.</strong> Before you write a fix or feature,
+   read the corresponding matter.js source (and connectedhomeip for
+   wire-truth). Your implementation mirrors theirs — same defaults, same
+   constraints, same status codes, same order, same wire shape — unless a
+   divergence is deliberate and recorded.</li>
+</ol>
+<p>A change that "looks right" but was never checked against matter.js is not
+acceptable, no matter how reasonable it seems. The protocol's edge cases were
+encoded into matter.js through real interop testing against Apple Home, Google
+Home, and Alexa; we mirror that hard-won behaviour rather than re-deriving it.</p>
+<h2 id="2-why-matterjs-chip-and-why-behaviour">2. Why matter.js / chip, and why <em>behaviour</em><a class="headerlink" href="#2-why-matterjs-chip-and-why-behaviour" title="Permanent link">&para;</a></h2>
+<p>matter.js HEAD is a production-tested, continuously-evolving Matter stack (it
+is not CSA-certified, and neither is this module). connectedhomeip (chip) is
+the CSA reference. Together they are the authority for:</p>
+<ul>
+<li>cluster IDs, revisions, attribute / command / event IDs (schema), <strong>and</strong></li>
+<li>defaults, constraint enforcement on writes, command semantics, status codes,
+  conformance gating, subscribe / report cadence, commissioning and CASE state
+  machines (<strong>behaviour</strong>), <strong>and</strong></li>
+<li>the byte-level wire shape (TLV, IM messages, sigma).</li>
+</ul>
+<p><strong>Schema parity is necessary but not sufficient.</strong> It is easy to advertise the
+right attribute IDs and revisions and still get the behaviour wrong — accept a
+write matter.js rejects, return the wrong status, skip a constraint, drop a
+session that must survive. Those defects pass every schema test and surface as
+silent Apple / Google pair-aborts or mis-behaving devices that take days to
+attribute back. Behaviour parity is the bar.</p>
+<p>This is not hypothetical: a parity sweep found a whole class of write-constraint
+and command-semantics defects (wrong setpoint limits, an unenforced
+percent-max, a <code>SupportedOperatingModes</code> bitmap that marked a mandatory mode
+unsupported, a <code>MoveToColorTemperature</code> that never moved, an <code>UpdateNOC</code> that
+tore down its own response session) — every one of which a schema test would
+have waved through.</p>
+<h2 id="3-the-workflow-for-every-change">3. The workflow for every change<a class="headerlink" href="#3-the-workflow-for-every-change" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Read the matter.js source first.</strong> Likely paths:</li>
+<li>schema constant / revision / id → <code>../matter.js/packages/model/src/standard/elements/&lt;name&gt;.element.ts</code></li>
+<li>cluster behaviour (defaults, mandatory attrs, conformance, write
+     constraints, command logic) → <code>../matter.js/packages/node/src/behaviors/&lt;name&gt;/&lt;Name&gt;Server.ts</code></li>
+<li>device type → <code>../matter.js/packages/node/src/devices/&lt;name&gt;.ts</code></li>
+<li>wire codec / IM / sigma → <code>../matter.js/packages/types/src/tlv/</code>, <code>../matter.js/packages/protocol/src/</code></li>
+<li>wire-truth cross-check → <code>../connectedhomeip/src/app/...</code>, <code>../connectedhomeip/src/messaging/...</code></li>
+<li><strong>Mirror the behaviour</strong> in Go idiom (struct-with-methods, <code>context.Context</code>,
+   goroutines for TS decorators / mixins / <code>Promise&lt;T&gt;</code>). Keep the same
+   defaults, constraints, status codes, and order.</li>
+<li><strong>Cite the source in the Go code:</strong>
+   <code>// Mirrors matter.js packages/node/src/behaviors/.../FooServer.ts:bar</code>
+   (or the chip path). Provenance must survive drift.</li>
+<li><strong>Add a parity test — behaviour, not just schema.</strong> A new constraint adds a
+   row to the negative-write parity table (§4). A new cluster server adds a
+   schema parity case. A wire change adds / updates a TLV fixture. PRs without
+   parity coverage are rejected.</li>
+<li><strong>Record deliberate divergences</strong> in
+   <a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md"><code>notes/parity/by_design.md</code></a> (the living
+   catalogue). A non-trivial divergence also gets an ADR under
+   <a href="./adr/"><code>docs/adr/</code></a>. Valid divergences are TypeScript-only optimisations
+   that fight Go's GC, or decorator patterns with no Go equivalent. Invalid
+   divergences are hand-coding cluster revisions, attribute IDs, constraint
+   defaults, status codes, or Apple-required tag patterns — those go verbatim
+   from matter.js.</li>
+</ol>
+<h2 id="4-the-standing-guards-enforcement">4. The standing guards (enforcement)<a class="headerlink" href="#4-the-standing-guards-enforcement" title="Permanent link">&para;</a></h2>
+<p>Parity is held by build- and test-time guards, <strong>not</strong> by periodically
+regenerated audit reports. These are the mechanism; keep them green and extend
+them with every change:</p>
+<table>
+<thead>
+<tr>
+<th>Guard</th>
+<th>Location</th>
+<th>Locks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Schema parity</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/tree/main/parity"><code>parity/</code></a> (the embedded matter.js HEAD extract) + <a href="https://github.com/SukramJ/go-fabric/blob/main/schema/parity_test.go"><code>schema/parity_test.go</code></a>, <code>schema/provenance_test.go</code>, <code>schema/staleness_test.go</code>, and the <code>*parity_matterjs_test.go</code> files across the tree</td>
+<td>cluster / device-type IDs, revisions, attribute / command / event IDs vs matter.js HEAD; that the generated Go maps match the snapshot they were generated from</td>
+</tr>
+<tr>
+<td><strong>Behavioural negative-write parity</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/blob/main/cluster/matter_negative_write_parity_test.go"><code>cluster/matter_negative_write_parity_test.go</code></a></td>
+<td>a write/invoke matter.js <em>rejects</em> is rejected with the matching IM status (ConstraintError 0x87 / InvalidCommand 0x85), plus boundary positive controls against over-rejection. Add one row per new constraint.</td>
+</tr>
+<tr>
+<td><strong>Wire-codec parity</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/blob/main/tlv/parity_matterjs_test.go"><code>tlv/parity_matterjs_test.go</code></a>, <a href="https://github.com/SukramJ/go-fabric/blob/main/im/wire_fixtures_parity_test.go"><code>im/wire_fixtures_parity_test.go</code></a>, <a href="https://github.com/SukramJ/go-fabric/blob/main/bridge/groups_parity_matterjs_test.go"><code>bridge/groups_parity_matterjs_test.go</code></a> (GroupKeyManagement / Groups command payloads), <a href="https://github.com/SukramJ/go-fabric/blob/main/bridge/groupcast_parity_matterjs_test.go"><code>bridge/groupcast_parity_matterjs_test.go</code></a> (Groupcast commands, Membership / AuxiliaryAcl values and events) and <a href="https://github.com/SukramJ/go-fabric/blob/main/groups/parity_matterjs_test.go"><code>groups/parity_matterjs_test.go</code></a> (group key schedule and sealed group messages), each reading its own <code>testdata/</code> copy of the fixtures; the generators live at <a href="https://github.com/SukramJ/go-fabric/tree/main/notes/parity/matter"><code>notes/parity/matter/</code></a></td>
+<td>byte-level TLV / IM / group-message shape</td>
+</tr>
+<tr>
+<td><strong>Reference-controller validation</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/tree/main/conformance"><code>conformance/</code></a> and <code>internal/chiptool/</code> under the <code>chiptool</code> build tag, driven by <code>.github/workflows/chiptool.yml</code></td>
+<td>end-to-end behaviour against the real <code>chip-tool</code> commissioner, plus borrowed CSA <code>Test_TC_*</code> cases</td>
+</tr>
+<tr>
+<td><strong>matter.js pin freshness</strong></td>
+<td><code>.github/workflows/matterjs-pin.yml</code> + <code>schema/staleness_test.go</code></td>
+<td>the embedded extract does not silently fall behind matter.js HEAD</td>
+</tr>
+<tr>
+<td><strong>matter.js citations</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/tree/main/script/citecheck"><code>script/citecheck</code></a>, <code>make cite-check</code> (needs a matter.js clone in <code>MATTERJS_DIR</code>), the <code>cite-check</code> job in <code>.github/workflows/ci.yml</code></td>
+<td>every <code>&lt;file&gt;.ts:&lt;line&gt;</code> the Go code cites resolves at the pin (<code>parity/schema.json</code> → <code>matter.sourceCommit</code>, or the citation's own <code>at &lt;sha&gt;</code>) — a <code>packages/…</code> path exactly, a partial path as a unique suffix, a bare file name as a unique basename — and its lines exist (hard: fails); a citation whose sentence gives, nearer to it than to any other reference, names the cited file contains, none of them within ±15 lines of the cited range, is drift (soft), listed in the committed <code>script/citecheck/drift.json</code> and held by the exact ratchet <code>citecheckDriftRatchet</code>. Fails on a hard error and when regenerating moves <code>drift.json</code> or <code>summary.md</code>; <code>make cite-report</code> regenerates them, committed with the ratchet constant in the same commit.</td>
+</tr>
+<tr>
+<td><strong>One time port</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/blob/main/clock/noraw_test.go"><code>clock/noraw_test.go</code></a>, part of <code>make test</code></td>
+<td>no production <code>.go</code> file outside <code>clock/</code>, <code>examples/</code> and <code>script/</code> calls or references <code>time.Now</code>, <code>time.AfterFunc</code>, <code>time.NewTimer</code>, <code>time.NewTicker</code>, <code>time.Sleep</code>, <code>time.After</code>, <code>time.Tick</code>, <code>time.Since</code> or <code>time.Until</code>; every interval runs on a <code>clock.Clock</code>, so a test drives matter.js's timings with <code>clocktest.Fake</code> (after matter.js <code>MockTime</code>) instead of the wall clock. Exceptions are listed in the test with a reason and an exact count (one: the socket read deadlines of <code>mdns/subtype_responder.go</code>).</td>
+</tr>
+<tr>
+<td><strong>Divergence catalogue</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md"><code>notes/parity/by_design.md</code></a></td>
+<td>every intentional deviation, with rationale and what pins it</td>
+</tr>
+<tr>
+<td><strong>Open-gap register</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matter_behaviour_findings.md"><code>notes/parity/matter_behaviour_findings.md</code></a></td>
+<td>known behaviour gaps that are <em>not</em> by design, as scoped fix packages</td>
+</tr>
+<tr>
+<td><strong>Test-porting register</strong></td>
+<td><a href="https://github.com/SukramJ/go-fabric/tree/main/script/testparity"><code>script/testparity/</code></a> (<code>register.json</code> against the committed snapshot <code>matterjs_tests.json</code>), rendered to <a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matterjs_tests.md"><code>notes/parity/matterjs_tests.md</code></a>; <code>make testparity-check</code> and the CI job <code>testparity</code></td>
+<td>every <code>*Test.ts</code> under matter.js's <code>packages/node/test</code> and <code>packages/protocol/test</code> at the pin is <code>ported</code>, <code>partial</code> (naming the <code>it</code> cases not covered), <code>planned</code> or <code>excluded</code> with one of five classes; every Go test an entry names exists; a <code>ported</code>, <code>partial</code> or <code>excluded</code> verdict fails once its matter.js file changes; the number of <code>planned</code> files sits exactly on <code>testparityPlannedRatchet</code></td>
+</tr>
+</tbody>
+</table>
+<p>When a parity sweep is genuinely warranted, prefer extending these guards over
+producing a throw-away report: a guard catches the <em>next</em> regression, a report
+catches only today's.</p>
+<h3 id="sweeping-a-pin-bump">Sweeping a pin bump<a class="headerlink" href="#sweeping-a-pin-bump" title="Permanent link">&para;</a></h3>
+<p>Moving <code>parity/schema.json</code> to a newer matter.js commit propagates the
+schema mechanically; the behaviour that changed between the two pins does
+not follow by itself. Every pin bump is therefore followed by a sweep of the
+commits in between, the way
+<a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/sweeps/2026-10-f07365a8-85cf6647.md"><code>notes/parity/sweeps/2026-10-f07365a8-85cf6647.md</code></a>
+was made:</p>
+<ol>
+<li>List the commits, not just the files:
+   <code>git -C ../matter.js log --oneline &lt;old&gt;..&lt;new&gt; -- packages/node/src
+   packages/protocol/src packages/types/src</code>. A commit message carries the
+   reason a file diff hides.</li>
+<li>Read each commit at its pin (<code>git -C ../matter.js show &lt;commit&gt;</code>) and give
+   it one verdict: (1) not applicable to the roles this module plays
+   (device-side responder, commissioner/controller) or to a feature it does
+   not have — say which; (2) already matches — cite
+   the Go code; (3) go-fabric differs — fix it through the workflow above
+   (read, mirror, cite, unit or parity test, CHANGELOG), or, if it is large,
+   record a finding in the open-gap register.</li>
+<li>Commit the table as <code>notes/parity/sweeps/&lt;yyyy-mm&gt;-&lt;old&gt;-&lt;new&gt;.md</code>
+   (commit, subject, verdict, Go reference / fix commit / finding), and
+   re-run every certification family that covers a verdict-3 change.</li>
+<li>Refresh the test snapshot (<code>make testparity-snapshot</code>, against the same
+   clone): <code>make testparity-check</code> then names every test file upstream added
+   or removed and every <code>ported</code>, <code>partial</code> or <code>excluded</code> entry whose file
+   changed. Re-check those mappings and exclusions, update their <code>snapshotSha</code>, and move
+   <code>testparityPlannedRatchet</code> with the <code>planned</code> count in the same commit.</li>
+</ol>
+<h2 id="5-where-the-hosts-own-parity-obligation-begins">5. Where the host's own parity obligation begins<a class="headerlink" href="#5-where-the-hosts-own-parity-obligation-begins" title="Permanent link">&para;</a></h2>
+<p>This module owns the wire format. A bridge is this module <em>plus</em> a host that
+projects its own devices onto clusters, and the host half has its own gold
+standard — for OpenCCU-Loom, the reference consumer, that is <code>aiohomematic</code> on
+the CCU side. The two reference layers do not overlap: CCU wire knowledge stays
+in aiohomematic, Matter wire knowledge stays in matter.js.</p>
+<p>The boundary is the <a href="https://github.com/SukramJ/go-fabric/tree/main/contract"><code>contract/</code></a> package. Everything on this side
+of it mirrors matter.js and is covered by §4. Everything on the far side —
+which data point becomes which cluster, which device type a product maps to —
+is the host's decision and the host's parity contract. A host that gets the
+projection wrong produces a device that pairs and then misbehaves, which is
+exactly the class of defect §2 is about; it is simply not caught by the guards
+listed here.</p>
+<p>One asymmetry worth stating: a port of a CCU stack converges, because the
+source stands still. The Matter mirror never "finishes" — matter.js HEAD bumps
+cluster and device-type revisions, and the wire shape is interop-critical.
+Parity here is a permanent discipline, re-verified on every change and whenever
+the matter.js pin is advanced.</p>
+<h2 id="6-the-non-negotiable-checklist">6. The non-negotiable checklist<a class="headerlink" href="#6-the-non-negotiable-checklist" title="Permanent link">&para;</a></h2>
+<p>Before you open a PR:</p>
+<ul>
+<li>[ ] I read the matter.js (and, for wire-truth, chip) source for this
+      cluster / behaviour / device-type.</li>
+<li>[ ] My implementation mirrors its defaults, constraints, status codes, and
+      order — or the divergence is recorded in <code>by_design.md</code> (+ ADR if
+      non-trivial).</li>
+<li>[ ] I cited the matter.js / chip <code>path:line</code> in the Go code.</li>
+<li>[ ] I added or extended a <strong>behaviour</strong> parity test (a constraint row, a
+      command-semantics case, a wire fixture) — not only a schema assertion.</li>
+<li>[ ] The standing guards in §4 are green.</li>
+</ul>
+<p>If you cannot check every box, the change is not ready.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Apache License 2.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "content.action.edit", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
