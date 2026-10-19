@@ -300,12 +300,20 @@ func TestPresetStoreRestoresPresetsAndActiveHandle(t *testing.T) {
 func TestPresetConfigurationRefused(t *testing.T) {
 	t.Parallel()
 	for name, edit := range map[string]func(*thermo.ThermostatConfig){
-		"no presets":        func(c *thermo.ThermostatConfig) { c.NumberOfPresets = 0 },
-		"no preset types":   func(c *thermo.ThermostatConfig) { c.PresetTypes = nil },
-		"an unnamed type":   func(c *thermo.ThermostatConfig) { c.Presets = []thermo.Preset{newPreset(withName("Home"))} },
-		"a missing type":    func(c *thermo.ThermostatConfig) { c.Presets = []thermo.Preset{newPreset(func(p *thermo.Preset) { p.PresetScenario = tdef.PresetScenarioVacation })} },
-		"too many presets":  func(c *thermo.ThermostatConfig) { c.NumberOfPresets = 1; c.Presets = []thermo.Preset{newPreset(), newPreset()} },
-		"setpoint too high": func(c *thermo.ThermostatConfig) { h := int16(3500); c.Presets = []thermo.Preset{newPreset(func(p *thermo.Preset) { p.HeatingSetpoint = &h })} },
+		"no presets":      func(c *thermo.ThermostatConfig) { c.NumberOfPresets = 0 },
+		"no preset types": func(c *thermo.ThermostatConfig) { c.PresetTypes = nil },
+		"an unnamed type": func(c *thermo.ThermostatConfig) { c.Presets = []thermo.Preset{newPreset(withName("Home"))} },
+		"a missing type": func(c *thermo.ThermostatConfig) {
+			c.Presets = []thermo.Preset{newPreset(func(p *thermo.Preset) { p.PresetScenario = tdef.PresetScenarioVacation })}
+		},
+		"too many presets": func(c *thermo.ThermostatConfig) {
+			c.NumberOfPresets = 1
+			c.Presets = []thermo.Preset{newPreset(), newPreset()}
+		},
+		"setpoint too high": func(c *thermo.ThermostatConfig) {
+			h := int16(3500)
+			c.Presets = []thermo.Preset{newPreset(func(p *thermo.Preset) { p.HeatingSetpoint = &h })}
+		},
 	} {
 		cfg := thermostatConfig(5, nil)
 		edit(&cfg)
