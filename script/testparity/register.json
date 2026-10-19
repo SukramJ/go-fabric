@@ -1011,13 +1011,13 @@
       "go": [
         "cluster/transition:TestStepCadenceRoundingAndFinish",
         "cluster/transition:TestRemainingTimeReportsOnCommandChanges",
-        "cluster/levelcontrol:TestExecuteIfOff"
+        "cluster/levelcontrol:TestExecuteIfOff",
+        "cluster/levelcontrol:TestParityMatterJS_LevelControlServerTest"
       ],
       "missing": [
-        "stops transition timers when destroyed",
-        "works with anonymous class and downlevel features"
+        "emits CurrentLevel and RemainingTime updates quietly"
       ],
-      "reason": "The transition to off, RemainingTime on command changes and the two stop cases are ported; timer teardown on destroy and the anonymous-class case are not.",
+      "reason": "The six it cases are ported: the transition to off, RemainingTime on command changes and the two stop cases locally, the timer teardown on a fabrictest node's Stop (the server's own fake clock counts the transition and deferred-report timers) and the anonymous-class server on a fabrictest DimmableLight. Missing is the case matter.js keeps commented out as non-deterministic (:24-53): its vector reports the first CurrentLevel 300 ms after RemainingTime, the Go server at the first step (100 ms), so every later level is sampled at another phase of the quiet interval.",
       "snapshotSha": "c4c832ba7be66a2791359e7f09d450a963403e46"
     },
     {
