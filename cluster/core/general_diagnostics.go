@@ -120,6 +120,10 @@ type GeneralDiagnostics struct {
 	// startTime; see upTime.
 	upTimeHighWater atomic.Int64
 
+	// noDataModelTest is a feature selection without DMTEST
+	// ([NewGeneralDiagnosticsWith]); fixed at construction.
+	noDataModelTest bool
+
 	// opSession is the operational time this process counted up to the
 	// checkpoint opLast, both guarded by opMu (taken after mu). Mirrors
 	// matter.js GeneralDiagnosticsServer.ts totalOperationalHoursCounter and
@@ -215,14 +219,38 @@ var gendiagInst = mustInstance(gendiagdef.Definition, spec.Options{
 	Attributes: []uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus},
 })
 
+// gendiagInstNoFeatures is the same surface without DMTEST, for a server
+// built with [GeneralDiagnosticsFeatures.DataModelTest] false.
+var gendiagInstNoFeatures = mustInstance(gendiagdef.Definition, spec.Options{
+	Attributes: []uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus},
+})
+
+// GeneralDiagnosticsFeatures is the feature selection of a
+// GeneralDiagnostics server, matter.js GeneralDiagnosticsServer.with(…).
+type GeneralDiagnosticsFeatures struct {
+	// DataModelTest (DMTEST) adds PayloadTestRequest. It is mandatory above
+	// a MaxPathsPerInvoke of one ([GeneralDiagnostics.CheckDataModelTest]).
+	DataModelTest bool
+}
+
 // NewGeneralDiagnostics returns the cluster with startTime captured
-// at construction. bootReason is supplied by the daemon's bootstrap
-// (typically [BootReasonPowerOnReboot] for cold start, or
-// [BootReasonSoftwareUpdate] after an OTA).
+// at construction and the DataModelTest feature, matter.js's default
+// selection (GeneralDiagnosticsServer.ts:51-52, "because we use
+// MaxPathsPerInvoke > 1 by default"). bootReason is supplied by the
+// daemon's bootstrap (typically [BootReasonPowerOnReboot] for cold start,
+// or [BootReasonSoftwareUpdate] after an OTA).
 func NewGeneralDiagnostics(bootReason uint8) *GeneralDiagnostics {
+	return NewGeneralDiagnosticsWith(bootReason, GeneralDiagnosticsFeatures{DataModelTest: true})
+}
+
+// NewGeneralDiagnosticsWith is [NewGeneralDiagnostics] with a feature
+// selection of the host's own — matter.js GeneralDiagnosticsServer.with(…);
+// the zero value selects none.
+func NewGeneralDiagnosticsWith(bootReason uint8, features GeneralDiagnosticsFeatures) *GeneralDiagnostics {
 	g := &GeneralDiagnostics{
-		clock:      clock.System{},
-		bootReason: bootReason,
+		clock:           clock.System{},
+		bootReason:      bootReason,
+		noDataModelTest: !features.DataModelTest,
 	}
 	g.startTime = g.clock.Now()
 	g.opLast = g.startTime
@@ -310,6 +338,34 @@ func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
 	return g.baseOperationalTime + g.operationalSession()
 }
 
+// def is the definition bound to the server's feature selection.
+func (g *GeneralDiagnostics) def() *spec.Instance {
+	if g.noDataModelTest {
+		return gendiagInstNoFeatures
+	}
+	return gendiagInst
+}
+
+// CheckDataModelTest holds the feature selection against the node's
+// BasicInformation MaxPathsPerInvoke: without DataModelTest a limit above
+// one is an error (the feature is mandatory there, Matter 1.6.1 Core
+// §11.12.4.1); with it a limit of one logs that the feature could be
+// dropped. The owner of both servers calls it when the node comes online.
+// Mirrors matter.js GeneralDiagnosticsServer.ts #assertDataModelTest
+// (:125-143), which #online runs (:352).
+func (g *GeneralDiagnostics) CheckDataModelTest(maxPathsPerInvoke uint16, logger *slog.Logger) error {
+	if g.noDataModelTest {
+		if maxPathsPerInvoke > 1 {
+			return fmt.Errorf("matter: the DataModelTest feature is mandatory with a maxPathsPerInvoke of %d; select it with GeneralDiagnosticsFeatures.DataModelTest or set maxPathsPerInvoke to 1", maxPathsPerInvoke)
+		}
+		return nil
+	}
+	if maxPathsPerInvoke == 1 && logger != nil {
+		logger.Info("The DataModelTest feature is enabled but is only required when maxPathsPerInvoke is greater than 1; disable it with GeneralDiagnosticsFeatures if you do not want to advertise it")
+	}
+	return nil
+}
+
 // elapsedSince is the time from start to end, floored at zero: a backward
 // clock step would otherwise lower the operational time below what was
 // persisted (and wrap the uint32 TotalOperationalHours and the uint64
@@ -375,7 +431,7 @@ func (g *GeneralDiagnostics) MatterClusterID() uint32 { return gendiagClusterID 
 // the definition's — TestEventTrigger and PayloadTestRequest require
 // Manage (access "M"), TimeSnapshot Operate.
 func (g *GeneralDiagnostics) MinInvokePrivilege(cmdID uint32) uint8 {
-	return gendiagInst.MinInvokePrivilege(cmdID)
+	return g.def().MinInvokePrivilege(cmdID)
 }
 
 // MatterRead implements [contract.ClusterServer].
@@ -436,7 +492,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		return g.testTrigger != nil, true
 
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return gendiagInst.ReadGlobal(attrID)
+		return g.def().ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -445,7 +501,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 // attribute answers UNSUPPORTED_WRITE and any other UNSUPPORTED_ATTRIBUTE,
 // as the definition judges them.
 func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := gendiagInst.ValidateWrite(attrID, value, nil)
+	_, err := g.def().ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("matter: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
@@ -479,6 +535,9 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		}
 		return resp, nil
 	case gendiagCmdPayloadTestRequest:
+		if g.noDataModelTest {
+			return nil, im.UnsupportedCommandf("matter: GeneralDiagnostics PayloadTestRequest needs the DataModelTest feature")
+		}
 		return g.payloadTestRequest(fields)
 	case gendiagCmdTestEventTrigger:
 		return nil, g.testEventTrigger(ctx, fields)
@@ -786,14 +845,14 @@ func (l NetworkInterfaceList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // the handler always rejects it with ConstraintError (no enable key). Only
 // PayloadTestRequest (0x03, DMTEST) stays unlisted.
 func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
-	return gendiagInst.MatterAcceptedCommands()
+	return g.def().MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
 // responses of the accepted requests, TimeSnapshotResponse and (DMTEST)
 // PayloadTestResponse.
 func (g *GeneralDiagnostics) MatterGeneratedCommands() []uint32 {
-	return gendiagInst.MatterGeneratedCommands()
+	return g.def().MatterGeneratedCommands()
 }
 
 // MatterReportable returns the subscribe-able attributes.
@@ -813,13 +872,13 @@ func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
 	// Subscribe-Initial via EmitBootReason() — Apple parses that event
 	// into the `estimated start time` log line and the BootReason
 	// attribute on the wire is redundant.
-	return gendiagInst.MatterAttributes()
+	return g.def().MatterAttributes()
 }
 
 // MatterEvents implements [contract.ClusterEventLister] so the
 // dispatcher synthesises the global EventList (0xFFFA) attribute
 // correctly for this cluster.
-func (g *GeneralDiagnostics) MatterEvents() []uint32 { return gendiagInst.MatterEvents() }
+func (g *GeneralDiagnostics) MatterEvents() []uint32 { return g.def().MatterEvents() }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 // Called by the bridge during topology assembly so [EmitBootReason]
@@ -865,7 +924,7 @@ func (g *GeneralDiagnostics) EmitBootReason() {
 		slog.Any("endpoint", endpoint), slog.Any("boot_reason", bootReason))
 	emitter.MatterEmitEvent(endpoint, gendiagClusterID, gendiagEventBootReason,
 		BootReasonEvent{BootReason: bootReason},
-		gendiagInst.EventPriority(gendiagEventBootReason))
+		g.def().EventPriority(gendiagEventBootReason))
 }
 
 // enumerateNetworkInterfaces walks net.Interfaces() and projects every

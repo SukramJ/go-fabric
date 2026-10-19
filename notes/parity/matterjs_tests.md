@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 64 |
+| ported | 65 |
 | partial | 116 |
-| planned | 57 |
+| planned | 56 |
 | excluded | 87 |
 | total | 324 |
 
@@ -48,7 +48,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 0 | 1 | 1 | 0 |
+| [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 0 | 0 | 1 | 0 |
@@ -333,7 +333,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| GeneralDiagnosticsFeaturesTest.ts | 78 | planned | ‚Äî | The DataModelTest feature against the node's paths-per-invoke limit. |
+| GeneralDiagnosticsFeaturesTest.ts | 78 | ported | `cluster/core:TestGeneralDiagnosticsFeatures` | The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; node.Config carries neither the selection nor MaxPathsPerInvoke. |
 | GeneralDiagnosticsOperationalHoursTest.ts | 157 | partial | `cluster/core:TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered`<br>`cluster/core:TestGenDiag_UpTimeMonotonicallyNonDecreasing`<br>`node:TestOperationalHoursSurviveARestart`<br>`cluster/core:TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep`<br>`cluster/core:TestGeneralDiagnosticsUpTimeHighWaterResetsAcrossARestart`<br>`cluster/core:TestGeneralDiagnosticsTotalOperationalHoursNonNegativeOnABackwardStep`<br>`cluster/core:TestGeneralDiagnosticsUpTimeNonNegativeOnABackwardStep`<br>`cluster/core:TestGeneralDiagnosticsPersistedCounterIsAnInteger`<br>`cluster/core:TestGeneralDiagnosticsGoesOfflineCleanlyOnABackwardStep` | UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form. Missing: ‚Äúkeeps the operational time counted across a backward wall-clock step‚Äù. |
 
 ## node/test/behaviors/group-key-management
@@ -974,10 +974,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/fan-control
 
 - `FanControlTest.ts` ‚Äî Local mode tags and the not-off-only command set of FanControlServer by default.
-
-### node/test/behaviors/general-diagnostics
-
-- `GeneralDiagnosticsFeaturesTest.ts` ‚Äî The DataModelTest feature against the node's paths-per-invoke limit.
 
 ### node/test/behaviors/groups
 

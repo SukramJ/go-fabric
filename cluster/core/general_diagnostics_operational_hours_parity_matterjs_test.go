@@ -5,7 +5,7 @@
 // at 862ad75f: UpTime and TotalOperationalHours across clock steps and a
 // restart (GeneralDiagnosticsServer.ts elapsedSince :60-68, #online
 // :351-375, #updateTotalOperationalHoursCounter :384-392, the upTime and
-// totalOperationalHours getters :535-570).
+// totalOperationalHours getters :518-553).
 //
 // matter.js runs a MockServerNode on MockTime and reads the root's state
 // with stateOf; the port runs a fabrictest device on the site's
@@ -122,7 +122,7 @@ func TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep(t *testing.T
 // upTime's high-water mark across a restart"
 // (GeneralDiagnosticsOperationalHoursTest.ts:82-96): 5 min, a forward step
 // of 10 min, UpTime 900; after stop and start, 0. matter.js resets the mark
-// in #online (:362); a Go restart builds a new server.
+// in #online (:364); a Go restart builds a new server.
 func TestGeneralDiagnosticsUpTimeHighWaterResetsAcrossARestart(t *testing.T) {
 	t.Parallel()
 	site, d := onlineDevice(t)

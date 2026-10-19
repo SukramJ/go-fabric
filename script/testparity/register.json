@@ -848,8 +848,11 @@
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
-      "status": "planned",
-      "reason": "The DataModelTest feature against the node's paths-per-invoke limit.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestGeneralDiagnosticsFeatures"
+      ],
+      "reason": "The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; node.Config carries neither the selection nor MaxPathsPerInvoke.",
       "snapshotSha": "c7221dfacafc1c25b8907cda1d5cf89dbed79b4f"
     },
     {

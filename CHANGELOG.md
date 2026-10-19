@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/core`: a GeneralDiagnostics feature selection of the host's own — `NewGeneralDiagnosticsWith(bootReason, GeneralDiagnosticsFeatures{DataModelTest: …})`, matter.js `GeneralDiagnosticsServer.with(…)`; without DataModelTest the server drops PayloadTestRequest/Response and FeatureMap reads 0. `GeneralDiagnostics.CheckDataModelTest(maxPathsPerInvoke, logger)` holds the selection against the node's MaxPathsPerInvoke: an error above one without the feature, an INFO advisory with it at one (`GeneralDiagnosticsServer.ts:125-143`). `NewGeneralDiagnostics` keeps DataModelTest.
+
 ### Fixed
 
 - `bridge`: a configuration change that groups several bridged devices raises the node's BasicInformation ConfigurationVersion once — `Bridge.IncreaseNodeConfigurationVersionWith(change)` runs the change, in which `ConfigurationChange.IncreaseConfigurationVersion(scope, deviceAddress)` raises each device's own version, and increments the node's afterwards, as matter.js `BasicInformationServer.increaseConfigurationVersion` does with the bridged nodes' shared context (`BasicInformationServer.ts:132-138`, `BridgedDeviceBasicInformationServer.ts:72-90`). Before, every bridged device raised the node again.
