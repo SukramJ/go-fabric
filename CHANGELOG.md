@@ -10,7 +10,9 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node` (and the two `packages/protocol/test` files whose subject lives in `controller/client`) onto `fabrictest`.
+## [0.8.0] — 2026-10-19
+
+Closes milestone 2 (the test foundation) of the [roadmap](./docs/roadmap.md). Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node` (and the two `packages/protocol/test` files whose subject lives in `controller/client`) onto `fabrictest`.
 
 ### Added
 
@@ -49,7 +51,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 
 ## [0.7.3] — 2026-10-18
 
-Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5, brief BH): the port of matter.js `packages/protocol/test` at `862ad75f` — one `*_parity_matterjs_test.go` per matter.js file, the register `script/testparity/register.json` naming every Go test and every `it` still missing. The ports found the gaps below; each fix cites the matter.js lines it mirrors.
+Milestone 2, phase 16 ([concept v4](./docs/history/concept-v4-test-foundation.md) §A.5, brief BH): the port of matter.js `packages/protocol/test` at `862ad75f` — one `*_parity_matterjs_test.go` per matter.js file, the register `script/testparity/register.json` naming every Go test and every `it` still missing. The ports found the gaps below; each fix cites the matter.js lines it mirrors.
 
 ### Added
 
@@ -97,7 +99,7 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 
 ## [0.7.2] — 2026-10-18
 
-Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
+Milestone 2, phase 15a ([concept v4](./docs/history/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
 
 **What a host must do.** Nothing, unless it implements `controller/exchange.Clock` or `exchange.Timer` itself (see Changed). A host that wants to drive the device side's timers in its tests sets `node.Config.Clock` (or `bridge.Config.Clock`) to a `clocktest.Fake`.
 
@@ -135,7 +137,7 @@ All removable in `v0.10.0` at the earliest; the README's deprecation table lists
 
 ## [0.7.1] — 2026-10-18
 
-Milestone 2, phase 14 ([the roadmap](./docs/roadmap.md), [concept v4](./docs/concept-v4-test-foundation.md)): the matter.js pin lifted from `0ceb202d` to `862ad75f` (57 upstream commits; the one model change is BridgedNode composing its full family, the 41 upstream fixes classified in `notes/parity/pin-lifts.md` — 12 register entries), two new standing guards (the test-porting register and the citation check), and the PartsList change that follows from the model. No API change; the store schema is unchanged.
+Milestone 2, phase 14 ([the roadmap](./docs/roadmap.md), [concept v4](./docs/history/concept-v4-test-foundation.md)): the matter.js pin lifted from `0ceb202d` to `862ad75f` (57 upstream commits; the one model change is BridgedNode composing its full family, the 41 upstream fixes classified in `notes/parity/pin-lifts.md` — 12 register entries), two new standing guards (the test-porting register and the citation check), and the PartsList change that follows from the model. No API change; the store schema is unchanged.
 
 ### Added
 
@@ -4228,7 +4230,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...v0.7.1

@@ -1,7 +1,7 @@
 # Konzept v5: Verhaltenstiefe (Meilenstein 3)
 
 Stand 2026-10-19, go-fabric `v0.7.3`, matter.js-Pin `862ad75f`. Fortsetzung
-von [Konzept v4](./concept-v4-test-foundation.md). Sprache ist Deutsch, weil
+von [Konzept v4](./history/concept-v4-test-foundation.md). Sprache ist Deutsch, weil
 es ein Planungsstand ist; ADRs und `by_design`-Einträge daraus sind Englisch.
 
 Meilenstein 2 hat das Fundament gelegt: eine Uhr, ein In-Process-Netz
