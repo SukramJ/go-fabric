@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.8.6] — 2026-10-19
+
+Milestone 3, phase 18b, brief BO: the behaviour-test ports of AccessControl Auxiliary, OperationalCredentials, GroupKeyManagement and the system commissioning tests (CommissioningWindowLifetime, CommissioningRestart, FabricBeforeStart) against matter.js at `862ad75f` — 30 of 42 open cases, two fixes the ports and the GeneralCommissioning audit found, the node wirings left by 18a, the GeneralCommissioning and AdministratorCommissioning audit.
+
 ### Added
 
 - `node`: `Config.GeneralDiagnosticsFeatures` selects the root GeneralDiagnostics' features (nil keeps DataModelTest, matter.js's default) and `Config.MaxPathsPerInvoke` sets the node's batch limit (0 is 10): BasicInformation advertises it, the PASE and CASE session parameters carry it, and the invoke path refuses a larger batch with InvalidAction (`InteractionServer.ts:198`, `:1017`). `Node.Start` runs the DataModelTest check matter.js runs when the node comes online and fails without the feature above one path per invoke (`GeneralDiagnosticsServer.ts:125-143`, `:352`). `bridge.Config.MaxPathsPerInvoke` and `im.ValidateInvokeBatchWithin` carry the limit.
@@ -4347,7 +4351,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/SukramJ/go-fabric/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/SukramJ/go-fabric/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/SukramJ/go-fabric/compare/v0.8.2...v0.8.3

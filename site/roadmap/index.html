@@ -1,0 +1,2770 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.">
+      
+      
+      
+        <link rel="canonical" href="https://sukramj.github.io/go-fabric/roadmap/">
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../guides/ports/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Roadmap - go-fabric</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="go-fabric" class="md-header__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            go-fabric
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Roadmap
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="go-fabric" class="md-nav__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    go-fabric
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/device/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The device side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The controller side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#baseline-2026-10-17-v060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline (2026-10-17, v0.6.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestones
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Milestones">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#milestone-1-the-commissioner-in-the-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 1: The commissioner in the field
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-2-the-test-foundation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 2: The test foundation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-3-behaviour-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 3: Behaviour depth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-4-the-embedding-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 4: The embedding layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-5-icd-and-the-controller-remainder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 5: ICD and the controller remainder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-6-completeness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 6: Completeness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-7-ble-on-the-device-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 7: BLE on the device side
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standing-work-outside-the-milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standing work, outside the milestones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-phase-is-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a phase is planned
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/concurrency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/persistence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/testing-in-process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing in process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../adr/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture decisions
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-matter-commissioning-bring-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001 — Matter wire-protocol design rules from chip-tool bring-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-im-opcode-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002 — Extract a testable gate + per-opcode seam from `handleIMOpcode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-sigma-resume-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003 — Sigma resumption extraction: already satisfied (finding corrected)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-groups-cluster-stays-stub/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004 — Minimal in-memory Groups cluster: rejected (stub is a deliberate, matter.js-conformant divergence)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-bridge-decomposition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005 — Matter `Bridge`: defer the CommissioningSession/IMEngine facade split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-subscribe-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006 — Extract cohesive sub-helpers from `handleSubscribeRequest`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-chiptool-send-receive-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007 — Hermetic per-DP-type Matter send/receive suite (chip-tool ↔ godevccu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0008-subscription-resumption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0008 — Server-side subscription persistence and re-establishment after restart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0009-groups-and-group-messaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0009 — A real Groups server and group message delivery, as matter.js builds them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0010-groupcast-and-auxiliary-acl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0010 — Groupcast and the AccessControl Auxiliary ACL on the root, as matter.js installs them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0011-certifiability-is-a-goal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0011 — Certifiability is a goal; certification is not pursued
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0012-scenesmanagement-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0012 — A real ScenesManagement server on the bridged lights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0013-generated-cluster-definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0013 — Cluster definitions generated from the matter.js model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0014-transitions-optional-per-endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0014 — Attribute transitions run in the module, optional per endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0015-chip-data-model-read-at-run-time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0015 — The CHIP data model cross-check reads connectedhomeip at test time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0016-device-type-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0016 — Assembled topologies are validated against their device types, as matter.js validates a server node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0017-generated-default-cluster-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0017 — A generated default cluster server, so that a cluster without matter.js logic costs no hand-written server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0018-device-layer-and-node-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0019-tcp-bdx-and-the-ota-requestor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0019 — TCP, BDX and the OTA Software Update Requestor enter the scope; DiagnosticLogs stays without BDX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0020-commissioner-and-controller-role/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0021-ota-provider-and-diagnosticlogs-over-bdx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0021 — The OTA Software Update Provider and DiagnosticLogs over BDX enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0022-media-and-content-clusters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0022 — The media and content clusters and the three media device types enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0023-apache-2-and-the-cla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0023 — Apache License 2.0 and a contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0024-ble-commissioning-in-the-controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0024 — BLE commissioning in the controller role
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matterjs-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    matter.js comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matter-parity-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parity contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../certifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Certifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chip-datamodel-crosscheck/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CHIP data-model cross-check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matter-ecosystem-observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystem observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CLA.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/LICENSE" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#baseline-2026-10-17-v060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline (2026-10-17, v0.6.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestones
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Milestones">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#milestone-1-the-commissioner-in-the-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 1: The commissioner in the field
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-2-the-test-foundation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 2: The test foundation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-3-behaviour-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 3: Behaviour depth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-4-the-embedding-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 4: The embedding layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-5-icd-and-the-controller-remainder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 5: ICD and the controller remainder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-6-completeness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 6: Completeness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#milestone-7-ble-on-the-device-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Milestone 7: BLE on the device side
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standing-work-outside-the-milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standing work, outside the milestones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-phase-is-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a phase is planned
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/SukramJ/go-fabric/edit/main/docs/roadmap.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h1>
+<p>Set by the owner on 2026-10-17, at <code>v0.6.0</code>, after the module's node had
+been paired and driven by Apple Home and by Home Assistant's Matter server
+(both on the reference bridge and OpenCCU-Loom). This page is the one place
+where the order of the remaining work is written down: what each milestone
+contains, roughly how it is phased, what it is worth and to whom, and when
+it counts as closed. The detail of a phase lives in its own document,
+written when the phase is next (see <a href="#how-a-phase-is-planned">How a phase is planned</a>).</p>
+<h2 id="the-goal">The goal<a class="headerlink" href="#the-goal" title="Permanent link">&para;</a></h2>
+<p><strong>Complete Matter 1.6.1, wherever matter.js implements it.</strong> matter.js is
+the gold standard (<a href="https://github.com/SukramJ/go-fabric/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a>);
+the measure of "complete" is therefore its HEAD, not the specification
+text: every cluster, device type, protocol feature and behaviour matter.js
+has, this module has — semantically, with the same defaults, the same
+constraints and the same wire shape — and nothing it lacks is invented here
+unless a connectedhomeip reference exists, as the parity contract already
+allows (DiagnosticLogs, FanControl coupling). A generated matter.js stub
+counts as an implementation: it is served here by the generated default
+server (<a href="../adr/0017-generated-default-cluster-server/">ADR 0017</a>), which
+is exactly as much as matter.js offers for it.</p>
+<p><strong>Beyond the standard: the embedding layer.</strong> matter.js is the gold
+standard; this module is meant to be the diamond one — not a larger
+protocol surface, but a smaller distance between a host's device model and
+a paired, working Matter node. The consumers that set that bar:</p>
+<table>
+<thead>
+<tr>
+<th>Consumer</th>
+<th>State</th>
+<th>What it needs from this module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/SukramJ/openccu-loom">OpenCCU-Loom</a></td>
+<td>in production; today imports 20 packages of this module directly</td>
+<td>a complete <code>node/</code> + <code>device/</code> + <code>contract/</code> surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering)</td>
+</tr>
+<tr>
+<td>go-ha-matter-bridge (working name; planned separately)</td>
+<td>not started; its concept is written when milestone 4 is due</td>
+<td>the declarative device kit, the in-process test pair, the adapter module below</td>
+</tr>
+<tr>
+<td>the <code>go-*2mqtt</code> family (daikin, homeconnect, mtec, unifi, zendure) via a shared adapter module (working name <code>go-hamatter</code>: <code>go-hamqtt</code>'s Home-Assistant vocabulary → Matter device types; lives outside this module, so <code>contract/</code> stays stdlib-only)</td>
+<td>not started</td>
+<td>the same device kit; energy and appliance device types, which already exist</td>
+</tr>
+<tr>
+<td><code>examples/reference-controller</code> and a host acting as commissioner</td>
+<td>shipped, controller stages 1–6b</td>
+<td>the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5)</td>
+</tr>
+</tbody>
+</table>
+<p>Priority follows from that table: a feature a consumer uses comes before
+one none uses, and both come before completeness for its own sake.</p>
+<h2 id="how-to-read-this-page">How to read this page<a class="headerlink" href="#how-to-read-this-page" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A <strong>milestone</strong> closes a topic area completely; it is not a sprint. One
+  minor version per milestone (<code>v0.7.0</code> is milestone 1), patch versions for
+  the waves inside it. The <code>v1.0.0</code> cut is the owner's call and is not
+  scheduled here; the <code>0.x</code> series continues until then, and the freeze of
+  <code>device/</code>, <code>node/</code> and <code>controller/</code> stays bound to that cut.</li>
+<li><strong>Phases</strong> continue the numbering of the concepts (concept v3 ends at
+  phase 13). A phase is one to three implementation waves, one pull request
+  per wave (<a href="https://github.com/SukramJ/go-fabric/blob/main/CLAUDE.md">one PR per wave</a>).</li>
+<li><strong>Definition of done</strong> is the same three pillars for every milestone, and
+  a milestone is not closed while one is missing:<ol>
+<li>the chip certification families the milestone names run green in
+   the harness (<code>make chiptool-families</code>), or are classified in
+   <a href="../certifiability/"><code>certifiability.md</code></a>;</li>
+<li>the matter.js test files the milestone names are ported as Go tests
+   and recorded in the test-porting register with its ratchet
+   (milestone 2 creates both);</li>
+<li>the rows of <a href="../matterjs-comparison/"><code>matterjs-comparison.md</code></a>
+   the milestone names move to ✅, or the gap moves to
+   <a href="https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md"><code>by_design.md</code></a>
+   with its reasoning.</li>
+</ol>
+</li>
+<li><strong>Every milestone opens with a pin check.</strong> matter.js HEAD moves while a
+  milestone runs (the checkout is 52 commits past the pin <code>0ceb202d</code>
+  today); the first wave of each milestone lifts the pin, classifies the
+  snapshot diff and regenerates, as concept v2 phase 6 did. A fact about
+  matter.js quoted in this page is at the pin named in the milestone.</li>
+</ul>
+<h2 id="baseline-2026-10-17-v060">Baseline (2026-10-17, <code>v0.6.0</code>)<a class="headerlink" href="#baseline-2026-10-17-v060" title="Permanent link">&para;</a></h2>
+<ul>
+<li>118 of the snapshot's 135 clusters served, 79 of its 91 device types
+  generated; the matter.js servers with hand-written logic number 25
+  (≥150 lines) and their depth here varies from a full port (ColorControl,
+  LevelControl, WindowCovering, OnOff, OTA) to none (Switch: the generated
+  definition and the wire type only, against <code>SwitchServer.ts</code> 486 lines
+  and a 3 527-line test).</li>
+<li>Controller role stages 1–6b landed; Joint Fabric (6c) deferred by
+  decision (<a href="../adr/0020-commissioner-and-controller-role/">ADR 0020</a>).</li>
+<li>Concept v3 phases 11–13 open: <code>crypto.Signer</code>, window-open from the
+  reference controller, the DCL snapshot and BLE commissioning
+  (<a href="../adr/0024-ble-commissioning-in-the-controller/">ADR 0024</a>) — none
+  of it in the tree yet.</li>
+<li>Verified ecosystems: Apple Home, Home Assistant (owner, 2026-10-17);
+  Google Home and Alexa await the owner at the device
+  (<a href="../matter-ecosystem-observations/">ecosystem observations</a>).</li>
+<li>matter.js's own tests, the proof for devices nobody has on the bench:
+  209 <code>*Test.ts</code> under <code>packages/node/test</code> (54 of them behaviour tests
+  in 36 cluster directories, 49 node-level), 114 under
+  <code>packages/protocol/test</code>, 68 certification cases under
+  <code>support/chip-testing/test/cert</code>. None of them is ported as such; the
+  module's parity tests were written from the servers, not from these
+  files.</li>
+</ul>
+<h2 id="milestones">Milestones<a class="headerlink" href="#milestones" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Milestone</th>
+<th>Version</th>
+<th>Phases</th>
+<th>Value, in one line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><a href="#milestone-1-the-commissioner-in-the-field">The commissioner in the field</a></td>
+<td><code>v0.7.0</code></td>
+<td>11–13</td>
+<td>a boxed Wi-Fi or Thread product is commissioned by this module and handed on to Apple Home</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="#milestone-2-the-test-foundation">The test foundation</a></td>
+<td><code>v0.8.0</code></td>
+<td>14–16</td>
+<td>every later milestone is proved against matter.js's own tests; consumers test their bridge without hardware</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="#milestone-3-behaviour-depth">Behaviour depth</a></td>
+<td><code>v0.9.0</code></td>
+<td>17–19</td>
+<td>the 25 matter.js servers with logic are ported line for line — remotes, thermostats, locks behave as the ecosystems expect</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="#milestone-4-the-embedding-layer">The embedding layer</a></td>
+<td><code>v0.10.0</code></td>
+<td>20–22</td>
+<td>a bridge is <code>node/</code> + <code>device/</code> + <code>contract/</code>; a new consumer is a day's work, not a port</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="#milestone-5-icd-and-the-controller-remainder">ICD and the controller remainder</a></td>
+<td><code>v0.11.0</code></td>
+<td>23–25</td>
+<td>battery devices stay reachable; the controller pushes firmware and uses TCP</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="#milestone-6-completeness">Completeness</a></td>
+<td><code>v0.12.0</code></td>
+<td>26–27</td>
+<td>135/135 clusters, 91/91 device types, every matter.js row of the comparison closed</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="#milestone-7-ble-on-the-device-side">BLE on the device side</a></td>
+<td><code>v0.13.0</code></td>
+<td>28</td>
+<td>a node of this module without a network is commissioned over BLE, as matter.js's <code>nodejs-ble</code> node is</td>
+</tr>
+</tbody>
+</table>
+<p>Milestones 2 and 3 are the owner's order of 2026-10-17: the test
+foundation first, because milestones 3–7 are proved on it; the behaviour
+depth before the embedding layer, so that the API frozen in milestone 4 has
+seen what Switch, Thermostat and ICD need from it.</p>
+<h3 id="milestone-1-the-commissioner-in-the-field">Milestone 1: The commissioner in the field<a class="headerlink" href="#milestone-1-the-commissioner-in-the-field" title="Permanent link">&para;</a></h3>
+<p><strong>Detail:</strong> <a href="https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md">concept v3</a> (German, in the history since the milestone closed) and
+<a href="../adr/0024-ble-commissioning-in-the-controller/">ADR 0024</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>11</td>
+<td><code>crypto.Signer</code> behind the controller CA; window-open from the reference controller (multi-admin from our side); the embedded DCL snapshot with modes dev / prod / none; the status table in the README</td>
+<td>in-repo tests; the hand-over to Apple Home in the manual test plan</td>
+</tr>
+<tr>
+<td>12</td>
+<td>BTP (<code>transport/btp</code>), <code>controller/ble</code>, the network steps of the commissioning flow (Wi-Fi credentials, Thread operational dataset, <code>ConnectNetwork</code>), a simulated Wi-Fi driver in the reference daemon; <strong>the decision where the Thread dataset comes from</strong> (operator-supplied, or the Thread border-router client of milestone 5)</td>
+<td>BTP vectors against <code>BtpSessionHandlerTest.ts</code> (1 526 lines) and <code>BtpCodecTest.ts</code>; network steps against the daemon</td>
+</tr>
+<tr>
+<td>13</td>
+<td>the sub-module <code>ble/bluez</code>, <code>pair --ble</code>, the <code>btvirt</code> job with chip's all-clusters-app</td>
+<td>BLE end to end, virtual; a real device in the test plan</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> A commissioner that only reaches devices already on the network
+is a laboratory tool. After this milestone a host built on this module
+commissions a boxed product and hands it on. Consumers: the reference
+controller, a loom installation acting as commissioner.</p>
+<p><strong>Done when.</strong> The comparison rows BLE/BTP and DCL move to ✅ for the
+controller role; <code>TC-DD</code> and <code>TC-SC</code> BLE cases are classified; the
+<code>btvirt</code> job passes.</p>
+<p><strong>Status 2026-10-18.</strong> Done, released as <code>v0.7.0</code>: phases 11–13 landed
+(pull requests 143, 144, 147, 149); the <code>ble-virtual</code> job is green against a
+matter.js node (ADR 0024 §5 as amended); the BLE and Thread cases of DD and
+SC are classified out of scope for the device side
+(<a href="../certifiability/">certifiability</a>). The field proof with a boxed
+product is the owner's manual test plan.</p>
+<h3 id="milestone-2-the-test-foundation">Milestone 2: The test foundation<a class="headerlink" href="#milestone-2-the-test-foundation" title="Permanent link">&para;</a></h3>
+<p><strong>Detail:</strong> <a href="https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v4-test-foundation.md">concept v4</a> (German), written 2026-10-18 when the milestone opened, in the history since it closed.</p>
+<p><strong>Status 2026-10-18.</strong> Phase 14 done, released as <code>v0.7.1</code> (pull requests 151–154): pin <code>862ad75f</code>, the upstream fixes classified, the test-porting register (134 <code>planned</code> on its ratchet) and the citation guard (266 drifts on its ratchet) in CI. Phase 15 done, released as <code>v0.7.2</code> (pull requests 157, 158, 160): every time source of the module behind <code>clock.Clock</code>, <code>clocktest.Fake</code> after <code>MockTime</code> and the no-raw-time guard; the public <code>fabrictest</code> package — in-process devices and controllers on an in-memory network and one clock, after <code>MockSite</code> — with the controller's own tests on it and the testing-in-process guide. Phase 16, first wave (brief BH, pull request 164), released as <code>v0.7.3</code>: the port of <code>packages/protocol/test</code> — 987 cases in Go, every missing case with its reason, 13 files <code>planned</code> with an <code>until</code>, the fixes the ports found and the X.520 DN gap registered first among eighteen findings; the second wave (brief BI, pull request 168), released as <code>v0.8.0</code>: the port of <code>packages/node/test/node</code> onto <code>fabrictest</code> — device side and controller side, every missing case with its reason, 69 files <code>planned</code> on the ratchet (the four node files left with <code>until M5 phase 25</code>), 22 fixes the ports found, the controller's <code>Restart</code>/<code>CommissionNode</code>/<code>Discover</code> in <code>fabrictest</code>. <strong>Milestone 2 is closed with <code>v0.8.0</code> (2026-10-19).</strong></p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>14</td>
+<td>pin lift to matter.js HEAD (snapshot diff classified, generators, citations re-checked, <code>chipdm-check</code> green); the <strong>test-porting register</strong> <code>notes/parity/matterjs_tests.md</code>: every <code>*Test.ts</code> under <code>packages/node/test</code> and <code>packages/protocol/test</code> mapped to the Go test(s) that port it or to a classified exclusion (controller-only at this stage, JS-runtime-only, Joint Fabric), with a ratchet guard like <code>reachability-check</code></td>
+<td>the guard fails when a matter.js test file is unmapped</td>
+</tr>
+<tr>
+<td>15</td>
+<td>the public test package (working name <code>fabrictest</code>, next to <code>bridgetest</code> and <code>endpointtest</code>): an in-process node, an in-process controller, the commissioned pair (<code>MockSite.addCommissionedPair</code>), a fake clock injected through one <code>Clock</code> port instead of the five ad-hoc fakes in the tree today (<code>MockTime</code>: <code>advance</code>, <code>resolve</code>, <code>yield</code>), the wire-path helpers (<code>interaction.read/write/invoke/subscribe</code> of <code>node-helpers.ts</code>)</td>
+<td>the module's own suites run on it; the concurrency guide names it</td>
+</tr>
+<tr>
+<td>16</td>
+<td>the protocol ports: <code>packages/protocol/test</code> (114 files — MRP, MessageExchange, MessageReceptionState, SessionManager, SecureSession, PASE/CASE pairing, MessageCodec, Certificates, DeviceAttestationValidator, Bdx, TcpChannel, Mdns*, FailsafeContext …) and the node-level suite <code>packages/node/test/node</code> (49 files — the Attribute/Command/Event response tests, the commissioning tests, ServerSubscription) as Go tests against this stack</td>
+<td>register at 100 % for the two trees, behaviour tests excepted (milestone 3)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> The owner's premise: the bench will never hold every device, so
+the proof has to come from matter.js's tests — which encode the ecosystem
+fixes matter.js collected. The package of phase 15 is also the first piece
+of the embedding layer: a consumer (loom, the HA bridge, a 2mqtt daemon)
+tests its own device mapping against an in-process controller, with no
+chip-tool and no radio. Consumers: every one.</p>
+<p><strong>Done when.</strong> The register exists, the guard holds, phases 15–16 are at
+100 %, and the per-package coverage floors did not drop.</p>
+<h3 id="milestone-3-behaviour-depth">Milestone 3: Behaviour depth<a class="headerlink" href="#milestone-3-behaviour-depth" title="Permanent link">&para;</a></h3>
+<p>The 25 matter.js servers with hand-written logic, each audited against its
+Go counterpart with the matter.js test file ported as the proof. Grouped
+by the surface they serve; the figures are matter.js lines of server / of
+test.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17</td>
+<td><strong>the device surface loom and the HA bridge map to:</strong> Switch — a real server (486 / 3 527: the multi-press and long-press state machine, <code>SwitchServer.ts</code>), Thermostat — presets, schedules, atomic writes (1 790 / 1 776 in six files), DoorLock (1 628 / 1 946), WindowCovering (654 / 145), OnOff (343 / 352), LevelControl (875 / 944), ColorControl (2 046 / 610), Identify (156 / 187), ServiceArea (300 / 234)</td>
+<td>SWTCH, TSTAT, DRLK, WNCV, OO, LVL, CC, I families green; the nine test files ported</td>
+</tr>
+<tr>
+<td>18</td>
+<td><strong>the system set:</strong> Descriptor (303 / 685), GeneralDiagnostics (631 / 235), AccessControl (775 / 619), OperationalCredentials (632 / 360), GroupKeyManagement (618 / 209), Groups (232 / 100), Groupcast (938 / 2 243), Binding (214 / 2 455), BasicInformation (213 / 214), GeneralCommissioning (285), AdministratorCommissioning (267), ScenesManagement (1 109 / 99)</td>
+<td>ACL, ACE, DESC, DGGEN, OPCREDS, GRPKEY, G, S, BIND, BINFO, CGEN, CADMIN green; the test files ported</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>OTA and the remaining behaviour tests:</strong> OTA requestor and provider (1 436 + 697 / 2 819 + utils), and the behaviour tests of the generated servers (boolean-state, fan-control, measurement, occupancy-sensing, power-source, hepa-filter-monitoring, concentration-measurement, energy-evse-mode, rvc-operational-state, commodity-tariff, thermostat-user-interface-configuration, time-format-localization, unit-localization, window-covering)</td>
+<td>SU green; the register at 100 % for <code>packages/node/test/behaviors</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> This is where the ecosystems judge a bridge: a HomeMatic remote
+that double-clicks, a thermostat whose presets Apple Home writes
+atomically, a KeyMatic that reports its lock state the way <code>DoorLockServer</code>
+does. Consumers: loom (switches, thermostats, locks, covers), the HA bridge
+(the same surface from the Home Assistant side).</p>
+<p><strong>Done when.</strong> The behaviour-test register is at 100 %, the named
+families are green, and no ◐ remains in the comparison's cluster section
+for a cluster with a hand-written matter.js server.</p>
+<p><strong>Status 2026-10-19.</strong> Phase 17 planned: <a href="../concept-v5-behaviour-depth/">concept v5</a> (German) with the owner's decisions 0.1–0.4 — a real Switch server after <code>SwitchServer.ts</code> beside the host-gesture path, the full Thermostat (presets, atomic writes, occupancy) and DoorLock (users, credentials, schedules) scope as selectable features, four waves in two parallel pairs (BJ ∥ BK, BL ∥ BM) as <code>v0.8.1</code>–<code>v0.8.4</code>, starting after <code>v0.8.0</code>. Phase 17a (brief BJ, pull request 170) released as <code>v0.8.1</code>: the behaviour-test ports of OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea — 66 of 76 cases, three fixes the ports found (window-covering enum conformance at construction, the level-control quiesce, the colour-temperature coupling floor), <code>fabrictest.Endpoint</code>; Phase 17b (brief BK, pull request 171) released as <code>v0.8.2</code>: <code>cluster/switch</code>, the port of <code>SwitchServer.ts</code> with matter.js's position input beside the kept gesture path, the reference daemon's button on positions, SwitchServerTest.ts 69 of 69 cases, TC-SWTCH-2.5 passing; Phase 17c (brief BL, pull request 175) released as <code>v0.8.3</code>: the Thermostat's Presets, atomic writes and Occupancy after <code>ThermostatServer.ts</code>, <code>AtomicWriteHandler.ts</code> and <code>AtomicWriteState.ts</code>, the seven thermostat test files 70 of 82 cases, presets persisted on the store (migration v5), KeypadLockout persistence, the reference daemon's thermostat in the shape of matter.js's CHIP test instance with TC-TSTAT-4.2 passing; Phase 17d (brief BM, pull request 176) released as <code>v0.8.4</code>: the DoorLock server after <code>DoorLockServer.ts</code>, <code>LockAuth.ts</code> and <code>LockSchedule.ts</code> with every feature selectable (PIN, RID, FGP, COTA, USR, WDSCH, YDSCH, HDSCH, DPS, UBOLT), users, credentials and schedules persisted on the store (migration v6, credential data encrypted at rest), the DRLK families against the reference daemon's lock. Phase 17 is complete. Phase 18 planned: <a href="../concept-v5-behaviour-depth/">concept v5</a> Teil E with the owner's decisions 18.1–18.3 — Opus implements all four waves, Fable reads every cited fix line of the security servers against the pin before the merge; <code>AccessControlCustomExtensionTest.ts</code> deferred to milestone 4; four sequential waves <code>v0.8.5</code>–<code>v0.8.8</code> (18a Descriptor, GeneralDiagnostics, BasicInformation, Groups, ScenesManagement and the protocol group tests; 18b AccessControl, OperationalCredentials, GroupKeyManagement and the system commissioning tests; 18c Groupcast; 18d Binding); Phase 18a (brief BN, pull request 182) released as <code>v0.8.5</code>: the ports of Descriptor, GeneralDiagnostics, BasicInformation, Groups, ScenesManagement and the protocol group tests, 38 of 47 open cases, four fixes (the bridge raises the node's ConfigurationVersion once for a grouped change, the operational time no longer wraps on a backward clock step, GeneralDiagnostics feature selection with the DataModelTest check, Descriptor TagList opt-in with matter.js's tag rules); Phase 18b (brief BO, pull request 184) released as <code>v0.8.6</code>: the ports of AccessControl Auxiliary, OperationalCredentials, GroupKeyManagement and the system commissioning tests, 30 of 42 open cases, two fixes (SetVIDVerificationStatement refuses vendor ID 0, ArmFailSafe(0) leaves the Breadcrumb to the fail-safe's expiry), the node's MaxPathsPerInvoke, CapabilityMinima, GeneralDiagnostics feature selection and grouped ConfigurationVersion, the GeneralCommissioning and AdministratorCommissioning audit (seven findings); the rotated-IPK gap (key set 0) is the owner's <code>secure/</code> change in 18c.</p>
+<h3 id="milestone-4-the-embedding-layer">Milestone 4: The embedding layer<a class="headerlink" href="#milestone-4-the-embedding-layer" title="Permanent link">&para;</a></h3>
+<p><strong>Detail:</strong> written when milestone 3 is closed, together with the concept
+of the go-ha-matter-bridge and the adapter module, because the three
+shape each other.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>20</td>
+<td>the <code>node/</code> facade complete: everything loom reaches below it today (<code>bridge</code>, <code>store</code>, <code>secure/*</code>, <code>mdns</code>, <code>im</code>) is reachable through <code>node/</code>, <code>device/</code> and <code>contract/</code>, or is documented as an advanced seam; the <strong>declarative device kit</strong> — a bridged device from a device type, its values and its command handlers in one declaration, with attribute change propagation, transitions and the device-type validator behind it; an <code>apidiff</code> guard from this milestone on, so that a break is announced before it ships</td>
+<td>loom's import list shrinks to the facade; the reference bridge is rewritten on the kit</td>
+</tr>
+<tr>
+<td>21</td>
+<td>observability and persistence as ports: <code>slog</code> attribute conventions, a metrics hook, the diagnostic event ring; the <code>Store</code> seam proved by a second implementation (in-memory, for tests and small daemons); hardening a daemon in the field needs (session and subscription limits documented, PASE attempt limit after §5.5, fuzz targets for the controller decoders)</td>
+<td>the persistence and concurrency guides describe the ports; <code>make fuzz</code> covers the new targets</td>
+</tr>
+<tr>
+<td>22</td>
+<td>packaging and the cookbook: container image and systemd unit for the reference apps, arm64, the "embed in a daemon" guide written against a <code>go-*2mqtt</code> project; the concept documents of the go-ha-matter-bridge and the adapter module</td>
+<td>a 2mqtt daemon exposes one device type end to end on the kit</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> The diamond-standard claim lives here, and it is a claim about
+embedding and operation, not about Matter semantics: <strong>ahead of matter.js
+in embedding and operation, equal in semantics</strong> (owner, 2026-10-19).
+matter.js asks a host to learn behaviours, agents and transactions; this
+module should ask for a device type and a handful of callbacks, and ship
+as one static binary with a small footprint. On the wire it is a port of
+matter.js and can be as correct as its source, not more; the ecosystem
+exceptions stay matter.js's. Consumers: every one; the HA bridge and the
+2mqtt family cannot start before it.</p>
+<p><strong>Done when.</strong> The comparison's "device model" and "runtime" sections have
+no ◐ left except the behaviour-layer idiom row; loom and one 2mqtt daemon
+build on the facade alone.</p>
+<h3 id="milestone-5-icd-and-the-controller-remainder">Milestone 5: ICD and the controller remainder<a class="headerlink" href="#milestone-5-icd-and-the-controller-remainder" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>23</td>
+<td>the ICD server (<code>IcdManagementServer.ts</code> 838 + <code>IcdMode.ts</code> 152: SIT / LIT, the check-in sender, <code>UserActiveModeTrigger</code>, the registration table), mounted where the device type asks for it; the check-in protocol (<code>protocol/src/icd</code>, 1 162)</td>
+<td>ICDM and ICDB families; <code>IcdManagementServerTest</code> (1 415) and the eight <code>protocol/test/icd</code> files ported</td>
+</tr>
+<tr>
+<td>24</td>
+<td>the controller side: <code>IcdClient</code> (1 140), the check-in receiver (<code>FabricIcd.processCheckIn</code>), peer wakefulness, the sustained subscription parking on a LIT peer and re-subscribing when it wakes (<code>SustainedSubscription.ts</code> 672 / test 1 712), <code>RebootResubscribeArmer</code></td>
+<td>the module's controller holds a subscription to the module's own LIT node across its idle cycles</td>
+</tr>
+<tr>
+<td>25</td>
+<td>the controller remainder: the rest of OTA push from the controller (<code>ota serve --announce</code> sends <code>AnnounceOTAProvider</code> today; writing <code>DefaultOTAProviders</code> and the provider's per-node consent record do not exist), the TCP initiator in <code>controller/</code>, the Thread border-router client (<code>packages/thread-br-client</code>: discovery, dataset codec, MeshCoP / OTBR diagnostics) if phase 12 chose it as the dataset source</td>
+<td><code>ClientNodeTcpTest</code>, the <code>peer/</code> tests ported; the reference controller updates the reference daemon over the air</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> The battery sensor, lock or button commissioned over BLE in
+milestone 1 is an ICD; without this milestone the controller loses it at
+its first idle period. Consumers: the controller role; the device side of
+loom and the HA bridge is mains-powered and gains the server only for
+completeness.</p>
+<p><strong>Done when.</strong> The comparison's ICD and CASE-initiator rows are ✅; the
+ICDM / ICDB families are green or classified.</p>
+<h3 id="milestone-6-completeness">Milestone 6: Completeness<a class="headerlink" href="#milestone-6-completeness" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>26</td>
+<td>the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; <code>WebRtcTransportRequestor</code> with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …); Thread network diagnostics</td>
+<td><code>chipdm-check</code> green; every snapshot device type in a devicegen list</td>
+</tr>
+<tr>
+<td>27</td>
+<td>the comparison swept: every remaining ◐ / ○ row is ✅ or a <code>by_design</code> entry; the findings register empty; the test-porting register at 100 % for <code>packages/node/test</code> (endpoint, validation, storage)</td>
+<td>the three registers agree</td>
+</tr>
+</tbody>
+</table>
+<p>Excluded by decision, restated so they are not re-opened by accident:
+<strong>Joint Fabric</strong> (two stub clusters and no behaviour at the pin; deferred
+past <code>v1.0.0</code>, ADR 0020 stage 6c), <strong>ARL / managed aggregator</strong> (no
+matter.js logic exists, <code>BD-Matter-ARL-NotMounted</code>), the <strong>Thread radio</strong>
+(hardware), <strong>certification itself</strong> (<a href="../adr/0011-certifiability-is-a-goal/">ADR 0011</a>).</p>
+<p><strong>Value.</strong> The claim in the first sentence of this page becomes checkable:
+135/135, 91/91, no row of the comparison older than its milestone. No
+consumer asked for a camera, which is why this is milestone 6 and not 2.</p>
+<h3 id="milestone-7-ble-on-the-device-side">Milestone 7: BLE on the device side<a class="headerlink" href="#milestone-7-ble-on-the-device-side" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Content</th>
+<th>Proof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>28</td>
+<td>the peripheral role of BTP (shared with milestone 1's central), <code>ble/bluez</code> as GATT peripheral, the commissionable advertisement over BLE, <code>NetworkCommissioning</code> with the Wi-Fi feature on a Linux host (the <code>wpa_supplicant</code> driver behind a host port)</td>
+<td>the reference daemon on a Pi without a cable is commissioned by the reference controller and by Apple Home over BLE</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value.</strong> matter.js's <code>nodejs-ble</code> node does it, so by the premise this
+module does too; the owner's decision of 2026-10-17 reopens ADR 0024's
+device-side exclusion as a late milestone. Consumers: a future Go device
+without a network at first boot — none of the current bridges.</p>
+<p><strong>Done when.</strong> The comparison's BLE row is ✅ for both roles; the DD and
+SC BLE cases run.</p>
+<h2 id="standing-work-outside-the-milestones">Standing work, outside the milestones<a class="headerlink" href="#standing-work-outside-the-milestones" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Pin lifts</strong> open every milestone (above).</li>
+<li><strong>The chip harness</strong> keeps running on every wave that moves the
+  daemon's composition or a FeatureMap; a wave that does not is said so in
+  its report.</li>
+<li><strong>The findings register</strong> takes every gap an audit finds; closing one
+  removes it. Ecosystem findings go to the observations page.</li>
+<li><strong>Google Home and Alexa</strong> runs happen when the owner is at the device;
+  their findings enter the register and may re-order a milestone's phases,
+  not the milestones.</li>
+<li><strong>Security paths</strong> (<code>secure/</code>, <code>commissioning/</code>, ACL, the four
+  hand-written core servers) are reviewed by the strongest model whatever
+  the milestone, as <code>CLAUDE.md</code> assigns them.</li>
+</ul>
+<h2 id="how-a-phase-is-planned">How a phase is planned<a class="headerlink" href="#how-a-phase-is-planned" title="Permanent link">&para;</a></h2>
+<p>A phase gets its detail document when it is next, not before: German,
+under <code>docs/</code> while it is current (as concept v3), moved to
+<code>docs/history/</code> when its milestone closes. It names the matter.js files
+at the pin with line ranges, the Go packages it touches, the decisions it
+needs from the owner (asked as a wizard with a recommendation), the waves
+with one agent each, and the three pillars it has to show. An architecture
+decision or a deliberate divergence inside it becomes an ADR or a
+<code>by_design</code> entry in the same pull request. The adapter module and the
+go-ha-matter-bridge get their own concept documents in their own
+repositories, written in milestone 4.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Apache License 2.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "content.action.edit", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

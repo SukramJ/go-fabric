@@ -1,0 +1,2621 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.">
+      
+      
+      
+        <link rel="canonical" href="https://sukramj.github.io/go-fabric/getting-started/device/">
+      
+      
+        <link rel="prev" href="../..">
+      
+      
+        <link rel="next" href="../controller/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>The device side - go-fabric</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#getting-started-the-device-side" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="go-fabric" class="md-header__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            go-fabric
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              The device side
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="go-fabric" class="md-nav__button md-logo" aria-label="go-fabric" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    go-fabric
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/SukramJ/go-fabric" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SukramJ/go-fabric
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The device side
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The device side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#node-or-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        node/ or bridge/?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-program" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The program
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Devices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Devices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-directions-of-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two directions of state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-aggregator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Aggregator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commissioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commissioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-reference-daemon-adds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reference daemon adds
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The controller side
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/concurrency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/persistence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing-in-process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing in process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../adr/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture decisions
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0001-matter-commissioning-bring-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001 — Matter wire-protocol design rules from chip-tool bring-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0002-im-opcode-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002 — Extract a testable gate + per-opcode seam from `handleIMOpcode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0003-sigma-resume-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003 — Sigma resumption extraction: already satisfied (finding corrected)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0004-groups-cluster-stays-stub/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004 — Minimal in-memory Groups cluster: rejected (stub is a deliberate, matter.js-conformant divergence)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0005-bridge-decomposition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005 — Matter `Bridge`: defer the CommissioningSession/IMEngine facade split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0006-subscribe-dispatch-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006 — Extract cohesive sub-helpers from `handleSubscribeRequest`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0007-chiptool-send-receive-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007 — Hermetic per-DP-type Matter send/receive suite (chip-tool ↔ godevccu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0008-subscription-resumption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0008 — Server-side subscription persistence and re-establishment after restart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0009-groups-and-group-messaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0009 — A real Groups server and group message delivery, as matter.js builds them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0010-groupcast-and-auxiliary-acl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0010 — Groupcast and the AccessControl Auxiliary ACL on the root, as matter.js installs them
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0011-certifiability-is-a-goal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0011 — Certifiability is a goal; certification is not pursued
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0012-scenesmanagement-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0012 — A real ScenesManagement server on the bridged lights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0013-generated-cluster-definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0013 — Cluster definitions generated from the matter.js model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0014-transitions-optional-per-endpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0014 — Attribute transitions run in the module, optional per endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0015-chip-data-model-read-at-run-time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0015 — The CHIP data model cross-check reads connectedhomeip at test time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0016-device-type-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0016 — Assembled topologies are validated against their device types, as matter.js validates a server node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0017-generated-default-cluster-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0017 — A generated default cluster server, so that a cluster without matter.js logic costs no hand-written server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0018-device-layer-and-node-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0019-tcp-bdx-and-the-ota-requestor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0019 — TCP, BDX and the OTA Software Update Requestor enter the scope; DiagnosticLogs stays without BDX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0020-commissioner-and-controller-role/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0021-ota-provider-and-diagnosticlogs-over-bdx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0021 — The OTA Software Update Provider and DiagnosticLogs over BDX enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0022-media-and-content-clusters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0022 — The media and content clusters and the three media device types enter the scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0023-apache-2-and-the-cla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0023 — Apache License 2.0 and a contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0024-ble-commissioning-in-the-controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0024 — BLE commissioning in the controller role
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../matterjs-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    matter.js comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../matter-parity-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parity contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../certifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Certifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../chip-datamodel-crosscheck/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CHIP data-model cross-check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../matter-ecosystem-observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystem observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CLA.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributor licence agreement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/SukramJ/go-fabric/blob/main/LICENSE" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#node-or-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        node/ or bridge/?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-program" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The program
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Devices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Devices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-directions-of-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two directions of state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-aggregator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Aggregator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commissioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commissioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-reference-daemon-adds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reference daemon adds
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/SukramJ/go-fabric/edit/main/docs/getting-started/device.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="getting-started-the-device-side">Getting started: the device side<a class="headerlink" href="#getting-started-the-device-side" title="Permanent link">&para;</a></h1>
+<p>This page builds a Matter bridge with one on/off light, pairs it, and walks
+through what each part of the program does. The program is
+<code>examples/quickstart-device/main.go</code>; its test builds it, starts the node on
+loopback, stops it and starts it again on the same database.</p>
+<h2 id="node-or-bridge"><code>node/</code> or <code>bridge/</code>?<a class="headerlink" href="#node-or-bridge" title="Permanent link">&para;</a></h2>
+<p>Embed <strong><code>node/</code></strong> unless you have a reason not to. <code>node.New</code> performs the
+whole bring-up the reference daemon used to do by hand: the stores, the root
+and Aggregator endpoints, PASE and CASE, the subscription engine, the
+commissioning window, the fabric hooks, and every port of <code>bridge/</code> in its
+documented order. You configure it with one <code>node.Config</code> and add devices to
+its Aggregator.</p>
+<p>Use the facade with your own topology when you already have an endpoint
+assembler over your own device model: set <code>Config.Topology</code> to your
+<code>bridge.Snapshotter</code>. The facade then builds no Aggregator, and everything
+else (stores, root servers, sessions, group state) stays the facade's.</p>
+<p>Use <strong><code>bridge/</code> directly</strong> only if you need to replace one of the
+collaborators the facade wires. <code>bridge.New</code> installs a no-op for every port
+you do not attach, so a half-wired bridge binds its socket, publishes mDNS
+and answers datagrams wrongly. The <a href="../../guides/ports/">ports guide</a> lists
+every port, what skipping it costs, and whether the failure is visible.
+<code>Node.Bridge()</code> gives you the bridge for a port the facade does not cover
+without leaving the facade.</p>
+<p><em>Source: <code>node/doc.go:4-43</code>, <code>node/config.go:94-103</code>, <code>bridge/bridge.go:29-47</code>, <code>node/node.go:601-603</code>.</em></p>
+<h2 id="the-program">The program<a class="headerlink" href="#the-program" title="Permanent link">&para;</a></h2>
+<p>// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.</p>
+<p>// Command quickstart-device is the smallest Matter bridge on go-fabric: one
+// on/off light under the node's Aggregator, its state in one SQLite file,
+// advertised over DNS-SD. docs/getting-started/device.md walks through it.
+// It pairs with the CSA test identity and is not a product.
+package main</p>
+<p>import (
+    "context"
+    "database/sql"
+    "fmt"
+    "log/slog"
+    "os"
+    "os/signal"
+    "slices"
+    "syscall"</p>
+<div class="highlight"><pre><span></span><code>_ &quot;modernc.org/sqlite&quot; // the host picks the SQLite driver
+
+&quot;github.com/SukramJ/go-fabric/cluster/onoff&quot;
+&quot;github.com/SukramJ/go-fabric/device&quot;
+&quot;github.com/SukramJ/go-fabric/endpoint&quot;
+&quot;github.com/SukramJ/go-fabric/mdns&quot;
+&quot;github.com/SukramJ/go-fabric/node&quot;
+</code></pre></div>
+<p>)</p>
+<p>func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    err := run(ctx)
+    stop()
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        os.Exit(1)
+    }
+}</p>
+<p>func run(ctx context.Context) error {
+    db, err := openDB("quickstart-device.db")
+    if err != nil {
+        return err
+    }
+    defer func() { _ = db.Close() }()</p>
+<div class="highlight"><pre><span></span><code>// DNS-SD: the subtype responder answers the discriminator-filtered
+// browse every commissioner sends for a QR or manual code.
+zc := mdns.NewZeroconf()
+if r, err := mdns.NewSubtypeResponder(slog.Default()); err == nil {
+    r.Start(ctx)
+    zc.AttachSubtypeResponder(r)
+    defer func() { _ = r.Close() }()
+}
+
+n, err := newNode(ctx, db, node.Network{}, zc)
+if err != nil {
+    return err
+}
+qr, manual, err := n.PairingCodes()
+if err != nil {
+    _ = n.Stop(context.WithoutCancel(ctx))
+    return err
+}
+fmt.Printf(&quot;QR code: %s\nManual code: %s\n&quot;, qr, manual)
+return n.Run(ctx) // Start, wait for ctx, Stop
+</code></pre></div>
+<p>}</p>
+<p>// openDB opens the SQLite file; foreign_keys carries the store's
+// cascade-delete on fabric removal. node.New applies the schemas.
+func openDB(path string) (*sql.DB, error) {
+    return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&amp;_pragma=busy_timeout(5000)")
+}</p>
+<p>// newNode builds the node and adds the light, unstarted.
+func newNode(ctx context.Context, db <em>sql.DB, network node.Network, adv mdns.Advertiser) (</em>node.Node, error) {
+    n, err := node.New(node.Config{ //nolint:contextcheck // the node's constructor takes no context
+        Network: network,
+        Commissioning: node.Commissioning{ // change all four for anything real
+            Passcode: 20202021, Discriminator: 3840,
+            PBKDFIterations: 1000, Salt: []byte("go-fabric-quickstart"),
+        },
+        ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001}, // CSA test vendor
+        BasicInformation: node.BasicInformation{
+            VendorName: "quickstart", ProductName: "quickstart-device",
+            NodeLabel: "Quickstart bridge", SerialNumber: "QUICKSTART-0001",
+        },
+        Store:      node.Store{DB: db},
+        Advertiser: adv,
+    })
+    if err != nil {
+        return nil, err
+    }
+    light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light-1"), Name: "Desk lamp"})
+    if err == nil {
+        light.OnChanged(onoff.ClusterID, func(attrs []uint32) {
+            if slices.Contains(attrs, onoff.AttrOnOff) {
+                slog.Info("light", slog.Bool("on", light.OnOff().OnOff())) // drive the real lamp here
+            }
+        })
+        err = n.Aggregator().Add(ctx, light)
+    }
+    if err != nil {
+        _ = n.Stop(context.WithoutCancel(ctx))
+        return nil, err
+    }
+    n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own; every device is added: stale endpoint numbers may go
+    return n, nil
+}</p>
+<p>Run it, scan the QR code or enter the manual code in a commissioner, and the
+light appears under the bridge:</p>
+<div class="highlight"><pre><span></span><code>go<span class="w"> </span>run<span class="w"> </span>./examples/quickstart-device
+</code></pre></div>
+<p>It listens on UDP port 5540 and needs IPv6 and multicast on the LAN, like
+any Matter device. A commissioner that filters by discriminator, which is
+what Apple Home, Google Home and chip-tool do for a QR or manual code, finds
+the device only through the subtype responder. Without the responder,
+<code>_matterc._udp</code> lists the instance, but the discriminator subtype query
+gets no answer.</p>
+<p><em>Source: <code>examples/quickstart-device/main.go</code>, <code>examples/quickstart-device/main_test.go</code>, <code>examples/reference-bridge/main.go:178-201</code>, <code>node/config.go:144-145</code>.</em></p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p><code>node.New</code> calls <code>Config.Validate</code> first and refuses the whole configuration
+with <code>node.ErrInvalidConfig</code> when any check fails. It checks:</p>
+<ul>
+<li>the discriminator fits 12 bits;</li>
+<li>the passcode is in range and not on the trivially-guessable list;</li>
+<li>the PBKDF iteration count and salt length are what SPAKE2+ accepts;</li>
+<li><code>VendorID</code>, <code>ProductID</code> and <code>NodeLabel</code> are set;</li>
+<li>a store is given (see below);</li>
+<li><code>SupportedFabrics</code> is at most 254;</li>
+<li><code>UniqueID</code> is at most 32 bytes;</li>
+<li><code>LocationCapability</code> is a valid regulatory location;</li>
+<li><code>Network.ReannounceInterval</code> is not negative;</li>
+<li><code>OTA.Dir</code> is set when <code>OTA</code> is.</li>
+</ul>
+<p>The quickstart uses the CSA test vendor <code>0xFFF1</code>. With no <code>Attestation</code> set,
+the node serves the CSA test attestation chain and test Certification
+Declaration for the configured vendor and product. Every commissioner
+accepts that chain through its test PAA, and a product must not ship with
+it. A product sets <code>Config.Attestation</code> to its own DAC, PAI and CD.</p>
+<p>Defaults worth knowing:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Zero value means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Network.Listen</code></td>
+<td><code>:5540</code></td>
+</tr>
+<tr>
+<td><code>Advertiser</code></td>
+<td><code>mdns.NewNoop()</code>: nothing is published, so nothing can discover the node</td>
+</tr>
+<tr>
+<td><code>DeviceTypeValidation</code></td>
+<td>matter.js's warn mode</td>
+</tr>
+<tr>
+<td><code>SupportedFabrics</code></td>
+<td>5 (matter.js defaults to 254)</td>
+</tr>
+<tr>
+<td><code>ProductDescription.Name</code></td>
+<td><code>BasicInformation.NodeLabel</code></td>
+</tr>
+<tr>
+<td><code>ProductDescription.DeviceType</code></td>
+<td>RootNode (0x0016)</td>
+</tr>
+<tr>
+<td><code>BasicInformation.UniqueID</code></td>
+<td>derived on the first boot and pinned in the store</td>
+</tr>
+<tr>
+<td><code>Locales</code></td>
+<td><code>en-US</code> alone</td>
+</tr>
+<tr>
+<td><code>Logger</code></td>
+<td><code>slog.Default()</code></td>
+</tr>
+</tbody>
+</table>
+<p><em>Source: <code>node/config.go:28-139</code>, <code>node/config.go:215-279</code>, <code>node/config.go:333-381</code>, <code>node/node.go:109-120</code>.</em></p>
+<h2 id="devices">Devices<a class="headerlink" href="#devices" title="Permanent link">&para;</a></h2>
+<p>The <code>device/</code> package has one constructor per Matter device type in scope:
+<code>device.NewOnOffLight</code>, <code>device.NewDimmableLight</code>, <code>device.NewThermostat</code>
+and so on. They are generated from the matter.js model. A constructor
+mounts every server cluster the device type mandates, with a default server
+(the module's own where one exists, otherwise the generated <code>spec.Server</code>).
+The endpoint assembler mounts Descriptor, Identify,
+BridgedDeviceBasicInformation, Groups and ScenesManagement; the device
+layer never does.</p>
+<p><code>device.Options</code> identifies the device:</p>
+<ul>
+<li><code>StableKey</code> is required and unique. The assembler keeps the endpoint
+  number under it, so the same key gets the same endpoint number after a
+  restart. The quickstart's test checks this.</li>
+<li><code>Name</code> becomes the bridged device's NodeLabel. <code>Vendor</code> is its
+  manufacturer.</li>
+<li><code>Reachable</code> is a probe for the device's reachability; nil means always
+  reachable.</li>
+</ul>
+<p>Options passed after <code>Options</code> change what the device serves:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithServer(srv)</code></td>
+<td>your own server for a cluster, replacing the default</td>
+</tr>
+<tr>
+<td><code>WithOptional(id)</code></td>
+<td>mounts an optional cluster (Groups and ScenesManagement are then the assembler's)</td>
+</tr>
+<tr>
+<td><code>WithFeatures(id, bits)</code></td>
+<td>the features of a cluster's default server</td>
+</tr>
+<tr>
+<td><code>WithElements(id, opts)</code></td>
+<td>optional attributes, commands and events of a default server</td>
+</tr>
+<tr>
+<td><code>WithInitial(id, values)</code></td>
+<td>initial attribute values of a default server</td>
+</tr>
+<tr>
+<td><code>WithMeasurement(src)</code></td>
+<td>a sensor's measurement clusters from your live reading</td>
+</tr>
+<tr>
+<td><code>WithChangeNotifier(n)</code></td>
+<td>tells the bridge your model changed state its servers read</td>
+</tr>
+<tr>
+<td><code>WithClientClusters(ids...)</code></td>
+<td>client clusters beyond the mandatory ones</td>
+</tr>
+</tbody>
+</table>
+<h3 id="two-directions-of-state">Two directions of state<a class="headerlink" href="#two-directions-of-state" title="Permanent link">&para;</a></h3>
+<p>A device's state moves both ways, and the two directions use different
+calls:</p>
+<ul>
+<li><strong>Controller to device.</strong> <code>Device.OnChanged(clusterID, fn)</code> calls <code>fn</code>
+  with the attribute ids that changed. The quickstart uses it to log the
+  light's new state. To refuse a command, for example when the physical
+  lamp did not switch, give the light your own <code>onoff.Server</code> with a
+  <code>Sink</code> (<code>onoff.Config.Sink</code> through <code>WithServer</code>). An error from the
+  sink answers FAILURE and stores nothing.</li>
+<li><strong>Device to controller.</strong> When the lamp is switched at the wall, call
+  <code>light.OnOff().Set(on)</code>. The value is stored and reported to
+  subscribers, and the sink is not called. <code>Set</code> is safe from any
+  goroutine, including from inside the sink.</li>
+</ul>
+<p><em>Source: <code>device/doc.go:4-27</code>, <code>device/options.go:18-43</code>, <code>device/options.go:91-215</code>, <code>device/device.go:643-661</code>, <code>cluster/onoff/server.go:54-72</code>, <code>cluster/onoff/server.go:749-768</code>.</em></p>
+<h2 id="the-aggregator">The Aggregator<a class="headerlink" href="#the-aggregator" title="Permanent link">&para;</a></h2>
+<p><code>Node.Aggregator()</code> is the Aggregator endpoint's set of bridged devices.</p>
+<ul>
+<li><strong>Before <code>Start</code></strong>, <code>Add</code> and <code>Remove</code> only change the set. The first
+  assembly happens at <code>Start</code>.</li>
+<li><strong>After <code>Start</code></strong>, each <code>Add</code> and <code>Remove</code> reassembles the running
+  bridge.</li>
+<li>An endpoint without a <code>StableKey</code> is refused with <code>ErrNoStableKey</code>. A
+  second endpoint with the same key is refused with <code>ErrDuplicateKey</code>.</li>
+</ul>
+<p>Call <code>MarkComplete</code> once every device you know about is added. Until then
+the node keeps the stored endpoint numbers of devices that are absent.
+Afterwards, a stored device missing from the set loses its number. A host
+whose model loads asynchronously calls <code>MarkComplete</code> after the load. If it
+is called too early, the endpoint numbers of devices not yet loaded are
+garbage-collected at boot, and every controller sees those devices as new.</p>
+<p><em>Source: <code>node/aggregator.go:40-132</code>, <code>examples/reference-bridge/main.go:328-332</code>.</em></p>
+<h2 id="commissioning">Commissioning<a class="headerlink" href="#commissioning" title="Permanent link">&para;</a></h2>
+<p><code>Node.PairingCodes</code> returns the QR payload and the 11-digit manual code for
+the configured passcode and discriminator. When <code>Start</code> loads no fabric from
+the store, it opens the node's own commissioning window. A commissioned node opens
+a window only when a controller asks for one through
+AdministratorCommissioning, or when you call <code>Node.OpenBasicWindow</code> with
+fresh credentials.</p>
+<p><code>Node.SetCommissioningBlocked(ctx, err)</code> refuses every new commissioning
+while <code>err</code> is non-nil, and controllers that are already paired keep
+working. A host calls it before <code>Start</code> when, for example, it cannot serve
+its configured attestation chain.</p>
+<p><em>Source: <code>node/node.go:691-712</code>, <code>node/node.go:526-534</code>, <code>node/commissioning.go:426-454</code>, <code>node/node.go:641-662</code>.</em></p>
+<h2 id="persistence">Persistence<a class="headerlink" href="#persistence" title="Permanent link">&para;</a></h2>
+<p><code>Config.Store.DB</code> is a <code>*sql.DB</code> that you open; no library package imports
+a SQLite driver. The quickstart uses <code>modernc.org/sqlite</code>, the pure-Go driver the
+module already depends on. <code>node.New</code> applies both schemas (fabrics,
+credentials, ACL, groups, subscriptions, settings, and endpoint numbers) to
+that handle on every boot; both scripts are idempotent.</p>
+<p>Open the database with <code>_pragma=foreign_keys(1)</code> in the DSN. The fabric
+tables cascade-delete through foreign keys, and SQLite ignores those
+silently with the pragma off. The pragma must be in the DSN, not in a
+statement, so that every pooled connection gets it.</p>
+<p>The <a href="../../guides/persistence/">persistence guide</a> lists every table and
+settings key.</p>
+<p><em>Source: <code>node/config.go:281-290</code>, <code>node/node.go:300-317</code>, <code>examples/reference-bridge/persist.go:24-34</code>.</em></p>
+<h2 id="stopping">Stopping<a class="headerlink" href="#stopping" title="Permanent link">&para;</a></h2>
+<p><code>Node.Run(ctx)</code> starts the node, waits for <code>ctx</code> to end, and stops it with a
+5-second budget. <code>Node.Stop</code> runs the shutdown in a fixed order:</p>
+<ol>
+<li>the OTA requestor stops;</li>
+<li>the operational time is stored and the ShutDown event is emitted;</li>
+<li>the bindings and client stack close;</li>
+<li>PASE, the commissioning window and the CASE reaper stop;</li>
+<li>the subscription engine, the group sender, BDX and the re-announce
+   loop stop;</li>
+<li>the bridge stops (sessions are closed with a CloseSession to each
+   peer, then the socket closes and the mDNS records are withdrawn);</li>
+<li>the advertiser closes.</li>
+</ol>
+<p><code>Stop</code> is idempotent and safe without <code>Start</code>. A stopped node does not
+restart: <code>Start</code> after <code>Stop</code> returns <code>node.ErrStopped</code>. To restart, build a
+new node on the same store.</p>
+<p><code>New</code> already starts the subscription engine and the session reapers. Call
+<code>Stop</code> on every node that <code>New</code> returned, including one you never started.
+The quickstart does this on its error paths.</p>
+<p><em>Source: <code>node/node.go:34-36</code>, <code>node/node.go:538-599</code>, <code>node/node.go:95-108</code>, <code>bridge/bridge.go:1541-1556</code>.</em></p>
+<h2 id="what-the-reference-daemon-adds">What the reference daemon adds<a class="headerlink" href="#what-the-reference-daemon-adds" title="Permanent link">&para;</a></h2>
+<p><code>examples/reference-bridge</code> is the facade plus the host's own pieces, each
+of which is something a product would also decide:</p>
+<ul>
+<li><strong>Flags</strong> for the listen address, TCP, passcode, discriminator, PBKDF
+  parameters, label and log level. Each flag is checked before the node is
+  built.</li>
+<li><strong>A vendor attestation chain</strong> read from a directory instead of the test
+  chain.</li>
+<li><strong>The OTA requestor</strong> with an applier that validates and keeps the image.
+  This is the host's <code>OtaApplier</code>.</li>
+<li><strong>An Actions server</strong> on the Aggregator, root FixedLabels and two
+  locales.</li>
+<li><strong>A fleet of simulated devices</strong>, one per surface the module serves. The
+  blind's position is persisted in the settings table.</li>
+<li><strong>Testing-only flags</strong> for certification runs: the app pipe, the
+  TestEventTrigger key, the OTA provider and its ledger check, the
+  simulated Wi-Fi link and the media devices. None of these belongs in a
+  product.</li>
+</ul>
+<p><em>Source: <code>examples/reference-bridge/main.go:4-24</code>, <code>examples/reference-bridge/main.go:96-145</code>, <code>examples/reference-bridge/main.go:147-299</code>, <code>examples/reference-bridge/main.go:306-391</code>, <code>examples/reference-bridge/persist.go:68-86</code>.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Apache License 2.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "navigation.indexes", "content.code.copy", "content.action.edit", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
