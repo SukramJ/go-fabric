@@ -190,3 +190,24 @@ ran everything again.
   matter.js's host refuses a setpoint in its `$Changing` reactors, which run
   for every setpoint change (`:594-603`); the Go `Sink.SetSetpoint` is told of
   SetActivePresetRequest's setpoints and, with OCC, of the unoccupied ones too.
+
+## Decided in review (2026-10-19)
+
+- `im.WithCommandPath` / `im.CommandPathFromContext` stay as the additive
+  `im` API; the fabric-removal capability stays an unexported interface in
+  `bridge` (duck-typed like `ForgetFabricScenes`), not a `contract/` type.
+- The daemon's preset row key stays `demo-thermostat-1`, the device
+  address, as the blind's `blind.position` setting is keyed by the device
+  and not by its StableKey.
+- The staged-write DataVersion bump and the missing OccupancySensing
+  coupling are in `notes/parity/matter_behaviour_findings.md` (BL block);
+  the KeypadLockout entry is removed. MSCH is out of scope (matter.js:
+  "not yet implemented", `ThermostatServer.ts:126-128`), no entry.
+- by_design: candidates 1 and 2 are one entry,
+  `BD-Matter-Thermostat-AtomicWritesPerServer`; candidate 3 is
+  `BD-Matter-Thermostat-PresetStoreIsTheHostSeam` (with the observer
+  seam); candidate 4 is parity, not a divergence — matter.js's `$Changing`
+  reactors run for command-driven setpoint changes too (`:594-603`) — so
+  no entry.
+- The TSTAT/TSUIC rows of the families table follow the labelled CI run of
+  this PR.

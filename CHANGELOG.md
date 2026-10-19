@@ -34,6 +34,8 @@ Milestone 3, phase 17c, brief BL: the Thermostat's Presets, atomic writes and Oc
 
 - `thermo`: KeypadLockout was NoLockout on every start; it keeps the value configured or written before (matter.js `ThermostatUserInterfaceConfigurationServer.ts:30-32`).
 
+## [0.8.2] — 2026-10-19
+
 Milestone 3, phase 17b, brief BK: the Switch server after matter.js `SwitchServer.ts`, with the port of `SwitchServerTest.ts`.
 
 ### Added
@@ -4285,7 +4287,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...v0.7.3
