@@ -4,7 +4,11 @@
 // Package thermo provides the Matter Thermostat cluster server (0x0201).
 // The server supports HEAT-only, COOL-only, and HEAT+COOL (with optional
 // AUTO) configurations, enforcing conformance rules on feature-gated
-// attributes per Matter Application Cluster Specification §4.3.
+// attributes per Matter Application Cluster Specification §4.3, and the
+// selectable Occupancy (the unoccupied setpoints, occupancy from the host)
+// and Presets (presets, the active preset and the atomic writes a
+// controller changes them with, persisted through a [PresetStore])
+// features, as matter.js's ThermostatServer serves them.
 //
 // The server holds its own state. Without a host port it answers every
 // write and command without forwarding it anywhere — the reference daemon
@@ -29,13 +33,16 @@
 package thermo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
@@ -57,12 +64,17 @@ const (
 	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                    // bit 1 — Cooling
 	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                   // bit 5 — AutoMode (requires HEAT+COOL)
 	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed) // bit 6 — LocalTemperatureNotExposed
+	ThermostatFeatureOCC  = uint32(tdef.FeatureOccupancy)                  // bit 2 — Occupancy
+	ThermostatFeaturePRES = uint32(tdef.FeaturePresets)                    // bit 8 — Presets
 )
 
 // servedFeatures are the features whose elements the server serves.
-// Occupancy (the Unoccupied setpoints), MatterScheduleConfiguration and
-// Presets (their attributes and commands) and the rest are not.
-const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE
+// MatterScheduleConfiguration (matter.js: "not implemented yet",
+// ThermostatServer.ts:126-128 at 862ad75f), ScheduleConfiguration and
+// Setback (deprecated, refused, :120-125), Events and
+// ThermostatSuggestions are not.
+const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
+	ThermostatFeatureOCC | ThermostatFeaturePRES
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermostat: feature selection not served")
@@ -90,7 +102,16 @@ const (
 	thermoAttrMinSetpointDeadBand         = tdef.AttrMinSetpointDeadBand
 	thermoAttrControlSequenceOfOperation  = tdef.AttrControlSequenceOfOperation
 	thermoAttrSystemMode                  = tdef.AttrSystemMode
+	thermoAttrOccupancy                   = tdef.AttrOccupancy
+	thermoAttrUnoccupiedHeatingSetpoint   = tdef.AttrUnoccupiedHeatingSetpoint
+	thermoAttrUnoccupiedCoolingSetpoint   = tdef.AttrUnoccupiedCoolingSetpoint
 )
+
+// defaultMinSetpointDeadBand is MinSetpointDeadBand's default, 2.0 °C in
+// its 0.1 °C unit (thermostat-cluster.element.ts: default celsius 2;
+// matter.js ThermostatBehaviorTest "correctly specifies
+// Thermostat-specific value in defaults").
+const defaultMinSetpointDeadBand = 20
 
 // ThermostatConfig holds the static configuration for a Thermostat
 // cluster server instance. All temperature values are in units of
@@ -119,6 +140,44 @@ type ThermostatConfig struct {
 	// InitialCoolingSetpoint is the initial OccupiedCoolingSetpoint
 	// (conformance COOL). Default: 2600 (26.00°C).
 	InitialCoolingSetpoint int16
+	// MinHeatSetpointLimit, MaxHeatSetpointLimit, MinCoolSetpointLimit and
+	// MaxCoolSetpointLimit are the initial user setpoint limits; nil takes
+	// the absolute limit (matter.js #userLimit: an unset user limit is its
+	// absolute bound, ThermostatServer.ts:927-931). [New] reconciles them
+	// with the rest.
+	MinHeatSetpointLimit, MaxHeatSetpointLimit *int16
+	MinCoolSetpointLimit, MaxCoolSetpointLimit *int16
+	// MinSetpointDeadBand is the AUTO deadband in 0.1 °C (0 to 127); nil is
+	// the default, 20 (2.0 °C). A value above 127 is reset to 20 and a
+	// negative one refused, as matter.js's initialize does
+	// (ThermostatServer.ts:154-160).
+	MinSetpointDeadBand *int8
+	// InitialUnoccupiedHeatingSetpoint and InitialUnoccupiedCoolingSetpoint
+	// are the unoccupied setpoints (conformance HEAT & OCC, COOL & OCC); nil
+	// is the attribute default, 2000 and 2600 (thermostat-cluster.element.ts
+	// default celsius 20 and 26).
+	InitialUnoccupiedHeatingSetpoint, InitialUnoccupiedCoolingSetpoint *int16
+	// Occupied is the initial occupancy with OCC — matter.js's
+	// externallyMeasuredOccupancy (ThermostatServer.ts:560-570); nil is
+	// occupied, with the warning matter.js logs. The host reports changes
+	// through [ThermostatServer.SetOccupied].
+	Occupied *bool
+	// NumberOfPresets, PresetTypes, Presets and ActivePresetHandle configure
+	// the Presets feature (PRES): the number of presets the thermostat
+	// holds, the preset types it supports, the presets it ships with and
+	// the active preset's handle (nil for none). The configured presets are
+	// the stored ones on the first start — a preset without a handle gets
+	// one, a null BuiltIn is false — and a [PresetStore] that holds presets
+	// replaces them (ThermostatServer.ts:134-152).
+	NumberOfPresets    uint8
+	PresetTypes        []PresetType
+	Presets            []Preset
+	ActivePresetHandle []byte
+	// PresetStore persists the presets and the active handle; nil keeps
+	// them in memory.
+	PresetStore PresetStore
+	// Clock times the atomic writes; nil is the system clock.
+	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
 	Sink Sink
 }
@@ -238,7 +297,23 @@ type ThermostatServer struct {
 	// AUTO-gated state
 	minSetpointDeadBand int8 // 0.1°C units; default 20 = 2.0°C
 
+	// OCC-gated state
+	unoccHeat int16
+	unoccCool int16
+	occupied  bool
+
+	// PRES-gated state: matter.js persistedPresets, presetTypes,
+	// numberOfPresets and activePresetHandle.
+	presets            []Preset
+	presetTypes        []PresetType
+	numberOfPresets    uint8
+	activePresetHandle []byte
+	presetStore        PresetStore
+
 	systemMode uint8 // SystemModeEnum value
+
+	clk    clock.Clock
+	atomic atomicWrites
 
 	// changes reports the setpoints a write's reconcile moved.
 	changes cluster.AttributeChanges
@@ -248,8 +323,10 @@ type ThermostatServer struct {
 // set when HEAT+COOL are not both present. A selection with neither HEAT
 // nor COOL — which matter.js's FeatureSelectionErrors refuses, HEAT and
 // COOL being "AUTO, O.a+" (thermostat-cluster.element.ts) — or naming a
-// feature the server does not serve (Occupancy, Setback, the schedule,
-// preset, event and suggestion features) is refused with [ErrFeatures].
+// feature the server does not serve (Setback, the schedule, event and
+// suggestion features) is refused with [ErrFeatures]; a negative
+// MinSetpointDeadBand with [ErrSetpoints], a preset configuration the
+// write rules refuse with [ErrPresets].
 //
 // Limits and initial setpoints that violate the setpoint rules are
 // repaired, preferring the heating side (the cooling side without HEAT):
@@ -283,25 +360,60 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		inst:                inst,
 		sink:                cfg.Sink,
 		localTempCalib:      0,
-		minSetpointDeadBand: 20, // 2.0°C default per matter.js packages/model/src/standard/elements/thermostat-cluster.element.ts MinSetpointDeadBand default
+		minSetpointDeadBand: defaultMinSetpointDeadBand,
+		occupied:            true,
+		clk:                 clock.Or(cfg.Clock),
+	}
+	// Mirrors matter.js ThermostatServer.ts:154-160 at 862ad75f: a deadband
+	// above 127 is reset to the default, one below 0 refused.
+	if d := cfg.MinSetpointDeadBand; d != nil {
+		if *d < 0 {
+			return nil, fmt.Errorf("%w: minSetpointDeadBand is out of valid range 0..127", ErrSetpoints)
+		}
+		s.minSetpointDeadBand = *d
+	}
+	or := func(v *int16, def int16) int16 {
+		if v != nil {
+			return *v
+		}
+		return def
 	}
 
 	if features&ThermostatFeatureHEAT != 0 {
 		s.absMinHeat = cfg.AbsMinHeatSetpointLimit
 		s.absMaxHeat = cfg.AbsMaxHeatSetpointLimit
 		s.occupHeat = cfg.InitialHeatingSetpoint
-		s.minHeat = cfg.AbsMinHeatSetpointLimit
-		s.maxHeat = cfg.AbsMaxHeatSetpointLimit
+		s.minHeat = or(cfg.MinHeatSetpointLimit, cfg.AbsMinHeatSetpointLimit)
+		s.maxHeat = or(cfg.MaxHeatSetpointLimit, cfg.AbsMaxHeatSetpointLimit)
+		if features&ThermostatFeatureOCC != 0 {
+			s.unoccHeat = or(cfg.InitialUnoccupiedHeatingSetpoint, 2000)
+		}
 	}
 	if features&ThermostatFeatureCOOL != 0 {
 		s.absMinCool = cfg.AbsMinCoolSetpointLimit
 		s.absMaxCool = cfg.AbsMaxCoolSetpointLimit
 		s.occupCool = cfg.InitialCoolingSetpoint
-		s.minCool = cfg.AbsMinCoolSetpointLimit
-		s.maxCool = cfg.AbsMaxCoolSetpointLimit
+		s.minCool = or(cfg.MinCoolSetpointLimit, cfg.AbsMinCoolSetpointLimit)
+		s.maxCool = or(cfg.MaxCoolSetpointLimit, cfg.AbsMaxCoolSetpointLimit)
+		if features&ThermostatFeatureOCC != 0 {
+			s.unoccCool = or(cfg.InitialUnoccupiedCoolingSetpoint, 2600)
+		}
+	}
+	if features&ThermostatFeatureOCC != 0 {
+		// Mirrors matter.js #setupOccupancyIntegration
+		// (ThermostatServer.ts:559-570 at 862ad75f) for a thermostat without
+		// an OccupancySensing endpoint: externallyMeasuredOccupancy, else
+		// occupied.
+		if cfg.Occupied == nil {
+			slog.Default().Warn("matter.thermostat.occupancy_unset",
+				slog.String("reason", "no local OccupancySensing cluster available and externallyMeasuredOccupancy state not set"))
+		} else {
+			s.occupied = *cfg.Occupied
+		}
 	}
 
 	st := s.setpointState()
+	before := st
 	violation, adjusted, err := st.reconcileInitial()
 	if err != nil {
 		return nil, err
@@ -311,6 +423,25 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		slog.Default().Warn("matter.thermostat.initial_setpoints_adjusted",
 			slog.String("violation", violation),
 			slog.String("adjusted", adjustedText(adjusted)))
+	}
+	if features&ThermostatFeaturePRES != 0 {
+		if err := s.seedPresets(cfg); err != nil {
+			return nil, err
+		}
+		// The setpoints initialize repaired change in its transaction, so
+		// their $Changing reactors run at its commit: a direct change of the
+		// setpoints in effect clears the active preset
+		// (ThermostatServer.ts:682-706, :744-768 at 862ad75f; matter.js
+		// ThermostatBehaviorTest "clears the active preset when it adjusts a
+		// setpoint").
+		unocc := !s.occupied
+		if s.activePresetHandle != nil &&
+			(before.setpoint(true, unocc) != st.setpoint(true, unocc) || before.setpoint(false, unocc) != st.setpoint(false, unocc)) {
+			s.activePresetHandle = nil
+			if err := s.savePresets(context.Background(), s.presets, nil); err != nil {
+				return nil, fmt.Errorf("%w: %w", ErrPresets, err)
+			}
+		}
 	}
 
 	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
@@ -441,6 +572,11 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 			slog.Int("min", lo), slog.Int("max", hi))
 	}
 	s.changes.Notify(changed...)
+	// A local change of an occupied setpoint is a direct one: it ends the
+	// active preset (ThermostatServer.ts:744-768 at 862ad75f).
+	if len(changed) > 0 {
+		s.clearActivePresetOnDirectWrite(context.Background(), false)
+	}
 }
 
 // sinkError maps a Sink refusal onto the answer: an error carrying an IM
@@ -496,6 +632,27 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
 		return s.maxCool, true
 	case thermoAttrMinSetpointDeadBand:
 		return s.minSetpointDeadBand, true
+	case thermoAttrOccupancy:
+		// OccupancyBitmap: bit 0 Occupied.
+		if s.occupied {
+			return uint8(1), true
+		}
+		return uint8(0), true
+	case thermoAttrUnoccupiedHeatingSetpoint:
+		return s.unoccHeat, true
+	case thermoAttrUnoccupiedCoolingSetpoint:
+		return s.unoccCool, true
+	case tdef.AttrPresetTypes:
+		return spec.List[PresetType](slices.Clone(s.presetTypes)), true
+	case tdef.AttrNumberOfPresets:
+		return s.numberOfPresets, true
+	case tdef.AttrActivePresetHandle:
+		if s.activePresetHandle == nil {
+			return nil, true
+		}
+		return bytes.Clone(s.activePresetHandle), true
+	case tdef.AttrPresets:
+		return spec.List[Preset](clonePresets(s.presets)), true
 	case thermoAttrControlSequenceOfOperation:
 		// Mandatory (M conformance). Derived from the supported modes:
 		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
@@ -507,6 +664,23 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
 	default: // thermoAttrSystemMode, the last served attribute
 		return s.systemMode, true
 	}
+}
+
+// MatterReadFiltered implements [contract.FabricScopedReader] for the one
+// attribute whose value depends on the reader: Presets, which the peer
+// holding an atomic write of it reads as it staged it — matter.js's
+// Presets getter (ThermostatServer.ts:1680-1699 at 862ad75f). Every other
+// attribute falls through to [ThermostatServer.MatterRead].
+func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	if attrID != tdef.AttrPresets || !s.inst.Serves(attrID) {
+		return nil, false
+	}
+	if v, ok := s.pendingAtomicValue(ctx, attrID); ok {
+		if presets, isPresets := v.([]Preset); isPresets {
+			return spec.List[Preset](clonePresets(presets)), true
+		}
+	}
+	return s.MatterRead(attrID)
 }
 
 // MatterWrite handles writable attributes (setpoints, setpoint limits,
@@ -523,10 +697,14 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	if err != nil {
 		return err
 	}
+	if attrID == tdef.AttrPresets {
+		return s.writePresets(ctx, v)
+	}
 	s.op.Lock()
 	defer s.op.Unlock()
 	switch attrID {
 	case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint,
+		thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint,
 		thermoAttrMinHeatSetpointLimit, thermoAttrMaxHeatSetpointLimit,
 		thermoAttrMinCoolSetpointLimit, thermoAttrMaxCoolSetpointLimit:
 		n, _ := v.(int64) // an int16 per ValidateWrite
@@ -562,6 +740,29 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		n, _ := v.(uint64)                      // an enum8 per ValidateWrite, its conformance checked
 		return s.writeSystemMode(ctx, uint8(n)) //nolint:gosec // an enum8 per ValidateWrite
 	}
+}
+
+// writePresets is a controller's write of Presets: outside the local
+// actor and a command, the Presets setter hands it to the atomic write
+// that holds the attribute (matter.js ThermostatServer.ts:1702-1716 at
+// 862ad75f, AtomicWriteHandler.writeAttribute), which validates it against
+// the stored presets — presets$AtomicChanging, #validatePresetWriteRequest
+// (:1289-1291) — and stages it. A list arrives element by element (the
+// REPLACE-ALL, then one append each): every step is validated and staged,
+// and the dispatcher appends to what the peer staged
+// ([ThermostatServer.MatterReadFiltered]).
+func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
+	presets, err := presetsValue(v)
+	if err != nil {
+		return err
+	}
+	presets = clonePresets(presets)
+	return s.writeAtomicAttribute(ctx, tdef.AttrPresets, presets, func(any) error {
+		s.mu.RLock()
+		old, rules := s.presets, s.presetRules()
+		s.mu.RUnlock()
+		return rules.validatePresetWrite(presets, old, false, map[string]bool{})
+	})
 }
 
 // writeSystemMode applies a SystemMode the definition admitted for the
@@ -619,16 +820,19 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 // holds s.op.
 func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v int) ([]uint32, error) {
 	t := map[uint32]struct {
-		heat  bool
-		limit bool
-		key   string
+		heat   bool
+		limit  bool
+		key    string
+		unoccu bool
 	}{
-		thermoAttrOccupiedHeatingSetpoint: {true, false, spOccupiedHeating},
-		thermoAttrOccupiedCoolingSetpoint: {false, false, spOccupiedCooling},
-		thermoAttrMinHeatSetpointLimit:    {true, true, spMinHeatLimit},
-		thermoAttrMaxHeatSetpointLimit:    {true, true, spMaxHeatLimit},
-		thermoAttrMinCoolSetpointLimit:    {false, true, spMinCoolLimit},
-		thermoAttrMaxCoolSetpointLimit:    {false, true, spMaxCoolLimit},
+		thermoAttrOccupiedHeatingSetpoint:   {true, false, spOccupiedHeating, false},
+		thermoAttrOccupiedCoolingSetpoint:   {false, false, spOccupiedCooling, false},
+		thermoAttrUnoccupiedHeatingSetpoint: {true, false, spUnoccHeating, true},
+		thermoAttrUnoccupiedCoolingSetpoint: {false, false, spUnoccCooling, true},
+		thermoAttrMinHeatSetpointLimit:      {true, true, spMinHeatLimit, false},
+		thermoAttrMaxHeatSetpointLimit:      {true, true, spMaxHeatLimit, false},
+		thermoAttrMinCoolSetpointLimit:      {false, true, spMinCoolLimit, false},
+		thermoAttrMaxCoolSetpointLimit:      {false, true, spMaxCoolLimit, false},
 	}[attrID]
 	s.mu.Lock()
 	// Served only with its feature, per ValidateWrite.
@@ -636,8 +840,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:760-762
 	// and :1042-1043 at 0ceb202d: an occupied setpoint equal to the stored
 	// one is no change — no $Changing, so neither the assert nor the Sink.
-	if (attrID == thermoAttrOccupiedHeatingSetpoint && v == cur.occupHeat) ||
-		(attrID == thermoAttrOccupiedCoolingSetpoint && v == cur.occupCool) {
+	if !t.limit && v == cur.value(attrID) {
 		s.mu.Unlock()
 		return nil, nil
 	}
@@ -647,7 +850,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 			s.mu.Unlock()
 			return nil, err
 		}
-	} else if err := st.assertSetpointWithinLimits(t.heat, v); err != nil {
+	} else if err := st.assertSetpointWithinLimits(t.heat, t.unoccu, v); err != nil {
 		s.mu.Unlock()
 		return nil, err
 	}
@@ -661,6 +864,9 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		// inbound setter cannot land in between.
 		coupled := withoutAttr(s.commitSetpoints(st), attrID)
 		s.mu.Unlock()
+		if !t.limit {
+			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+		}
 		return coupled, nil
 	}
 	// The Sink hears the value the server will store: the written
@@ -678,7 +884,6 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	// The state as it is now: an inbound setter may have moved a setpoint
 	// while the Sink ran. The consented value goes onto it and the
 	// reconcile computes the companions afresh; the limits cannot have
@@ -705,7 +910,10 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		}
 		slog.Default().Warn("matter.thermostat.sink_companions_moved", attrs...)
 	}
-	return withoutAttr(s.commitSetpoints(next), attrID), nil
+	coupled := withoutAttr(s.commitSetpoints(next), attrID)
+	s.mu.Unlock()
+	s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+	return coupled, nil
 }
 
 // withoutAttr drops attrID from ids.
@@ -759,11 +967,20 @@ func (s *ThermostatServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) 
 	return s.changes.OnMatterAttributesChanged(cb)
 }
 
-// MatterInvoke handles SetpointRaiseLower and weekly-schedule commands.
+// MatterInvoke handles SetpointRaiseLower and, with PRES,
+// SetActivePresetRequest and AtomicRequest. Without PRES (and without
+// MatterScheduleConfiguration, which the server does not serve) AtomicRequest
+// is unsupported (matter.js ThermostatServer.ts:130-132 at 862ad75f).
 func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	switch cmdID {
-	case tdef.CmdSetpointRaiseLower:
+	switch {
+	case cmdID == tdef.CmdSetpointRaiseLower:
 		return nil, s.handleSetpointRaiseLower(ctx, fields)
+	case cmdID == tdef.CmdSetActivePresetRequest && s.inst.Accepts(cmdID):
+		return nil, s.handleSetActivePresetRequest(ctx, fields)
+	case cmdID == tdef.CmdAtomicRequest && s.inst.Accepts(cmdID):
+		s.op.Lock()
+		defer s.op.Unlock()
+		return s.handleAtomicRequest(ctx, fields)
 	default:
 		return nil, im.UnsupportedCommandf("thermostat: command 0x%02X not supported", cmdID)
 	}
@@ -817,7 +1034,14 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.RLock()
+	// The setpoints in effect: the unoccupied pair while the thermostat is
+	// unoccupied (matter.js heatingSetpoint / coolingSetpoint,
+	// ThermostatServer.ts:327-361 at 862ad75f).
+	unoccupied := !s.occupiedLocked()
 	occupHeat, occupCool := s.occupHeat, s.occupCool
+	if unoccupied {
+		occupHeat, occupCool = s.unoccHeat, s.unoccCool
+	}
 	minHeat, maxHeat, minCool, maxCool := s.minHeat, s.maxHeat, s.minCool, s.maxCool
 	deadband := int(s.minSetpointDeadBand) * 10 // matter.js setpointDeadBand, 0.01 °C
 	s.mu.RUnlock()
@@ -906,7 +1130,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	default:
 		return thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower unsupported mode %d", mode)}
 	}
-	return s.applyRaiseLower(ctx, prevHeat, prevCool, occupHeat, occupCool)
+	return s.applyRaiseLower(ctx, unoccupied, prevHeat, prevCool, occupHeat, occupCool)
 }
 
 // applyRaiseLower hands what SetpointRaiseLower moves to the Sink in one
@@ -922,13 +1146,13 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 // meanwhile; a setpoint the command did not move keeps what is stored
 // then. The command runs no reconcile, before the Sink or after it. The
 // caller holds s.op.
-func (s *ThermostatServer) applyRaiseLower(ctx context.Context, prevHeat, prevCool, heat, cool int16) error {
+func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool, prevHeat, prevCool, heat, cool int16) error {
 	moves := make([]SetpointChange, 0, 2)
 	if cool != prevCool {
-		moves = append(moves, SetpointChange{AttrID: thermoAttrOccupiedCoolingSetpoint, Value: cool})
+		moves = append(moves, SetpointChange{AttrID: setpointAttr(false, unoccupied), Value: cool})
 	}
 	if heat != prevHeat {
-		moves = append(moves, SetpointChange{AttrID: thermoAttrOccupiedHeatingSetpoint, Value: heat})
+		moves = append(moves, SetpointChange{AttrID: setpointAttr(true, unoccupied), Value: heat})
 	}
 	if len(moves) == 0 {
 		return nil
@@ -944,13 +1168,135 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, prevHeat, prevCo
 	}
 	s.mu.Lock()
 	for _, m := range moves {
-		if m.AttrID == thermoAttrOccupiedCoolingSetpoint {
+		switch m.AttrID {
+		case thermoAttrOccupiedCoolingSetpoint:
 			s.occupCool = m.Value
-		} else {
+		case thermoAttrOccupiedHeatingSetpoint:
 			s.occupHeat = m.Value
+		case thermoAttrUnoccupiedCoolingSetpoint:
+			s.unoccCool = m.Value
+		default:
+			s.unoccHeat = m.Value
 		}
 	}
 	s.mu.Unlock()
+	return nil
+}
+
+// applyCommandSetpoints stores the setpoints a command moved (next against
+// cur): what moves goes to the [Sink] in one call first — the heating
+// setpoint as the primary, matter.js's assignment order for
+// setActivePresetRequest (ThermostatServer.ts:309-314 at 862ad75f) — and a
+// refusal stores nothing. The caller holds s.op.
+func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next setpointState, what string) error {
+	moves := setpointDiff(cur, next)
+	if len(moves) == 0 {
+		return nil
+	}
+	slices.SortStableFunc(moves, func(a, b SetpointChange) int {
+		return setpointOrder(a.AttrID) - setpointOrder(b.AttrID)
+	})
+	if s.sink != nil {
+		primary, companions := moves[0], moves[1:]
+		if len(companions) == 0 {
+			companions = nil
+		}
+		if err := s.sink.SetSetpoint(ctx, primary.AttrID, primary.Value, companions); err != nil {
+			return sinkError(fmt.Sprintf("%s setpoint 0x%04X = %d", what, primary.AttrID, primary.Value), err)
+		}
+	}
+	s.mu.Lock()
+	changed := s.commitSetpoints(next)
+	s.mu.Unlock()
+	s.changes.Notify(changed...)
+	return nil
+}
+
+// setpointOrder puts the setpoints a command moves first, heating before
+// cooling, then the limits.
+func setpointOrder(attrID uint32) int {
+	switch attrID {
+	case thermoAttrOccupiedHeatingSetpoint, thermoAttrUnoccupiedHeatingSetpoint:
+		return 0
+	case thermoAttrOccupiedCoolingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
+		return 1
+	}
+	return 2
+}
+
+// occupiedLocked is matter.js `occupied` (ThermostatServer.ts:327-329 at
+// 862ad75f): the occupancy with OCC, occupied otherwise. The caller holds
+// s.mu.
+func (s *ThermostatServer) occupiedLocked() bool {
+	return s.features&ThermostatFeatureOCC == 0 || s.occupied
+}
+
+// SetOccupied records the occupancy the host measured — matter.js's
+// externallyMeasuredOccupancy (ThermostatServer.ts:568, :573-575 at
+// 862ad75f): Occupancy follows and is announced, and the setpoints in
+// effect for SetpointRaiseLower and SetActivePresetRequest become the
+// occupied or the unoccupied pair. Without OCC it is logged and ignored.
+func (s *ThermostatServer) SetOccupied(occupied bool) {
+	if s.features&ThermostatFeatureOCC == 0 {
+		slog.Default().Warn("matter.thermostat.inbound_occupancy_ignored", slog.String("reason", "feature not served"))
+		return
+	}
+	s.mu.Lock()
+	changed := s.occupied != occupied
+	s.occupied = occupied
+	s.mu.Unlock()
+	if changed {
+		s.changes.Notify(thermoAttrOccupancy)
+	}
+}
+
+// SetAbsoluteSetpointLimit changes an absolute setpoint limit
+// (AbsMin/AbsMax Heat/Cool SetpointLimit) as the device's own change: the
+// user limits must stay within it, or the change is refused with
+// CONSTRAINT_ERROR — matter.js #assertUserSetpointLimits on
+// absMin*/absMax*SetpointLimit$Changing (ThermostatServer.ts:586-593,
+// :708-742, :830-853 at 862ad75f). The attributes are read-only to a
+// controller.
+func (s *ThermostatServer) SetAbsoluteSetpointLimit(attrID uint32, v int16) error {
+	heat := attrID == thermoAttrAbsMinHeatSetpointLimit || attrID == thermoAttrAbsMaxHeatSetpointLimit
+	if !heat && attrID != thermoAttrAbsMinCoolSetpointLimit && attrID != thermoAttrAbsMaxCoolSetpointLimit {
+		return fmt.Errorf("thermostat: 0x%04X is not an absolute setpoint limit", attrID)
+	}
+	if !s.inst.Serves(attrID) {
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: attribute 0x%04X is not served", attrID)
+	}
+	s.op.Lock()
+	defer s.op.Unlock()
+	s.mu.Lock()
+	st := s.setpointState()
+	switch attrID {
+	case thermoAttrAbsMinHeatSetpointLimit:
+		st.absMinHeat = int(v)
+	case thermoAttrAbsMaxHeatSetpointLimit:
+		st.absMaxHeat = int(v)
+	case thermoAttrAbsMinCoolSetpointLimit:
+		st.absMinCool = int(v)
+	default:
+		st.absMaxCool = int(v)
+	}
+	if err := st.assertUserSetpointLimits(heat); err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	changed := false
+	for _, f := range []struct {
+		dst *int16
+		v   int
+	}{{&s.absMinHeat, st.absMinHeat}, {&s.absMaxHeat, st.absMaxHeat}, {&s.absMinCool, st.absMinCool}, {&s.absMaxCool, st.absMaxCool}} {
+		if int(*f.dst) != f.v {
+			*f.dst = int16(f.v) //nolint:gosec // an int16 given
+			changed = true
+		}
+	}
+	s.mu.Unlock()
+	if changed {
+		s.changes.Notify(attrID)
+	}
 	return nil
 }
 
@@ -1055,16 +1401,17 @@ func controlSequenceOfOperation(features uint32) uint8 {
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
-// SetpointRaiseLower, the only mandatory command; the schedule, preset and
-// atomic commands carry MSCH / PRES conformance, features the server never
-// serves. Without the lister the dispatcher synthesised an empty
+// SetpointRaiseLower, the only mandatory command, and with PRES
+// SetActivePresetRequest and AtomicRequest; the schedule commands carry
+// MSCH conformance, a feature the server does not serve. Without the lister the dispatcher synthesised an empty
 // AcceptedCommandList, and a controller that reads the list before
 // invoking — Apple Home and Google Home both do — saw a thermostat that
 // accepts nothing. Found by the chip-tool data-model sweep.
 func (s *ThermostatServer) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
-// MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// SetpointRaiseLower answers with a status only.
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]:
+// AtomicResponse with PRES; SetpointRaiseLower and SetActivePresetRequest
+// answer with a status only.
 func (s *ThermostatServer) MatterGeneratedCommands() []uint32 {
 	return s.inst.MatterGeneratedCommands()
 }
@@ -1116,6 +1463,7 @@ func (thermoInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.Stat
 var (
 	_ contract.ClusterServer          = (*ThermostatServer)(nil)
 	_ contract.ClusterAttributeLister = (*ThermostatServer)(nil)
+	_ contract.FabricScopedReader     = (*ThermostatServer)(nil)
 	_ im.StatusCodeError              = thermoConstraintErr{}
 	_ im.StatusCodeError              = thermoInvalidCommandErr{}
 )
