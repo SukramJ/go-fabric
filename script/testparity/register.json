@@ -864,17 +864,15 @@
       "status": "partial",
       "go": [
         "store:TestRemoveGroupKeySet_DropsOnlyItsMappings",
-        "bridge:TestGroupKeyManagementCommandsOverTheWire"
+        "bridge:TestGroupKeyManagementCommandsOverTheWire",
+        "cluster/core:TestGroupKeyManagementProvisionalGroupcast",
+        "cluster/core:TestGroupKeyManagementTooManyGroupKeys",
+        "cluster/core:TestGroupKeyManagementMulticastPolicy"
       ],
       "missing": [
-        "rejects the provisional Groupcast feature",
-        "does not implement the provisional GroupcastAdoption attribute by default",
-        "prevents too many group keys",
-        "accepts a key set whose multicast policy is not PerGroupID and does not store the policy",
-        "reports PerGroupID for a written key set and for the IPK key set",
         "drops the policy from key sets stored by earlier versions"
       ],
-      "reason": "Pruning GroupKeyMap entries of a removed key set is covered; the Groupcast feature refusal, the key-count limit and the multicast policy cases are not.",
+      "reason": "The provisional Groupcast feature (the Go server has no feature selection: FeatureMap without GCAST) and GroupcastAdoption absent, the key-count limit at maxGroupKeysPerFabric 3 (on the server: node.Config carries no such option), the AllNodes policy accepted and not stored and KeySetRead reporting PerGroupID for key sets 1 and 0 over the wire, and the pruning of a removed key set's GroupKeyMap entries are ported (cluster/core/group_key_management_server_parity_matterjs_test.go). Missing, js-runtime-only: matter.js's persisted behavior state of earlier matter.js versions carried the policy; the Go key-set table has no policy column and never had one.",
       "snapshotSha": "0e0ef7a3c5c58a2d2acbff018c1d1a0be8db1c8e"
     },
     {
