@@ -179,7 +179,7 @@ does. Consumers: loom (switches, thermostats, locks, covers), the HA bridge
 families are green, and no ◐ remains in the comparison's cluster section
 for a cluster with a hand-written matter.js server.
 
-**Status 2026-10-19.** Phase 17 planned: [concept v5](./concept-v5-behaviour-depth.md) (German) with the owner's decisions 0.1–0.4 — a real Switch server after `SwitchServer.ts` beside the host-gesture path, the full Thermostat (presets, atomic writes, occupancy) and DoorLock (users, credentials, schedules) scope as selectable features, four waves in two parallel pairs (BJ ∥ BK, BL ∥ BM) as `v0.8.1`–`v0.8.4`, starting after `v0.8.0`.
+**Status 2026-10-19.** Phase 17 planned: [concept v5](./concept-v5-behaviour-depth.md) (German) with the owner's decisions 0.1–0.4 — a real Switch server after `SwitchServer.ts` beside the host-gesture path, the full Thermostat (presets, atomic writes, occupancy) and DoorLock (users, credentials, schedules) scope as selectable features, four waves in two parallel pairs (BJ ∥ BK, BL ∥ BM) as `v0.8.1`–`v0.8.4`, starting after `v0.8.0`. Phase 17a (brief BJ, pull request 170) released as `v0.8.1`: the behaviour-test ports of OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea — 66 of 76 cases, three fixes the ports found (window-covering enum conformance at construction, the level-control quiesce, the colour-temperature coupling floor), `fabrictest.Endpoint`; 17b (BK, the Switch server, pull request 171) open, 17c/17d (BL, BM) running.
 
 ### Milestone 4: The embedding layer
 

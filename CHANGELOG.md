@@ -19,12 +19,29 @@ Milestone 3, phase 17d, brief BM: the DoorLock server after matter.js `DoorLockS
 - `cluster/lock`: `lock.New(cfg)` returns the configuration error (`lock.ErrConfig`); a server without `Source` keeps LockState itself and moves the lock through `DoorLockConfig.Hardware` (`lock.LockOperationHandler`, matter.js `handleLockOperation`), whose `lock.LockOperationFailedError` names the reason LockOperationError reports. A `StateSource` that implements `LockOperationHandler` is told the operation's actuation, source and user. `Users`, `User`, `SetLockState`, `SetDoorState` (DPS) and `ReportAlarm` are the host's side; `lock.IsAccessGranted` and `lock.LocalInstantOf` are matter.js's `LockSchedule` functions.
 - `cluster/lock`: `lock.AuthStore` persists a lock's users, credentials and schedules; `*store.Store` implements it. Credential data is stored encrypted with AES-128-GCM under a random 16-byte key the server generates once and keeps under `store.SettingDoorLockCredentialKey` (`lock.Cipher` replaces the cipher, `lock.NewCredentialCipher` is the default). Without an AuthStore the records stay in memory.
 - `store`: `LoadDoorLockAuth` / `SaveDoorLockAuth` on the new tables `matter_doorlock_users`, `matter_doorlock_credentials` and `matter_doorlock_schedules` — migration `v6` (`store.Migrations()` now has 5 steps, the last `v6`; `v5` is the Thermostat presets' step of the same milestone). The schema fingerprint after `store.Apply` is now `b50fe661e4bdb70e9bdaf5f9841e744c48eab9b434b2471e6940da06942d506f`.
-- `fabrictest.Endpoint(key, deviceType, servers...)`: a bridged endpoint serving the cluster servers a test built (also brought by brief BJ).
 - The reference daemon's lock serves users with PIN credentials, the three schedule kinds, PINs over the air and Unbolting with the limits of matter.js's CHIP test lock, AutoRelockTime 60 s, and keeps its records in the node's store.
+
+### Fixed
+
+- A DoorLock SetUser, GetUser, ClearUser, SetCredential or schedule Set/Clear request whose fields the schema refuses answers INVALID_COMMAND, and GetWeekDaySchedule, GetYearDaySchedule and GetHolidaySchedule answer an index out of range in their response (matter.js `DoorLockServer.ts:1491-1521`); the bridge answered CONSTRAINT_ERROR (TC-DRLK-2.7, TC-DRLK-2.8).
 
 ### Changed
 
 - `cluster/lock`: `DoorLockServer` embeds the generated `spec.Server`. A `DoorLockConfig` that names no feature serves the former selection — Unbolting alone, without UnlockWithTimeout — so a host that does not opt in sees no change on the wire.
+
+## [0.8.1] — 2026-10-19
+
+Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/behaviors` for OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea.
+
+### Added
+
+- `fabrictest.Endpoint(key, deviceType, servers...)`: a bridged endpoint for `Topology.Bridged` serving cluster servers the test built itself — a feature selection or an initial state no device-layer constructor offers, as matter.js's tests add a `MutableEndpoint(…).with(…Server)` to a `MockServerNode`.
+
+### Fixed
+
+- `cluster/cover`: `New` refuses a `Type` or `EndProductType` whose enum-value conformance the FeatureMap disallows — a shutter that lifts and tilts, a roller shade on a covering that tilts too — with the new `cover.ErrEnumValue`; `NewWindowCoveringServer` panics on it, as on a FeatureMap it refuses. A host whose configured Type or EndProductType disagreed with its FeatureMap (an InteriorBlind, "LF & TL", on a lift-only covering) built the server before and fails at construction now: check the mapping before upgrading. matter.js validates the behavior's initial state against the schema and throws `EnumValueConformanceError` (`ServerBehaviorBacking.ts:60-63`, `conformance-compiler.ts:735-747`, `window-covering-cluster.element.ts:150-192`). A tilt-only host that left `Type` at its zero value (Rollershade, lift only) now fails at construction: set `TiltBlindTiltOnly` or `Unknown`.
+- `cluster/levelcontrol`: `MatterQuiesce` under the transition engine also drops a CurrentLevel report the quieter holds back, with its timer, so no timer of a server outlives the node or the reassembly that removed it; matter.js disposes the behavior's QuietObservable with its "delayed emit" timer (`LevelControlServer.ts:765-770`, `Observable.ts:806-815`, `:1276-1280`). The deferred report used to fire up to a second after the server had been quiesced.
+- `cluster/light`: `ColorControlServerConfig.CoupleColorTempToLevelMinMireds` sets the colour temperature LevelControl's CoupleColorTempToLevel option couples the maximum level to, and the attribute reads it; zero keeps the physical minimum. matter.js scales the coupled colour temperature from `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds` (`ColorControlServer.ts:1582`); the Go server always used the physical minimum, so a light with a coupling floor above it got a different colour temperature for every coupled level.
 
 ## [0.8.0] — 2026-10-19
 
@@ -4246,7 +4263,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...v0.7.2

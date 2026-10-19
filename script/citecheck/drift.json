@@ -847,7 +847,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 214,
+    "line": 220,
     "citation": "window-covering-cluster.element.ts:130-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -856,7 +856,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 714,
+    "line": 736,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",

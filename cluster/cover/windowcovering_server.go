@@ -73,6 +73,12 @@ var ErrFeatureMap = errors.New("windowcovering: FeatureMap names features this s
 // MoveStep: the device moves, the server does not simulate it.
 var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.MoveStep exclude each other")
 
+// ErrEnumValue reports a Config.Type or Config.EndProductType the
+// FeatureMap's conformance disallows: a shutter (Shutter, SwingingShutter:
+// "LF & !TL | !LF & TL") that lifts and tilts, a roller shade ("LF & !TL")
+// on a covering that tilts too.
+var ErrEnumValue = errors.New("windowcovering: Type or EndProductType not allowed under the FeatureMap")
+
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
 // (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338,
@@ -277,7 +283,8 @@ func (s *WindowCoveringServer) OnMatterAttributesChanged(cb func(attrIDs []uint3
 // than zero, [ServedFeatureMap], [ServedTiltFeatureMap] and
 // [ServedLiftTiltFeatureMap] is refused with [ErrFeatureMap]: advertising
 // it would list attributes or commands the server does not serve. A Mover
-// together with a non-zero MoveStep is refused with [ErrMoverWithMoveStep].
+// together with a non-zero MoveStep is refused with [ErrMoverWithMoveStep],
+// a Type or EndProductType the FeatureMap disallows with [ErrEnumValue].
 func New(cfg Config) (*WindowCoveringServer, error) {
 	features := cfg.FeatureMap
 	if features == 0 {
@@ -294,6 +301,21 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	// Each served selection satisfies "O.a+" and "[LF]" / "[TL]", and its
 	// optional attributes are allowed under it, so spec.New cannot refuse it.
 	inst, _ := spec.New(wcdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features)})
+	// The initial state conforms to the schema or the server is not built:
+	// a TypeEnum or EndProductTypeEnum member whose conformance the features
+	// disallow is refused (window-covering-cluster.element.ts:150-192).
+	// Mirrors matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63
+	// (invokeInitializer validates the behavior's state) and
+	// packages/node/src/behavior/state/validation/conformance-compiler.ts:735-747
+	// (disallowEnumValue throws EnumValueConformanceError).
+	for _, v := range []struct {
+		attr  uint32
+		value uint8
+	}{{wcdef.AttrType, cfg.Type}, {wcdef.AttrEndProductType, cfg.EndProductType}} {
+		if _, err := inst.CheckValue(v.attr, uint64(v.value), nil); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrEnumValue, err)
+		}
+	}
 	s := &WindowCoveringServer{
 		inst:           inst,
 		features:       features,
