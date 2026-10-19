@@ -183,9 +183,10 @@ type ThermostatConfig struct {
 }
 
 // Sink is the optional host port: told about every SystemMode and
-// occupied-setpoint change a controller asks for — a write of SystemMode,
-// OccupiedHeatingSetpoint or OccupiedCoolingSetpoint, and the setpoints a
-// SetpointRaiseLower moves — after the server validated it and before
+// setpoint change a controller asks for — a write of SystemMode,
+// OccupiedHeatingSetpoint or OccupiedCoolingSetpoint (with OCC also the
+// unoccupied pair), and the setpoints a SetpointRaiseLower or a
+// SetActivePresetRequest moves — after the server validated it and before
 // anything is stored. An error refuses the change: the write or command
 // answers with the error's status when it carries one (an
 // [im.StatusCodeError], passed through as is), FAILURE otherwise, and
@@ -221,7 +222,8 @@ type Sink interface {
 	// SetSystemMode is a SystemMode write the definition admitted.
 	SetSystemMode(ctx context.Context, mode uint8) error
 	// SetSetpoint is a change of OccupiedHeatingSetpoint or
-	// OccupiedCoolingSetpoint (attrID) to value, with companions: the
+	// OccupiedCoolingSetpoint — with OCC also UnoccupiedHeatingSetpoint or
+	// UnoccupiedCoolingSetpoint — (attrID) to value, with companions: the
 	// other attributes that move with it, computed but not yet stored.
 	// For a write, value is the written setpoint after the reconcile
 	// (matter.js #reconcileSetpoints) — the value the server will store,

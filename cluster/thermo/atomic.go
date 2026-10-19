@@ -187,16 +187,6 @@ func (w *atomicWrites) forAttribute(now time.Time, attrID uint32) *atomicWriteSt
 	return nil
 }
 
-// closeAll closes every state (AtomicWriteHandler.ts:84-89).
-func (w *atomicWrites) closeAll() {
-	w.mu.Lock()
-	all := slices.Clone(w.states)
-	w.mu.Unlock()
-	for _, s := range all {
-		s.close()
-	}
-}
-
 // closeFabric closes the states of fabricIndex's peers — matter.js
 // #handleFabricRemoval (AtomicWriteHandler.ts:378-388).
 func (w *atomicWrites) closeFabric(fabricIndex uint8) {

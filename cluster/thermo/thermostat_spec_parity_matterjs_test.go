@@ -45,8 +45,8 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 
 // TestFeaturesTheServerDoesNotServeAreRefused pins the refusal of a
 // feature whose elements the server does not serve — the schedules
-// (MatterScheduleConfiguration, "not yet implemented" in matter.js), the
-// deprecated Setback, the events and the suggestions — New with
+// (MatterScheduleConfiguration, "not yet implemented" in matter.js),
+// Setback, which matter.js refuses, the events and the suggestions — New with
 // ErrFeatures, NewThermostatServer with a panic.
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {
 	t.Parallel()
