@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+- CI: TC-DD-1.16 and TC-DD-1.17 run against a factory-fresh daemon. `TC_DD_1_16_17.py` is a `MatterTestUncommissionedDevice` case: it parses the onboarding payload and checks the commissionable advertisement without commissioning (chip's CI runs it with `factory-reset: true` and no commissioning method). Against the harness's commissioned snapshot the device no longer advertised and both cases failed, which was the one red check on every pull request labelled `needs-chiptool` since #170. They are now `uncommissioned` in the family table, as TC-SC-7.1 is (matter.js `test/core/SC.test.ts` `chip("SC/7.1").uncommissioned()`); the committed goldens already recorded the passing shape, so no fixture moved.
+
 ## [0.8.4] — 2026-10-19
 
 Milestone 3, phase 17d, brief BM: the DoorLock server after matter.js `DoorLockServer.ts`, `LockAuth.ts` and `LockSchedule.ts`, and the port of `DoorLockServerTest.ts` (67 of 68 cases).
