@@ -17,6 +17,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `node`: a rotated IPK reaches CASE. The responder resolves a Sigma1 under every key of key set 0 and keys Sigma2 and Sigma3 on the key that matched (`Fabric.ts:399-403`, `FabricManager.ts:325-331`; chip `CASESession.cpp:973-990`); the node's own identity keys on the current key of key set 0 (`Fabric.ts:391-393`); a KeySetWrite or KeySetRemove of key set 0 rotates both. The identity used to stay on the IPK of AddNOC, so an administrator rotating the IPK lost CASE to the node. The AddNOC key stays a candidate.
+- `cluster/core`: Groupcast JoinGroup applies the group's multicast policy before it writes the endpoints, so a new IanaAddr group joins FF05::FA straight away instead of joining its per-group address first and rebinding (`GroupcastServer.ts:252-257`).
 
 ## [0.8.6] — 2026-10-19
 
