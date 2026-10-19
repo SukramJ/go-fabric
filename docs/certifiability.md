@@ -207,7 +207,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | S | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
 | SEAR | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| SWTCH | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
+| SWTCH | 5 | 2 | 0 | 0 | 2 | 1 | 0 |
 | TMP | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | TSUIC | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -227,7 +227,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **692** | **387** | **0** | **4** | **129** | **167** | **5** |
+| **all** | **692** | **388** | **0** | **4** | **128** | **167** | **5** |
 
 ### Cases not run
 
@@ -512,8 +512,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SU/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
-| SWTCH/2.5 | (b) not supported | TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0) (runs, and skips itself) |
-| SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0) (runs, and skips itself) |
+| SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance "[MS & !AS]", switch.element.ts) (runs, and skips itself) |
 | SWTCH/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |

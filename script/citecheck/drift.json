@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 631,
+    "line": 632,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1333,
+    "line": 1356,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1648,
+    "line": 1671,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",

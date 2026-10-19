@@ -10,6 +10,23 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 3, phase 17b, brief BK: the Switch server after matter.js `SwitchServer.ts`, with the port of `SwitchServerTest.ts`.
+
+### Added
+
+- `cluster/switch` (package `switchserver`): the Switch server (0x003B), a port of matter.js `SwitchBaseServer` (`packages/node/src/behaviors/switch/SwitchServer.ts`) on the generated definition, with the features LS, MS, MSR, MSL, MSM and AS selectable (`Config.Features`). It derives every Switch event from a stream of positions: `SetRawPosition` (matter.js `rawPosition`, debounced by `Config.DebounceDelay` / `SetDebounceDelay`) and `SetCurrentPosition` (a position the host debounced), decided as matter.js decides them — SwitchLatched; InitialPress, ShortRelease, LongPress and LongRelease; MultiPressOngoing and MultiPressComplete up to `MultiPressMax`; one press per cycle for an action switch — with matter.js's defaults (long press 2 s, multi press 300 ms, two positions, MultiPressMax 2), its timers on `Config.Clock`, and the events and CurrentPosition writes applied in input order. A position outside the range answers CONSTRAINT_ERROR (`ErrPositionOutOfRange`). The server also implements `contract.SwitchEventEmitter`, so a source that narrates gestures keeps working, and the gestures move CurrentPosition. `ResetState` starts a clean cycle. The port of `SwitchServerTest.ts` (69 cases) runs against it.
+- `contract.SwitchPositionSink` (`SetRawPosition`, `SetCurrentPosition`): the position input of a Switch server. A measurement source with a `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` method is handed it at every reassembly, as a gesture source is handed its `contract.SwitchEventEmitter`.
+- `cluster/wire.GenericSwitchMultiPressSource` (`MatterSwitchMultiPressMax() uint8`, 2 or more advertises MSM) and `cluster/wire.GenericSwitchActionSource` (`MatterSwitchActionSwitch() bool`, AS instead of MSR, with MSM): optional source capabilities the MomentarySwitch materialiser reads.
+
+### Changed
+
+- The MomentarySwitch measurement class materialises the `cluster/switch` server instead of `cluster/wire.GenericSwitch`. A gesture source sees the same events; CurrentPosition now moves with the narrated gestures (1 from InitialPress, 0 after the release) where it read a `GenericSwitchPositionSource` live — the source's position is the start position.
+- `examples/reference-bridge`: the wall button reports positions instead of narrating gestures and states MultiPressMax 3, so its endpoint advertises MS, MSR, MSL and MSM (FeatureMap 0x1E) and serves MultiPressMax, MultiPressOngoing and MultiPressComplete. The app-pipe commands `SimulateLongPress` and `SimulateMultiPress` move it through positions with the timings of the command, as matter.js's `SwitchSimulator` does (any number of presses), and `SimulateSwitchIdle` resets it. TC-SWTCH-2.5 runs.
+
+### Deprecated
+
+- `github.com/SukramJ/go-fabric/cluster/wire.GenericSwitch` and `wire.NewGenericSwitch`: replaced by `github.com/SukramJ/go-fabric/cluster/switch` (`switchserver.New`); now a thin wrapper over it with unchanged reads. Removable in `v0.10.0` at the earliest.
+
 ## [0.8.1] — 2026-10-19
 
 Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/behaviors` for OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea.

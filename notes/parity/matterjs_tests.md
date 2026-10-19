@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 58 |
+| ported | 59 |
 | partial | 114 |
-| planned | 65 |
+| planned | 64 |
 | excluded | 87 |
 | total | 324 |
 
@@ -65,7 +65,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
@@ -440,7 +440,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| SwitchServerTest.ts | 3527 | planned | â€” | The Switch server's validators, debounce and the latching and momentary press state machines, which milestone 3 phase 17 ports. |
+| SwitchServerTest.ts | 3527 | ported | `cluster/switch:TestSwitchServerCustomValidators`<br>`cluster/switch:TestSwitchServerDebounce`<br>`cluster/switch:TestSwitchServerLS`<br>`cluster/switch:TestSwitchServerMSMSRMSL`<br>`cluster/switch:TestSwitchServerMSMSRNotMSL`<br>`cluster/switch:TestSwitchServerMSNotMSRNotMSL`<br>`cluster/switch:TestSwitchServerMSMSRMSLMSM`<br>`cluster/switch:TestSwitchServerMSASMSLMSM`<br>`cluster/switch:TestSwitchServerMSMSRNotMSLMSM`<br>`cluster/switch:TestSwitchServerResetState` | All 69 cases in the ten describes are ported one to one onto cluster/switch on a clocktest.Fake: the validators, debounce, the latching switch, the momentary switch with and without release, long press and multi press, the action switch, and resetState with the switch state lock. |
 
 ## node/test/behaviors/thermostat
 
@@ -1015,10 +1015,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/rvc-operational-state
 
 - `RvcOperationalStateServerTest.ts` â€” The RVC operational state server's base commands.
-
-### node/test/behaviors/switch
-
-- `SwitchServerTest.ts` â€” The Switch server's validators, debounce and the latching and momentary press state machines, which milestone 3 phase 17 ports.
 
 ### node/test/behaviors/thermostat
 

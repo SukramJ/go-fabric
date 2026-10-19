@@ -29,6 +29,8 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 	lines := []string{
 		`{"Name":"SimulateMultiPress","EndpointId":20,"MultiPressNumPresses":1}`,
 		`{"Name":"SimulateLongPress","EndpointId":20}`,
+		`{"Name":"SimulateMultiPress","EndpointId":20,"ButtonId":1,"MultiPressPressedTimeMillis":1,"MultiPressReleasedTimeMillis":1,"MultiPressNumPresses":3}`,
+		`{"Name":"SimulateSwitchIdle","EndpointId":20}`,
 		`{"Name":"SetBooleanState","EndpointId":19,"NewState":false}`,
 		`{"Name":"SetOccupancy","EndpointId":18,"Occupancy":1}`,
 		`{"Name":"SetSensorValue","Device":"humidity","Value":61.5}`,

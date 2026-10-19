@@ -1827,8 +1827,13 @@
       "stepsSkipped": 0
     },
     "SWTCH/2.1": {
-      "steps": 3,
-      "stepsSkipped": 1
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "SWTCH/2.5": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
     },
     "TCCM/1.2": {
       "tests": 1,
