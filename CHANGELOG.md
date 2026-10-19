@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-10-19
+
 Milestone 3, phase 17c, brief BL: the Thermostat's Presets, atomic writes and Occupancy after matter.js `ThermostatServer.ts`, `AtomicWriteHandler.ts` and `AtomicWriteState.ts` at `862ad75f`, and the port of the seven thermostat test files.
 
 ### Added
@@ -4287,7 +4289,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/SukramJ/go-fabric/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/SukramJ/go-fabric/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...v0.8.0
