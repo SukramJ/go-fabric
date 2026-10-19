@@ -28,8 +28,7 @@ func TestPresetWriteRules(t *testing.T) {
 		{PresetScenario: tdef.PresetScenarioOccupied, NumberOfPresets: 5, PresetTypeFeatures: tdef.PresetTypeFeaturesSupportsNames},
 		{PresetScenario: tdef.PresetScenarioSleep, NumberOfPresets: 1, PresetTypeFeatures: tdef.PresetTypeFeaturesSupportsNames},
 	}
-	srv := mustNew(t, cfg)
-	stored := srv.Presets()[0]
+	stored := builtIn // normalisation leaves a preset with a handle and a BuiltIn as it is
 	sleep := func(p *thermo.Preset) { p.PresetScenario = tdef.PresetScenarioSleep }
 	noCool := func(p *thermo.Preset) { p.CoolingSetpoint = nil }
 	noHeat := func(p *thermo.Preset) { p.HeatingSetpoint = nil }
@@ -51,9 +50,13 @@ func TestPresetWriteRules(t *testing.T) {
 		"the built-in removed":  {[]thermo.Preset{newPreset()}, im.StatusConstraintError, "Cannot remove built-in preset with presetHandle 07"},
 		"an undefined scenario": {[]thermo.Preset{stored, newPreset(func(p *thermo.Preset) { p.PresetScenario = 9 })}, im.StatusConstraintError, "No PresetType defined for scenario 9"},
 	} {
-		t.Run(name, func(t *testing.T) { wantStatusCode(t, srv.SetPresets(ctx, c.presets), c.status, c.text) })
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			wantStatusCode(t, mustNew(t, cfg).SetPresets(ctx, c.presets), c.status, c.text)
+		})
 	}
 	// A null BuiltIn keeps the stored preset's.
+	srv := mustNew(t, cfg)
 	kept := stored
 	nullBuiltIn(&kept)
 	if err := srv.SetPresets(ctx, []thermo.Preset{kept, newPreset(nullBuiltIn, withName("n"))}); err != nil {
@@ -195,9 +198,9 @@ type memorySettings struct {
 	fail   error
 }
 
-func (m *memorySettings) GetSetting(_ context.Context, key string) (string, bool, error) {
-	v, ok := m.values[key]
-	return v, ok, nil
+func (m *memorySettings) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
+	value, ok = m.values[key]
+	return value, ok, nil
 }
 
 func (m *memorySettings) SetSetting(_ context.Context, key, value string) error {

@@ -401,18 +401,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 			s.unoccCool = or(cfg.InitialUnoccupiedCoolingSetpoint, 2600)
 		}
 	}
-	if features&ThermostatFeatureOCC != 0 {
-		// Mirrors matter.js #setupOccupancyIntegration
-		// (ThermostatServer.ts:559-570 at 862ad75f) for a thermostat without
-		// an OccupancySensing endpoint: externallyMeasuredOccupancy, else
-		// occupied.
-		if cfg.Occupied == nil {
-			slog.Default().Warn("matter.thermostat.occupancy_unset",
-				slog.String("reason", "no local OccupancySensing cluster available and externallyMeasuredOccupancy state not set"))
-		} else {
-			s.occupied = *cfg.Occupied
-		}
-	}
+	s.initOccupancy(cfg.Occupied)
 
 	st := s.setpointState()
 	before := st
@@ -457,6 +446,21 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		s.systemMode = uint8(tdef.SystemModeCool)
 	}
 	return s, nil
+}
+
+// initOccupancy is matter.js #setupOccupancyIntegration
+// (ThermostatServer.ts:559-570 at 862ad75f) for a thermostat without an
+// OccupancySensing endpoint: externallyMeasuredOccupancy, else occupied.
+func (s *ThermostatServer) initOccupancy(occupied *bool) {
+	if s.features&ThermostatFeatureOCC == 0 {
+		return
+	}
+	if occupied == nil {
+		slog.Default().Warn("matter.thermostat.occupancy_unset",
+			slog.String("reason", "no local OccupancySensing cluster available and externallyMeasuredOccupancy state not set"))
+		return
+	}
+	s.occupied = *occupied
 }
 
 // NewThermostatServer constructs the cluster as [New] does; it panics on a

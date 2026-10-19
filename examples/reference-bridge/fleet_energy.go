@@ -157,7 +157,7 @@ func (w *demoWaterHeater) ChangeToMode(_ context.Context, newMode uint8) (modeba
 // duration timer, then turn the heat on or off as the boost requires. The
 // server sets BoostState and emits BoostStarted when this returns.
 func (w *demoWaterHeater) Boost(_ context.Context, info energy.BoostInfo) error {
-	w.build()
+	w.build() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.boost, w.reached, w.boosting = info, false, true

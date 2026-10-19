@@ -273,7 +273,7 @@ func decodePresets(t *testing.T, n spec.Node) []thermo.Preset {
 }
 
 // readPresets reads Presets from q.
-func (p *thermostatPair) readPresets(t *testing.T, ctx context.Context, q *fabrictest.Pair) []thermo.Preset {
+func (p *thermostatPair) readPresets(ctx context.Context, t *testing.T, q *fabrictest.Pair) []thermo.Preset {
 	t.Helper()
 	d, err := fabrictest.Read(ctx, q, p.attrPath(presetsAttribute))
 	if err != nil {
@@ -300,7 +300,7 @@ func (r *presetReports) last() ([]thermo.Preset, bool) {
 }
 
 // subscribePresets subscribes to Presets from the pair's controller.
-func (p *thermostatPair) subscribePresets(t *testing.T, ctx context.Context) *presetReports {
+func (p *thermostatPair) subscribePresets(ctx context.Context, t *testing.T) *presetReports {
 	t.Helper()
 	r := &presetReports{}
 	floor, ceiling := time.Duration(0), 60*time.Second
@@ -309,11 +309,11 @@ func (p *thermostatPair) subscribePresets(t *testing.T, ctx context.Context) *pr
 		MinIntervalFloor:   &floor,
 		MaxIntervalCeiling: &ceiling,
 		Updated: func(rep *interaction.Report) {
-			for _, a := range rep.Attributes {
-				if a.Path.Attribute != presetsAttribute {
+			for i := range rep.Attributes {
+				if rep.Attributes[i].Path.Attribute != presetsAttribute {
 					continue
 				}
-				v, err := tdef.Definition.Attribute(presetsAttribute).Decode(a.Value)
+				v, err := tdef.Definition.Attribute(presetsAttribute).Decode(rep.Attributes[i].Value)
 				if err != nil {
 					continue
 				}

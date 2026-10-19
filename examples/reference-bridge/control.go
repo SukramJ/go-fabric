@@ -399,7 +399,7 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	if trigger == triggerGeneric || trigger == triggerGenericAlias {
 		return nil
 	}
-	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) ||
+	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) || //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
 		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) ||
 		f.esa.testEventTrigger(trigger) || f.evse.testEventTrigger(trigger) || f.energyMarketTestEventTrigger(trigger) {
 		return nil

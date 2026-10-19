@@ -414,7 +414,8 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 	for _, attr := range req.AttributeRequests {
 		status := tdef.StatusSuccess
 		if v, ok := st.staged(attr); ok && attr == tdef.AttrPresets {
-			if err := s.commitPresets(ctx, v.([]tdef.PresetStruct)); err != nil {
+			staged, _ := v.([]Preset) // writePresets stages a []Preset
+			if err := s.commitPresets(ctx, staged); err != nil {
 				status = tdef.Status(statusOf(err, "committing attribute Presets"))
 			}
 		}

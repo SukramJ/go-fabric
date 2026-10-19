@@ -96,7 +96,7 @@ func TestParityMatterJS_PresetsAtomicWriteTest(t *testing.T) {
 		p := presetsThermostat(t)
 		ctx := parityCtx(t)
 		deviceAnnouncements := recordThermostatChanges(p.srv)
-		clientReports := p.subscribePresets(t, ctx)
+		clientReports := p.subscribePresets(ctx, t)
 
 		begin(t, p)
 		statusesAre(t, write(t, p, []thermo.Preset{newPreset()}), im.StatusSuccess, im.StatusSuccess)
@@ -135,7 +135,7 @@ func TestParityMatterJS_PresetsAtomicWriteTest(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		cached := p.readPresets(t, ctx, p.pair)
+		cached := p.readPresets(ctx, t, p.pair)
 		if len(cached) != 1 || cached[0].PresetHandle.Null || len(cached[0].PresetHandle.Value) != 16 {
 			t.Errorf("read presets %+v, want the one with its 16-byte handle", cached)
 		}
@@ -147,7 +147,7 @@ func TestParityMatterJS_PresetsAtomicWriteTest(t *testing.T) {
 		if got := p.srv.Presets(); len(got) != 0 {
 			t.Errorf("persisted presets %+v, want none", got)
 		}
-		if got := p.readPresets(t, parityCtx(t), p.pair); len(got) != 0 {
+		if got := p.readPresets(parityCtx(t), t, p.pair); len(got) != 0 {
 			t.Errorf("read presets %+v, want none", got)
 		}
 	})
@@ -161,7 +161,7 @@ func TestParityMatterJS_PresetsAtomicWriteTest(t *testing.T) {
 		}
 		// The holding peer reads what it staged: the REPLACE-ALL's empty
 		// list, the append refused.
-		if got := p.readPresets(t, parityCtx(t), p.pair); len(got) != 0 {
+		if got := p.readPresets(parityCtx(t), t, p.pair); len(got) != 0 {
 			t.Errorf("read presets %+v, want none", got)
 		}
 	})

@@ -141,9 +141,10 @@ func presetName(p Preset) *string {
 // presetScenarioName is the PresetScenarioEnum name of a scenario, for
 // the messages.
 func presetScenarioName(sc tdef.PresetScenarioEnum) string {
-	for _, v := range tdef.PresetScenarioEnumDef.Values {
-		if v.Value == uint64(sc) {
-			return v.Name
+	values := tdef.PresetScenarioEnumDef.Values
+	for i := range values {
+		if values[i].Value == uint64(sc) {
+			return values[i].Name
 		}
 	}
 	return fmt.Sprintf("%d", sc)
