@@ -200,10 +200,10 @@ FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index,
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var (
-			kind                                 string
+			kind                                  string
 			index, daysMask, sh, sm, eh, em, mode uint8
-			user                                 uint16
-			start, end                           uint32
+			user                                  uint16
+			start, end                            uint32
 		)
 		if err := rows.Scan(&kind, &index, &user, &daysMask, &sh, &sm, &eh, &em, &start, &end, &mode); err != nil {
 			return fmt.Errorf("matter store: load door lock schedules: %w", err)
