@@ -279,3 +279,56 @@ CREATE TABLE IF NOT EXISTS matter_ota_default_providers (
     PRIMARY KEY(fabric_index, position),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
+
+-- matter_doorlock_users, matter_doorlock_credentials and
+-- matter_doorlock_schedules hold the DoorLock server's user database, its
+-- credentials and its week-day, year-day and holiday schedules
+-- (cluster/lock AuthStore), one set per lock endpoint named by the host's
+-- endpoint_key. matter.js keeps the same five lists as nonvolatile state of
+-- the server (DoorLockServer.ts State :1538-1574); a credential's data is
+-- stored encrypted, under the key the server keeps in matter_settings
+-- (door_lock.credential_key). Users and credentials outlive the fabric
+-- that created them, as in matter.js, so there is no foreign key into
+-- matter_fabrics. A user's credential references ride as JSON, the
+-- schedules of the three kinds in one table (user_index 0 for a holiday
+-- schedule, which belongs to no user). Migration v6.
+CREATE TABLE IF NOT EXISTS matter_doorlock_users (
+    endpoint_key               TEXT     NOT NULL,
+    user_index                 INTEGER  NOT NULL CHECK(user_index BETWEEN 1 AND 65535),
+    user_name                  TEXT     NOT NULL,
+    user_unique_id             INTEGER,
+    user_status                INTEGER  NOT NULL,
+    user_type                  INTEGER  NOT NULL,
+    credential_rule            INTEGER  NOT NULL,
+    credentials_json           TEXT     NOT NULL,
+    creator_fabric_index       INTEGER  NOT NULL,
+    last_modified_fabric_index INTEGER  NOT NULL,
+    expiring_user_expires_at   INTEGER,
+    PRIMARY KEY(endpoint_key, user_index)
+);
+
+CREATE TABLE IF NOT EXISTS matter_doorlock_credentials (
+    endpoint_key               TEXT     NOT NULL,
+    credential_type            INTEGER  NOT NULL,
+    credential_index           INTEGER  NOT NULL CHECK(credential_index BETWEEN 0 AND 65535),
+    credential_data            BLOB     NOT NULL,
+    creator_fabric_index       INTEGER  NOT NULL,
+    last_modified_fabric_index INTEGER  NOT NULL,
+    PRIMARY KEY(endpoint_key, credential_type, credential_index)
+);
+
+CREATE TABLE IF NOT EXISTS matter_doorlock_schedules (
+    endpoint_key        TEXT     NOT NULL,
+    kind                TEXT     NOT NULL CHECK(kind IN ('week_day', 'year_day', 'holiday')),
+    schedule_index      INTEGER  NOT NULL CHECK(schedule_index BETWEEN 0 AND 255),
+    user_index          INTEGER  NOT NULL,
+    days_mask           INTEGER  NOT NULL DEFAULT 0,
+    start_hour          INTEGER  NOT NULL DEFAULT 0,
+    start_minute        INTEGER  NOT NULL DEFAULT 0,
+    end_hour            INTEGER  NOT NULL DEFAULT 0,
+    end_minute          INTEGER  NOT NULL DEFAULT 0,
+    local_start_time    INTEGER  NOT NULL DEFAULT 0,
+    local_end_time      INTEGER  NOT NULL DEFAULT 0,
+    operating_mode      INTEGER  NOT NULL DEFAULT 0,
+    PRIMARY KEY(endpoint_key, kind, user_index, schedule_index)
+);

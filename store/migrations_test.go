@@ -114,11 +114,11 @@ func TestMigrationsMatchApply(t *testing.T) {
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := store.Migrations()
-	if len(ms) != 4 {
-		t.Fatalf("len(Migrations()) = %d, want 4", len(ms))
+	if len(ms) != 5 {
+		t.Fatalf("len(Migrations()) = %d, want 5", len(ms))
 	}
-	if last := ms[len(ms)-1].Version; last != "v4" {
-		t.Errorf("last migration = %s, want v4", last)
+	if last := ms[len(ms)-1].Version; last != "v6" {
+		t.Errorf("last migration = %s, want v6", last)
 	}
 	seen := map[string]bool{}
 	for _, m := range ms {
@@ -134,7 +134,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "924e777a63a110753483a2dd08fb61c19bc5b9f96f09271b1bd265b9212bd924"
+	const want = "b50fe661e4bdb70e9bdaf5f9841e744c48eab9b434b2471e6940da06942d506f"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}
@@ -207,8 +207,8 @@ func TestSchemaTablesAreTheSchemas(t *testing.T) {
 		tables = append(tables, n)
 	}
 	_ = rows.Close()
-	if len(tables) != 14 {
-		t.Errorf("Apply created %d matter_* tables, want 14: %v", len(tables), tables)
+	if len(tables) != 17 {
+		t.Errorf("Apply created %d matter_* tables, want 17: %v", len(tables), tables)
 	}
 	for _, table := range tables {
 		other := openTestDB(t)
