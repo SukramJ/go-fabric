@@ -1107,14 +1107,12 @@
     },
     {
       "path": "packages/node/test/behaviors/scenes-management/ScenesManagementServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/core:TestScenesAddAndRecallOnOff"
+        "cluster/core:TestScenesAddAndRecallOnOff",
+        "cluster/core:TestScenesManagementServerAddAndRecallOnOff"
       ],
-      "missing": [
-        "add and recall onoff boolean scene value"
-      ],
-      "reason": "The one it is covered in part: adding a scene and recalling it on is ported with a zero transition, but the second scene at the 60 000 000 ms transition-time maximum and the recall running its 1 s transition are not.",
+      "reason": "The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays.",
       "snapshotSha": "ef606063b6cd1ee8010f79c9f0d3ea58af6f3fb5"
     },
     {

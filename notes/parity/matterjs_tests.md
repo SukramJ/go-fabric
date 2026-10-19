@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 66 |
-| partial | 116 |
+| ported | 67 |
+| partial | 115 |
 | planned | 55 |
 | excluded | 87 |
 | total | 324 |
@@ -63,7 +63,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
@@ -428,7 +428,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ScenesManagementServerTest.ts | 99 | partial | `cluster/core:TestScenesAddAndRecallOnOff` | The one it is covered in part: adding a scene and recalling it on is ported with a zero transition, but the second scene at the 60 000 000 ms transition-time maximum and the recall running its 1 s transition are not. Missing: ‚Äúadd and recall onoff boolean scene value‚Äù. |
+| ScenesManagementServerTest.ts | 99 | ported | `cluster/core:TestScenesAddAndRecallOnOff`<br>`cluster/core:TestScenesManagementServerAddAndRecallOnOff` | The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays. |
 
 ## node/test/behaviors/service-area
 
