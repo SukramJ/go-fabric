@@ -10,6 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/core`: a GeneralDiagnostics feature selection of the host's own — `NewGeneralDiagnosticsWith(bootReason, GeneralDiagnosticsFeatures{DataModelTest: …})`, matter.js `GeneralDiagnosticsServer.with(…)`; without DataModelTest the server drops PayloadTestRequest/Response and FeatureMap reads 0. `GeneralDiagnostics.CheckDataModelTest(maxPathsPerInvoke, logger)` holds the selection against the node's MaxPathsPerInvoke: an error above one without the feature, an INFO advisory with it at one (`GeneralDiagnosticsServer.ts:125-143`). `NewGeneralDiagnostics` keeps DataModelTest.
+- `cluster/core`: the Descriptor's TagList, opt-in — `Descriptor.EnableTagList(tags...)` selects the TagList feature (FeatureMap TAGLIST, TagList served) and `Descriptor.AddTags(tags...)` adds semantic tags as matter.js `DescriptorServer.addTags` does (`DescriptorServer.ts:122-147`): a listed tag is not added again, a non-null label replaces the listed one, a null or missing label keeps it; without the feature it fails with `ErrTagListNotEnabled`. A Descriptor that does not opt in serves neither, as before.
+
+### Fixed
+
+- `bridge`: a configuration change that groups several bridged devices raises the node's BasicInformation ConfigurationVersion once — `Bridge.IncreaseNodeConfigurationVersionWith(change)` runs the change, in which `ConfigurationChange.IncreaseConfigurationVersion(scope, deviceAddress)` raises each device's own version, and increments the node's afterwards, as matter.js `BasicInformationServer.increaseConfigurationVersion` does with the bridged nodes' shared context (`BasicInformationServer.ts:132-138`, `BridgedDeviceBasicInformationServer.ts:72-90`). Before, every bridged device raised the node again.
+- `cluster/core`: GeneralDiagnostics floors every elapsed time at zero and keeps the operational time it counted when the clock steps back (matter.js `elapsedSince` and `#updateTotalOperationalHoursCounter`, `GeneralDiagnosticsServer.ts:60-68`, `:384-392`). Before, a backward step of the node's clock (a `clock.Clock` without monotonic readings) wrapped TotalOperationalHours to 4294967295 and made `node.Node.Stop` persist a negative operational time that the next `node.New` refused to load.
+
+### Changed
+
 - CI: TC-DD-1.16 and TC-DD-1.17 run against a factory-fresh daemon. `TC_DD_1_16_17.py` is a `MatterTestUncommissionedDevice` case: it parses the onboarding payload and checks the commissionable advertisement without commissioning (chip's CI runs it with `factory-reset: true` and no commissioning method). Against the harness's commissioned snapshot the device no longer advertised and both cases failed, which was the one red check on every pull request labelled `needs-chiptool` since #170. They are now `uncommissioned` in the family table, as TC-SC-7.1 is (matter.js `test/core/SC.test.ts` `chip("SC/7.1").uncommissioned()`); the committed goldens already recorded the passing shape, so no fixture moved.
 
 ## [0.8.4] — 2026-10-19

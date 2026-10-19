@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 62 |
-| partial | 118 |
-| planned | 57 |
+| ported | 69 |
+| partial | 113 |
+| planned | 55 |
 | excluded | 87 |
 | total | 324 |
 
@@ -38,20 +38,20 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/system/sessions](#nodetestbehaviorsystemsessions) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/subscriptions](#nodetestbehaviorsystemsubscriptions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/access-control](#nodetestbehaviorsaccess-control) | 2 | 0 | 1 | 1 | 0 |
-| [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 0 | 3 | 0 | 0 |
+| [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 0 | 3 | 0 | 0 |
 | [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 0 | 2 | 0 | 0 |
+| [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 2 | 0 | 0 | 0 |
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 0 | 1 | 1 | 0 |
+| [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
@@ -63,7 +63,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
@@ -266,9 +266,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BasicInformationValidatorsTest.ts | 44 | partial | `cluster/core:TestBasicInfo_ValidationVendorIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4`<br>`cluster/core:TestBasicInfo_ValidationProductIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorID0001Accepted`<br>`cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted` | The VendorID/ProductID identity checks are covered; skipping them where a bridged device leaves both absent is not. Missing: “skips the check when VendorID/ProductID are absent (optional on bridged devices)”. |
-| CapabilityMinimaTest.ts | 44 | partial | `cluster/core:TestCapabilityMinimaRev6Defaults`<br>`cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum` | The Matter 1.6 CapabilityMinima defaults are covered; caller-provided values winning over them are not. Missing: “preserves caller-provided values over the derived defaults”. |
-| ConfigurationVersionTest.ts | 126 | partial | `bridge:TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode`<br>`cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne` | A bridged-node change raising the bridge's ConfigurationVersion is covered; the callback order, the refused decrease and the grouped bump are not. Missing: “runs the change callback and increments afterwards”; “rejects a decrease of configurationVersion”; “bumps the bridge once when grouping bridged-node changes via a shared context”; “throws when increasing a bridged node's ConfigurationVersion that is not enabled”. |
+| BasicInformationValidatorsTest.ts | 44 | ported | `cluster/core:TestBasicInfo_ValidationVendorIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4`<br>`cluster/core:TestBasicInfo_ValidationProductIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorID0001Accepted`<br>`cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted`<br>`cluster/core:TestBasicInformationValidatorsSkipsAbsentIdentity` | The VendorID/ProductID identity checks run in the Go constructors (a thrown ImplementationError is a constructor error); a bridged device without VendorID/ProductID constructs and serves neither attribute. |
+| CapabilityMinimaTest.ts | 44 | ported | `cluster/core:TestCapabilityMinimaRev6Defaults`<br>`cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum`<br>`cluster/core:TestCapabilityMinimaPreservesCallerValues` | The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima, the server state node.Config does not carry. |
+| ConfigurationVersionTest.ts | 126 | partial | `bridge:TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode`<br>`cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne`<br>`cluster/core:TestConfigurationVersionRunsTheChangeThenIncrements`<br>`cluster/core:TestConfigurationVersionRefusesADecrease`<br>`cluster/core:TestConfigurationVersionGroupsBridgedChanges`<br>`bridge:TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce` | The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse. Missing: “throws when increasing a bridged node's ConfigurationVersion that is not enabled”. |
 
 ## node/test/behaviors/binding
 
@@ -308,8 +308,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| DescriptorServerClientListTest.ts | 37 | partial | `device:TestClientListCarriesTheMandatoryClientClusters`<br>`cluster/core:TestDescriptor_ReadClientList` | The mandatory client clusters of a device type reaching ClientList are covered; the explicit-client and same-cluster-in-both-lists cases are not. Missing: “is empty when no client clusters declared”; “includes explicit .with(<Client>) entries”; “lists same cluster id in both serverList and clientList (dimmer-switch / Identify)”. |
-| DescriptorServerTest.ts | 648 | partial | `cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_DoesNotAddDeviceTypeWhenUnnecessary`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsServersAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes`<br>`cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision`<br>`cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild` | The descriptor parity tests port the endpoint-type, device-type, server, parts and TagList cases; tag edits, full-family composition, the manual-ID hierarchy orders and PartsList ordering are not ported. Missing: “stops watching a removed part”; “adds a tag that is already listed only once”; “does not add a listed tag again when the label is the same”; “replaces the label of a listed tag”; “keeps the label when a listed tag is added without one”; “lists every descendant for an aggregator and a bridged node and only children for a light”; “lists every descendant once a full-family device type is added at runtime”; “lists only children once the full-family device type is replaced at runtime”; “when constructed with full hierarchy (manual ID)”; “when child is added before parent (auto ID)”; “when child is added before parent (manual ID)”; “when parent is added before child (auto ID)”; “when parent is added before child (manual ID)”; “when additional child is added (manual ID)”; “updates ${name}”; “orders PartsList numerically”. |
+| DescriptorServerClientListTest.ts | 37 | ported | `device:TestClientListCarriesTheMandatoryClientClusters`<br>`cluster/core:TestDescriptor_ReadClientList`<br>`device:TestDescriptorServerClientList` | The empty ClientList of a type without client clusters, an explicit client cluster (WithClientClusters), the mandatory client clusters of a device type and the same cluster in ServerList and ClientList (DimmerSwitch / Identify) are ported on the device-layer types through the assembler's Descriptor. |
+| DescriptorServerTest.ts | 648 | ported | `cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_DoesNotAddDeviceTypeWhenUnnecessary`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsServersAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_AddsPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically`<br>`cluster/core:TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes`<br>`cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision`<br>`cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy`<br>`cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild`<br>`endpoint:TestDescriptorServerStopsWatchingARemovedPart`<br>`endpoint:TestDescriptorServerAddTags`<br>`endpoint:TestDescriptorServerComposition`<br>`endpoint:TestDescriptorServerIndexedHierarchy`<br>`endpoint:TestDescriptorServerMembershipChangesThatKeepTheCount`<br>`endpoint:TestDescriptorServerOrdersPartsListNumerically` | The endpoint-type, device-type, server and parts cases run on the Descriptor; the removed part, full-family composition (also after a device-type change, a reassembly), the hierarchy orders (a manual ID is a number the store holds, the order of additions the order of snapshots), the membership change keeping the count (one assembly, so matter.js's four timing windows are its two parent types) and the numeric PartsList order run through the assembler on a fabrictest device, read through the dispatcher; the tag edits on Descriptor.EnableTagList and AddTags. |
 
 ## node/test/behaviors/door-lock
 
@@ -333,8 +333,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| GeneralDiagnosticsFeaturesTest.ts | 78 | planned | — | The DataModelTest feature against the node's paths-per-invoke limit. |
-| GeneralDiagnosticsOperationalHoursTest.ts | 157 | partial | `cluster/core:TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered`<br>`cluster/core:TestGenDiag_UpTimeMonotonicallyNonDecreasing`<br>`node:TestOperationalHoursSurviveARestart` | UpTime across forward and backward clock steps and operational hours across a restart are covered; the high-water reset, the integer counter and the offline transition are not. Missing: “keeps the operational time counted across a backward wall-clock step”; “keeps upTime counting across a backward wall-clock step”; “resets upTime's high-water mark across a restart”; “keeps totalOperationalHours non-negative when the clock steps backwards”; “keeps the persisted counter an integer despite a fractional Time.nowUs reading”; “takes the node offline cleanly when the clock steps backwards”. |
+| GeneralDiagnosticsFeaturesTest.ts | 78 | ported | `cluster/core:TestGeneralDiagnosticsFeatures` | The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; node.Config carries neither the selection nor MaxPathsPerInvoke. |
+| GeneralDiagnosticsOperationalHoursTest.ts | 157 | partial | `cluster/core:TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered`<br>`cluster/core:TestGenDiag_UpTimeMonotonicallyNonDecreasing`<br>`node:TestOperationalHoursSurviveARestart`<br>`cluster/core:TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep`<br>`cluster/core:TestGeneralDiagnosticsUpTimeHighWaterResetsAcrossARestart`<br>`cluster/core:TestGeneralDiagnosticsTotalOperationalHoursNonNegativeOnABackwardStep`<br>`cluster/core:TestGeneralDiagnosticsUpTimeNonNegativeOnABackwardStep`<br>`cluster/core:TestGeneralDiagnosticsPersistedCounterIsAnInteger`<br>`cluster/core:TestGeneralDiagnosticsGoesOfflineCleanlyOnABackwardStep` | UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form. Missing: “keeps the operational time counted across a backward wall-clock step”. |
 
 ## node/test/behaviors/group-key-management
 
@@ -352,7 +352,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| GroupsServerSchemaTest.ts | 100 | planned | — | The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response. |
+| GroupsServerSchemaTest.ts | 100 | ported | `cluster/core:TestGroupsServerSchemaRelaxation` | The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair. |
 
 ## node/test/behaviors/hepa-filter-monitoring
 
@@ -428,7 +428,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ScenesManagementServerTest.ts | 99 | partial | `cluster/core:TestScenesAddAndRecallOnOff` | The one it is covered in part: adding a scene and recalling it on is ported with a zero transition, but the second scene at the 60 000 000 ms transition-time maximum and the recall running its 1 s transition are not. Missing: “add and recall onoff boolean scene value”. |
+| ScenesManagementServerTest.ts | 99 | ported | `cluster/core:TestScenesAddAndRecallOnOff`<br>`cluster/core:TestScenesManagementServerAddAndRecallOnOff` | The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays. |
 
 ## node/test/behaviors/service-area
 
@@ -794,7 +794,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | GroupsMulticastPolicyTest.ts | 74 | ported | `groups:TestGroupcastPolicyMovesTheMulticastMembership`<br>`groups:TestGroupsMulticastPolicy` | The per-group default, the shared IANA address under IanaAddr, reverting after removal and independent per-group policies are ported on one shared fabric through SetGroupProperties and RemoveGroupProperties. |
 | GroupsTest.ts | 148 | ported | `groups:TestGroupsMulticastAddress`<br>`groups:TestGroupsIDMap`<br>`groups:TestGroupsSubjectForGroup`<br>`groups:TestGroupsCurrentKeyForID` | The per-group multicast address and its refusal of group id 0, the GroupKeyMap replacement (store change and Reload), the subject of a group message through Decode's HasValidMapping and Endpoints including the session-id collision peer, and the current key of a group with the matter.js error texts are ported. |
 | KeySetsTest.ts | 174 | partial | `groups:TestKeySetsForIDAdd`<br>`groups:TestKeySetsAllKeysForID`<br>`groups:TestKeySetsCurrentKeyForID`<br>`groups:TestKeySetsContainsOperationalKey` | Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0. Missing: “returns the only key for the default key set”; “returns the second-newest key for the IPK key set (§4.14.2.6)”. |
-| MessagingStateTest.ts | 76 | partial | `groups:TestMessagingStateReceptionStateFor` | The per-(source node, key) reception state is ported on Manager.receptionWindow; the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter). Missing: “allows setting storage once when constructed without it”; “rejects setting storage a second time”; “returns the max across legacy *-data entries, ignoring others”; “returns undefined when there are no legacy entries”; “clears only the legacy *-data entries”. |
+| MessagingStateTest.ts | 76 | partial | `groups:TestMessagingStateReceptionStateFor` | The per-(source node, key) reception state is ported on Manager.receptionWindow; the five missing cases are js-runtime-only: the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter). Missing: “allows setting storage once when constructed without it”; “rejects setting storage a second time”; “returns the max across legacy *-data entries, ignoring others”; “returns undefined when there are no legacy entries”; “clears only the legacy *-data entries”. |
 
 ## protocol/test/icd
 
@@ -974,14 +974,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/fan-control
 
 - `FanControlTest.ts` — Local mode tags and the not-off-only command set of FanControlServer by default.
-
-### node/test/behaviors/general-diagnostics
-
-- `GeneralDiagnosticsFeaturesTest.ts` — The DataModelTest feature against the node's paths-per-invoke limit.
-
-### node/test/behaviors/groups
-
-- `GroupsServerSchemaTest.ts` — The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response.
 
 ### node/test/behaviors/icd-management
 

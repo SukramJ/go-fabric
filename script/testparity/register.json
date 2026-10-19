@@ -562,31 +562,27 @@
     },
     {
       "path": "packages/node/test/behaviors/basic-information/BasicInformationValidatorsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestBasicInfo_ValidationVendorIDZero",
         "cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4",
         "cluster/core:TestBasicInfo_ValidationProductIDZero",
         "cluster/core:TestBasicInfo_ValidationVendorID0001Accepted",
-        "cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted"
+        "cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted",
+        "cluster/core:TestBasicInformationValidatorsSkipsAbsentIdentity"
       ],
-      "missing": [
-        "skips the check when VendorID/ProductID are absent (optional on bridged devices)"
-      ],
-      "reason": "The VendorID/ProductID identity checks are covered; skipping them where a bridged device leaves both absent is not.",
+      "reason": "The VendorID/ProductID identity checks run in the Go constructors (a thrown ImplementationError is a constructor error); a bridged device without VendorID/ProductID constructs and serves neither attribute.",
       "snapshotSha": "f76cab7ecb65f9aa7cca8359a4177216818247a4"
     },
     {
       "path": "packages/node/test/behaviors/basic-information/CapabilityMinimaTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestCapabilityMinimaRev6Defaults",
-        "cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum"
+        "cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum",
+        "cluster/core:TestCapabilityMinimaPreservesCallerValues"
       ],
-      "missing": [
-        "preserves caller-provided values over the derived defaults"
-      ],
-      "reason": "The Matter 1.6 CapabilityMinima defaults are covered; caller-provided values winning over them are not.",
+      "reason": "The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima, the server state node.Config does not carry.",
       "snapshotSha": "14c20ec658d9c76822d6e05950a7cd9a6992b721"
     },
     {
@@ -594,15 +590,16 @@
       "status": "partial",
       "go": [
         "bridge:TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode",
-        "cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne"
+        "cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne",
+        "cluster/core:TestConfigurationVersionRunsTheChangeThenIncrements",
+        "cluster/core:TestConfigurationVersionRefusesADecrease",
+        "cluster/core:TestConfigurationVersionGroupsBridgedChanges",
+        "bridge:TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce"
       ],
       "missing": [
-        "runs the change callback and increments afterwards",
-        "rejects a decrease of configurationVersion",
-        "bumps the bridge once when grouping bridged-node changes via a shared context",
         "throws when increasing a bridged node's ConfigurationVersion that is not enabled"
       ],
-      "reason": "A bridged-node change raising the bridge's ConfigurationVersion is covered; the callback order, the refused decrease and the grouped bump are not.",
+      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
       "snapshotSha": "b255a8bb62d2df742a723bc6c3c231b13ac323aa"
     },
     {
@@ -764,22 +761,18 @@
     },
     {
       "path": "packages/node/test/behaviors/descriptor/DescriptorServerClientListTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "device:TestClientListCarriesTheMandatoryClientClusters",
-        "cluster/core:TestDescriptor_ReadClientList"
+        "cluster/core:TestDescriptor_ReadClientList",
+        "device:TestDescriptorServerClientList"
       ],
-      "missing": [
-        "is empty when no client clusters declared",
-        "includes explicit .with(<Client>) entries",
-        "lists same cluster id in both serverList and clientList (dimmer-switch / Identify)"
-      ],
-      "reason": "The mandatory client clusters of a device type reaching ClientList are covered; the explicit-client and same-cluster-in-both-lists cases are not.",
+      "reason": "The empty ClientList of a type without client clusters, an explicit client cluster (WithClientClusters), the mandatory client clusters of a device type and the same cluster in ServerList and ClientList (DimmerSwitch / Identify) are ported on the device-layer types through the assembler's Descriptor.",
       "snapshotSha": "6c7e9539b97e6459a15b0fcf76bcfceb5ab16618"
     },
     {
       "path": "packages/node/test/behaviors/descriptor/DescriptorServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType",
         "cluster/core:TestParityMatterJS_DescriptorServer_AddsDeviceTypeAutomatically",
@@ -791,27 +784,15 @@
         "cluster/core:TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision",
         "cluster/core:TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap",
         "cluster/core:TestParityMatterJS_DescriptorServer_PartsListAutoIDHierarchy",
-        "cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild"
+        "cluster/core:TestParityMatterJS_DescriptorServer_PartsListLifecycle_AddAdditionalChild",
+        "endpoint:TestDescriptorServerStopsWatchingARemovedPart",
+        "endpoint:TestDescriptorServerAddTags",
+        "endpoint:TestDescriptorServerComposition",
+        "endpoint:TestDescriptorServerIndexedHierarchy",
+        "endpoint:TestDescriptorServerMembershipChangesThatKeepTheCount",
+        "endpoint:TestDescriptorServerOrdersPartsListNumerically"
       ],
-      "missing": [
-        "stops watching a removed part",
-        "adds a tag that is already listed only once",
-        "does not add a listed tag again when the label is the same",
-        "replaces the label of a listed tag",
-        "keeps the label when a listed tag is added without one",
-        "lists every descendant for an aggregator and a bridged node and only children for a light",
-        "lists every descendant once a full-family device type is added at runtime",
-        "lists only children once the full-family device type is replaced at runtime",
-        "when constructed with full hierarchy (manual ID)",
-        "when child is added before parent (auto ID)",
-        "when child is added before parent (manual ID)",
-        "when parent is added before child (auto ID)",
-        "when parent is added before child (manual ID)",
-        "when additional child is added (manual ID)",
-        "updates ${name}",
-        "orders PartsList numerically"
-      ],
-      "reason": "The descriptor parity tests port the endpoint-type, device-type, server, parts and TagList cases; tag edits, full-family composition, the manual-ID hierarchy orders and PartsList ordering are not ported.",
+      "reason": "The endpoint-type, device-type, server and parts cases run on the Descriptor; the removed part, full-family composition (also after a device-type change, a reassembly), the hierarchy orders (a manual ID is a number the store holds, the order of additions the order of snapshots), the membership change keeping the count (one assembly, so matter.js's four timing windows are its two parent types) and the numeric PartsList order run through the assembler on a fabrictest device, read through the dispatcher; the tag edits on Descriptor.EnableTagList and AddTags.",
       "snapshotSha": "d8f64b6ffdee1a721fac42d2b509aecb59592464"
     },
     {
@@ -851,8 +832,11 @@
     },
     {
       "path": "packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts",
-      "status": "planned",
-      "reason": "The DataModelTest feature against the node's paths-per-invoke limit.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestGeneralDiagnosticsFeatures"
+      ],
+      "reason": "The feature selection of the server's own (NewGeneralDiagnosticsWith without DataModelTest), the refused start above one path per invoke, the accepted one at one, and the advisory at one and its absence above are ported on the server and CheckDataModelTest, the check matter.js runs from #online; node.Config carries neither the selection nor MaxPathsPerInvoke.",
       "snapshotSha": "c7221dfacafc1c25b8907cda1d5cf89dbed79b4f"
     },
     {
@@ -861,17 +845,18 @@
       "go": [
         "cluster/core:TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered",
         "cluster/core:TestGenDiag_UpTimeMonotonicallyNonDecreasing",
-        "node:TestOperationalHoursSurviveARestart"
+        "node:TestOperationalHoursSurviveARestart",
+        "cluster/core:TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep",
+        "cluster/core:TestGeneralDiagnosticsUpTimeHighWaterResetsAcrossARestart",
+        "cluster/core:TestGeneralDiagnosticsTotalOperationalHoursNonNegativeOnABackwardStep",
+        "cluster/core:TestGeneralDiagnosticsUpTimeNonNegativeOnABackwardStep",
+        "cluster/core:TestGeneralDiagnosticsPersistedCounterIsAnInteger",
+        "cluster/core:TestGeneralDiagnosticsGoesOfflineCleanlyOnABackwardStep"
       ],
       "missing": [
-        "keeps the operational time counted across a backward wall-clock step",
-        "keeps upTime counting across a backward wall-clock step",
-        "resets upTime's high-water mark across a restart",
-        "keeps totalOperationalHours non-negative when the clock steps backwards",
-        "keeps the persisted counter an integer despite a fractional Time.nowUs reading",
-        "takes the node offline cleanly when the clock steps backwards"
+        "keeps the operational time counted across a backward wall-clock step"
       ],
-      "reason": "UpTime across forward and backward clock steps and operational hours across a restart are covered; the high-water reset, the integer counter and the offline transition are not.",
+      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
       "snapshotSha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330"
     },
     {
@@ -959,8 +944,11 @@
     },
     {
       "path": "packages/node/test/behaviors/groups/GroupsServerSchemaTest.ts",
-      "status": "planned",
-      "reason": "The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestGroupsServerSchemaRelaxation"
+      ],
+      "reason": "The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair.",
       "snapshotSha": "7f2c62836c279045fb929da047b7a806b5aea784"
     },
     {
@@ -1103,14 +1091,12 @@
     },
     {
       "path": "packages/node/test/behaviors/scenes-management/ScenesManagementServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/core:TestScenesAddAndRecallOnOff"
+        "cluster/core:TestScenesAddAndRecallOnOff",
+        "cluster/core:TestScenesManagementServerAddAndRecallOnOff"
       ],
-      "missing": [
-        "add and recall onoff boolean scene value"
-      ],
-      "reason": "The one it is covered in part: adding a scene and recalling it on is ported with a zero transition, but the second scene at the 60 000 000 ms transition-time maximum and the recall running its 1 s transition are not.",
+      "reason": "The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays.",
       "snapshotSha": "ef606063b6cd1ee8010f79c9f0d3ea58af6f3fb5"
     },
     {
@@ -3840,7 +3826,7 @@
         "returns undefined when there are no legacy entries",
         "clears only the legacy *-data entries"
       ],
-      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
+      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the five missing cases are js-runtime-only: the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
       "snapshotSha": "8ee0caea698f3cd0993ea8a0a23bb649e2c2f41c"
     },
     {

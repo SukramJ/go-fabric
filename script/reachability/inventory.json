@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5781,
+  "entry_points": 5803,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13226,
-    "reachable": 9195,
-    "whitelisted": 4026,
+    "total_exported": 13233,
+    "reachable": 9199,
+    "whitelisted": 4029,
     "unreachable": 5
   },
   "by_package": [
@@ -3516,6 +3516,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/configuration_version_test.go",
+      "line": 56
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
@@ -5640,14 +5647,14 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 459
+      "line": 553
     },
     {
       "package": "cluster/core",
       "identifier": "DeviceTypeStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/descriptor.go",
-      "line": 77
+      "line": 81
     },
     {
       "package": "cluster/core",
@@ -5661,7 +5668,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 594
+      "line": 688
     },
     {
       "package": "cluster/core",
@@ -5669,6 +5676,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/bridged_device_basic_information.go",
       "line": 130
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "SemanticTag",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/core/descriptor.go",
+      "line": 106
     },
     {
       "package": "cluster/core",
@@ -5857,7 +5871,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 628
+      "line": 722
     },
     {
       "package": "cluster/core",
@@ -19186,6 +19200,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/unimplemented_commands_test.go",
       "line": 20
+    },
+    {
+      "package": "device",
+      "identifier": "TestDescriptorServerClientList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/descriptor_client_list_parity_matterjs_test.go",
+      "line": 48
     },
     {
       "package": "device",

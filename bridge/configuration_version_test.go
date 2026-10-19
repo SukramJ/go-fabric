@@ -47,3 +47,37 @@ func TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode(t *testing.T) {
 		t.Errorf("an unknown device raised %+v", none)
 	}
 }
+
+// TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce pins the
+// grouped form (matter.js BasicInformationServer.increaseConfigurationVersion
+// with the bridged nodes' changes under its context): the device raised
+// inside the change gets its next version, the node one increment however
+// many devices changed, and a nil change raises the node alone.
+func TestIncreaseNodeConfigurationVersionWithRaisesTheNodeOnce(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	bi, err := mattercore.NewBasicInformation(mattercore.Config{VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "n", VendorName: "v", ProductName: "p", SerialNumber: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AttachRootClusters([]contract.ClusterServer{bi})
+
+	got := b.IncreaseNodeConfigurationVersionWith(func(c *ConfigurationChange) {
+		if raised := c.IncreaseConfigurationVersion("ccu1", "MANYTMP"); len(raised) != 30 {
+			t.Errorf("raised %d endpoints, want 30", len(raised))
+		}
+		if raised := c.IncreaseConfigurationVersion("ccu1", "NO-SUCH-DEVICE"); len(raised) != 0 {
+			t.Errorf("an unknown device raised %v", raised)
+		}
+	})
+	if got.Node != 2 || len(got.Bridged) != 30 {
+		t.Errorf("grouped change = node %d, %d bridged; want 2, 30", got.Node, len(got.Bridged))
+	}
+	if alone := b.IncreaseNodeConfigurationVersionWith(nil); alone.Node != 3 || len(alone.Bridged) != 0 {
+		t.Errorf("nil change = %+v, want node 3 alone", alone)
+	}
+	var nilBridge *Bridge
+	if none := nilBridge.IncreaseNodeConfigurationVersionWith(nil); none.Node != 0 {
+		t.Errorf("nil bridge raised %+v", none)
+	}
+}
