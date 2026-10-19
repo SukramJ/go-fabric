@@ -858,17 +858,18 @@
       "go": [
         "cluster/core:TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered",
         "cluster/core:TestGenDiag_UpTimeMonotonicallyNonDecreasing",
-        "node:TestOperationalHoursSurviveARestart"
+        "node:TestOperationalHoursSurviveARestart",
+        "cluster/core:TestGeneralDiagnosticsUpTimeCountsAcrossABackwardWallClockStep",
+        "cluster/core:TestGeneralDiagnosticsUpTimeHighWaterResetsAcrossARestart",
+        "cluster/core:TestGeneralDiagnosticsTotalOperationalHoursNonNegativeOnABackwardStep",
+        "cluster/core:TestGeneralDiagnosticsUpTimeNonNegativeOnABackwardStep",
+        "cluster/core:TestGeneralDiagnosticsPersistedCounterIsAnInteger",
+        "cluster/core:TestGeneralDiagnosticsGoesOfflineCleanlyOnABackwardStep"
       ],
       "missing": [
-        "keeps the operational time counted across a backward wall-clock step",
-        "keeps upTime counting across a backward wall-clock step",
-        "resets upTime's high-water mark across a restart",
-        "keeps totalOperationalHours non-negative when the clock steps backwards",
-        "keeps the persisted counter an integer despite a fractional Time.nowUs reading",
-        "takes the node offline cleanly when the clock steps backwards"
+        "keeps the operational time counted across a backward wall-clock step"
       ],
-      "reason": "UpTime across forward and backward clock steps and operational hours across a restart are covered; the high-water reset, the integer counter and the offline transition are not.",
+      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
       "snapshotSha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330"
     },
     {

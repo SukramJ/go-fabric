@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `bridge`: a configuration change that groups several bridged devices raises the node's BasicInformation ConfigurationVersion once — `Bridge.IncreaseNodeConfigurationVersionWith(change)` runs the change, in which `ConfigurationChange.IncreaseConfigurationVersion(scope, deviceAddress)` raises each device's own version, and increments the node's afterwards, as matter.js `BasicInformationServer.increaseConfigurationVersion` does with the bridged nodes' shared context (`BasicInformationServer.ts:132-138`, `BridgedDeviceBasicInformationServer.ts:72-90`). Before, every bridged device raised the node again.
+- `cluster/core`: GeneralDiagnostics floors every elapsed time at zero and keeps the operational time it counted when the clock steps back (matter.js `elapsedSince` and `#updateTotalOperationalHoursCounter`, `GeneralDiagnosticsServer.ts:60-68`, `:384-392`). Before, a backward step of the node's clock (a `clock.Clock` without monotonic readings) wrapped TotalOperationalHours to 4294967295 and made `node.Node.Stop` persist a negative operational time that the next `node.New` refused to load.
 
 ## [0.8.4] — 2026-10-19
 

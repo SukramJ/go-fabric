@@ -120,6 +120,15 @@ type GeneralDiagnostics struct {
 	// startTime; see upTime.
 	upTimeHighWater atomic.Int64
 
+	// opSession is the operational time this process counted up to the
+	// checkpoint opLast, both guarded by opMu (taken after mu). Mirrors
+	// matter.js GeneralDiagnosticsServer.ts totalOperationalHoursCounter and
+	// lastTotalOperationalHoursCounterUpdateTime (:384-392, :460): what was
+	// counted stays counted when the clock steps back.
+	opMu      sync.Mutex
+	opSession time.Duration
+	opLast    time.Time
+
 	// utcClock is the node's TimeSynchronization UTC time; nil when the
 	// node has no TimeSynchronization cluster (see SetUTCClock).
 	utcClock func() (time.Time, bool)
@@ -216,6 +225,7 @@ func NewGeneralDiagnostics(bootReason uint8) *GeneralDiagnostics {
 		bootReason: bootReason,
 	}
 	g.startTime = g.clock.Now()
+	g.opLast = g.startTime
 	// Seed DataVersion at a non-zero sentinel so DataVersionFilter=0 does not
 	// produce false-positive cache hits.
 	g.dataVersion.Bump()
@@ -230,6 +240,9 @@ func (g *GeneralDiagnostics) SetClock(c clock.Clock) {
 	defer g.mu.Unlock()
 	g.clock = clock.Or(c)
 	g.startTime = g.clock.Now()
+	g.opMu.Lock()
+	g.opSession, g.opLast = 0, g.startTime
+	g.opMu.Unlock()
 }
 
 // UpTimeSeconds returns the seconds elapsed since the cluster was
@@ -238,7 +251,7 @@ func (g *GeneralDiagnostics) SetClock(c clock.Clock) {
 func (g *GeneralDiagnostics) UpTimeSeconds() uint64 {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return uint64(clock.Since(g.clock, g.startTime).Seconds())
+	return uint64(elapsedSince(g.startTime, g.clock.Now()).Seconds())
 }
 
 // SetPersistedCounters seeds RebootCount and the
@@ -294,7 +307,29 @@ func (g *GeneralDiagnostics) SetPersistedOperationalTime(d time.Duration) {
 func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return g.baseOperationalTime + clock.Since(g.clock, g.startTime)
+	return g.baseOperationalTime + g.operationalSession()
+}
+
+// elapsedSince is the time from start to end, floored at zero: a backward
+// clock step would otherwise lower the operational time below what was
+// persisted (and wrap the uint32 TotalOperationalHours and the uint64
+// SystemTimeMs). Mirrors matter.js GeneralDiagnosticsServer.ts elapsedSince
+// (:60-68).
+func elapsedSince(start, end time.Time) time.Duration {
+	return max(end.Sub(start), 0)
+}
+
+// operationalSession folds the time elapsed since the last checkpoint into
+// this process's operational time and returns it; call it with mu held.
+// Mirrors matter.js GeneralDiagnosticsServer.ts
+// #updateTotalOperationalHoursCounter (:384-392).
+func (g *GeneralDiagnostics) operationalSession() time.Duration {
+	g.opMu.Lock()
+	defer g.opMu.Unlock()
+	now := g.clock.Now()
+	g.opSession += elapsedSince(g.opLast, now)
+	g.opLast = now
+	return g.opSession
 }
 
 // BootReasonEvent is the payload for the BootReason event (0x03,
@@ -377,7 +412,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		// Hours.of(base + uptime): the floor of the whole operational
 		// time, so the part-hours of earlier runs add up (matter.js
 		// GeneralDiagnosticsServer.ts totalOperationalHours getter).
-		total := g.baseOperationalTime + clock.Since(g.clock, g.startTime)
+		total := g.baseOperationalTime + g.operationalSession()
 		return uint32(total / time.Hour), true //nolint:gosec // 2^32 hours is ~490,000 years
 	// BootReason / ActiveHardwareFaults / ActiveRadioFaults /
 	// ActiveNetworkFaults are OPTIONAL on GeneralDiagnostics. matter.js's
@@ -427,7 +462,7 @@ func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value
 func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case gendiagCmdTimeSnapshot:
-		systemMs := uint64(clock.Since(g.clock, g.startTime).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
+		systemMs := uint64(elapsedSince(g.startTime, g.clock.Now()).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
 		// PosixTimeMs only when the node's TimeSynchronization cluster holds
 		// a UTC time: matter.js GeneralDiagnosticsServer.ts timeSnapshot
 		// (agent.has(TimeSynchronizationBehavior) && utcTime !== null), and
