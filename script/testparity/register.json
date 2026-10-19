@@ -826,27 +826,15 @@
         "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity",
         "cluster/lock:TestDoorLockServerAuthorizationParity",
         "cluster/lock:TestDoorLockServerWrongCodeLockoutParity",
-        "cluster/lock:TestDoorLockServerOperatingModeParity"
+        "cluster/lock:TestDoorLockServerOperatingModeParity",
+        "cluster/lock:TestDoorLockServerLockHardwareParity",
+        "cluster/lock:TestDoorLockServerLockOperationEventsParity",
+        "cluster/lock:TestDoorLockServerLockUserChangeParity"
       ],
       "missing": [
-        "measures the lockout on the monotonic clock",
-        "moves the hardware after authorization and before the lock state changes",
-        "refuses a lock command invoked locally before the hardware moves",
-        "starts the attempt count again only after the hardware succeeds",
-        "keeps the attempt count through an operation without PIN",
-        "refuses a PIN that belongs to no user as a wrong code",
-        "runs one lock operation at a time",
-        "does not relock for a timer an unlock replaced while the relock waited",
-        "fails the operation when the hardware fails",
-        "reports the reason the hardware gives for a failure",
-        "relocks through the hardware and keeps the state when it fails",
-        "reports UnboltDoor as Unlock and leaves the latch alone",
-        "reports schedule changes",
-        "reports the user index as DataIndex for user changes",
-        "reports the owning user when the programming PIN is modified",
-        "reports the owning user for credential changes"
+        "measures the lockout on the monotonic clock"
       ],
-      "reason": "Ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go); the port continues describe by describe (brief BM).",
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {
