@@ -10,6 +10,15 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+- CI: the chip-tool workflow runs the DGGEN family in its own group `long`,
+  which only the nightly run and a manual dispatch run. TC-DGGEN-2.1 sits
+  through 3 h 10 min of literal waits for TotalOperationalHours
+  (connectedhomeip#29580), which was 3 h 10 min of a 3 h 33 min
+  commissioning group on every pull request labelled `needs-chiptool`; that
+  group now ends in about 25 minutes and a labelled pull request's chip run
+  in under an hour. `TestWorkflowRunsEveryFamily` holds the group to the
+  family table: exactly the families with a case budget of an hour or more.
+
 ## [0.8.3] — 2026-10-19
 
 Milestone 3, phase 17c, brief BL: the Thermostat's Presets, atomic writes and Occupancy after matter.js `ThermostatServer.ts`, `AtomicWriteHandler.ts` and `AtomicWriteState.ts` at `862ad75f`, and the port of the seven thermostat test files.

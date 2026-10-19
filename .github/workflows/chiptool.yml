@@ -25,9 +25,13 @@
 #     (docs/adr/0011-certifiability-is-a-goal.md): the families run with PICS
 #     generated from the device, every excluded case carries its class and
 #     reason, and docs/certifiability.md is the status. An unlabelled pull
-#     request runs the core groups (core-su, core-idm, core-ace, core-rest, in parallel); the nightly run, a manual dispatch and
-#     the `needs-chiptool` label run all of them, split into groups so no job
-#     exceeds the runner limit. A group an event does not run gets no job.
+#     request runs the core groups (core-su, core-idm, core-ace, core-rest,
+#     in parallel); the `needs-chiptool` label adds the application groups;
+#     the nightly run and a manual dispatch run all of them, including
+#     `long`, the families whose one case waits for hours by design
+#     (TC-DGGEN-2.1 sits through 3 h 10 min of literal waits for
+#     TotalOperationalHours). The split keeps every job under the runner
+#     limit. A group an event does not run gets no job.
 #
 # Not a blanket per-PR gate — the runs are slow and the image is large. It
 # runs nightly, on manual dispatch, on the `needs-chiptool` label, and
@@ -125,9 +129,14 @@ jobs:
       # One place for the split (TestWorkflowRunsEveryFamily holds it to the
       # family table): the groups divide internal/chiptool's family table so
       # no job exceeds the runner's six hours. An unlabelled pull request runs
-      # the core-* groups only; the nightly run, a manual dispatch and the
-      # `needs-chiptool` label run every group. A group that is not run does
-      # not get a job at all, so it can neither look green nor hide a skip.
+      # the core-* groups only; the `needs-chiptool` label adds every group
+      # but `long`; the nightly run and a manual dispatch run every group.
+      # `long` holds the families whose case budget is hours (the family
+      # table's timeout: TC-DGGEN-2.1 waits 3 h 10 min by design,
+      # connectedhomeip#29580), so a pull request's chip run ends in under
+      # an hour and the wait is paid once a night. A group that is not run
+      # does not get a job at all, so it can neither look green nor hide a
+      # skip.
       - id: groups
         env:
           EVENT: ${{ github.event_name }}
@@ -147,20 +156,27 @@ jobs:
             "core-idm=IDM"
             "core-ace=ACE,ACL,OPCREDS,CGEN"
             "core-rest=DESC,BINFO,BRBINFO,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,BDX,BIND,FLABEL,ULABEL,LCFG,LTIME,LUNIT,DGSW,DGETH,DGWIFI,ACT,PSCFG,ECOINFO"
-            "commissioning=CADMIN,SC,DA,DD,CNET,CNETWIFI,DGGEN,G,GC"
+            "commissioning=CADMIN,SC,DA,DD,CNET,CNETWIFI,G,GC"
             "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,BOOLCFG,OCC,TMP,RH,FLW,CDOCONC,CMOCONC,FLDCONC,NDOCONC,OZCONC,PMHCONC,RNCONC,TVOCCONC,AIRQUAL,PMICONC,PMKCONC,SOIL"
             "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL,EPREF,EWATERHTR,WHM,MTRID,DISHALM,REFALM,OVENOPSTATE,OTCCM,MWOCTRL,MWOM,SEAR,CLDIM,TSUIC"
             "app-energy=DEM,DEMM,EEVSE,EEVSEM,SETRF,COMMTR,EGC"
             "app-media=ALOGIN,APBSC,APPLAUNCHER,APPOBSERVER,AUDIOOUTPUT,CHANNEL,CONTENTLAUNCHER,KEYPADINPUT,LOWPOWER,MEDIAINPUT,MEDIAPLAYBACK,TGTNAV,WAKEONLAN"
+            "long=DGGEN"
           )
-          all=true
-          if [ "$EVENT" = "pull_request" ] && [ "$LABELLED" != "true" ]; then
-            all=false
-          fi
+          # core-*: every event. long: never a pull request. The rest:
+          # every event but an unlabelled pull request.
           include="[]"
           for entry in "${groups[@]}"; do
             group="${entry%%=*}"; families="${entry#*=}"
-            if [ "$all" = true ] || [[ "$group" == core-* ]]; then
+            runs=false
+            if [[ "$group" == core-* ]]; then
+              runs=true
+            elif [ "$group" = long ]; then
+              if [ "$EVENT" != "pull_request" ]; then runs=true; fi
+            elif [ "$EVENT" != "pull_request" ] || [ "$LABELLED" = "true" ]; then
+              runs=true
+            fi
+            if [ "$runs" = true ]; then
               include=$(jq -c --arg g "$group" --arg f "$families" '. + [{group: $g, families: $f}]' <<<"$include")
             fi
           done
