@@ -466,7 +466,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// aborts the whole invoke before a producer runs. Runs after the timed gate
 	// because matter.js validates the timed window first (InteractionServer.ts
 	// handleInvokeRequest).
-	if status := im.ValidateInvokeBatch(req); status != im.StatusSuccess {
+	if status := im.ValidateInvokeBatchWithin(req, int(b.cfg.MaxPathsPerInvoke)); status != im.StatusSuccess {
 		if req.SuppressResponse {
 			return b.replyStatusUnlessSuppressed(true, src, requestHdr, proto, "invoke_batch", status)
 		}

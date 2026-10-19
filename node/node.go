@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/operational"
@@ -199,6 +200,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		NodeLabel:     bi.NodeLabel,
 		Discriminator: cfg.Commissioning.Discriminator,
 		Clock:         n.cfg.Clock,
+		// The invoke path refuses what BasicInformation does not advertise.
+		MaxPathsPerInvoke: cfg.MaxPathsPerInvoke,
 	}, n.logger)
 	if err != nil {
 		return nil, fmt.Errorf("node: bridge: %w", err)
@@ -269,7 +272,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
-	}, responderSessionParams(cfg.Network.TCP), n.logger)
+	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), n.logger)
 
 	// --- the commissioning window (main.go:329-360) ---------------------
 	advert, err := n.advertisement()
@@ -531,6 +534,19 @@ func (n *Node) Start(ctx context.Context) error {
 		return ErrStopped
 	case n.started:
 		return nil
+	}
+	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
+	// anything goes online. Mirrors matter.js
+	// packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts
+	// #online (:352) → #assertDataModelTest (:125-143): without the feature a
+	// MaxPathsPerInvoke above one fails the node's start, with it a limit of
+	// one is logged.
+	maxPaths := n.cfg.MaxPathsPerInvoke
+	if maxPaths == 0 {
+		maxPaths = im.DefaultMaxPathsPerInvoke
+	}
+	if err := n.root.GeneralDiagnostics.CheckDataModelTest(maxPaths, n.logger); err != nil {
+		return fmt.Errorf("node: %w", err)
 	}
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)

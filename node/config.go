@@ -127,6 +127,28 @@ type Config struct {
 	// GeneralDiagnosticsServer.timeSnapshot does without a
 	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
 	DisableTimeSynchronization bool
+	// GeneralDiagnosticsFeatures selects the root GeneralDiagnostics'
+	// features (mattercore.NewGeneralDiagnosticsWith); nil keeps
+	// matter.js's default selection, DataModelTest
+	// (GeneralDiagnosticsServer.ts:51-52). Without DataModelTest a
+	// MaxPathsPerInvoke above one fails [Node.Start]
+	// (mattercore.GeneralDiagnostics.CheckDataModelTest).
+	GeneralDiagnosticsFeatures *mattercore.GeneralDiagnosticsFeatures
+	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
+	// the root BasicInformation advertises it, the PASE and CASE session
+	// parameters carry it and the invoke path refuses a larger batch with
+	// InvalidAction. 0 is im.DefaultMaxPathsPerInvoke (10), matter.js's
+	// DEFAULT_MAX_PATHS_PER_INVOKE. Mirrors matter.js
+	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
+	// enforces.
+	MaxPathsPerInvoke uint16
+	// CapabilityMinima is the root BasicInformation's CapabilityMinima:
+	// a zero field takes matter.js's default (the Matter floor of 3 for
+	// CaseSessionsPerFabric and SubscriptionsPerFabric, 20 for the four
+	// revision-6 fields, BasicInformationServer.ts initialize), a value
+	// the host sets wins (CapabilityMinimaTest.ts "caller-provided values
+	// win").
+	CapabilityMinima mattercore.CapabilityMinimaStruct
 	// Client is the node's client stack ([Client]): the socket, exchanges
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.

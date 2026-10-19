@@ -457,7 +457,20 @@ func (ir InvokeResponse) HasCommandData() bool {
 // The wire decoder guarantees every command path carries a cluster and a
 // command, so a "wildcard" here is a path without a concrete endpoint.
 func ValidateInvokeBatch(req InvokeRequest) StatusCode {
-	if len(req.Invokes) > DefaultMaxPathsPerInvoke {
+	return ValidateInvokeBatchWithin(req, DefaultMaxPathsPerInvoke)
+}
+
+// ValidateInvokeBatchWithin is [ValidateInvokeBatch] with the node's own
+// MaxPathsPerInvoke in place of [DefaultMaxPathsPerInvoke]; maxPaths 0 is
+// the default. Mirrors matter.js
+// packages/node/src/node/server/InteractionServer.ts:198
+// (`#maxPathsPerInvoke = node.state.basicInformation.maxPathsPerInvoke ??
+// DEFAULT_MAX_PATHS_PER_INVOKE`) and :1017, the limit the node advertises.
+func ValidateInvokeBatchWithin(req InvokeRequest, maxPaths int) StatusCode {
+	if maxPaths <= 0 {
+		maxPaths = DefaultMaxPathsPerInvoke
+	}
+	if len(req.Invokes) > maxPaths {
 		return StatusInvalidAction
 	}
 	multiple := len(req.Invokes) > 1

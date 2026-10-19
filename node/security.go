@@ -226,7 +226,11 @@ type security struct {
 // {tcpClient: outgoing, tcpServer: incoming}}` only with a TCP role) at
 // 0ceb202d; the size bound is sessionparams.DefaultMaxTCPMessageSize
 // (bridge.SessionParametersFor).
-func responderSessionParams(tcp bridge.TCPConfig) *sessionparams.Parameters {
+//
+// maxPathsPerInvoke, when non-zero, replaces the default MaxPathsPerInvoke:
+// the session parameters state the node's own (SessionManager
+// sessionParameters carry basicInformation.maxPathsPerInvoke).
+func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16) *sessionparams.Parameters {
 	var transports uint16
 	if tcp.Incoming {
 		transports |= sessionparams.TransportTCPServer
@@ -235,6 +239,9 @@ func responderSessionParams(tcp bridge.TCPConfig) *sessionparams.Parameters {
 		transports |= sessionparams.TransportTCPClient
 	}
 	p := bridge.SessionParametersFor(transports, 0)
+	if maxPathsPerInvoke != 0 {
+		p.MaxPathsPerInvoke = maxPathsPerInvoke
+	}
 	return &p
 }
 
