@@ -1165,8 +1165,17 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "status": "planned",
-      "reason": "Local writes of presets: handles, persistence, validation per transaction.",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_PresetsLocalWriteTest"
+      ],
+      "missing": [
+        "refuses a preset an observer stripped the handle from, and stays writable",
+        "checks the settled presets of every commit that shares one transaction",
+        "refuses a preset an observer marks built-in after the thermostat issued its handle",
+        "validates a change an observer makes after the thermostat normalized"
+      ],
+      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's; the four missing cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
       "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
     },
     {
