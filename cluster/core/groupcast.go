@@ -592,7 +592,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 	// The policy lands before the endpoints, so the endpoint-driven
 	// multicast join binds the group's own address up front instead of
 	// joining the default one and rebinding. Mirrors matter.js
-	// packages/node/src/behaviors/groupcast/GroupcastServer.ts:252-257
+	// packages/node/src/behaviors/groupcast/GroupcastServer.ts:253-258
 	// (fabric.groups.setGroupMulticastPolicy before the group table
 	// writes); the auxiliary-ACL flag follows with the properties at the
 	// end, :280-283.

@@ -245,11 +245,12 @@ func capturedSite(t *testing.T) (*fabrictest.Site, *logCapture) {
 func TestGroupcastMulticastPolicyOrderingParityMatterJS(t *testing.T) {
 	holdSite(t)
 
-	// :1367-1389. matter.js reads the group's address when its
-	// groupKeyIdMap entry appears; what that address decides is the
-	// multicast join, so the port asserts the joins the network sees: the
-	// group's own address from the first one on, no join of the default
-	// per-group address and rebind (GroupcastServer.ts:252-257).
+	// :1367-1389. matter.js reads the group's address when its key map
+	// entry appears (GroupcastServerTest.ts:1374-1376); what that address
+	// decides is the multicast join, so the port asserts the joins the
+	// network sees: the group's own address from the first one on, no
+	// join of the default per-group address and rebind. The policy is set
+	// before the endpoints (GroupcastServer.ts:253-258).
 	t.Run("sets policy before groupKeyIdMap.added fires (listeners see correct address immediately)", func(t *testing.T) {
 		g := newGCNode(t, quietSite(t), fabrictest.Topology{})
 		changes := watchMemberships(t, g.site)

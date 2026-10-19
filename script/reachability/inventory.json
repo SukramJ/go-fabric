@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5825,
+  "entry_points": 5849,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13236,
-    "reachable": 9200,
-    "whitelisted": 4031,
+    "total_exported": 13239,
+    "reachable": 9201,
+    "whitelisted": 4033,
     "unreachable": 5
   },
   "by_package": [
@@ -21113,6 +21113,13 @@
       "line": 142
     },
     {
+      "package": "fabrictest",
+      "identifier": "TestMulticastModelDelivery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/multicast_internal_test.go",
+      "line": 23
+    },
+    {
       "package": "groups",
       "identifier": "FuzzDecode",
       "reason": "auto-whitelist:pattern=test-file",
@@ -28433,6 +28440,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 77
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestMembershipDelegatesToTheSocketModel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 172
     },
     {
       "package": "transport/udp",
