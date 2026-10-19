@@ -66,7 +66,11 @@ host when the test ends.
 | DNS-SD | the site answers each controller's queries from every running device's advertiser — the commissionable record while a window is open, an operational record per fabric — with the device's address | — |
 
 `Topology.Configure` edits the node's configuration before `node.New`: a
-passcode, a product name, an OTA requestor. Both hosts run the production
+passcode, a product name, an OTA requestor. `fabrictest.Endpoint(key,
+deviceType, servers...)` is a bridged endpoint for `Topology.Bridged` that
+serves cluster servers the test built itself — a feature selection or an
+initial state no device-layer constructor offers; `Device.EndpointOf(key)`
+finds its number. Both hosts run the production
 code: the device's bridge serves the production `transport/udp.Listener`
 over a socket of the in-memory network, so every datagram it receives,
 answers or initiates takes the path a kernel socket would.
@@ -75,7 +79,7 @@ answers or initiates takes the path a kernel socket would.
 (`client.Registry.ForAddress`): bound to the peer, neither started nor
 subscribed.
 
-*Source: `fabrictest/device.go` (`config`, `Start`), `fabrictest/controller.go`
+*Source: `fabrictest/device.go` (`config`, `Start`), `fabrictest/endpoint.go`, `fabrictest/controller.go`
 (`start`), `fabrictest/net.go`, `fabrictest/mdns.go`,
 `internal/udpseam/udpseam.go`, `bridge/seam.go` (`UseListener`).*
 

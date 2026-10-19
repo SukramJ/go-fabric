@@ -26,6 +26,17 @@ Milestone 3, phase 17b, brief BK: the Switch server after matter.js `SwitchServe
 ### Deprecated
 
 - `github.com/SukramJ/go-fabric/cluster/wire.GenericSwitch` and `wire.NewGenericSwitch`: replaced by `github.com/SukramJ/go-fabric/cluster/switch` (`switchserver.New`); now a thin wrapper over it with unchanged reads. Removable in `v0.10.0` at the earliest.
+Milestone 3, phase 17a, brief BJ: the ports of matter.js `packages/node/test/behaviors` for OnOff, LevelControl, ColorControl, Identify, WindowCovering and ServiceArea.
+
+### Added
+
+- `fabrictest.Endpoint(key, deviceType, servers...)`: a bridged endpoint for `Topology.Bridged` serving cluster servers the test built itself — a feature selection or an initial state no device-layer constructor offers, as matter.js's tests add a `MutableEndpoint(…).with(…Server)` to a `MockServerNode`.
+
+### Fixed
+
+- `cluster/cover`: `New` refuses a `Type` or `EndProductType` whose enum-value conformance the FeatureMap disallows — a shutter that lifts and tilts, a roller shade on a covering that tilts too — with the new `cover.ErrEnumValue`; `NewWindowCoveringServer` panics on it, as on a FeatureMap it refuses. A host whose configured Type or EndProductType disagreed with its FeatureMap (an InteriorBlind, "LF & TL", on a lift-only covering) built the server before and fails at construction now: check the mapping before upgrading. matter.js validates the behavior's initial state against the schema and throws `EnumValueConformanceError` (`ServerBehaviorBacking.ts:60-63`, `conformance-compiler.ts:735-747`, `window-covering-cluster.element.ts:150-192`). A tilt-only host that left `Type` at its zero value (Rollershade, lift only) now fails at construction: set `TiltBlindTiltOnly` or `Unknown`.
+- `cluster/levelcontrol`: `MatterQuiesce` under the transition engine also drops a CurrentLevel report the quieter holds back, with its timer, so no timer of a server outlives the node or the reassembly that removed it; matter.js disposes the behavior's QuietObservable with its "delayed emit" timer (`LevelControlServer.ts:765-770`, `Observable.ts:806-815`, `:1276-1280`). The deferred report used to fire up to a second after the server had been quiesced.
+- `cluster/light`: `ColorControlServerConfig.CoupleColorTempToLevelMinMireds` sets the colour temperature LevelControl's CoupleColorTempToLevel option couples the maximum level to, and the attribute reads it; zero keeps the physical minimum. matter.js scales the coupled colour temperature from `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds` (`ColorControlServer.ts:1582`); the Go server always used the physical minimum, so a light with a coupling floor above it got a different colour temperature for every coupled level.
 
 ## [0.8.0] — 2026-10-19
 

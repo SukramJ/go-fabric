@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 55 |
+| ported | 59 |
 | partial | 114 |
-| planned | 68 |
+| planned | 64 |
 | excluded | 87 |
 | total | 324 |
 
@@ -54,17 +54,17 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
-| [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 0 | 4 | 0 | 0 |
+| [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
@@ -72,7 +72,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/devices](#nodetestdevices) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/endpoint](#nodetestendpoint) | 8 | 0 | 0 | 1 | 7 |
 | [node/test/endpoint/properties](#nodetestendpointproperties) | 5 | 0 | 0 | 0 | 5 |
@@ -288,7 +288,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ColorControlServerTest.ts | 407 | partial | `cluster/transition:TestCyclicHueDownwards`<br>`cluster/light:TestStopMoveStepReportsZero`<br>`cluster/light:TestRemainingTimeOnStops` | The cyclic hue transition and the stop cases' RemainingTime are ported; the primaries case, the application end time and a running color loop are not. Missing: “accepts a primary a light supplies without stating the number of primaries”; “clears the end time the application states on StopMoveStep”; “leaves the remaining time alone on StopMoveStep while a color loop runs”. |
+| ColorControlServerTest.ts | 407 | partial | `cluster/transition:TestCyclicHueDownwards`<br>`cluster/light:TestStopMoveStepReportsZero`<br>`cluster/light:TestRemainingTimeOnStops`<br>`cluster/light:TestParityMatterJS_ColorControlServerTest` | The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case (the Go ColorControl server serves no Primary1X … Primary6Intensity attributes, so a light cannot supply one) and the application end time (the Go server keeps no application-stated transitionEndTime, by_design BD-Matter-LevelControl-NativeRamp). Missing: “accepts a primary a light supplies without stating the number of primaries”; “clears the end time the application states on StopMoveStep”. |
 | ColorConversionUtilsTest.ts | 131 | ported | `cluster/light:TestColorConversionHSVToRGBAndBack`<br>`cluster/light:TestColorConversionXYToRGBAndBack`<br>`cluster/light:TestColorConversionMiredsToXYAndBack` | The three colour-space round trips are ported one to one. |
 | RemainingTimeTest.ts | 72 | ported | `cluster/light:TestRemainingTimeOfAHueTransition` | The one case, RemainingTime part-way through and at the end of a hue transition, is ported. |
 
@@ -371,16 +371,16 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| IdentifyServerTest.ts | 187 | planned | — | TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement. |
+| IdentifyServerTest.ts | 187 | partial | `cluster/core:TestParityMatterJS_IdentifyServerTest` | The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify), which accepts TriggerEffect on every device type and exposes no effectTriggered event, so the withdrawal on a device type that does not require the command (IdentifyServer.ts:78-90) and the effect observations (:133-135) are missing: the device-type requirement must reach the endpoint's Identify, a change of the endpoint layer outside this wave. Missing: “is unsupported on a device type that does not require it”; “is supported on a device type that requires it”; “remains locally invocable when withdrawn”; “is supported when explicitly implemented”. |
 
 ## node/test/behaviors/level-control
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ColorTemperatureCouplingTest.ts | 289 | partial | `cluster/levelcontrol:TestColorTemperatureCoupling` | The coupling of level to colour temperature and its scaling are ported; the transaction-sharing cases and the per-command overrides are not. Missing: “couples a WithOnOff step when the Options attribute asks for it”; “couples a WithOnOff move when the Options attribute asks for it”; “couples two level changes that share one transaction”; “leaves the color temperature where a later command in the transaction overrides the coupling off”; “couples where a later command in the transaction overrides the coupling on”; “waits for a transaction that holds the color temperature”; “honors an override that sets the coupling for one command”; “honors an override that clears the coupling for one command”. |
-| LevelControlServerTest.ts | 315 | partial | `cluster/transition:TestStepCadenceRoundingAndFinish`<br>`cluster/transition:TestRemainingTimeReportsOnCommandChanges`<br>`cluster/levelcontrol:TestExecuteIfOff` | The transition to off, RemainingTime on command changes and the two stop cases are ported; timer teardown on destroy and the anonymous-class case are not. Missing: “stops transition timers when destroyed”; “works with anonymous class and downlevel features”. |
-| OnOffCouplingTest.ts | 145 | partial | `cluster/levelcontrol:TestOnOffCoupling`<br>`cluster/levelcontrol:TestNativeSourceOnOffCoupling` | The four switching cases are ported; the two transaction-rollback cases of the coupling block are not. Missing: “lifts the on/off coupling block when its transaction rolls back”; “holds the on/off coupling block through a committed level change”. |
-| RemainingTimeTest.ts | 195 | partial | `cluster/transition:TestCancelReportsZero` | The two stop cases are ported; the application-supplied remaining-time and end-time cases are not. Missing: “reports the time left in a transition the application did not configure”; “reads zero once the transition completes”; “reports the time left in a transition”; “reads zero after a stop, although the application stated a remaining time”; “reads zero after a stop, although the application stated a later end time”. |
+| ColorTemperatureCouplingTest.ts | 289 | partial | `cluster/levelcontrol:TestColorTemperatureCoupling`<br>`cluster/levelcontrol:TestParityMatterJS_ColorTemperatureCouplingTest` | Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits. Missing: “leaves the color temperature where a later command in the transaction overrides the coupling off”. |
+| LevelControlServerTest.ts | 315 | ported | `cluster/transition:TestStepCadenceRoundingAndFinish`<br>`cluster/transition:TestRemainingTimeReportsOnCommandChanges`<br>`cluster/levelcontrol:TestExecuteIfOff`<br>`cluster/levelcontrol:TestParityMatterJS_LevelControlServerTest` | The six it cases are ported: the transition to off, RemainingTime on command changes and the two stop cases locally, the timer teardown on a fabrictest node's Stop (the server's own fake clock counts the transition and deferred-report timers) and the anonymous-class server on a fabrictest DimmableLight. Not counted (no `it` at the pin): the case matter.js keeps commented out as non-deterministic (:24-53); its vector reports the first CurrentLevel 300 ms after RemainingTime, the Go server at the first step (100 ms), so every later level is sampled at another phase of the quiet interval. |
+| OnOffCouplingTest.ts | 145 | partial | `cluster/levelcontrol:TestOnOffCoupling`<br>`cluster/levelcontrol:TestNativeSourceOnOffCoupling`<br>`cluster/levelcontrol:TestParityMatterJS_OnOffCouplingTest` | The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns. Missing: “lifts the on/off coupling block when its transaction rolls back”. |
+| RemainingTimeTest.ts | 195 | partial | `cluster/transition:TestCancelReportsZero`<br>`cluster/levelcontrol:TestParityMatterJS_LevelControlRemainingTimeTest` | The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup. Missing: “reads zero after a stop, although the application stated a remaining time”; “reads zero after a stop, although the application stated a later end time”. |
 
 ## node/test/behaviors/measurement
 
@@ -398,7 +398,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OnOffServerTest.ts | 352 | planned | — | OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports. |
+| OnOffServerTest.ts | 352 | ported | `cluster/onoff:TestParityMatterJS_OnOffServerTest` | Every case runs on a fabrictest device (the OffOnly case over the wire from a commissioned pair): the async observer, the ten OnWithTimedOff countdown cases on the site's fake clock (timerCountFor is onoff.TimersRunning) and the OffOnly command statuses; the type-only extension case is a compile-time Sink assertion. |
 
 ## node/test/behaviors/operational-credentials
 
@@ -434,7 +434,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ServiceAreaServerTest.ts | 234 | planned | — | ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation. |
+| ServiceAreaServerTest.ts | 234 | ported | `cluster/servicearea:TestParityMatterJS_ServiceAreaServerTest` | The five cases run on fabrictest: a robotic vacuum cleaner with the servicearea server under the Aggregator, with and without Maps, and the supportedAreas rules, the rejection being servicearea.New's ErrInvalidState (the Go server checks its initial state when built). The Go server's required Selector is a pass-through no case calls. |
 
 ## node/test/behaviors/switch
 
@@ -487,7 +487,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| WindowCoveringServerTest.ts | 145 | planned | — | OperationalStatus change events on a target change and the lift/tilt type checks of a shutter. |
+| WindowCoveringServerTest.ts | 145 | ported | `cluster/cover:TestParityMatterJS_WindowCoveringServerTest` | The five cases run on the Go server in its package: the operationalStatus$Changed sequence as the committed OperationalStatus around each command of a travelling lift-and-tilt blind on a clock the test never moves (the $Changing events have no Go observer), and the Type / EndProductType conformance checks of a shutter as cover.ErrEnumValue from cover.New. |
 
 ## node/test/devices
 
@@ -992,10 +992,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `IcdManagementServerTest.ts` — The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 - `IcdModeTest.ts` — The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
 
-### node/test/behaviors/identify
-
-- `IdentifyServerTest.ts` — TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement.
-
 ### node/test/behaviors/measurement
 
 - `MeasurementServersTest.ts` — The measurement servers' unavailable default range and the TemperatureMeasurement bound checks.
@@ -1003,10 +999,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/occupancy-sensing
 
 - `OccupancySensingServerTest.ts` — OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature.
-
-### node/test/behaviors/on-off
-
-- `OnOffServerTest.ts` — OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports.
 
 ### node/test/behaviors/operational-credentials
 
@@ -1023,10 +1015,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/rvc-operational-state
 
 - `RvcOperationalStateServerTest.ts` — The RVC operational state server's base commands.
-
-### node/test/behaviors/service-area
-
-- `ServiceAreaServerTest.ts` — ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation.
 
 ### node/test/behaviors/thermostat
 
@@ -1051,10 +1039,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/web-rtc-transport-requestor
 
 - `WebRtcTransportRequestorServerTest.ts` — The WebRTC transport requestor server, which milestone 6 phase 26 builds.
-
-### node/test/behaviors/window-covering
-
-- `WindowCoveringServerTest.ts` — OperationalStatus change events on a target change and the lift/tilt type checks of a shutter.
 
 ### node/test/endpoint
 

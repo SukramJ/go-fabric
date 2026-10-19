@@ -98,6 +98,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -382,6 +383,9 @@ type Server struct {
 	// engine.
 	changes cluster.AttributeChanges
 	quiet   *cluster.Quieter
+	// quiescing suppresses the quieter's report while MatterQuiesce drops
+	// the one it holds back.
+	quiescing atomic.Bool
 
 	mu sync.Mutex
 	// startUp is StartUpCurrentLevel; nil is null.

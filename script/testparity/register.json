@@ -712,14 +712,14 @@
       "go": [
         "cluster/transition:TestCyclicHueDownwards",
         "cluster/light:TestStopMoveStepReportsZero",
-        "cluster/light:TestRemainingTimeOnStops"
+        "cluster/light:TestRemainingTimeOnStops",
+        "cluster/light:TestParityMatterJS_ColorControlServerTest"
       ],
       "missing": [
         "accepts a primary a light supplies without stating the number of primaries",
-        "clears the end time the application states on StopMoveStep",
-        "leaves the remaining time alone on StopMoveStep while a color loop runs"
+        "clears the end time the application states on StopMoveStep"
       ],
-      "reason": "The cyclic hue transition and the stop cases' RemainingTime are ported; the primaries case, the application end time and a running color loop are not.",
+      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case (the Go ColorControl server serves no Primary1X … Primary6Intensity attributes, so a light cannot supply one) and the application end time (the Go server keeps no application-stated transitionEndTime, by_design BD-Matter-LevelControl-NativeRamp).",
       "snapshotSha": "23c14586e80efe7f245301082deb9ee284a84a97"
     },
     {
@@ -973,42 +973,42 @@
     },
     {
       "path": "packages/node/test/behaviors/identify/IdentifyServerTest.ts",
-      "status": "planned",
-      "reason": "TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement.",
+      "status": "partial",
+      "go": [
+        "cluster/core:TestParityMatterJS_IdentifyServerTest"
+      ],
+      "missing": [
+        "is unsupported on a device type that does not require it",
+        "is supported on a device type that requires it",
+        "remains locally invocable when withdrawn",
+        "is supported when explicitly implemented"
+      ],
+      "reason": "The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify), which accepts TriggerEffect on every device type and exposes no effectTriggered event, so the withdrawal on a device type that does not require the command (IdentifyServer.ts:78-90) and the effect observations (:133-135) are missing: the device-type requirement must reach the endpoint's Identify, a change of the endpoint layer outside this wave.",
       "snapshotSha": "3d6054c75fafade0dc04aa4ffded539afe04fee5"
     },
     {
       "path": "packages/node/test/behaviors/level-control/ColorTemperatureCouplingTest.ts",
       "status": "partial",
       "go": [
-        "cluster/levelcontrol:TestColorTemperatureCoupling"
+        "cluster/levelcontrol:TestColorTemperatureCoupling",
+        "cluster/levelcontrol:TestParityMatterJS_ColorTemperatureCouplingTest"
       ],
       "missing": [
-        "couples a WithOnOff step when the Options attribute asks for it",
-        "couples a WithOnOff move when the Options attribute asks for it",
-        "couples two level changes that share one transaction",
-        "leaves the color temperature where a later command in the transaction overrides the coupling off",
-        "couples where a later command in the transaction overrides the coupling on",
-        "waits for a transaction that holds the color temperature",
-        "honors an override that sets the coupling for one command",
-        "honors an override that clears the coupling for one command"
+        "leaves the color temperature where a later command in the transaction overrides the coupling off"
       ],
-      "reason": "The coupling of level to colour temperature and its scaling are ported; the transaction-sharing cases and the per-command overrides are not.",
+      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits.",
       "snapshotSha": "69c2d9e69eb27dae9b1d66804e70de1ea276fce6"
     },
     {
       "path": "packages/node/test/behaviors/level-control/LevelControlServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/transition:TestStepCadenceRoundingAndFinish",
         "cluster/transition:TestRemainingTimeReportsOnCommandChanges",
-        "cluster/levelcontrol:TestExecuteIfOff"
+        "cluster/levelcontrol:TestExecuteIfOff",
+        "cluster/levelcontrol:TestParityMatterJS_LevelControlServerTest"
       ],
-      "missing": [
-        "stops transition timers when destroyed",
-        "works with anonymous class and downlevel features"
-      ],
-      "reason": "The transition to off, RemainingTime on command changes and the two stop cases are ported; timer teardown on destroy and the anonymous-class case are not.",
+      "reason": "The six it cases are ported: the transition to off, RemainingTime on command changes and the two stop cases locally, the timer teardown on a fabrictest node's Stop (the server's own fake clock counts the transition and deferred-report timers) and the anonymous-class server on a fabrictest DimmableLight. Not counted (no `it` at the pin): the case matter.js keeps commented out as non-deterministic (:24-53); its vector reports the first CurrentLevel 300 ms after RemainingTime, the Go server at the first step (100 ms), so every later level is sampled at another phase of the quiet interval.",
       "snapshotSha": "c4c832ba7be66a2791359e7f09d450a963403e46"
     },
     {
@@ -1016,29 +1016,27 @@
       "status": "partial",
       "go": [
         "cluster/levelcontrol:TestOnOffCoupling",
-        "cluster/levelcontrol:TestNativeSourceOnOffCoupling"
+        "cluster/levelcontrol:TestNativeSourceOnOffCoupling",
+        "cluster/levelcontrol:TestParityMatterJS_OnOffCouplingTest"
       ],
       "missing": [
-        "lifts the on/off coupling block when its transaction rolls back",
-        "holds the on/off coupling block through a committed level change"
+        "lifts the on/off coupling block when its transaction rolls back"
       ],
-      "reason": "The four switching cases are ported; the two transaction-rollback cases of the coupling block are not.",
+      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns.",
       "snapshotSha": "189a9755de998ba24ad323fcb6a783e2597842da"
     },
     {
       "path": "packages/node/test/behaviors/level-control/RemainingTimeTest.ts",
       "status": "partial",
       "go": [
-        "cluster/transition:TestCancelReportsZero"
+        "cluster/transition:TestCancelReportsZero",
+        "cluster/levelcontrol:TestParityMatterJS_LevelControlRemainingTimeTest"
       ],
       "missing": [
-        "reports the time left in a transition the application did not configure",
-        "reads zero once the transition completes",
-        "reports the time left in a transition",
         "reads zero after a stop, although the application stated a remaining time",
         "reads zero after a stop, although the application stated a later end time"
       ],
-      "reason": "The two stop cases are ported; the application-supplied remaining-time and end-time cases are not.",
+      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup.",
       "snapshotSha": "57ecfbd7a1732693bd794dd7a6003c760ee98384"
     },
     {
@@ -1055,8 +1053,11 @@
     },
     {
       "path": "packages/node/test/behaviors/on-off/OnOffServerTest.ts",
-      "status": "planned",
-      "reason": "OnWithTimedOff timing (0xFFFF holds, countdowns, writes during a countdown) and the OffOnly feature, which milestone 3 phase 17 ports.",
+      "status": "ported",
+      "go": [
+        "cluster/onoff:TestParityMatterJS_OnOffServerTest"
+      ],
+      "reason": "Every case runs on a fabrictest device (the OffOnly case over the wire from a commissioned pair): the async observer, the ten OnWithTimedOff countdown cases on the site's fake clock (timerCountFor is onoff.TimersRunning) and the OffOnly command statuses; the type-only extension case is a compile-time Sink assertion.",
       "snapshotSha": "14a81e94ac361ddfc4916fef611beaf6d3421c19"
     },
     {
@@ -1097,8 +1098,11 @@
     },
     {
       "path": "packages/node/test/behaviors/service-area/ServiceAreaServerTest.ts",
-      "status": "planned",
-      "reason": "ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation.",
+      "status": "ported",
+      "go": [
+        "cluster/servicearea:TestParityMatterJS_ServiceAreaServerTest"
+      ],
+      "reason": "The five cases run on fabrictest: a robotic vacuum cleaner with the servicearea server under the Aggregator, with and without Maps, and the supportedAreas rules, the rejection being servicearea.New's ErrInvalidState (the Go server checks its initial state when built). The Go server's required Selector is a pass-through no case calls.",
       "snapshotSha": "085de804e15b15fc20845678a811ebd307fb2977"
     },
     {
@@ -1214,8 +1218,11 @@
     },
     {
       "path": "packages/node/test/behaviors/window-covering/WindowCoveringServerTest.ts",
-      "status": "planned",
-      "reason": "OperationalStatus change events on a target change and the lift/tilt type checks of a shutter.",
+      "status": "ported",
+      "go": [
+        "cluster/cover:TestParityMatterJS_WindowCoveringServerTest"
+      ],
+      "reason": "The five cases run on the Go server in its package: the operationalStatus$Changed sequence as the committed OperationalStatus around each command of a travelling lift-and-tilt blind on a clock the test never moves (the $Changing events have no Go observer), and the Type / EndProductType conformance checks of a shutter as cover.ErrEnumValue from cover.New.",
       "snapshotSha": "0f106520ca8434ae8540d188e02bcb7a8ecaa0d5"
     },
     {

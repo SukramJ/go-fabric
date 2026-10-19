@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5730,
+  "entry_points": 5740,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13174,
-    "reachable": 9148,
-    "whitelisted": 4021,
+    "total_exported": 13177,
+    "reachable": 9150,
+    "whitelisted": 4022,
     "unreachable": 5
   },
   "by_package": [
@@ -6795,28 +6795,28 @@
       "identifier": "MoveRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 248
+      "line": 249
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "MoveToLevelRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 246
+      "line": 247
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StepRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 250
+      "line": 251
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StopRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 252
+      "line": 253
     },
     {
       "package": "cluster/light",
@@ -7034,6 +7034,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/onoff/server_internal_test.go",
       "line": 36
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TimersRunning",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/export_test.go",
+      "line": 10
     },
     {
       "package": "cluster/opstate",
