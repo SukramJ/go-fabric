@@ -134,6 +134,14 @@ const groupJoinRetryInterval = 30 * time.Second
 // when a join failed. An address stays joined while any fabric's group
 // uses it. Runs serialized. Mirrors matter.js ServerGroupNetworking
 // #reconcileUntilSettled / #join / #leave.
+//
+// A failed join logs at info the first time and at debug while the same
+// address keeps failing; the streak ends when the join succeeds or the
+// address is no longer wanted, so the next failure logs at info again.
+// Mirrors matter.js packages/node/src/behavior/system/network/
+// ServerGroupNetworking.ts:39-40 (#failedJoins), :136-140 (an address no
+// longer wanted leaves the set) and :159-176 (#join: info on the first
+// failure, debug on its repeats, the set cleared on success).
 func (b *Bridge) reconcileGroupMemberships() {
 	b.groupNetMu.Lock()
 	defer b.groupNetMu.Unlock()
@@ -155,6 +163,14 @@ func (b *Bridge) reconcileGroupMemberships() {
 	if b.groupJoined == nil {
 		b.groupJoined = make(map[string]net.IP)
 	}
+	if b.groupJoinFailed == nil {
+		b.groupJoinFailed = make(map[string]struct{})
+	}
+	for key := range b.groupJoinFailed {
+		if _, ok := wanted[key]; !ok {
+			delete(b.groupJoinFailed, key)
+		}
+	}
 	for key, addr := range b.groupJoined {
 		if _, ok := wanted[key]; ok {
 			continue
@@ -173,11 +189,17 @@ func (b *Bridge) reconcileGroupMemberships() {
 		}
 		if err := member.JoinGroup(addr); err != nil {
 			failed = true
-			b.logger.Warn("matter.groups.join",
+			level := slog.LevelInfo
+			if _, streak := b.groupJoinFailed[key]; streak {
+				level = slog.LevelDebug
+			}
+			b.groupJoinFailed[key] = struct{}{}
+			b.logger.Log(ctx, level, "matter.groups.join_failed",
 				slog.String("address", key), slog.String("err", err.Error()),
 				slog.Duration("retry_in", groupJoinRetryInterval))
 			continue
 		}
+		delete(b.groupJoinFailed, key)
 		b.groupJoined[key] = addr
 		b.logger.Debug("matter.groups.joined", slog.String("address", key))
 	}
@@ -218,6 +240,7 @@ func (b *Bridge) stopGroupNetworking() {
 		}
 	}
 	b.groupJoined = nil
+	b.groupJoinFailed = nil
 	b.groupMember = nil
 }
 
