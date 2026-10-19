@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 55 |
-| partial | 114 |
-| planned | 68 |
+| partial | 115 |
+| planned | 67 |
 | excluded | 87 |
 | total | 324 |
 
@@ -54,7 +54,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
-| [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 0 | 4 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
@@ -371,7 +371,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| IdentifyServerTest.ts | 187 | planned | — | TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement. |
+| IdentifyServerTest.ts | 187 | partial | `cluster/core:TestParityMatterJS_IdentifyServerTest` | The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify), which accepts TriggerEffect on every device type and exposes no effectTriggered event, so the withdrawal on a device type that does not require the command (IdentifyServer.ts:78-90) and the effect observations (:133-135) are missing: the device-type requirement must reach the endpoint's Identify, a change of the endpoint layer outside this wave. Missing: “is unsupported on a device type that does not require it”; “is supported on a device type that requires it”; “remains locally invocable when withdrawn”; “is supported when explicitly implemented”. |
 
 ## node/test/behaviors/level-control
 
@@ -991,10 +991,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `IcdManagementServerTest.ts` — The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 - `IcdModeTest.ts` — The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
-
-### node/test/behaviors/identify
-
-- `IdentifyServerTest.ts` — TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement.
 
 ### node/test/behaviors/measurement
 

@@ -973,8 +973,17 @@
     },
     {
       "path": "packages/node/test/behaviors/identify/IdentifyServerTest.ts",
-      "status": "planned",
-      "reason": "TriggerEffect support following the device type's requirement, its withdrawal and explicit enablement.",
+      "status": "partial",
+      "go": [
+        "cluster/core:TestParityMatterJS_IdentifyServerTest"
+      ],
+      "missing": [
+        "is unsupported on a device type that does not require it",
+        "is supported on a device type that requires it",
+        "remains locally invocable when withdrawn",
+        "is supported when explicitly implemented"
+      ],
+      "reason": "The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify), which accepts TriggerEffect on every device type and exposes no effectTriggered event, so the withdrawal on a device type that does not require the command (IdentifyServer.ts:78-90) and the effect observations (:133-135) are missing: the device-type requirement must reach the endpoint's Identify, a change of the endpoint layer outside this wave.",
       "snapshotSha": "3d6054c75fafade0dc04aa4ffded539afe04fee5"
     },
     {
