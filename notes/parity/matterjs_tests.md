@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 62 |
-| partial | 118 |
+| ported | 64 |
+| partial | 116 |
 | planned | 57 |
 | excluded | 87 |
 | total | 324 |
@@ -38,7 +38,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/system/sessions](#nodetestbehaviorsystemsessions) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/subscriptions](#nodetestbehaviorsystemsubscriptions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/access-control](#nodetestbehaviorsaccess-control) | 2 | 0 | 1 | 1 | 0 |
-| [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 0 | 3 | 0 | 0 |
+| [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 0 | 3 | 0 | 0 |
 | [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
@@ -266,8 +266,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BasicInformationValidatorsTest.ts | 44 | partial | `cluster/core:TestBasicInfo_ValidationVendorIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4`<br>`cluster/core:TestBasicInfo_ValidationProductIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorID0001Accepted`<br>`cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted` | The VendorID/ProductID identity checks are covered; skipping them where a bridged device leaves both absent is not. Missing: “skips the check when VendorID/ProductID are absent (optional on bridged devices)”. |
-| CapabilityMinimaTest.ts | 44 | partial | `cluster/core:TestCapabilityMinimaRev6Defaults`<br>`cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum` | The Matter 1.6 CapabilityMinima defaults are covered; caller-provided values winning over them are not. Missing: “preserves caller-provided values over the derived defaults”. |
+| BasicInformationValidatorsTest.ts | 44 | ported | `cluster/core:TestBasicInfo_ValidationVendorIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4`<br>`cluster/core:TestBasicInfo_ValidationProductIDZero`<br>`cluster/core:TestBasicInfo_ValidationVendorID0001Accepted`<br>`cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted`<br>`cluster/core:TestBasicInformationValidatorsSkipsAbsentIdentity` | The VendorID/ProductID identity checks run in the Go constructors (a thrown ImplementationError is a constructor error); a bridged device without VendorID/ProductID constructs and serves neither attribute. |
+| CapabilityMinimaTest.ts | 44 | ported | `cluster/core:TestCapabilityMinimaRev6Defaults`<br>`cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum`<br>`cluster/core:TestCapabilityMinimaPreservesCallerValues` | The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima, the server state node.Config does not carry. |
 | ConfigurationVersionTest.ts | 126 | partial | `bridge:TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode`<br>`cluster/core:TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne` | A bridged-node change raising the bridge's ConfigurationVersion is covered; the callback order, the refused decrease and the grouped bump are not. Missing: “runs the change callback and increments afterwards”; “rejects a decrease of configurationVersion”; “bumps the bridge once when grouping bridged-node changes via a shared context”; “throws when increasing a bridged node's ConfigurationVersion that is not enabled”. |
 
 ## node/test/behaviors/binding

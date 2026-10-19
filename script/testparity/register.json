@@ -562,31 +562,27 @@
     },
     {
       "path": "packages/node/test/behaviors/basic-information/BasicInformationValidatorsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestBasicInfo_ValidationVendorIDZero",
         "cluster/core:TestBasicInfo_ValidationVendorIDAboveFFF4",
         "cluster/core:TestBasicInfo_ValidationProductIDZero",
         "cluster/core:TestBasicInfo_ValidationVendorID0001Accepted",
-        "cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted"
+        "cluster/core:TestBasicInfo_ValidationVendorIDFFF4Accepted",
+        "cluster/core:TestBasicInformationValidatorsSkipsAbsentIdentity"
       ],
-      "missing": [
-        "skips the check when VendorID/ProductID are absent (optional on bridged devices)"
-      ],
-      "reason": "The VendorID/ProductID identity checks are covered; skipping them where a bridged device leaves both absent is not.",
+      "reason": "The VendorID/ProductID identity checks run in the Go constructors (a thrown ImplementationError is a constructor error); a bridged device without VendorID/ProductID constructs and serves neither attribute.",
       "snapshotSha": "f76cab7ecb65f9aa7cca8359a4177216818247a4"
     },
     {
       "path": "packages/node/test/behaviors/basic-information/CapabilityMinimaTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestCapabilityMinimaRev6Defaults",
-        "cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum"
+        "cluster/core:TestBasicInfo_CapabilityMinima_FloorsAtSpecMinimum",
+        "cluster/core:TestCapabilityMinimaPreservesCallerValues"
       ],
-      "missing": [
-        "preserves caller-provided values over the derived defaults"
-      ],
-      "reason": "The Matter 1.6 CapabilityMinima defaults are covered; caller-provided values winning over them are not.",
+      "reason": "The Matter 1.6 CapabilityMinima defaults and caller-provided values winning over them are ported on core.Config.CapabilityMinima, the server state node.Config does not carry.",
       "snapshotSha": "14c20ec658d9c76822d6e05950a7cd9a6992b721"
     },
     {
