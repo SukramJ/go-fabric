@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType verifies
@@ -218,13 +219,19 @@ func TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically(t *testing.T)
 // correct revision.
 //
 // Mirrors matter.js packages/node/test/behaviors/descriptor/
-// DescriptorServerTest.ts:122 (case "fully populates device types").
-// matter.js expects [{deviceType:268 (0x010C), revision:4}].
+// DescriptorServerTest.ts:146-158 (case "fully populates device types") at
+// 862ad75f: [{deviceType:268 (0x010C), revision:5}], the revision of the
+// device type itself, which the Go side reads from the snapshot
+// (schema.DeviceTypeRevision) rather than hand-coding.
 func TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes(t *testing.T) {
 	t.Parallel()
-	// 0x010C = ColorTemperatureLight (268 decimal), revision 4 per matter.js HEAD.
+	// 0x010C = ColorTemperatureLight (268 decimal).
+	rev, ok := schema.DeviceTypeRevision(0x010C)
+	if !ok {
+		t.Fatal("schema: no revision for device type 0x010C")
+	}
 	d, err := core.NewDescriptor(
-		[]core.DeviceTypeStruct{{DeviceType: 0x010C, Revision: 4}},
+		[]core.DeviceTypeStruct{{DeviceType: 0x010C, Revision: rev}},
 		nil, nil, nil,
 	)
 	if err != nil {
@@ -241,8 +248,8 @@ func TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes(t *testing.T)
 	if list[0].DeviceType != 0x010C {
 		t.Errorf("deviceType = 0x%04X, want 0x010C", list[0].DeviceType)
 	}
-	if list[0].Revision != 4 {
-		t.Errorf("revision = %d, want 4 (matter.js HEAD ColorTemperatureLight)", list[0].Revision)
+	if list[0].Revision != 5 {
+		t.Errorf("revision = %d, want 5 (DescriptorServerTest.ts:158 at 862ad75f)", list[0].Revision)
 	}
 }
 

@@ -578,6 +578,41 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
+Line numbers at `862ad75f`.
+
+- **The node does not run matter.js's DataModelTest check when it comes
+  online.** `GeneralDiagnosticsServer.ts` `#online` (`:352`) runs
+  `#assertDataModelTest` (`:125-143`): without the feature a
+  MaxPathsPerInvoke above one is an error, with it a limit of one is
+  logged. `cluster/core` has the check (`CheckDataModelTest`) and the
+  feature selection (`NewGeneralDiagnosticsWith`), but `node.Config`
+  carries neither a feature selection nor MaxPathsPerInvoke, so nothing
+  calls it at `Node.Start`. (Milestone 3, wave 18b: `node/` is its path.)
+- **A grouped ConfigurationVersion change is not persisted as one.**
+  `Bridge.IncreaseNodeConfigurationVersionWith` raises the node's version
+  once for a change across several bridged devices
+  (`BasicInformationServer.ts:132-138`,
+  `BridgedDeviceBasicInformationServer.ts:72-90`); the node facade
+  (`Aggregator.IncreaseConfigurationVersion`) still takes one device key
+  and persists per call. (Milestone 3, wave 18b.)
+- **CapabilityMinima is not a node option.** matter.js lets the
+  application override the Matter 1.6 defaults
+  (`CapabilityMinimaTest.ts`, "caller-provided values win"); the Go port
+  runs on `core.Config`, `node.Config` has no field. (Milestone 3,
+  wave 18b.)
+- **A bridged endpoint cannot opt into TagList.** `Descriptor.EnableTagList`
+  / `AddTags` exist on the server (`DescriptorServer.ts:122-147`), but
+  `endpoint.Spec` carries no tags, so a host's device model cannot set
+  them; the default stays off for Apple (the note at
+  `cluster/core/descriptor.go` `MatterAttributes`). (Milestone 4, the
+  embedding layer.)
+- **The groups manager holds no key set 0.** `KeySetsTest.ts` reads the
+  only key of the default key set and the second-newest key of the IPK
+  key set (§4.14.2.6); `groups/manager.go` loads key sets from 1 and the
+  CASE IPK lives in `secure/`, so the two cases stay `missing`.
+  (Milestone 3, wave 18b, the security path.)
+
 Found by the phase-17d DoorLock port (brief BM, PR #176, 2026-10-19).
 Line numbers at `862ad75f`.
 
@@ -588,6 +623,11 @@ Line numbers at `862ad75f`.
   clock", register `missing`); `clocktest.Fake` has one reading, so a
   wall-clock step moves a deadline kept as `time.Time` too, and the case
   has no in-process port. Under `clock.System` the comparison is monotonic.
+  The phase-18a port (brief BN, PR #182) hit the same wall: "keeps the
+  operational time counted across a backward wall-clock step"
+  (`GeneralDiagnosticsOperationalHoursTest.ts:27-40`) steps the wall clock
+  alone and stays `missing`; its UpTime twin runs on a package seam
+  (`core.UpTimeFrom`) instead of the clock.
   Fix: a monotonic reading on `clock.Clock` and `clocktest.Fake`.
   (Milestone 4, the embedding layer.)
 - **An ExpiringUser provisioned without ExpiringUserTimeout logs no

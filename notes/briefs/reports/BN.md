@@ -106,3 +106,18 @@ The four `missing` (ConfigurationVersion "not enabled"; OperationalHours wall-on
 ## by_design candidates
 
 - **Bridged ConfigurationVersion always served.** matter.js enables BridgedDeviceBasicInformation.ConfigurationVersion only when the application seeds a value and refuses `increaseConfigurationVersion` otherwise (`BridgedDeviceBasicInformationServer.ts:61-70`; `ConfigurationVersionTest.ts:110-125`); `cluster/core/bridged_device_basic_information.go` instanceOptions serves it on every bridged endpoint, because Apple iOS 18.4+ probes it and warns "Outdated configuration" when absent.
+
+## Decided in review (2026-10-19)
+
+- No per-case exclusion field in the register: a `partial` entry keeps its
+  runtime-only cases in `missing` with the class named in the reason, as
+  ReadTest and SessionParametersTest do. Revisited if a third wave needs it.
+- `TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes` now
+  reads the revision from the snapshot (`schema.DeviceTypeRevision`) and
+  asserts 5, the pin's expectation (`DescriptorServerTest.ts:158`); it had
+  hand-fed 4.
+- Fix 2 confirmed against `GeneralDiagnosticsServer.ts:60-68` and
+  `:384-392`: a backward step contributes zero, what was counted stays.
+- by_design: `BD-Matter-BridgedDevice-ConfigurationVersionAlwaysServed`.
+  Findings: the four node-wiring gaps and the key set 0 gap as a BN block;
+  the wall-clock-only step joined BM's monotonic-clock item.

@@ -3595,3 +3595,19 @@ the lock's position.
 `time.Local` when nil (`cluster/lock/schedules.go` `LocalInstantOf`): the
 same default, with a host override for a lock whose zone is not the
 process's.
+
+### BD-Matter-BridgedDevice-ConfigurationVersionAlwaysServed — a bridged endpoint always serves ConfigurationVersion
+
+matter.js serves BridgedDeviceBasicInformation.ConfigurationVersion only
+when the application seeds a value, and `increaseConfigurationVersion`
+throws "ConfigurationVersion is not enabled on this bridged device"
+otherwise (`BridgedDeviceBasicInformationServer.ts:61-70`,
+`ConfigurationVersionTest.ts:110-125`). The Go server serves it on every
+bridged endpoint, starting at 1 (`cluster/core/bridged_device_basic_information.go`
+`instanceOptions`, `configVersion: max(cfg.ConfigurationVersion, 1)`), so
+`Bridge.IncreaseConfigurationVersion` never refuses: Apple iOS 18.4+ reads
+the attribute on every bridged endpoint and logs "Outdated configuration"
+when it is absent (the comment at the attribute's constant). The
+matter.js case "throws when increasing a bridged node's ConfigurationVersion
+that is not enabled" therefore has no Go counterpart and stays `missing`
+in the register with this entry as its reason.
