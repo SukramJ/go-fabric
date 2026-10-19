@@ -303,7 +303,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	inst, _ := spec.New(wcdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features)})
 	// The initial state conforms to the schema or the server is not built:
 	// a Type or EndProductType member whose conformance the features
-	// disallow is refused (window-covering-cluster.element.ts:150-191).
+	// disallow is refused (window-covering-cluster.element.ts:150-192).
 	// Mirrors matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63
 	// (invokeInitializer validates the behavior's state) and
 	// packages/node/src/behavior/state/validation/conformance-compiler.ts:735-747

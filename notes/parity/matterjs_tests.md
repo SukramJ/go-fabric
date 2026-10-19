@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 56 |
+| ported | 57 |
 | partial | 115 |
-| planned | 66 |
+| planned | 65 |
 | excluded | 87 |
 | total | 324 |
 
@@ -64,7 +64,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
@@ -434,7 +434,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ServiceAreaServerTest.ts | 234 | planned | â€” | ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation. |
+| ServiceAreaServerTest.ts | 234 | ported | `cluster/servicearea:TestParityMatterJS_ServiceAreaServerTest` | The five cases run on fabrictest: a robotic vacuum cleaner with the servicearea server under the Aggregator, with and without Maps, and the supportedAreas rules, the rejection being servicearea.New's ErrInvalidState (the Go server checks its initial state when built). The Go server's required Selector is a pass-through no case calls. |
 
 ## node/test/behaviors/switch
 
@@ -1015,10 +1015,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/rvc-operational-state
 
 - `RvcOperationalStateServerTest.ts` â€” The RVC operational state server's base commands.
-
-### node/test/behaviors/service-area
-
-- `ServiceAreaServerTest.ts` â€” ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation.
 
 ### node/test/behaviors/switch
 

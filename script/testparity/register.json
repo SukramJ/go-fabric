@@ -1109,8 +1109,11 @@
     },
     {
       "path": "packages/node/test/behaviors/service-area/ServiceAreaServerTest.ts",
-      "status": "planned",
-      "reason": "ServiceArea estimatedEndTime forms, the server without Maps and the supportedAreas validation.",
+      "status": "ported",
+      "go": [
+        "cluster/servicearea:TestParityMatterJS_ServiceAreaServerTest"
+      ],
+      "reason": "The five cases run on fabrictest: a robotic vacuum cleaner with the servicearea server under the Aggregator, with and without Maps, and the supportedAreas rules, the rejection being servicearea.New's ErrInvalidState (the Go server checks its initial state when built). The Go server's required Selector is a pass-through no case calls.",
       "snapshotSha": "085de804e15b15fc20845678a811ebd307fb2977"
     },
     {
