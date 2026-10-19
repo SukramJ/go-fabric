@@ -42,10 +42,16 @@ func TestInvokeDelayReportDataDefersSubscriptions(t *testing.T) {
 	b.AttachSubscriptionManager(mgr)
 
 	start := time.Now()
-	b.deferReportsFor(im.InvokeRequest{
-		Invokes:         []im.CommandInvocation{{Path: im.ConcreteCommandPath{Endpoint: 7, Cluster: 0x0006, Command: 2, HasEndpoint: true, HasCluster: true, HasCommand: true}}},
-		DelayReportData: &im.DelayReportData{DelayMinMs: 1000},
-	})
+	toggle := func(ep uint16) im.InvokeRequest {
+		return im.InvokeRequest{
+			Invokes:         []im.CommandInvocation{{Path: im.ConcreteCommandPath{Endpoint: ep, Cluster: 0x0006, Command: 2, HasEndpoint: true, HasCluster: true, HasCommand: true}}},
+			DelayReportData: &im.DelayReportData{DelayMinMs: 1000},
+		}
+	}
+	// A command that cannot be dispatched — endpoint 8 serves no OnOff
+	// here — defers nothing (im.DispatchEndpoints).
+	b.deferReportsFor(context.Background(), deferDispatcher{}, toggle(8))
+	b.deferReportsFor(context.Background(), deferDispatcher{}, toggle(7))
 	mgr.OnAttributeChanged(path(7))
 	mgr.OnAttributeChanged(path(8))
 	mgr.Tick(context.Background(), start.Add(500*time.Millisecond))
@@ -60,4 +66,14 @@ func TestInvokeDelayReportDataDefersSubscriptions(t *testing.T) {
 	if reported[held.ID] != 1 {
 		t.Errorf("at 1.1 s: the deferred subscription reported %d times, want 1", reported[held.ID])
 	}
+}
+
+// deferDispatcher resolves OnOff on endpoint 7 only.
+type deferDispatcher struct{ im.Dispatcher }
+
+func (deferDispatcher) CommandPathStatus(p im.ConcreteCommandPath) im.StatusCode {
+	if p.Endpoint == 7 && p.Cluster == 0x0006 {
+		return im.StatusSuccess
+	}
+	return im.StatusUnsupportedEndpoint
 }

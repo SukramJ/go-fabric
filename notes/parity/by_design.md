@@ -2612,7 +2612,9 @@ leaves the image alone: the value changes when the peer reports it, which
 the default subscription delivers. A host that reads the image right
 after a write sees the old value until the report arrives, where matter.js
 shows the new one at once; the image never shows a value the peer did not
-confirm. Report AK.
+confirm. Report AK. The write-through, transaction and `RemoteWriter`
+cases of ClientNodeTest.ts:1137-2853 (at `862ad75f`, about 60) are
+`missing` under this entry; report BI (phase 16, 2026-10-19).
 
 By design (brief AK, D6). The compensation machinery is the price of
 optimistic local state; the port takes the pessimistic one.
@@ -3440,3 +3442,16 @@ The seed-kind cases are `missing` under this entry. Report BH (phase 16,
 
 By design. Test roots enter through `attestation.Trust`'s own option
 (`BD-Matter-DCL-OptIn`), never through the snapshot a release ships.
+
+### BD-Matter-BasicInfo-SerialNumberAlwaysServed — SerialNumber is always present
+
+matter.js's `BasicInformationServer` serves SerialNumber only when the
+host sets it; its MockServerNode has none and AttributeReadResponseTest.ts
+(at `862ad75f`) reads it as UNSUPPORTED_ATTRIBUTE.
+`cluster/core/basic_information.go:69` serves it always, falling back to a
+value derived from UniqueID (`TestParityMatterJS_BasicInfoServer_SerialNumberFallback`),
+because Apple Home's HAP build asks for it. The full-wildcard read cases
+assert the Go composition as it is. Report BI (phase 16, 2026-10-19).
+
+By design. The fallback stays until the interop record says Apple Home no
+longer needs it.

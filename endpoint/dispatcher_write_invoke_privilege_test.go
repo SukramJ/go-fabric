@@ -126,9 +126,9 @@ func privilegeTestTopology(t *testing.T) *Topology {
 // =============================================================================
 
 // TestTopologyDispatcher_MinWritePrivilege locks the per-attribute write
-// privilege the dispatcher reports for the mounted root clusters, plus the
-// Operate-default fallback for unmounted endpoints/clusters and
-// non-elevated attributes. Mirrors Matter §9.10.5.3 (AccessControl.ACL /
+// privilege the dispatcher reports for the mounted root clusters, the
+// Operate default for non-elevated attributes and View for a path that does
+// not resolve. Mirrors Matter §9.10.5.3 (AccessControl.ACL /
 // Extension → Administer) and matter.js
 // packages/model/src/standard/elements/access-control.element.ts:28,32 +
 // general-commissioning.element.ts:26.
@@ -162,9 +162,15 @@ func TestTopologyDispatcher_MinWritePrivilege(t *testing.T) {
 		{"GeneralCommissioning.Breadcrumb requires Administer", 0, generalCommID, gcBreadcrumb, 5},
 		{"GeneralCommissioning attribute without override defaults to Operate", 0, generalCommID, gcCommissioningIn, 3},
 		{"plain cluster attribute defaults to Operate", 0, plainClusterID, 0x0000, 3},
-		{"unmounted cluster on a real endpoint defaults to Operate", 0, 0x9999, 0x0000, 3},
-		{"unmounted endpoint keeps the model privilege", 42, accessControlID, accessControlACL, 5},
-		{"BridgedDeviceBasicInformation.NodeLabel requires Manage without a server override", 42, 0x0039, 0x0005, 4},
+		// A path that does not resolve needs View only: the View pass
+		// precedes the existence checks, the write privilege applies to
+		// an attribute that exists (matter.js
+		// packages/protocol/src/action/server/AttributeWriteResponse.ts:200-241
+		// at 862ad75f; chip src/app/WriteHandler.cpp CheckWriteAllowed).
+		{"unmounted cluster on a real endpoint needs View", 0, 0x9999, 0x0000, 1},
+		{"unmounted endpoint needs View", 42, accessControlID, accessControlACL, 1},
+		{"unmounted endpoint needs View for BridgedDeviceBasicInformation.NodeLabel", 42, 0x0039, 0x0005, 1},
+		{"unlisted attribute of a mounted cluster needs View", 0, accessControlID, 0x0777, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,11 +216,13 @@ func TestTopologyDispatcher_MinInvokePrivilege(t *testing.T) {
 		{"GeneralCommissioning unmapped command defaults to Operate", 0, generalCommID, gcUnmappedCmd, 3},
 		{"plain cluster command defaults to Operate", 0, plainClusterID, 0x00, 3},
 		{"unmounted cluster on a real endpoint defaults to Operate", 0, 0x9999, 0x00, 3},
-		// The model's privilege applies even where the cluster is not
-		// mounted, as matter.js resolves limits from the model for a path
-		// that does not exist (CommandInvokeResponse.ts).
-		{"unmounted endpoint keeps the model privilege", 42, opCredsID, opCredsRemoveFab, 5},
-		{"Identify.Identify requires Manage without a server override", 42, 0x0003, 0x00, 4},
+		// A path that does not resolve needs Operate only: matter.js
+		// resolves the model's limits for it, but the Operate pass and the
+		// existence checks come first, so the model's privilege is never
+		// reached (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
+		// at 862ad75f).
+		{"unmounted endpoint needs Operate", 42, opCredsID, opCredsRemoveFab, 3},
+		{"unmounted endpoint needs Operate for Identify.Identify", 42, 0x0003, 0x00, 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

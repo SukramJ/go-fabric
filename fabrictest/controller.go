@@ -46,6 +46,19 @@ type ControllerOptions struct {
 	CATs []uint32
 	// Logger receives the controller's logs; nil is the site's logger.
 	Logger *slog.Logger
+	// Registry, when set, edits the configuration of the client node
+	// registry before it is built, on every start of the controller
+	// ([Controller.Restart] included): its hooks, AutoStart, the node
+	// template. Its Store is the controller's own [client.MemoryStore],
+	// kept across restarts; an edit may replace it.
+	Registry func(*client.RegistryConfig)
+	// Attestation is the commissioner's trust store; nil is
+	// attestation.TestStore (the CSA test PAAs, test roots accepted).
+	Attestation attestation.PAAStore
+	// NoAttestationStore commissions without a trust store — matter.js's
+	// controller without a DclCertificateService: every attestation
+	// carries the DclServiceUnavailable warning. It overrides Attestation.
+	NoAttestationStore bool
 }
 
 // Controller is an in-process Matter controller of a site: the module's
@@ -73,6 +86,16 @@ type Controller struct {
 	com      *commissioner.Commissioner
 	reg      *client.Registry
 
+	// caStore keeps the certificate authority and the fabric, resume the
+	// CASE resumption records and regStore the client nodes, across a
+	// [Controller.Restart] — what matter.js's MockStorageService keeps of
+	// a ServerNode stopped and started again.
+	caStore  *ca.MemoryStore
+	regStore client.Store
+
+	// mu guards the stack's fields against [Controller.Restart] for the
+	// site's resolver, which reads them from the devices' goroutines.
+	mu     sync.RWMutex
 	stop   context.CancelFunc
 	served chan struct{}
 	once   sync.Once
@@ -98,7 +121,7 @@ func (s *Site) AddController(opts ControllerOptions) *Controller {
 	if opts.Logger == nil {
 		opts.Logger = s.log
 	}
-	c := &Controller{site: s, index: s.index(), opts: opts}
+	c := &Controller{site: s, index: s.index(), opts: opts, caStore: &ca.MemoryStore{}, resume: &peer.MemoryResumptionStore{}, regStore: &client.MemoryStore{}}
 	if err := c.start(); err != nil {
 		c.Close()
 		s.tb.Fatalf("fabrictest: controller %d: %v", c.index, err)
@@ -111,6 +134,8 @@ func (s *Site) AddController(opts ControllerOptions) *Controller {
 }
 
 func (c *Controller) start() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	clk, log := c.site.clk, c.opts.Logger
 	l, err := c.site.listen(c.index)
 	if err != nil {
@@ -127,15 +152,15 @@ func (c *Controller) start() error {
 		_ = l.Serve(ctx, c.mgr.HandleDatagram)
 	}()
 	c.names = discovery.NewNames(newQueryConn(c.site), log)
-	if c.ca, err = ca.New(ca.Config{Store: &ca.MemoryStore{}, Clock: clk}); err != nil {
+	if c.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk}); err != nil {
 		return fmt.Errorf("certificate authority: %w", err)
 	}
 	if c.fabric, err = commissioner.NewFabric(c.ca, commissioner.FabricConfig{
 		FabricID: c.opts.FabricID, RootNodeID: c.opts.NodeID, VendorID: c.opts.VendorID, Label: c.opts.Label, CATs: c.opts.CATs,
+		Store: c.caStore,
 	}); err != nil {
 		return fmt.Errorf("fabric: %w", err)
 	}
-	c.resume = &peer.MemoryResumptionStore{}
 	if c.set, err = peer.NewSet(peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: c.resume, Logger: log, Clock: clk,
 	}); err != nil {
@@ -145,18 +170,34 @@ func (c *Controller) start() error {
 	// With Fabrics the commissioner runs the CASE responder that adopts
 	// the sessions a device opens to the controller into the peer set.
 	if c.com, err = commissioner.New(commissioner.Context{
-		Exchanges: c.mgr, Peers: c.set, Attestation: attestation.TestStore(), Logger: log, Clock: clk,
+		Exchanges: c.mgr, Peers: c.set, Attestation: c.trustStore(), Logger: log, Clock: clk,
 		Subscriptions: c.subs, Fabrics: []*commissioner.Fabric{c.fabric}, Resumption: c.resume,
 	}); err != nil {
 		return fmt.Errorf("commissioner: %w", err)
 	}
-	if c.reg, err = client.NewRegistry(client.RegistryConfig{
-		Commissioner: c.com, Peers: c.set, Exchanges: c.mgr, Fabrics: []*commissioner.Fabric{c.fabric},
+	rc := client.RegistryConfig{
+		Store: c.regStore, Commissioner: c.com, Peers: c.set, Exchanges: c.mgr, Fabrics: []*commissioner.Fabric{c.fabric},
 		Subscriptions: c.subs, Logger: log, Clock: clk, Node: client.Config{Logger: log, Clock: clk},
-	}); err != nil {
+	}
+	if c.opts.Registry != nil {
+		c.opts.Registry(&rc)
+		c.regStore = rc.Store
+	}
+	if c.reg, err = client.NewRegistry(rc); err != nil {
 		return fmt.Errorf("client registry: %w", err)
 	}
 	return nil
+}
+
+// trustStore is the commissioner's attestation trust store.
+func (c *Controller) trustStore() attestation.PAAStore {
+	switch {
+	case c.opts.NoAttestationStore:
+		return nil
+	case c.opts.Attestation != nil:
+		return c.opts.Attestation
+	}
+	return attestation.TestStore()
 }
 
 // Close stops the controller. It is idempotent.
@@ -164,32 +205,69 @@ func (c *Controller) Close() {
 	c.once.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
-		if c.reg != nil {
-			_ = c.reg.Close(ctx)
-		}
-		if c.subs != nil {
-			_ = c.subs.Close(ctx)
-		}
-		if c.com != nil {
-			c.com.Close()
-		}
-		if c.set != nil {
-			c.set.Close(ctx)
-		}
-		if c.mgr != nil {
-			c.mgr.Close()
-		}
-		if c.stop != nil {
-			c.stop()
-			<-c.served
-		}
-		if c.listener != nil {
-			_ = c.listener.Close()
-		}
-		if c.names != nil {
-			_ = c.names.Close()
-		}
+		c.shutdown(ctx)
 	})
+}
+
+// Restart stops the controller and starts it again on its stores and
+// address — matter.js's controller ServerNode stopped and started again
+// on its MockStorageService (the "after the controller restarts" cases of
+// ClientNodeTest.ts): the certificate authority, the fabric, the CASE
+// resumption records and the client node registry's store survive; the
+// exchange manager, DNS-SD cache, peer set, subscriptions, commissioner
+// and registry are new, the registry restoring the stored nodes. A pair's
+// Peer and Interaction belong to the stopped stack; use the registry's
+// nodes after a restart. A site on loopback sockets gives the controller a
+// new port.
+func (c *Controller) Restart(ctx context.Context) error {
+	// The stack's close waits for timers of its own (a subscription's
+	// last exchange); with a fake clock it runs under Site.Run.
+	if err := c.site.Run(ctx, func(ctx context.Context) error {
+		c.shutdown(ctx)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
+	}
+	//nolint:contextcheck // the new stack's services run under contexts of their own, as at AddController
+	if err := c.start(); err != nil {
+		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
+	}
+	return nil
+}
+
+// shutdown stops the controller's stack, leaving its stores. The fields
+// are read under the lock and closed outside it, so the site's resolver
+// is not held up while the stack winds down.
+func (c *Controller) shutdown(ctx context.Context) {
+	c.mu.RLock()
+	reg, subs, com, set, mgr := c.reg, c.subs, c.com, c.set, c.mgr
+	stop, served, listener, names := c.stop, c.served, c.listener, c.names
+	c.mu.RUnlock()
+	if reg != nil {
+		_ = reg.Close(ctx)
+	}
+	if subs != nil {
+		_ = subs.Close(ctx)
+	}
+	if com != nil {
+		com.Close()
+	}
+	if set != nil {
+		set.Close(ctx)
+	}
+	if mgr != nil {
+		mgr.Close()
+	}
+	if stop != nil {
+		stop()
+		<-served
+	}
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if names != nil {
+		_ = names.Close()
+	}
 }
 
 // Index is the controller's host index on the site, from 1.
@@ -199,36 +277,74 @@ func (c *Controller) Index() int { return c.index }
 func (c *Controller) Addr() *net.UDPAddr { return c.listener.LocalAddr() }
 
 // Exchanges is the controller's exchange manager.
-func (c *Controller) Exchanges() *exchange.Manager { return c.mgr }
+func (c *Controller) Exchanges() *exchange.Manager {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.mgr
+}
 
 // Names is the controller's DNS-SD cache, answered by the site.
-func (c *Controller) Names() *discovery.Names { return c.names }
+func (c *Controller) Names() *discovery.Names {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.names
+}
 
 // CA is the controller's certificate authority.
-func (c *Controller) CA() *ca.CA { return c.ca }
+func (c *Controller) CA() *ca.CA {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.ca
+}
 
 // Fabric is the controller's fabric.
-func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
+func (c *Controller) Fabric() *commissioner.Fabric {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.fabric
+}
 
 // Peers is the controller's peer set.
-func (c *Controller) Peers() *peer.Set { return c.set }
+func (c *Controller) Peers() *peer.Set {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.set
+}
 
 // Resumption is the peer set's CASE resumption store.
-func (c *Controller) Resumption() *peer.MemoryResumptionStore { return c.resume }
+func (c *Controller) Resumption() *peer.MemoryResumptionStore {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.resume
+}
 
 // Subscriptions is the controller's subscription registry.
-func (c *Controller) Subscriptions() *interaction.Subscriptions { return c.subs }
+func (c *Controller) Subscriptions() *interaction.Subscriptions {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.subs
+}
 
 // Commissioner is the controller's commissioner.
-func (c *Controller) Commissioner() *commissioner.Commissioner { return c.com }
+func (c *Controller) Commissioner() *commissioner.Commissioner {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.com
+}
 
 // Registry is the controller's client node registry — matter.js's Peers,
 // the controller ServerNode's container of client nodes.
-func (c *Controller) Registry() *client.Registry { return c.reg }
+func (c *Controller) Registry() *client.Registry {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.reg
+}
 
 // answers reports whether the controller is node nodeID of the fabric
 // with compressedFabricID.
 func (c *Controller) answers(compressedFabricID [8]byte, nodeID uint64) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.fabric != nil && c.fabric.Identity.CompressedFabricID == compressedFabricID && c.opts.NodeID == nodeID
 }
 
@@ -282,8 +398,12 @@ type Pair struct {
 	// session; nil before commissioning.
 	Peer *peer.Peer
 	// Interaction is the controller's interaction with the device over
-	// Peer; nil before commissioning.
+	// Peer; nil before commissioning. A pair of [Controller.PASE] speaks
+	// over PASESession instead.
 	Interaction *interaction.Interaction
+	// PASESession is the PASE session of a pair of [Controller.PASE]; nil
+	// otherwise.
+	PASESession *exchange.Session
 }
 
 // Commissioned reports whether the pair's device is commissioned.
@@ -296,7 +416,7 @@ func (p *Pair) Node() (*client.Node, error) {
 	if !p.Commissioned() {
 		return nil, errors.New("fabrictest: the pair is not commissioned")
 	}
-	return p.Controller.reg.ForAddress(p.Address, "")
+	return p.Controller.Registry().ForAddress(p.Address, "")
 }
 
 // PairOptions configures [Site.CommissionedPair] and

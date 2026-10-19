@@ -3,7 +3,10 @@
 
 package client
 
-import "github.com/SukramJ/go-fabric/controller/interaction"
+import (
+	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/im"
+)
 
 // ConnectionStateFor exposes the connection-state decision to the tests.
 var ConnectionStateFor = connectionStateFor
@@ -52,3 +55,35 @@ func SaveSettingsAutoSubscribe(n *Node) error {
 	n.saveSettingsLocked()
 	return nil
 }
+
+// KnownVersions is the version filters a read of req sends — matter.js
+// clientStructureOf(peer).injectVersionFilters(request)
+// (node/src/testing/node-helpers.ts:540, ClientStructure.ts:286-323).
+func KnownVersions(n *Node, req interaction.ReadRequest) []im.DataVersionFilter {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.s.withKnownVersions(newScope(req.Attributes, req.NoFabricFilter), req.DataVersionFilters, false)
+}
+
+// CacheFabricFiltered is the fabric filter of the interactions the cache
+// takes data from — matter.js clientStructureOf(peer).cacheFabricFiltered.
+func CacheFabricFiltered(n *Node) bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.s.subscribedFabricFiltered
+}
+
+// UpdateRecord edits the node's commissioning record and stores it — what
+// matter.js does with peer.set({ commissioning: … }).
+func UpdateRecord(n *Node, f func(r *Record)) { n.updateRecord(f) }
+
+// MaxEventNumber is the highest event number the node stored —
+// matter.js peer.stateOf(NetworkClient).maxEventNumber.
+func MaxEventNumber(n *Node) uint64 {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.settings.maxEventNumber
+}
+
+// DeliverEvent hands e to the node as an event of a report.
+func DeliverEvent(n *Node, e interaction.EventData) { n.deliverEvent(&e) }

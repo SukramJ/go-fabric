@@ -756,8 +756,8 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		if !ok {
 			return fmt.Errorf("matter: NodeLabel write expected string, got %T", value)
 		}
-		if len(s) > 32 {
-			return errors.New("matter: NodeLabel exceeds 32 utf-8 bytes")
+		if err := b.checkLabelWrite(attrID, s); err != nil {
+			return err
 		}
 		b.mu.Lock()
 		b.nodeLabel = s
@@ -770,8 +770,8 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		if !ok {
 			return fmt.Errorf("matter: Location write expected string, got %T", value)
 		}
-		if len(s) != 2 {
-			return fmt.Errorf("matter: Location must be ISO-3166 2-letter (got len=%d)", len(s))
+		if err := b.checkLabelWrite(attrID, s); err != nil {
+			return err
 		}
 		b.mu.Lock()
 		b.location = s
@@ -792,6 +792,21 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 	// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 	_, err := b.inst().ValidateWrite(attrID, value, nil)
 	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
+}
+
+// checkLabelWrite holds a NodeLabel or Location write to the attribute's
+// constraint — NodeLabel "max 32", Location "2"
+// (packages/model/src/standard/elements/basic-information.element.ts:36,
+// :40 at 862ad75f) — and refuses a violation with CONSTRAINT_ERROR, as
+// matter.js's string-length validator does. Mirrors matter.js
+// packages/node/src/behavior/state/validation/constraint.ts:199-211 at
+// 862ad75f (ConstraintError, "String length of … is not within bounds");
+// the refusal used to surface as FAILURE.
+func (b *BasicInformation) checkLabelWrite(attrID uint32, s string) error {
+	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
+		return refusedWrite{sentinel: fmt.Errorf("matter: BasicInformation 0x%04X write of %d bytes", attrID, len(s)), status: err}
+	}
+	return nil
 }
 
 // MatterInvoke always rejects — BasicInformation has no commands.

@@ -213,6 +213,35 @@ func (l *EventLog) DropBuffered() {
 	l.occurrences = nil
 }
 
+// DropFabric removes the records of fabric-sensitive events that belong to
+// fabricIndex — a fabric the node no longer has — and returns how many
+// went. A record of another event keeps its place, whatever its payload
+// says (BasicInformation's Leave carries the index of the fabric it left).
+// Mirrors matter.js
+// packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:114-170 at
+// 862ad75f (limitNodeDataToAllowedFabrics: the occurrences of events whose
+// access is fabric-scoped or fabric-sensitive, bound to a fabric that is
+// not allowed, are removed), run when a fabric is deleted
+// (ServerEnvironment.ts:186-195). They stayed in the log.
+func (l *EventLog) DropFabric(fabricIndex uint8) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	kept := l.occurrences[:0]
+	dropped := 0
+	for _, rec := range l.occurrences {
+		if isFabricSensitiveEventCluster(rec.Cluster) {
+			if owner, ok := eventPayloadFabricIndex(rec.Payload); ok && owner == fabricIndex {
+				dropped++
+				continue
+			}
+		}
+		kept = append(kept, rec)
+	}
+	clear(l.occurrences[len(kept):])
+	l.occurrences = kept
+	return dropped
+}
+
 // harvestLocked drops the least valuable records once the buffer has grown
 // past MaxEventAllowance, bringing it back to MinEventAllowance. A no-op
 // below that threshold, so the cost is paid once per MaxEventAllowance -

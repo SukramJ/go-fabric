@@ -1681,23 +1681,22 @@
         "endpoint:TestRead_WildcardEndpointFansOut",
         "im:TestRead_DataVersionFilterMatching_SkipsCluster",
         "endpoint:TestRead_UnknownEndpoint",
-        "endpoint:TestRead_AttributeNotImplemented"
+        "endpoint:TestRead_AttributeNotImplemented",
+        "node:TestAttributeReadResponseParity"
       ],
       "missing": [
-        "reads model-known absent high-privilege attribute as unsupported attribute for view-only subject",
-        "reads wildcard endpoint & attributes",
-        "reads full wildcard",
-        "reads full wildcard with adding and removing endpoint",
-        "reads attributeList global Attribute full wildcard",
         "reads attributeList global Attribute full wildcard excluding attributerList via WildcardPath Filter"
       ],
-      "reason": "Concrete, endpoint-wildcard, version-filtered and non-existent reads are covered on the dispatcher; the full wildcards, the view-only subject and the AttributeList filter cases are not.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave.",
       "snapshotSha": "a8a94c17d633ea6c6aa79b8ebb98c021443867b2"
     },
     {
       "path": "packages/node/test/node/AttributeSubscriptionResponseTest.ts",
-      "status": "planned",
-      "reason": "Which paths a subscription's dirty-attribute report reads; the Go handler parity test names its one case untranslatable as written, so nothing is ported yet.",
+      "status": "ported",
+      "go": [
+        "node:TestAttributeSubscriptionResponseParity"
+      ],
+      "reason": "Which attributes a subscription's data report carries after a change, over the wire on fabrictest: the writable BasicInformation attributes stand in for the fixed ones matter.js marks dirty, a probe attribute proves the absent data, five LevelControl attributes the five-attribute case.",
       "snapshotSha": "97d57dadbd480fb2cc28677a90efcc1e53dc54f4"
     },
     {
@@ -1709,37 +1708,34 @@
         "endpoint:TestHandleWriteRequest_EnforcesElevatedWritePrivilege",
         "endpoint:TestWrite_ConcreteReadOnlyAttributeRejected",
         "endpoint:TestWrite_WildcardSkipsReadOnlyAttribute",
-        "endpoint:TestWrite_ConstraintMaps"
+        "endpoint:TestWrite_ConstraintMaps",
+        "node:TestAttributeWriteResponseParity",
+        "im:TestWriteParity_DataVersion_WildcardEndpoint_Ignored"
       ],
       "missing": [
-        "writes model-known absent high-privilege attribute as unsupported attribute for view-only subject",
-        "writes endpoint wildcard attribute with ACL issue",
-        "writes version mismatch concrete attribute with error",
-        "writes version mismatch wildcard attribute where mismatch got ignored",
-        "writes wildcard attribute with constraint error",
         "writes with invalid wildcard combination",
         "${group ? \"group\" : \"wildcard\"} write skips an attribute that another write interaction holds"
       ],
-      "reason": "Concrete and wildcard writes, the ACL error, read-only attributes and constraint errors are covered; data-version mismatches, the view-only subject and wildcard constraint errors are not.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestAttributeWriteResponseParity; three fixes: the View pass before existence, the DataVersion ignored on a wildcard path, NodeLabel CONSTRAINT_ERROR). Missing: the invalid wildcard combination — matter.js answers the whole interaction with a StatusResponse of InvalidAction (AttributeWriteResponse.ts:279-285), the Go server an AttributeStatus per path, a response-shape change; the two held-write cases — AttributeWriteResponse's isHeldByOtherWrite lock across write interactions (:355), which the Go server does not have.",
       "snapshotSha": "8364800f12a8ec2f1484b142f3bc82fe033f75ac"
     },
     {
       "path": "packages/node/test/node/BitmapWriteValidationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/cover:TestWindowCoveringServer_WriteModeConstraint"
+        "cluster/cover:TestWindowCoveringServer_WriteModeConstraint",
+        "node:TestBitmapWriteValidationParity"
       ],
-      "missing": [
-        "accepts a defined bit",
-        "accepts the motor direction bit on a covering with no lift"
-      ],
-      "reason": "The reserved-bit write is ported; the defined bit and the motor direction bit on a covering without lift are not.",
+      "reason": "The three Mode writes run over the wire on fabrictest (node:TestBitmapWriteValidationParity) besides the server-level reserved-bit test.",
       "snapshotSha": "42e420d20f6b0762235a48ee1846f6ceb82e60b5"
     },
     {
       "path": "packages/node/test/node/CaseConnectionTimeoutTest.ts",
-      "status": "planned",
-      "reason": "The controller's CASE connection budget failing commissioning and deleting the peer, and refusing a non-finite budget.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestCaseConnectionTimeoutParity"
+      ],
+      "reason": "The CASE connection budget after AddNOC (Sigma1 to the device dropped on fabrictest's network): commissioning through the registry fails before 60 s with a peer.UnreachableError naming the budget and the peer is deleted; a non-finite budget is refused (controller/client:TestCaseConnectionTimeoutParity).",
       "snapshotSha": "4b4dd0e33775a00065001e755f1ff1b6bfa29482"
     },
     {
@@ -1762,37 +1758,39 @@
         "controller/commissioner:TestRejectedAttestation",
         "controller/commissioner:TestAcceptedFailedAttestation",
         "controller/dcl:TestCommissionWithDCLStore",
-        "controller/dcl:TestCommissionRevokedDAC"
+        "controller/dcl:TestCommissionRevokedDAC",
+        "controller/client:TestClientAttestationNoTrustStoreParity",
+        "controller/client:TestClientAttestationTrustStoreParity",
+        "controller/client:TestClientAttestationCallbackContractParity"
       ],
       "missing": [
-        "commissions with default policy (undefined)",
-        "custom callback receives DclServiceUnavailable warning and other findings",
-        "custom callback receives findings and rejects",
-        "callback receives CertificationTypeTest and other expected findings",
-        "rejects with onAttestationFailure=false despite valid chain",
         "self-heals a corrupt cached PAA by re-fetching from DCL",
         "surfaces an unrecoverable corrupt cached PAA as a judgeable finding",
         "rejects an unrecoverable corrupt cached PAA when policy rejects, surfacing the cause",
-        "emits TrustedAsTestCertificate finding, callback rejects",
-        "emits TrustedAsTestCertificate finding, callback accepts → commissioning proceeds",
-        "PaaNotTrusted error finding, callback rejects",
-        "PaaNotTrusted error finding, callback accepts → commissioning proceeds",
         "rejects when PAI serial is in revocation list",
         "passes when revocation list has different serial numbers",
-        "dynamically fetches revocation data from DCL during commissioning",
-        "string return on success-path findings wraps the synthesized error as cause",
-        "string return on hard-error finding wraps the original DeviceAttestationError as cause",
-        "callback throw propagates verbatim (no wrapping)",
-        "callback throwing DeviceAttestationError on success-path findings propagates without re-invocation",
-        "callback throwing DeviceAttestationError on hard-error finding propagates without re-invocation"
+        "dynamically fetches revocation data from DCL during commissioning"
       ],
-      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store are covered; the findings callbacks and corrupt-cache cases are not.",
+      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest.",
       "snapshotSha": "f9312f9c95045cfa3ad304b8b2e26732aab89708"
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
-      "status": "planned",
-      "reason": "How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits).",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientBridgeStructureBridgeParity",
+        "controller/client:TestClientBridgeStructureTwoInteractionsParity",
+        "controller/client:TestClientBridgeStructureRootOmitsParity",
+        "controller/client:TestClientBridgeStructureChangesParity",
+        "controller/client:TestClientBridgeStructureNestedAggregatorParity",
+        "controller/client:TestClientBridgeStructureSeveralEndpointsParity"
+      ],
+      "missing": [
+        "puts a sensor the bridge adds to a composed device below that device",
+        "keeps each aggregator's own devices below it",
+        "reports the nested aggregator as an aggregator"
+      ],
+      "reason": "How the client builds a bridge peer's tree: a composed device's parts below it on a real bridge (fabrictest), and on Descriptor reports applied to the image (Node.apply) — the claims kept across two interactions, the root omitting an endpoint, lists that change, an aggregator below an aggregator, bridged devices of several endpoints, the claimant ranking and the several-parents warning (controller/client:TestClientBridgeStructure*; fix: the claimant naming the fewest other claimants, then the shorter list, then the lower number owns a part whatever the arrival order, an endpoint the root no longer names is not waited for and not warned about, ClientStructure.ts:1436-1599). Missing: a sensor added to a composed device at run time and deleted again (device.Device has no part removal), and the real nested-aggregator device (the Go node serves one Aggregator at endpoint 1; the fed case covers the client's placement).",
       "snapshotSha": "383dcabbcfeadb8c3ff816583d859c91d6267cb7"
     },
     {
@@ -1804,8 +1802,11 @@
     },
     {
       "path": "packages/node/test/node/ClientChunkedListTest.ts",
-      "status": "planned",
-      "reason": "The controller reassembling a list attribute chunked across reports, by subscription and by read.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientChunkedListParity"
+      ],
+      "reason": "A 50-channel ChannelList chunked across reports, reassembled through the default subscription and through a read (controller/client:TestClientChunkedListParity, a Channel server on the bridged light).",
       "snapshotSha": "5cae8c1538f3b9be0529ee877624e3c900cd08a9"
     },
     {
@@ -1830,34 +1831,53 @@
       "go": [
         "controller/peer:TestTwoAddressesStaggered",
         "controller/peer:TestOperationalAddressStaysAsFallback",
-        "controller/peer:TestConnectDiscoveredAddress"
+        "controller/peer:TestConnectDiscoveredAddress",
+        "controller/client:TestClientConnectivityParity"
       ],
       "missing": [
-        "throws error if node cannot be reached",
-        "reconnects and updates connection status",
         "connects via last known address when MDNS is unavailable",
         "reconnects after device address change with expired records",
         "reconnects after device address change with stale MDNS records",
         "tracks peer online status with session lifecycle",
-        "resubscribes on timeout",
-        "signals subscription alive when a sustained subscription re-establishes",
-        "resubscribes after extended offline period",
-        "closes cleanly during sustained subscription reconnection",
-        "terminates the sustained subscription when the node is disabled",
-        "establishes a fresh sustained subscription after disable/enable",
         "closes a non-sustained subscription when the node is disabled",
-        "does not crash on restart when uncommissioned peer exists",
-        "shuts down without errors whilst establishing exchange",
-        "subscribes to a peer that is not initially available (start/stop)",
         "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback are covered; reconnects, online tracking and resubscription are not.",
+      "reason": "Staggered addresses and the last-known address as fallback keep their controller/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path).",
       "snapshotSha": "d8d5ef04cd30330aea21df86f89bd871e5043671"
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
-      "status": "planned",
-      "reason": "Delivery of peer events to the controller's observers, timestamps and event numbers.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientEventNotificationEventsOfParity",
+        "controller/client:TestClientEventNotificationEventNumbersParity"
+      ],
+      "missing": [
+        "emits EventOccurrence for MS initialPress",
+        "emits EventOccurrence for MS, MSR and MSM events",
+        "distinguishes the four wire timestamp variants",
+        "delivers an event to every observer when one of them throws or rejects",
+        "warns once per node and kind of failure when a change observer fails for each event report",
+        "commissions a node while a change observer fails for each event",
+        "ignores events and event numbers of a replaced default subscription",
+        "finishes delivering an event only after its asynchronous observers settled",
+        "does not emit an event again when the default subscription changes while its observers run",
+        "stores the number of the events the commissioning read emitted when the read fails",
+        "returns a narrow read's events to the caller only",
+        "returns a narrow subscription's events to the caller only",
+        "resubscribes a sustained subscription above the last event it delivered",
+        "does not store the number of an event dropped because the node is being deleted",
+        "does not store the number of an event dropped because the node crashed",
+        "stores the number when another transaction holds the network state",
+        "does not emit a held event once its interaction stopped emitting events",
+        "emits every event of an interaction when observers fail for some of them",
+        "does not queue emit jobs for the events of an interaction that stopped emitting",
+        "does not emit an interaction's delayed event at the end of another one when the first ends",
+        "does not emit an interaction's delayed event at the end of another one when the first fails",
+        "includes all Switch events even when featureMap is 0",
+        "preserves detected supportedFeatures after all-feature composition"
+      ],
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). Missing: matter.js's ChangeNotificationService and its EventOccurrence (names, timestamp kind), the per-event emitter and its observers (several, failing, asynchronous, rejecting; the warning per node and kind; the emit job queue of concurrent interactions and their delayed events), the per-subscription event number and the subscription-local events of a narrow read or subscription (Node.Read and Node.Subscribe apply every event to the image), a replaced default subscription's callbacks, the network state held by another transaction, the crashed node, and an event of a node being deleted (no hook inside Registry.Decommission), and the PeerBehavior event composition (Go does not gate events by features: any event of the definition decodes).",
       "snapshotSha": "1575387a3d2a35e62b3fafe9eee015d83f320d2c"
     },
     {
@@ -1869,8 +1889,52 @@
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "status": "planned",
-      "reason": "The controller's invoke batching, its bypasses and network propagation.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientInvokeParity"
+      ],
+      "missing": [
+        "executes commands via the batcher",
+        "requires MockTime.resolve for batched commands (non-root endpoints)",
+        "bypasses batching when maxPathsPerInvoke is 1",
+        "clears maxPathsPerInvoke cache when node goes offline",
+        "rejects pending commands when batcher is closed",
+        "bypasses batching for timed invoke requests",
+        "batches different commands together while splitting duplicates",
+        "direct invoke (#invokeSingle) propagates network to exchange",
+        "batched invoke (#invokeWithBatching) propagates network to exchange",
+        "split invoke (#invokeWithSplitting) propagates network to each exchange",
+        "command with expectedProcessingTime never joins a batch",
+        "command with useExtendedFailSafeMessageResponseTimeout never joins a batch",
+        "command with additionalMrpDelay never joins a batch",
+        "command with interactionModelRevision never joins a batch",
+        "command with timeout never joins a batch",
+        "command with beforeDispatch never joins a batch",
+        "command with timedRequest never joins a batch",
+        "command with suppressResponse never joins a batch",
+        "command with delayReportData never joins a batch",
+        "command with largeMessage never joins a batch",
+        "timed command goes out alone after a TimedRequest",
+        "command with suppressResponse goes out alone",
+        "only a non-default interaction model revision keeps a command out of the batch",
+        "command without an endpoint never joins a batch",
+        "abort, network, skipValidation and icdAwaitTimeout do not keep a command out of the batch",
+        "command with its own expected processing time keeps it",
+        "command with the extended fail-safe timeout keeps it",
+        "command with its own MRP delay keeps it",
+        "command with an address override keeps it",
+        "commands without options share a batch (characterization)",
+        "command with options goes out alone and ahead of the batch invoked before it",
+        "commands for different networks go into separate batches",
+        "batches for different networks do not wait on each other",
+        "command without a network and one naming the default network share a batch",
+        "command queued while the interaction closes is rejected with the close reason",
+        "direct invoke keeps its expected processing time (characterization)",
+        "stops the batch exchange of a command whose acting context aborts",
+        "correctly splits different-path commands when maxPathsPerInvoke is 1",
+        "splits duplicate command paths into separate batches"
+      ],
+      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). Missing: matter.js's invoke batcher — batching up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), splitting, commandRef matching, the cache cleared when the node goes offline, closing the batcher, the batch exchange aborted with its context — and the network propagation of invoke options (network profiles, MRP delays, expected processing times observed on the exchange): the Go client sends one command per InvokeRequest (controller/interaction Interaction.Invoke) and offers no seam to observe the exchange's timing; the device's maxPathsPerInvoke is not configurable on the Go node (always 10).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -1882,14 +1946,23 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeConfigurationVersionTest.ts",
-      "status": "planned",
-      "reason": "The controller emitting configurationVersionChanged when a peer bumps ConfigurationVersion.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientNodeConfigurationVersionParity"
+      ],
+      "reason": "A ConfigurationVersion bump on the device signalled by the client node (controller/client:TestClientNodeConfigurationVersionParity; fix: client.Hooks.ConfigurationVersionChanged, Peers.ts:757, :803-814).",
       "snapshotSha": "60eef13b9fe3d856d15f527ff30dcd5d074a218e"
     },
     {
       "path": "packages/node/test/node/ClientNodePhysicalPropertiesTest.ts",
-      "status": "planned",
-      "reason": "The controller retaining and re-evaluating a peer's physical properties across teardown and reconnect.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientNodePhysicalPropertiesParity"
+      ],
+      "missing": [
+        "detaches the snapshot from live behavior state at freeze"
+      ],
+      "reason": "The properties kept after the node closes and re-evaluated after Stop and Start run on fabrictest (controller/client:TestClientNodePhysicalPropertiesParity). Missing: the snapshot's array identity at freeze — client.Node.Properties returns a value, so there is no live accessor whose array could be detached.",
       "snapshotSha": "4e0bec609a35936dadc889c13dbaa3a781e59947"
     },
     {
@@ -1902,26 +1975,191 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTest.ts",
-      "status": "planned",
-      "reason": "The controller's client node end to end: discovery, commissioning, PASE address order, reconnection, structure and subscriptions.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientNodeParity",
+        "controller/client:TestClientNodeForwardsModelInvalidWriteParity",
+        "controller/client:TestClientNodeSendsWritesParity",
+        "controller/client:TestClientNodeSendsUnchangedWriteParity",
+        "controller/client:TestClientNodeAcceptedWriteParity",
+        "controller/client:TestClientNodeFabricIndexParity",
+        "controller/client:TestClientNodeOrphanedPeerCleanupParity",
+        "controller/client:TestClientNodePeerAddressResilienceParity",
+        "controller/client:TestClientNodeChangesOmittedVersionFiltersParity",
+        "controller/client:TestClientNodeDropsOptionalAttributeParity",
+        "controller/client:TestClientNodeSchrodingersClusterParity"
+      ],
+      "missing": [
+        "starts controller automatically when commissioning with controller offline",
+        "times out commissioning discovery",
+        "establishes PASE with the device's addresses in their ranked order",
+        "establishes PASE with the most desirable of the given addresses first",
+        "tries a repeated address once",
+        "stops after the first address of one discovered device",
+        "tries every address when the device identity is unknown",
+        "commissions with an explicit id and restores the peer under that id after restart",
+        "assigns an unused node ID when commissioning after a restart with existing peers",
+        "establishes a PASE session via discovery (PaseDiscovery)",
+        "commissions the correct node with same-discriminator devices and mixed passcodes",
+        "commissions same-discriminator devices with an explicit node ID without a peer-address conflict",
+        "tells the scanners to forget a device it commissioned",
+        "tells the scanners the identity of a device it discovered and commissioned",
+        "leaves a device the scanners know when commissioning it fails",
+        "leaves a device the scanners know when the commissioning steps fail",
+        "commissions a device and tells the other scanners when one scanner fails to forget it",
+        "reads a peer's basic information through one shared state reference",
+        "closes the protocol peer when the node's address is cleared",
+        "writes nullable attribute via setStateOf: null, 0 and 2",
+        "via agent.state assignment",
+        "via setStateOf",
+        "via endpoint.set",
+        "via agent.state assignment",
+        "via setStateOf",
+        "via endpoint.set",
+        "via local ServerNode set surfaces the listener's StatusResponseError",
+        "when one of two writes is declined, surfaces only that rejection",
+        "when both writes are declined, surfaces a MatterAggregateError with each per-attribute error",
+        "keeps the pre-write value when the only write is declined",
+        "applies only the accepted attribute when one of two writes is declined",
+        "keeps both attributes when both writes are declined",
+        "declines a write of a global attribute locally and leaves the cache intact",
+        "writes a value twice and the device receives both writes",
+        "writes a list twice and the device receives both writes",
+        "does not send an assignment refused locally",
+        "does not resend an assignment after its transaction rolled back",
+        "does not resend an assignment after the device declined it",
+        "does not write back a value a report applies",
+        "with no subscription to report the value back",
+        "and leaves alone a value the peer reported while the write was in flight",
+        "and keeps a same-value assignment the device accepted over a concurrent report",
+        "and keeps a concurrent report when the device declines a same-value assignment",
+        "keeps the value when the peer reported it before the answer was lost",
+        "accepted, with no report",
+        "declined, with no report",
+        "accepted, reported the initial value in flight",
+        "accepted, reported the written value in flight",
+        "accepted, reported another value in flight",
+        "declined, reported the initial value in flight",
+        "declined, reported the written value in flight",
+        "declined, reported another value in flight",
+        "accepted, another controller's write wins with 1 report(s)",
+        "accepted, another controller's write wins with 2 report(s)",
+        "shows the transaction its own assignment and everyone else the old value until the device accepts",
+        "holds the accepted value when the writing transaction's post-commit reads it",
+        "keeps a later write of the same transaction over an earlier one",
+        "announces a report that lands before the accepted value is announced after it",
+        "announces accepted values when the transaction concludes, after its local changes",
+        "does not resend an earlier cycle's write in a cascaded cycle of the same transaction",
+        "holds the accepted value when the next transaction takes the lock",
+        "lets an observer of the accepted value write a datasource a cascaded cycle of the writer held",
+        "rolls back a local change of the same transaction when the device declines the write",
+        "settles the accepted attributes of a partly declined write and rolls back the rest",
+        "sends only the last value of an attribute assigned twice",
+        "keeps what one peer accepted when another declines, accepting peer assigned first",
+        "keeps what one peer accepted when another declines, declining peer assigned first",
+        "applies and announces an accepted value whose local persist failed",
+        "applies a report whose local persist failed",
+        "lets a post-commit observer await a write of the same client cluster in another transaction",
+        "announces every cluster of a write when an observer of one throws",
+        "lets an observer of the accepted value write",
+        "logs an observer of the accepted value that fails and still resolves the write",
+        "logs a failure to settle an accepted value and still resolves the write",
+        "applies nothing when the cache is erased while the write is in flight",
+        "applies nothing when the cache is reclaimed while the write is in flight",
+        "applies and announces the attributes the device accepted when it declines another",
+        "accepts FabricIndex.OMIT_FABRIC as the mandatory placeholder",
+        "rejects FabricIndex.NO_FABRIC (0)",
+        "does not relax server-side fabricIndex validation",
+        "backfills fabricIndexOnPeer from operational credentials on reload when state was cleared",
+        "erases node after leave event",
+        "refuses to allocate a peer address whose NodeId is already in use",
+        "properly supports unknown clusters",
+        "correctly replaces behavior",
+        "omits version filters only for clusters in which the peer has a changes-omitted attribute",
+        "exposes attributes added by a behavior replace",
+        "propagates global attribute changes to the change notification service",
+        "correctly removes behavior",
+        "removes attributes when a behavior replace drops a feature",
+        "re-installs a cluster the device drops and later restores",
+        "while the controller stays online",
+        "while the controller is offline, and after the controller restarts again",
+        "when the cache already holds the shrunk attribute list next to a stale value",
+        "handles shutdown event and reestablishes connection",
+        "disconnect from/disables the node",
+        "skips the controller's own node ID",
+        "skips a previously allocated node ID",
+        "endpoint.state[behaviorId] returns undefined after close",
+        "survives a read that runs while the report carrying its data is still arriving",
+        "keeps a cluster a wire batch carries data for though its descriptor omits it",
+        "rebuilds a cluster when a wire change alters its revision",
+        "accepts a peer endpoint whose number a local endpoint holds",
+        "builds the structure of a reported endpoint whose values it fails to persist, and warns once",
+        "adopts an endpoint created by require() when the peer reports it",
+        "refuses a duplicate number in a hand-built peer structure"
+      ],
+      "reason": "Discovery, commissioning through the registry (its options and refusals: autoSubscribe, autoStateInitialize, an explicit node id in use before PASE, a node without addresses), the image restored after a controller restart, commands and reports, decommission and the protocol peer it closes, writes whose subject is the device's answer, events, endpoints that appear and disappear (fix: an endpoint a reassembly adds announces all its attributes to the subscriptions, ProtocolService.ts:280-287), the registry's culling and address pruning, and the report-fed structure cases (the dropped optional attribute, Schrödinger's cluster, changes-omitted filters) run on fabrictest and on Node.apply (controller/client:TestClientNode*). Missing: matter.js's writes through the client node's state — the agent.state, setStateOf and endpoint.set variants of one wire write, the RemoteWriter that applies an accepted value to the cache, transactions, locks, observers and the local validator (Go has one write surface, Node.Write, which leaves the image to the next report; controller/client doc 'Not here'), and the declining test servers they use; peers.commission/peers.pase by discovery with ParallelPaseDiscovery over same-discriminator devices, the scanners told to forget a device (no ScannerSet.forgetCommissionedDevice), the ranked PASE destinations and the wrong-passcode attempt counts (fabrictest gives a host one link-local address and no IPv4), a commission with an explicit local id, sequential node ids and the peer-address allocator (the commissioner draws random ids); the protocol peer's shared basicInformation, a peer address cleared by a state write, the fabricIndexOnPeer backfill on reload; the leave a device sends when it removes the fabric itself (node.RemoveFabric closes the fabric's subscriptions without flushing the Leave event, matter.js Fabric.leave closeSubscriptions(true)); unknown vendor clusters served by the device, a device whose shape changes across a restart (fabrictest restarts the same servers) and the ChangeNotificationService; PowerSource on the root (the Go root serves none); endpoint.require placeholders and hand-built endpoints, the store failure warned once, applyWireChanges and an interleaved chunked report (Node.apply takes a report whole); the two matter.js TODO cases with empty bodies.",
       "snapshotSha": "4f11d42a658c25c213e95faafbfa1947e26de112"
     },
     {
       "path": "packages/node/test/node/ClientStartUpTest.ts",
-      "status": "planned",
-      "reason": "The controller's handling of a peer's StartUp event against its sessions.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientStartUpParity",
+        "controller/client:TestReactionsNeedSubscription",
+        "controller/client:TestReactionStartUp"
+      ],
+      "reason": "A StartUp the device reports while the default subscription is active keeps the live session (controller/client:TestClientStartUpParity on fabrictest); a StartUp without an active subscription is ignored (TestReactionsNeedSubscription) and sessions older than the newest are closed (TestReactionStartUp), on the registry's scripted peer: matter.js emits the event on the peer locally and injects a mock session, which fabrictest cannot.",
       "snapshotSha": "2d1de94216bbfe2670fc201f2cb7d5aec49743fd"
     },
     {
       "path": "packages/node/test/node/ClientStructureOffloadTest.ts",
-      "status": "planned",
-      "reason": "The controller applying a multi-cluster priming report and events of the same interaction.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientStructureOffloadParity"
+      ],
+      "reason": "The priming report's values on the light and the root, and an InitialPress event of the same interaction delivered to Hooks.Event, run on fabrictest (controller/client:TestClientStructureOffloadParity); the switch is a bridged GenericSwitch where matter.js mounts it on the root (the Go root serves no Switch).",
       "snapshotSha": "8132391c19d2618d96a60a30ecc065605214dc94"
     },
     {
       "path": "packages/node/test/node/ClientSubscribeTest.ts",
-      "status": "planned",
-      "reason": "The controller's subscribe: data version filter injection, sustained subscriptions, fabric filters.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientSubscribeParity",
+        "controller/client:TestClientSubscribeDataVersionFiltersParity",
+        "controller/client:TestClientSubscribeCacheFabricFilterParity"
+      ],
+      "missing": [
+        "sends only the caller's data version filters with includeKnownVersions",
+        "keeps includeKnownVersions when a sustained subscription replaces a lost one",
+        "follows the fabric filter the default subscription sends",
+        "sends a default subscription given as a built request as it is",
+        "forgets data versions when the default subscription's fabric filter changes",
+        "forgets a version known only to storage when the fabric filter changes",
+        "forgets data versions cached under another fabric filter on restart",
+        "keeps forgotten data versions unknown across a restart",
+        "keeps data versions of a node stored without a fabric filter record and records the filter",
+        "applies data of an interaction that started before a switch to unfiltered without its version",
+        "applies data of an interaction that started before a switch to filtered without its version",
+        "warns and keeps the cache usable when the first record cannot be written",
+        "records no version for data of an interaction that started before the first record of another filter",
+        "logs an error when the switched filter cannot be recorded",
+        "keeps the old filter and still subscribes after a runtime change",
+        "keeps the old filter and still starts the node",
+        "ignores callbacks of a replaced default subscription",
+        "does not install a default subscription that closed while it was established",
+        "subscribes at the next start after a default subscription failed to start",
+        "runs startup and the reaction to defaultSubscription one at a time",
+        "runs the reactions to autoSubscribe and defaultSubscription one at a time",
+        "reports not subscribed when an active default subscription ends",
+        "records no data version for a report of a subscription opened before a switch",
+        "records data versions again once a subscription opened before a switch is replaced",
+        "answers the priming report that arrives after the cancel with INVALID_SUBSCRIPTION",
+        "answers the priming report with INVALID_SUBSCRIPTION when the session signal aborts",
+        "answers the priming report it is processing during the cancel with INVALID_SUBSCRIPTION",
+        "answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it",
+        "answers the priming report with INVALID_SUBSCRIPTION when processing it fails"
+      ],
+      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks); and the priming report answered INVALID_SUBSCRIPTION after a cancel or a failing updated (controller/interaction acknowledges it Success and its Updated cannot fail — brief BH's path).",
       "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9"
     },
     {
@@ -1953,92 +2191,94 @@
       "go": [
         "endpoint:TestInvoke_SuccessAndUnknownCommand",
         "endpoint:TestInvokeUnsupportedCommandMapsTo0x81",
-        "endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege"
+        "endpoint:TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
+        "node:TestCommandInvokeResponseParity",
+        "node:TestCommandInvokeResponseDispatchEndpointsParity"
       ],
       "missing": [
-        "invokes existing endpoint wildcard commands",
-        "produces results regardless of suppressResponse",
-        "invokes non-existing endpoint wildcard command",
-        "invokes model-known absent high-privilege command as existence status for operate-only subject",
-        "does not invoke a command on a client cluster declared via withClientClusters",
-        "does not invoke a command on a client cluster added via require",
-        "counts an existing command denied at the actual-privilege ACL pass as existent",
-        "clamps the outer status to FAILURE when a handler reports a cluster-specific status",
-        "reports an error with no defined status code as a per-command FAILURE",
-        "reports a plain Error escaping a handler as a per-command FAILURE",
-        "keeps sibling results and continues the batch when one command throws",
-        "reports an unimplemented mandatory command as UNSUPPORTED_COMMAND and omits it from AcceptedCommandList",
-        "reports a payload that does not match the command schema as INVALID_COMMAND",
-        "refuses a fabric-scoped command over a PASE session with UNSUPPORTED_ACCESS",
-        "the framework fabric-scoped guard refuses invocation before the handler runs, even without a handler-level guard",
-        "invokes a command that is not fabric-scoped over the same PASE session",
-        "skips a fabric-scoped command on a wildcard path over a PASE session rather than reporting it",
-        "names the endpoint of a concrete path",
-        "names every endpoint a wildcard path expands to",
-        "leaves out a concrete path that fails validation",
-        "leaves out a concrete path that needs a timed interaction it lacks",
-        "leaves out a fabric-scoped concrete path on a session without fabric",
-        "names only the group's endpoints for a group invoke",
-        "leaves out endpoints a wildcard path may not invoke on"
+        "names only the group's endpoints for a group invoke"
       ],
-      "reason": "A concrete invoke and an unknown command are covered; wildcard invokes, client clusters, privilege-pass existence and status clamping are not.",
+      "reason": "Every other case runs over the wire on fabrictest (node:TestCommandInvokeResponseParity; fixes: wildcard-endpoint invokes, the Operate pass before existence, the outer FAILURE under a cluster status, INVALID_COMMAND for a non-structure payload); the dispatch-endpoint group is observed through the DelayReportData deferral (node:TestCommandInvokeResponseDispatchEndpointsParity; fix: only dispatchable endpoints are deferred). Missing: the group invoke — fabrictest's network carries no group messages.",
       "snapshotSha": "1ff5c131ac0cbf5b4f620b77a9af7db32a97617d"
     },
     {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
-      "status": "planned",
-      "reason": "The PASE session closed when the commissioning flow cannot be created.",
+      "status": "ported",
+      "go": [
+        "node:TestCommissioningPaseLifetimeParity"
+      ],
+      "reason": "On fabrictest: the step between PASE and the flow (ClaimNodeIDAfterPASE) refuses in place of matter.js's unconstructable flow class, and the controller holds no session the attempt opened (node:TestCommissioningPaseLifetimeParity).",
       "snapshotSha": "f0d47ddd295a239f55020671bc3f3b0a2eb5fe0e"
     },
     {
       "path": "packages/node/test/node/DecommissionTest.ts",
-      "status": "planned",
-      "reason": "The controller decommissioning a peer: RemoveFabric, lost responses, leave events.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestDecommissionUnstructuredParity",
+        "controller/client:TestDecommissionParity"
+      ],
+      "missing": [
+        "removes the node when removeFabric is delivered but the response is lost",
+        "removes the node when a matching leave event arrives even if removeFabric rejects",
+        "does not treat a leave for a different fabric as confirmation",
+        "keeps the node and throws when removeFabric returns a non-Ok status, even if a leave arrives",
+        "probe resolves false on a destroyed node instead of throwing",
+        "rejects a decommission of a node that is being deleted",
+        "waits for a running decommission before handing out a node (removed)",
+        "rejects a decommission of a crashed node with its lifecycle error",
+        "rejects a commission of a crashed node with its lifecycle error",
+        "rejects a commission attempt registered for a crashed node",
+        "does not cull the node while its decommission deletes it",
+        "reports the node gone as soon as its deletion begins",
+        "rejects acting on a node whose deletion has begun instead of restarting it",
+        "ignores an event that arrives for a node while it is deleted"
+      ],
+      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). Missing: the cases that patch the peer's removeFabric client to throw PeerMessageMissingError or a non-Ok status or to emit a leave inside the call (no seam on the wire for a delivered request whose answer is lost, nor for a leave timed inside the call); the probe of a destroyed node (no node-level probe); a node being deleted or a delete wrapper (deletion is the registry's Decommission, no public delete in flight); the crashed construction status, runCommissioning, isGone and act on a node whose deletion began (no construction lifecycle in Go); an event fed into the structure while the node is deleted (Node.apply is package-internal; covered by the closing node dropping events).",
       "snapshotSha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d"
     },
     {
       "path": "packages/node/test/node/DelayReportDataTest.ts",
       "status": "partial",
       "go": [
-        "im/subscription:TestDeferReports"
+        "im/subscription:TestDeferReports",
+        "node:TestDelayReportDataParity"
       ],
       "missing": [
-        "adds a random jitter below DelayJitterWindowMs",
-        "defers whether or not the command succeeds",
-        "applies a new deferral after an earlier one ended",
-        "holds a report that is already waiting for its send delay",
-        "defers for a wildcard invoke on the endpoints it expands to",
-        "defers a subscription of another fabric",
-        "still reports after the send delay under a stream of invokes without delay",
-        "reschedules a held report when a later invoke shortens the deferral",
-        "sends no extra report after a deferred one",
-        "does not hold a report past the subscription's next scheduled report",
-        "defers only the next report",
-        "defers a subscription whose path selects every endpoint",
-        "defers a subscription whose event path selects a targeted endpoint",
-        "does not defer when no command of the invoke can be dispatched",
-        "does not defer a subscription of every endpoint when no command can be dispatched",
         "ignores DelayReportData"
       ],
-      "reason": "The deferral, its shortening, the send-interval bound and the untargeted subscription are ported; jitter, the wildcard and event-path cases and the feature switch are not.",
+      "reason": "Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData).",
       "snapshotSha": "613143fd04bb2ce7a3cc44fe052f9347b076ff00"
     },
     {
       "path": "packages/node/test/node/DotQualifiedConstraintTest.ts",
-      "status": "planned",
-      "reason": "Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others).",
+      "status": "ported",
+      "go": [
+        "node:TestDotQualifiedConstraintParity"
+      ],
+      "reason": "Writes over the wire on fabrictest, local sets and server construction against the generated servers (node:TestDotQualifiedConstraintParity); fix: dot-qualified bounds resolved and initial values re-checked with their siblings in place.",
       "snapshotSha": "d89b3df6751ca920a8963e8b054bf198282f02dc"
     },
     {
       "path": "packages/node/test/node/EventReadResponseTest.ts",
-      "status": "planned",
-      "reason": "Event reads: fabric-sensitive filtering, version filters, wildcards and non-existent paths.",
+      "status": "ported",
+      "go": [
+        "node:TestEventReadResponseParity"
+      ],
+      "reason": "Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive.",
       "snapshotSha": "42640add744cb2de9ca005d35a43500d8c723c05"
     },
     {
       "path": "packages/node/test/node/FailsafeCommissioningTest.ts",
-      "status": "planned",
-      "reason": "Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete.",
+      "status": "partial",
+      "go": [
+        "node:TestFailsafeCommissioningParity"
+      ],
+      "missing": [
+        "re-announces after failsafe expiry with PASE session active (before addNOC)",
+        "re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)",
+        "recovers cleanly when initial ACL creation fails during addNOC"
+      ],
+      "reason": "On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back and leaves the device commissionable (node:TestFailsafeCommissioningParity); the re-announcement itself is missing — the Go device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes, where matter.js starts an advertisement round (DeviceAdvertiser.ts:131-162); the ACL-failure case has no seam to fail the device's initial ACL.",
       "snapshotSha": "8e1751cc53222167bae7811a878aa7bb8f11fc4d"
     },
     {
@@ -2073,26 +2313,78 @@
     },
     {
       "path": "packages/node/test/node/NodeLifecycleSeededTest.ts",
-      "status": "planned",
-      "reason": "When the controller considers a peer's structure seeded, and its warnings for root-only nodes.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestNodeLifecycleSeededParity",
+        "controller/client:TestNodeLifecycleSeededPairParity"
+      ],
+      "missing": [
+        "seeds a node built by hand once an endpoint beyond the root is added",
+        "seeds a node built by hand on BasicInformation install when endpoints are already present",
+        "uses ClientNodeLifecycle for a client node and plain NodeLifecycle for a server node"
+      ],
+      "reason": "When the client node is seeded — BasicInformation present and every endpoint the root's reported PartsList names installed, a root-only node included, more than the root without a PartsList — and the root-only warning (once, not for a node-scoped device type, not without a reported DeviceTypeList) run on Node.apply with Descriptor reports (controller/client:TestNodeLifecycleSeededParity) and on fabrictest for the commissioned pair and the restored peer (TestNodeLifecycleSeededPairParity); fix: the seeding rule of Peers.ts #evaluateSeeded (:760-797) at 862ad75f — the Go node seeded only with more than one endpoint. matter.js also reads an unreported mandatory list as empty; the Go image holds no value. Missing: nodes built by hand (endpoints.require, behaviors.require — the Go image is built from reports and its store only) and the ClientNodeLifecycle/NodeLifecycle class split (no lifecycle class hierarchy in Go).",
       "snapshotSha": "87a08ef46981063bb00f80dfaa949b2d2a2dd15b"
     },
     {
       "path": "packages/node/test/node/NodePhysicalPropertiesTest.ts",
-      "status": "planned",
-      "reason": "Subscription intervals the controller chooses from a peer's power source and network.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestNodePhysicalPropertiesParity",
+        "controller/client:TestNodePhysicalPropertiesPairParity"
+      ],
+      "reason": "The physical properties and the interval bounds of a node built as matter.js's MockServerNode compositions (the cluster on the root, on a utility endpoint, behind an Aggregator; default, request, ICD, battery, mains and battery, Wi-Fi, sleepy and active Thread intervals; the network medium inferred from the root's diagnostics; the device types collected) run on Node.apply of the image (controller/client:TestNodePhysicalPropertiesParity), the device's own specification version on fabrictest (TestNodePhysicalPropertiesPairParity).",
       "snapshotSha": "f7921db5589915e15ee22c65d9ee93ed62c6496a"
     },
     {
       "path": "packages/node/test/node/PeerBehaviorTest.ts",
-      "status": "planned",
-      "reason": "The schema the controller builds for a peer's clusters from AttributeList and revision.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeerBehaviorDiscoveredParity"
+      ],
+      "missing": [
+        "builds a cluster even when the peer reports an empty AttributeList",
+        "builds a cluster for an ID a custom model resolves but the specification does not allow",
+        "judges a revision-conformant element against the revision the peer sent",
+        "leaves a revision-conformant element to the peer on a write from a client node",
+        "distinguishes shapes that differ only in revision",
+        "shares a behavior with a peer that reports the standard revision",
+        "omits an attribute the peer reports whose conformance before a trailing deprecation excludes it",
+        "keeps the conformance of a reported attribute that the peer's features make mandatory",
+        "exposes an obsolete attribute the peer reports",
+        "omits a disallowed attribute the peer reports",
+        "tolerates a peer that does not report a revision",
+        "returns a peer behavior as it is"
+      ],
+      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete); the conformance of a peer cluster's attributes — mandatory attributes kept supported under an empty AttributeList, a listed attribute excluded by its conformance before a trailing D, a disallowed (X) one, the effective conformance string, a revision-gated element validated against the peer's revision or left to the peer on a client write (client.Cluster.Supports follows the AttributeList only); the revision of a cluster the peer reports none for (matter.js the model's, 1 for an unknown cluster; client.Cluster.Revision is 0 — a decision for the owner).",
       "snapshotSha": "aa253cbd1374b4704ffecad0539b2dd746afbb76"
     },
     {
       "path": "packages/node/test/node/PeerDescriptorTest.ts",
-      "status": "planned",
-      "reason": "The controller's persisted peer descriptor: session parameters, intervals, migrated older records.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeerDescriptorRecordParity",
+        "controller/client:TestPeerDescriptorParity",
+        "controller/peer:TestAddKnownPeerMergeAndCoalescedSave"
+      ],
+      "missing": [
+        "bounds paths per invoke by the negotiated session rather than the reported attribute",
+        "selects TCP for the first connect after a restart from the stored session parameters",
+        "moves a set of DNS-SD intervals to the advertised intervals",
+        "keeps a full set as the reported session parameters",
+        "keeps advertised intervals already stored under the new key",
+        "keeps reported session parameters already stored under the new key",
+        "persist with the next write of the behavior",
+        "do not return after the migrated value is cleared",
+        "drops DNS-SD intervals beyond what DNS-SD can advertise",
+        "keeps a peer marked TCP-unsupported across a restart until a session reports TCP support",
+        "keeps advertised session intervals while the service holds no TXT record",
+        "drops an advertised session interval the device no longer advertises",
+        "take the spec default for a value the session left out",
+        "fall back to BasicInformation before any session reported",
+        "stay as reported when TCP is marked unsupported"
+      ],
+      "reason": "What the commissioning record keeps of the peer's descriptor (session intervals above the DNS-SD maximum, a vendor-specific device type, the reported parameters without fallbacks; controller/client:TestPeerDescriptorRecordParity) and what the controller restores into the protocol peer after a restart (later-session intervals winning over the advertised ones, the stored parameters before the first session, only what the device sent; TestPeerDescriptorParity on fabrictest, the record set through client.UpdateRecord where matter.js assigns the descriptor) are ported; a known peer's reported parameters and discovery data kept over a later descriptor is controller/peer:TestAddKnownPeerMergeAndCoalescedSave. Missing: paths per invoke bounded by the session against BasicInformation and the BasicInformation fallback before any session (the Go peer takes no BasicInformation input; the descriptor is not assignable); TCP (markTcpUnsupported, the transport selection, the descriptor flag — no TCP client); the migration of the legacy sessionParameters storage key (Go never stored it); the advertised intervals kept or dropped by DNS-SD changes as the record sees them (covered at the peer level by TestServiceChangeUpdatesDiscoveryData, but not the empty-TXT, T=4 and no-TXT steps nor through fabrictest, whose devices' TXT the test cannot change).",
       "snapshotSha": "5ee3894c828d2d9058e8634f79050b767cd07446"
     },
     {
@@ -2104,21 +2396,35 @@
     },
     {
       "path": "packages/node/test/node/ReceivedStatusTest.ts",
-      "status": "planned",
-      "reason": "How the controller surfaces a status the device sent, as opposed to a local refusal.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestReceivedStatusParity"
+      ],
+      "missing": [
+        "throws a received specialization for a status the device sent",
+        "throws a local error when validation rejects the request before sending",
+        "returns undefined when the device rejects the signing request",
+        "rethrows the local error for a response with a foreign fabric index",
+        "keeps the device's status in the cause of the CommissioningError"
+      ],
+      "reason": "A read of an endpoint the device removed reports the device's UNSUPPORTED_ENDPOINT per path (controller/client:TestReceivedStatusParity; matter.js's EndpointReadFailedError is the report's Statuses). Missing: the received/local status class distinction itself (every interaction.StatusError is received in Go; no ReceivedStatusResponse hierarchy) with its rejecting Identify server (the endpoint assembler mounts Identify, no host replacement) and the local validation refusal (Node.Invoke does no client-side field validation); controller-side VendorIdVerification (none in Go); the CommissioningError caused by a scripted CertificateChainRequest failure (no scripted OperationalCredentials server on a fabrictest root).",
       "snapshotSha": "b39c57afa3dc45d8c5a7adbc5f155aea3baab88e"
     },
     {
       "path": "packages/node/test/node/RegulatoryConfigCommissioningTest.ts",
-      "status": "planned",
-      "reason": "The default and explicit country code the commissioner sends in SetRegulatoryConfig.",
+      "status": "ported",
+      "go": [
+        "node:TestRegulatoryConfigCommissioningParity"
+      ],
+      "reason": "A Wi-Fi device commissioned to the end on fabrictest with the default and an explicit country code (node:TestRegulatoryConfigCommissioningParity); the device dropping CountryCode on decode is a register candidate.",
       "snapshotSha": "4d7ac664ddc68db7b290ff9ac464826a8da8bbf5"
     },
     {
       "path": "packages/node/test/node/ReportedSessionParametersTest.ts",
       "status": "planned",
-      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller.",
-      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85"
+      "reason": "The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller. Left planned in BI-2: both cases assert both ends with configured intervals; fabrictest sets neither the controller's exchange.Config.LocalParameters nor the device's session intervals, and the device's record of what the controller sent has no accessor.",
+      "snapshotSha": "da6d23d239f29280dae99d8c5448bde73a71ed85",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/ScanNetworksRejectionCommissioningTest.ts",
@@ -2127,21 +2433,92 @@
         "controller/commissioner:TestNetworkWiFiScanRejectedThenAddFails",
         "controller/commissioner:TestNetworkThreadFailures",
         "controller/commissioner:TestFlowRearmsBeforeNetworkStep",
-        "controller/commissioner:TestBLERearmInterval"
+        "controller/commissioner:TestBLERearmInterval",
+        "controller/commissioner:TestScanNetworksRejectionParity_ThreadScanRejected"
       ],
       "missing": [
-        "continues Thread setup when the device rejects the scan with a status",
         "continues WiFi setup when the device answers the scan too late",
         "ends commissioning when the device does not acknowledge the scan",
         "commissions over a PASE session that suppresses peer loss"
       ],
-      "reason": "The rejected scan, the failure that names it and the fail-safe re-arming are covered; the Thread rejection, the late answer and the unacknowledged scan are not.",
+      "reason": "The rejected scan (Wi-Fi and Thread), the failure that names it and the fail-safe re-arming are covered on the commissioner's scripted device; the late answer and the unacknowledged scan need the scripted device to answer late or never, and the PASE session's peer-loss suppression is not observable outside controller/exchange.",
       "snapshotSha": "a044dded9f253d1868a6a0add6933dd5ab58f415"
     },
     {
       "path": "packages/node/test/node/ServerNodeTest.ts",
-      "status": "planned",
-      "reason": "The server node end to end: lifecycle, announcement, operational port, commissioning, factory reset.",
+      "status": "partial",
+      "go": [
+        "node:TestServerNodeParity"
+      ],
+      "missing": [
+        "with part at startup",
+        "with part added before online",
+        "with part added after online",
+        "announces and expires correctly",
+        "lists its peers in its diagnostics",
+        "binds the standard Matter port for a commissionable node without an explicit port",
+        "uses an ephemeral operational port for a controller node without an explicit port",
+        "honors an explicit port on a commissionable node",
+        "honors an explicit port on a controller node",
+        "commissions with delayed provided certificates",
+        "decommissions on the last fabric and resets once the fail-safe ends",
+        "keeps a commissioning that completes under the fail-safe after the last fabric left",
+        "resets when the fail-safe rolls back a fabric it added after the last fabric left",
+        "waits for a fail-safe armed after the last fabric left",
+        "factory resets when offline after commission",
+        "factory resets when online after commission",
+        "factory resets when offline without commission",
+        "handles factory resets when online but in parallel offline is called correctly",
+        "keeps node services across a factory reset and releases them on close",
+        "sanitizes fabric-scoped data once per fabric removal after a factory reset",
+        "releases storage a node opened before its construction failed",
+        "releases the storage lock when an earlier service fails to close",
+        "releases the storage lock when an endpoint fails to close",
+        "releases the storage lock when taking the node offline fails",
+        "starts a node after an earlier node could not open the mDNS socket",
+        "frees the endpoint numbers a factory reset erases",
+        "goes to the preset endpoint when it constructs before the stored endpoint",
+        "is refused when the stored endpoint is installed first",
+        "ignores a stored number outside the range of a part",
+        "starts over from 1 when the next number in storage is corrupt",
+        "is taken over when the stored endpoint is not part of the node",
+        "is taken over from an endpoint closed in the same run",
+        "clears the stored number of the endpoint it took over",
+        "keeps both numbers across a restart when a returning endpoint changes its preset",
+        "gives a number two stored endpoints record to the first that returns",
+        "frees the numbers of a deleted subtree",
+        "continues new endpoint numbers after the highest preset number",
+        "wraps new endpoint numbers to the lowest free number",
+        "keeps the holder's number when a refused endpoint is erased",
+        "erases the persisted store of a part that crashes before number assignment",
+        "factory reset erases blobs an earlier session left behind",
+        "gives a restarted node new, unblocked client subscriptions",
+        "factory reset erases the blobs a transfer left behind",
+        "factory reset of a controller erases peers and CA key material",
+        "factory reset closes the fabric authority the node owns",
+        "completes factory reset when a peer cannot be torn down",
+        "completes factory reset when removing the protocol peer fails",
+        "erases CA key material the node never loaded",
+        "erases every peer endpoint store when one fails",
+        "erases remaining areas when one fails during factory reset",
+        "keeps serving events from the one event manager across factory reset",
+        "leaves its own event manager open when it creates a peer",
+        "commissions again on the same controller instance after factory reset",
+        "commissions again after factory reset of a controller with commissioned peers",
+        "removes the entries of a removed fabric from a fabric-sensitive list",
+        "sanitizes orphaned fabric-scoped data at startup",
+        "from root behavior error",
+        "from behavior error on child during node create",
+        "from behavior on child after node create",
+        "from root behavior error",
+        "from behavior error on child during startup",
+        "from behavior error on child added after startup",
+        "is resilient to conformance changes that affect persisted data",
+        "keeps the access control list when a newer default root endpoint adds a feature",
+        "validates the event buffers of a subclass of the events behavior",
+        "with part at startup"
+      ],
+      "reason": "Commissioning, its timeout, decommission and recommission, a second fabric and the removal of the first with its fabric-scoped data (fix: the removed fabric's fabric-sensitive events leave the log), a restart's persisted values and the Aggregator's composition run over the wire on fabrictest (node:TestServerNodeParity). Missing: the matter.js node runtime — lifecycle events, mDNS packet TTLs, the operational-port defaults of commissionable and controller nodes, factory reset (erase) and what it keeps or releases, storage locks and failed construction, behavior crashes, conformance migrations of persisted data, the event buffers of an events-behavior subclass, endpoint-number presets and their storage, the controller's factory reset of peers and CA material, its diagnostics — and the fail-safe interplay with a pending reset after the last fabric, which the Go node answers by reopening its window when idle rather than erasing.",
       "snapshotSha": "6b898f522247220a2d2ea42014fcef4e230e0499"
     },
     {
@@ -2151,18 +2528,18 @@
         "im/subscription:TestHandlerParity_PeerCancel_RemovesSubscriptionFromActive",
         "im/subscription:TestHandlerParity_SendInterval_ClampedToMinIntervalFloor",
         "im/subscription:TestHandlerParity_SendInterval_HalfUnder60s_Uses80Percent",
-        "im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed"
+        "im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed",
+        "node:TestServerSubscriptionParity",
+        "im/subscription:TestServerSubscriptionParity"
       ],
       "missing": [
         "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a higher ceiling",
         "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a lower ceiling",
-        "terminates on close() but not on closeForShutdown()",
         "terminates when the peer refuses a report sent during a shutdown close",
         "keeps a subscription that joins a session closing for shutdown",
         "terminates when the peer answers a report with an error status",
         "ends the subscription when the peer answers INVALID_SUBSCRIPTION on a session without MRP",
         "waits for the status and keeps the subscription when the peer answers SUCCESS on a session without MRP",
-        "requests a status on an MRP session and ends the subscription on INVALID_SUBSCRIPTION",
         "closes subscription even when in-flight exchange close throws",
         "abandons the subscription after repeated MRP exhaustion, leaving the session alone",
         "completes a flushing close triggered from inside an in-flight update",
@@ -2183,18 +2560,19 @@
         "keeps the keep-alive on time after a report sent after the wall clock stepped forwards",
         "keeps the min interval floor after the initial report when the wall clock stepped forwards before it",
         "flushes a report queued behind a report being sent on close despite a deferral",
-        "selects endpoints by its event paths when it has no attribute paths",
-        "reports only the changed attribute when several attributes of one cluster are subscribed",
         "completes session force-close triggered from inside an in-flight update",
         "suppresses peer loss on the exchanges it opens to push subscription reports"
       ],
-      "reason": "Peer cancel and the non-ICD interval negotiation are ported; the LIT ICD intervals, shutdown closes and keep-alive statuses are not.",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest). Missing: the LIT ICD intervals (the device ICD role, M5 phase 23); the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
       "snapshotSha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820"
     },
     {
       "path": "packages/node/test/node/SetRegulatoryConfigSideEffectTest.ts",
-      "status": "planned",
-      "reason": "SetRegulatoryConfig leaving BasicInformation.Location alone when validation fails.",
+      "status": "ported",
+      "go": [
+        "node:TestSetRegulatoryConfigSideEffectParity"
+      ],
+      "reason": "Over a PASE session on fabrictest: Outdoor on an Indoor-only node answers ValueOutsideRange and Location stays (node:TestSetRegulatoryConfigSideEffectParity).",
       "snapshotSha": "7b57d30a4213f7b04da9d529d901d4ee5d1f06be"
     },
     {
@@ -2214,8 +2592,9 @@
     {
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
       "status": "planned",
-      "reason": "A second controller completing a PASE-only commissioning a first one started, and its failure paths.",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
+      "reason": "A second controller completing a PASE-only commissioning a first one started, and its failure paths. Left planned in BI-2: controller/client has no completeCommissioning (only the first half exists: commissioner Options.FinalizeCommissioning) and fabrictest cannot share a CA and fabric between two controllers.",
+      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -2242,26 +2621,41 @@
     },
     {
       "path": "packages/node/test/node/client/ClientNodeSemanticTagTest.ts",
-      "status": "planned",
-      "reason": "A semantic tag a peer reports without a label read by the controller as carrying none.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientNodeSemanticTagParity"
+      ],
+      "reason": "A tag a peer reports without a label decodes with no Label (absent, not null) next to a labeled one, and the tag list change is announced (controller/client:TestClientNodeSemanticTagParity on Node.apply; the Go device's Descriptor serves no TagList, so the tag list is reported to the image as a device sends it).",
       "snapshotSha": "274e8bf105db0fc95581f36c1673420b856bcd7a"
     },
     {
       "path": "packages/node/test/node/client/PeersAutoStartTest.ts",
-      "status": "planned",
-      "reason": "Auto-start of commissioned peers when the controller goes online, and its opt-out.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersAutoStartParity"
+      ],
+      "reason": "The commissioned node started again when the registry starts with AutoStart (matter.js's default; opt-in in Go) and not started without it, the expired uncommissioned node culled either way (controller/client:TestPeersAutoStartParity on fabrictest).",
       "snapshotSha": "94fe8d98d4d868596d1a29f85590869bc76170fe"
     },
     {
       "path": "packages/node/test/node/client/PeersCommissionedTest.ts",
       "status": "planned",
-      "reason": "The controller's list of commissioned peers excluding discoveries and groups.",
-      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44"
+      "reason": "The controller's list of commissioned peers excluding discoveries and groups. Left planned in BI-2: the one case needs group nodes (peers.forAddress of a group id, nodeType \"group\"), which controller/client does not have (doc 'Not here: Groups'); the commissioned/discovered/forAddress split holds in TestRegistryRestore.",
+      "snapshotSha": "aa2b783cf0406787a80b300f04c989826c6f4c44",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/PeersForDescriptorTest.ts",
-      "status": "planned",
-      "reason": "Finding or creating the controller's node for a discovered device descriptor.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeersForDescriptorParity",
+        "controller/client:TestForDevice"
+      ],
+      "missing": [
+        "creates a new node for a device whose node is being deleted",
+        "creates a new node for a device whose node has begun deletion"
+      ],
+      "reason": "Two concurrent sightings of one device find one node (fix: Registry.ForDevice finds or creates under the registry's operation mutex, Peers.ts:371-389) and a node is matched by its current device identifier (controller/client:TestPeersForDescriptorParity); a sighting waits out a decommission (TestForDevice). Missing: the lookups while the matched node is being deleted (matter.js's construction Inactive and destroying signals; a Go node is deleted through Registry.Decommission with no hook inside it — a closing node is skipped by find).",
       "snapshotSha": "01d584ca2af6df2232d3833c70518cc5a7610889"
     },
     {
@@ -2281,8 +2675,9 @@
     {
       "path": "packages/node/test/node/client/PeersLoadFailureTest.ts",
       "status": "planned",
-      "reason": "Keeping a fabric's other peers usable when one cannot load from storage.",
-      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547"
+      "reason": "Keeping a fabric's other peers usable when one cannot load from storage. Left planned in BI-2: the Go registry drops a node that fails to load (logged once, registry.go NewRegistry; TestRegistryRestore) where matter.js keeps it with a rejected construction and a typed cause — a decision for the owner, not a port.",
+      "snapshotSha": "d9dd1bd67c3bbce5693ec21654053b12010f0547",
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/node/test/node/client/WireChangeKeysTest.ts",
@@ -2395,8 +2790,11 @@
     },
     {
       "path": "packages/protocol/test/action/client/ReadScopeTest.ts",
-      "status": "planned",
-      "reason": "The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
+      "status": "ported",
+      "go": [
+        "controller/client:TestReadScopeParity"
+      ],
+      "reason": "Which clusters a read covers — empty, full wildcard, a cluster on every endpoint, an endpoint and cluster, a concrete attribute (out of scope), the fabric filter flag — on the client's newScope (controller/client:TestReadScopeParity; the Go subject lives in controller/client, ported in tranche BI-2).",
       "snapshotSha": "eef880b90358e4fc34c70657b7cdf3752b6489e2"
     },
     {
@@ -3725,8 +4123,14 @@
     },
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
-      "status": "planned",
-      "reason": "The subject (PhysicalDeviceProperties: computeProperties, isLongIdleTimeOperating, intervalBounds) lives in controller/client, brief BI's path, which this tranche does not touch; the cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
+      "status": "ported",
+      "go": [
+        "controller/client:TestPhysicalDevicePropertiesParity",
+        "controller/client:TestPhysicalDevicePropertiesMinIntervalFloorParity",
+        "controller/client:TestPhysicalDevicePropertiesMaxIntervalCeilingParity",
+        "controller/client:TestPhysicalDevicePropertiesICDCeilingParity"
+      ],
+      "reason": "The interval bounds of a peer's physical properties — the floor (Thread before 1.3, a Generic Switch, a requested floor, ICD), the ceiling with its one-sided jitter (Wi-Fi, Thread, sleepy, battery, mains and battery, a requested ceiling, the floor clamp, ICD) and the ICD idle-synced ceiling — run on the client's intervalBounds over a Properties value (controller/client:TestPhysicalDeviceProperties*; the Go subject lives in controller/client, ported in tranche BI-2).",
       "snapshotSha": "05a12bae66a0294e57cd4b483431f04ee23c4004"
     },
     {

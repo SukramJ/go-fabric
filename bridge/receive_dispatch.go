@@ -486,9 +486,6 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 			slog.Any("status_code", uint8(status)))
 		return nil
 	}
-	if req.DelayReportData != nil {
-		b.deferReportsFor(req)
-	}
 	// Stamp the FabricIndex into the context so cluster handlers
 	// can distinguish PASE (0) from CASE (>0) — required by
 	// GeneralCommissioning.CommissioningComplete (matter.js
@@ -518,6 +515,9 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	after := &im.AfterResponse{}
 	defer after.Run()
 	invokeCtx = im.WithAfterResponse(invokeCtx, after)
+	if req.DelayReportData != nil {
+		b.deferReportsFor(invokeCtx, dispatcher, req)
+	}
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
 	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
@@ -929,38 +929,20 @@ func (b *Bridge) sessionAttestationChallenge(sessionID uint16) ([]byte, bool) {
 // selects an endpoint the invoke dispatches to, by DelayMinMs plus a
 // random jitter below DelayJitterWindowMs: matter.js InteractionServer
 // #deferReports, run before dispatch whether or not the commands succeed.
-// A wildcard-endpoint command expands to the endpoints serving its
-// cluster. matter.js gates this behind its "delay-report-data" forward
-// feature, which its own CHIP test support switches on (TC-IDM-1.5);
-// the module acts on it always (BD-Matter-DelayReportData).
-func (b *Bridge) deferReportsFor(req im.InvokeRequest) {
+// The endpoints are those a command passes its checks on — access, fabric
+// scope, timed quality, existence — and those a wildcard-endpoint command
+// expands to ([im.DispatchEndpoints]); a command that fails its checks
+// defers nothing (matter.js CommandInvokeResponse's dispatch endpoints,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165,
+// :297 at 862ad75f). matter.js gates this behind its "delay-report-data"
+// forward feature, which its own CHIP test support switches on
+// (TC-IDM-1.5); the module acts on it always (BD-Matter-DelayReportData).
+func (b *Bridge) deferReportsFor(ctx context.Context, dispatcher im.Dispatcher, req im.InvokeRequest) {
 	mgr := b.subscriptionManagerLocked()
 	if mgr == nil {
 		return
 	}
-	endpoints := map[uint16]bool{}
-	for _, inv := range req.Invokes {
-		if inv.Path.HasEndpoint {
-			endpoints[inv.Path.Endpoint] = true
-			continue
-		}
-		b.mu.RLock()
-		topo := b.topology
-		b.mu.RUnlock()
-		if topo == nil {
-			continue
-		}
-		for _, ep := range topo.Endpoints {
-			if ep == nil {
-				continue
-			}
-			for _, srv := range endpointpkg.ClusterServers(ep) {
-				if srv.MatterClusterID() == inv.Path.Cluster {
-					endpoints[ep.ID] = true
-				}
-			}
-		}
-	}
+	endpoints := im.DispatchEndpoints(ctx, dispatcher, req)
 	delay := time.Duration(req.DelayReportData.DelayMinMs) * time.Millisecond
 	if w := req.DelayReportData.DelayJitterWindowMs; w > 0 {
 		delay += time.Duration(rand.IntN(int(w))) * time.Millisecond //nolint:gosec // a report jitter, not a secret

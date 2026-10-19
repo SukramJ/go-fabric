@@ -10,10 +10,12 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // defaultRequest is the default subscription — every attribute, every
@@ -283,35 +285,97 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	n.log.Info("matter.controller.client.unknown_cluster_events", slog.Uint64("cluster", uint64(cluster)))
 }
 
-// evaluateSeeded marks the node seeded once its root has BasicInformation
-// and the image more than the root endpoint (Peers.ts:747-759,
-// ClientNodeLifecycle.ts:51-75).
+// evaluateSeeded marks the node seeded once its structure is known.
+// Mirrors matter.js packages/node/src/node/client/Peers.ts:760-797
+// (#evaluateSeeded at 862ad75f): BasicInformation is present and every
+// endpoint the root's reported PartsList names (the valid endpoint
+// numbers) is installed — an empty PartsList is a node of its root only;
+// a node whose PartsList was not reported needs an endpoint beyond the
+// root. A root-only node whose reported DeviceTypeList names nothing but
+// Root Node is logged as offering no function beyond node management
+// (:786-796).
 func (n *Node) evaluateSeeded() {
 	n.mu.Lock()
-	if n.seeded || readyCluster(n.s.root, basicinformation.ClusterID) == nil {
+	if n.seeded || n.s.root == nil || readyCluster(n.s.root, basicinformation.ClusterID) == nil {
 		n.mu.Unlock()
 		return
 	}
-	installed := 0
-	for _, ep := range n.s.endpoints {
-		if ep.installed {
-			installed++
+	var desc *Cluster
+	if c := n.s.root.clusters[descriptor.ClusterID]; c != nil && c.cache != nil {
+		desc = c
+	}
+	parts, partsReported := reportedParts(desc)
+	if partsReported {
+		for _, no := range parts {
+			if ep := n.s.endpoints[no]; ep == nil || !ep.installed {
+				n.mu.Unlock()
+				return
+			}
+		}
+	} else {
+		installed := 0
+		for _, ep := range n.s.endpoints {
+			if ep.installed {
+				installed++
+			}
+		}
+		if installed <= 1 {
+			n.mu.Unlock()
+			return
 		}
 	}
-	if installed <= 1 {
-		n.mu.Unlock()
-		return
-	}
 	n.seeded = true
+	rootOnly := partsReported && len(parts) == 0 && rootDeviceTypesOnly(desc)
 	n.mu.Unlock()
+	if rootOnly {
+		n.log.Warn("matter.controller.client.root_only",
+			slog.String("node", n.cfg.ID),
+			slog.String("reason", "has no endpoint besides its root and no device type besides Root Node, so it offers no function beyond node management"))
+	}
 	if h := n.cfg.Hooks.Seeded; h != nil {
 		h()
 	}
 }
 
-// Seeded reports whether the image has been read at least once: the root
-// has BasicInformation and there is more than the root endpoint
-// (ClientNodeLifecycle.ts:51-57).
+// reportedParts is the root Descriptor's PartsList, its valid endpoint
+// numbers (0 to 0xFFFE, EndpointNumber.isValid), and whether the peer
+// reported it.
+func reportedParts(desc *Cluster) ([]uint16, bool) {
+	if desc == nil {
+		return nil, false
+	}
+	v, ok := desc.cache.values[descriptor.AttrPartsList]
+	if !ok || !v.El.IsContainer {
+		return nil, false
+	}
+	var out []uint16
+	for _, c := range v.Children {
+		if c.El.Type >= tlv.TypeUnsignedInt1 && c.El.Type <= tlv.TypeUnsignedInt8 && c.El.Uint <= 0xFFFE {
+			out = append(out, uint16(c.El.Uint))
+		}
+	}
+	return out, true
+}
+
+// rootDeviceTypesOnly: the root Descriptor reported its DeviceTypeList and
+// every entry is Root Node (an empty list included).
+func rootDeviceTypesOnly(desc *Cluster) bool {
+	v, ok := desc.cache.values[descriptor.AttrDeviceTypeList]
+	if !ok || !v.El.IsContainer {
+		return false
+	}
+	for _, e := range v.Children {
+		for _, f := range e.Children {
+			if f.El.Tag == tlv.ContextTag(0) && f.El.Uint != uint64(rootNodeDeviceType) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Seeded reports whether the node's structure is known ([Hooks].Seeded;
+// ClientNodeLifecycle.ts:51-57).
 func (n *Node) Seeded() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()

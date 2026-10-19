@@ -175,6 +175,34 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 	return out
 }
 
+// withKnownVersions is the version filters a read or subscription sends —
+// the caller's own, kept as given and first, then the injected ones.
+// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
+// (injectVersionFilters at 862ad75f): a request with the other fabric
+// filter than the cache's gets none injected (:288), and a cluster the
+// caller filters gets no injected filter (:293-295, :312), so the peer
+// sees exactly the caller's filter for it. caller is not modified.
+func (s *structure) withKnownVersions(sc scope, caller []im.DataVersionFilter, refreshChangesOmitted bool) []im.DataVersionFilter {
+	out := slices.Clone(caller)
+	if sc.fabricFiltered != s.subscribedFabricFiltered {
+		return out
+	}
+	type key struct {
+		ep      uint16
+		cluster uint32
+	}
+	filtered := make(map[key]bool, len(caller))
+	for _, f := range caller {
+		filtered[key{f.Endpoint, f.Cluster}] = true
+	}
+	for _, f := range s.injectVersionFilters(sc, refreshChangesOmitted) {
+		if !filtered[key{f.Endpoint, f.Cluster}] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // hasChangesOmittedAttribute: the peer has an attribute with the
 // changes-omitted quality in the cluster — every such attribute of the
 // model without the peer's AttributeList, the listed ones with it
@@ -775,13 +803,23 @@ func (s *structure) resolvePartClaims() {
 				s.deleteClaims(part)
 				continue
 			}
-			owner := s.ownerFor(part, claimants)
+			owner, contenders := s.ownerFor(claimants)
 			if owner == nil || !s.isPlaced(owner) {
 				continue
 			}
 			s.deleteClaims(part)
 			if !s.isOnTheNode(part) {
 				continue
+			}
+			// The warning for the other claimants comes after the root's
+			// check of the part (ClientStructure.ts:1455-1471 at 862ad75f).
+			if len(contenders) > 0 {
+				others := make([]int, 0, len(contenders))
+				for _, o := range contenders {
+					others = append(others, int(o.number))
+				}
+				s.log.Warn("matter.controller.client.several_parents", slog.Int("parent", int(owner.number)), slog.Int("part", int(part.number)),
+					slog.Any("also_named_by", others), slog.String("reason", "an endpoint has a single parent"))
 			}
 			part.pendingOwner = owner
 			s.schedule(part, "install")
@@ -804,13 +842,18 @@ func (s *structure) isOnTheNode(ep *Endpoint) bool {
 	return !ok || rootParts[ep.number]
 }
 
-// ownerFor is the claimant that owns part, nil while that cannot be told
-// (:1360-1403): an ordinary claimant first — the first, with a warning
-// when there are several (:1381-1392) — else the innermost full-family
-// one once every endpoint it names has reported its own parts
-// (:1394-1402). A claimant whose composition is unknown makes the part
-// wait (:1374-1376); one the root does not name owns nothing (:1367-1369).
-func (s *structure) ownerFor(part *Endpoint, claimants []*Endpoint) *Endpoint {
+// ownerFor is the claimant that owns a part, with the claimants that
+// conflict with that choice, nil while that cannot be told. Mirrors
+// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1551
+// (#ownerFor at 862ad75f): a claimant the root does not name owns nothing
+// (:1513-1518), one whose composition is unknown makes the part wait
+// (:1520-1525); an ordinary claimant is closer to the part than any
+// full-family one (:1530-1533); among the candidates the closest wins
+// ([structure.closestClaimant]); a full-family owner waits until every
+// endpoint it names has reported its own parts (:1539-1541). The
+// contenders are the other ordinary claimants, or the full-family ones
+// that do not name the owner (:1543-1548).
+func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders []*Endpoint) {
 	var ordinary, fullFamily []*Endpoint
 	for _, c := range claimants {
 		if !s.isOnTheNode(c) {
@@ -818,7 +861,7 @@ func (s *structure) ownerFor(part *Endpoint, claimants []*Endpoint) *Endpoint {
 		}
 		comp, ok := s.composition[c]
 		if !ok {
-			return nil
+			return nil, nil
 		}
 		if comp == schema.CompositionFullFamily {
 			fullFamily = append(fullFamily, c)
@@ -826,39 +869,69 @@ func (s *structure) ownerFor(part *Endpoint, claimants []*Endpoint) *Endpoint {
 			ordinary = append(ordinary, c)
 		}
 	}
+	candidates := ordinary
+	if len(candidates) == 0 {
+		candidates = fullFamily
+	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	owner = s.closestClaimant(candidates, append(slices.Clone(ordinary), fullFamily...))
+	if len(ordinary) == 0 && !s.partsAccountedFor(owner) {
+		return nil, nil
+	}
 	if len(ordinary) > 0 {
-		if len(ordinary) > 1 {
-			others := make([]int, 0, len(ordinary)-1)
-			for _, o := range ordinary[1:] {
-				others = append(others, int(o.number))
+		for _, c := range ordinary {
+			if c != owner {
+				contenders = append(contenders, c)
 			}
-			s.log.Warn("matter.controller.client.several_parents", slog.Int("parent", int(ordinary[0].number)), slog.Int("part", int(part.number)),
-				slog.Any("also_named_by", others), slog.String("reason", "an endpoint has a single parent"))
 		}
-		return ordinary[0]
+		return owner, contenders
 	}
-	for _, cand := range fullFamily {
-		inner := true
-		for _, other := range fullFamily {
-			if other != cand && s.partsListOf[cand][other.number] {
-				inner = false
-				break
-			}
-		}
-		if inner {
-			if s.partsAccountedFor(cand) {
-				return cand
-			}
-			return nil
+	for _, c := range fullFamily {
+		if c != owner && !s.partsListOf[c][owner.number] {
+			contenders = append(contenders, c)
 		}
 	}
-	return nil
+	return owner, contenders
+}
+
+// closestClaimant is the candidate closest to the part the claimants all
+// name: the one naming the fewest of the other claimants, then the one
+// with the shorter PartsList, then the one with the lower endpoint number
+// — the choice depends on the lists, not on the order they arrived in.
+// Mirrors matter.js ClientStructure.ts:1553-1578 (#closestClaimant at
+// 862ad75f).
+func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint {
+	rank := func(c *Endpoint) [3]int {
+		parts := s.partsListOf[c]
+		named := 0
+		for _, other := range claimants {
+			if other != c && parts[other.number] {
+				named++
+			}
+		}
+		return [3]int{named, len(parts), int(c.number)}
+	}
+	closest, closestRank := candidates[0], rank(candidates[0])
+	for _, c := range candidates[1:] {
+		if r := rank(c); slices.Compare(r[:], closestRank[:]) < 0 {
+			closest, closestRank = c, r
+		}
+	}
+	return closest
 }
 
 // partsAccountedFor: every endpoint ep names has reported a PartsList of
-// its own (:1409-1417).
+// its own; an endpoint the root no longer names reports nothing more and
+// is not waited for. Mirrors matter.js ClientStructure.ts:1580-1599
+// (#partsAccountedFor at 862ad75f).
 func (s *structure) partsAccountedFor(ep *Endpoint) bool {
+	rootParts, rootReported := s.partsListOf[s.endpoints[0]]
 	for partNo := range s.partsListOf[ep] {
+		if rootReported && !rootParts[partNo] {
+			continue
+		}
 		part := s.endpoints[partNo]
 		if part == nil {
 			return false

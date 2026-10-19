@@ -353,7 +353,7 @@ Device side:
   #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
   `SuppressResponse = false`, wait for the status, end the subscription on
   INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
-  reports. (Phase 16, ServerSubscriptionTest port.)
+  reports. (Left open by phase 16; milestone 3.)
 - **A subscription that ends while the node runs stays persisted.**
   `im/subscription/manager.go:128-149` keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.
@@ -362,13 +362,13 @@ Device side:
   (`Subscription.ts:21-40`, `ServerSubscription.ts:766-812`,
   SubscriptionsServerTest "drops the stored subscription when the peer closes
   its session while the node keeps running"). Fix: terminate on every close
-  except the one `Stop` performs. (Phase 16.)
+  except the one `Stop` performs. (Left open by phase 16; milestone 3.)
 - **No BUSY for a write that races a chunked write.** A chunked write holds
   its attribute (`bridge/exchange_routing.go:62` `writeTxs`); another
   exchange writing the same attribute is not answered BUSY as matter.js does
   (`InteractionServer.ts:507,526` at `862ad75f`, #4768; InteractionProtocolTest
   "answers BUSY to another exchange's write of an attribute while a chunked
-  write holds it"). (Phase 16.)
+  write holds it"). (Left open by phase 16; milestone 3.)
 - **Utility component on the composing endpoint is not a candidate.**
   `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
   composition scope; matter.js #4745 prepends the composing endpoint when it
@@ -398,24 +398,10 @@ Device side:
 
 Controller side:
 
-- **A concrete event path to an unknown endpoint, cluster or event is
-  answered with nothing.** `im/read.go:598-640` `BuildEventReports` only
-  queries the log, so a read or subscribe naming an event the node does not
-  serve returns no EventStatusIB; matter.js answers UnsupportedEndpoint /
-  UnsupportedCluster / UnsupportedEvent per path
-  (`packages/protocol/src/action/server/EventReadResponse.ts:210-218`), after
-  the View-privilege pass (`:204`, spec §8.4.3.2 order). Only the ACL pass
-  exists here (`im/read.go:888` `DeniedEventPathStatuses`, UnsupportedAccess).
-  Seen by brief BG's agent in a scratch test (report BG, left out). (Phase 16,
-  with the `packages/protocol/test` port.)
 - **Known answers are sent with their original TTL.**
   `controller/discovery/solicitor.go:368-375`; matter.js #4756 sends the
   remaining TTL rounded up and omits a record past half its TTL
-  (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Phase 16.)
-- **A root-only peer never seeds.** `controller/client/config.go:116-118` and
-  `node.go` `evaluateSeeded` require more than the root endpoint; matter.js
-  #4770 requires BasicInformation and every endpoint of the root's PartsList
-  (`ClientNodeLifecycle.ts:52-56`; NodeLifecycleSeededTest). (Phase 16.)
+  (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Left open by phase 16; milestone 5 phase 25.)
 - **Discovery has one error and no abort.** matter.js #4747 distinguishes
   `DeviceNotDiscoveredError`, `DiscoveryIncompleteError`,
   `NoDiscoveryTransportError` and lets the caller abort every attempt
@@ -484,7 +470,9 @@ Controller side:
   refuses an oversized write with `ErrRequestTooLarge` where matter.js
   chunks (`interaction/InteractionMessenger.ts:1269-1460`). `AckWaitAbort`
   exists to build the abandonment on. Register `until M5 phase 25`
-  (ClientInteractionSubscribeTest). (Milestone 5 phase 25.)
+  (ClientInteractionSubscribeTest); ClientChunkedWriteTest (5 cases) and
+  ClientInvokeTest's batching (39 cases) are `missing` under it since brief
+  BI, and the device's MaxPathsPerInvoke is fixed at 10. (Milestone 5 phase 25.)
 - **No `_matterd._udp` commissioner advertisement**
   (`packages/protocol/test/mdns/MdnsTest.ts:546-713`). (Milestone 5 phase 25.)
 - **`ForgetCommissioned` is not wired into the commissioner.**
@@ -513,6 +501,87 @@ Controller side:
   allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`) and
   never classified; the controller never rotates its NOC key
   (`fabric/FabricAuthority.ts:88-99`, `:181-186`). (Milestone 6.)
+
+Found by the phase-16 port of `packages/node/test/node` (brief BI, PR #168,
+2026-10-19). Line numbers at `862ad75f`.
+
+Device side:
+
+- **AttributePathIB `WildcardPathFlags` (tag 7) is not decoded.** The
+  decoder in `im/` reads tags 0–5; a read that asks to skip the global
+  lists reads them all (AttributeReadResponseTest "skipAttributeList").
+  (Milestone 3.)
+- **A write path without cluster or attribute is answered per path.**
+  `im/write.go:292-298` appends an AttributeStatus of INVALID_ACTION for
+  the path and goes on; matter.js and chip refuse the whole interaction
+  with a StatusResponse of INVALID_ACTION
+  (`action/server/AttributeWriteResponse.ts:278-285`, `:305-312`; chip
+  `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`).
+  (Milestone 3.)
+- **No `isHeldByOtherWrite` on a wildcard write.** matter.js skips, in a
+  wildcard or group write, an attribute another write interaction holds
+  (`AttributeWriteResponse.ts:355-358`); the Go write has no such check.
+  Goes with the BUSY item above. (Milestone 3.)
+- **A closed PASE session does not restart the commissioning
+  advertisement.** The device keeps its commissionable record during PASE
+  and publishes nothing when the session closes; matter.js starts a
+  commissioning advertisement round on every PASE session that closes
+  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`).
+  (Milestone 3.)
+- **A host-initiated RemoveFabric does not flush the Leave event.**
+  `node/node.go:707` `RemoveFabric` closes the fabric's subscriptions
+  without a last report; matter.js `Fabric.leave` closes each session
+  through `closeSubscriptions(true)` so the Leave event reaches the
+  controller (`fabric/Fabric.ts:447-457`; ClientNodeTest "erases node
+  after leave event"). (Milestone 3.)
+- **Data versions are drawn anew at every start.**
+  `contract.DataVersionTracker` is the host's, and the module's own
+  trackers start random; matter.js loads a persistent cluster's version
+  from its store and draws one only when the store has none
+  (`behavior/state/managed/Datasource.ts:597`, `:802`), so a controller's
+  cache survives a device restart where this side sends every cluster
+  again. (Milestone 4, the embedding layer.)
+- **SetRegulatoryConfig's CountryCode never reaches Location.**
+  `bridge/fields_reader.go:466-479` drops the field on decode, a deliberate
+  revert after an Apple Home regression; matter.js writes it to
+  BasicInformation.Location (`GeneralCommissioningServer.ts:146-170`,
+  `:206-208`). Open: the revert's reason is outside matter.js and needs a
+  re-audit with Apple Home before it moves. (Owner decision.)
+
+Controller side:
+
+- **`Node.Disable` closes the default subscription only.**
+  `controller/client/node.go:382`; matter.js closes every subscription of
+  the node (ClientConnectivityTest "closes a non-sustained subscription
+  when the node is disabled"). (Milestone 5 phase 25.)
+- **`includeKnownVersions` has no subscription form.** `Node.Subscribe`
+  takes `interaction.SubscribeRequest`, so a subscription cannot opt out
+  of the injected version filters as `ReadRequest.IncludeKnownVersions`
+  does (`ClientNodeInteraction.ts:123-124`). API change. (Milestone 5
+  phase 25.)
+- **A priming report after a cancelled establishment is acknowledged
+  Success.** `controller/interaction/handler.go`; matter.js answers
+  INVALID_SUBSCRIPTION (five ClientSubscribeTest cases; brief BH's path).
+  (Milestone 5 phase 25.)
+- **`Cluster.Supports` applies no conformance, `Cluster.Revision` is 0
+  without a report.** `controller/client/cluster.go:228`, `:291`;
+  matter.js takes the model's revision when the peer reports none or an
+  invalid one (`PeerBehavior.ts:429-434`, override only for a valid,
+  differing revision) and judges mandatory unlisted, deprecated and
+  disallowed attributes by conformance (PeerBehaviorTest, 12 cases
+  `missing`). (Milestone 5 phase 25.)
+- **Registry `AutoStart` is opt-in.** `controller/client/registry.go:41-43`;
+  matter.js `NetworkServer.autoStartCommissionedPeers` defaults to true
+  (`behavior/system/network/NetworkServer.ts:236`). A default change is a
+  break for hosts; the ports set it where matter.js relies on the default.
+  (Milestone 5 phase 25, with the API review.)
+- **A node that fails to load is dropped.** `controller/client/registry.go:153-155`
+  logs and skips it; matter.js keeps the node with a rejected construction
+  and a typed cause so its id stays visible (`node/client/Peers.ts:144-161`;
+  PeersLoadFailureTest, register `until M5 phase 25`). (Milestone 5 phase 25.)
+- **fabrictest carries no group messages**, so group invokes, their
+  dispatch endpoints and group nodes (PeersCommissionedTest, register
+  `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
 ## Application cluster servers — open items
 

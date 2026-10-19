@@ -412,6 +412,30 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 	return im.StatusUnsupportedCluster
 }
 
+// EventPathStatus implements [im.EventPathChecker]: UNSUPPORTED_ENDPOINT for
+// an endpoint the topology lacks, UNSUPPORTED_CLUSTER for a cluster the
+// endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
+// not list (a server without an event lister answers for itself), Success
+// otherwise — the existence checks of matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
+// 862ad75f (#addConcrete), in their order.
+func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
+	ep := d.topology.FindByID(path.Endpoint)
+	if ep == nil {
+		return im.StatusUnsupportedEndpoint
+	}
+	for _, srv := range ClusterServers(ep) {
+		if srv == nil || srv.MatterClusterID() != path.Cluster {
+			continue
+		}
+		if lister, ok := srv.(contract.ClusterEventLister); ok && !slices.Contains(lister.MatterEvents(), path.Event) {
+			return im.StatusUnsupportedEvent
+		}
+		return im.StatusSuccess
+	}
+	return im.StatusUnsupportedCluster
+}
+
 // InvokeAuthorized implements [im.AuthorizingInvoker]: a command whose
 // endpoint is a wildcard runs on every endpoint that hosts the cluster and
 // accepts the command, in ascending endpoint order, each location gated by
@@ -425,6 +449,43 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		return []im.InvokeResult{d.Invoke(ctx, path, fields)}
 	}
 	var results []im.InvokeResult
+	for _, t := range d.commandTargets(path, authorize) {
+		ePath := path
+		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
+		resp, err := t.srv.MatterInvoke(ctx, path.Command, fields)
+		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
+		if err != nil {
+			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
+		}
+		results = append(results, res)
+	}
+	return results
+}
+
+// CommandTargets implements [im.CommandTargeter]: the endpoints
+// [TopologyDispatcher.InvokeAuthorized] would run the wildcard-endpoint
+// command path on, in ascending order, without running it.
+func (d *TopologyDispatcher) CommandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []uint16 {
+	targets := d.commandTargets(path, authorize)
+	out := make([]uint16, 0, len(targets))
+	for _, t := range targets {
+		out = append(out, t.ep.ID)
+	}
+	return out
+}
+
+// commandTarget is an endpoint a wildcard command runs on and its server.
+type commandTarget struct {
+	ep  *Endpoint
+	srv contract.ClusterServer
+}
+
+// commandTargets selects the endpoints of a wildcard-endpoint command:
+// every endpoint hosting the cluster whose server accepts the command (a
+// server that lists no accepted commands answers for itself) and that
+// authorize admits — matter.js CommandInvokeResponse #wildcardTargetOf.
+func (d *TopologyDispatcher) commandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []commandTarget {
+	var out []commandTarget
 	for _, ep := range d.resolveEndpoints(im.ConcreteAttributePath{}) {
 		for _, srv := range ClusterServers(ep) {
 			if srv == nil || srv.MatterClusterID() != path.Cluster {
@@ -436,18 +497,11 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 			if authorize != nil && !authorize(ep.ID, path.Cluster, path.Command).IsSuccess() {
 				break
 			}
-			ePath := path
-			ePath.Endpoint, ePath.HasEndpoint = ep.ID, true
-			resp, err := srv.MatterInvoke(ctx, path.Command, fields)
-			res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
-			if err != nil {
-				res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
-			}
-			results = append(results, res)
+			out = append(out, commandTarget{ep: ep, srv: srv})
 			break
 		}
 	}
-	return results
+	return out
 }
 
 // resolveEndpoints expands the wildcard-aware endpoint selector. A
@@ -876,22 +930,35 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 // so an Operate subject could write BridgedDeviceBasicInformation.NodeLabel,
 // OnOff.StartUpOnOff or the Thermostat setpoint limits ("RW VM") —
 // TC-ACE-2.2.
+//
+// A path that does not resolve — no such endpoint, no such cluster on it,
+// an attribute the cluster does not list — needs View only: matter.js
+// authorizes a concrete write at View first, answers the existence
+// statuses next, and checks the write privilege only for an attribute that
+// exists (packages/protocol/src/action/server/AttributeWriteResponse.ts:200-241
+// at 862ad75f, core spec §8.7.3.2), so a View subject learns that an
+// attribute is absent, as it does on a read. The dispatcher's Write then
+// answers UNSUPPORTED_ENDPOINT, _CLUSTER or _ATTRIBUTE.
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
+	const privilegeView uint8 = 1
 	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return want
+		return privilegeView
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
+		}
+		if !isGlobalAttribute(attrID) && !attributeListed(srv, attrID) {
+			return privilegeView
 		}
 		if priv, ok := srv.(contract.ClusterAttributeWritePrivilege); ok {
 			want = max(want, priv.MinWritePrivilege(attrID))
 		}
 		return want
 	}
-	return want
+	return privilegeView
 }
 
 // MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]: the
@@ -902,22 +969,35 @@ func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrI
 // packages/model/src/standard/elements/*.element.ts; a server without the
 // optional interface (Identify) used to fall back to Operate and let an
 // Operate subject identify a device (TC-ACE-2.3).
+//
+// A path that does not resolve — no such endpoint, no such cluster on it,
+// a command its server does not accept — needs Operate only: matter.js
+// authorizes a concrete invoke at Operate first, answers the existence
+// statuses next, and checks the command's privilege only for a command
+// that exists (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
+// at 862ad75f, core spec §8.8.3.2), so an Operate subject learns that a
+// Manage command's cluster is absent. The existence check then answers
+// UNSUPPORTED_ENDPOINT, _CLUSTER or _COMMAND.
 func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8 {
+	const privilegeOperate uint8 = 3
 	want := schema.InvokePrivilege(clusterID, cmdID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return want
+		return min(want, privilegeOperate)
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
+		}
+		if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+			return min(want, privilegeOperate)
 		}
 		if priv, ok := srv.(contract.ClusterCommandInvokePrivilege); ok {
 			want = max(want, priv.MinInvokePrivilege(cmdID))
 		}
 		return want
 	}
-	return want
+	return min(want, privilegeOperate)
 }
 
 // IsTimedCommand implements [im.TimedCommandProvider]: the cluster server

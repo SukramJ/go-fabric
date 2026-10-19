@@ -287,45 +287,83 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			inv.Path = p
 		case tagCmdDataFields:
-			if fieldsReader == nil {
-				// No cluster-native reader wired — skip the container.
-				// The dispatcher fan-out can still route on path alone
-				// (ArmFailSafe / disarm flows, where the path uniquely
-				// identifies the command and fields carry only optional
-				// arguments). Without this branch the nil-reader call
-				// below panics.
-				if el.IsContainer {
-					if err := skipContainer(dec); err != nil {
-						return CommandInvocation{}, fmt.Errorf("%w: skip fields: %w", ErrInvalidInvokeRequest, err)
-					}
-				}
-				continue
+			if err := readCommandFields(dec, el, fieldsReader, &inv); err != nil {
+				return CommandInvocation{}, err
 			}
-			f, err := fieldsReader(inv.Path, dec, el)
-			if err != nil {
-				// A typed reject is a per-command outcome, not a malformed
-				// request: drain the rest of the fields container so the
-				// remaining commands of the batch still decode, and carry
-				// the status to the dispatcher.
-				var sce StatusCodeError
-				if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
-					return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
-				}
-				if el.IsContainer && !fieldsContainerConsumed(err) {
-					if err := skipContainer(dec); err != nil {
-						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
-					}
-				}
-				inv.Fields = nil
-				inv.DecodeStatus = sce.MatterStatusCode()
-				continue
-			}
-			inv.Fields = f
 		case tagCmdDataRef:
 			inv.CommandRef = uint16(el.Uint & 0xFFFF)
 			inv.HasCommandRef = true
 		}
 	}
+}
+
+// readCommandFields reads the CommandFields element el of inv: the
+// cluster-native fields, or the per-command status a refused payload
+// carries.
+func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFieldsReader, inv *CommandInvocation) error {
+	if fieldsReader == nil {
+		// No cluster-native reader wired — skip the container.
+		// The dispatcher fan-out can still route on path alone
+		// (ArmFailSafe / disarm flows, where the path uniquely
+		// identifies the command and fields carry only optional
+		// arguments). Without this branch the nil-reader call
+		// below panics.
+		if el.IsContainer {
+			if err := skipContainer(dec); err != nil {
+				return fmt.Errorf("%w: skip fields: %w", ErrInvalidInvokeRequest, err)
+			}
+		}
+		return nil
+	}
+	// CommandFields is a structure (Matter §10.6.12); a payload of
+	// another type cannot decode against any command's schema and
+	// is the command's INVALID_COMMAND, the rest of the batch
+	// unaffected. Mirrors matter.js
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
+	// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
+	// reader read past it and the request failed as a whole.
+	if notStruct, err := skipNonStructFields(dec, el); notStruct || err != nil {
+		if err != nil {
+			return err
+		}
+		inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
+		return nil
+	}
+	f, err := fieldsReader(inv.Path, dec, el)
+	if err != nil {
+		// A typed reject is a per-command outcome, not a malformed
+		// request: drain the rest of the fields container so the
+		// remaining commands of the batch still decode, and carry
+		// the status to the dispatcher.
+		var sce StatusCodeError
+		if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
+			return fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+		}
+		if el.IsContainer && !fieldsContainerConsumed(err) {
+			if err := skipContainer(dec); err != nil {
+				return fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+			}
+		}
+		inv.Fields = nil
+		inv.DecodeStatus = sce.MatterStatusCode()
+		return nil
+	}
+	inv.Fields = f
+	return nil
+}
+
+// skipNonStructFields reports whether the CommandFields element el is
+// something other than a structure, consuming it when it is a container.
+func skipNonStructFields(dec *tlv.Decoder, el tlv.Element) (bool, error) {
+	if el.IsContainer && el.Type == tlv.TypeStructure {
+		return false, nil
+	}
+	if el.IsContainer {
+		if err := skipContainer(dec); err != nil {
+			return true, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+		}
+	}
+	return true, nil
 }
 
 func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
@@ -525,45 +563,19 @@ func pathStatusEntry(inv CommandInvocation, status StatusCode) InvokeResponseEnt
 // fabricIndex==0 before AddNOC, [IsPASEFromContext] after it adopted the
 // session onto the new fabric.
 func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) InvokeResponse {
-	_, fabricIndex := FabricFilterFromContext(ctx)
-	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
-	pase := IsPASEFromContext(ctx)
-	aclChecker, hasACL := d.(ACLChecker)
-	privProvider, hasPrivProvider := d.(CommandInvokePrivilegeProvider)
-	pathChecker, hasPathChecker := d.(CommandPathChecker)
-	timedProvider, hasTimedProvider := d.(TimedCommandProvider)
-	isTimed := func(inv CommandInvocation) bool {
-		if hasTimedProvider && inv.Path.HasEndpoint {
-			return timedProvider.IsTimedCommand(inv.Path.Endpoint, inv.Path.Cluster, inv.Path.Command)
-		}
-		return schema.IsTimedInvoke(inv.Path.Cluster, inv.Path.Command)
-	}
-
-	// invokePrivilege returns the minimum privilege needed to invoke the
-	// given command. Falls back to Operate (3) — the Matter §9.10.4.4
-	// default invoke privilege — when no CommandInvokePrivilegeProvider
-	// is wired or the command has no elevated requirement.
-	invokePrivilege := func(inv CommandInvocation) uint8 {
-		const privilegeOperate uint8 = 3
-		if hasPrivProvider {
-			return privProvider.MinInvokePrivilege(inv.Path.Endpoint, inv.Path.Cluster, inv.Path.Command)
-		}
-		return privilegeOperate
-	}
-
+	g := newInvokeGate(ctx, d)
 	// The access check a cluster server may consult for a privilege
 	// beyond the command's own ([AuthorityAt]): the same gate the command
 	// itself passed — PASE holds the implicit Administer, a CASE subject
 	// what the ACL grants, and nothing is granted without an ACL source.
-	requestCtx := ctx
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
-		if pase || fabricIndex == 0 {
+		if g.pase || g.fabricIndex == 0 {
 			return StatusSuccess
 		}
-		if !hasACL {
+		if !g.hasACL {
 			return StatusUnsupportedAccess
 		}
-		return aclChecker.CheckACL(requestCtx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+		return g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
 	})
 
 	var ir InvokeResponse
@@ -574,71 +586,23 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
 	// value of this wire field — so it stays at its zero value here.
 	for _, inv := range req.Invokes {
-		// ACL gate. PASE skips ACL: commissioning invokes arrive before
-		// the fabric's ACL entry exists (fabricIndex==0) and continue
-		// over the same PASE channel after AddNOC adopted it onto the
-		// new fabric ([IsPASEFromContext]) — matter.js
-		// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
-		// keys the implicit Administer grant on the auth mode. The
-		// required privilege is per-command (RemoveFabric,
-		// OpenCommissioningWindow, … → Administer) rather than a flat
-		// Operate, so an Operate-only subject cannot invoke an
-		// administrative command.
-		if hasACL && !pase && fabricIndex != 0 {
-			if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, inv.Path.Endpoint, inv.Path.Cluster, invokePrivilege(inv)); !status.IsSuccess() {
-				ir.Responses = append(ir.Responses, InvokeResponseEntry{
-					Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
-					CommandRef:    inv.CommandRef,
-					HasCommandRef: inv.HasCommandRef,
-					IsStatus:      true,
-					Status:        StatusIB{Status: status},
-				})
-				continue
+		// A wildcard-endpoint command runs on every endpoint that serves
+		// the cluster, accepts the command and on which the session may
+		// invoke it; an endpoint it may not is skipped, not reported.
+		// Mirrors matter.js
+		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-170
+		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
+		// #wildcardTargetOf: the command's privilege, its fabric scope,
+		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
+		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint && inv.DecodeStatus.IsSuccess() {
+			for _, res := range wild.InvokeAuthorized(ctx, inv.Path, inv.Fields, g.wildcardTarget) {
+				ir.Responses = append(ir.Responses, resultEntry(inv, res))
 			}
-		}
-		// A fabric-scoped command needs an accessing fabric: invoked on a
-		// session without one — PASE before AddNOC — it answers
-		// UnsupportedAccess. Mirrors matter.js CommandInvokeResponse.ts:287
-		// (`limits.fabricScoped && !this.session.fabric`). Found by the CHIP
-		// Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
-		if fabricIndex == 0 && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
-			ir.Responses = append(ir.Responses, InvokeResponseEntry{
-				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
-				CommandRef:    inv.CommandRef,
-				HasCommandRef: inv.HasCommandRef,
-				IsStatus:      true,
-				Status:        StatusIB{Status: StatusUnsupportedAccess},
-			})
 			continue
 		}
-		// A timed-required command ("T") outside a timed interaction answers
-		// NeedsTimedInteraction for its own path, after the access and
-		// fabric checks — matter.js CommandInvokeResponse.ts:292-295. The
-		// resolved server answers from its model first ([TimedCommandProvider]),
-		// the generated schema table otherwise.
-		if timed, known := TimedInteractionFromContext(ctx); known && !timed && isTimed(inv) {
-			ir.Responses = append(ir.Responses, InvokeResponseEntry{
-				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
-				CommandRef:    inv.CommandRef,
-				HasCommandRef: inv.HasCommandRef,
-				IsStatus:      true,
-				Status:        StatusIB{Status: StatusNeedsTimedInteraction},
-			})
+		if status := g.concrete(inv); !status.IsSuccess() {
+			ir.Responses = append(ir.Responses, pathStatusEntry(inv, status))
 			continue
-		}
-		// Existence before the payload check: matter.js
-		// CommandInvokeResponse.ts #processConcrete answers
-		// UnsupportedEndpoint / UnsupportedCluster / UnsupportedCommand
-		// before it validates the request, so a payload a generated decoder
-		// refused on a cluster the endpoint does not serve still answers
-		// UnsupportedCluster (TC-IDM-1.2). matter.js checks existence ahead
-		// of the fabric-scope and timed gates above too; those keep their
-		// place here, pinned by the bridge's timed conformance tests.
-		if hasPathChecker && inv.Path.HasEndpoint {
-			if status := pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
-				ir.Responses = append(ir.Responses, pathStatusEntry(inv, status))
-				continue
-			}
 		}
 		// Fields the reader rejected never reach the cluster server: the
 		// command owes the status the reader attached (ConstraintError for
@@ -648,24 +612,197 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue
 		}
-		res := d.Invoke(ctx, inv.Path, inv.Fields)
-		ent := InvokeResponseEntry{
-			Path:          res.Path,
-			CommandRef:    inv.CommandRef,
-			HasCommandRef: inv.HasCommandRef,
-		}
-		if res.Status != StatusSuccess {
-			ent.IsStatus = true
-			ent.Status = StatusIB{Status: res.Status, ClusterStatus: res.ClusterStatus, HasClusterStatus: res.HasClusterStatus}
-		} else if res.Response != nil {
-			ent.Response = res.Response
-			ent.HasResponse = true
-		} else {
-			// Status-only success path: explicit StatusIB(Success).
-			ent.IsStatus = true
-			ent.Status = StatusIB{Status: StatusSuccess}
-		}
-		ir.Responses = append(ir.Responses, ent)
+		ir.Responses = append(ir.Responses, resultEntry(inv, d.Invoke(ctx, inv.Path, inv.Fields)))
 	}
 	return ir
+}
+
+// DispatchEndpoints returns the endpoints req would dispatch a command to
+// in ctx: each concrete path that passes the checks [HandleInvokeRequest]
+// makes before dispatching (access, fabric scope, timed quality,
+// existence), and every endpoint a wildcard path expands to. A path that
+// fails a check contributes nothing, and nothing runs. It is matter.js's
+// dispatch-endpoint set, collected in CommandInvokeResponse's validation
+// pass and handed to its dispatch hook before any command runs
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
+// and :297 at 862ad75f), the endpoints a DelayReportData defers.
+func DispatchEndpoints(ctx context.Context, d Dispatcher, req InvokeRequest) map[uint16]bool {
+	g := newInvokeGate(ctx, d)
+	out := map[uint16]bool{}
+	for _, inv := range req.Invokes {
+		if !inv.Path.HasEndpoint {
+			if t, ok := d.(CommandTargeter); ok {
+				for _, ep := range t.CommandTargets(inv.Path, g.wildcardTarget) {
+					out[ep] = true
+				}
+			}
+			continue
+		}
+		if g.concrete(inv).IsSuccess() {
+			out[inv.Path.Endpoint] = true
+		}
+	}
+	return out
+}
+
+// CommandTargeter is an optional interface a [Dispatcher] implements to
+// name the endpoints a wildcard-endpoint command would run on, without
+// running it: those [AuthorizingInvoker.InvokeAuthorized] dispatches to.
+type CommandTargeter interface {
+	CommandTargets(path ConcreteCommandPath, authorize CommandAuthorizer) []uint16
+}
+
+// invokeGate holds what an invoke is checked against before a command is
+// dispatched: the session's fabric, subject and auth mode, the timed
+// interaction, and the dispatcher's access, privilege, timed and path
+// sources.
+type invokeGate struct {
+	ctx             context.Context
+	fabricIndex     uint8
+	subjectNodeID   uint64
+	subjectCATs     []uint32
+	pase            bool
+	aclChecker      ACLChecker
+	hasACL          bool
+	privProvider    CommandInvokePrivilegeProvider
+	hasPrivProvider bool
+	pathChecker     CommandPathChecker
+	hasPathChecker  bool
+	timedProvider   TimedCommandProvider
+	hasTimed        bool
+	timed           bool
+	timedKnown      bool
+}
+
+func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
+	g := &invokeGate{ctx: ctx}
+	_, g.fabricIndex = FabricFilterFromContext(ctx)
+	g.subjectNodeID, g.subjectCATs = SubjectFromContext(ctx)
+	g.pase = IsPASEFromContext(ctx)
+	g.aclChecker, g.hasACL = d.(ACLChecker)
+	g.privProvider, g.hasPrivProvider = d.(CommandInvokePrivilegeProvider)
+	g.pathChecker, g.hasPathChecker = d.(CommandPathChecker)
+	g.timedProvider, g.hasTimed = d.(TimedCommandProvider)
+	g.timed, g.timedKnown = TimedInteractionFromContext(ctx)
+	return g
+}
+
+// isTimed reports whether the command needs a timed interaction: the
+// resolved server answers from its model first ([TimedCommandProvider]),
+// the generated schema table otherwise.
+func (g *invokeGate) isTimed(p ConcreteCommandPath) bool {
+	if g.hasTimed && p.HasEndpoint {
+		return g.timedProvider.IsTimedCommand(p.Endpoint, p.Cluster, p.Command)
+	}
+	return schema.IsTimedInvoke(p.Cluster, p.Command)
+}
+
+// invokePrivilege returns the minimum privilege needed to invoke the
+// given command. Falls back to Operate (3) — the Matter §9.10.4.4
+// default invoke privilege — when no CommandInvokePrivilegeProvider is
+// wired or the command has no elevated requirement.
+func (g *invokeGate) invokePrivilege(p ConcreteCommandPath) uint8 {
+	const privilegeOperate uint8 = 3
+	if g.hasPrivProvider {
+		return g.privProvider.MinInvokePrivilege(p.Endpoint, p.Cluster, p.Command)
+	}
+	return privilegeOperate
+}
+
+// concrete returns Success when the command of a concrete path may be
+// dispatched, otherwise the status its path answers.
+func (g *invokeGate) concrete(inv CommandInvocation) StatusCode {
+	// ACL gate. PASE skips ACL: commissioning invokes arrive before
+	// the fabric's ACL entry exists (fabricIndex==0) and continue
+	// over the same PASE channel after AddNOC adopted it onto the
+	// new fabric ([IsPASEFromContext]) — matter.js
+	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+	// keys the implicit Administer grant on the auth mode. The
+	// required privilege is per-command (RemoveFabric,
+	// OpenCommissioningWindow, … → Administer) rather than a flat
+	// Operate, so an Operate-only subject cannot invoke an
+	// administrative command.
+	if g.hasACL && !g.pase && g.fabricIndex != 0 {
+		if status := g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, inv.Path.Endpoint, inv.Path.Cluster, g.invokePrivilege(inv.Path)); !status.IsSuccess() {
+			return status
+		}
+	}
+	// A fabric-scoped command needs an accessing fabric: invoked on a
+	// session without one — PASE before AddNOC — it answers
+	// UnsupportedAccess. Mirrors matter.js CommandInvokeResponse.ts:287
+	// (`limits.fabricScoped && !this.session.fabric`). Found by the CHIP
+	// Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
+	if g.fabricIndex == 0 && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
+		return StatusUnsupportedAccess
+	}
+	// A timed-required command ("T") outside a timed interaction answers
+	// NeedsTimedInteraction for its own path, after the access and
+	// fabric checks — matter.js CommandInvokeResponse.ts:292-295.
+	if g.timedKnown && !g.timed && g.isTimed(inv.Path) {
+		return StatusNeedsTimedInteraction
+	}
+	// Existence before the payload check: matter.js
+	// CommandInvokeResponse.ts #processConcrete answers
+	// UnsupportedEndpoint / UnsupportedCluster / UnsupportedCommand
+	// before it validates the request, so a payload a generated decoder
+	// refused on a cluster the endpoint does not serve still answers
+	// UnsupportedCluster (TC-IDM-1.2). matter.js checks existence ahead
+	// of the fabric-scope and timed gates above too; those keep their
+	// place here, pinned by the bridge's timed conformance tests.
+	if g.hasPathChecker && inv.Path.HasEndpoint {
+		if status := g.pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
+			return status
+		}
+	}
+	return StatusSuccess
+}
+
+// wildcardTarget is the [CommandAuthorizer] of a wildcard path's
+// endpoints: the command's privilege, its fabric scope and its timed
+// quality at the endpoint (#wildcardTargetOf,
+// CommandInvokeResponse.ts:367-412 at 862ad75f).
+func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32) StatusCode {
+	at := ConcreteCommandPath{Endpoint: endpoint, Cluster: clusterID, Command: commandID, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	if g.hasACL && !g.pase && g.fabricIndex != 0 {
+		if status := g.aclChecker.CheckACL(g.ctx, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, g.invokePrivilege(at)); !status.IsSuccess() {
+			return status
+		}
+	}
+	if g.fabricIndex == 0 && schema.IsFabricScopedInvoke(clusterID, commandID) {
+		return StatusUnsupportedAccess
+	}
+	if g.timedKnown && !g.timed && g.isTimed(at) {
+		return StatusNeedsTimedInteraction
+	}
+	return StatusSuccess
+}
+
+// resultEntry is the InvokeResponse entry of a dispatched command's
+// result: its response, or its status. A cluster-specific status goes out
+// under an outer FAILURE whatever the handler named — Matter §7.10.7,
+// matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:448-451
+// at 862ad75f (#addStatus); it went out under the handler's status.
+func resultEntry(inv CommandInvocation, res InvokeResult) InvokeResponseEntry {
+	ent := InvokeResponseEntry{
+		Path:          res.Path,
+		CommandRef:    inv.CommandRef,
+		HasCommandRef: inv.HasCommandRef,
+	}
+	switch {
+	case res.Status != StatusSuccess:
+		status := res.Status
+		if res.HasClusterStatus {
+			status = StatusFailure
+		}
+		ent.IsStatus = true
+		ent.Status = StatusIB{Status: status, ClusterStatus: res.ClusterStatus, HasClusterStatus: res.HasClusterStatus}
+	case res.Response != nil:
+		ent.Response = res.Response
+		ent.HasResponse = true
+	default:
+		// Status-only success path: explicit StatusIB(Success).
+		ent.IsStatus = true
+		ent.Status = StatusIB{Status: StatusSuccess}
+	}
+	return ent
 }

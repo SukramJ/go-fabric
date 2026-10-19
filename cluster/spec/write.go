@@ -4,6 +4,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -369,15 +370,33 @@ func (i *Instance) satisfies(c Constraint, v float64, peers Peers) bool {
 }
 
 func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {
+	var ref string
 	switch {
-	case b == nil || b.Expr != "":
+	case b == nil:
 		return 0, false
+	case b.Expr != "":
+		// A dotted reference the generator keeps as its expression tree
+		// ({"type":".","lhs":…,"rhs":…}) is the qualified name it spells;
+		// any other expression stays unresolved.
+		if ref = dottedReference(b.Expr); ref == "" {
+			return 0, false
+		}
 	case b.Ref == "":
 		return float64(b.Int), true
-	case peers == nil:
+	default:
+		ref = b.Ref
+	}
+	if peers == nil {
 		return 0, false
 	}
-	a := i.def.AttributeByName(b.Ref)
+	// A qualified reference ("holdTimeLimits.holdTimeMin") names a sibling
+	// attribute by its first segment and a field of its value by each
+	// further one. Mirrors matter.js
+	// packages/node/src/behavior/state/managed/NameResolver.ts:107-131 at
+	// 862ad75f (resolveQualifiedName); an unresolved field admits every
+	// value, as an unresolved bound does. Such a bound was never resolved.
+	segments := strings.Split(ref, ".")
+	a := i.def.AttributeByName(segments[0])
 	if a == nil {
 		return 0, false
 	}
@@ -385,7 +404,65 @@ func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {
 	if !ok || v == nil {
 		return 0, false
 	}
+	for _, field := range segments[1:] {
+		if v, ok = structField(v, field); !ok || v == nil {
+			return 0, false
+		}
+	}
 	return asFloat(v)
+}
+
+// dottedReference is the qualified name a "." expression tree of
+// references spells ("holdTimeLimits.holdTimeMin"), or "" for any other
+// expression.
+func dottedReference(expr string) string {
+	var node struct {
+		Type string          `json:"type"`
+		Name string          `json:"name"`
+		LHS  json.RawMessage `json:"lhs"`
+		RHS  json.RawMessage `json:"rhs"`
+	}
+	if err := json.Unmarshal([]byte(expr), &node); err != nil {
+		return ""
+	}
+	switch node.Type {
+	case "reference":
+		return node.Name
+	case ".":
+		lhs, rhs := dottedReference(string(node.LHS)), dottedReference(string(node.RHS))
+		if lhs == "" || rhs == "" {
+			return ""
+		}
+		return lhs + "." + rhs
+	}
+	return ""
+}
+
+// structField is the field of struct value v whose name is name, matched
+// without regard to case (the model's camel case against the Go field),
+// dereferenced; ok is false when v is no struct or has no such field.
+func structField(v any, name string) (any, bool) {
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil, false
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil, false
+	}
+	f := rv.FieldByNameFunc(func(n string) bool { return strings.EqualFold(n, name) })
+	if !f.IsValid() || !f.CanInterface() {
+		return nil, false
+	}
+	for f.Kind() == reflect.Pointer {
+		if f.IsNil() {
+			return nil, true
+		}
+		f = f.Elem()
+	}
+	return f.Interface(), true
 }
 
 // UintMax is the largest value an unsigned integer of bits holds; one less

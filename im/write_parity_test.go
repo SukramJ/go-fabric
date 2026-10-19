@@ -290,13 +290,13 @@ func TestWriteParity_InvalidMessage_MalformedTLV(t *testing.T) {
 	}
 }
 
-// TestWriteParity_DataVersion_WildcardEndpoint_RejectsWithInvalidAction mirrors
-// matter.js packages/protocol/src/action/request/Write.ts:33 (#3988): a write
-// that carries HasDataVersion=true but HasEndpoint=false (wildcard endpoint) MUST
-// produce AttributeStatus with StatusInvalidAction. A DataVersion is meaningless
-// against a wildcard-endpoint path — resolving it against endpoint 0 is silent
-// data corruption per Matter §8.9.2.8.1.
-func TestWriteParity_DataVersion_WildcardEndpoint_RejectsWithInvalidAction(t *testing.T) {
+// TestWriteParity_DataVersion_WildcardEndpoint_Ignored mirrors matter.js
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:67-71 at
+// 862ad75f: a write whose wildcard-endpoint path carries a DataVersion is
+// written, the version ignored — the server stays lenient although Matter
+// §8.9.2.8.1 forbids the client to send it (AttributeWriteResponseTest.ts
+// "writes version mismatch wildcard attribute where mismatch got ignored").
+func TestWriteParity_DataVersion_WildcardEndpoint_Ignored(t *testing.T) {
 	t.Parallel()
 	d := &fakeDispatcher{writeStat: StatusSuccess}
 	req := WriteRequest{
@@ -319,8 +319,8 @@ func TestWriteParity_DataVersion_WildcardEndpoint_RejectsWithInvalidAction(t *te
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
-	if wr.Responses[0].Status.Status != StatusInvalidAction {
-		t.Fatalf("status=%v, want StatusInvalidAction", wr.Responses[0].Status.Status)
+	if wr.Responses[0].Status.Status != StatusSuccess {
+		t.Fatalf("status=%v, want StatusSuccess", wr.Responses[0].Status.Status)
 	}
 }
 

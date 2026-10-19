@@ -38,6 +38,9 @@
 //     (controller/, ADR 0020): exchange manager, DNS-SD cache, certificate
 //     authority, fabric, peer set, subscription registry, commissioner with
 //     its CASE responder and client node registry, all on the site's clock.
+//     [Controller.CommissionNode] commissions a device through the registry
+//     as matter.js controller.peers.commission does, and
+//     [Controller.Restart] starts the stack again on its stores.
 //   - The in-memory network ([Network]) addresses every host like UDP, by
 //     an IPv6 link-local address the site hands out (fe80::<index>, port
 //     5540), and can lose, delay (on the site's clock) and duplicate

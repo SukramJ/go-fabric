@@ -198,8 +198,17 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// initial value is in place, not in id order — matter.js validates the
 	// whole state after the initializer has run. Mirrors matter.js
 	// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63
-	// (invokeInitializer: finalizeState → datasource.validate).
+	// (invokeInitializer: finalizeState → datasource.validate). So is a
+	// bound that names a sibling ("holdTimeLimits.holdTimeMin to …",
+	// DotQualifiedConstraintTest.ts at 862ad75f): an initial value is held
+	// to it again with every sibling in place; in id order the sibling was
+	// still unset and the bound admitted anything.
 	for _, id := range inst.attrs {
+		if _, initial := cfg.Initial[id]; initial {
+			if _, err := s.CheckValue(id, s.values[id], s.peers); err != nil {
+				return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
+			}
+		}
 		if err := s.checkIn(id, s.values[id], s.peers); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 		}

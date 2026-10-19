@@ -6,6 +6,7 @@ package client
 import (
 	"context"
 	"slices"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/controller/interaction"
@@ -25,14 +26,15 @@ type ReadRequest struct {
 // ClientNodeInteraction.read (ClientNodeInteraction.ts:91-112): unless
 // IncludeKnownVersions, and when the read has the default subscription's
 // fabric filter (:103-106), the cached versions go along as filters, none
-// for a cluster with a changes-omitted attribute (:107). The caller gets
-// the report as the peer sent it, its chunks merged.
+// for a cluster with a changes-omitted attribute (:107) and none for a
+// cluster the caller filters ([structure.withKnownVersions]). The caller
+// gets the report as the peer sent it, its chunks merged.
 func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, error) {
 	r := req.ReadRequest
 	sc := newScope(r.Attributes, r.NoFabricFilter)
 	n.mu.RLock()
-	if !req.IncludeKnownVersions && sc.fabricFiltered == n.s.subscribedFabricFiltered {
-		r.DataVersionFilters = append(slices.Clone(r.DataVersionFilters), n.s.injectVersionFilters(sc, true)...)
+	if !req.IncludeKnownVersions {
+		r.DataVersionFilters = n.s.withKnownVersions(sc, r.DataVersionFilters, true)
 	}
 	n.mu.RUnlock()
 	ia, err := n.interaction()
@@ -48,31 +50,57 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, 
 }
 
 // Subscribe subscribes through the node — ClientNodeInteraction.subscribe
-// (ClientNodeInteraction.ts:125-169): the cached versions go along as
-// filters (:128, no changes-omitted refresh); the interval bounds are the
-// node's for the request's (:129-133); each report is applied to the image
-// before req.Updated sees it (:139-146); a sustained subscription's
-// re-subscriptions send the versions then current and the event minimum
-// past the highest event seen (:148-155).
+// (ClientNodeInteraction.ts:125-169 at 0ceb202d): the cached versions go
+// along as filters (:128, no changes-omitted refresh), as for a read none
+// for a cluster the caller filters and none with the other fabric filter
+// than the cache's ([structure.withKnownVersions]); the interval bounds
+// are the node's for the request's (:129-133); each report is applied to
+// the image before req.Updated sees it (:139-146); a sustained
+// subscription's re-subscriptions send the versions then current and the
+// event minimum past the highest event seen (:148-155).
+//
+// A sustained subscription's re-subscription starts from the caller's own
+// filters, runs the caller's RefreshRequest on them, then injects the
+// versions, and its reports are applied by the scope of the request that
+// produced them. Mirrors matter.js
+// packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
+// 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
 func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) (*interaction.Subscription, error) {
-	sc := newScope(req.Attributes, req.NoFabricFilter)
+	callerFilters := slices.Clone(req.DataVersionFilters)
+	var callerRefresh func(interaction.SubscribeRequest) interaction.SubscribeRequest
+	if req.Sustain {
+		callerRefresh = req.RefreshRequest
+	}
+	var sentMu sync.Mutex
+	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req
 	n.mu.RLock()
-	r.DataVersionFilters = append(slices.Clone(req.DataVersionFilters), n.s.injectVersionFilters(sc, false)...)
+	r.DataVersionFilters = n.s.withKnownVersions(sent, callerFilters, false)
 	n.mu.RUnlock()
 	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
 	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
 	r.Updated = func(rep *interaction.Report) {
+		sentMu.Lock()
+		sc := sent
+		sentMu.Unlock()
 		n.apply(sc, rep)
 		if req.Updated != nil {
 			req.Updated(rep)
 		}
 	}
 	r.RefreshRequest = func(x interaction.SubscribeRequest) interaction.SubscribeRequest {
+		x.DataVersionFilters = slices.Clone(callerFilters)
+		if callerRefresh != nil {
+			x = callerRefresh(x)
+		}
+		sc := newScope(x.Attributes, x.NoFabricFilter)
 		n.mu.RLock()
 		x.EventFilters = []im.EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
-		x.DataVersionFilters = n.s.injectVersionFilters(newScope(x.Attributes, x.NoFabricFilter), false)
+		x.DataVersionFilters = n.s.withKnownVersions(sc, x.DataVersionFilters, false)
 		n.mu.RUnlock()
+		sentMu.Lock()
+		sent = sc
+		sentMu.Unlock()
 		n.observeRequest(x)
 		return x
 	}

@@ -497,7 +497,7 @@ func TestHandlerParity_KeepSubscriptionsFalse_ClosePeerFreesQuota(t *testing.T) 
 // not in the subscription engine itself.
 func TestHandlerParity_SKIP_AttrSubResponse_ConcreteInFilter(t *testing.T) {
 	// Mirrors matter.js packages/node/test/node/AttributeSubscriptionResponseTest.ts:16-41
-	t.Skip("FixMe: AttributeSubscriptionResponse requires a full IM+Node stack; go-fabric dirty-filter logic tested at the engine layer via drainDirtyIfElapsed")
+	t.Skip("ported over the wire: node/attribute_subscription_response_parity_matterjs_test.go (TestAttributeSubscriptionResponseParity)")
 }
 
 // ---- Case 14 --------------------------------------------------------------
