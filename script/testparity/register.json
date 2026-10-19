@@ -761,17 +761,13 @@
     },
     {
       "path": "packages/node/test/behaviors/descriptor/DescriptorServerClientListTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "device:TestClientListCarriesTheMandatoryClientClusters",
-        "cluster/core:TestDescriptor_ReadClientList"
+        "cluster/core:TestDescriptor_ReadClientList",
+        "device:TestDescriptorServerClientList"
       ],
-      "missing": [
-        "is empty when no client clusters declared",
-        "includes explicit .with(<Client>) entries",
-        "lists same cluster id in both serverList and clientList (dimmer-switch / Identify)"
-      ],
-      "reason": "The mandatory client clusters of a device type reaching ClientList are covered; the explicit-client and same-cluster-in-both-lists cases are not.",
+      "reason": "The empty ClientList of a type without client clusters, an explicit client cluster (WithClientClusters), the mandatory client clusters of a device type and the same cluster in ServerList and ClientList (DimmerSwitch / Identify) are ported on the device-layer types through the assembler's Descriptor.",
       "snapshotSha": "6c7e9539b97e6459a15b0fcf76bcfceb5ab16618"
     },
     {
