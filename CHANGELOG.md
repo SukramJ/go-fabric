@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.8.5] — 2026-10-19
+
+Milestone 3, phase 18a, brief BN: the behaviour-test ports of Descriptor, GeneralDiagnostics, BasicInformation, Groups, ScenesManagement and the protocol group tests against matter.js at `862ad75f` — 38 of 47 open cases, four fixes the ports found.
+
 ### Added
 
 - `cluster/core`: a GeneralDiagnostics feature selection of the host's own — `NewGeneralDiagnosticsWith(bootReason, GeneralDiagnosticsFeatures{DataModelTest: …})`, matter.js `GeneralDiagnosticsServer.with(…)`; without DataModelTest the server drops PayloadTestRequest/Response and FeatureMap reads 0. `GeneralDiagnostics.CheckDataModelTest(maxPathsPerInvoke, logger)` holds the selection against the node's MaxPathsPerInvoke: an error above one without the feature, an INFO advisory with it at one (`GeneralDiagnosticsServer.ts:125-143`). `NewGeneralDiagnostics` keeps DataModelTest.
@@ -4332,7 +4336,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/SukramJ/go-fabric/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/SukramJ/go-fabric/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/SukramJ/go-fabric/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/SukramJ/go-fabric/compare/v0.8.1...v0.8.2
