@@ -990,19 +990,13 @@
       "path": "packages/node/test/behaviors/level-control/ColorTemperatureCouplingTest.ts",
       "status": "partial",
       "go": [
-        "cluster/levelcontrol:TestColorTemperatureCoupling"
+        "cluster/levelcontrol:TestColorTemperatureCoupling",
+        "cluster/levelcontrol:TestParityMatterJS_ColorTemperatureCouplingTest"
       ],
       "missing": [
-        "couples a WithOnOff step when the Options attribute asks for it",
-        "couples a WithOnOff move when the Options attribute asks for it",
-        "couples two level changes that share one transaction",
-        "leaves the color temperature where a later command in the transaction overrides the coupling off",
-        "couples where a later command in the transaction overrides the coupling on",
-        "waits for a transaction that holds the color temperature",
-        "honors an override that sets the coupling for one command",
-        "honors an override that clears the coupling for one command"
+        "leaves the color temperature where a later command in the transaction overrides the coupling off"
       ],
-      "reason": "The coupling of level to colour temperature and its scaling are ported; the transaction-sharing cases and the per-command overrides are not.",
+      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits.",
       "snapshotSha": "69c2d9e69eb27dae9b1d66804e70de1ea276fce6"
     },
     {
