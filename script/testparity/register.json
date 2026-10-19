@@ -1025,13 +1025,13 @@
       "status": "partial",
       "go": [
         "cluster/levelcontrol:TestOnOffCoupling",
-        "cluster/levelcontrol:TestNativeSourceOnOffCoupling"
+        "cluster/levelcontrol:TestNativeSourceOnOffCoupling",
+        "cluster/levelcontrol:TestParityMatterJS_OnOffCouplingTest"
       ],
       "missing": [
-        "lifts the on/off coupling block when its transaction rolls back",
-        "holds the on/off coupling block through a committed level change"
+        "lifts the on/off coupling block when its transaction rolls back"
       ],
-      "reason": "The four switching cases are ported; the two transaction-rollback cases of the coupling block are not.",
+      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns.",
       "snapshotSha": "189a9755de998ba24ad323fcb6a783e2597842da"
     },
     {
