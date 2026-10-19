@@ -16,9 +16,11 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	hepaspec "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // --- device: a ceiling fan -------------------------------------------------
@@ -170,13 +172,37 @@ func copyUint8(v *uint8) *uint8 {
 //
 // Its display settings are a
 // ThermostatUserInterfaceConfiguration, the optional cluster the Thermostat
-// device type offers (thermostat.element.ts), with matter.js's defaults.
+// device type offers (thermostat.element.ts), with matter.js's defaults;
+// KeypadLockout persists in the daemon's settings.
+//
+// It serves Presets (PRES) in the shape of matter.js's preset tests
+// (packages/node/test/behaviors/thermostat/preset-helpers.ts:35-55
+// thermostatConfig at 862ad75f): five presets of one type, Occupied, without
+// names, none configured — a controller adds them in an atomic write — kept
+// in the daemon's store. No Occupancy: the endpoint has no occupancy
+// sensor.
 type demoThermostat struct {
 	name string
 	once sync.Once
 	srv  *thermo.ThermostatServer
 	pref *energy.PreferenceServer
 	ui   *thermo.ThermostatUIServer
+
+	// presets and settings are the daemon's store (attachStore); nil keeps
+	// the presets and KeypadLockout in memory.
+	presets  thermo.PresetStore
+	settings thermo.SettingStore
+}
+
+// thermostatStoreKey names the thermostat's rows in the daemon's store: its
+// device address.
+const thermostatStoreKey = "demo-thermostat-1"
+
+// attachStore persists the thermostat's presets and KeypadLockout in st.
+// Call it before the thermostat's servers are built (fleet.endpoints).
+func (t *demoThermostat) attachStore(st *store.Store) {
+	t.presets = st.ThermostatPresets(thermostatStoreKey)
+	t.settings = st
 }
 
 var _ energy.PreferenceChanger = (*demoThermostat)(nil)
@@ -193,7 +219,10 @@ func (t *demoThermostat) servers() []contract.ClusterServer {
 func (t *demoThermostat) build() {
 	t.once.Do(func() {
 		cfg := thermo.DefaultThermostatConfig()
-		cfg.Features = thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL
+		cfg.Features = thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL | thermo.ThermostatFeaturePRES
+		cfg.NumberOfPresets = 5
+		cfg.PresetTypes = []thermo.PresetType{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 5}}
+		cfg.PresetStore = t.presets
 		t.srv = thermo.NewThermostatServer(cfg)
 		room := int16(2150)
 		t.srv.SetLocalTemperature(&room)
@@ -211,7 +240,9 @@ func (t *demoThermostat) build() {
 			panic(fmt.Sprintf("thermostat EnergyPreference: %v", err))
 		}
 		t.pref = pref
-		ui, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{})
+		ui, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{
+			Settings: t.settings, SettingKey: thermostatStoreKey + ".keypad_lockout",
+		})
 		if err != nil {
 			panic(fmt.Sprintf("thermostat ThermostatUserInterfaceConfiguration: %v", err))
 		}
