@@ -1038,16 +1038,14 @@
       "path": "packages/node/test/behaviors/level-control/RemainingTimeTest.ts",
       "status": "partial",
       "go": [
-        "cluster/transition:TestCancelReportsZero"
+        "cluster/transition:TestCancelReportsZero",
+        "cluster/levelcontrol:TestParityMatterJS_LevelControlRemainingTimeTest"
       ],
       "missing": [
-        "reports the time left in a transition the application did not configure",
-        "reads zero once the transition completes",
-        "reports the time left in a transition",
         "reads zero after a stop, although the application stated a remaining time",
         "reads zero after a stop, although the application stated a later end time"
       ],
-      "reason": "The two stop cases are ported; the application-supplied remaining-time and end-time cases are not.",
+      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup.",
       "snapshotSha": "57ecfbd7a1732693bd794dd7a6003c760ee98384"
     },
     {
