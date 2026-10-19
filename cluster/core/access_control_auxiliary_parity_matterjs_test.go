@@ -34,13 +34,14 @@
 // Missing (register): "ignores provider entries without AuxiliaryType" —
 // AuxiliaryACLSource yields store.ACLEntry values, which carry no
 // AuxiliaryType, and every entry it supplies is served as Groupcast, so
-// there is no untyped provider entry to ignore; "keeps the applied real
+// there is no untyped provider entry to ignore. "keeps the applied real
 // entries when auxiliary entries change during a controller ACL write" —
-// the Go ACL write lands in the store at once, where matter.js delays the
-// effective list to the end of the interaction
-// (AccessControlServer.ts:545-605); "applies an overridden extension access
-// check to a fabric commissioned after startup" — the Go AccessControl has
-// no overridable extension access check (AccessControlServer.ts:441-450).
+// the Go ACL write lands in the store at once, where matter.js applies the
+// effective list when the interaction ends (AccessControlServer.ts:545-605,
+// #handleInteractionEnd, #delayAclUpdateFor). "applies an overridden
+// extension access check to a fabric commissioned after startup" — the Go
+// server has no overridable extensionEntryAccessCheck
+// (AccessControlServer.ts:441-450).
 package core_test
 
 import (

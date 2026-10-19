@@ -18,8 +18,8 @@ func (g *GeneralDiagnostics) UpTimeFrom(mono, wall time.Duration) time.Duration 
 
 // RegisterAuxiliaryProvider exposes registerAuxiliaryProvider to the
 // external parity tests, which emit provider entries the node's one
-// provider (Groupcast) cannot produce — matter.js registerAuxAclProvider
-// with a free observable (AccessControlAuxiliaryTest.ts:32-34).
+// provider (Groupcast) cannot produce — the test's free observable,
+// createProvider (AccessControlAuxiliaryTest.ts:32-34).
 func (a *AccessControl) RegisterAuxiliaryProvider(ctx context.Context, src AuxiliaryACLSource) {
 	a.registerAuxiliaryProvider(ctx, src)
 }

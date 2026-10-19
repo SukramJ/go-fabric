@@ -25,10 +25,10 @@
 // the group state legs run here. "treats UpdateFabricLabel as a final
 // fabric change" and "treats SetVIDVerificationStatement as a final fabric
 // change" assert the node's fabricsChanged event "1 updated"
-// (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582
-// on FabricManager replaced, FabricManager.ts:236-247); the Go node raises
-// no fabric event for a label or vendor ID change (Observers.OnFabricUpdated
-// follows UpdateNOC).
+// (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582).
+// matter.js raises it on every persist of a fabric (FabricManager.ts:236-247,
+// persistCallback). The Go node raises no fabric event for a label or
+// vendor ID change: Observers.OnFabricUpdated follows UpdateNOC.
 package node_test
 
 import (
@@ -275,8 +275,8 @@ func TestOperationalCredentialsAddNOCCertificateChecks(t *testing.T) {
 }
 
 // TestOperationalCredentialsSetVIDVerificationStatementVendor ports
-// "refuses the Matter Standard vendor ID" (OperationalCredentialsServerTest.ts:156-164):
-// SetVIDVerificationStatement with VendorID 0 answers ConstraintError
+// "refuses the Matter Standard vendor ID" of setVidVerificationStatement
+// (OperationalCredentialsServerTest.ts:156-164): VendorID 0 answers ConstraintError
 // (OperationalCredentialsServer.ts:516-518, VendorId.isOperational).
 func TestOperationalCredentialsSetVIDVerificationStatementVendor(t *testing.T) {
 	holdSite(t)
