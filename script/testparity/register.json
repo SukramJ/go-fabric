@@ -538,25 +538,25 @@
         "bridge:TestACLWriteWithAuxiliaryTypeOverTheWire",
         "groups:TestAuxiliaryACLEntries",
         "cluster/core:TestGroupcastAuxiliaryACLParityMatterJS",
-        "endpoint:TestCheckACLWithTheAuxiliaryFeature"
+        "endpoint:TestCheckACLWithTheAuxiliaryFeature",
+        "cluster/core:TestAccessControlAuxiliaryEventsPerChangedFabric",
+        "cluster/core:TestAccessControlAuxiliarySplitsProviderEntries",
+        "cluster/core:TestAccessControlAuxiliaryRestart",
+        "cluster/core:TestAccessControlAuxiliaryLocalWrite",
+        "cluster/core:TestAccessControlAuxiliaryControllerWrite"
       ],
       "missing": [
-        "installs unchanged provider entries after a restart",
-        "reports AuxiliaryAccessUpdated only for fabrics whose entries changed",
-        "keeps auxiliary entries when the ACL is written locally",
-        "rejects a local ACL write with an entry that includes AuxiliaryType with FAILURE",
-        "splits provider entries to the per-entry subject and target limits",
         "ignores provider entries without AuxiliaryType",
-        "keeps auxiliary entries across a controller ACL write",
         "keeps the applied real entries when auxiliary entries change during a controller ACL write",
         "applies an overridden extension access check to a fabric commissioned after startup"
       ],
-      "reason": "Auxiliary ACL entries from Groupcast, the feature gate and the refused AuxiliaryType write are covered; restart, AuxiliaryAccessUpdated, local writes and the per-entry split are not.",
+      "reason": "Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: an untyped provider entry cannot exist (AuxiliaryACLSource yields store.ACLEntry, served as Groupcast); the Go ACL write lands in the store at once where matter.js delays the effective list to the interaction's end (AccessControlServer.ts:545-605); the Go AccessControl has no overridable extensionEntryAccessCheck (:441-450).",
       "snapshotSha": "9ccf261c72c458d1aa3728439f626ea3b892e21e"
     },
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlCustomExtensionTest.ts",
       "status": "planned",
+      "until": "M4",
       "reason": "A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.",
       "snapshotSha": "4ee3a54035ed20ee81b0e0687711943b476254c5"
     },
