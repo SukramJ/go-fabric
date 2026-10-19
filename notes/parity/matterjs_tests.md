@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 65 |
+| ported | 66 |
 | partial | 116 |
-| planned | 56 |
+| planned | 55 |
 | excluded | 87 |
 | total | 324 |
 
@@ -51,7 +51,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
@@ -352,7 +352,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| GroupsServerSchemaTest.ts | 100 | planned | â€” | The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response. |
+| GroupsServerSchemaTest.ts | 100 | ported | `cluster/core:TestGroupsServerSchemaRelaxation` | The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair. |
 
 ## node/test/behaviors/hepa-filter-monitoring
 
@@ -974,10 +974,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/fan-control
 
 - `FanControlTest.ts` â€” Local mode tags and the not-off-only command set of FanControlServer by default.
-
-### node/test/behaviors/groups
-
-- `GroupsServerSchemaTest.ts` â€” The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response.
 
 ### node/test/behaviors/icd-management
 

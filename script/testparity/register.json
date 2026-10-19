@@ -960,8 +960,11 @@
     },
     {
       "path": "packages/node/test/behaviors/groups/GroupsServerSchemaTest.ts",
-      "status": "planned",
-      "reason": "The relaxed AddGroup GroupId/GroupName constraints, which leave the handler to answer out-of-range values with a command response.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestGroupsServerSchemaRelaxation"
+      ],
+      "reason": "The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair.",
       "snapshotSha": "7f2c62836c279045fb929da047b7a806b5aea784"
     },
     {
