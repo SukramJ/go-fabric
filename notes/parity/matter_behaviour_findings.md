@@ -583,6 +583,25 @@ Controller side:
   dispatch endpoints and group nodes (PeersCommissionedTest, register
   `until M5 phase 25`) have no in-process test. (Milestone 5 phase 25.)
 
+Found by the phase-17b Switch server (brief BK, PR #171, 2026-10-19).
+
+- **The materialised Switch server runs on the system clock.**
+  `contract.MeasurementContext` carries `EndpointID` only
+  (`contract/matter.go:332-338`), so the MomentarySwitch materialiser
+  (`cluster/measurement/materializers.go` `switchConfig`) builds
+  `cluster/switch` on `clock.System` even under `fabrictest`; matter.js's
+  behaviors take `Time` from the node's environment. A bridged button's
+  long-press and multi-press timers cannot be driven by a fake clock in an
+  in-process test. Fix: the context carries the node's clock (an additive
+  field). (Milestone 4, the embedding layer.)
+- **TC-SWTCH-2.6 is not covered.** It needs ActionSwitch, which excludes
+  MomentarySwitchRelease (`switch.element.ts:25-27` at `862ad75f`: MSR
+  "[MS & !AS]", MSM "AS, [MS & MSR]"); the daemon's one button serves MSR.
+  A second switch endpoint (MS, AS, MSL, MSM, matter.js's all-clusters
+  `ep3`) would move the composition and the IDM goldens. Harness note, not
+  a parity gap; `internal/chiptool/families_table_test.go` classifies it.
+  (With the next CHIP image lift, if at all.)
+
 ## Application cluster servers — open items
 
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,

@@ -190,3 +190,11 @@ race and chiptool-test were not repeated for it.
   `ResetState` wait, while `SetRawPosition`/`SetCurrentPosition` never wait
   (a matter.js `set` would). Observables and `MaybePromise` have no Go
   counterpart; delivery is synchronous before an input or a timer returns.
+
+## Decided in review (2026-10-19)
+
+- The server, the seams, the materialiser and the daemon stand as cited; merged as PR #171 after PR #170 (`v0.8.1`) and the labelled chip-tool jobs; released as `v0.8.2`.
+- Package name `switchserver` stays. The materialised server owns CurrentPosition (mirrors matter.js); `BD-Matter-ButtonGroupCurrentPositionReporting` is marked superseded, `BD-Matter-ButtonPressCycleFromDiscreteFrames` amended with the two inputs.
+- The lock is `BD-Matter-Switch-LockAsMutexAndOutbox`.
+- No second daemon endpoint for TC-SWTCH-2.6 now (composition and IDM goldens would move); recorded as a harness note in the findings. `MeasurementContext` without a clock is a finding for milestone 4.
+- `ResetState` and the delay setters stay off `contract.SwitchPositionSink`; the daemon's blocking simulation is acceptable for the reference daemon.
