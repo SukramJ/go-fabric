@@ -820,23 +820,12 @@
       "go": [
         "cluster/lock:TestDoorLockServerParity",
         "cluster/lock:TestDoorLockServerScheduleRestrictedAccessParity",
-        "cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity"
+        "cluster/lock:TestDoorLockServerWeekDayWindowBoundsParity",
+        "cluster/lock:TestDoorLockServerAutoRelockParity",
+        "cluster/lock:TestDoorLockServerAutoRelockLargestTimeParity",
+        "cluster/lock:TestDoorLockServerExpiringUserTimeoutParity"
       ],
       "missing": [
-        "relocks once AutoRelockTime has passed since the latest unlock",
-        "unlocks and stays unlocked",
-        "keeps granting access before the timeout elapses",
-        "disables the user when the timeout elapses after first use, without a further access attempt",
-        "does not arm the timeout before the first successful use",
-        "keeps the deadline when a modification changes neither status nor type",
-        "starts a new cycle when an expired user is enabled again",
-        "denies and disables once the wall clock passes the deadline, before the timer fires",
-        "re-arms for the remaining time when the timer fires early after the wall clock stepped back",
-        "denies an ExpiringUser while ExpiringUserTimeout is not set",
-        "disables at startup a user whose stored deadline has passed",
-        "starts with a deadline beyond the timer range and still disables once it passes",
-        "restores deadlines at startup from an overridden auth store",
-        "disables a user when a deadline that was still pending at startup passes",
         "refuses ${name} in ${OperatingMode[mode]}",
         "refuses a NonAccessUser and reports the access attempt",
         "keeps a DisposableUser enabled when it locks the door",

@@ -539,3 +539,8 @@ func nextIndex(n *spec.Nullable[uint16]) *uint16 {
 func withPairFabric() context.Context {
 	return im.WithFabricFilter(context.Background(), false, pairFabric)
 }
+
+// nullFabric and nullNode are the null FabricIndex and SourceNode of an
+// event of no fabric.
+func nullFabric() spec.Nullable[uint8] { return spec.NullOf[uint8]() }
+func nullNode() spec.Nullable[uint64]  { return spec.NullOf[uint64]() }
