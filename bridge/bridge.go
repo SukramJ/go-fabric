@@ -1262,6 +1262,13 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 	b.mu.Unlock()
 }
 
+// fabricRemovalObserver is the optional capability of a device's cluster
+// server to drop what it holds for a removed fabric's peers
+// (thermo.ThermostatServer: its atomic writes).
+type fabricRemovalObserver interface {
+	MatterFabricRemoved(fabricIndex uint8)
+}
+
 // fabricSessionCloser is the optional capability of a [SessionRegistry]
 // to close every session of one fabric (operational.Manager.CloseFabric).
 type fabricSessionCloser interface {
@@ -1450,6 +1457,16 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		for _, ep := range topo.Endpoints {
 			if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
 				ep.ForgetFabricScenes(fabricIndex) // parts included
+				// And the state a device's cluster server keeps for the
+				// fabric's peers: the Thermostat's atomic writes (matter.js
+				// AtomicWriteHandler observes FabricManager.events.deleting,
+				// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:75,
+				// :378-388 at 862ad75f).
+				for _, srv := range endpoint.ClusterServers(ep) {
+					if o, ok := srv.(fabricRemovalObserver); ok {
+						o.MatterFabricRemoved(fabricIndex)
+					}
+				}
 			}
 		}
 	}

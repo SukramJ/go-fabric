@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5740,
+  "entry_points": 5758,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13177,
-    "reachable": 9150,
-    "whitelisted": 4022,
+    "total_exported": 13191,
+    "reachable": 9161,
+    "whitelisted": 4025,
     "unreachable": 5
   },
   "by_package": [
@@ -15692,14 +15692,28 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 44
+      "line": 50
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "Preset",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/presets.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "PresetType",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/presets.go",
+      "line": 33
     },
     {
       "package": "cluster/thermo",
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 47
+      "line": 53
     },
     {
       "package": "cluster/thermo",
@@ -15713,7 +15727,14 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 42
+      "line": 48
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestAtomicWriteStateParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/atomic_write_state_parity_matterjs_test.go",
+      "line": 28
     },
     {
       "package": "cluster/thermo",

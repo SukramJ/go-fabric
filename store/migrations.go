@@ -51,7 +51,8 @@ type Migration struct {
 //   - v3 — v0.2.0: the matter_group_key_map rebuild without that foreign
 //     key ([Upgrade]'s step).
 //   - v4 — v0.3.0: matter_ota_default_providers.
-var migrationVersions = []string{"v1", "v2", "v3", "v4"}
+//   - v5 — v0.8.3: matter_thermostat_presets.
+var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5"}
 
 // Migrations returns the schema's steps in order. Applied to an empty
 // database one after the other, they produce the schema [Apply] produces —

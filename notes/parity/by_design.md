@@ -3525,3 +3525,38 @@ the coupling cases that need no transaction are ported. Report BJ (phase
 By design. The Go servers have no transaction object a host could hold
 across commands; the `Act` of `fabrictest` runs one local change, not a
 transaction.
+
+### BD-Matter-Thermostat-AtomicWritesPerServer — each Thermostat server holds its own atomic writes
+
+matter.js keeps one `AtomicWriteHandler` per node environment
+(`AtomicWriteHandler.ts:70-89`, `Environmental.create`), its states keyed
+by peer, endpoint and cluster (`:393-420`), and closes them when the
+peer's fabric is deleted (`FabricManager.events.deleting`, `:75`,
+`:378-388`). The Go port is per server: `cluster/thermo/atomic.go`
+(`atomicWrites`) holds the states of its own endpoint and cluster, and
+the bridge tells every cluster server of a device endpoint about a
+removed fabric through the unexported `fabricRemovalObserver`
+(`MatterFabricRemoved`), as it tells the endpoints to forget their
+scenes. The Thermostat is the one user of atomic writes in both stacks,
+so the keying is the same; a handler per node would need a registry in
+`contract/`, which names host types only. The timeout is a timer and a
+deadline (`atomicWriteState.live`): a request right after the timeout
+sees the hold released before the timer's goroutine ran, where matter.js
+closes on the timer alone (`AtomicWriteState.ts:51-55`, `:70-82`) — the
+observable rule, closed once the timeout passed, is the same.
+
+### BD-Matter-Thermostat-PresetStoreIsTheHostSeam — presets persist through a host PresetStore, not an observable state
+
+matter.js persists `persistedPresets` as behavior state in the node's
+storage (`ThermostatServer.ts:64-74`, quality N) and an application
+refuses or rewrites presets in flight from a `persistedPresets$Changing`
+observer (`PresetsLocalWriteTest.ts:194-366`). The Go server hands the
+TLV of the Presets list and the active handle to a host `PresetStore`
+(`thermo.PresetStore`; `store.ThermostatPresets(key)` on
+`matter_thermostat_presets`, migration v5) keyed by the host's name for
+the endpoint, loads it once at construction and saves after every
+accepted change; a host refuses by returning an error from `SavePresets`
+and cannot rewrite in flight. The host's seams are the explicit ports of
+`contract/` and the server's methods, not observers on internal state
+(`BD-Matter-HostPort-OutsideTheSetterLock`); the five observer cases are
+`missing` in the register with that reason.

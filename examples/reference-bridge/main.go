@@ -321,8 +321,9 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 		applier.requestor = func() *mattercore.OTASoftwareUpdateRequestor { return n.Root().OTARequestor }
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
+	devices.thermostat.attachStore(n.Store())
 
-	eps, err := devices.endpoints()
+	eps, err := devices.endpoints() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
 	if err != nil {
 		return nil, err
 	}

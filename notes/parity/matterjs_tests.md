@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 59 |
-| partial | 114 |
-| planned | 64 |
+| ported | 62 |
+| partial | 117 |
+| planned | 58 |
 | excluded | 87 |
 | total | 324 |
 
@@ -66,8 +66,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 0 | 1 | 5 | 0 |
-| [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
+| [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
@@ -446,18 +446,18 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| AtomicWriteHandlerTest.ts | 519 | planned | — | Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets. |
-| AtomicWriteStateTest.ts | 41 | planned | — | The atomic-write state emitting closed once, built with the atomic writes. |
-| PresetsAtomicWriteTest.ts | 215 | planned | — | Writing presets through an atomic write. |
-| PresetsConfigurationTest.ts | 150 | planned | — | Presets seeded from configuration and the write rules without configured presets. |
-| PresetsLocalWriteTest.ts | 460 | planned | — | Local writes of presets: handles, persistence, validation per transaction. |
-| ThermostatBehaviorTest.ts | 391 | partial | `cluster/thermo:TestParityMatterJS_Thermostat_StartupReconciliation` | The startup reconciliation of setpoints and limits is ported; the schema defaults, user-limit ordering and runtime limit validation are not. Missing: “has correct Thermostat-specific celsius defaults in schema”; “correctly specifies Thermostat-specific value in defaults”; “clears the active preset when it adjusts a setpoint”; “accepts absolute limits narrower than the defaults without user limits”; “orders unordered user limits by raising the max limit”; “orders unordered cool user limits on a heating and cooling thermostat”; “orders unordered cool user limits on a cooling-only thermostat”; “pulls a user limit inside narrowed absolute limits”; “rejects an absolute limit change that leaves a user limit outside”; “rejects a user limit outside the absolute limits”; “rejects setpoints outside the user limits”; “raises the coupled cool limit when a heat min limit write would violate the deadband”; “lowers the coupled heat limit when a cool max limit write would violate the deadband”; “does not adjust when the write already satisfies the deadband”; “raises the coupled max limit when a min limit is written above it (ordering repair)”; “clamps a setpoint back inside the limits when a limit write crosses it”; “pins the written limit back when the coupled limit cannot move within its absolute bounds”; “rejects a limit write the fix leaves invalid, naming the violated condition”; “nudges the coupled setpoint to preserve the deadband when a limit write clamps a setpoint”. |
+| AtomicWriteHandlerTest.ts | 519 | partial | `cluster/thermo:TestParityMatterJS_AtomicWriteHandlerTest` | BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session); the inherited-quality case is a TypeScript schema extension of a behavior class with no Go counterpart (the atomic quality is the generated definition's), and the five CommitWrite cases stage Schedules, MatterScheduleConfiguration, which the server does not serve (matter.js does not implement it either, ThermostatServer.ts:126-128). Missing: “accepts an attribute whose atomic quality is inherited from the element it overrides”; “applies every pending write when all of them succeed”; “reports an attribute the peer did not write as SUCCESS, in the CommitWrite request's order”; “validates an attribute once the other pending attributes are staged”; “discards a valid Schedules write when the Presets write fails”; “discards a valid Presets write when the Schedules write fails”. |
+| AtomicWriteStateTest.ts | 41 | ported | `cluster/thermo:TestAtomicWriteStateParity` | The one case runs on the package's atomic-write state (cluster/thermo/atomic.go, the port of AtomicWriteState.ts) on a clocktest.Fake: closed emits once. |
+| PresetsAtomicWriteTest.ts | 215 | partial | `cluster/thermo:TestParityMatterJS_PresetsAtomicWriteTest` | BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged; the observer case is missing: it rewrites the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have (the host refuses through its PresetStore). Missing: “refuses a commit whose settled presets an observer stripped the handle from”. |
+| PresetsConfigurationTest.ts | 150 | partial | `cluster/thermo:TestParityMatterJS_PresetsConfigurationTest` | The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. The seed case is missing: it plants a value under the attribute's pre-accessor storage key, and the Go server never stored presets anywhere but its PresetStore. Missing: “seeds from configuration, not from presets a device stored before the accessor existed”. |
+| PresetsLocalWriteTest.ts | 460 | partial | `cluster/thermo:TestParityMatterJS_PresetsLocalWriteTest` | The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's; the four missing cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have. Missing: “refuses a preset an observer stripped the handle from, and stays writable”; “checks the settled presets of every commit that shares one transaction”; “refuses a preset an observer marks built-in after the thermostat issued its handle”; “validates a change an observer makes after the thermostat normalized”. |
+| ThermostatBehaviorTest.ts | 391 | ported | `cluster/thermo:TestParityMatterJS_Thermostat_StartupReconciliation`<br>`cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest` | Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. |
 
 ## node/test/behaviors/thermostat-user-interface-configuration
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ThermostatUserInterfaceConfgurationServerTest.ts | 68 | planned | — | KeypadLockout default, configuration and persistence across a restart. |
+| ThermostatUserInterfaceConfgurationServerTest.ts | 68 | ported | `cluster/thermo:TestParityMatterJS_ThermostatUserInterfaceConfigurationServerTest` | Every case runs on a fabrictest device; KeypadLockout is configured through ThermostatUIConfig.KeypadLockout and persists through its Settings (the node's store), the restart adding a new server on the restarted node's store. |
 
 ## node/test/behaviors/thread-network-diagnostics
 
@@ -1015,18 +1015,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/rvc-operational-state
 
 - `RvcOperationalStateServerTest.ts` — The RVC operational state server's base commands.
-
-### node/test/behaviors/thermostat
-
-- `AtomicWriteHandlerTest.ts` — Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets.
-- `AtomicWriteStateTest.ts` — The atomic-write state emitting closed once, built with the atomic writes.
-- `PresetsAtomicWriteTest.ts` — Writing presets through an atomic write.
-- `PresetsConfigurationTest.ts` — Presets seeded from configuration and the write rules without configured presets.
-- `PresetsLocalWriteTest.ts` — Local writes of presets: handles, persistence, validation per transaction.
-
-### node/test/behaviors/thermostat-user-interface-configuration
-
-- `ThermostatUserInterfaceConfgurationServerTest.ts` — KeypadLockout default, configuration and persistence across a restart.
 
 ### node/test/behaviors/thread-network-diagnostics
 

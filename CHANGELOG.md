@@ -10,6 +10,30 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 3, phase 17c, brief BL: the Thermostat's Presets, atomic writes and Occupancy after matter.js `ThermostatServer.ts`, `AtomicWriteHandler.ts` and `AtomicWriteState.ts` at `862ad75f`, and the port of the seven thermostat test files.
+
+### Added
+
+- `thermo`: the Presets feature (`ThermostatFeaturePRES`). The server serves Presets, PresetTypes, NumberOfPresets, ActivePresetHandle, SetActivePresetRequest and AtomicRequest. `ThermostatConfig.NumberOfPresets`, `PresetTypes`, `Presets` and `ActivePresetHandle` configure it: the configured presets are the stored ones on the first start, a preset without a handle gets a 16-byte one and a null BuiltIn is false; an ActivePresetHandle that matches no preset is cleared with a warning. A write is validated as matter.js validates it: at most NumberOfPresets (RESOURCE_EXHAUSTED), a known handle or none (NOT_FOUND), at most the type's count per scenario, a name only with SupportsNames and none twice, the setpoints within the limits, a built-in preset neither added nor removed nor changed, the active preset not removed (INVALID_IN_STATE). `ThermostatServer.SetPresets` is the local write, `Presets` and `ActivePresetHandle` read, `SetActivePresetHandle` sets the handle locally. SetActivePresetRequest takes a stored preset's setpoints, clamped to the limits, as matter.js does; a direct setpoint change of the setpoints in effect ends the active preset.
+- `thermo`: atomic writes (`cluster/thermo/atomic.go`). A controller writes Presets only inside an AtomicRequest: BeginWrite holds the attributes for the requesting peer (fabric index and operational node id) for the requested timeout, at most 9 s, answering per attribute UNSUPPORTED_ACCESS, INVALID_COMMAND for one that is not atomic, BUSY for one another peer holds; the peer reads what it staged; CommitWrite validates and stores the staged presets as one unit, reporting the reasons per attribute under a command FAILURE; RollbackWrite, the timeout on the server's clock (`ThermostatConfig.Clock`) and the removal of the peer's fabric discard the write. A write outside an atomic write is INVALID_IN_STATE, one another peer holds BUSY.
+- `thermo`: the Occupancy feature (`ThermostatFeatureOCC`): Occupancy, UnoccupiedHeatingSetpoint and UnoccupiedCoolingSetpoint (validated and reconciled with the occupied pair), `ThermostatConfig.Occupied` and `ThermostatServer.SetOccupied` as matter.js's externallyMeasuredOccupancy; SetpointRaiseLower and SetActivePresetRequest act on the unoccupied setpoints while unoccupied. The OccupancySensing coupling of the same endpoint is not built.
+- `thermo.ThermostatConfig.MinHeatSetpointLimit`, `MaxHeatSetpointLimit`, `MinCoolSetpointLimit`, `MaxCoolSetpointLimit` (nil: the absolute limit), `MinSetpointDeadBand` (nil: 2.0 °C; a negative one is `ErrSetpoints`), `InitialUnoccupiedHeatingSetpoint`, `InitialUnoccupiedCoolingSetpoint`; `ThermostatServer.SetAbsoluteSetpointLimit` changes an absolute limit as the device's own change, refused when a user limit would leave it.
+- `thermo.PresetStore` persists one endpoint's presets and active handle (`EncodePresets` / `DecodePresets` are the TLV form it keeps); `ThermostatConfig.PresetStore`, nil keeps them in memory. `store.Store.ThermostatPresets(endpointKey)` implements it, with `LoadThermostatPresets` / `SaveThermostatPresets`, on the new table `matter_thermostat_presets` (migration `v5`). `thermo.ErrPresets` reports a preset configuration the server refuses.
+- `thermo.ThermostatUIConfig.KeypadLockout` (the initial value), `Settings` (a `thermo.SettingStore`, `*store.Store` is one) and `SettingKey`: KeypadLockout persists across a restart, a controller's write and the device's own (`ThermostatUIServer.Set`) alike.
+- `im.WithCommandPath` / `im.CommandPathFromContext`: the endpoint dispatcher stamps the concrete command path before a cluster server's `MatterInvoke`, so a server checking a privilege for part of its request names the endpoint it runs at.
+- The reference daemon's thermostat serves Presets in the shape of matter.js's CHIP test thermostat (`AllClustersTestInstance.ts:1058-1103`: UserDefined, Occupied and Unoccupied, one preset each with names, NumberOfPresets 5, two presets shipped) on the daemon's store, and keeps its KeypadLockout there. TC-TSTAT-4.2 runs against it (PICS slice `ep15.txt`, goldens of TSTAT, TSUIC and IDM regenerated), as does TC-OVENOPSTATE-2.5 on the PICS of #137.
+
+### Changed
+
+- `thermo.New` serves OCC and PRES and no longer refuses them with `ErrFeatures`; MatterScheduleConfiguration, Setback, Events and ThermostatSuggestions stay refused.
+- The setpoint and limit refusals of `thermo` carry matter.js's texts (`HeatOccupiedSetpoint (900) must be greater than or equal to minHeatSetpointLimit (1000)`, `CoolSetpointLimit (3300) must be within absolute limits [1600, 3200]`); the IM status is unchanged.
+- The bridge decodes a write of Thermostat Presets through the generated definition, and tells a device endpoint's cluster servers of a removed fabric (`MatterFabricRemoved`).
+- Store schema fingerprint after `Apply`: `0a4a2dc1c0e4e691d7b93867e71e4316174c10761ff8ce74739bc00a10177241` (migration `v5`, `matter_thermostat_presets`).
+
+### Fixed
+
+- `thermo`: KeypadLockout was NoLockout on every start; it keeps the value configured or written before (matter.js `ThermostatUserInterfaceConfigurationServer.ts:30-32`).
+
 ## [0.8.2] — 2026-10-19
 
 Milestone 3, phase 17b, brief BK: the Switch server after matter.js `SwitchServer.ts`, with the port of `SwitchServerTest.ts`.

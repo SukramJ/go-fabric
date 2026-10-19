@@ -1490,7 +1490,7 @@
     "OVENOPSTATE/2.5": {
       "tests": 1,
       "steps": 26,
-      "stepsSkipped": 42
+      "stepsSkipped": 36
     },
     "OZCONC/2.1": {
       "steps": 6,
@@ -1877,8 +1877,8 @@
       "stepsSkipped": 0
     },
     "TSTAT/2.1": {
-      "steps": 23,
-      "stepsSkipped": 53
+      "steps": 28,
+      "stepsSkipped": 48
     },
     "TSTAT/2.2": {
       "tests": 1,
@@ -1888,7 +1888,7 @@
     "TSTAT/4.2": {
       "tests": 1,
       "steps": 18,
-      "stepsSkipped": 34
+      "stepsSkipped": 0
     },
     "TSUIC/2.1": {
       "steps": 3,
