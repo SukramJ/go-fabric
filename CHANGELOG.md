@@ -13,6 +13,8 @@ pseudo-version of `main`.
 ### Added
 
 - `groups`: `Manager.IPKKeys` and `Manager.CurrentIPK` expose key set 0, the Identity Protection Key set, which the manager now holds apart from the operational key sets as matter.js's `KeySets` does (`FabricGroups.ts:35-50`, `KeySets.ts:113-121`): every key for a responder, the second-newest of three for an initiator (§4.14.2.6.1).
+- `fabrictest`: a multicast model after matter.js's `MockNetwork`. A host's production listener joins and leaves IPv6 multicast groups on the in-memory network (`transport/udp` hands the membership to a socket that carries its own), which delivers a datagram sent to a group to every host holding it; `Device.MulticastGroups`, `Network.Members`, `Network.WatchMemberships` (`recordMembershipChanges`) and `Network.FailJoins` (a throwing `addMembership`) are the assertion and failure-injection surface.
+- `cluster/core`: `GroupcastConfig.MaxMcastAddrCount` sets the MaxMcastAddrCount attribute and limit (0 keeps 44), as a matter.js node overrides `GroupcastServer` State `maxMcastAddrCount` (`GroupcastServer.ts:933`).
 
 ### Fixed
 

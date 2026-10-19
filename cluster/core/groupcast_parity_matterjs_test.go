@@ -15,11 +15,15 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"reflect"
 	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
@@ -77,6 +81,14 @@ const gcAdminNode uint64 = 0x0000_0000_0000_0077
 
 func newGCFixture(t *testing.T, fabrics int) *gcFixture {
 	t.Helper()
+	return newGCFixtureWith(t, fabrics, nil)
+}
+
+// newGCFixtureWith is newGCFixture with edit applied to the Groupcast
+// configuration — matter.js's MockServerNode options for the
+// GroupcastServer state.
+func newGCFixtureWith(t *testing.T, fabrics int, edit func(*core.GroupcastConfig)) *gcFixture {
+	t.Helper()
 	ctx := context.Background()
 	f := &gcFixture{fs: newFakeStore(), emitter: &gcRecordingEmitter{}}
 	for i := range fabrics {
@@ -95,14 +107,18 @@ func newGCFixture(t *testing.T, fabrics int) *gcFixture {
 		t.Fatal(err)
 	}
 	f.acl.SetMatterEventEmitter(f.emitter)
-	if f.gc, err = core.NewGroupcast(core.GroupcastConfig{
+	cfg := core.GroupcastConfig{
 		Groups: f.mgr, GroupKeyManagement: f.gkm, AccessControl: f.acl,
 		TestingTimer: func(d time.Duration, fire func()) func() {
 			tm := &testingTimer{d: d, fire: fire}
 			f.timers = append(f.timers, tm)
 			return func() { tm.stopped = true }
 		},
-	}); err != nil {
+	}
+	if edit != nil {
+		edit(&cfg)
+	}
+	if f.gc, err = core.NewGroupcast(cfg); err != nil {
 		t.Fatal(err)
 	}
 	f.gc.SetMatterEventEmitter(f.emitter)
@@ -979,4 +995,831 @@ func twentyOneEndpoints() []uint16 {
 		out[i] = uint16(i + 1)
 	}
 	return out
+}
+
+// The cases below port GroupcastServerTest.ts describe by describe, one
+// test per describe group with the `it` titles as subtests; each names
+// its lines. matter.js's node.addFabric() is a fabric of the fixture,
+// node.online with a MockExchange of fabric fi is as(fi, Administer),
+// node.stateOf(GroupcastServer).groupProperties is the store's
+// matter_groupcast_groups rows (gcProps), a local write of
+// GroupKeyManagementServer state.groupKeyMap is a GroupKeyMap write of the
+// fabric, state.groupTable = [] is every endpoint removed from the
+// fabric's groups (gkm.removeEndpoint, the Groups-cluster path), and a
+// status matter.js rejects with is the IM status plus the Go error text.
+
+// gcProps is node.stateOf(GroupcastServer).groupProperties of a fabric.
+func (f *gcFixture) gcProps(t *testing.T, fabric uint8) map[uint16]mstore.GroupcastGroup {
+	t.Helper()
+	rows, err := f.fs.ListGroupcastGroups(context.Background(), fabric)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := make(map[uint16]mstore.GroupcastGroup, len(rows))
+	for _, r := range rows {
+		out[r.GroupID] = r
+	}
+	return out
+}
+
+// keyMap is the fabric's GroupKeyManagement GroupKeyMap.
+func (f *gcFixture) keyMap(t *testing.T, fabric uint8) []core.GroupKeyMapStruct {
+	t.Helper()
+	v, ok := f.gkm.MatterReadFiltered(as(fabric, 5), 0x0000)
+	if !ok {
+		t.Fatal("GroupKeyMap unreadable")
+	}
+	var out []core.GroupKeyMapStruct
+	for _, e := range v.([]core.GroupKeyMapStruct) {
+		if e.FabricIndex == fabric {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// groupTable is the fabric's GroupKeyManagement GroupTable.
+func (f *gcFixture) groupTable(t *testing.T, fabric uint8) []core.GroupInfoMapStruct {
+	t.Helper()
+	v, ok := f.gkm.MatterReadFiltered(as(fabric, 5), 0x0001)
+	if !ok {
+		t.Fatal("GroupTable unreadable")
+	}
+	var out []core.GroupInfoMapStruct
+	for _, e := range v.([]core.GroupInfoMapStruct) {
+		if e.FabricIndex == fabric {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// auxACL is the fabric's entries of AccessControl AuxiliaryAcl.
+func (f *gcFixture) auxACL(t *testing.T, fabric uint8) []core.AccessControlAuxiliaryEntryStruct {
+	t.Helper()
+	v, ok := f.acl.MatterRead(0x0007)
+	if !ok {
+		t.Fatal("AuxiliaryAcl unreadable")
+	}
+	var out []core.AccessControlAuxiliaryEntryStruct
+	for _, e := range v.([]core.AccessControlAuxiliaryEntryStruct) {
+		if e.Entry.FabricIndex == fabric {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// writeKeyMap is a local write of state.groupKeyMap for the fabric.
+func (f *gcFixture) writeKeyMap(t *testing.T, fabric uint8, list ...core.GroupKeyMapStruct) {
+	t.Helper()
+	if list == nil {
+		list = []core.GroupKeyMapStruct{}
+	}
+	if err := f.gkm.MatterWrite(as(fabric, 5), 0x0000, list); err != nil {
+		t.Fatalf("GroupKeyMap write: %v", err)
+	}
+}
+
+// clearGroupTable is state.groupTable = [] for the fabric: every endpoint
+// leaves every group, the external removal path.
+func (f *gcFixture) clearGroupTable(t *testing.T, fabric uint8) {
+	t.Helper()
+	ctx := context.Background()
+	table, err := f.mgr.GroupTable(ctx, fabric)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range table {
+		for _, ep := range e.Endpoints {
+			if _, err := f.mgr.RemoveEndpoint(ctx, fabric, ep, e.GroupID, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// ianaReq is the file's usual JoinGroup: key set 1, the key when it
+// creates the set, the IanaAddr policy.
+func ianaReq(groupID uint16, endpoints []uint16, withKey bool) core.JoinGroupRequest {
+	req := core.JoinGroupRequest{GroupID: groupID, Endpoints: endpoints, KeySetID: 1, McastAddrPolicy: u8p(groups.PolicyIanaAddr)}
+	if withKey {
+		req.Key = testKey
+	}
+	return req
+}
+
+// refusal checks a rejected command: the IM status and matter.js's
+// message, which the Go error carries.
+func refusal(t *testing.T, err error, want im.StatusCode, msg string) {
+	t.Helper()
+	if st := statusOf(err); st != want || err == nil || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(msg)) {
+		t.Errorf("refusal %v (%v), want %v %q", err, st, want, msg)
+	}
+}
+
+// uintOf reads an unsigned attribute value: uintOf(t)(server.MatterRead(id)).
+func uintOf(t *testing.T) func(v any, ok bool) int {
+	t.Helper()
+	return func(v any, ok bool) int {
+		t.Helper()
+		if !ok {
+			t.Fatal("attribute unreadable")
+		}
+		return int(reflect.ValueOf(v).Uint()) //nolint:gosec // an attribute's small count
+	}
+}
+
+// TestGroupcastJoinGroupPropertiesParityMatterJS ports the groupProperties
+// cases of the describe "joinGroup" (GroupcastServerTest.ts:100-151).
+func TestGroupcastJoinGroupPropertiesParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+
+	t.Run("records groupProperties flags", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0102, []uint16{1}, true))
+		p, ok := f.gcProps(t, 1)[0x0102]
+		if !ok || p.FabricIndex != 1 || p.McastAddrPolicy != groups.PolicyIanaAddr || p.HasAuxiliaryACL {
+			t.Errorf("groupProperties entry %+v (%v), want fabric 1, IanaAddr, no auxiliary ACL", p, ok)
+		}
+	})
+
+	t.Run("does not overwrite hasAuxiliaryAcl on a plain re-join", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		req := ianaReq(0x0102, []uint16{1}, true)
+		req.UseAuxiliaryACL = boolp(true)
+		f.join(admin, t, req)
+		f.join(admin, t, ianaReq(0x0102, []uint16{2}, false))
+		if p := f.gcProps(t, 1)[0x0102]; !p.HasAuxiliaryACL {
+			t.Errorf("a re-join without UseAuxiliaryAcl reset the flag: %+v", p)
+		}
+	})
+}
+
+// TestGroupcastLeaveGroupMirrorParityMatterJS ports the remaining cases of
+// the describe "leaveGroup" (GroupcastServerTest.ts:358-458). Of the
+// loop-generated pair (:358-404) the Sender case runs; the case without
+// the Sender feature is in the register's missing list, the Go server
+// always has it.
+func TestGroupcastLeaveGroupMirrorParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+
+	t.Run("keeps a group a wildcard request empties as sender-only", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		f.join(admin, t, ianaReq(0x0002, []uint16{1, 2}, false))
+		if _, st := f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0, Endpoints: []uint16{1}, HasEndpoints: true}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+		m1, ok1 := f.memberOf(t, 1, 0x0001)
+		m2, _ := f.memberOf(t, 1, 0x0002)
+		if !ok1 || len(m1.Endpoints) != 0 || !slices.Equal(m2.Endpoints, []uint16{2}) {
+			t.Errorf("after the wildcard leave: group 1 %+v (%v), group 2 %v", m1, ok1, m2.Endpoints)
+		}
+		if !slices.ContainsFunc(f.keyMap(t, 1), func(e core.GroupKeyMapStruct) bool { return e.GroupID == 0x0001 }) {
+			t.Error("the sender-only group lost its GroupKeyMap entry")
+		}
+	})
+
+	t.Run("removes groupProperties entry", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0102, []uint16{1}, true))
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0x0102})
+		if _, ok := f.gcProps(t, 1)[0x0102]; ok {
+			t.Error("LeaveGroup kept the groupProperties entry")
+		}
+	})
+
+	t.Run("leaves all groups of the fabric with the wildcard group id", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		f.join(admin, t, ianaReq(0x0002, []uint16{1}, false))
+		resp, st := f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0})
+		if r, ok := resp.(core.LeaveGroupResponse); st != im.StatusSuccess || !ok || r.GroupID != 0 {
+			t.Fatalf("LeaveGroup(0) = %+v, %v", resp, st)
+		}
+		if ms, props, km, table := f.membership(t), f.gcProps(t, 1), f.keyMap(t, 1), f.groupTable(t, 1); len(ms) != 0 || len(props) != 0 || len(km) != 0 || len(table) != 0 {
+			t.Errorf("after the wildcard leave: membership %v, groupProperties %v, groupKeyIdMap %v, endpoints %v", ms, props, km, table)
+		}
+	})
+}
+
+// TestGroupcastUpdateGroupKeyMirrorParityMatterJS ports "updates keySetId
+// for an existing group" (GroupcastServerTest.ts:505-530).
+func TestGroupcastUpdateGroupKeyMirrorParityMatterJS(t *testing.T) {
+	t.Parallel()
+	t.Run("updates keySetId for an existing group", func(t *testing.T) {
+		t.Parallel()
+		admin := as(1, 5)
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		if _, st := f.invoke(admin, 0x03, core.UpdateGroupKeyRequest{GroupID: 0x0001, KeySetID: 2, Key: testKey}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+		if ms := f.membership(t); len(ms) != 1 || ms[0].KeySetID == nil || *ms[0].KeySetID != 2 {
+			t.Errorf("membership %+v, want KeySetId 2", ms)
+		}
+	})
+}
+
+// TestGroupcastConfigureAuxiliaryACLMirrorParityMatterJS ports the describe
+// "configureAuxiliaryAcl" (GroupcastServerTest.ts:550-625).
+func TestGroupcastConfigureAuxiliaryACLMirrorParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+
+	t.Run("sets hasAuxiliaryAcl on a membership entry", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		if _, st := f.invoke(admin, 0x04, core.ConfigureAuxiliaryACLRequest{GroupID: 0x0001, UseAuxiliaryACL: true}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+		if ms := f.membership(t); len(ms) != 1 || !ms[0].HasAuxiliaryACL {
+			t.Errorf("membership %+v, want hasAuxiliaryAcl", ms)
+		}
+		if p := f.gcProps(t, 1)[0x0001]; !p.HasAuxiliaryACL {
+			t.Errorf("groupProperties %+v, want hasAuxiliaryAcl", p)
+		}
+		if aux := f.auxACL(t, 1); len(aux) != 1 {
+			t.Errorf("auxiliary ACL of fabric 1: %+v, want one entry", aux)
+		}
+	})
+
+	t.Run("keeps the feature-aware mcastAddrPolicy default on a legacy-only group", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		if err := f.mgr.AddEndpointForGroup(context.Background(), 1, 0x0400, 1, "Legacy"); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := f.gcProps(t, 1)[0x0400]; ok {
+			t.Fatal("a legacy group has groupProperties")
+		}
+		if _, st := f.invoke(admin, 0x04, core.ConfigureAuxiliaryACLRequest{GroupID: 0x0400, UseAuxiliaryACL: true}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+		if m, _ := f.memberOf(t, 1, 0x0400); m.McastAddrPolicy != groups.PolicyPerGroup {
+			t.Errorf("membership policy %d, want PerGroup", m.McastAddrPolicy)
+		}
+		if p := f.gcProps(t, 1)[0x0400]; p.McastAddrPolicy != groups.PolicyPerGroup {
+			t.Errorf("groupProperties policy %d, want PerGroup", p.McastAddrPolicy)
+		}
+	})
+
+	// matter.js refuses the node at start with an ImplementationError;
+	// the Go AccessControl's Auxiliary feature is the provider NewGroupcast
+	// registers, so the Go form of "AccessControl lacks it" is none, and
+	// the assertion is on the Go error.
+	t.Run("rejects the Listener feature when AccessControl lacks the Auxiliary feature", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		_, err := core.NewGroupcast(core.GroupcastConfig{Groups: f.mgr, GroupKeyManagement: f.gkm})
+		if err == nil || !strings.Contains(err.Error(), "requires AccessControl with the Auxiliary feature") {
+			t.Errorf("NewGroupcast without AccessControl: %v", err)
+		}
+	})
+}
+
+// TestGroupcastGKMMirrorParityMatterJS ports the describe "GKM mirror"
+// (GroupcastServerTest.ts:627-883).
+func TestGroupcastGKMMirrorParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+	ctx := context.Background()
+
+	t.Run("propagates Membership keySetId mappings to GKM groupKeyMap", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		if got, want := f.keyMap(t, 1), []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 1, FabricIndex: 1}}; !slices.Equal(got, want) {
+			t.Errorf("GroupKeyMap %+v, want %+v", got, want)
+		}
+		// EpochStartTime0 1 on the wire (core§11.27.7.1.4); matter.js's
+		// MATTER_EPOCH_OFFSET_US + 1 is its unix-based internal form.
+		ks, err := f.fs.GetGroupKeySet(ctx, 1, 1)
+		if err != nil || ks.EpochStart0 != 1 {
+			t.Errorf("auto-created key set %+v, %v, want EpochStartTime0 1", ks, err)
+		}
+	})
+
+	t.Run("preserves legacy group configuration not owned by Groupcast", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.writeKeyMap(t, 1, core.GroupKeyMapStruct{GroupID: 0x0300, GroupKeySetID: 5})
+		if err := f.mgr.AddEndpointForGroup(ctx, 1, 0x0300, 1, "Legacy"); err != nil {
+			t.Fatal(err)
+		}
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		km := map[uint16]uint16{}
+		for _, e := range f.keyMap(t, 1) {
+			km[e.GroupID] = e.GroupKeySetID
+		}
+		if km[0x0300] != 5 || km[0x0001] != 1 {
+			t.Errorf("GroupKeyMap %v, want 0x0300→5 and 0x0001→1", km)
+		}
+		name := func() string {
+			for _, e := range f.groupTable(t, 1) {
+				if e.GroupID == 0x0300 {
+					return e.GroupName
+				}
+			}
+			return "<absent>"
+		}
+		if got := name(); got != "Legacy" {
+			t.Errorf("legacy group name %q", got)
+		}
+		f.join(admin, t, ianaReq(0x0300, []uint16{2}, false))
+		if got := name(); got != "Legacy" {
+			t.Errorf("legacy group name after the Groupcast join %q", got)
+		}
+	})
+
+	t.Run("shrinks Membership and auxiliary ACLs when groups are removed via the GKM group table", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		req := ianaReq(0x0001, []uint16{1}, true)
+		req.UseAuxiliaryACL = boolp(true)
+		f.join(admin, t, req)
+		if aux := f.auxACL(t, 1); len(aux) != 1 {
+			t.Fatalf("auxiliary ACL %+v, want one entry", aux)
+		}
+		f.clearGroupTable(t, 1)
+		if ms := f.membership(t); len(ms) != 0 {
+			t.Errorf("membership after the external removal %+v", ms)
+		}
+		if aux := f.auxACL(t, 1); len(aux) != 0 {
+			t.Errorf("auxiliary ACL after the external removal %+v", aux)
+		}
+	})
+
+	t.Run("membership KeySetId follows the GroupKeyMap link", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		f.writeKeyMap(t, 1)
+		if ms := f.membership(t); len(ms) != 1 || *ms[0].KeySetID != groups.UnmappedKeySetID {
+			t.Errorf("membership after clearing GroupKeyMap %+v, want KeySetId 0xFFFF", ms)
+		}
+		f.writeKeyMap(t, 1, core.GroupKeyMapStruct{GroupID: 1, GroupKeySetID: 1})
+		if ms := f.membership(t); len(ms) != 1 || *ms[0].KeySetID != 1 {
+			t.Errorf("membership after restoring GroupKeyMap %+v, want KeySetId 1", ms)
+		}
+	})
+
+	t.Run("keeps unmapped groups out of the operational group key map", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		f.join(admin, t, ianaReq(0x0002, []uint16{1}, false))
+		f.writeKeyMap(t, 1, core.GroupKeyMapStruct{GroupID: 1, GroupKeySetID: 1})
+		if m, _ := f.memberOf(t, 1, 0x0002); *m.KeySetID != groups.UnmappedKeySetID {
+			t.Errorf("group 2 KeySetId %d, want 0xFFFF", *m.KeySetID)
+		}
+		f.join(admin, t, ianaReq(0x0001, []uint16{1, 2}, false))
+		if ok, _ := f.mgr.HasKeyMapping(ctx, 1, 0x0001); !ok {
+			t.Error("group 1 left the operational key map")
+		}
+		if ok, _ := f.mgr.HasKeyMapping(ctx, 1, 0x0002); ok {
+			t.Error("the unmapped group 2 reappeared in the operational key map")
+		}
+		if !slices.ContainsFunc(f.groupTable(t, 1), func(e core.GroupInfoMapStruct) bool { return e.GroupID == 0x0002 }) {
+			t.Error("the unmapped group lost its endpoints")
+		}
+	})
+
+	t.Run("Groupcast per-fabric cap aligns with GKM maxGroupsPerFabric", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		gkmCap := uintOf(t)(f.gkm.MatterReadFiltered(admin, 0x0002))
+		gcMax := uintOf(t)(f.gc.MatterRead(0x0001))
+		if gcMax/2 != gkmCap {
+			t.Errorf("floor(MaxMembershipCount %d / 2) != MaxGroupsPerFabric %d", gcMax, gkmCap)
+		}
+	})
+
+	t.Run("mirror fills GKM up to maxGroupsPerFabric without tripping the validator", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		gkmCap := uintOf(t)(f.gkm.MatterReadFiltered(admin, 0x0002))
+		for i := 1; i <= gkmCap; i++ {
+			f.join(admin, t, ianaReq(uint16(i), []uint16{1}, i == 1)) //nolint:gosec // i ≤ 22
+		}
+		if n, km := len(f.membership(t)), len(f.keyMap(t, 1)); n != gkmCap || km != gkmCap {
+			t.Errorf("membership %d, GroupKeyMap %d, want %d each", n, km, gkmCap)
+		}
+		_, err := f.gc.MatterInvoke(admin, 0x00, ianaReq(uint16(gkmCap+1), []uint16{1}, false)) //nolint:gosec // 23
+		refusal(t, err, im.StatusResourceExhausted, "Per-fabric membership limit reached")
+	})
+
+	t.Run("direct GKM attribute write still enforces maxGroupsPerFabric", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		gkmCap := uintOf(t)(f.gkm.MatterReadFiltered(admin, 0x0002))
+		tooMany := make([]core.GroupKeyMapStruct, 0, gkmCap+1)
+		for i := range gkmCap + 1 {
+			tooMany = append(tooMany, core.GroupKeyMapStruct{GroupID: uint16(i + 1), GroupKeySetID: 1, FabricIndex: 1}) //nolint:gosec // ≤ 23
+		}
+		refusal(t, f.gkm.MatterWrite(admin, 0x0000, tooMany), im.StatusResourceExhausted, "Too many groups per fabric")
+	})
+}
+
+// TestGroupcastEndpointMirrorParityMatterJS ports the describe "endpoint
+// mirror" (GroupcastServerTest.ts:885-936).
+func TestGroupcastEndpointMirrorParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+
+	t.Run("propagates Membership endpoints to GKM groupTable and FabricGroups.endpoints", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0103, []uint16{1, 2}, true))
+		table := f.groupTable(t, 1)
+		if len(table) != 1 || table[0].GroupID != 0x0103 || !slices.Equal(slices.Sorted(slices.Values(table[0].Endpoints)), []uint16{1, 2}) {
+			t.Errorf("GroupTable %+v, want group 0x0103 on [1 2]", table)
+		}
+		entries, err := f.mgr.GroupTable(context.Background(), 1)
+		if err != nil || len(entries) != 1 || !slices.Equal(entries[0].Endpoints, []uint16{1, 2}) {
+			t.Errorf("FabricGroups endpoints %+v, %v", entries, err)
+		}
+	})
+
+	t.Run("removes endpoints from GKM groupTable and FabricGroups when group is left", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0103, []uint16{1}, true))
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0x0103})
+		if table := f.groupTable(t, 1); len(table) != 0 {
+			t.Errorf("GroupTable after the leave %+v", table)
+		}
+		if entries, _ := f.mgr.GroupTable(context.Background(), 1); len(entries) != 0 {
+			t.Errorf("FabricGroups endpoints after the leave %+v", entries)
+		}
+	})
+}
+
+// TestGroupcastLegacyRemovalPruneParityMatterJS ports the server-side cases
+// of the describe "legacy removal prune" (GroupcastServerTest.ts:938-1122);
+// gkm.removeEndpoint(fabric, 1) — Groups RemoveAllGroups on endpoint 1 —
+// is the group state's RemoveEndpoint of endpoint 1 from every group.
+func TestGroupcastLegacyRemovalPruneParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+	ctx := context.Background()
+	removeAll := func(t *testing.T, f *gcFixture, ep uint16) {
+		t.Helper()
+		if _, err := f.mgr.RemoveEndpoint(ctx, 1, ep, 0, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("legacy RemoveAllGroups fully removes a groupcast listener group", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		req := ianaReq(0x0103, []uint16{1}, true)
+		req.UseAuxiliaryACL = boolp(true)
+		f.join(admin, t, req)
+		if aux := f.auxACL(t, 1); len(aux) != 1 {
+			t.Fatalf("auxiliary ACL %+v", aux)
+		}
+		removeAll(t, f, 1)
+		if _, ok := f.memberOf(t, 1, 0x0103); ok {
+			t.Error("the group is still a member")
+		}
+		if _, ok := f.gcProps(t, 1)[0x0103]; ok {
+			t.Error("the group kept its groupProperties")
+		}
+		for _, e := range f.auxACL(t, 1) {
+			if slices.Contains(e.Entry.Subjects, 0x0103) {
+				t.Errorf("auxiliary ACL entry of the removed group: %+v", e)
+			}
+		}
+	})
+
+	t.Run("legacy RemoveAllGroups does not touch a sender-only group", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0104, []uint16{}, true))
+		f.join(admin, t, ianaReq(0x0103, []uint16{1}, false))
+		removeAll(t, f, 1)
+		if _, ok := f.memberOf(t, 1, 0x0104); !ok {
+			t.Error("the sender-only group left")
+		}
+		if _, ok := f.memberOf(t, 1, 0x0103); ok {
+			t.Error("the listener group stayed")
+		}
+	})
+
+	t.Run("leaveGroup keeps a Sender-feature group as sender-only after emptying its endpoints", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0106, []uint16{1}, true))
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0x0106, Endpoints: []uint16{1}, HasEndpoints: true})
+		if _, ok := f.memberOf(t, 1, 0x0106); !ok {
+			t.Error("the group left instead of staying sender-only")
+		}
+	})
+
+	t.Run("a no-op leaveGroup on an already sender-only group does not leak a stale retained mark", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0107, []uint16{}, true))
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0x0107, Endpoints: []uint16{9}, HasEndpoints: true})
+		f.join(admin, t, ianaReq(0x0107, []uint16{1}, false))
+		f.clearGroupTable(t, 1)
+		if _, ok := f.memberOf(t, 1, 0x0107); ok {
+			t.Error("the externally removed group stayed a member")
+		}
+		if _, ok := f.gcProps(t, 1)[0x0107]; ok {
+			t.Error("the externally removed group kept its groupProperties")
+		}
+	})
+}
+
+// TestGroupcastPerFabricQuotaFillParityMatterJS ports "two fabrics each
+// fill to quota using full M_max (even alignment, no spillover)"
+// (GroupcastServerTest.ts:1320-1364).
+func TestGroupcastPerFabricQuotaFillParityMatterJS(t *testing.T) {
+	t.Parallel()
+	t.Run("two fabrics each fill to quota using full M_max (even alignment, no spillover)", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 2)
+		maxCount := uintOf(t)(f.gc.MatterRead(0x0001))
+		quota := maxCount / 2
+		if 2*quota != maxCount {
+			t.Fatalf("MaxMembershipCount %d is odd", maxCount)
+		}
+		fill := func(fabric uint8, start int) {
+			for i := range quota {
+				f.join(as(fabric, 5), t, ianaReq(uint16(start+i), []uint16{1}, i == 0)) //nolint:gosec // ≤ 44
+			}
+		}
+		fill(1, 1)
+		fill(2, quota+1)
+		if n := len(f.membership(t)); n != maxCount {
+			t.Errorf("membership %d, want %d", n, maxCount)
+		}
+		_, err := f.gc.MatterInvoke(as(1, 5), 0x00, ianaReq(uint16(2*quota+1), []uint16{1}, false)) //nolint:gosec // 45
+		refusal(t, err, im.StatusResourceExhausted, "Per-fabric membership limit reached")
+	})
+}
+
+// TestGroupcastMaxMcastAddrCountParityMatterJS ports the describe
+// "MaxMcastAddrCount" (GroupcastServerTest.ts:1542-1589) on a server
+// configured with MaxMcastAddrCount 4, as matter.js's
+// `groupcast: { maxMcastAddrCount: 4 }`.
+func TestGroupcastMaxMcastAddrCountParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+	nodeWithAddrLimit := func(t *testing.T) (*gcFixture, func(groupID uint16, policy uint8) error) {
+		t.Helper()
+		f := newGCFixtureWith(t, 1, func(cfg *core.GroupcastConfig) { cfg.MaxMcastAddrCount = 4 })
+		join := func(groupID uint16, policy uint8) error {
+			req := ianaReq(groupID, []uint16{1}, groupID == 1)
+			req.McastAddrPolicy = &policy
+			_, err := f.gc.MatterInvoke(admin, 0x00, req)
+			return err
+		}
+		for _, id := range []uint16{1, 2, 3} {
+			if err := join(id, groups.PolicyPerGroup); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, id := range []uint16{4, 5} {
+			if err := join(id, groups.PolicyIanaAddr); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if used := uintOf(t)(f.gc.MatterRead(0x0003)); used != 4 {
+			t.Fatalf("UsedMcastAddrCount %d, want 4", used)
+		}
+		return f, join
+	}
+
+	t.Run("rejects a new per-group address beyond the limit and accepts another IANA group", func(t *testing.T) {
+		t.Parallel()
+		f, join := nodeWithAddrLimit(t)
+		refusal(t, join(6, groups.PolicyPerGroup), im.StatusResourceExhausted, "MaxMcastAddrCount limit reached")
+		if err := join(6, groups.PolicyIanaAddr); err != nil {
+			t.Fatalf("another IANA group: %v", err)
+		}
+		if used := uintOf(t)(f.gc.MatterRead(0x0003)); used != 4 {
+			t.Errorf("UsedMcastAddrCount %d, want 4", used)
+		}
+	})
+
+	t.Run("rejects switching an existing group to a per-group address beyond the limit", func(t *testing.T) {
+		t.Parallel()
+		f, join := nodeWithAddrLimit(t)
+		refusal(t, join(5, groups.PolicyPerGroup), im.StatusResourceExhausted, "MaxMcastAddrCount limit reached")
+		if used := uintOf(t)(f.gc.MatterRead(0x0003)); used != 4 {
+			t.Errorf("UsedMcastAddrCount %d, want 4", used)
+		}
+	})
+}
+
+// TestGroupcastTestingDurationParityMatterJS ports the describe
+// "groupcastTesting duration" (GroupcastServerTest.ts:1712-1750) on a fake
+// clock, MockTime.
+func TestGroupcastTestingDurationParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+	withClock := func(t *testing.T) (*gcFixture, *clocktest.Fake) {
+		t.Helper()
+		clk := clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+		f := newGCFixtureWith(t, 1, func(cfg *core.GroupcastConfig) { cfg.TestingTimer, cfg.Clock = nil, clk })
+		return f, clk
+	}
+	underTest := func(t *testing.T, f *gcFixture) int { t.Helper(); return uintOf(t)(f.gc.MatterRead(0x0004)) }
+	runTesting := func(t *testing.T, f *gcFixture, op uint8, seconds *uint16) {
+		t.Helper()
+		if _, st := f.invoke(admin, 0x05, core.GroupcastTestingRequest{TestOperation: op, DurationSeconds: seconds}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+	}
+
+	t.Run("ends testing after 60 seconds when the request omits the duration", func(t *testing.T) {
+		t.Parallel()
+		f, clk := withClock(t)
+		runTesting(t, f, 1, nil)
+		if got := underTest(t, f); got != 1 {
+			t.Fatalf("FabricUnderTest %d, want 1", got)
+		}
+		clk.Advance(59 * time.Second)
+		if got := underTest(t, f); got != 1 {
+			t.Errorf("FabricUnderTest after 59 s %d, want 1", got)
+		}
+		clk.Advance(time.Second)
+		if got := underTest(t, f); got != 0 {
+			t.Errorf("FabricUnderTest after 60 s %d, want none", got)
+		}
+	})
+
+	t.Run("ends testing after the duration of the latest request once disabled and enabled again", func(t *testing.T) {
+		t.Parallel()
+		f, clk := withClock(t)
+		runTesting(t, f, 1, u16p(10))
+		clk.Advance(5 * time.Second)
+		runTesting(t, f, 0, nil)
+		runTesting(t, f, 1, u16p(100))
+		clk.Advance(10 * time.Second)
+		if got := underTest(t, f); got != 1 {
+			t.Errorf("FabricUnderTest 10 s into the second period %d, want 1", got)
+		}
+		clk.Advance(90 * time.Second)
+		if got := underTest(t, f); got != 0 {
+			t.Errorf("FabricUnderTest after the second period %d, want none", got)
+		}
+	})
+}
+
+// TestGroupcastTestingEventsParityMatterJS ports the describe
+// "groupcastTesting events" (GroupcastServerTest.ts:1752-1915).
+// SessionManager.emitGroupMessage is the group state's ReportGroupMessage;
+// its sourceIp "fe80::1%en0" arrives here without the zone, which the
+// receive path keeps in the UDP address, not the IP.
+func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+	iana := groups.IANAGroupcastAddress.To16()
+	enable := func(t *testing.T, f *gcFixture, fabric uint8) {
+		t.Helper()
+		if _, st := f.invoke(as(fabric, 5), 0x05, core.GroupcastTestingRequest{TestOperation: 1, DurationSeconds: u16p(60)}); st != im.StatusSuccess {
+			t.Fatal(st)
+		}
+		f.emitter.take()
+	}
+	events := func(f *gcFixture) []core.GroupcastTestingEvent {
+		var out []core.GroupcastTestingEvent
+		for _, e := range f.emitter.take() {
+			if e.cluster == 0x0065 && e.event == 0 {
+				out = append(out, e.data.(core.GroupcastTestingEvent))
+			}
+		}
+		return out
+	}
+	allowed := true
+
+	t.Run("derives multicast destination and source addresses for testing events", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		enable(t, f, 1)
+		f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+			Result: groups.TestResultSuccess, FabricIndex: 1, GroupID: 1, HasGroupID: true,
+			SourceIP: net.ParseIP("fd00::1"), HasEndpoint: true, EndpointID: 1, AccessAllowed: &allowed,
+		})
+		f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+			Result: groups.TestResultNoAvailableKey, HeaderGroupID: 1, HasHeaderGroupID: true, SourceIP: net.ParseIP("fe80::1"),
+		})
+		f.mgr.ReportGroupMessage(groups.GroupMessageEvent{Result: groups.TestResultNoAvailableKey, SourceIP: net.ParseIP("fd00::2")})
+		evs := events(f)
+		if len(evs) != 3 {
+			t.Fatalf("events %+v, want 3", evs)
+		}
+		if e := evs[2]; e.GroupcastTestResult != groups.TestResultNoAvailableKey || e.GroupID != nil || !slices.Equal(e.DestinationIPAddress, iana) {
+			t.Errorf("event 2 %+v", e)
+		}
+		if e := evs[0]; e.GroupcastTestResult != groups.TestResultSuccess || e.GroupID == nil || *e.GroupID != 1 || e.AccessAllowed == nil || !*e.AccessAllowed ||
+			!slices.Equal(e.SourceIPAddress, net.ParseIP("fd00::1").To16()) || !slices.Equal(e.DestinationIPAddress, iana) {
+			t.Errorf("event 0 %+v", e)
+		}
+		if e := evs[1]; e.GroupcastTestResult != groups.TestResultNoAvailableKey || e.GroupID != nil ||
+			!slices.Equal(e.SourceIPAddress, net.ParseIP("fe80::1").To16()) || !slices.Equal(e.DestinationIPAddress, iana) {
+			t.Errorf("event 1 %+v", e)
+		}
+	})
+
+	t.Run("drops messages that another fabric authenticated", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 2)
+		enable(t, f, 1)
+		for _, fabric := range []uint8{2, 1} {
+			f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+				Result: groups.TestResultNoAvailableKey, FabricIndex: fabric, HeaderGroupID: 1, HasHeaderGroupID: true, SourceIP: net.ParseIP("fd00::1"),
+			})
+		}
+		evs := events(f)
+		if len(evs) != 1 || evs[0].FabricIndex != 1 || !slices.Equal(evs[0].DestinationIPAddress, iana) {
+			t.Errorf("events %+v, want one of fabric 1 from the IANA address", evs)
+		}
+	})
+
+	t.Run("derives the destination from each group's policy when groups share a key set", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		perGroup := ianaReq(0x0002, []uint16{1}, false)
+		perGroup.McastAddrPolicy = u8p(groups.PolicyPerGroup)
+		f.join(admin, t, perGroup)
+		enable(t, f, 1)
+		for _, gid := range []uint16{1, 2} {
+			f.mgr.ReportGroupMessage(groups.GroupMessageEvent{
+				Result: groups.TestResultSuccess, FabricIndex: 1, GroupID: gid, HasGroupID: true,
+				SourceIP: net.ParseIP("fd00::1"), HasEndpoint: true, EndpointID: 1, AccessAllowed: &allowed,
+			})
+		}
+		addr, err := f.mgr.MulticastAddressFor(context.Background(), 1, 0x0002)
+		if err != nil || addr.Equal(groups.IANAGroupcastAddress) {
+			t.Fatalf("per-group address %v, %v", addr, err)
+		}
+		evs := events(f)
+		if len(evs) != 2 || !slices.Equal(evs[0].DestinationIPAddress, iana) || !slices.Equal(evs[1].DestinationIPAddress, addr.To16()) {
+			t.Errorf("destinations %+v, want [IANA, %v]", evs, addr)
+		}
+	})
+}
+
+// TestGroupcastDerivedMembershipParityMatterJS ports the server-side cases
+// of the describe "derived membership" (GroupcastServerTest.ts:1918-1941,
+// 1976-2000, 2145-2168); the reload cases run in node/.
+func TestGroupcastDerivedMembershipParityMatterJS(t *testing.T) {
+	t.Parallel()
+	admin := as(1, 5)
+
+	t.Run("derives Membership from groupProperties + GKM tables", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		req := ianaReq(0x0102, []uint16{1}, true)
+		req.KeySetID, req.UseAuxiliaryACL = 3, boolp(true)
+		f.join(admin, t, req)
+		m, ok := f.memberOf(t, 1, 0x0102)
+		if !ok || !slices.Equal(m.Endpoints, []uint16{1}) || *m.KeySetID != 3 || !m.HasAuxiliaryACL || m.McastAddrPolicy != groups.PolicyIanaAddr {
+			t.Errorf("membership %+v (%v)", m, ok)
+		}
+	})
+
+	t.Run("legacy-only group appears in Membership with default flags", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		if err := f.mgr.AddEndpointForGroup(context.Background(), 1, 0x0201, 1, "Legacy"); err != nil {
+			t.Fatal(err)
+		}
+		f.writeKeyMap(t, 1, core.GroupKeyMapStruct{GroupID: 0x0201, GroupKeySetID: 5})
+		if _, ok := f.gcProps(t, 1)[0x0201]; ok {
+			t.Fatal("a legacy group has groupProperties")
+		}
+		m, ok := f.memberOf(t, 1, 0x0201)
+		if !ok || m.McastAddrPolicy != groups.PolicyPerGroup || m.HasAuxiliaryACL {
+			t.Errorf("membership %+v (%v), want PerGroup without auxiliary ACL", m, ok)
+		}
+	})
+
+	t.Run("Membership$Changed fires on join", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		var fired atomic.Bool
+		unsub := f.gc.OnMatterValueChanged(func() { fired.Store(true) })
+		defer unsub()
+		f.join(admin, t, ianaReq(0x0001, []uint16{1}, true))
+		if !fired.Load() {
+			t.Error("no change notification on JoinGroup")
+		}
+	})
 }

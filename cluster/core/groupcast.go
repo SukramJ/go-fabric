@@ -187,6 +187,12 @@ type GroupcastConfig struct {
 	// Clock arms the membership timers when TestingTimer is unset; nil
 	// is [clock.System].
 	Clock clock.Clock
+	// MaxMcastAddrCount is the MaxMcastAddrCount attribute, the most
+	// multicast addresses the memberships may use; 0 is 44. A node
+	// overrides it as matter.js overrides GroupcastServer State
+	// maxMcastAddrCount (GroupcastServer.ts:933, "Implementation-defined
+	// … min 1 per spec"; GroupcastServerTest.ts:1543-1547 sets 4).
+	MaxMcastAddrCount uint16
 }
 
 // Groupcast is the Groupcast cluster server of the root endpoint, the
@@ -206,6 +212,8 @@ type Groupcast struct {
 	gkm    *GroupKeyManagement
 	acl    *AccessControl
 	timer  func(d time.Duration, fire func()) (stop func())
+	// maxMcastAddr is MaxMcastAddrCount.
+	maxMcastAddr uint16
 
 	// cmdMu serialises the commands: each one reads Membership, checks it
 	// and then changes several sources, as one matter.js transaction does.
@@ -253,7 +261,13 @@ func NewGroupcast(cfg GroupcastConfig) (*Groupcast, error) {
 	case cfg.AccessControl == nil:
 		return nil, errors.New("matter: Groupcast: the Listener feature requires AccessControl with the Auxiliary feature")
 	}
-	g := &Groupcast{groups: cfg.Groups, gkm: cfg.GroupKeyManagement, acl: cfg.AccessControl, timer: cfg.TestingTimer}
+	g := &Groupcast{
+		groups: cfg.Groups, gkm: cfg.GroupKeyManagement, acl: cfg.AccessControl, timer: cfg.TestingTimer,
+		maxMcastAddr: cfg.MaxMcastAddrCount,
+	}
+	if g.maxMcastAddr == 0 {
+		g.maxMcastAddr = groupcastMaxMcastAddrCount
+	}
 	if g.timer == nil {
 		clk := clock.Or(cfg.Clock)
 		g.timer = func(d time.Duration, fire func()) func() {
@@ -371,7 +385,7 @@ func (g *Groupcast) read(ctx context.Context, attrID uint32, filtered bool, fabr
 	case groupcastAttrMaxMembershipCount:
 		return groupcastMaxMembershipCount, true
 	case groupcastAttrMaxMcastAddrCount:
-		return groupcastMaxMcastAddrCount, true
+		return g.maxMcastAddr, true
 	case groupcastAttrUsedMcastAddrCount:
 		ms, err := g.groups.GroupcastMemberships(ctx)
 		if err != nil {
@@ -546,7 +560,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
 	}
 	existing, isMember := memberOf(ms, fabric, req.GroupID)
-	if err := checkJoinCapacity(ms, fabric, req.GroupID, isMember, policy); err != nil {
+	if err := checkJoinCapacity(ms, fabric, req.GroupID, isMember, policy, g.maxMcastAddr); err != nil {
 		return err
 	}
 
@@ -648,7 +662,7 @@ func joinTarget(req JoinGroupRequest, current []uint16) []uint16 {
 // checkJoinCapacity applies the membership limits — per fabric
 // floor(MaxMembershipCount/2), in total MaxMembershipCount, for a new group
 // only — and MaxMcastAddrCount for the address the join would use.
-func checkJoinCapacity(ms []groups.GroupcastMembership, fabric uint8, groupID uint16, isMember bool, policy uint8) error {
+func checkJoinCapacity(ms []groups.GroupcastMembership, fabric uint8, groupID uint16, isMember bool, policy uint8, maxMcastAddr uint16) error {
 	if !isMember {
 		perFabric := 0
 		for _, m := range ms {
@@ -667,7 +681,7 @@ func checkJoinCapacity(ms []groups.GroupcastMembership, fabric uint8, groupID ui
 		return m.FabricIndex == fabric && m.GroupID == groupID
 	})
 	projected = append(projected, groups.GroupcastMembership{McastAddrPolicy: policy})
-	if n := usedMcastAddrCount(projected); n > groupcastMaxMcastAddrCount && n > usedMcastAddrCount(ms) {
+	if n := usedMcastAddrCount(projected); n > maxMcastAddr && n > usedMcastAddrCount(ms) {
 		return groupcastErr(im.StatusResourceExhausted, "MaxMcastAddrCount limit reached")
 	}
 	return nil
