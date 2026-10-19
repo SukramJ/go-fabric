@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 55 |
-| partial | 114 |
-| planned | 68 |
+| partial | 115 |
+| planned | 67 |
 | excluded | 87 |
 | total | 324 |
 
@@ -66,7 +66,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 1 | 1 | 4 | 0 |
+| [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 1 | 2 | 3 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
@@ -446,7 +446,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| AtomicWriteHandlerTest.ts | 519 | planned | — | Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets. |
+| AtomicWriteHandlerTest.ts | 519 | partial | `cluster/thermo:TestParityMatterJS_AtomicWriteHandlerTest` | BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session); the inherited-quality case is a TypeScript schema extension of a behavior class with no Go counterpart (the atomic quality is the generated definition's), and the five CommitWrite cases stage Schedules, MatterScheduleConfiguration, which the server does not serve (matter.js does not implement it either, ThermostatServer.ts:126-128). Missing: “accepts an attribute whose atomic quality is inherited from the element it overrides”; “applies every pending write when all of them succeed”; “reports an attribute the peer did not write as SUCCESS, in the CommitWrite request's order”; “validates an attribute once the other pending attributes are staged”; “discards a valid Schedules write when the Presets write fails”; “discards a valid Presets write when the Schedules write fails”. |
 | AtomicWriteStateTest.ts | 41 | ported | `cluster/thermo:TestAtomicWriteStateParity` | The one case runs on the package's atomic-write state (cluster/thermo/atomic.go, the port of AtomicWriteState.ts) on a clocktest.Fake: closed emits once. |
 | PresetsAtomicWriteTest.ts | 215 | planned | — | Writing presets through an atomic write. |
 | PresetsConfigurationTest.ts | 150 | planned | — | Presets seeded from configuration and the write rules without configured presets. |
@@ -1034,7 +1034,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behaviors/thermostat
 
-- `AtomicWriteHandlerTest.ts` — Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets.
 - `PresetsAtomicWriteTest.ts` — Writing presets through an atomic write.
 - `PresetsConfigurationTest.ts` — Presets seeded from configuration and the write rules without configured presets.
 - `PresetsLocalWriteTest.ts` — Local writes of presets: handles, persistence, validation per transaction.

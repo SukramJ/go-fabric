@@ -36,7 +36,7 @@ import (
 // describe/it names and the Go tests' Test and t.Run names. Phase 16 brings
 // the protocol/test and node/test/node share of it to zero, milestone 3 the
 // node/test/behaviors share.
-const testparityPlannedRatchet = 68
+const testparityPlannedRatchet = 67
 
 // moduleRoot is where the committed artefacts live, seen from this package.
 const moduleRoot = "../.."

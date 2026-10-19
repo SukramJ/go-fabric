@@ -1115,8 +1115,19 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteHandlerTest.ts",
-      "status": "planned",
-      "reason": "Atomic writes (BeginWrite, CommitWrite, timeouts, per-peer holds), which milestone 3 phase 17 builds with the thermostat presets.",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_AtomicWriteHandlerTest"
+      ],
+      "missing": [
+        "accepts an attribute whose atomic quality is inherited from the element it overrides",
+        "applies every pending write when all of them succeed",
+        "reports an attribute the peer did not write as SUCCESS, in the CommitWrite request's order",
+        "validates an attribute once the other pending attributes are staged",
+        "discards a valid Schedules write when the Presets write fails",
+        "discards a valid Presets write when the Schedules write fails"
+      ],
+      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session); the inherited-quality case is a TypeScript schema extension of a behavior class with no Go counterpart (the atomic quality is the generated definition's), and the five CommitWrite cases stage Schedules, MatterScheduleConfiguration, which the server does not serve (matter.js does not implement it either, ThermostatServer.ts:126-128).",
       "snapshotSha": "169b7cc8fea0d7a2db31d147679b19a13463772d"
     },
     {
