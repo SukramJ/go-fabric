@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -104,26 +106,38 @@ func (b *demoBinary) reportFromDevice(value bool) {
 
 // --- device: a wall button -------------------------------------------------
 
-// demoButton is a momentary wall button. Its endpoint is assembled from the
-// MomentarySwitch measurement class, which mounts the GenericSwitch (Switch,
-// 0x003B) cluster; presses reach it as the Matter gesture sequence through
-// the [contract.SwitchEventEmitter] the bridge hands over at assembly
-// (WireMatterSwitchHandler).
+// demoButton is a momentary wall button that knows its position: idle (0)
+// or pressed (1). Its endpoint is assembled from the MomentarySwitch
+// measurement class, which mounts the Switch server (cluster/switch, the
+// port of matter.js SwitchServer.ts) with MS, MSR, MSL and MSM; the button
+// reports each position through the [contract.SwitchPositionSink] the
+// bridge hands over at assembly (WireMatterSwitchPositions), and the server
+// derives every event — InitialPress, ShortRelease, LongPress, LongRelease,
+// MultiPressOngoing, MultiPressComplete — from that stream.
 //
 // A press here has no physical button behind it: the debug control hook
-// (control.go) narrates one on a test's behalf, exactly as a host narrates a
-// press its southbound bus reported.
+// (control.go) moves the button through positions on a test's behalf, the
+// way matter.js's own test app does (support/chip-testing/src/simulators/
+// SwitchSimulator.ts).
 type demoButton struct {
 	name string
 
-	mu       sync.Mutex
-	emitter  contract.SwitchEventEmitter
-	position uint8
+	mu   sync.Mutex
+	sink contract.SwitchPositionSink
+
+	// running is held while one simulated action sequence runs; a second
+	// one is refused, as SwitchSimulator.executeActions refuses one while
+	// actions are pending (SwitchSimulator.ts:25-32).
+	running sync.Mutex
 }
 
 var _ contract.MeasurementSource = (*demoButton)(nil)
 
 func newDemoButton(name string) *demoButton { return &demoButton{name: name} }
+
+// demoButtonMultiPressMax is the button's MultiPressMax: three presses
+// counted, a fourth aborts the sequence (TC-SWTCH-2.5 step 6b runs with it).
+const demoButtonMultiPressMax = 3
 
 // MatterMeasurementClass implements [contract.MeasurementSource].
 func (b *demoButton) MatterMeasurementClass() contract.MeasurementClass {
@@ -134,60 +148,125 @@ func (b *demoButton) MatterMeasurementClass() contract.MeasurementClass {
 // pressed.
 func (b *demoButton) MatterSwitchPositions() uint8 { return 2 }
 
-// MatterSwitchSupportsLongPress implements the GenericSwitch source port.
-// The button tells a long press from a short one, so the cluster advertises
-// MSL and forwards LongPress / LongRelease.
+// MatterSwitchSupportsLongPress implements the GenericSwitch source port:
+// the server tells a long press from a short one (MSL).
 func (b *demoButton) MatterSwitchSupportsLongPress() bool { return true }
 
-// MatterSwitchCurrentPosition implements the optional live-position port: 1
-// while a press is held.
-func (b *demoButton) MatterSwitchCurrentPosition() uint8 {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.position
-}
+// MatterSwitchMultiPressMax implements the optional multi-press port: the
+// server counts presses up to three (MSM).
+func (b *demoButton) MatterSwitchMultiPressMax() uint8 { return demoButtonMultiPressMax }
 
-// WireMatterSwitchHandler is how the bridge hands the button its emitter at
-// every reassembly; the returned closure detaches it again.
-func (b *demoButton) WireMatterSwitchHandler(e contract.SwitchEventEmitter) func() {
+// WireMatterSwitchPositions is how the bridge hands the button the Switch
+// server's position input at every reassembly; the returned closure
+// detaches it again.
+func (b *demoButton) WireMatterSwitchPositions(sink contract.SwitchPositionSink) func() {
 	b.mu.Lock()
-	b.emitter = e
+	b.sink = sink
 	b.mu.Unlock()
 	return func() {
 		b.mu.Lock()
-		if b.emitter == e {
-			b.emitter = nil
+		if b.sink == sink {
+			b.sink = nil
 		}
 		b.mu.Unlock()
 	}
 }
 
-// press narrates one press as Matter gestures: InitialPress, then
-// ShortRelease — or InitialPress, LongPress, LongRelease for a long one.
-// Mirrors matter.js SwitchServer.ts, which derives the same sequence from
-// one currentPosition stream.
-func (b *demoButton) press(long bool) bool {
+// switchTuner is the part of the Switch server (cluster/switch.Server)
+// beyond the position input that the simulation sets, as matter.js's
+// SwitchSimulator sets the server's state before it acts.
+type switchTuner interface {
+	SetLongPressDelay(time.Duration)
+	SetMultiPressDelay(time.Duration)
+	ResetState()
+}
+
+// switchAction is one step of a simulated sequence: move to position, then
+// wait delay (SwitchSimulator.ts:17).
+type switchAction struct {
+	position uint8
+	delay    time.Duration
+}
+
+// errButtonNotMounted reports a button whose endpoint is not assembled yet.
+var errButtonNotMounted = errors.New("the button has no position input yet (not mounted)")
+
+// execute moves the button through actions, in order, each followed by its
+// delay (SwitchSimulator.ts:25-65).
+func (b *demoButton) execute(tune func(switchTuner), actions []switchAction) error {
+	if !b.running.TryLock() {
+		return errors.New("still unprocessed switch actions")
+	}
+	defer b.running.Unlock()
 	b.mu.Lock()
-	e := b.emitter
-	b.position = 1
+	sink := b.sink
 	b.mu.Unlock()
-	if e == nil {
-		return false
+	if sink == nil {
+		return errButtonNotMounted
 	}
-	e.FireInitialPress(1)
-	if long {
-		e.FireLongPress(1)
+	if t, ok := sink.(switchTuner); ok && tune != nil {
+		tune(t)
+	}
+	for _, a := range actions {
+		if err := sink.SetCurrentPosition(a.position); err != nil {
+			return err
+		}
+		if a.delay > 0 {
+			time.Sleep(a.delay)
+		}
+	}
+	return nil
+}
+
+// simulateLongPress holds the button at position for duration, after
+// setting the long-press delay to delay (0 keeps it). Mirrors matter.js
+// SwitchSimulator.simulateLongPress (SwitchSimulator.ts:81-92).
+func (b *demoButton) simulateLongPress(position uint8, delay, duration time.Duration) error {
+	err := b.execute(func(t switchTuner) {
+		if delay > 0 {
+			t.SetLongPressDelay(delay)
+		}
+	}, []switchAction{{position: position, delay: duration}, {position: 0}})
+	if err == nil {
+		slog.Info("button.press", slog.String("device", b.name), slog.Bool("long", true))
+	}
+	return err
+}
+
+// simulateMultiPress presses the button n times, pressed for pressed and
+// released for released between the presses, after setting the
+// multi-press delay to released + 500 ms. Mirrors matter.js
+// SwitchSimulator.simulateMultiPress (SwitchSimulator.ts:111-139).
+func (b *demoButton) simulateMultiPress(position uint8, n int, pressed, released time.Duration) error {
+	actions := make([]switchAction, 0, 2*n)
+	for i := range n {
+		actions = append(actions, switchAction{position: position, delay: pressed})
+		if i < n-1 {
+			actions = append(actions, switchAction{position: 0, delay: released})
+		}
+	}
+	actions = append(actions, switchAction{position: 0})
+	err := b.execute(func(t switchTuner) { t.SetMultiPressDelay(released + 500*time.Millisecond) }, actions)
+	if err == nil {
+		slog.Info("button.press", slog.String("device", b.name), slog.Int("presses", n))
+	}
+	return err
+}
+
+// simulateIdle returns the button to its idle position, then resets the
+// server's press state. Mirrors matter.js support/chip-testing/src/
+// AllClustersTestInstance.ts:179-185 (simulateSwitchIdle).
+func (b *demoButton) simulateIdle() error {
+	if err := b.execute(nil, []switchAction{{position: 0}}); err != nil {
+		return err
 	}
 	b.mu.Lock()
-	b.position = 0
+	sink := b.sink
 	b.mu.Unlock()
-	if long {
-		e.FireLongRelease(1)
-	} else {
-		e.FireShortRelease(1)
+	if t, ok := sink.(switchTuner); ok {
+		t.ResetState()
 	}
-	slog.Info("button.press", slog.String("device", b.name), slog.Bool("long", long))
-	return true
+	return nil
 }
 
 // --- device: an air quality sensor -------------------------------------------

@@ -54,9 +54,10 @@ these interfaces does not drag the host's dependencies into the module.
 | `ElectricalReadings` | a host meter | the consolidated electrical readings | — |
 | `MeasurementMaterializer` | a host (with `RegisterMeasurementKind`) | the servers of a measurement kind the module does not ship | — |
 | `EligibilitySource` | a host model | whether and how fully a data point maps to Matter | the classifier treats it as unmappable |
-| `SwitchEventEmitter` | the module (`cluster/wire.GenericSwitch`) | the press events a host narrates | — |
+| `SwitchEventEmitter` | the module (`cluster/switch.Server`) | the press gestures a host narrates (InitialPress, ShortRelease, LongPress, LongRelease); handed to a source with `WireMatterSwitchHandler` | — |
+| `SwitchPositionSink` | the module (`cluster/switch.Server`) | the positions a host reports (`SetRawPosition` debounced, `SetCurrentPosition`); the server derives every Switch event, multi press included, as matter.js `SwitchServer.ts` does; handed to a source with `WireMatterSwitchPositions` | a source without either method reports no press |
 
-*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-440`, `contract/matter.go:572-830`, `contract/switchevents.go:26`.*
+*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-440`, `contract/matter.go:572-830`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
 ## `node.Config`: the facade's ports
 

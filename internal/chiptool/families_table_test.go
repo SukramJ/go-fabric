@@ -785,8 +785,7 @@ var chipFamilies = []family{
 		name: "SWTCH", deviceType: dtGenericSwitch,
 		exclude: map[string]gap{
 			"2.2": {classNotSupported, "TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary)", true},
-			"2.5": {classNotSupported, "TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0)", true},
-			"2.6": {classNotSupported, "TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0)", true},
+			"2.6": {classNotSupported, "TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance \"[MS & !AS]\", switch.element.ts)", true},
 		},
 	},
 	{

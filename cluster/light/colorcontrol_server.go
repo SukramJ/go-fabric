@@ -109,6 +109,13 @@ type ColorControlServerConfig struct {
 	MaxMireds uint16
 	// InitialMireds is the starting value for ColorTemperatureMireds (0x0007).
 	InitialMireds uint16
+	// CoupleColorTempToLevelMinMireds is CoupleColorTempToLevelMinMireds
+	// (0x400D): the colour temperature LevelControl's
+	// CoupleColorTempToLevel option couples the maximum level to. Zero is
+	// the physical minimum, the value matter.js falls back to when the
+	// attribute is unset (ColorControlServer.ts:1582
+	// `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds`).
+	CoupleColorTempToLevelMinMireds uint16
 	// InitialColorMode is the colour mode at start; nil is the XY mode
 	// with the XY feature, else the CT mode with CT, else hue and
 	// saturation. matter.js leaves ColorMode without a default for the
@@ -530,10 +537,12 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	case ccdef.AttrColorTempPhysicalMaxMireds:
 		return s.cfg.MaxMireds, true
 	case ccdef.AttrCoupleColorTempToLevelMinMireds:
-		// The server keeps no separate coupling floor, so the value is the
-		// one matter.js falls back to: the physical minimum
-		// (ColorControlServer.ts syncColorTemperatureWithLevelLogic
+		// The configured coupling floor, else the value matter.js falls
+		// back to: the physical minimum (ColorControlServer.ts:1582
 		// `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds`).
+		if s.cfg.CoupleColorTempToLevelMinMireds != 0 {
+			return s.cfg.CoupleColorTempToLevelMinMireds, true
+		}
 		return s.cfg.MinMireds, true
 	case ccdef.AttrStartUpColorTemperatureMireds:
 		if s.startUpMireds == nil {

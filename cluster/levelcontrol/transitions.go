@@ -85,7 +85,11 @@ type coupling struct {
 // and MaxLevel, RemainingTime reported by hand.
 func (s *Server) initTransitions(cfg Transitions) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
-	s.quiet = &cluster.Quieter{Report: func() { s.changes.Notify(AttrCurrentLevel) }, Clock: cfg.Clock}
+	s.quiet = &cluster.Quieter{Report: func() {
+		if !s.quiescing.Load() {
+			s.changes.Notify(AttrCurrentLevel)
+		}
+	}, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
 		Manage:       true,
 		StepInterval: cfg.StepInterval,
@@ -219,12 +223,25 @@ func (s *Server) MatterSelfReportedAttributes() []uint32 {
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: a transition stops
-// where it is, without a report (matter.js LevelControlServer
-// [Symbol.asyncDispose] closes its transitions).
+// where it is, and a CurrentLevel report the quieter holds back is dropped
+// with its timer, both without a report, so no timer of the server
+// outlives it. Mirrors matter.js
+// packages/node/src/behaviors/level-control/LevelControlServer.ts:765-770
+// ([Symbol.asyncDispose] closes the transitions) and
+// packages/general/src/util/Observable.ts:806-815, :1276-1280 (disposing
+// the behavior's events disposes each QuietObservable, which stops its
+// "delayed emit" timer, #stop :1309-1314). The quieter stays usable: a
+// later command reports by its rules again.
 func (s *Server) MatterQuiesce() {
-	if s.engine != nil {
-		s.engine.StopAll()
+	if s.engine == nil {
+		return
 	}
+	s.engine.StopAll()
+	// EmitNow clears the pending report and stops its timer; the report
+	// itself is suppressed.
+	s.quiescing.Store(true)
+	s.quiet.EmitNow()
+	s.quiescing.Store(false)
 }
 
 // effectiveOptions is matter.js #calculateEffectiveOptions: per bit, a set

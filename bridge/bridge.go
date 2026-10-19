@@ -402,8 +402,9 @@ type Bridge struct {
 	measurementUnsubscribers []func()
 	// switchUnsubscribers holds the unsubscribe closures returned by
 	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
-	// matterSwitchSubscribable assertion) for every bridged
-	// GenericSwitch endpoint. Drained at the start of each reassemble:
+	// matterSwitchSubscribable assertion) and by a position source's
+	// WireMatterSwitchPositions (matterSwitchPositionReporter) for every
+	// bridged GenericSwitch endpoint. Drained at the start of each reassemble:
 	// the wiring registers update hooks on the underlying press DP(s),
 	// and without teardown the hooks would accumulate across
 	// reassembles — every physical press would then emit one duplicate
@@ -1011,6 +1012,14 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 						switchUnsubs = append(switchUnsubs, subscriber.WireMatterSwitchHandler(emitter))
 					}
 				}
+				// A source that reports positions instead of gestures gets
+				// the server's position input (cluster/switch), with the
+				// same teardown on the next reassemble.
+				if sink, ok := srv.(contract.SwitchPositionSink); ok {
+					if reporter, ok := ep.Measurement.(matterSwitchPositionReporter); ok {
+						switchUnsubs = append(switchUnsubs, reporter.WireMatterSwitchPositions(sink))
+					}
+				}
 			}
 		}
 	}
@@ -1202,6 +1211,20 @@ type matterEndpointReceiver interface {
 // [Bridge.switchUnsubscribers] and drained on the next reassemble.
 type matterSwitchSubscribable interface {
 	WireMatterSwitchHandler(contract.SwitchEventEmitter) func()
+}
+
+// matterSwitchPositionReporter is the model-side surface of a switch source
+// that knows its positions rather than its gestures: at every reassembly it
+// is handed the Switch server's position input ([contract.SwitchPositionSink],
+// cluster/switch.Server — matter.js SwitchServer.ts's rawPosition and
+// currentPosition) and reports each position there. The parameter names
+// the shared contract type for the reason [matterSwitchSubscribable] gives.
+//
+// The returned closure detaches the sink; it is retained in
+// [Bridge.switchUnsubscribers] and drained on the next reassemble, so a
+// source never reports into the server of a superseded topology.
+type matterSwitchPositionReporter interface {
+	WireMatterSwitchPositions(contract.SwitchPositionSink) func()
 }
 
 // SetOnFabricAdded wires the post-AddNOC hook. The bridge does not

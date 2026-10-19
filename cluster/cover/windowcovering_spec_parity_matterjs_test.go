@@ -26,7 +26,7 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 		{cover.ServedTiltFeatureMap, cover.ServedTiltFeatureMap},
 		{cover.ServedLiftTiltFeatureMap, cover.ServedLiftTiltFeatureMap},
 	} {
-		srv, err := cover.New(cover.Config{FeatureMap: c.cfg})
+		srv, err := cover.New(cover.Config{Type: uint8(wcdef.TypeUnknown), EndProductType: uint8(wcdef.EndProductTypeUnknown), FeatureMap: c.cfg})
 		if err != nil {
 			t.Fatalf("FeatureMap 0x%X: %v", c.cfg, err)
 		}
