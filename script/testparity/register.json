@@ -1180,32 +1180,12 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/thermo:TestParityMatterJS_Thermostat_StartupReconciliation"
+        "cluster/thermo:TestParityMatterJS_Thermostat_StartupReconciliation",
+        "cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest"
       ],
-      "missing": [
-        "has correct Thermostat-specific celsius defaults in schema",
-        "correctly specifies Thermostat-specific value in defaults",
-        "clears the active preset when it adjusts a setpoint",
-        "accepts absolute limits narrower than the defaults without user limits",
-        "orders unordered user limits by raising the max limit",
-        "orders unordered cool user limits on a heating and cooling thermostat",
-        "orders unordered cool user limits on a cooling-only thermostat",
-        "pulls a user limit inside narrowed absolute limits",
-        "rejects an absolute limit change that leaves a user limit outside",
-        "rejects a user limit outside the absolute limits",
-        "rejects setpoints outside the user limits",
-        "raises the coupled cool limit when a heat min limit write would violate the deadband",
-        "lowers the coupled heat limit when a cool max limit write would violate the deadband",
-        "does not adjust when the write already satisfies the deadband",
-        "raises the coupled max limit when a min limit is written above it (ordering repair)",
-        "clamps a setpoint back inside the limits when a limit write crosses it",
-        "pins the written limit back when the coupled limit cannot move within its absolute bounds",
-        "rejects a limit write the fix leaves invalid, naming the violated condition",
-        "nudges the coupled setpoint to preserve the deadband when a limit write clamps a setpoint"
-      ],
-      "reason": "The startup reconciliation of setpoints and limits is ported; the schema defaults, user-limit ordering and runtime limit validation are not.",
+      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts.",
       "snapshotSha": "87ef846ade095d3775da6f593c48a0009f0399d8"
     },
     {
