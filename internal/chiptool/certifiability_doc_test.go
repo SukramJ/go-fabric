@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // No build tag: this runs in every `go test ./...`. It needs no harness —
@@ -229,10 +230,17 @@ func renderCertifiability(g docGolden) string {
 // mdCell escapes the pipes of a Markdown table cell.
 func mdCell(s string) string { return strings.ReplaceAll(s, "|", "\\|") }
 
+// longRunningBudget is the case budget from which a family belongs in the
+// workflow's `long` group: a case that waits for hours by design
+// (TC-DGGEN-2.1, 3 h 10 min of literal waits) runs nightly and on
+// dispatch, never on a pull request.
+const longRunningBudget = time.Hour
+
 // TestWorkflowRunsEveryFamily holds the family groups of
 // .github/workflows/chiptool.yml (chip-families matrix) to the family
-// table: every declared family runs in exactly one group, and no group
-// names a family the table does not declare.
+// table: every declared family runs in exactly one group, no group names
+// a family the table does not declare, and the `long` group is exactly
+// the families with a case budget of longRunningBudget or more.
 func TestWorkflowRunsEveryFamily(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "chiptool.yml"))
 	if err != nil {
@@ -242,6 +250,7 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 	// `groups` step in the workflow's `code touched` job.
 	entry := regexp.MustCompile(`^"([a-z-]+)=([A-Z0-9,]+)"$`)
 	seen := map[string]int{}
+	long := map[string]bool{}
 	groups := 0
 	for _, line := range strings.Split(string(data), "\n") {
 		m := entry.FindStringSubmatch(strings.TrimSpace(line))
@@ -251,6 +260,9 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 		groups++
 		for _, f := range strings.Split(m[2], ",") {
 			seen[f]++
+			if m[1] == "long" {
+				long[f] = true
+			}
 		}
 	}
 	if groups == 0 {
@@ -261,6 +273,13 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 		declared[fam.name] = true
 		if seen[fam.name] != 1 {
 			t.Errorf("family %s runs in %d workflow groups, want exactly 1", fam.name, seen[fam.name])
+		}
+		hours := false
+		for _, d := range fam.timeout {
+			hours = hours || d >= longRunningBudget
+		}
+		if hours != long[fam.name] {
+			t.Errorf("family %s: a case budget of %s or more is %v, membership of the workflow's long group is %v; the two must agree", fam.name, longRunningBudget, hours, long[fam.name])
 		}
 	}
 	for f := range seen {
