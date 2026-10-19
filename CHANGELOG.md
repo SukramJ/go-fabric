@@ -21,7 +21,7 @@ Milestone 3, phase 17c, brief BL: the Thermostat's Presets, atomic writes and Oc
 - `thermo.PresetStore` persists one endpoint's presets and active handle (`EncodePresets` / `DecodePresets` are the TLV form it keeps); `ThermostatConfig.PresetStore`, nil keeps them in memory. `store.Store.ThermostatPresets(endpointKey)` implements it, with `LoadThermostatPresets` / `SaveThermostatPresets`, on the new table `matter_thermostat_presets` (migration `v5`). `thermo.ErrPresets` reports a preset configuration the server refuses.
 - `thermo.ThermostatUIConfig.KeypadLockout` (the initial value), `Settings` (a `thermo.SettingStore`, `*store.Store` is one) and `SettingKey`: KeypadLockout persists across a restart, a controller's write and the device's own (`ThermostatUIServer.Set`) alike.
 - `im.WithCommandPath` / `im.CommandPathFromContext`: the endpoint dispatcher stamps the concrete command path before a cluster server's `MatterInvoke`, so a server checking a privilege for part of its request names the endpoint it runs at.
-- The reference daemon's thermostat serves Presets (five presets of one type, Occupied, without names) on the daemon's store, and keeps its KeypadLockout there.
+- The reference daemon's thermostat serves Presets in the shape of matter.js's CHIP test thermostat (`AllClustersTestInstance.ts:1058-1103`: UserDefined, Occupied and Unoccupied, one preset each with names, NumberOfPresets 5, two presets shipped) on the daemon's store, and keeps its KeypadLockout there. TC-TSTAT-4.2 runs against it (PICS slice `ep15.txt`, goldens of TSTAT, TSUIC and IDM regenerated), as does TC-OVENOPSTATE-2.5 on the PICS of #137.
 
 ### Changed
 
