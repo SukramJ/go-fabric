@@ -703,14 +703,12 @@
     },
     {
       "path": "packages/node/test/behaviors/boolean-state/BooleanStateServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "bridge:TestBooleanStateChangeEvent"
+        "bridge:TestBooleanStateChangeEvent",
+        "cluster/measurement:TestBooleanStateServerParityMatterJS"
       ],
-      "missing": [
-        "enables the ChangeEvent feature by default"
-      ],
-      "reason": "The StateChange event is covered; the event being enabled by default is not asserted.",
+      "reason": "The StateChange event the bridge emits on a StateValue change (bridge:TestBooleanStateChangeEvent) and the ChangeEvent feature the server advertises by default, FeatureMap and EventList (cluster/measurement/boolean_state_server_parity_matterjs_test.go).",
       "snapshotSha": "0bc76387536350609742f8941b03d974fa375694"
     },
     {

@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 77 |
-| partial | 122 |
+| ported | 78 |
+| partial | 121 |
 | planned | 38 |
 | excluded | 87 |
 | total | 324 |
@@ -40,7 +40,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/access-control](#nodetestbehaviorsaccess-control) | 2 | 0 | 1 | 1 | 0 |
 | [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 2 | 1 | 0 | 0 |
-| [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
@@ -282,7 +282,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BooleanStateServerTest.ts | 34 | partial | `bridge:TestBooleanStateChangeEvent` | The StateChange event is covered; the event being enabled by default is not asserted. Missing: ‚Äúenables the ChangeEvent feature by default‚Äù. |
+| BooleanStateServerTest.ts | 34 | ported | `bridge:TestBooleanStateChangeEvent`<br>`cluster/measurement:TestBooleanStateServerParityMatterJS` | The StateChange event the bridge emits on a StateValue change (bridge:TestBooleanStateChangeEvent) and the ChangeEvent feature the server advertises by default, FeatureMap and EventList (cluster/measurement/boolean_state_server_parity_matterjs_test.go). |
 
 ## node/test/behaviors/color-control
 
