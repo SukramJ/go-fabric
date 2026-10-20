@@ -322,7 +322,7 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	s.mu.RUnlock()
 	// Position belongs to Positioning, which the server always serves;
 	// Latch and Speed to features it does not (LT, SP): both ignored.
-	target := req.Position
+	target := (*wire.ClosureTargetPosition)(req.Position)
 	if target == nil {
 		target = fallback
 	}
@@ -400,40 +400,57 @@ func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) err
 // bridge decodes MoveTo through the generated definition, so a real
 // invocation arrives as [closuredef.MoveToRequest] (a field of the wrong
 // TLV type already answered INVALID_COMMAND there, as matter.js's request
-// schema answers it); a host that decodes the command itself may pass
-// [wire.MoveToRequest], the raw TLV or the tag-keyed map of the bridge's
-// generic salvage path (bridge/fields_reader.go decodeGenericTagMap).
-func moveToRequest(fields any) (wire.MoveToRequest, error) {
+// schema answers it), by value or by pointer — the primary form; a host
+// that decodes the command itself may pass the tag-keyed map of the
+// bridge's generic salvage path (bridge/fields_reader.go
+// decodeGenericTagMap), and, until their removal in v0.12.0, the
+// [wire.MoveToRequest] (Deprecated) or the raw TLV.
+func moveToRequest(fields any) (closuredef.MoveToRequest, error) {
+	if req, ok := spec.RequestOf[closuredef.MoveToRequest](fields); ok {
+		if req.Position == nil && req.Latch == nil && req.Speed == nil {
+			return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
+		return req, nil
+	}
 	switch v := fields.(type) {
-	case closuredef.MoveToRequest:
-		return moveToRequest(wire.MoveToRequest{
-			Position: (*wire.ClosureTargetPosition)(v.Position),
-			Latch:    v.Latch,
-			Speed:    (*uint8)(v.Speed),
-		})
-	case *closuredef.MoveToRequest:
-		if v == nil {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
-		}
-		return moveToRequest(*v)
-	case wire.MoveToRequest:
-		if v.Position == nil && v.Latch == nil && v.Speed == nil {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
-		}
-		return v, nil
-	case *wire.MoveToRequest:
-		if v == nil {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
-		}
-		return moveToRequest(*v)
-	case []byte:
-		return wire.DecodeClosureMoveTo(v)
 	case map[uint8]any:
 		return moveToRequestFromTagMap(v)
-	default:
-		return wire.MoveToRequest{}, fmt.Errorf(
-			"closurecontrol: MoveTo expected wire.MoveToRequest, map[uint8]any or []byte, got %T", fields,
+	case *closuredef.MoveToRequest: // nil: RequestOf takes a non-nil one
+		return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
+	}
+	legacy, ok, err := legacyMoveToRequest(fields)
+	if !ok {
+		return closuredef.MoveToRequest{}, fmt.Errorf(
+			"closurecontrol: MoveTo expected closurecontrol.MoveToRequest or map[uint8]any, got %T", fields,
 		)
+	}
+	if err != nil {
+		return closuredef.MoveToRequest{}, err
+	}
+	return moveToRequest(closuredef.MoveToRequest{
+		Position: (*closuredef.TargetPositionEnum)(legacy.Position),
+		Latch:    legacy.Latch,
+		Speed:    (*closuredef.ThreeLevelAutoEnum)(legacy.Speed),
+	})
+}
+
+// legacyMoveToRequest reads the deprecated in-process forms: the
+// cluster/wire request and the raw TLV it decodes. ok is false for any
+// other payload.
+func legacyMoveToRequest(fields any) (req wire.MoveToRequest, ok bool, err error) { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+	switch v := fields.(type) {
+	case wire.MoveToRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		return v, true, nil
+	case *wire.MoveToRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		if v == nil {
+			return req, true, wire.ErrClosureControlMalformed
+		}
+		return *v, true, nil
+	case []byte:
+		req, err := wire.DecodeClosureMoveTo(v) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		return req, true, err
+	default:
+		return req, false, nil
 	}
 }
 
@@ -450,22 +467,22 @@ const (
 // as absent here — the same reading [wire.DecodeClosureMoveTo] gives a
 // null element. A map carrying none of the three fields is malformed for
 // the same reason the TLV decoder says so: at least one is mandatory.
-func moveToRequestFromTagMap(m map[uint8]any) (wire.MoveToRequest, error) {
-	var req wire.MoveToRequest
+func moveToRequestFromTagMap(m map[uint8]any) (closuredef.MoveToRequest, error) {
+	var req closuredef.MoveToRequest
 	if raw, present := m[moveToFieldPosition]; present && raw != nil {
 		// TargetPositionEnum is enum8: a wider value is a malformed field,
 		// not a large position.
 		n, ok := raw.(uint64)
 		if !ok || n > math.MaxUint8 {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+			return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
 		}
-		pos := wire.ClosureTargetPosition(n)
+		pos := closuredef.TargetPositionEnum(n)
 		req.Position = &pos
 	}
 	if raw, present := m[moveToFieldLatch]; present && raw != nil {
 		latch, ok := raw.(bool)
 		if !ok {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+			return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
 		}
 		req.Latch = &latch
 	}
@@ -473,13 +490,13 @@ func moveToRequestFromTagMap(m map[uint8]any) (wire.MoveToRequest, error) {
 		// ThreeLevelAutoEnum is enum8; same reasoning as Position.
 		n, ok := raw.(uint64)
 		if !ok || n > math.MaxUint8 {
-			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+			return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
 		}
-		speed := uint8(n)
+		speed := closuredef.ThreeLevelAutoEnum(n)
 		req.Speed = &speed
 	}
 	if req.Position == nil && req.Latch == nil && req.Speed == nil {
-		return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
 	}
 	return req, nil
 }

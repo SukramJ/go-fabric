@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -55,7 +56,7 @@ func TestColorControl_WriteThrough_WriterCalledOnce(t *testing.T) {
 
 	const target uint16 = 300
 	ret, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
-		wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
+		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke returned error: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestColorControl_WriteThrough_WriterError(t *testing.T) {
 	}
 
 	_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
-		wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
+		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
 
 	if err == nil {
 		t.Fatal("MatterInvoke expected error when writer fails, got nil")
@@ -131,7 +132,7 @@ func TestColorControl_WriteThrough_Clamping(t *testing.T) {
 			srv.SetWriter(w)
 
 			_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
-				wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target})
+				ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target})
 			if err != nil {
 				t.Fatalf("MatterInvoke returned error: %v", err)
 			}
@@ -161,7 +162,7 @@ func TestColorControl_WriteThrough_NoWriter(t *testing.T) {
 
 	const target uint16 = 250
 	ret, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
-		wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
+		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke without writer returned error: %v", err)
 	}
@@ -186,7 +187,7 @@ func TestColorControl_WriteThrough_SetWriterNil(t *testing.T) {
 
 	const target uint16 = 200
 	_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
-		wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
+		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke after SetWriter(nil) returned error: %v", err)
 	}

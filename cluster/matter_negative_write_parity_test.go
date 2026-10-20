@@ -870,7 +870,7 @@ func TestPositiveInvokeControl(t *testing.T) {
 	t.Run("DishwasherMode/ChangeToMode Heavy answered Success", func(t *testing.T) {
 		t.Parallel()
 		srv := newDishwasherModeServer()
-		resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, wire.ChangeToModeRequest{NewMode: 1})
+		resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, dishdef.ChangeToModeRequest{NewMode: 1})
 		if err != nil || resp.(wire.ChangeToModeResponse).Status != 0 {
 			t.Fatalf("ChangeToMode 1: %+v, %v", resp, err)
 		}

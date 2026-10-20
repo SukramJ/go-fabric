@@ -47,6 +47,14 @@ type ModeOptionStruct struct {
 }
 
 // ChangeToModeRequest is the decoded ChangeToMode payload.
+//
+// Deprecated: the bridge decodes ChangeToMode into the derivation's
+// generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/<mode>.ChangeToModeRequest
+// (github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode, rvcrunmode,
+// rvccleanmode, dishwashermode, …), which the modebase server takes by
+// value or by pointer; use it. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 type ChangeToModeRequest struct {
 	NewMode uint8
 }

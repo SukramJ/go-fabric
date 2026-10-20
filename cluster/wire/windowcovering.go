@@ -43,11 +43,21 @@ var ErrWindowCoveringMalformed = errors.New("wire: WindowCovering command malfor
 // GoToLiftPercentageRequest mirrors Matter §5.3.7.5.
 // Matter 1.5.1 deprecated the old uint8 LiftPercentageValue field;
 // the canonical encoding is uint16 LiftPercent100thsValue.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToLiftPercentageRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type GoToLiftPercentageRequest struct {
 	LiftPercent100thsValue uint16
 }
 
 // GoToTiltPercentageRequest mirrors Matter §5.3.7.6.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToTiltPercentageRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type GoToTiltPercentageRequest struct {
 	TiltPercent100thsValue uint16
 }
@@ -63,6 +73,12 @@ type GoToTiltValueRequest struct {
 }
 
 // DecodeGoToLiftPercentage parses GoToLiftPercentage payloads.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToLiftPercentageRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeGoToLiftPercentage(payload []byte) (GoToLiftPercentageRequest, error) {
 	var req GoToLiftPercentageRequest
 	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {
@@ -82,6 +98,12 @@ func DecodeGoToLiftPercentage(payload []byte) (GoToLiftPercentageRequest, error)
 }
 
 // DecodeGoToTiltPercentage parses GoToTiltPercentage payloads.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToTiltPercentageRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeGoToTiltPercentage(payload []byte) (GoToTiltPercentageRequest, error) {
 	var req GoToTiltPercentageRequest
 	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {

@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -36,33 +35,12 @@ type colorControlFixture struct {
 	BytesHex string          `json:"bytesHex"`
 }
 
-// canonicalColorRequest turns what commandFieldsReader hands the server
-// into the generated request type: the four commands with hand-written
-// decoders arrive as cluster/wire structs, the rest as generated structs.
+// canonicalColorRequest is what commandFieldsReader hands the server: every
+// ColorControl request decodes through the generated definition into its
+// generated request struct (gate 1, G1-2).
 func canonicalColorRequest(t *testing.T, got any) spec.Encodable {
 	t.Helper()
-	switch v := got.(type) {
-	case wire.MoveToHueRequest:
-		return ccdef.MoveToHueRequest{
-			Hue: v.Hue, Direction: ccdef.DirectionEnum(v.Direction), TransitionTime: v.TransitionTime,
-			OptionsMask: ccdef.OptionsBitmap(v.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(v.OptionsOverride),
-		}
-	case wire.MoveToSaturationRequest:
-		return ccdef.MoveToSaturationRequest{
-			Saturation: v.Saturation, TransitionTime: v.TransitionTime,
-			OptionsMask: ccdef.OptionsBitmap(v.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(v.OptionsOverride),
-		}
-	case wire.MoveToHueAndSaturationRequest:
-		return ccdef.MoveToHueAndSaturationRequest{
-			Hue: v.Hue, Saturation: v.Saturation, TransitionTime: v.TransitionTime,
-			OptionsMask: ccdef.OptionsBitmap(v.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(v.OptionsOverride),
-		}
-	case wire.MoveToColorTemperatureRequest:
-		return ccdef.MoveToColorTemperatureRequest{
-			ColorTemperatureMireds: v.ColorTemperatureMireds, TransitionTime: v.TransitionTime,
-			OptionsMask: ccdef.OptionsBitmap(v.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(v.OptionsOverride),
-		}
-	case spec.Encodable:
+	if v, ok := got.(spec.Encodable); ok {
 		return v
 	}
 	t.Fatalf("commandFieldsReader handed %T", got)

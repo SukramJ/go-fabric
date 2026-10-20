@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
@@ -240,7 +241,7 @@ func TestParityMatterJS_ColorControl_MoveToColorTemperatureCropsToRange(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			srv2 := light.NewColorControlServer(cfg)
-			if _, err := srv2.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target}); err != nil {
+			if _, err := srv2.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target}); err != nil {
 				t.Fatalf("MoveToColorTemperature(%d): %v", tc.target, err)
 			}
 			v, ok := srv2.MatterRead(wire.ColorCtrlAttrColorTemperatureMireds)

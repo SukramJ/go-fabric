@@ -862,10 +862,11 @@ func (s *WindowCoveringServer) MatterAttributes() []uint32 { return s.inst.Matte
 // [wcdef.GoToTiltPercentageRequest] (a missing field already answered
 // INVALID_COMMAND there, a value above 10000 CONSTRAINT_ERROR, as
 // matter.js's request schema answers them); a host that decodes the
-// command itself may pass the wire request or the tag-keyed map of the
-// bridge's generic salvage path (bridge/fields_reader.go
+// command itself may pass the tag-keyed map of the bridge's generic
+// salvage path (bridge/fields_reader.go
 // decodeGenericTagMap, the value a uint64), and the bare uint16 and the
-// "percent"-keyed map stay accepted for direct callers. Values > 10000
+// "percent"-keyed map stay accepted for direct callers, the deprecated
+// cluster/wire requests until their removal in v0.12.0. Values > 10000
 // are rejected with ConstraintError per
 // window-covering-cluster.element.ts:72, :76 constraint "max 10000".
 func extractPercent100ths(fields any, cmd string) (uint16, error) {
@@ -880,9 +881,9 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
-	case wire.GoToLiftPercentageRequest:
+	case wire.GoToLiftPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		pct = v.LiftPercent100thsValue
-	case *wire.GoToLiftPercentageRequest:
+	case *wire.GoToLiftPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if v == nil {
 			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
 		}
@@ -894,9 +895,9 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
-	case wire.GoToTiltPercentageRequest:
+	case wire.GoToTiltPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		pct = v.TiltPercent100thsValue
-	case *wire.GoToTiltPercentageRequest:
+	case *wire.GoToTiltPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if v == nil {
 			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
 		}

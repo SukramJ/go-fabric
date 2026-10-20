@@ -195,7 +195,7 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	refusing := &recordingThermoSink{err: errors.New("no")}
 	srv = newSinkHeatCool(refusing)
 	_, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower,
-		clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeBoth, Amount: 3})
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: 3})
 	if got := sinkStatus(t, err); got != im.StatusFailure {
 		t.Errorf("refused SetpointRaiseLower: status %s, want FAILURE", got)
 	}

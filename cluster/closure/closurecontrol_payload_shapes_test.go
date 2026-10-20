@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -71,8 +72,8 @@ func TestClosureControlMoveToAcceptsEveryPayloadShape(t *testing.T) {
 	pos := clusterwire.ClosureTargetPositionMoveToVentilationPosition
 
 	shapes := map[string]any{
-		"typed value":   clusterwire.MoveToRequest{Position: &pos},
-		"typed pointer": &clusterwire.MoveToRequest{Position: &pos},
+		"typed value":   clusterwire.MoveToRequest{Position: &pos},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		"typed pointer": &clusterwire.MoveToRequest{Position: &pos}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		"raw TLV": closureMoveToPayload(t, func(e *tlv.Encoder) {
 			e.PutUint(tlv.ContextTag(0), uint64(pos))
 		}),
@@ -103,7 +104,7 @@ func TestClosureControlMoveToRejectsAPayloadItCannotRead(t *testing.T) {
 	t.Parallel()
 	cases := map[string]any{
 		// A nil typed pointer carries no fields at all.
-		"nil typed pointer": (*clusterwire.MoveToRequest)(nil),
+		"nil typed pointer": (*clusterwire.MoveToRequest)(nil), //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		// Position is TargetPositionEnum, an enum8
 		// (closure-control.element.ts:79,97): a wider integer is a
 		// malformed field, not a large position.
@@ -176,7 +177,7 @@ func TestClosureControlMoveToAndStopFailWithoutAHandler(t *testing.T) {
 
 	if _, err := srv.MatterInvoke(
 		context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: &pos},
+		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pos)},
 	); err == nil {
 		t.Error("MoveTo without a handler reported success")
 	}

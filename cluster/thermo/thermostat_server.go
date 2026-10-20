@@ -1035,7 +1035,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	if err != nil {
 		return err
 	}
-	mode, amount := req.Mode, req.Amount
+	mode, amount := uint8(req.Mode), req.Amount
 
 	// matter.js ThermostatServer.ts:189-198: reject Heat/Cool modes when feature absent.
 	switch mode {
@@ -1327,78 +1327,93 @@ const (
 // hands over. The bridge decodes the command through the generated
 // definition, so a real invocation arrives as
 // [tdef.SetpointRaiseLowerRequest] (a missing field already answered
-// INVALID_COMMAND there, as matter.js's request schema answers it); a host
-// that decodes the command itself may pass [wire.SetpointRaiseLowerRequest],
-// the raw TLV or the tag-keyed map of the bridge's generic salvage path
+// INVALID_COMMAND there, as matter.js's request schema answers it), by
+// value or by pointer — the primary form; a host that decodes the command
+// itself may pass the tag-keyed map of the bridge's generic salvage path
 // (bridge/fields_reader.go decodeGenericTagMap: unsigned as uint64, signed
-// as int64). The "mode" /
-// "amount" string-keyed map stays accepted for direct callers.
+// as int64), and, until their removal in v0.12.0, the deprecated
+// [wire.SetpointRaiseLowerRequest] or the raw TLV. The "mode" / "amount"
+// string-keyed map stays accepted for direct callers.
 //
 // Both fields are conformance M (element :322-323), so a payload without
 // Mode is refused rather than acknowledged as a no-op.
-func setpointRaiseLowerRequest(fields any) (wire.SetpointRaiseLowerRequest, error) {
-	switch v := fields.(type) {
-	case tdef.SetpointRaiseLowerRequest:
-		return wire.SetpointRaiseLowerRequest{Mode: uint8(v.Mode), Amount: v.Amount}, nil
-	case *tdef.SetpointRaiseLowerRequest:
-		if v == nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
-		}
-		return setpointRaiseLowerRequest(*v)
-	case wire.SetpointRaiseLowerRequest:
-		return v, nil
-	case *wire.SetpointRaiseLowerRequest:
-		if v == nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
-		}
-		return *v, nil
-	case []byte:
-		req, err := wire.DecodeSetpointRaiseLower(v)
-		if err != nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower: %v", err)}
-		}
+func setpointRaiseLowerRequest(fields any) (tdef.SetpointRaiseLowerRequest, error) {
+	if req, ok := spec.RequestOf[tdef.SetpointRaiseLowerRequest](fields); ok {
 		return req, nil
+	}
+	if legacy, ok, err := legacySetpointRaiseLowerRequest(fields); ok {
+		if err != nil {
+			return tdef.SetpointRaiseLowerRequest{}, err
+		}
+		return tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(legacy.Mode), Amount: legacy.Amount}, nil
+	}
+	switch v := fields.(type) {
+	case *tdef.SetpointRaiseLowerRequest: // nil: RequestOf takes a non-nil one
+		return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
 	case map[uint8]any:
 		rawMode, ok := v[setpointRaiseLowerFieldMode]
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
 		}
 		mode, ok := cluster.AsUint8(rawMode)
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Mode is %T, want an enum8", rawMode)}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Mode is %T, want an enum8", rawMode)}
 		}
 		rawAmount, ok := v[setpointRaiseLowerFieldAmount]
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Amount field"}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Amount field"}
 		}
 		amount, ok := cluster.AsInt16(rawAmount)
 		if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Amount %v (%T) is not an int8", rawAmount, rawAmount)}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Amount %v (%T) is not an int8", rawAmount, rawAmount)}
 		}
-		return wire.SetpointRaiseLowerRequest{Mode: mode, Amount: int8(amount)}, nil
+		return tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: int8(amount)}, nil
 	case map[string]any:
-		var req wire.SetpointRaiseLowerRequest
+		var req tdef.SetpointRaiseLowerRequest
 		rawMode, has := v["mode"]
 		if !has {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
 		}
 		mode, ok := cluster.AsUint8(rawMode)
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower mode is %T, want an enum8", rawMode)}
+			return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower mode is %T, want an enum8", rawMode)}
 		}
-		req.Mode = mode
+		req.Mode = tdef.SetpointRaiseLowerModeEnum(mode)
 		if rawAmount, has := v["amount"]; has {
 			amount, ok := cluster.AsInt16(rawAmount)
 			if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
-				return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower amount %v (%T) is not an int8", rawAmount, rawAmount)}
+				return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower amount %v (%T) is not an int8", rawAmount, rawAmount)}
 			}
 			req.Amount = int8(amount)
 		}
 		return req, nil
 	default:
-		return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{
-			fmt.Sprintf("thermostat: SetpointRaiseLower expected wire.SetpointRaiseLowerRequest, map[uint8]any or []byte, got %T", fields),
+		return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{
+			fmt.Sprintf("thermostat: SetpointRaiseLower expected thermostat.SetpointRaiseLowerRequest or map[uint8]any, got %T", fields),
 		}
+	}
+}
+
+// legacySetpointRaiseLowerRequest reads the deprecated in-process forms:
+// the cluster/wire request and the raw TLV it decodes. ok is false for any
+// other payload.
+func legacySetpointRaiseLowerRequest(fields any) (req wire.SetpointRaiseLowerRequest, ok bool, err error) { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+	switch v := fields.(type) {
+	case wire.SetpointRaiseLowerRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		return v, true, nil
+	case *wire.SetpointRaiseLowerRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		if v == nil {
+			return req, true, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
+		}
+		return *v, true, nil
+	case []byte:
+		req, err := wire.DecodeSetpointRaiseLower(v) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		if err != nil {
+			return req, true, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower: %v", err)}
+		}
+		return req, true, nil
+	default:
+		return req, false, nil
 	}
 }
 

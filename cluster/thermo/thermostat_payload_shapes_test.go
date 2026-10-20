@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -73,8 +74,8 @@ func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 	mode := clusterwire.ThermostatSetpointModeHeat
 
 	shapes := map[string]any{
-		"typed value":    clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
-		"typed pointer":  &clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
+		"typed value":    clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		"typed pointer":  &clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		"raw TLV":        setpointPayload(t, mode, amount),
 		"bridge tag map": map[uint8]any{0: uint64(mode), 1: int64(amount)},
 		"string map":     map[string]any{"mode": mode, "amount": amount},
@@ -102,7 +103,7 @@ func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 func TestSetpointRaiseLowerRejectsAPayloadItCannotRead(t *testing.T) {
 	t.Parallel()
 	cases := map[string]any{
-		"nil typed pointer": (*clusterwire.SetpointRaiseLowerRequest)(nil),
+		"nil typed pointer": (*clusterwire.SetpointRaiseLowerRequest)(nil), //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		// Mode is conformance M — a payload without it is refused rather
 		// than acknowledged as a no-op.
 		"tag map without Mode":   map[uint8]any{1: int64(5)},
@@ -125,7 +126,7 @@ func TestSetpointRaiseLowerRejectsAPayloadItCannotRead(t *testing.T) {
 		"unknown Go type":               3.5,
 		// SetpointRaiseLowerModeEnum has exactly Heat 0, Cool 1, Both 2
 		// (thermostat-cluster.element.ts:509-513).
-		"mode outside the enum": clusterwire.SetpointRaiseLowerRequest{Mode: 9, Amount: 5},
+		"mode outside the enum": tdef.SetpointRaiseLowerRequest{Mode: 9, Amount: 5},
 	}
 	for name, fields := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -180,7 +181,7 @@ func TestSetpointRaiseLowerCoolOnlyBothMovesTheCoolingSetpoint(t *testing.T) {
 	srv := newCoolOnly()
 	if _, err := srv.MatterInvoke(
 		context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower,
-		clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeBoth, Amount: -20},
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: -20},
 	); err != nil {
 		t.Fatalf("SetpointRaiseLower: %v", err)
 	}
@@ -204,7 +205,7 @@ func TestSetpointRaiseLowerCoolOnlyRejectsHeatMode(t *testing.T) {
 	srv := newCoolOnly()
 	_, err := srv.MatterInvoke(
 		context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower,
-		clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5},
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeHeat), Amount: 5},
 	)
 	var status im.StatusCodeError
 	if !errors.As(err, &status) {

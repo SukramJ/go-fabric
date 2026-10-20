@@ -33,49 +33,49 @@ func TestColorControlFieldShapes(t *testing.T) {
 			ccdef.MoveToHueRequest{Hue: 5},
 			&ccdef.MoveToHueRequest{Hue: 5},
 			map[uint8]any{0: u(5), 1: u(0), 2: u(0), 3: u(0), 4: u(0)},
-			wire.MoveToHueRequest{Hue: 5},
+			wire.MoveToHueRequest{Hue: 5}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdMoveHue,
 			ccdef.MoveHueRequest{MoveMode: 1, Rate: 1},
 			&ccdef.MoveHueRequest{MoveMode: 3, Rate: 1},
 			map[uint8]any{0: u(0), 1: u(0), 2: u(0), 3: u(0)},
-			wire.MoveHueRequest{MoveMode: 1, Rate: 1},
+			wire.MoveHueRequest{MoveMode: 1, Rate: 1}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdStepHue,
 			ccdef.StepHueRequest{StepMode: 1, StepSize: 1},
 			&ccdef.StepHueRequest{StepMode: 3, StepSize: 1},
 			map[uint8]any{0: u(1), 1: u(1), 2: u(0), 3: u(0), 4: u(0)},
-			wire.StepHueRequest{StepMode: 1, StepSize: 1},
+			wire.StepHueRequest{StepMode: 1, StepSize: 1}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdMoveToSaturation,
 			ccdef.MoveToSaturationRequest{Saturation: 3},
 			&ccdef.MoveToSaturationRequest{},
 			map[uint8]any{0: u(3), 1: u(0), 2: u(0), 3: u(0)},
-			wire.MoveToSaturationRequest{Saturation: 4},
+			wire.MoveToSaturationRequest{Saturation: 4}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdMoveSaturation,
 			ccdef.MoveSaturationRequest{MoveMode: 1, Rate: 1},
 			&ccdef.MoveSaturationRequest{},
 			map[uint8]any{0: u(3), 1: u(5), 2: u(0), 3: u(0)},
-			wire.MoveSaturationRequest{MoveMode: 3, Rate: 2},
+			wire.MoveSaturationRequest{MoveMode: 3, Rate: 2}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdStepSaturation,
 			ccdef.StepSaturationRequest{StepMode: 1, StepSize: 1},
 			&ccdef.StepSaturationRequest{StepMode: 3, StepSize: 1},
 			map[uint8]any{0: u(1), 1: u(1), 2: u(0), 3: u(0), 4: u(0)},
-			wire.StepSaturationRequest{StepMode: 3, StepSize: 2},
+			wire.StepSaturationRequest{StepMode: 3, StepSize: 2}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdMoveToHueAndSaturation,
 			ccdef.MoveToHueAndSaturationRequest{Hue: 1},
 			&ccdef.MoveToHueAndSaturationRequest{},
 			map[uint8]any{0: u(2), 1: u(2), 2: u(0), 3: u(0), 4: u(0)},
-			wire.MoveToHueAndSaturationRequest{Hue: 3},
+			wire.MoveToHueAndSaturationRequest{Hue: 3}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdMoveToColor,
@@ -103,7 +103,7 @@ func TestColorControlFieldShapes(t *testing.T) {
 			ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 200},
 			&ccdef.MoveToColorTemperatureRequest{},
 			map[uint8]any{0: u(300), 1: u(0), 2: u(0), 3: u(0)},
-			wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 250},
+			wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 250}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		},
 		{
 			ccdef.CmdEnhancedMoveToHue,
@@ -172,7 +172,7 @@ func TestColorControlFieldShapes(t *testing.T) {
 	}
 	// A StepHue in cluster/wire's struct whose TransitionTime does not
 	// fit the generated uint8 field is refused, not truncated.
-	if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdStepHue, wire.StepHueRequest{StepMode: 1, StepSize: 1, TransitionTime: 300}); !statusIs(err, im.StatusInvalidCommand) {
+	if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdStepHue, wire.StepHueRequest{StepMode: 1, StepSize: 1, TransitionTime: 300}); !statusIs(err, im.StatusInvalidCommand) { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		t.Errorf("StepHue TransitionTime 300: %v", err)
 	}
 	// A tag-map value wider than its field reads as 0.
