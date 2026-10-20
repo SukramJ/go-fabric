@@ -102,10 +102,12 @@ The `device/` package has one constructor per Matter device type in scope:
 and so on. They are generated from the matter.js model. A constructor
 mounts every server cluster the device type mandates, with a default server:
 the module's own server where one runs on its own state — OnOff,
-LevelControl, ColorControl, Binding, EcosystemInformation, and Switch,
-DoorLock, WindowCovering and Thermostat for a feature selection their
-server serves — otherwise the generated `spec.Server`, whose commands are
-unimplemented until you handle them. A `NewDimmableLight` therefore dims:
+LevelControl, ColorControl, Binding, EcosystemInformation, the alarm,
+BooleanStateConfiguration, ThermostatUserInterfaceConfiguration and energy
+servers, and Switch, DoorLock, WindowCovering, Thermostat, the filter
+monitors and LaundryWasherControls for a feature selection their server
+serves (`device/defaults.go` lists them) — otherwise the generated
+`spec.Server`, whose commands are unimplemented until you handle them. A `NewDimmableLight` therefore dims:
 a controller's MoveToLevel moves its level, and the "with On/Off" commands
 switch its OnOff.
 The endpoint assembler mounts Descriptor, Identify,
