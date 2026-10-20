@@ -44,20 +44,17 @@ type Patch struct {
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
 // typed events. It adds no behavior: each method reaches the server's
-// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
-// optional interfaces). Mount the underlying server, not this one.
-type Server struct{ spec.Hull }
+// own. It is not a contract.ClusterServer: mount the underlying server,
+// not this one.
+type Server struct{ spec.Wrapper }
 
-// Wrap returns srv as the typed server: nil for nil, a typed server as
-// it is.
+// Wrap returns srv as the typed server; nil for nil. A typed server is
+// no contract.ClusterServer, so it is never wrapped twice.
 func Wrap(srv contract.ClusterServer) *Server {
-	switch s := srv.(type) {
-	case nil:
+	if srv == nil {
 		return nil
-	case *Server:
-		return s
 	}
-	return &Server{spec.NewHull(srv)}
+	return &Server{spec.NewWrapper(srv)}
 }
 
 // Set applies p through the server's SetAttributes: every value is

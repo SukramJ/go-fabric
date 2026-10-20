@@ -49,8 +49,8 @@ func TestTypedServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := Wrap(srv)
-	if Wrap(s) != s || s.Underlying() != srv {
-		t.Error("Wrap does not hold the server once")
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
 	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
