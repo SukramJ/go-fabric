@@ -163,19 +163,26 @@ type item struct {
 type pendingEntry struct{ cancel func() }
 
 // record is the tracking of one source endpoint — matter.js ServerRecord
-// (BindingManager.ts:34-44).
+// (BindingManager.ts:34-44). Its `groups` map, every registered group
+// entry, is the manager's registered: matter.js keeps it at the time of
+// the call, not at the time of the resolution.
 type record struct {
 	pending     map[string]*pendingEntry
 	established map[string]Resolution
-	// groups is every registered group entry, resolved or waiting for a key.
-	groups map[string]*item
 	// dormant are the entries that resolve once something observes
 	// established.
 	dormant map[string]*item
 }
 
 func (r *record) empty() bool {
-	return len(r.pending) == 0 && len(r.established) == 0 && len(r.groups) == 0 && len(r.dormant) == 0
+	return len(r.pending) == 0 && len(r.established) == 0 && len(r.dormant) == 0
+}
+
+// regKey identifies a registered group entry: its source endpoint and its
+// entry key.
+type regKey struct {
+	source uint16
+	key    string
 }
 
 // handler is one OnEstablished or OnRemoved registration.
@@ -203,7 +210,8 @@ type Manager struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	// mu guards the queue, the handlers, the attachments and closed.
+	// mu guards the queue, the handlers, the attachments, the registered
+	// group entries and closed.
 	mu          sync.Mutex
 	queue       []func()
 	wake        chan struct{}
@@ -214,6 +222,15 @@ type Manager struct {
 	attached    map[uint16]attachment
 	rechecks    map[uint8]bool
 	seq         uint64
+	// registered is every registered group entry, resolved or waiting for
+	// the fabric to hold a key for its group. Mirrors matter.js
+	// packages/node/src/behaviors/binding/BindingManager.ts ServerRecord
+	// .groups (:39-40): register and unregister change it when they are
+	// called (:119-141), disposeServer drops a server's when it is called
+	// (:191-195), so a resolution under way on the worker sees an
+	// unregister or a disposal that came in meanwhile (#isRegisteredGroup,
+	// :528-532).
+	registered map[regKey]*item
 
 	// state is the worker's; stateMu lets Established read it.
 	stateMu sync.Mutex
@@ -229,7 +246,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, log: cfg.Logger, link: realLink{},
 		wake: make(chan struct{}, 1), attached: map[uint16]attachment{}, rechecks: map[uint8]bool{},
-		records: map[uint16]*record{},
+		registered: map[regKey]*item{}, records: map[uint16]*record{},
 	}
 	if m.log == nil {
 		m.log = slog.New(slog.DiscardHandler)
@@ -314,6 +331,9 @@ func (m *Manager) Attach(endpoint uint16, b *mattercore.Binding) {
 		}
 	})
 	m.attached[endpoint] = attachment{b: b, stop: stop}
+	if had {
+		m.forgetRegisteredLocked(endpoint)
+	}
 	m.mu.Unlock()
 	if had {
 		prev.stop()
@@ -332,6 +352,7 @@ func (m *Manager) Detach(endpoint uint16) {
 	m.mu.Lock()
 	a, had := m.attached[endpoint]
 	delete(m.attached, endpoint)
+	m.forgetRegisteredLocked(endpoint)
 	m.mu.Unlock()
 	if had {
 		a.stop()
@@ -354,33 +375,51 @@ func (m *Manager) Attached() []uint16 {
 
 // Register resolves entry of the Binding server on sourceEndpoint in the
 // background — matter.js BindingManager.register (BindingManager.ts:
-// 135-145). An entry already registered under its key is left alone.
+// 119-129), which records a group entry as registered at once and
+// resolves it later. An entry already registered under its key is left
+// alone.
 func (m *Manager) Register(sourceEndpoint uint16, entry Entry) {
 	m.mu.Lock()
 	m.seq++
 	it := &item{source: sourceEndpoint, entry: entry, key: entry.Key(), seq: m.seq}
+	if entry.HasGroup() && !entry.HasNode() && !m.closing {
+		k := regKey{source: sourceEndpoint, key: it.key}
+		if m.registered[k] == nil {
+			m.registered[k] = it
+		}
+	}
 	m.mu.Unlock()
 	m.post(func() {
-		rec := m.record(sourceEndpoint)
-		if rec.known(it.key) {
+		if m.known(sourceEndpoint, it.key) {
 			return
-		}
-		if entry.HasGroup() && !entry.HasNode() {
-			m.stateMu.Lock()
-			rec.groups[it.key] = it
-			m.stateMu.Unlock()
 		}
 		m.resolveAndEmit(it)
 	})
 }
 
-// known reports whether an entry of key is tracked.
-func (r *record) known(key string) bool {
+// known reports whether an entry of key is tracked: pending, established
+// or dormant.
+func (m *Manager) known(source uint16, key string) bool {
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	r := m.records[source]
+	if r == nil {
+		return false
+	}
 	_, p := r.pending[key]
 	_, e := r.established[key]
-	_, g := r.groups[key]
 	_, d := r.dormant[key]
-	return p || e || g || d
+	return p || e || d
+}
+
+// forgetRegisteredLocked drops the registered group entries of a source
+// endpoint. Called with mu held.
+func (m *Manager) forgetRegisteredLocked(source uint16) {
+	for k := range m.registered {
+		if k.source == source {
+			delete(m.registered, k)
+		}
+	}
 }
 
 // Unregister forgets entry of the Binding server on sourceEndpoint in the
@@ -388,15 +427,12 @@ func (r *record) known(key string) bool {
 // BindingManager.unregister (BindingManager.ts:147-157).
 func (m *Manager) Unregister(sourceEndpoint uint16, entry Entry) {
 	key := entry.Key()
+	// The group entry is no longer registered from now on, also for a
+	// resolution under way (BindingManager.ts:131-136).
+	m.mu.Lock()
+	delete(m.registered, regKey{source: sourceEndpoint, key: key})
+	m.mu.Unlock()
 	m.post(func() {
-		m.stateMu.Lock()
-		if rec := m.records[sourceEndpoint]; rec != nil {
-			if _, ok := rec.groups[key]; ok {
-				delete(rec.groups, key)
-				m.forgetIfEmptyLocked(sourceEndpoint)
-			}
-		}
-		m.stateMu.Unlock()
 		if m.clearDormant(sourceEndpoint, key) || m.clearPending(sourceEndpoint, key, nil) {
 			return
 		}
@@ -509,6 +545,7 @@ func (m *Manager) Close() {
 			m.disposeServer(ep)
 		}
 		m.mu.Lock()
+		clear(m.registered)
 		m.closed = true
 		m.mu.Unlock()
 		m.cancel()

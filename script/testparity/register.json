@@ -614,23 +614,16 @@
       "status": "partial",
       "go": [
         "node:TestLiveBinding",
-        "binding:TestDormantThenWoken"
+        "binding:TestDormantThenWoken",
+        "node:TestBindingIntegrationParityMatterJS",
+        "node:TestBindingIntegrationGroupSendsParityMatterJS"
       ],
       "missing": [
         "receives reports without data of the peer's root endpoint",
         "detects a lost peer by the subscription timeout and resubscribes once it is back",
-        "detects a restarting peer by the subscription timeout and resubscribes after its restart",
-        "kind=group: binding resolves to ClientGroup with OnOffClient installed on materialized endpoint",
-        "records no cache fabric filter for a group",
-        "sends a command through a binding as a group command without an endpoint",
-        "names the group on the log line of a group command it sends",
-        "refuses a timed invoke on a group",
-        "resolves a command with a response to undefined on a group",
-        "resolves a group binding written before the sender holds the group's key once it does, and sends",
-        "fails a group send for which the sender holds no key",
-        "refuses a group invoke that names an endpoint"
+        "detects a restarting peer by the subscription timeout and resubscribes after its restart"
       ],
-      "reason": "A written binding reaching a peer and a self-binding resolving locally are covered; the subscription-backed client, group sends and their refusals are not.",
+      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). Missing: the default subscription of a bound client (a Register candidate): the subscription the host sets on the bound ClientNode (NetworkClient defaultSubscription, autoSubscribe) has its Go counterpart in Resolution.Interaction.Subscribe with Sustain (controller/interaction/sustained.go), but fabrictest carries no node client stack — node/client.go opens a kernel socket and its own DNS-SD cache — so two nodes cannot reach each other over CASE on a site.",
       "snapshotSha": "12d2db88432bfd7bab871aae408d06551a7cfa24"
     },
     {
@@ -643,59 +636,30 @@
         "binding:TestClientEstablishedOnSession",
         "binding:TestUnregister",
         "binding:TestGroupWaitsForKey",
-        "binding:TestAttachDetachClose"
+        "binding:TestAttachDetachClose",
+        "binding:TestBindingManagerParityMatterJS",
+        "binding:TestBindingManagerClientSelectionParityMatterJS",
+        "binding:TestBindingManagerWithoutObserverParityMatterJS",
+        "node:TestBindingManagerNodeParityMatterJS"
       ],
       "missing": [
         "lazy-installs into node.env on first get",
-        "queues register calls before node online; flushes after online",
-        "resolves kind=client for remote nodeId — no emission until peer lifecycle.online fires",
-        "resolves kind=group for groupId set",
-        "group kind: two registrations against the same groupId share the same ClientGroup",
         "close clears queue, pending subscriptions, and maps without emitting",
-        "rejects entry whose cluster filter is not in source's declared clientClusters",
-        "kind=server rejects when target endpoint lacks the cluster server",
-        "kind=server accepts a cluster server added to the endpoint at runtime via behaviors.require",
-        "kind=server rejects when the endpoint only has the cluster as a client, not a server",
-        "kind=group establishes once when several key changes arrive together",
-        "kind=group does not resolve a waiting entry after its server was disposed",
-        "stops watching a fabric's group keys once the fabric is deleted",
-        "kind=group does not resolve when the key is withdrawn while the group is being registered",
-        "kind=group does not resolve an entry unregistered while its group is being registered",
-        "kind=group resolves on a key provisioned after its fabric was replaced",
-        "kind=group resolves on a key provisioned through the fabric object a replacement superseded",
-        "kind=client installs declared client behaviors on the materialized endpoint",
-        "installs every declared client on a bound peer except those whose cluster chooses its peer",
-        "installs the utility client an entry filters to",
-        "rejects an entry filtered to a client whose cluster chooses its peer, saying so",
-        "names both clusters when an entry matches only several clients a binding never directs",
-        "says so when an entry without a cluster reaches an endpoint without client clusters",
-        "names a cluster the model does not define by its ID",
-        "rejects an entry for a cluster the endpoint has no client for, naming the cluster",
-        "rejects an entry of an endpoint whose only clients choose their peer, saying so",
-        "leaves a client whose cluster chooses its peer off a bound group",
-        "registers no group until something observes",
-        "leaves an entry dormant that arrives after a once observer was used up",
-        "parks a resolved entry when its once observer was taken while its peer came online",
-        "forgets dormant entries of a disposed server",
-        "keeps the other dormant entry when one is unregistered",
-        "resolves no dormant entry after the manager closed",
-        "still warns about an entry that can never resolve"
+        "stops watching a fabric's group keys once the fabric is deleted"
       ],
-      "reason": "The binding package ports the manager's kinds, drop reasons, dormant entries and group-key wait; client selection, queueing before online and the fabric-replacement cases are not ported.",
+      "reason": "The manager's cases run on its unit harness (binding/manager_parity_matterjs_test.go: client selection, dormant entries, the group-key rules, an unregister while the group resolves — a fix) and on a commissioned fabrictest node (node/binding_manager_parity_matterjs_test.go: the register queue before online, two servers sharing one group sender, a client-only cluster, the fabric replaced by UpdateNOC). Missing: js-runtime-only: Environment.get installs the manager; manager.close() alone emits no removed, while the Go Manager.Close is the node's shutdown and disposes every server first (BindingServer.ts:160-163), emitting removed (a by_design candidate); js-runtime-only: the per-fabric observer of the fabric's group key maps, which the Go manager does not hold — the node pushes GroupKeysChanged (node/client.go).",
       "snapshotSha": "144d38ee8deab83f6752efbcebd5f324c73a9bd2"
     },
     {
       "path": "packages/node/test/behaviors/binding/BindingServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "binding:TestAttachDetachClose",
         "binding:TestDormantThenWoken",
-        "cluster/core:TestBindingPersist"
+        "cluster/core:TestBindingPersist",
+        "cluster/core:TestBindingServerParityMatterJS"
       ],
-      "missing": [
-        "resolves a stored entry for a behavior that observes established after the entries registered"
-      ],
-      "reason": "Replay, write diff, close and the dormant-until-observed entry are covered; a stored entry for a behavior that observes later is not.",
+      "reason": "Replay, write diff, close and the dormant-until-observed entry are covered; a stored entry for an observer that attaches after the entries registered resolves once it does (cluster/core/binding_parity_matterjs_test.go).",
       "snapshotSha": "d06db74944f129d4f6ac4db3157681b5fff76b5c"
     },
     {

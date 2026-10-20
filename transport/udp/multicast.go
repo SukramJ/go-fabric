@@ -33,16 +33,21 @@ var multicastInterfaces = func() []net.Interface {
 	return out
 }
 
-// multicastMember is the optional membership surface of a socket that is
+// multicastMember is the optional multicast surface of a socket that is
 // no kernel socket — the in-memory socket of fabrictest's network, handed
-// in through internal/udpseam. [Listener.JoinGroup] and
-// [Listener.LeaveGroup] delegate to it before they demand a
-// *net.UDPConn, so the socket's own model decides which groups it holds
-// (matter.js MockUdpSocket.addMembership / dropMembership, which hand the
-// membership to the host's MockNetwork).
+// in through internal/udpseam. [Listener.JoinGroup],
+// [Listener.LeaveGroup] and [Listener.SendMulticast] delegate to it
+// before they demand a *net.UDPConn, so the socket's own model decides
+// which groups it holds and who receives what it sends to one, as matter.js
+// MockUdpSocket hands the membership to the host's MockNetwork. A datagram
+// to a group goes to the network's router for every host that takes its
+// destination: MockUdpSocket.send
+// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at 862ad75f) with
+// MockNetwork.shouldReceive (MockNetwork.ts:79-81).
 type multicastMember interface {
 	JoinGroup(group net.IP) error
 	LeaveGroup(group net.IP) error
+	SendMulticast(group net.IP, port int, payload []byte) error
 }
 
 // JoinGroup makes the listener's socket a member of the IPv6 multicast
@@ -117,7 +122,8 @@ func (l *Listener) membership(group net.IP, join bool) error {
 // default one (packages/nodejs/src/net/NodeJsUdpSocket.ts:298-325); a
 // receiver reachable over two interfaces takes the second copy as a
 // replay. Returns [ErrPayloadTooLarge] past [MaxDatagramSize] and
-// [ErrListenerClosed] after Close.
+// [ErrListenerClosed] after Close. A socket with its own multicast model
+// (fabrictest's) takes the datagram after those checks.
 func (l *Listener) SendMulticast(group net.IP, port int, payload []byte) error {
 	if group.To16() == nil || group.To4() != nil || !group.IsMulticast() {
 		return fmt.Errorf("udp: %v is not an IPv6 multicast address", group)
@@ -127,6 +133,9 @@ func (l *Listener) SendMulticast(group net.IP, port int, payload []byte) error {
 	}
 	if l.isClosed() {
 		return ErrListenerClosed
+	}
+	if mc, ok := l.conn.(multicastMember); ok {
+		return mc.SendMulticast(group, port, payload)
 	}
 	uc, ok := l.conn.(*net.UDPConn)
 	if !ok {

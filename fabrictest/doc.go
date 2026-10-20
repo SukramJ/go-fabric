@@ -55,7 +55,11 @@
 //     socket's close, as MockNetwork keeps them on the host — and delivers a
 //     datagram sent to a group to every host holding it. A test asserts the
 //     groups a node joined, the joins and leaves it made, and injects join
-//     failures; the site has one interface per host and routes nothing.
+//     failures; the site has one interface per host and routes nothing. A
+//     node's group messages (node.Node.Groups' senders) leave through its
+//     bridge's socket on the network, as MockUdpSocket.send sends them, so
+//     a [Network.Filter] sees each as one datagram to the group and every
+//     member receives it.
 //   - [Options].Loopback puts every host on a real UDP socket on [::1]
 //     instead, for a test that needs sockets.
 //

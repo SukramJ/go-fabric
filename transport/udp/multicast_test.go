@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"slices"
 	"testing"
 	"time"
 )
@@ -140,6 +142,7 @@ func TestSendMulticastReachesAJoinedListener(t *testing.T) {
 type memberConn struct {
 	joined []string
 	left   []string
+	sent   []string
 	err    error
 	closed chan struct{}
 }
@@ -162,6 +165,14 @@ func (c *memberConn) JoinGroup(group net.IP) error {
 
 func (c *memberConn) LeaveGroup(group net.IP) error {
 	c.left = append(c.left, group.String())
+	return nil
+}
+
+func (c *memberConn) SendMulticast(group net.IP, port int, payload []byte) error {
+	if c.err != nil {
+		return c.err
+	}
+	c.sent = append(c.sent, fmt.Sprintf("[%s]:%d %x", group, port, payload))
 	return nil
 }
 
@@ -192,5 +203,38 @@ func TestMembershipDelegatesToTheSocketModel(t *testing.T) {
 	_ = l.Close()
 	if err := l.JoinGroup(group); !errors.Is(err, ErrListenerClosed) {
 		t.Errorf("JoinGroup after Close: %v, want ErrListenerClosed", err)
+	}
+}
+
+// TestSendMulticastDelegatesToTheSocketModel pins the send half of the
+// seam: a socket that carries its own multicast model takes the datagram
+// (fabrictest's network then delivers it to every host holding the
+// group, matter.js MockUdpSocket.send) — after the listener's own checks
+// of the address, the size and Close, and with its error returned as the
+// listener's.
+func TestSendMulticastDelegatesToTheSocketModel(t *testing.T) {
+	c := &memberConn{closed: make(chan struct{})}
+	l := newListener(c)
+	group := net.ParseIP("ff35:40:fd00::f:ab00:101")
+	if err := l.SendMulticast(group, MatterPort, []byte{1, 2}); err != nil {
+		t.Fatalf("SendMulticast: %v", err)
+	}
+	if want := []string{"[ff35:40:fd00::f:ab00:101]:5540 0102"}; !slices.Equal(c.sent, want) {
+		t.Fatalf("socket saw sends %v, want %v", c.sent, want)
+	}
+	if err := l.SendMulticast(net.ParseIP("2001:db8::1"), MatterPort, []byte{1}); err == nil || len(c.sent) != 1 {
+		t.Errorf("a unicast address reached the socket model: %v, sends %v", err, c.sent)
+	}
+	if err := l.SendMulticast(group, MatterPort, make([]byte, MaxDatagramSize+1)); !errors.Is(err, ErrPayloadTooLarge) || len(c.sent) != 1 {
+		t.Errorf("an oversized datagram: %v, sends %v", err, c.sent)
+	}
+	c.err = errors.New("simulated send failure")
+	if err := l.SendMulticast(group, MatterPort, []byte{1}); !errors.Is(err, c.err) {
+		t.Errorf("SendMulticast error %v, want the socket model's", err)
+	}
+	c.err = nil
+	_ = l.Close()
+	if err := l.SendMulticast(group, MatterPort, []byte{1}); !errors.Is(err, ErrListenerClosed) || len(c.sent) != 1 {
+		t.Errorf("SendMulticast after Close: %v, sends %v", err, c.sent)
 	}
 }
