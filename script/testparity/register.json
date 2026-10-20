@@ -510,8 +510,11 @@
     },
     {
       "path": "packages/node/test/behavior/system/network/FabricLabelReconciliationTest.ts",
-      "status": "planned",
-      "reason": "The controller pushing a drifted fabric label to a peer on start.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestFabricLabelReconciliationParityMatterJS"
+      ],
+      "reason": "Both cases run on the registry's client.Node of a commissioned fabrictest device: the once-per-start reconciliation (Registry.reconcileLabel on the first SubscriptionAlive) re-run by a new start of the node, the controller's label the commissioner fabric's Label (set between a controller restart and the start, as it has no setter), the device's the label its store holds (controller/client/fabric_label_reconciliation_parity_matterjs_test.go).",
       "snapshotSha": "ed8f3865361e256da5b9dcd220144d9fc9cf68cb"
     },
     {

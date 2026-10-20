@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 76 |
+| ported | 77 |
 | partial | 121 |
-| planned | 40 |
+| planned | 39 |
 | excluded | 87 |
 | total | 324 |
 
@@ -33,7 +33,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/icd](#nodetestbehaviorsystemicd) | 5 | 0 | 0 | 0 | 5 |
-| [node/test/behavior/system/network](#nodetestbehaviorsystemnetwork) | 2 | 0 | 1 | 1 | 0 |
+| [node/test/behavior/system/network](#nodetestbehaviorsystemnetwork) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behavior/system/remote](#nodetestbehaviorsystemremote) | 3 | 0 | 0 | 0 | 3 |
 | [node/test/behavior/system/sessions](#nodetestbehaviorsystemsessions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/subscriptions](#nodetestbehaviorsystemsubscriptions) | 1 | 0 | 1 | 0 | 0 |
@@ -233,7 +233,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ConnectionStateTest.ts | 207 | partial | `controller/client:TestConnectionStateParityMatterJS` | Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate. Missing: ‚Äútransitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in‚Äù. |
-| FabricLabelReconciliationTest.ts | 52 | planned | ‚Äî | The controller pushing a drifted fabric label to a peer on start. |
+| FabricLabelReconciliationTest.ts | 52 | ported | `controller/client:TestFabricLabelReconciliationParityMatterJS` | Both cases run on the registry's client.Node of a commissioned fabrictest device: the once-per-start reconciliation (Registry.reconcileLabel on the first SubscriptionAlive) re-run by a new start of the node, the controller's label the commissioner fabric's Label (set between a controller restart and the start, as it has no setter), the device's the label its store holds (controller/client/fabric_label_reconciliation_parity_matterjs_test.go). |
 
 ## node/test/behavior/system/remote
 
@@ -942,10 +942,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behavior/system/dcl
 
 - `DclBehaviorTest.ts` ‚Äî The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).
-
-### node/test/behavior/system/network
-
-- `FabricLabelReconciliationTest.ts` ‚Äî The controller pushing a drifted fabric label to a peer on start.
 
 ### node/test/behaviors/access-control
 
