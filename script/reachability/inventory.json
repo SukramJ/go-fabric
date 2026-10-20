@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5888,
+  "entry_points": 5901,
   "entry_packages": [
     ".",
     "bdx",
@@ -227,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13254,
-    "reachable": 9202,
-    "whitelisted": 4047,
+    "total_exported": 13290,
+    "reachable": 9221,
+    "whitelisted": 4064,
     "unreachable": 5
   },
   "by_package": [
@@ -19246,6 +19246,20 @@
     },
     {
       "package": "device",
+      "identifier": "AvailabilityProbe",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 58
+    },
+    {
+      "package": "device",
+      "identifier": "SourceKey",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 54
+    },
+    {
+      "package": "device",
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
@@ -20642,7 +20656,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 360
+      "line": 356
     },
     {
       "package": "examples/reference-bridge",
@@ -20653,10 +20667,17 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestAttestationConfig",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/attestation_test.go",
+      "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 186
+      "line": 187
     },
     {
       "package": "examples/reference-bridge",
@@ -20670,7 +20691,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 318
+      "line": 314
     },
     {
       "package": "examples/reference-bridge",
@@ -20684,7 +20705,7 @@
       "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 389
+      "line": 385
     },
     {
       "package": "examples/reference-bridge",
@@ -20705,7 +20726,7 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "examples/reference-bridge",
@@ -20818,13 +20839,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 312
-    },
-    {
-      "package": "examples/reference-bridge",
-      "identifier": "TestLoadAttestation",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/attestation_test.go",
-      "line": 20
     },
     {
       "package": "examples/reference-bridge",
@@ -20957,7 +20971,7 @@
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 155
+      "line": 156
     },
     {
       "package": "examples/reference-bridge",
@@ -20971,14 +20985,14 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 92
+      "line": 93
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 335
+      "line": 331
     },
     {
       "package": "examples/reference-bridge",
@@ -24174,10 +24188,101 @@
     },
     {
       "package": "node",
+      "identifier": "AttestationFiles",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/attestation.go",
+      "line": 17
+    },
+    {
+      "package": "node",
+      "identifier": "CommissioningWindow",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 41
+    },
+    {
+      "package": "node",
+      "identifier": "DiagnosticEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 55
+    },
+    {
+      "package": "node",
+      "identifier": "HealthSample",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/health.go",
+      "line": 16
+    },
+    {
+      "package": "node",
+      "identifier": "MDNSFinding",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/mdns.go",
+      "line": 25
+    },
+    {
+      "package": "node",
+      "identifier": "MDNSService",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/mdns.go",
+      "line": 29
+    },
+    {
+      "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
       "line": 8
+    },
+    {
+      "package": "node",
+      "identifier": "SessionManager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 46
+    },
+    {
+      "package": "node",
+      "identifier": "Snapshotter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 29
+    },
+    {
+      "package": "node",
+      "identifier": "SubscriptionManager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 51
+    },
+    {
+      "package": "node",
+      "identifier": "TCPConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 37
+    },
+    {
+      "package": "node",
+      "identifier": "TestAttestationBlocksCommissioning",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/attestation_internal_test.go",
+      "line": 91
+    },
+    {
+      "package": "node",
+      "identifier": "TestAttestationFilesLoad",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/attestation_internal_test.go",
+      "line": 51
+    },
+    {
+      "package": "node",
+      "identifier": "TestBootIDRotation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/bootid_internal_test.go",
+      "line": 16
     },
     {
       "package": "node",
@@ -24206,6 +24311,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 41
+    },
+    {
+      "package": "node",
+      "identifier": "TestDefaultAdvertiser",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_internal_test.go",
+      "line": 42
     },
     {
       "package": "node",
@@ -24248,6 +24360,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 167
+    },
+    {
+      "package": "node",
+      "identifier": "Topology",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 33
     },
     {
       "package": "schema",

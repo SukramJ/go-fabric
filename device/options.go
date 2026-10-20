@@ -20,7 +20,7 @@ type Options struct {
 	// StableKey identifies the device across reassemblies and restarts
 	// ([endpoint.Spec.StableKey]); required, and unique per device and
 	// per part.
-	StableKey endpoint.SourceKey
+	StableKey SourceKey
 	// Name is the BridgedDeviceBasicInformation NodeLabel
 	// ([endpoint.Spec.FriendlyName]).
 	Name string
@@ -34,7 +34,7 @@ type Options struct {
 	ChannelAddress string
 	// Reachable probes the device's live reachability
 	// ([endpoint.Spec.Availability]); nil reads as always reachable.
-	Reachable endpoint.AvailabilityProbe
+	Reachable AvailabilityProbe
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
@@ -49,6 +49,13 @@ type Options struct {
 	// the host supplies (WithServer) keeps its own.
 	Clock clock.Clock
 }
+
+// SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
+type SourceKey = endpoint.SourceKey
+
+// AvailabilityProbe is the type of [Options].Reachable
+// ([endpoint.AvailabilityProbe]).
+type AvailabilityProbe = endpoint.AvailabilityProbe
 
 // Option configures one device at construction, as matter.js's
 // `Behavior.with(...)` and the endpoint's initial state configure an

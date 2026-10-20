@@ -20,8 +20,12 @@
 // window, the fabric hooks — in the order bridge/bridge.go documents. What
 // stays here is the host's own: its device models and the servers whose
 // rules need a host port (fleet*.go), the out-of-band test controls
-// (control.go), the OTA applier (ota.go), the mDNS responder and the
-// operator's banner.
+// (control.go), the OTA applier (ota.go) and the operator's banner. The
+// node opens its SQLite file (node.Store.Path), builds its DNS-SD
+// advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
+// loads a vendor attestation chain (node.Attestation.Files) and runs the
+// health probe (node.Config.Health); the daemon names none of bridge,
+// mdns, secure/* or store for them.
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -43,16 +47,12 @@ import (
 	"strings"
 	"syscall"
 
-	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/dcl"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/secure/setup"
 )
 
 // CSA test identity. 0xFFF1 is the Connectivity Standards Alliance's test
@@ -124,8 +124,8 @@ func parseFlags() flags {
 // checkFlags applies the checks whose message names the flag; the node's
 // Config.Validate holds the same ranges again.
 func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
-	if f.discriminator > setup.MaxDiscriminator {
-		return 0, 0, fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", f.discriminator, setup.MaxDiscriminator)
+	if f.discriminator > node.MaxDiscriminator {
+		return 0, 0, fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", f.discriminator, node.MaxDiscriminator)
 	}
 	// setupPasscodeMax is the Matter §5.1.1.6 upper bound; the narrowing
 	// below is safe exactly because of this check.
@@ -134,8 +134,8 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 		return 0, 0, fmt.Errorf("--passcode %d exceeds the Matter maximum %d", f.passcode, setupPasscodeMax)
 	}
 	passcode = uint32(f.passcode)
-	if !setup.IsValidSetupPIN(passcode) {
-		return 0, 0, fmt.Errorf("--passcode %d is invalid or on the trivially-guessable list", passcode)
+	if err := node.ValidateSetupPIN(passcode); err != nil {
+		return 0, 0, fmt.Errorf("--passcode: %w", err)
 	}
 	if f.iterations < 0 {
 		return 0, 0, fmt.Errorf("--pbkdf-iterations %d must be positive", f.iterations)
@@ -167,42 +167,12 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// --- persistence: the node applies both schemas to the handle ---------
-	db, err := openDB(ctx, f.dbPath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = db.Close() }()
-
-	// --- mDNS ---------------------------------------------------------------
-	var advertiser mdns.Advertiser = mdns.NewNoop()
-	if f.advertise {
-		zc := mdns.NewZeroconf()
-		if f.osHostName {
-			if h, err := os.Hostname(); err == nil && h != "" {
-				zc.HostName = strings.TrimSuffix(h, ".local")
-			}
-		}
-		// The subtype side-car is NOT optional for discovery, only for the
-		// generic browse: without it `_matterc._udp` carries the instance
-		// but `_L<discriminator>._sub._matterc._udp` answers nothing, and
-		// every commissioner that filters by discriminator — chip-tool's
-		// `pairing onnetwork-long`, Apple Home, Google Home — sees no
-		// device against a perfectly valid QR code. Zeroconf publishes the
-		// subtype PTRs only when a responder is attached.
-		responder, rErr := mdns.NewSubtypeResponder(logger)
-		if rErr != nil {
-			logger.Warn("mdns.subtype_responder", slog.String("err", rErr.Error()),
-				slog.String("hint", "discriminator-filtered browse will find nothing"))
-		} else {
-			responder.Start(ctx)
-			zc.AttachSubtypeResponder(responder)
-			defer func() { _ = responder.Close() }()
-		}
-		advertiser = zc
-	}
-
 	// --- the node -----------------------------------------------------------
+	// The node opens --db itself (node.Store.Path) and builds its
+	// advertiser: Zeroconf with the subtype responder, which answers the
+	// `_L<discriminator>._sub` browse every commissioner filtering by
+	// discriminator sends (chip-tool's `pairing onnetwork-long`, Apple
+	// Home, Google Home), or nothing under --advertise=false.
 	devices := newFleet()
 	otaDownloads := f.otaDir
 	if otaDownloads == "" {
@@ -220,9 +190,13 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	if err != nil {
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
-	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, db, advertiser, applier, actions, logger)
-	if cfg.Attestation, err = loadAttestation(f.attestationDir); err != nil {
-		return err
+	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
+	cfg.Attestation = attestationConfig(f.attestationDir)
+	// The listener's verdict, logged when it fails (node.Config.Health).
+	cfg.Health.OnSample = func(s node.HealthSample) {
+		if !s.Healthy {
+			logger.Warn("health.listener", slog.String("note", s.Note))
+		}
 	}
 	applyTestWiFi(&cfg, f, devices)
 	if f.otaProvider {
@@ -280,7 +254,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	printTopology(n.Bridge())
+	printTopology(n)
 	if f.appPipe != "" {
 		if err := serveAppPipe(ctx, devices, f.appPipe, logger); err != nil {
 			_ = n.Stop(context.WithoutCancel(ctx))
@@ -357,11 +331,11 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 
 // nodeConfig is the daemon's node.Config: the CSA test identity, the
 // flags, and the root's optional labels and locales.
-func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp matterbridge.TCPConfig, db dbHandle,
-	advertiser mdns.Advertiser, applier *otaApplier, actions contract.ClusterServer, logger *slog.Logger,
+func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConfig,
+	applier *otaApplier, actions contract.ClusterServer, logger *slog.Logger,
 ) node.Config {
 	return node.Config{
-		Network: node.Network{Listen: f.listen, TCP: tcp},
+		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
 			PBKDFIterations: f.iterations, Salt: []byte(f.salt),
@@ -377,8 +351,9 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp matterbridge
 			SoftwareVersion:       1,
 			SoftwareVersionString: "1",
 		},
-		Store:      node.Store{DB: db},
-		Advertiser: advertiser,
+		// The node opens the SQLite file and applies both schemas
+		// (persist.go has the daemon's own settings).
+		Store: node.Store{Path: f.dbPath},
 		// The OTA Software Update Requestor (ADR 0019) on the root, with
 		// the daemon's applier (ota.go).
 		OTA: &node.OtaConfig{Dir: applier.dir, Harness: applier.harness, Applier: applier},
@@ -392,6 +367,19 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp matterbridge
 		AggregatorServers: []contract.ClusterServer{actions},
 		Logger:            logger,
 	}
+}
+
+// mdnsConfig is the advertiser the node builds: none under
+// --advertise=false, the OS host name as SRV target under
+// --mdns-os-hostname.
+func mdnsConfig(f flags) node.MDNS {
+	m := node.MDNS{Disabled: !f.advertise}
+	if f.osHostName {
+		if h, err := os.Hostname(); err == nil && h != "" {
+			m.HostName = strings.TrimSuffix(h, ".local")
+		}
+	}
+	return m
 }
 
 // printPairingInfo writes the onboarding payload to stdout. It goes to stdout
@@ -424,7 +412,7 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
     chip-tool pairing onnetwork-long 1 %d %d
   --------------------------------------------------------------
 
-`, br.LocalAddr(), bridged, testVendorID, testProductID,
+`, n.LocalAddr(), bridged, testVendorID, testProductID,
 		discriminator, passcode, manual, qr, passcode, discriminator)
 	return nil
 }
@@ -433,8 +421,8 @@ func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error
 // stdout after the banner — what a test driver reads to point a case at
 // the endpoint that serves its cluster, without a controller of its own.
 // Like the banner it is for an operator's eyes too.
-func printTopology(br *matterbridge.Bridge) {
-	topology := br.Topology()
+func printTopology(n *node.Node) {
+	topology := n.Bridge().Topology()
 	if topology == nil {
 		return
 	}
@@ -468,19 +456,4 @@ func deviceTypeRevision(id uint32) uint16 {
 		panic(fmt.Sprintf("device type %#06x is not in the matter.js schema snapshot", id))
 	}
 	return rev
-}
-
-// endpointByKey returns the live endpoint id of the endpoint with key;
-// false before the first assembly or for a key the topology does not hold.
-func endpointByKey(br *matterbridge.Bridge, key endpoint.StringKey) (uint16, bool) {
-	topology := br.Topology()
-	if topology == nil {
-		return 0, false
-	}
-	for _, ep := range topology.Endpoints {
-		if ep != nil && ep.SourceKey == key {
-			return ep.ID, true
-		}
-	}
-	return 0, false
 }

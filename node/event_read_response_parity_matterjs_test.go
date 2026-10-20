@@ -254,7 +254,7 @@ func (m *eventPair) act(t *testing.T, fn func(n *node.Node)) {
 // fabricIndex is the device's index of the pair's fabric.
 func (m *eventPair) fabricIndex(t *testing.T) uint8 {
 	t.Helper()
-	fabrics, err := m.pair.Device.Node().Fabrics(parityCtx(t))
+	fabrics, err := m.pair.Device.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %+v, %v", fabrics, err)
 	}

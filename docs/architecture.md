@@ -130,6 +130,15 @@ The layers and their allowed direction are held by `script/archcheck`
 | Camera and WebRTC clusters | need a media path in the host | [matter.js comparison](matterjs-comparison.md) |
 | CSA certification | not pursued; certifiability is the goal | [ADR 0011](adr/0011-certifiability-is-a-goal.md) |
 
+The facade is the host's boundary too: a host configures and observes a
+node through `node/` and builds on `device/`, `contract/`, `schema/`,
+`eligibility/` and the `cluster/…` servers. What stays public below it —
+`bridge`, `endpoint`, `store`, `mdns`, `secure/…`, `groups`,
+`im/subscription`, `diagevent` — and what going around the facade costs is
+on [Advanced seams](guides/advanced-seams.md);
+[Migrating to the facade](guides/migrating-to-the-facade.md) maps each
+symbol a host reaches today to its route.
+
 ## How parity is held
 
 matter.js is the gold standard for behaviour; connectedhomeip is the

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // Observers are the host's callbacks on the node's fabric and
@@ -73,13 +74,33 @@ type Observers struct {
 // FabricInfo names one fabric, as OperationalCredentials' AddNOC hook
 // carries it (cluster/core OpcredsConfig.OnFabricInstalled: fabric index,
 // fabric id, node id, root public key) plus the compressed fabric id the
-// operational record is named by.
+// operational record is named by, and the vendor and label the fabric's
+// administrator set — the fields of the store's record a host shows
+// ([Node.FabricInfos]).
 type FabricInfo struct {
 	FabricIndex        uint8
 	FabricID           uint64
 	NodeID             uint64
 	RootPublicKey      []byte
 	CompressedFabricID [8]byte
+	// VendorID is the AdminVendorID AddNOC carried for the fabric.
+	VendorID uint16
+	// Label is the fabric's label (UpdateFabricLabel); empty until an
+	// administrator sets one.
+	Label string
+}
+
+// fabricInfoOf is the FabricInfo of one stored fabric.
+func fabricInfoOf(rec store.FabricRecord) FabricInfo {
+	return FabricInfo{
+		FabricIndex:        rec.FabricIndex,
+		FabricID:           rec.FabricID,
+		NodeID:             rec.NodeID,
+		RootPublicKey:      append([]byte(nil), rec.RootPublicKey...),
+		CompressedFabricID: rec.CompressedID,
+		VendorID:           rec.VendorID,
+		Label:              rec.Label,
+	}
 }
 
 // WindowSnapshot is the commissioning window after a transition.
@@ -125,11 +146,7 @@ func (n *Node) fabricInfo(ctx context.Context, fabricIndex uint8) (FabricInfo, b
 	if err != nil {
 		return FabricInfo{FabricIndex: fabricIndex}, false
 	}
-	return FabricInfo{
-		FabricIndex:        fabricIndex,
-		FabricID:           rec.FabricID,
-		NodeID:             rec.NodeID,
-		RootPublicKey:      append([]byte(nil), rec.RootPublicKey...),
-		CompressedFabricID: rec.CompressedID,
-	}, true
+	info := fabricInfoOf(rec)
+	info.FabricIndex = fabricIndex
+	return info, true
 }

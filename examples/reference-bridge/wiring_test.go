@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -186,11 +187,14 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 func TestBlindPositionSurvivesARestart(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "reference-bridge.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
-		t.Fatalf("openDB: %v", err)
+		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
 	st := store.New(db)
 	saved := make(chan struct{}, 16)
 	first := newDemoBlind("blind")

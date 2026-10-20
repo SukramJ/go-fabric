@@ -92,8 +92,8 @@ func TestRandomSalt_Length(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first RandomSalt: unexpected error: %v", err)
 	}
-	if len(s1) != 16 {
-		t.Errorf("len(salt) = %d, want 16", len(s1))
+	if len(s1) != 32 {
+		t.Errorf("len(salt) = %d, want 32", len(s1))
 	}
 
 	s2, err := bridge.RandomSalt()

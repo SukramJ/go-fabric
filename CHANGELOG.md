@@ -10,9 +10,31 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the reference consumer reaches below `node/` has a facade route or is a documented advanced seam (`docs/guides/advanced-seams.md`).
+
 ### Added
 
+- `node`: the names a host configures and observes a node with, without importing the lower packages — the type aliases `Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager` and `DiagnosticEvent` (the same types as `bridge.Snapshotter`, `endpoint.Topology`, `bridge.TCPConfig`, `bridge.CommissioningWindow`, `operational.Manager`, `subscription.Manager` and `diagevent.Event`); the bridge's window errors `ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen` and `ErrCommissioningWindowNotConfigured` (the same values, for `errors.Is`); the commissioning bounds `MaxDiscriminator`, `PBKDFIterationsMin`/`Max` and `PBKDFSaltMin`/`Max` (from `secure/setup` and `secure/spake2`), `ValidateSetupPIN`, the regulatory locations `RegulatoryIndoor`, `RegulatoryOutdoor`, `RegulatoryIndoorOutdoor` and `SoftwareVersionFromString` (cluster/core's). `Config.Topology`, `Network.TCP`, `Node.Sessions`, `Node.Subscriptions` and `Node.CommissioningWindow` are declared through the aliases; their types do not change.
+- `device`: the aliases `SourceKey` and `AvailabilityProbe`, the types of `Options.StableKey` and `Options.Reachable` (`endpoint.SourceKey`, `endpoint.AvailabilityProbe`).
+- `node`: the health probe — `Config.Health{Interval, OnSample}` runs `bridge.StartHealthProbeWithClock` on the node's clock from `Start` to `Stop` (0 is `DefaultProbeInterval`, 30 s; the zero value runs none), `Node.Health` returns the last `HealthSample` (an alias of `bridge.HealthSample`). `Node.LocalAddr` returns the operational listener's address.
+- `node`: `Config.Store.Path` — the node opens the SQLite file itself (the pure-Go `modernc.org/sqlite` driver, foreign keys on, a 5 s busy timeout), applies both schemas as for `Store.DB`, and closes it on `Stop`. `Path` and `DB` exclude each other.
+- `node`: `Node.FabricInfos` returns the installed fabrics as `FabricInfo`, which gains `VendorID` and `Label` (from the store's record; the observers' `FabricInfo` carries them too). `Node.UniqueID` returns the BasicInformation UniqueID the node serves.
+- `node`: `Config.Attestation.Files` (`AttestationFiles`, an alias of `attestation.ChainFiles`: the DAC, its key, the PAI and the CD on disk) — `New` loads the chain with `attestation.LoadChainFiles` into `Chain` and `CertificationDeclaration`; files naming nothing keep the CSA test chain, a chain that does not load fails `New`. With `Attestation.BlockCommissioningOnError` the node builds on the test chain instead, refuses every commissioning with the load error and reports it in `Node.AttestationError`; paired controllers keep working.
+- `node`: `Network.MDNS{Disabled, HostName}` configures the advertiser the node builds for a nil `Config.Advertiser`; `Node.MDNSEnabled`, `Node.MDNSServices` and `Node.DiagnoseMDNS` (`mdns.IsEnabled`, `Active`, `Diagnose` over the node's advertiser; `MDNSService` and `MDNSFinding` alias `mdns.Service` and `mdns.Finding`).
+- `node`: `Config.BootID.RotateUniqueIDs` turns on the development rotation of UniqueIDs (`bootid.EnableRotation`) before the node derives its own — process-wide, for the life of the process.
+- `docs`: [Advanced seams](./docs/guides/advanced-seams.md) — the packages that stay public below the facade (`bridge`, `endpoint`, `store`, `mdns`, `secure/…`, `groups`, `im/subscription`, `diagevent`), each with what it gives, when a host needs it and what going around the facade costs; [Migrating to the facade](./docs/guides/migrating-to-the-facade.md) — every symbol a host reaches below `node/` mapped to its route, OpenCCU-Loom at its `v0.6.0` pin as the worked example. The device getting-started page and the ports guide list the new `Config` fields.
+- `node`: `NewCommissioningCredentials` draws a commissioning secret `Config.Validate` accepts — a random passcode from the valid set, a random discriminator, a random 32-byte salt (`bridge.RandomPasscode`, `RandomDiscriminator`, `RandomSalt`) and the minimum 1000 PBKDF iterations; `Commissioning.WindowCredentials(timeout)` turns a secret into the `WindowCredentials` of one `Node.OpenBasicWindow`; `Node.PairingCodesFor` returns the QR payload and manual code of such a window.
 - `script/archcheck`: the layers of ADR 0026 principle 1 as a Go test (`make archcheck`, part of `make ci`) — `layers.json` assigns every package to a layer, an import that points up fails unless it is a listed exception, and a stale exception or an unassigned package fails too.
+
+### Changed
+
+- `bridge`: `RandomSalt` draws 32 bytes instead of 16, as matter.js draws the salt of its basic and enhanced windows (`DeviceCommissioner.ts:134`, `CommissioningClient.ts:524`). It is wire-visible in the PBKDFParamResponse of a window opened on such a salt, and stays within the 16–32 bytes Matter §3.10.1.5 admits.
+- `examples/reference-bridge`: the daemon builds its node through the facade routes — the node opens `--db` (`Store.Path`), builds the advertiser (`Network.MDNS` from `--advertise` and `--mdns-os-hostname`), names the `--attestation-dir` files in `Attestation.Files`, logs an unhealthy listener (`Config.Health`) and checks its flags with `node.MaxDiscriminator` and `node.ValidateSetupPIN`. `main.go` imports none of `bridge`, `mdns`, `secure/*`, `store` or `bootid`.
+- `node`: a nil `Config.Advertiser` advertises: the node builds `mdns.Zeroconf` with the subtype responder (what the reference daemon wired by hand), as a matter.js ServerNode advertises on the IP network unless configured otherwise (`NetworkServer.ts:207-209`, `ServerEnvironment.ts:155`). It used to be `mdns.NewNoop()`, which published nothing; a host that wants that sets `Network.MDNS.Disabled`. Every in-repo `node.Config` already states its advertiser or sets `Disabled` (`fabrictest` sets its own).
+
+### Deprecated
+
+- `node`: `Node.Fabrics`, which returns `[]store.FabricRecord`. Use `Node.FabricInfos`. Removable in `v0.11.0`.
 
 ## [0.9.0] — 2026-10-20
 

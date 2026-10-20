@@ -248,7 +248,7 @@ func newOTASite(t *testing.T, o otaSiteOptions) *otaSite {
 		t.Fatal("the provider device has no provider endpoint")
 	}
 	s.provEP = ep.ID
-	fabrics, err := s.req.Node().Fabrics(parityCtx(t))
+	fabrics, err := s.req.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("requestor fabrics %v, %v", fabrics, err)
 	}

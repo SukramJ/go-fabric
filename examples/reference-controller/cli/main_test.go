@@ -344,7 +344,7 @@ func TestReferenceController(t *testing.T) {
 	if !strings.Contains(out, "paired node 17185") || !strings.Contains(out, "endpoint 0:") {
 		t.Fatalf("pair:\n%s", out)
 	}
-	fabrics, err := h.n.Fabrics(context.Background())
+	fabrics, err := h.n.FabricInfos(context.Background())
 	if err != nil || len(fabrics) != 1 || fabrics[0].NodeID != harnessNodeID {
 		t.Fatalf("harness fabrics %+v %v", fabrics, err)
 	}
@@ -416,7 +416,7 @@ func TestReferenceController(t *testing.T) {
 	if out := tl.run("unpair", nid); !strings.Contains(out, "unpaired node 17185") {
 		t.Fatalf("unpair:\n%s", out)
 	}
-	if fabrics, _ := h.n.Fabrics(context.Background()); len(fabrics) != 0 {
+	if fabrics, _ := h.n.FabricInfos(context.Background()); len(fabrics) != 0 {
 		t.Fatalf("the harness still has fabrics %+v", fabrics)
 	}
 	if out := tl.run("nodes"); !strings.Contains(out, "no paired nodes") {

@@ -393,7 +393,7 @@ func newGroupDevice(t *testing.T) *groupDevice {
 		t.Fatal("the light has no endpoint")
 	}
 	g.ep = ep
-	fabrics, err := dev.Node().Fabrics(context.Background())
+	fabrics, err := dev.Node().FabricInfos(context.Background())
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %v, %v", fabrics, err)
 	}
@@ -543,7 +543,7 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 
 	t.Run("rejects a NOC for another fabric ID with InvalidNOC", func(t *testing.T) {
 		p := quietSite(t).CommissionedPair(fabrictest.PairOptions{})
-		fabrics, err := p.Device.Node().Fabrics(context.Background())
+		fabrics, err := p.Device.Node().FabricInfos(context.Background())
 		if err != nil || len(fabrics) != 1 {
 			t.Fatalf("fabrics %v, %v", fabrics, err)
 		}
@@ -554,7 +554,7 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 		if got != uint64(core.NOCStatusInvalidNOC) {
 			t.Errorf("UpdateNOC StatusCode %d, want InvalidNOC (%d)", got, core.NOCStatusInvalidNOC)
 		}
-		after, err := p.Device.Node().Fabrics(context.Background())
+		after, err := p.Device.Node().FabricInfos(context.Background())
 		if err != nil || len(after) != 1 || !sameFabric(after[0], fabrics[0]) {
 			t.Errorf("fabrics after = %+v, want %+v", after, fabrics)
 		}
@@ -564,9 +564,9 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 	})
 }
 
-func sameFabric(a, b store.FabricRecord) bool {
+func sameFabric(a, b node.FabricInfo) bool {
 	return a.FabricIndex == b.FabricIndex && a.FabricID == b.FabricID && a.NodeID == b.NodeID &&
-		bytes.Equal(a.RootPublicKey, b.RootPublicKey) && a.CompressedID == b.CompressedID
+		bytes.Equal(a.RootPublicKey, b.RootPublicKey) && a.CompressedFabricID == b.CompressedFabricID
 }
 
 // ocUpdateFabricLabel is UpdateFabricLabel's command id.
@@ -582,7 +582,7 @@ const ocUpdateFabricLabel uint32 = 0x09
 // its one fabric.
 func TestOperationalCredentialsFinalFabricChange(t *testing.T) {
 	holdSite(t)
-	changeFabric := func(t *testing.T, cmd uint32, fields spec.Encodable) store.FabricRecord {
+	changeFabric := func(t *testing.T, cmd uint32, fields spec.Encodable) node.FabricInfo {
 		t.Helper()
 		var mu sync.Mutex
 		var changes []uint8
@@ -614,7 +614,7 @@ func TestOperationalCredentialsFinalFabricChange(t *testing.T) {
 				t.Errorf("error logged: %s %v", r.msg, r.attrs)
 			}
 		}
-		fabrics, err := p.Device.Node().Fabrics(parityCtx(t))
+		fabrics, err := p.Device.Node().FabricInfos(parityCtx(t))
 		if err != nil || len(fabrics) != 1 {
 			t.Fatalf("fabrics %+v, %v: the node is not commissioned", fabrics, err)
 		}

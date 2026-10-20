@@ -81,6 +81,8 @@ nav:
   - Roadmap: roadmap.md
   - Guides:
       - Host ports: guides/ports.md
+      - Advanced seams: guides/advanced-seams.md
+      - Migrating to the facade: guides/migrating-to-the-facade.md
       - Concurrency: guides/concurrency.md
       - Persistence: guides/persistence.md
       - Testing in process: guides/testing-in-process.md

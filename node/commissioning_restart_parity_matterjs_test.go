@@ -51,7 +51,7 @@ func TestCommissioningRestart(t *testing.T) {
 			t.Fatalf("commission after the restart: %v", err)
 		}
 
-		fabrics, err := p.Device.Node().Fabrics(context.Background())
+		fabrics, err := p.Device.Node().FabricInfos(context.Background())
 		if err != nil || len(fabrics) != 1 {
 			t.Errorf("isCommissioned: fabrics %v, %v; want one", fabrics, err)
 		}

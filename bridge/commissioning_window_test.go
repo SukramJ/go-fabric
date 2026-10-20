@@ -726,15 +726,16 @@ func TestCommissioningWindow_OpenWindow_AllowsWhenFailSafeDisarmed(t *testing.T)
 	}
 }
 
-// TestRandomSalt_Length16 verifies the returned salt is exactly 16 bytes.
-func TestRandomSalt_Length16(t *testing.T) {
+// TestRandomSalt_Length32 verifies the returned salt is exactly 32 bytes,
+// matter.js's length (DeviceCommissioner.ts:134).
+func TestRandomSalt_Length32(t *testing.T) {
 	t.Parallel()
 	s, err := bridge.RandomSalt()
 	if err != nil {
 		t.Fatalf("RandomSalt: %v", err)
 	}
-	if len(s) != 16 {
-		t.Errorf("RandomSalt: len = %d, want 16", len(s))
+	if len(s) != 32 {
+		t.Errorf("RandomSalt: len = %d, want 32", len(s))
 	}
 }
 

@@ -175,7 +175,7 @@ func TestGroupKeyManagementMulticastPolicy(t *testing.T) {
 	t.Run("accepts a key set whose multicast policy is not PerGroupID and does not store the policy", func(t *testing.T) {
 		t.Parallel()
 		p := gkmPair(t)
-		fabrics, err := p.Device.Node().Fabrics(context.Background())
+		fabrics, err := p.Device.Node().FabricInfos(context.Background())
 		if err != nil || len(fabrics) != 1 {
 			t.Fatalf("fabrics %v, %v", fabrics, err)
 		}

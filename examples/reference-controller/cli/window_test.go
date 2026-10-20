@@ -111,7 +111,7 @@ func TestReferenceControllerWindow(t *testing.T) {
 	if !strings.Contains(out, "paired node 21845") {
 		t.Fatalf("second pair:\n%s", out)
 	}
-	fabrics, err := h.n.Fabrics(context.Background())
+	fabrics, err := h.n.FabricInfos(context.Background())
 	if err != nil || len(fabrics) != 2 {
 		t.Fatalf("harness fabrics %+v %v", fabrics, err)
 	}

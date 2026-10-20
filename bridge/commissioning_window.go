@@ -984,11 +984,14 @@ func RandomPasscode() (uint32, error) {
 	}
 }
 
-// RandomSalt returns 16 random bytes — the Matter §3.10.1.5 minimum
-// salt length for the Spake2+ Verifier. The spec accepts up to 32
-// bytes; 16 is the conventional choice.
+// RandomSalt returns 32 random bytes for the Spake2+ Verifier — the
+// longest salt Matter §3.10.1.5 admits (16 to 32 bytes). Mirrors matter.js
+// packages/protocol/src/protocol/DeviceCommissioner.ts:134 (the basic
+// window's `randomBytes(32)`) and
+// packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524
+// (the enhanced window's).
 func RandomSalt() ([]byte, error) {
-	b := make([]byte, 16)
+	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return nil, fmt.Errorf("rand salt: %w", err)
 	}

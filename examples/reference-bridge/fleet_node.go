@@ -33,6 +33,21 @@ const (
 	lampKey = endpoint.StringKey("demo:light:1")
 )
 
+// endpointByKey returns the live endpoint id of the endpoint with key;
+// false before the first assembly or for a key the topology does not hold.
+func endpointByKey(br *matterbridge.Bridge, key endpoint.StringKey) (uint16, bool) {
+	topology := br.Topology()
+	if topology == nil {
+		return 0, false
+	}
+	for _, ep := range topology.Endpoints {
+		if ep != nil && ep.SourceKey == key {
+			return ep.ID, true
+		}
+	}
+	return 0, false
+}
+
 // attachNodeProviders points PowerSourceConfiguration's Sources at the EV
 // charger's PowerSource endpoint, the demo actions at the desk lamp's and
 // the fleet's endpoint lookup at the live topology. Attached after Start,

@@ -164,7 +164,7 @@ func (f *fabricBeforeStart) current() *operationalSpy {
 // lifecycle.isCommissioned: a fabric, no window, no commissionable record.
 func (f *fabricBeforeStart) commissioned(t *testing.T) bool {
 	t.Helper()
-	fabrics, err := f.device.Node().Fabrics(context.Background())
+	fabrics, err := f.device.Node().FabricInfos(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -66,7 +66,7 @@ func newGCNode(t *testing.T, site *fabrictest.Site, topo fabrictest.Topology) *g
 // fabricOf is the index of the fabric pair's controller commissioned.
 func fabricOf(t *testing.T, p *fabrictest.Pair) uint8 {
 	t.Helper()
-	fabrics, err := p.Device.Node().Fabrics(context.Background())
+	fabrics, err := p.Device.Node().FabricInfos(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestGroupcastMulticastPolicyOrderingParityMatterJS(t *testing.T) {
 		if !holdsGroup(g.dev, groups.IANAGroupcastAddress) {
 			t.Fatalf("the device holds %v, want the IANA address", g.dev.MulticastGroups())
 		}
-		fabrics, err := g.dev.Node().Fabrics(parityCtx(t))
+		fabrics, err := g.dev.Node().FabricInfos(parityCtx(t))
 		if err != nil {
 			t.Fatal(err)
 		}

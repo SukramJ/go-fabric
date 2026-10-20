@@ -29,7 +29,7 @@ func (p *Pair) Grant(ctx context.Context, privilege store.Privilege) error {
 	if privilege < store.PrivilegeView || privilege > store.PrivilegeAdminister {
 		return fmt.Errorf("fabrictest: privilege %d", privilege)
 	}
-	fabrics, err := p.Device.Node().Fabrics(ctx)
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
 	if err != nil {
 		return fmt.Errorf("fabrictest: device fabrics: %w", err)
 	}
