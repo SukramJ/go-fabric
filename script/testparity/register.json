@@ -652,16 +652,14 @@
     },
     {
       "path": "packages/node/test/behaviors/binding/BindingServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "binding:TestAttachDetachClose",
         "binding:TestDormantThenWoken",
-        "cluster/core:TestBindingPersist"
+        "cluster/core:TestBindingPersist",
+        "cluster/core:TestBindingServerParityMatterJS"
       ],
-      "missing": [
-        "resolves a stored entry for a behavior that observes established after the entries registered"
-      ],
-      "reason": "Replay, write diff, close and the dormant-until-observed entry are covered; a stored entry for a behavior that observes later is not.",
+      "reason": "Replay, write diff, close and the dormant-until-observed entry are covered; a stored entry for an observer that attaches after the entries registered resolves once it does (cluster/core/binding_parity_matterjs_test.go).",
       "snapshotSha": "d06db74944f129d4f6ac4db3157681b5fff76b5c"
     },
     {
