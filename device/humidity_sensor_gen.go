@@ -49,7 +49,9 @@ func NewHumiditySensor(opts Options, with ...Option) (*HumiditySensor, error) {
 	return &HumiditySensor{d}, nil
 }
 
-// RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (mandatory), or nil when the host supplied one of another type.
+// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *HumiditySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
+	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
 }

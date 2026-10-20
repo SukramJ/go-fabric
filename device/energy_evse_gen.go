@@ -59,17 +59,22 @@ func NewEnergyEvse(opts Options, with ...Option) (*EnergyEvse, error) {
 	return &EnergyEvse{d}, nil
 }
 
-// EnergyEvse returns the EnergyEvse server (mandatory), or nil when the host supplied one of another type.
-func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
-	return serverAs[*energyevsedef.Server](d.Device, 0x0099)
-}
+// EnergyEvse returns the typed EnergyEvse server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server { return energyevsedef.Wrap(d.Server(0x0099)) }
 
-// EnergyEvseMode returns the EnergyEvseMode server (mandatory), or nil when the host supplied one of another type.
+// EnergyEvseMode returns the typed EnergyEvseMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
-	return serverAs[*energyevsemodedef.Server](d.Device, 0x009D)
+	return energyevsemodedef.Wrap(d.Server(0x009D))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }

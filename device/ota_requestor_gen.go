@@ -49,7 +49,9 @@ func NewOtaRequestor(opts Options, with ...Option) (*OtaRequestor, error) {
 	return &OtaRequestor{d}, nil
 }
 
-// OtaSoftwareUpdateRequestor returns the OtaSoftwareUpdateRequestor server (mandatory), or nil when the host supplied one of another type.
+// OtaSoftwareUpdateRequestor returns the typed OtaSoftwareUpdateRequestor server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *otasoftwareupdaterequestordef.Server {
-	return serverAs[*otasoftwareupdaterequestordef.Server](d.Device, 0x002A)
+	return otasoftwareupdaterequestordef.Wrap(d.Server(0x002A))
 }

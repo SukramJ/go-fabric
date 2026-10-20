@@ -37,8 +37,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrMembership, spec.List[MembershipStruct]([]MembershipStruct{MembershipStruct{GroupId: uint16(1), Endpoints: spectest.Ptr([]uint16{uint16(1)}), KeySetId: uint16(1), HasAuxiliaryAcl: spectest.Ptr(true), McastAddrPolicy: MulticastAddrPolicyEnum(0), FabricIndex: uint8(1)}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -48,19 +47,32 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleJoinGroup(func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleLeaveGroup(func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil })
-	s.HandleUpdateGroupKey(func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleConfigureAuxiliaryAcl(func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleJoinGroup(func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleLeaveGroup(func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUpdateGroupKey(func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleConfigureAuxiliaryAcl(func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitGroupcastTesting(0, GroupcastTestingEvent{}) // not in the empty definition's EventList: refused
 }

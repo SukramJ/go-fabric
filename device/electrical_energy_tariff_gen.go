@@ -60,17 +60,26 @@ func NewElectricalEnergyTariff(opts Options, with ...Option) (*ElectricalEnergyT
 	return &ElectricalEnergyTariff{d}, nil
 }
 
-// CommodityPrice returns the CommodityPrice server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CommodityPrice returns the typed CommodityPrice server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
-	return serverAs[*commoditypricedef.Server](d.Device, 0x0095)
+	return commoditypricedef.Wrap(d.Server(0x0095))
 }
 
-// ElectricalGridConditions returns the ElectricalGridConditions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ElectricalGridConditions returns the typed ElectricalGridConditions server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
-	return serverAs[*electricalgridconditionsdef.Server](d.Device, 0x00A0)
+	return electricalgridconditionsdef.Wrap(d.Server(0x00A0))
 }
 
-// CommodityTariff returns the CommodityTariff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CommodityTariff returns the typed CommodityTariff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
-	return serverAs[*commoditytariffdef.Server](d.Device, 0x0700)
+	return commoditytariffdef.Wrap(d.Server(0x0700))
 }

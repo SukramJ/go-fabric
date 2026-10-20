@@ -44,7 +44,9 @@ func NewElectricalUtilityMeter(opts Options, with ...Option) (*ElectricalUtility
 	return &ElectricalUtilityMeter{d}, nil
 }
 
-// MeterIdentification returns the MeterIdentification server (mandatory), or nil when the host supplied one of another type.
+// MeterIdentification returns the typed MeterIdentification server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ElectricalUtilityMeter) MeterIdentification() *meteridentificationdef.Server {
-	return serverAs[*meteridentificationdef.Server](d.Device, 0x0B06)
+	return meteridentificationdef.Wrap(d.Server(0x0B06))
 }

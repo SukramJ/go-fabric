@@ -49,7 +49,9 @@ func NewGenericSwitch(opts Options, with ...Option) (*GenericSwitch, error) {
 	return &GenericSwitch{d}, nil
 }
 
-// Switch returns the Switch server (mandatory), or nil when the host supplied one of another type.
+// Switch returns the typed Switch server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *GenericSwitch) Switch() *switchclusterdef.Server {
-	return serverAs[*switchclusterdef.Server](d.Device, 0x003B)
+	return switchclusterdef.Wrap(d.Server(0x003B))
 }

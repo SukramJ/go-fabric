@@ -46,8 +46,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrChannelList, spec.List[ChannelInfoStruct]([]ChannelInfoStruct{ChannelInfoStruct{MajorNumber: uint16(1), MinorNumber: uint16(1), Name: spectest.Ptr("x"), CallSign: spectest.Ptr("x"), AffiliateCallSign: spectest.Ptr("x"), Identifier: spectest.Ptr("x"), Type: spectest.Ptr(ChannelTypeEnum(0))}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -57,24 +56,38 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleChangeChannel(func(context.Context, ChangeChannelRequest) (ChangeChannelResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleChangeChannel(func(context.Context, ChangeChannelRequest) (ChangeChannelResponse, error) {
 		return ChangeChannelResponse{}, nil
-	})
-	s.HandleChangeChannelByNumber(func(context.Context, ChangeChannelByNumberRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSkipChannel(func(context.Context, SkipChannelRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetProgramGuide(func(context.Context, GetProgramGuideRequest) (ProgramGuideResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleChangeChannelByNumber(func(context.Context, ChangeChannelByNumberRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSkipChannel(func(context.Context, SkipChannelRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetProgramGuide(func(context.Context, GetProgramGuideRequest) (ProgramGuideResponse, error) {
 		return ProgramGuideResponse{}, nil
-	})
-	s.HandleRecordProgram(func(context.Context, RecordProgramRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleCancelRecordProgram(func(context.Context, CancelRecordProgramRequest) (struct{}, error) { return struct{}{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRecordProgram(func(context.Context, RecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCancelRecordProgram(func(context.Context, CancelRecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

@@ -57,17 +57,26 @@ func NewRefrigerator(opts Options, with ...Option) (*Refrigerator, error) {
 	return &Refrigerator{d}, nil
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the RefrigeratorAndTemperatureControlledCabinetMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	return serverAs[*refrigeratorandtemperaturecontrolledcabinetmodedef.Server](d.Device, 0x0052)
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
 }
 
-// RefrigeratorAlarm returns the RefrigeratorAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RefrigeratorAlarm returns the typed RefrigeratorAlarm server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
-	return serverAs[*refrigeratoralarmdef.Server](d.Device, 0x0057)
+	return refrigeratoralarmdef.Wrap(d.Server(0x0057))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }

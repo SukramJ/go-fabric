@@ -55,17 +55,24 @@ func NewElectricalMeter(opts Options, with ...Option) (*ElectricalMeter, error) 
 	return &ElectricalMeter{d}, nil
 }
 
-// ElectricalPowerMeasurement returns the ElectricalPowerMeasurement server (mandatory), or nil when the host supplied one of another type.
+// ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
-	return serverAs[*electricalpowermeasurementdef.Server](d.Device, 0x0090)
+	return electricalpowermeasurementdef.Wrap(d.Server(0x0090))
 }
 
-// ElectricalEnergyMeasurement returns the ElectricalEnergyMeasurement server (mandatory), or nil when the host supplied one of another type.
+// ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
-	return serverAs[*electricalenergymeasurementdef.Server](d.Device, 0x0091)
+	return electricalenergymeasurementdef.Wrap(d.Server(0x0091))
 }
 
-// CommodityMetering returns the CommodityMetering server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CommodityMetering returns the typed CommodityMetering server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ElectricalMeter) CommodityMetering() *commoditymeteringdef.Server {
-	return serverAs[*commoditymeteringdef.Server](d.Device, 0x0B07)
+	return commoditymeteringdef.Wrap(d.Server(0x0B07))
 }

@@ -48,7 +48,9 @@ func NewOtaProvider(opts Options, with ...Option) (*OtaProvider, error) {
 	return &OtaProvider{d}, nil
 }
 
-// OtaSoftwareUpdateProvider returns the OtaSoftwareUpdateProvider server (mandatory), or nil when the host supplied one of another type.
+// OtaSoftwareUpdateProvider returns the typed OtaSoftwareUpdateProvider server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *OtaProvider) OtaSoftwareUpdateProvider() *otasoftwareupdateproviderdef.Server {
-	return serverAs[*otasoftwareupdateproviderdef.Server](d.Device, 0x0029)
+	return otasoftwareupdateproviderdef.Wrap(d.Server(0x0029))
 }

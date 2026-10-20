@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the EnergyEvse cluster: one field per attribute
@@ -71,76 +72,125 @@ type Patch struct {
 	Null                     []uint32         // attribute ids set to null
 }
 
-// Server is the typed EnergyEvse server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed EnergyEvse server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleDisable registers fn for the Disable command; nil removes the handler.
-func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) {
-	s.Handle(CmdDisable, spec.HandlerOf(fn))
+// HandleDisable registers fn for the Disable command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
-// HandleEnableCharging registers fn for the EnableCharging command; nil removes the handler.
-func (s *Server) HandleEnableCharging(fn func(ctx context.Context, req EnableChargingRequest) (struct{}, error)) {
-	s.Handle(CmdEnableCharging, spec.HandlerOf(fn))
+// HandleEnableCharging registers fn for the EnableCharging command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnableCharging(fn func(ctx context.Context, req EnableChargingRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnableCharging, fn)
 }
 
-// HandleEnableDischarging registers fn for the EnableDischarging command; nil removes the handler.
-func (s *Server) HandleEnableDischarging(fn func(ctx context.Context, req EnableDischargingRequest) (struct{}, error)) {
-	s.Handle(CmdEnableDischarging, spec.HandlerOf(fn))
+// HandleEnableDischarging registers fn for the EnableDischarging command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnableDischarging(fn func(ctx context.Context, req EnableDischargingRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnableDischarging, fn)
 }
 
-// HandleStartDiagnostics registers fn for the StartDiagnostics command; nil removes the handler.
-func (s *Server) HandleStartDiagnostics(fn func(ctx context.Context, req StartDiagnosticsRequest) (struct{}, error)) {
-	s.Handle(CmdStartDiagnostics, spec.HandlerOf(fn))
+// HandleStartDiagnostics registers fn for the StartDiagnostics command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStartDiagnostics(fn func(ctx context.Context, req StartDiagnosticsRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStartDiagnostics, fn)
 }
 
-// HandleSetTargets registers fn for the SetTargets command; nil removes the handler.
-func (s *Server) HandleSetTargets(fn func(ctx context.Context, req SetTargetsRequest) (struct{}, error)) {
-	s.Handle(CmdSetTargets, spec.HandlerOf(fn))
+// HandleSetTargets registers fn for the SetTargets command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetTargets(fn func(ctx context.Context, req SetTargetsRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetTargets, fn)
 }
 
-// HandleGetTargets registers fn for the GetTargets command; nil removes the handler.
-func (s *Server) HandleGetTargets(fn func(ctx context.Context, req GetTargetsRequest) (GetTargetsResponse, error)) {
-	s.Handle(CmdGetTargets, spec.HandlerOf(fn))
+// HandleGetTargets registers fn for the GetTargets command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetTargets(fn func(ctx context.Context, req GetTargetsRequest) (GetTargetsResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetTargets, fn)
 }
 
-// HandleClearTargets registers fn for the ClearTargets command; nil removes the handler.
-func (s *Server) HandleClearTargets(fn func(ctx context.Context, req ClearTargetsRequest) (struct{}, error)) {
-	s.Handle(CmdClearTargets, spec.HandlerOf(fn))
+// HandleClearTargets registers fn for the ClearTargets command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearTargets(fn func(ctx context.Context, req ClearTargetsRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearTargets, fn)
 }
 
-func init() { spec.RegisterTyped(ClusterID, Wrap) }
+// EmitEvConnected emits the EvConnected event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitEvConnected(endpoint uint16, data EvConnectedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventEvConnected, data)
+}
+
+// EmitEvNotDetected emits the EvNotDetected event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitEvNotDetected(endpoint uint16, data EvNotDetectedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventEvNotDetected, data)
+}
+
+// EmitEnergyTransferStarted emits the EnergyTransferStarted event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitEnergyTransferStarted(endpoint uint16, data EnergyTransferStartedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStarted, data)
+}
+
+// EmitEnergyTransferStopped emits the EnergyTransferStopped event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitEnergyTransferStopped(endpoint uint16, data EnergyTransferStoppedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStopped, data)
+}
+
+// EmitFault emits the Fault event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitFault(endpoint uint16, data FaultEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventFault, data)
+}
+
+// EmitRfid emits the Rfid event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitRfid(endpoint uint16, data RfidEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventRfid, data)
+}

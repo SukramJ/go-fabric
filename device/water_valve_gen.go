@@ -59,12 +59,17 @@ func NewWaterValve(opts Options, with ...Option) (*WaterValve, error) {
 	return &WaterValve{d}, nil
 }
 
-// ValveConfigurationAndControl returns the ValveConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
+// ValveConfigurationAndControl returns the typed ValveConfigurationAndControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
-	return serverAs[*valveconfigurationandcontroldef.Server](d.Device, 0x0081)
+	return valveconfigurationandcontroldef.Wrap(d.Server(0x0081))
 }
 
-// FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
-	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+	return flowmeasurementdef.Wrap(d.Server(0x0404))
 }

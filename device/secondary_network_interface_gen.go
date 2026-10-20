@@ -56,17 +56,25 @@ func NewSecondaryNetworkInterface(opts Options, with ...Option) (*SecondaryNetwo
 	return &SecondaryNetworkInterface{d}, nil
 }
 
-// NetworkCommissioning returns the NetworkCommissioning server (mandatory), or nil when the host supplied one of another type.
+// NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
-	return serverAs[*networkcommissioningdef.Server](d.Device, 0x0031)
+	return networkcommissioningdef.Wrap(d.Server(0x0031))
 }
 
-// WiFiNetworkDiagnostics returns the WiFiNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
-	return serverAs[*wifinetworkdiagnosticsdef.Server](d.Device, 0x0036)
+	return wifinetworkdiagnosticsdef.Wrap(d.Server(0x0036))
 }
 
-// EthernetNetworkDiagnostics returns the EthernetNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
-	return serverAs[*ethernetnetworkdiagnosticsdef.Server](d.Device, 0x0037)
+	return ethernetnetworkdiagnosticsdef.Wrap(d.Server(0x0037))
 }

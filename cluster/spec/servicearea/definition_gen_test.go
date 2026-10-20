@@ -41,8 +41,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrProgress, spec.List[ProgressStruct]([]ProgressStruct{ProgressStruct{AreaId: uint32(1), Status: OperationalStatusEnum(0), TotalOperationalTime: spectest.Ptr(spec.ValueOf(uint32(1))), EstimatedTime: spectest.Ptr(spec.ValueOf(uint32(1)))}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -52,18 +51,24 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleSelectAreas(func(context.Context, SelectAreasRequest) (SelectAreasResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSelectAreas(func(context.Context, SelectAreasRequest) (SelectAreasResponse, error) {
 		return SelectAreasResponse{}, nil
-	})
-	s.HandleSkipArea(func(context.Context, SkipAreaRequest) (SkipAreaResponse, error) { return SkipAreaResponse{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSkipArea(func(context.Context, SkipAreaRequest) (SkipAreaResponse, error) { return SkipAreaResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

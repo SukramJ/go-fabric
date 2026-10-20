@@ -43,7 +43,9 @@ func NewPowerSource(opts Options, with ...Option) (*PowerSource, error) {
 	return &PowerSource{d}, nil
 }
 
-// PowerSource returns the PowerSource server (mandatory), or nil when the host supplied one of another type.
+// PowerSource returns the typed PowerSource server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *PowerSource) PowerSource() *powersourcedef.Server {
-	return serverAs[*powersourcedef.Server](d.Device, 0x002F)
+	return powersourcedef.Wrap(d.Server(0x002F))
 }

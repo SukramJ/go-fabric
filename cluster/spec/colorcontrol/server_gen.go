@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the ColorControl cluster: one field per attribute
@@ -129,136 +130,161 @@ type Patch struct {
 	Null                            []uint32                 // attribute ids set to null
 }
 
-// Server is the typed ColorControl server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed ColorControl server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleMoveToHue registers fn for the MoveToHue command; nil removes the handler.
-func (s *Server) HandleMoveToHue(fn func(ctx context.Context, req MoveToHueRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToHue, spec.HandlerOf(fn))
+// HandleMoveToHue registers fn for the MoveToHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToHue(fn func(ctx context.Context, req MoveToHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToHue, fn)
 }
 
-// HandleMoveHue registers fn for the MoveHue command; nil removes the handler.
-func (s *Server) HandleMoveHue(fn func(ctx context.Context, req MoveHueRequest) (struct{}, error)) {
-	s.Handle(CmdMoveHue, spec.HandlerOf(fn))
+// HandleMoveHue registers fn for the MoveHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveHue(fn func(ctx context.Context, req MoveHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveHue, fn)
 }
 
-// HandleStepHue registers fn for the StepHue command; nil removes the handler.
-func (s *Server) HandleStepHue(fn func(ctx context.Context, req StepHueRequest) (struct{}, error)) {
-	s.Handle(CmdStepHue, spec.HandlerOf(fn))
+// HandleStepHue registers fn for the StepHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStepHue(fn func(ctx context.Context, req StepHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStepHue, fn)
 }
 
-// HandleMoveToSaturation registers fn for the MoveToSaturation command; nil removes the handler.
-func (s *Server) HandleMoveToSaturation(fn func(ctx context.Context, req MoveToSaturationRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToSaturation, spec.HandlerOf(fn))
+// HandleMoveToSaturation registers fn for the MoveToSaturation command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToSaturation(fn func(ctx context.Context, req MoveToSaturationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToSaturation, fn)
 }
 
-// HandleMoveSaturation registers fn for the MoveSaturation command; nil removes the handler.
-func (s *Server) HandleMoveSaturation(fn func(ctx context.Context, req MoveSaturationRequest) (struct{}, error)) {
-	s.Handle(CmdMoveSaturation, spec.HandlerOf(fn))
+// HandleMoveSaturation registers fn for the MoveSaturation command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveSaturation(fn func(ctx context.Context, req MoveSaturationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveSaturation, fn)
 }
 
-// HandleStepSaturation registers fn for the StepSaturation command; nil removes the handler.
-func (s *Server) HandleStepSaturation(fn func(ctx context.Context, req StepSaturationRequest) (struct{}, error)) {
-	s.Handle(CmdStepSaturation, spec.HandlerOf(fn))
+// HandleStepSaturation registers fn for the StepSaturation command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStepSaturation(fn func(ctx context.Context, req StepSaturationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStepSaturation, fn)
 }
 
-// HandleMoveToHueAndSaturation registers fn for the MoveToHueAndSaturation command; nil removes the handler.
-func (s *Server) HandleMoveToHueAndSaturation(fn func(ctx context.Context, req MoveToHueAndSaturationRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToHueAndSaturation, spec.HandlerOf(fn))
+// HandleMoveToHueAndSaturation registers fn for the MoveToHueAndSaturation command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToHueAndSaturation(fn func(ctx context.Context, req MoveToHueAndSaturationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToHueAndSaturation, fn)
 }
 
-// HandleMoveToColor registers fn for the MoveToColor command; nil removes the handler.
-func (s *Server) HandleMoveToColor(fn func(ctx context.Context, req MoveToColorRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToColor, spec.HandlerOf(fn))
+// HandleMoveToColor registers fn for the MoveToColor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToColor(fn func(ctx context.Context, req MoveToColorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToColor, fn)
 }
 
-// HandleMoveColor registers fn for the MoveColor command; nil removes the handler.
-func (s *Server) HandleMoveColor(fn func(ctx context.Context, req MoveColorRequest) (struct{}, error)) {
-	s.Handle(CmdMoveColor, spec.HandlerOf(fn))
+// HandleMoveColor registers fn for the MoveColor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveColor(fn func(ctx context.Context, req MoveColorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveColor, fn)
 }
 
-// HandleStepColor registers fn for the StepColor command; nil removes the handler.
-func (s *Server) HandleStepColor(fn func(ctx context.Context, req StepColorRequest) (struct{}, error)) {
-	s.Handle(CmdStepColor, spec.HandlerOf(fn))
+// HandleStepColor registers fn for the StepColor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStepColor(fn func(ctx context.Context, req StepColorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStepColor, fn)
 }
 
-// HandleMoveToColorTemperature registers fn for the MoveToColorTemperature command; nil removes the handler.
-func (s *Server) HandleMoveToColorTemperature(fn func(ctx context.Context, req MoveToColorTemperatureRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToColorTemperature, spec.HandlerOf(fn))
+// HandleMoveToColorTemperature registers fn for the MoveToColorTemperature command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToColorTemperature(fn func(ctx context.Context, req MoveToColorTemperatureRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToColorTemperature, fn)
 }
 
-// HandleEnhancedMoveToHue registers fn for the EnhancedMoveToHue command; nil removes the handler.
-func (s *Server) HandleEnhancedMoveToHue(fn func(ctx context.Context, req EnhancedMoveToHueRequest) (struct{}, error)) {
-	s.Handle(CmdEnhancedMoveToHue, spec.HandlerOf(fn))
+// HandleEnhancedMoveToHue registers fn for the EnhancedMoveToHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnhancedMoveToHue(fn func(ctx context.Context, req EnhancedMoveToHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHue, fn)
 }
 
-// HandleEnhancedMoveHue registers fn for the EnhancedMoveHue command; nil removes the handler.
-func (s *Server) HandleEnhancedMoveHue(fn func(ctx context.Context, req EnhancedMoveHueRequest) (struct{}, error)) {
-	s.Handle(CmdEnhancedMoveHue, spec.HandlerOf(fn))
+// HandleEnhancedMoveHue registers fn for the EnhancedMoveHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnhancedMoveHue(fn func(ctx context.Context, req EnhancedMoveHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveHue, fn)
 }
 
-// HandleEnhancedStepHue registers fn for the EnhancedStepHue command; nil removes the handler.
-func (s *Server) HandleEnhancedStepHue(fn func(ctx context.Context, req EnhancedStepHueRequest) (struct{}, error)) {
-	s.Handle(CmdEnhancedStepHue, spec.HandlerOf(fn))
+// HandleEnhancedStepHue registers fn for the EnhancedStepHue command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnhancedStepHue(fn func(ctx context.Context, req EnhancedStepHueRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnhancedStepHue, fn)
 }
 
-// HandleEnhancedMoveToHueAndSaturation registers fn for the EnhancedMoveToHueAndSaturation command; nil removes the handler.
-func (s *Server) HandleEnhancedMoveToHueAndSaturation(fn func(ctx context.Context, req EnhancedMoveToHueAndSaturationRequest) (struct{}, error)) {
-	s.Handle(CmdEnhancedMoveToHueAndSaturation, spec.HandlerOf(fn))
+// HandleEnhancedMoveToHueAndSaturation registers fn for the EnhancedMoveToHueAndSaturation command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnhancedMoveToHueAndSaturation(fn func(ctx context.Context, req EnhancedMoveToHueAndSaturationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHueAndSaturation, fn)
 }
 
-// HandleColorLoopSet registers fn for the ColorLoopSet command; nil removes the handler.
-func (s *Server) HandleColorLoopSet(fn func(ctx context.Context, req ColorLoopSetRequest) (struct{}, error)) {
-	s.Handle(CmdColorLoopSet, spec.HandlerOf(fn))
+// HandleColorLoopSet registers fn for the ColorLoopSet command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleColorLoopSet(fn func(ctx context.Context, req ColorLoopSetRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdColorLoopSet, fn)
 }
 
-// HandleStopMoveStep registers fn for the StopMoveStep command; nil removes the handler.
-func (s *Server) HandleStopMoveStep(fn func(ctx context.Context, req StopMoveStepRequest) (struct{}, error)) {
-	s.Handle(CmdStopMoveStep, spec.HandlerOf(fn))
+// HandleStopMoveStep registers fn for the StopMoveStep command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStopMoveStep(fn func(ctx context.Context, req StopMoveStepRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStopMoveStep, fn)
 }
 
-// HandleMoveColorTemperature registers fn for the MoveColorTemperature command; nil removes the handler.
-func (s *Server) HandleMoveColorTemperature(fn func(ctx context.Context, req MoveColorTemperatureRequest) (struct{}, error)) {
-	s.Handle(CmdMoveColorTemperature, spec.HandlerOf(fn))
+// HandleMoveColorTemperature registers fn for the MoveColorTemperature command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveColorTemperature(fn func(ctx context.Context, req MoveColorTemperatureRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveColorTemperature, fn)
 }
 
-// HandleStepColorTemperature registers fn for the StepColorTemperature command; nil removes the handler.
-func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)) {
-	s.Handle(CmdStepColorTemperature, spec.HandlerOf(fn))
+// HandleStepColorTemperature registers fn for the StepColorTemperature command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStepColorTemperature, fn)
 }
-
-func init() { spec.RegisterTyped(ClusterID, Wrap) }

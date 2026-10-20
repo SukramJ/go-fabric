@@ -49,7 +49,7 @@ func NewDoorLock(opts Options, with ...Option) (*DoorLock, error) {
 	return &DoorLock{d}, nil
 }
 
-// DoorLock returns the DoorLock server (mandatory), or nil when the host supplied one of another type.
-func (d *DoorLock) DoorLock() *doorlockdef.Server {
-	return serverAs[*doorlockdef.Server](d.Device, 0x0101)
-}
+// DoorLock returns the typed DoorLock server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *DoorLock) DoorLock() *doorlockdef.Server { return doorlockdef.Wrap(d.Server(0x0101)) }

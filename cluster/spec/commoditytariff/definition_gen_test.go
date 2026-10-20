@@ -45,8 +45,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdGetDayEntryResponse, spec.Response, GetDayEntryResponse{DayEntry: DayEntryStruct{DayEntryId: uint32(1), StartTime: uint16(1), Duration: spectest.Ptr(uint16(1)), RandomizationOffset: spectest.Ptr(int16(1)), RandomizationType: spectest.Ptr(DayEntryRandomizationTypeEnum(0))}})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -56,20 +55,26 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleGetTariffComponent(func(context.Context, GetTariffComponentRequest) (GetTariffComponentResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetTariffComponent(func(context.Context, GetTariffComponentRequest) (GetTariffComponentResponse, error) {
 		return GetTariffComponentResponse{}, nil
-	})
-	s.HandleGetDayEntry(func(context.Context, GetDayEntryRequest) (GetDayEntryResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetDayEntry(func(context.Context, GetDayEntryRequest) (GetDayEntryResponse, error) {
 		return GetDayEntryResponse{}, nil
-	})
+	}); err != nil {
+		t.Error(err)
+	}
 }

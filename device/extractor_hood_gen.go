@@ -58,17 +58,25 @@ func NewExtractorHood(opts Options, with ...Option) (*ExtractorHood, error) {
 	return &ExtractorHood{d}, nil
 }
 
-// FanControl returns the FanControl server (mandatory), or nil when the host supplied one of another type.
+// FanControl returns the typed FanControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ExtractorHood) FanControl() *fancontroldef.Server {
-	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
+	return fancontroldef.Wrap(d.Server(0x0202))
 }
 
-// HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	return serverAs[*hepafiltermonitoringdef.Server](d.Device, 0x0071)
+	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }

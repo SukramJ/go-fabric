@@ -62,8 +62,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventLockUserChange, LockUserChangeEvent{LockDataType: LockDataTypeEnum(0), DataOperationType: DataOperationTypeEnum(0), OperationSource: OperationSourceEnum(0), UserIndex: spec.ValueOf(uint16(1)), FabricIndex: spec.ValueOf(uint8(1)), SourceNode: spec.ValueOf(uint64(1)), DataIndex: spec.ValueOf(uint16(1))})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -73,46 +72,97 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleLockDoor(func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleUnlockDoor(func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleUnlockWithTimeout(func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetWeekDaySchedule(func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetWeekDaySchedule(func(context.Context, GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleLockDoor(func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnlockDoor(func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnlockWithTimeout(func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetWeekDaySchedule(func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetWeekDaySchedule(func(context.Context, GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error) {
 		return GetWeekDayScheduleResponse{}, nil
-	})
-	s.HandleClearWeekDaySchedule(func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetYearDaySchedule(func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetYearDaySchedule(func(context.Context, GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearWeekDaySchedule(func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetYearDaySchedule(func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetYearDaySchedule(func(context.Context, GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error) {
 		return GetYearDayScheduleResponse{}, nil
-	})
-	s.HandleClearYearDaySchedule(func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetHolidaySchedule(func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetHolidaySchedule(func(context.Context, GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearYearDaySchedule(func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetHolidaySchedule(func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetHolidaySchedule(func(context.Context, GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error) {
 		return GetHolidayScheduleResponse{}, nil
-	})
-	s.HandleClearHolidaySchedule(func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetUser(func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetUser(func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil })
-	s.HandleClearUser(func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetCredential(func(context.Context, SetCredentialRequest) (SetCredentialResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearHolidaySchedule(func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetUser(func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetUser(func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearUser(func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetCredential(func(context.Context, SetCredentialRequest) (SetCredentialResponse, error) {
 		return SetCredentialResponse{}, nil
-	})
-	s.HandleGetCredentialStatus(func(context.Context, GetCredentialStatusRequest) (GetCredentialStatusResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetCredentialStatus(func(context.Context, GetCredentialStatusRequest) (GetCredentialStatusResponse, error) {
 		return GetCredentialStatusResponse{}, nil
-	})
-	s.HandleClearCredential(func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleUnboltDoor(func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetAliroReaderConfig(func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearCredential(func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnboltDoor(func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetAliroReaderConfig(func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitDoorLockAlarm(0, DoorLockAlarmEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitDoorStateChange(0, DoorStateChangeEvent{})       // not in the empty definition's EventList: refused
+	_ = s.EmitLockOperation(0, LockOperationEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitLockOperationError(0, LockOperationErrorEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitLockUserChange(0, LockUserChangeEvent{})         // not in the empty definition's EventList: refused
 }

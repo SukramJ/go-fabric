@@ -68,22 +68,32 @@ func NewRoboticVacuumCleaner(opts Options, with ...Option) (*RoboticVacuumCleane
 	return &RoboticVacuumCleaner{d}, nil
 }
 
-// RvcRunMode returns the RvcRunMode server (mandatory), or nil when the host supplied one of another type.
+// RvcRunMode returns the typed RvcRunMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
-	return serverAs[*rvcrunmodedef.Server](d.Device, 0x0054)
+	return rvcrunmodedef.Wrap(d.Server(0x0054))
 }
 
-// RvcOperationalState returns the RvcOperationalState server (mandatory), or nil when the host supplied one of another type.
+// RvcOperationalState returns the typed RvcOperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
-	return serverAs[*rvcoperationalstatedef.Server](d.Device, 0x0061)
+	return rvcoperationalstatedef.Wrap(d.Server(0x0061))
 }
 
-// RvcCleanMode returns the RvcCleanMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RvcCleanMode returns the typed RvcCleanMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
-	return serverAs[*rvccleanmodedef.Server](d.Device, 0x0055)
+	return rvccleanmodedef.Wrap(d.Server(0x0055))
 }
 
-// ServiceArea returns the ServiceArea server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ServiceArea returns the typed ServiceArea server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
-	return serverAs[*serviceareadef.Server](d.Device, 0x0150)
+	return serviceareadef.Wrap(d.Server(0x0150))
 }

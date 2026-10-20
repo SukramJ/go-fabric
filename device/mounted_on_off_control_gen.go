@@ -6,7 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -86,10 +85,15 @@ func NewMountedOnOffControl(opts Options, with ...Option) (*MountedOnOffControl,
 	return &MountedOnOffControl{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *MountedOnOffControl) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *MountedOnOffControl) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// LevelControl returns the LevelControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// LevelControl returns the typed LevelControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *MountedOnOffControl) LevelControl() *levelcontroldef.Server {
-	return serverAs[*levelcontroldef.Server](d.Device, 0x0008)
+	return levelcontroldef.Wrap(d.Server(0x0008))
 }

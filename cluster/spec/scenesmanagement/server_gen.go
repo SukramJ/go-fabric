@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the ScenesManagement cluster: one field per attribute
@@ -29,81 +30,95 @@ type Patch struct {
 	SceneTableSize *uint16 `matter:"0x0001"` // attribute 0x0001
 }
 
-// Server is the typed ScenesManagement server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed ScenesManagement server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAddScene registers fn for the AddScene command; nil removes the handler.
-func (s *Server) HandleAddScene(fn func(ctx context.Context, req AddSceneRequest) (AddSceneResponse, error)) {
-	s.Handle(CmdAddScene, spec.HandlerOf(fn))
+// HandleAddScene registers fn for the AddScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleAddScene(fn func(ctx context.Context, req AddSceneRequest) (AddSceneResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdAddScene, fn)
 }
 
-// HandleViewScene registers fn for the ViewScene command; nil removes the handler.
-func (s *Server) HandleViewScene(fn func(ctx context.Context, req ViewSceneRequest) (ViewSceneResponse, error)) {
-	s.Handle(CmdViewScene, spec.HandlerOf(fn))
+// HandleViewScene registers fn for the ViewScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleViewScene(fn func(ctx context.Context, req ViewSceneRequest) (ViewSceneResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdViewScene, fn)
 }
 
-// HandleRemoveScene registers fn for the RemoveScene command; nil removes the handler.
-func (s *Server) HandleRemoveScene(fn func(ctx context.Context, req RemoveSceneRequest) (RemoveSceneResponse, error)) {
-	s.Handle(CmdRemoveScene, spec.HandlerOf(fn))
+// HandleRemoveScene registers fn for the RemoveScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleRemoveScene(fn func(ctx context.Context, req RemoveSceneRequest) (RemoveSceneResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdRemoveScene, fn)
 }
 
-// HandleRemoveAllScenes registers fn for the RemoveAllScenes command; nil removes the handler.
-func (s *Server) HandleRemoveAllScenes(fn func(ctx context.Context, req RemoveAllScenesRequest) (RemoveAllScenesResponse, error)) {
-	s.Handle(CmdRemoveAllScenes, spec.HandlerOf(fn))
+// HandleRemoveAllScenes registers fn for the RemoveAllScenes command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleRemoveAllScenes(fn func(ctx context.Context, req RemoveAllScenesRequest) (RemoveAllScenesResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdRemoveAllScenes, fn)
 }
 
-// HandleStoreScene registers fn for the StoreScene command; nil removes the handler.
-func (s *Server) HandleStoreScene(fn func(ctx context.Context, req StoreSceneRequest) (StoreSceneResponse, error)) {
-	s.Handle(CmdStoreScene, spec.HandlerOf(fn))
+// HandleStoreScene registers fn for the StoreScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStoreScene(fn func(ctx context.Context, req StoreSceneRequest) (StoreSceneResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStoreScene, fn)
 }
 
-// HandleRecallScene registers fn for the RecallScene command; nil removes the handler.
-func (s *Server) HandleRecallScene(fn func(ctx context.Context, req RecallSceneRequest) (struct{}, error)) {
-	s.Handle(CmdRecallScene, spec.HandlerOf(fn))
+// HandleRecallScene registers fn for the RecallScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleRecallScene(fn func(ctx context.Context, req RecallSceneRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdRecallScene, fn)
 }
 
-// HandleGetSceneMembership registers fn for the GetSceneMembership command; nil removes the handler.
-func (s *Server) HandleGetSceneMembership(fn func(ctx context.Context, req GetSceneMembershipRequest) (GetSceneMembershipResponse, error)) {
-	s.Handle(CmdGetSceneMembership, spec.HandlerOf(fn))
+// HandleGetSceneMembership registers fn for the GetSceneMembership command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetSceneMembership(fn func(ctx context.Context, req GetSceneMembershipRequest) (GetSceneMembershipResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetSceneMembership, fn)
 }
 
-// HandleCopyScene registers fn for the CopyScene command; nil removes the handler.
-func (s *Server) HandleCopyScene(fn func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)) {
-	s.Handle(CmdCopyScene, spec.HandlerOf(fn))
+// HandleCopyScene registers fn for the CopyScene command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleCopyScene(fn func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdCopyScene, fn)
 }
-
-func init() { spec.RegisterTyped(ClusterID, Wrap) }

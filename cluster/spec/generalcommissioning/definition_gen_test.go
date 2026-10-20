@@ -38,8 +38,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrBasicCommissioningInfo, BasicCommissioningInfo{FailSafeExpiryLengthSeconds: uint16(1), MaxCumulativeFailsafeSeconds: uint16(1)})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -49,26 +48,36 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleArmFailSafe(func(context.Context, ArmFailSafeRequest) (ArmFailSafeResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleArmFailSafe(func(context.Context, ArmFailSafeRequest) (ArmFailSafeResponse, error) {
 		return ArmFailSafeResponse{}, nil
-	})
-	s.HandleSetRegulatoryConfig(func(context.Context, SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetRegulatoryConfig(func(context.Context, SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error) {
 		return SetRegulatoryConfigResponse{}, nil
-	})
-	s.HandleCommissioningComplete(func(context.Context, CommissioningCompleteRequest) (CommissioningCompleteResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCommissioningComplete(func(context.Context, CommissioningCompleteRequest) (CommissioningCompleteResponse, error) {
 		return CommissioningCompleteResponse{}, nil
-	})
-	s.HandleSetTcAcknowledgements(func(context.Context, SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTcAcknowledgements(func(context.Context, SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error) {
 		return SetTcAcknowledgementsResponse{}, nil
-	})
+	}); err != nil {
+		t.Error(err)
+	}
 }

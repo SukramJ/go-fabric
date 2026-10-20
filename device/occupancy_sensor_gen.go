@@ -54,12 +54,17 @@ func NewOccupancySensor(opts Options, with ...Option) (*OccupancySensor, error) 
 	return &OccupancySensor{d}, nil
 }
 
-// OccupancySensing returns the OccupancySensing server (mandatory), or nil when the host supplied one of another type.
+// OccupancySensing returns the typed OccupancySensing server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *OccupancySensor) OccupancySensing() *occupancysensingdef.Server {
-	return serverAs[*occupancysensingdef.Server](d.Device, 0x0406)
+	return occupancysensingdef.Wrap(d.Server(0x0406))
 }
 
-// BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *OccupancySensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	return serverAs[*booleanstateconfigurationdef.Server](d.Device, 0x0080)
+	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
 }

@@ -50,7 +50,9 @@ func NewClosurePanel(opts Options, with ...Option) (*ClosurePanel, error) {
 	return &ClosurePanel{d}, nil
 }
 
-// ClosureDimension returns the ClosureDimension server (mandatory), or nil when the host supplied one of another type.
+// ClosureDimension returns the typed ClosureDimension server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ClosurePanel) ClosureDimension() *closuredimensiondef.Server {
-	return serverAs[*closuredimensiondef.Server](d.Device, 0x0105)
+	return closuredimensiondef.Wrap(d.Server(0x0105))
 }

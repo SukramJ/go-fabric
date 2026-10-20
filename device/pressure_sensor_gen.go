@@ -49,7 +49,9 @@ func NewPressureSensor(opts Options, with ...Option) (*PressureSensor, error) {
 	return &PressureSensor{d}, nil
 }
 
-// PressureMeasurement returns the PressureMeasurement server (mandatory), or nil when the host supplied one of another type.
+// PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *PressureSensor) PressureMeasurement() *pressuremeasurementdef.Server {
-	return serverAs[*pressuremeasurementdef.Server](d.Device, 0x0403)
+	return pressuremeasurementdef.Wrap(d.Server(0x0403))
 }

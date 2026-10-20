@@ -58,12 +58,17 @@ func NewRainSensor(opts Options, with ...Option) (*RainSensor, error) {
 	return &RainSensor{d}, nil
 }
 
-// BooleanState returns the BooleanState server (mandatory), or nil when the host supplied one of another type.
+// BooleanState returns the typed BooleanState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *RainSensor) BooleanState() *booleanstatedef.Server {
-	return serverAs[*booleanstatedef.Server](d.Device, 0x0045)
+	return booleanstatedef.Wrap(d.Server(0x0045))
 }
 
-// BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RainSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	return serverAs[*booleanstateconfigurationdef.Server](d.Device, 0x0080)
+	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
 }

@@ -35,8 +35,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrRegisteredClients, spec.List[MonitoringRegistrationStruct]([]MonitoringRegistrationStruct{MonitoringRegistrationStruct{CheckInNodeId: uint64(1), MonitoredSubject: uint64(1), Key: spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), ClientType: ClientTypeEnum(0), FabricIndex: uint8(1)}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -46,21 +45,29 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleRegisterClient(func(context.Context, RegisterClientRequest) (RegisterClientResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRegisterClient(func(context.Context, RegisterClientRequest) (RegisterClientResponse, error) {
 		return RegisterClientResponse{}, nil
-	})
-	s.HandleUnregisterClient(func(context.Context, UnregisterClientRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStayActiveRequest(func(context.Context, StayActiveRequestRequest) (StayActiveResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnregisterClient(func(context.Context, UnregisterClientRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStayActiveRequest(func(context.Context, StayActiveRequestRequest) (StayActiveResponse, error) {
 		return StayActiveResponse{}, nil
-	})
+	}); err != nil {
+		t.Error(err)
+	}
 }

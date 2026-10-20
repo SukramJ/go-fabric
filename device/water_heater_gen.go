@@ -61,17 +61,21 @@ func NewWaterHeater(opts Options, with ...Option) (*WaterHeater, error) {
 	return &WaterHeater{d}, nil
 }
 
-// WaterHeaterManagement returns the WaterHeaterManagement server (mandatory), or nil when the host supplied one of another type.
+// WaterHeaterManagement returns the typed WaterHeaterManagement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
-	return serverAs[*waterheatermanagementdef.Server](d.Device, 0x0094)
+	return waterheatermanagementdef.Wrap(d.Server(0x0094))
 }
 
-// WaterHeaterMode returns the WaterHeaterMode server (mandatory), or nil when the host supplied one of another type.
+// WaterHeaterMode returns the typed WaterHeaterMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
-	return serverAs[*waterheatermodedef.Server](d.Device, 0x009E)
+	return waterheatermodedef.Wrap(d.Server(0x009E))
 }
 
-// Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) Thermostat() *thermostatdef.Server {
-	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
-}
+// Thermostat returns the typed Thermostat server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *WaterHeater) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }

@@ -44,8 +44,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventRfid, RfidEvent{Uid: []byte{1}})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -55,21 +54,43 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil })
-	s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitEvConnected(0, EvConnectedEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitEvNotDetected(0, EvNotDetectedEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitEnergyTransferStarted(0, EnergyTransferStartedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitEnergyTransferStopped(0, EnergyTransferStoppedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitFault(0, FaultEvent{})                                 // not in the empty definition's EventList: refused
+	_ = s.EmitRfid(0, RfidEvent{})                                   // not in the empty definition's EventList: refused
 }

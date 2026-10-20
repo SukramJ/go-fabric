@@ -81,17 +81,23 @@ func NewThermostat(opts Options, with ...Option) (*Thermostat, error) {
 	return &Thermostat{d}, nil
 }
 
-// Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *Thermostat) Thermostat() *thermostatdef.Server {
-	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
-}
+// Thermostat returns the typed Thermostat server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Thermostat) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }
 
-// EnergyPreference returns the EnergyPreference server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// EnergyPreference returns the typed EnergyPreference server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
-	return serverAs[*energypreferencedef.Server](d.Device, 0x009B)
+	return energypreferencedef.Wrap(d.Server(0x009B))
 }
 
-// ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
+	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
 }

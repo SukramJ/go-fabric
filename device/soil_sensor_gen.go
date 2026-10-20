@@ -54,12 +54,17 @@ func NewSoilSensor(opts Options, with ...Option) (*SoilSensor, error) {
 	return &SoilSensor{d}, nil
 }
 
-// SoilMeasurement returns the SoilMeasurement server (mandatory), or nil when the host supplied one of another type.
+// SoilMeasurement returns the typed SoilMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
-	return serverAs[*soilmeasurementdef.Server](d.Device, 0x0430)
+	return soilmeasurementdef.Wrap(d.Server(0x0430))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *SoilSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }

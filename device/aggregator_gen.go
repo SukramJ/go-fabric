@@ -53,12 +53,16 @@ func NewAggregator(opts Options, with ...Option) (*Aggregator, error) {
 	return &Aggregator{d}, nil
 }
 
-// Actions returns the Actions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Aggregator) Actions() *actionsdef.Server {
-	return serverAs[*actionsdef.Server](d.Device, 0x0025)
-}
+// Actions returns the typed Actions server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Aggregator) Actions() *actionsdef.Server { return actionsdef.Wrap(d.Server(0x0025)) }
 
-// CommissionerControl returns the CommissionerControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CommissionerControl returns the typed CommissionerControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *Aggregator) CommissionerControl() *commissionercontroldef.Server {
-	return serverAs[*commissionercontroldef.Server](d.Device, 0x0751)
+	return commissionercontroldef.Wrap(d.Server(0x0751))
 }

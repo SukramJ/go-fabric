@@ -57,8 +57,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrThermostatSuggestions, spec.List[ThermostatSuggestionStruct]([]ThermostatSuggestionStruct{ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -68,22 +67,44 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleSetpointRaiseLower(func(context.Context, SetpointRaiseLowerRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetActiveScheduleRequest(func(context.Context, SetActiveScheduleRequestRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetActivePresetRequest(func(context.Context, SetActivePresetRequestRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleAddThermostatSuggestion(func(context.Context, AddThermostatSuggestionRequest) (AddThermostatSuggestionResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetpointRaiseLower(func(context.Context, SetpointRaiseLowerRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetActiveScheduleRequest(func(context.Context, SetActiveScheduleRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetActivePresetRequest(func(context.Context, SetActivePresetRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddThermostatSuggestion(func(context.Context, AddThermostatSuggestionRequest) (AddThermostatSuggestionResponse, error) {
 		return AddThermostatSuggestionResponse{}, nil
-	})
-	s.HandleRemoveThermostatSuggestion(func(context.Context, RemoveThermostatSuggestionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveThermostatSuggestion(func(context.Context, RemoveThermostatSuggestionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitSystemModeChange(0, SystemModeChangeEvent{})             // not in the empty definition's EventList: refused
+	_ = s.EmitLocalTemperatureChange(0, LocalTemperatureChangeEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitOccupancyChange(0, OccupancyChangeEvent{})               // not in the empty definition's EventList: refused
+	_ = s.EmitSetpointChange(0, SetpointChangeEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitRunningStateChange(0, RunningStateChangeEvent{})         // not in the empty definition's EventList: refused
+	_ = s.EmitRunningModeChange(0, RunningModeChangeEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitActiveScheduleChange(0, ActiveScheduleChangeEvent{})     // not in the empty definition's EventList: refused
+	_ = s.EmitActivePresetChange(0, ActivePresetChangeEvent{})         // not in the empty definition's EventList: refused
 }

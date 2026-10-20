@@ -35,8 +35,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrAccuracy, MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -46,14 +45,18 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitCumulativeEnergyMeasured(0, CumulativeEnergyMeasuredEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitPeriodicEnergyMeasured(0, PeriodicEnergyMeasuredEvent{})     // not in the empty definition's EventList: refused
 }

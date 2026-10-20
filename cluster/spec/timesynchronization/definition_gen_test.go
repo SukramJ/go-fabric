@@ -45,8 +45,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrDstOffset, spec.List[DSTOffsetStruct]([]DSTOffsetStruct{DSTOffsetStruct{Offset: int32(1), ValidStarting: uint64(1), ValidUntil: spec.ValueOf(uint64(1))}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -56,21 +55,38 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetTimeZone(func(context.Context, SetTimeZoneRequest) (SetTimeZoneResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTimeZone(func(context.Context, SetTimeZoneRequest) (SetTimeZoneResponse, error) {
 		return SetTimeZoneResponse{}, nil
-	})
-	s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitDstTableEmpty(0, DstTableEmptyEvent{})                       // not in the empty definition's EventList: refused
+	_ = s.EmitDstStatus(0, DstStatusEvent{})                               // not in the empty definition's EventList: refused
+	_ = s.EmitTimeZoneStatus(0, TimeZoneStatusEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitTimeFailure(0, TimeFailureEvent{})                           // not in the empty definition's EventList: refused
+	_ = s.EmitMissingTrustedTimeSource(0, MissingTrustedTimeSourceEvent{}) // not in the empty definition's EventList: refused
 }

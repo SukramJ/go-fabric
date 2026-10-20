@@ -6,7 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/schema"
@@ -50,10 +49,14 @@ func NewSpeaker(opts Options, with ...Option) (*Speaker, error) {
 	return &Speaker{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *Speaker) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Speaker) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
+// LevelControl returns the typed LevelControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *Speaker) LevelControl() *levelcontroldef.Server {
-	return serverAs[*levelcontroldef.Server](d.Device, 0x0008)
+	return levelcontroldef.Wrap(d.Server(0x0008))
 }

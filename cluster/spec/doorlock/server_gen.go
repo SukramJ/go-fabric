@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the DoorLock cluster: one field per attribute
@@ -118,151 +119,209 @@ type Patch struct {
 	Null                                               []uint32                        // attribute ids set to null
 }
 
-// Server is the typed DoorLock server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed DoorLock server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleLockDoor registers fn for the LockDoor command; nil removes the handler.
-func (s *Server) HandleLockDoor(fn func(ctx context.Context, req LockDoorRequest) (struct{}, error)) {
-	s.Handle(CmdLockDoor, spec.HandlerOf(fn))
+// HandleLockDoor registers fn for the LockDoor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleLockDoor(fn func(ctx context.Context, req LockDoorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdLockDoor, fn)
 }
 
-// HandleUnlockDoor registers fn for the UnlockDoor command; nil removes the handler.
-func (s *Server) HandleUnlockDoor(fn func(ctx context.Context, req UnlockDoorRequest) (struct{}, error)) {
-	s.Handle(CmdUnlockDoor, spec.HandlerOf(fn))
+// HandleUnlockDoor registers fn for the UnlockDoor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleUnlockDoor(fn func(ctx context.Context, req UnlockDoorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdUnlockDoor, fn)
 }
 
-// HandleToggle registers fn for the Toggle command; nil removes the handler.
-func (s *Server) HandleToggle(fn func(ctx context.Context, req ToggleRequest) (struct{}, error)) {
-	s.Handle(CmdToggle, spec.HandlerOf(fn))
+// HandleToggle registers fn for the Toggle command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleToggle(fn func(ctx context.Context, req ToggleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdToggle, fn)
 }
 
-// HandleUnlockWithTimeout registers fn for the UnlockWithTimeout command; nil removes the handler.
-func (s *Server) HandleUnlockWithTimeout(fn func(ctx context.Context, req UnlockWithTimeoutRequest) (struct{}, error)) {
-	s.Handle(CmdUnlockWithTimeout, spec.HandlerOf(fn))
+// HandleUnlockWithTimeout registers fn for the UnlockWithTimeout command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleUnlockWithTimeout(fn func(ctx context.Context, req UnlockWithTimeoutRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdUnlockWithTimeout, fn)
 }
 
-// HandleSetWeekDaySchedule registers fn for the SetWeekDaySchedule command; nil removes the handler.
-func (s *Server) HandleSetWeekDaySchedule(fn func(ctx context.Context, req SetWeekDayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdSetWeekDaySchedule, spec.HandlerOf(fn))
+// HandleSetWeekDaySchedule registers fn for the SetWeekDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetWeekDaySchedule(fn func(ctx context.Context, req SetWeekDayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetWeekDaySchedule, fn)
 }
 
-// HandleGetWeekDaySchedule registers fn for the GetWeekDaySchedule command; nil removes the handler.
-func (s *Server) HandleGetWeekDaySchedule(fn func(ctx context.Context, req GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error)) {
-	s.Handle(CmdGetWeekDaySchedule, spec.HandlerOf(fn))
+// HandleGetWeekDaySchedule registers fn for the GetWeekDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetWeekDaySchedule(fn func(ctx context.Context, req GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetWeekDaySchedule, fn)
 }
 
-// HandleClearWeekDaySchedule registers fn for the ClearWeekDaySchedule command; nil removes the handler.
-func (s *Server) HandleClearWeekDaySchedule(fn func(ctx context.Context, req ClearWeekDayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdClearWeekDaySchedule, spec.HandlerOf(fn))
+// HandleClearWeekDaySchedule registers fn for the ClearWeekDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearWeekDaySchedule(fn func(ctx context.Context, req ClearWeekDayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearWeekDaySchedule, fn)
 }
 
-// HandleSetYearDaySchedule registers fn for the SetYearDaySchedule command; nil removes the handler.
-func (s *Server) HandleSetYearDaySchedule(fn func(ctx context.Context, req SetYearDayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdSetYearDaySchedule, spec.HandlerOf(fn))
+// HandleSetYearDaySchedule registers fn for the SetYearDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetYearDaySchedule(fn func(ctx context.Context, req SetYearDayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetYearDaySchedule, fn)
 }
 
-// HandleGetYearDaySchedule registers fn for the GetYearDaySchedule command; nil removes the handler.
-func (s *Server) HandleGetYearDaySchedule(fn func(ctx context.Context, req GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error)) {
-	s.Handle(CmdGetYearDaySchedule, spec.HandlerOf(fn))
+// HandleGetYearDaySchedule registers fn for the GetYearDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetYearDaySchedule(fn func(ctx context.Context, req GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetYearDaySchedule, fn)
 }
 
-// HandleClearYearDaySchedule registers fn for the ClearYearDaySchedule command; nil removes the handler.
-func (s *Server) HandleClearYearDaySchedule(fn func(ctx context.Context, req ClearYearDayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdClearYearDaySchedule, spec.HandlerOf(fn))
+// HandleClearYearDaySchedule registers fn for the ClearYearDaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearYearDaySchedule(fn func(ctx context.Context, req ClearYearDayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearYearDaySchedule, fn)
 }
 
-// HandleSetHolidaySchedule registers fn for the SetHolidaySchedule command; nil removes the handler.
-func (s *Server) HandleSetHolidaySchedule(fn func(ctx context.Context, req SetHolidayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdSetHolidaySchedule, spec.HandlerOf(fn))
+// HandleSetHolidaySchedule registers fn for the SetHolidaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetHolidaySchedule(fn func(ctx context.Context, req SetHolidayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetHolidaySchedule, fn)
 }
 
-// HandleGetHolidaySchedule registers fn for the GetHolidaySchedule command; nil removes the handler.
-func (s *Server) HandleGetHolidaySchedule(fn func(ctx context.Context, req GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error)) {
-	s.Handle(CmdGetHolidaySchedule, spec.HandlerOf(fn))
+// HandleGetHolidaySchedule registers fn for the GetHolidaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetHolidaySchedule(fn func(ctx context.Context, req GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetHolidaySchedule, fn)
 }
 
-// HandleClearHolidaySchedule registers fn for the ClearHolidaySchedule command; nil removes the handler.
-func (s *Server) HandleClearHolidaySchedule(fn func(ctx context.Context, req ClearHolidayScheduleRequest) (struct{}, error)) {
-	s.Handle(CmdClearHolidaySchedule, spec.HandlerOf(fn))
+// HandleClearHolidaySchedule registers fn for the ClearHolidaySchedule command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearHolidaySchedule(fn func(ctx context.Context, req ClearHolidayScheduleRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearHolidaySchedule, fn)
 }
 
-// HandleSetUser registers fn for the SetUser command; nil removes the handler.
-func (s *Server) HandleSetUser(fn func(ctx context.Context, req SetUserRequest) (struct{}, error)) {
-	s.Handle(CmdSetUser, spec.HandlerOf(fn))
+// HandleSetUser registers fn for the SetUser command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetUser(fn func(ctx context.Context, req SetUserRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetUser, fn)
 }
 
-// HandleGetUser registers fn for the GetUser command; nil removes the handler.
-func (s *Server) HandleGetUser(fn func(ctx context.Context, req GetUserRequest) (GetUserResponse, error)) {
-	s.Handle(CmdGetUser, spec.HandlerOf(fn))
+// HandleGetUser registers fn for the GetUser command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetUser(fn func(ctx context.Context, req GetUserRequest) (GetUserResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetUser, fn)
 }
 
-// HandleClearUser registers fn for the ClearUser command; nil removes the handler.
-func (s *Server) HandleClearUser(fn func(ctx context.Context, req ClearUserRequest) (struct{}, error)) {
-	s.Handle(CmdClearUser, spec.HandlerOf(fn))
+// HandleClearUser registers fn for the ClearUser command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearUser(fn func(ctx context.Context, req ClearUserRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearUser, fn)
 }
 
-// HandleSetCredential registers fn for the SetCredential command; nil removes the handler.
-func (s *Server) HandleSetCredential(fn func(ctx context.Context, req SetCredentialRequest) (SetCredentialResponse, error)) {
-	s.Handle(CmdSetCredential, spec.HandlerOf(fn))
+// HandleSetCredential registers fn for the SetCredential command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetCredential(fn func(ctx context.Context, req SetCredentialRequest) (SetCredentialResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetCredential, fn)
 }
 
-// HandleGetCredentialStatus registers fn for the GetCredentialStatus command; nil removes the handler.
-func (s *Server) HandleGetCredentialStatus(fn func(ctx context.Context, req GetCredentialStatusRequest) (GetCredentialStatusResponse, error)) {
-	s.Handle(CmdGetCredentialStatus, spec.HandlerOf(fn))
+// HandleGetCredentialStatus registers fn for the GetCredentialStatus command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleGetCredentialStatus(fn func(ctx context.Context, req GetCredentialStatusRequest) (GetCredentialStatusResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdGetCredentialStatus, fn)
 }
 
-// HandleClearCredential registers fn for the ClearCredential command; nil removes the handler.
-func (s *Server) HandleClearCredential(fn func(ctx context.Context, req ClearCredentialRequest) (struct{}, error)) {
-	s.Handle(CmdClearCredential, spec.HandlerOf(fn))
+// HandleClearCredential registers fn for the ClearCredential command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearCredential(fn func(ctx context.Context, req ClearCredentialRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearCredential, fn)
 }
 
-// HandleUnboltDoor registers fn for the UnboltDoor command; nil removes the handler.
-func (s *Server) HandleUnboltDoor(fn func(ctx context.Context, req UnboltDoorRequest) (struct{}, error)) {
-	s.Handle(CmdUnboltDoor, spec.HandlerOf(fn))
+// HandleUnboltDoor registers fn for the UnboltDoor command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleUnboltDoor(fn func(ctx context.Context, req UnboltDoorRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdUnboltDoor, fn)
 }
 
-// HandleSetAliroReaderConfig registers fn for the SetAliroReaderConfig command; nil removes the handler.
-func (s *Server) HandleSetAliroReaderConfig(fn func(ctx context.Context, req SetAliroReaderConfigRequest) (struct{}, error)) {
-	s.Handle(CmdSetAliroReaderConfig, spec.HandlerOf(fn))
+// HandleSetAliroReaderConfig registers fn for the SetAliroReaderConfig command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSetAliroReaderConfig(fn func(ctx context.Context, req SetAliroReaderConfigRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSetAliroReaderConfig, fn)
 }
 
-// HandleClearAliroReaderConfig registers fn for the ClearAliroReaderConfig command; nil removes the handler.
-func (s *Server) HandleClearAliroReaderConfig(fn func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)) {
-	s.Handle(CmdClearAliroReaderConfig, spec.HandlerOf(fn))
+// HandleClearAliroReaderConfig registers fn for the ClearAliroReaderConfig command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleClearAliroReaderConfig(fn func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdClearAliroReaderConfig, fn)
 }
 
-func init() { spec.RegisterTyped(ClusterID, Wrap) }
+// EmitDoorLockAlarm emits the DoorLockAlarm event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitDoorLockAlarm(endpoint uint16, data DoorLockAlarmEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventDoorLockAlarm, data)
+}
+
+// EmitDoorStateChange emits the DoorStateChange event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitDoorStateChange(endpoint uint16, data DoorStateChangeEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventDoorStateChange, data)
+}
+
+// EmitLockOperation emits the LockOperation event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitLockOperation(endpoint uint16, data LockOperationEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperation, data)
+}
+
+// EmitLockOperationError emits the LockOperationError event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitLockOperationError(endpoint uint16, data LockOperationErrorEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperationError, data)
+}
+
+// EmitLockUserChange emits the LockUserChange event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data)
+}

@@ -49,7 +49,9 @@ func NewFlowSensor(opts Options, with ...Option) (*FlowSensor, error) {
 	return &FlowSensor{d}, nil
 }
 
-// FlowMeasurement returns the FlowMeasurement server (mandatory), or nil when the host supplied one of another type.
+// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *FlowSensor) FlowMeasurement() *flowmeasurementdef.Server {
-	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+	return flowmeasurementdef.Wrap(d.Server(0x0404))
 }

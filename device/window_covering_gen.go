@@ -54,7 +54,9 @@ func NewWindowCovering(opts Options, with ...Option) (*WindowCovering, error) {
 	return &WindowCovering{d}, nil
 }
 
-// WindowCovering returns the WindowCovering server (mandatory), or nil when the host supplied one of another type.
+// WindowCovering returns the typed WindowCovering server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *WindowCovering) WindowCovering() *windowcoveringdef.Server {
-	return serverAs[*windowcoveringdef.Server](d.Device, 0x0102)
+	return windowcoveringdef.Wrap(d.Server(0x0102))
 }

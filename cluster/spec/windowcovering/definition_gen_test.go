@@ -33,8 +33,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdGoToTiltPercentage, spec.Request, GoToTiltPercentageRequest{TiltPercent100thsValue: uint16(1)})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -44,19 +43,31 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleUpOrOpen(func(context.Context, UpOrOpenRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleDownOrClose(func(context.Context, DownOrCloseRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStopMotion(func(context.Context, StopMotionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGoToLiftPercentage(func(context.Context, GoToLiftPercentageRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGoToTiltPercentage(func(context.Context, GoToTiltPercentageRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUpOrOpen(func(context.Context, UpOrOpenRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDownOrClose(func(context.Context, DownOrCloseRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopMotion(func(context.Context, StopMotionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGoToLiftPercentage(func(context.Context, GoToLiftPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGoToTiltPercentage(func(context.Context, GoToTiltPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

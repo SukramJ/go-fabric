@@ -57,12 +57,17 @@ func NewTemperatureSensor(opts Options, with ...Option) (*TemperatureSensor, err
 	return &TemperatureSensor{d}, nil
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (mandatory), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
+	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
 }

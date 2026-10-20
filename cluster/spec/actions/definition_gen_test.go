@@ -46,8 +46,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrEndpointLists, spec.List[EndpointListStruct]([]EndpointListStruct{EndpointListStruct{EndpointListId: uint16(1), Name: "x", Type: EndpointListTypeEnum(0), Endpoints: []uint16{uint16(1)}}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -57,26 +56,54 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitActionFailed(0, ActionFailedEvent{}) // not in the empty definition's EventList: refused
 }

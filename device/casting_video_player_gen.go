@@ -6,7 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	accountlogindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	applicationlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	audiooutputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
@@ -114,70 +113,106 @@ func NewCastingVideoPlayer(opts Options, with ...Option) (*CastingVideoPlayer, e
 	return &CastingVideoPlayer{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *CastingVideoPlayer) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// MediaPlayback returns the MediaPlayback server (mandatory), or nil when the host supplied one of another type.
+// MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *CastingVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
-	return serverAs[*mediaplaybackdef.Server](d.Device, 0x0506)
+	return mediaplaybackdef.Wrap(d.Server(0x0506))
 }
 
-// KeypadInput returns the KeypadInput server (mandatory), or nil when the host supplied one of another type.
+// KeypadInput returns the typed KeypadInput server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *CastingVideoPlayer) KeypadInput() *keypadinputdef.Server {
-	return serverAs[*keypadinputdef.Server](d.Device, 0x0509)
+	return keypadinputdef.Wrap(d.Server(0x0509))
 }
 
-// ContentLauncher returns the ContentLauncher server (mandatory), or nil when the host supplied one of another type.
+// ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *CastingVideoPlayer) ContentLauncher() *contentlauncherdef.Server {
-	return serverAs[*contentlauncherdef.Server](d.Device, 0x050A)
+	return contentlauncherdef.Wrap(d.Server(0x050A))
 }
 
-// Messages returns the Messages server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// Messages returns the typed Messages server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) Messages() *messagesdef.Server {
-	return serverAs[*messagesdef.Server](d.Device, 0x0097)
+	return messagesdef.Wrap(d.Server(0x0097))
 }
 
-// WakeOnLan returns the WakeOnLan server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// WakeOnLan returns the typed WakeOnLan server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) WakeOnLan() *wakeonlandef.Server {
-	return serverAs[*wakeonlandef.Server](d.Device, 0x0503)
+	return wakeonlandef.Wrap(d.Server(0x0503))
 }
 
-// Channel returns the Channel server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) Channel() *channeldef.Server {
-	return serverAs[*channeldef.Server](d.Device, 0x0504)
-}
+// Channel returns the typed Channel server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *CastingVideoPlayer) Channel() *channeldef.Server { return channeldef.Wrap(d.Server(0x0504)) }
 
-// TargetNavigator returns the TargetNavigator server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
-	return serverAs[*targetnavigatordef.Server](d.Device, 0x0505)
+	return targetnavigatordef.Wrap(d.Server(0x0505))
 }
 
-// MediaInput returns the MediaInput server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// MediaInput returns the typed MediaInput server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) MediaInput() *mediainputdef.Server {
-	return serverAs[*mediainputdef.Server](d.Device, 0x0507)
+	return mediainputdef.Wrap(d.Server(0x0507))
 }
 
-// LowPower returns the LowPower server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// LowPower returns the typed LowPower server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) LowPower() *lowpowerdef.Server {
-	return serverAs[*lowpowerdef.Server](d.Device, 0x0508)
+	return lowpowerdef.Wrap(d.Server(0x0508))
 }
 
-// AudioOutput returns the AudioOutput server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// AudioOutput returns the typed AudioOutput server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) AudioOutput() *audiooutputdef.Server {
-	return serverAs[*audiooutputdef.Server](d.Device, 0x050B)
+	return audiooutputdef.Wrap(d.Server(0x050B))
 }
 
-// ApplicationLauncher returns the ApplicationLauncher server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) ApplicationLauncher() *applicationlauncherdef.Server {
-	return serverAs[*applicationlauncherdef.Server](d.Device, 0x050C)
+	return applicationlauncherdef.Wrap(d.Server(0x050C))
 }
 
-// AccountLogin returns the AccountLogin server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// AccountLogin returns the typed AccountLogin server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) AccountLogin() *accountlogindef.Server {
-	return serverAs[*accountlogindef.Server](d.Device, 0x050E)
+	return accountlogindef.Wrap(d.Server(0x050E))
 }
 
-// ContentControl returns the ContentControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ContentControl returns the typed ContentControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *CastingVideoPlayer) ContentControl() *contentcontroldef.Server {
-	return serverAs[*contentcontroldef.Server](d.Device, 0x050F)
+	return contentcontroldef.Wrap(d.Server(0x050F))
 }

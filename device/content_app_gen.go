@@ -86,42 +86,61 @@ func NewContentApp(opts Options, with ...Option) (*ContentApp, error) {
 	return &ContentApp{d}, nil
 }
 
-// KeypadInput returns the KeypadInput server (mandatory), or nil when the host supplied one of another type.
+// KeypadInput returns the typed KeypadInput server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
-	return serverAs[*keypadinputdef.Server](d.Device, 0x0509)
+	return keypadinputdef.Wrap(d.Server(0x0509))
 }
 
-// ApplicationLauncher returns the ApplicationLauncher server (mandatory), or nil when the host supplied one of another type.
+// ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
-	return serverAs[*applicationlauncherdef.Server](d.Device, 0x050C)
+	return applicationlauncherdef.Wrap(d.Server(0x050C))
 }
 
-// ApplicationBasic returns the ApplicationBasic server (mandatory), or nil when the host supplied one of another type.
+// ApplicationBasic returns the typed ApplicationBasic server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
-	return serverAs[*applicationbasicdef.Server](d.Device, 0x050D)
+	return applicationbasicdef.Wrap(d.Server(0x050D))
 }
 
-// Channel returns the Channel server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) Channel() *channeldef.Server {
-	return serverAs[*channeldef.Server](d.Device, 0x0504)
-}
+// Channel returns the typed Channel server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) Channel() *channeldef.Server { return channeldef.Wrap(d.Server(0x0504)) }
 
-// TargetNavigator returns the TargetNavigator server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
-	return serverAs[*targetnavigatordef.Server](d.Device, 0x0505)
+	return targetnavigatordef.Wrap(d.Server(0x0505))
 }
 
-// MediaPlayback returns the MediaPlayback server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
-	return serverAs[*mediaplaybackdef.Server](d.Device, 0x0506)
+	return mediaplaybackdef.Wrap(d.Server(0x0506))
 }
 
-// ContentLauncher returns the ContentLauncher server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
-	return serverAs[*contentlauncherdef.Server](d.Device, 0x050A)
+	return contentlauncherdef.Wrap(d.Server(0x050A))
 }
 
-// AccountLogin returns the AccountLogin server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// AccountLogin returns the typed AccountLogin server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *ContentApp) AccountLogin() *accountlogindef.Server {
-	return serverAs[*accountlogindef.Server](d.Device, 0x050E)
+	return accountlogindef.Wrap(d.Server(0x050E))
 }

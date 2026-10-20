@@ -69,22 +69,31 @@ func NewMicrowaveOven(opts Options, with ...Option) (*MicrowaveOven, error) {
 	return &MicrowaveOven{d}, nil
 }
 
-// OperationalState returns the OperationalState server (mandatory), or nil when the host supplied one of another type.
+// OperationalState returns the typed OperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *MicrowaveOven) OperationalState() *operationalstatedef.Server {
-	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
+	return operationalstatedef.Wrap(d.Server(0x0060))
 }
 
-// MicrowaveOvenMode returns the MicrowaveOvenMode server (mandatory), or nil when the host supplied one of another type.
+// MicrowaveOvenMode returns the typed MicrowaveOvenMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *MicrowaveOven) MicrowaveOvenMode() *microwaveovenmodedef.Server {
-	return serverAs[*microwaveovenmodedef.Server](d.Device, 0x005E)
+	return microwaveovenmodedef.Wrap(d.Server(0x005E))
 }
 
-// MicrowaveOvenControl returns the MicrowaveOvenControl server (mandatory), or nil when the host supplied one of another type.
+// MicrowaveOvenControl returns the typed MicrowaveOvenControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *MicrowaveOven) MicrowaveOvenControl() *microwaveovencontroldef.Server {
-	return serverAs[*microwaveovencontroldef.Server](d.Device, 0x005F)
+	return microwaveovencontroldef.Wrap(d.Server(0x005F))
 }
 
-// FanControl returns the FanControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// FanControl returns the typed FanControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *MicrowaveOven) FanControl() *fancontroldef.Server {
-	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
+	return fancontroldef.Wrap(d.Server(0x0202))
 }

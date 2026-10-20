@@ -33,8 +33,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrTargetList, spec.List[TargetInfoStruct]([]TargetInfoStruct{TargetInfoStruct{Identifier: uint8(1), Name: "x"}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -44,17 +43,22 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleNavigateTarget(func(context.Context, NavigateTargetRequest) (NavigateTargetResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleNavigateTarget(func(context.Context, NavigateTargetRequest) (NavigateTargetResponse, error) {
 		return NavigateTargetResponse{}, nil
-	})
+	}); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitTargetUpdated(0, TargetUpdatedEvent{}) // not in the empty definition's EventList: refused
 }

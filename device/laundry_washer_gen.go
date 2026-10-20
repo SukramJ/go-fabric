@@ -6,7 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	laundrywashercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	laundrywashermodedef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
@@ -73,25 +72,39 @@ func NewLaundryWasher(opts Options, with ...Option) (*LaundryWasher, error) {
 	return &LaundryWasher{d}, nil
 }
 
-// OperationalState returns the OperationalState server (mandatory), or nil when the host supplied one of another type.
+// OperationalState returns the typed OperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *LaundryWasher) OperationalState() *operationalstatedef.Server {
-	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
+	return operationalstatedef.Wrap(d.Server(0x0060))
 }
 
-// OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *LaundryWasher) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *LaundryWasher) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// LaundryWasherMode returns the LaundryWasherMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// LaundryWasherMode returns the typed LaundryWasherMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *LaundryWasher) LaundryWasherMode() *laundrywashermodedef.Server {
-	return serverAs[*laundrywashermodedef.Server](d.Device, 0x0051)
+	return laundrywashermodedef.Wrap(d.Server(0x0051))
 }
 
-// LaundryWasherControls returns the LaundryWasherControls server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// LaundryWasherControls returns the typed LaundryWasherControls server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *LaundryWasher) LaundryWasherControls() *laundrywashercontrolsdef.Server {
-	return serverAs[*laundrywashercontrolsdef.Server](d.Device, 0x0053)
+	return laundrywashercontrolsdef.Wrap(d.Server(0x0053))
 }
 
-// TemperatureControl returns the TemperatureControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *LaundryWasher) TemperatureControl() *temperaturecontroldef.Server {
-	return serverAs[*temperaturecontroldef.Server](d.Device, 0x0056)
+	return temperaturecontroldef.Wrap(d.Server(0x0056))
 }

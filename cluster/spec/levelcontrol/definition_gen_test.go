@@ -37,8 +37,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdMoveToClosestFrequency, spec.Request, MoveToClosestFrequencyRequest{Frequency: uint16(1)})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -48,23 +47,43 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

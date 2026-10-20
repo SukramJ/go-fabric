@@ -48,8 +48,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrFabricSceneInfo, spec.List[SceneInfoStruct]([]SceneInfoStruct{SceneInfoStruct{SceneCount: uint8(1), CurrentScene: uint8(1), CurrentGroup: uint16(1), SceneValid: true, RemainingCapacity: uint8(1), FabricIndex: uint8(1)}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -59,28 +58,46 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleAddScene(func(context.Context, AddSceneRequest) (AddSceneResponse, error) { return AddSceneResponse{}, nil })
-	s.HandleViewScene(func(context.Context, ViewSceneRequest) (ViewSceneResponse, error) { return ViewSceneResponse{}, nil })
-	s.HandleRemoveScene(func(context.Context, RemoveSceneRequest) (RemoveSceneResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddScene(func(context.Context, AddSceneRequest) (AddSceneResponse, error) { return AddSceneResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleViewScene(func(context.Context, ViewSceneRequest) (ViewSceneResponse, error) { return ViewSceneResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveScene(func(context.Context, RemoveSceneRequest) (RemoveSceneResponse, error) {
 		return RemoveSceneResponse{}, nil
-	})
-	s.HandleRemoveAllScenes(func(context.Context, RemoveAllScenesRequest) (RemoveAllScenesResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveAllScenes(func(context.Context, RemoveAllScenesRequest) (RemoveAllScenesResponse, error) {
 		return RemoveAllScenesResponse{}, nil
-	})
-	s.HandleStoreScene(func(context.Context, StoreSceneRequest) (StoreSceneResponse, error) { return StoreSceneResponse{}, nil })
-	s.HandleRecallScene(func(context.Context, RecallSceneRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleGetSceneMembership(func(context.Context, GetSceneMembershipRequest) (GetSceneMembershipResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStoreScene(func(context.Context, StoreSceneRequest) (StoreSceneResponse, error) { return StoreSceneResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRecallScene(func(context.Context, RecallSceneRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetSceneMembership(func(context.Context, GetSceneMembershipRequest) (GetSceneMembershipResponse, error) {
 		return GetSceneMembershipResponse{}, nil
-	})
-	s.HandleCopyScene(func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCopyScene(func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

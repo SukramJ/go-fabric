@@ -36,8 +36,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrMessages, spec.List[MessageStruct]([]MessageStruct{MessageStruct{MessageId: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, Priority: MessagePriorityEnum(0), MessageControl: MessageControlBitmap(1 << 0), StartTime: spec.ValueOf(uint32(1)), Duration: spec.ValueOf(uint64(1)), MessageText: "x", Responses: spectest.Ptr([]MessageResponseOptionStruct{MessageResponseOptionStruct{MessageResponseId: uint32(1), Label: "x"}}), FabricIndex: uint8(1)}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -47,16 +46,25 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandlePresentMessagesRequest(func(context.Context, PresentMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleCancelMessagesRequest(func(context.Context, CancelMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePresentMessagesRequest(func(context.Context, PresentMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCancelMessagesRequest(func(context.Context, CancelMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitMessageQueued(0, MessageQueuedEvent{})       // not in the empty definition's EventList: refused
+	_ = s.EmitMessagePresented(0, MessagePresentedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitMessageComplete(0, MessageCompleteEvent{})   // not in the empty definition's EventList: refused
 }

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the LevelControl cluster: one field per attribute
@@ -53,86 +54,101 @@ type Patch struct {
 	Null                []uint32       // attribute ids set to null
 }
 
-// Server is the typed LevelControl server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed LevelControl server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleMoveToLevel registers fn for the MoveToLevel command; nil removes the handler.
-func (s *Server) HandleMoveToLevel(fn func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToLevel, spec.HandlerOf(fn))
+// HandleMoveToLevel registers fn for the MoveToLevel command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToLevel(fn func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToLevel, fn)
 }
 
-// HandleMove registers fn for the Move command; nil removes the handler.
-func (s *Server) HandleMove(fn func(ctx context.Context, req MoveRequest) (struct{}, error)) {
-	s.Handle(CmdMove, spec.HandlerOf(fn))
+// HandleMove registers fn for the Move command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMove(fn func(ctx context.Context, req MoveRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMove, fn)
 }
 
-// HandleStep registers fn for the Step command; nil removes the handler.
-func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) {
-	s.Handle(CmdStep, spec.HandlerOf(fn))
+// HandleStep registers fn for the Step command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
 
-// HandleStop registers fn for the Stop command; nil removes the handler.
-func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) {
-	s.Handle(CmdStop, spec.HandlerOf(fn))
+// HandleStop registers fn for the Stop command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
-// HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command; nil removes the handler.
-func (s *Server) HandleMoveToLevelWithOnOff(fn func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToLevelWithOnOff, spec.HandlerOf(fn))
+// HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToLevelWithOnOff(fn func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToLevelWithOnOff, fn)
 }
 
-// HandleMoveWithOnOff registers fn for the MoveWithOnOff command; nil removes the handler.
-func (s *Server) HandleMoveWithOnOff(fn func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)) {
-	s.Handle(CmdMoveWithOnOff, spec.HandlerOf(fn))
+// HandleMoveWithOnOff registers fn for the MoveWithOnOff command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveWithOnOff(fn func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveWithOnOff, fn)
 }
 
-// HandleStepWithOnOff registers fn for the StepWithOnOff command; nil removes the handler.
-func (s *Server) HandleStepWithOnOff(fn func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)) {
-	s.Handle(CmdStepWithOnOff, spec.HandlerOf(fn))
+// HandleStepWithOnOff registers fn for the StepWithOnOff command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStepWithOnOff(fn func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStepWithOnOff, fn)
 }
 
-// HandleStopWithOnOff registers fn for the StopWithOnOff command; nil removes the handler.
-func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)) {
-	s.Handle(CmdStopWithOnOff, spec.HandlerOf(fn))
+// HandleStopWithOnOff registers fn for the StopWithOnOff command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStopWithOnOff, fn)
 }
 
-// HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command; nil removes the handler.
-func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) {
-	s.Handle(CmdMoveToClosestFrequency, spec.HandlerOf(fn))
+// HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdMoveToClosestFrequency, fn)
 }
-
-func init() { spec.RegisterTyped(ClusterID, Wrap) }

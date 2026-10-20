@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the OtaSoftwareUpdateProvider cluster: one field per attribute
@@ -23,56 +24,65 @@ type State struct {
 type Patch struct {
 }
 
-// Server is the typed OtaSoftwareUpdateProvider server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed OtaSoftwareUpdateProvider server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleQueryImage registers fn for the QueryImage command; nil removes the handler.
-func (s *Server) HandleQueryImage(fn func(ctx context.Context, req QueryImageRequest) (QueryImageResponse, error)) {
-	s.Handle(CmdQueryImage, spec.HandlerOf(fn))
+// HandleQueryImage registers fn for the QueryImage command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleQueryImage(fn func(ctx context.Context, req QueryImageRequest) (QueryImageResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdQueryImage, fn)
 }
 
-// HandleApplyUpdateRequest registers fn for the ApplyUpdateRequest command; nil removes the handler.
-func (s *Server) HandleApplyUpdateRequest(fn func(ctx context.Context, req ApplyUpdateRequestRequest) (ApplyUpdateResponse, error)) {
-	s.Handle(CmdApplyUpdateRequest, spec.HandlerOf(fn))
+// HandleApplyUpdateRequest registers fn for the ApplyUpdateRequest command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleApplyUpdateRequest(fn func(ctx context.Context, req ApplyUpdateRequestRequest) (ApplyUpdateResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdApplyUpdateRequest, fn)
 }
 
-// HandleNotifyUpdateApplied registers fn for the NotifyUpdateApplied command; nil removes the handler.
-func (s *Server) HandleNotifyUpdateApplied(fn func(ctx context.Context, req NotifyUpdateAppliedRequest) (struct{}, error)) {
-	s.Handle(CmdNotifyUpdateApplied, spec.HandlerOf(fn))
+// HandleNotifyUpdateApplied registers fn for the NotifyUpdateApplied command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleNotifyUpdateApplied(fn func(ctx context.Context, req NotifyUpdateAppliedRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdNotifyUpdateApplied, fn)
 }
-
-func init() { spec.RegisterTyped(ClusterID, Wrap) }

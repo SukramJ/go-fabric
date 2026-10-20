@@ -38,8 +38,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdAddGroupIfIdentifying, spec.Request, AddGroupIfIdentifyingRequest{GroupId: uint16(1), GroupName: "x"})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -49,24 +48,38 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleAddGroup(func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil })
-	s.HandleViewGroup(func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil })
-	s.HandleGetGroupMembership(func(context.Context, GetGroupMembershipRequest) (GetGroupMembershipResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddGroup(func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleViewGroup(func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetGroupMembership(func(context.Context, GetGroupMembershipRequest) (GetGroupMembershipResponse, error) {
 		return GetGroupMembershipResponse{}, nil
-	})
-	s.HandleRemoveGroup(func(context.Context, RemoveGroupRequest) (RemoveGroupResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveGroup(func(context.Context, RemoveGroupRequest) (RemoveGroupResponse, error) {
 		return RemoveGroupResponse{}, nil
-	})
-	s.HandleRemoveAllGroups(func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil })
-	s.HandleAddGroupIfIdentifying(func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil })
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveAllGroups(func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddGroupIfIdentifying(func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

@@ -57,12 +57,18 @@ func NewIrrigationSystem(opts Options, with ...Option) (*IrrigationSystem, error
 	return &IrrigationSystem{d}, nil
 }
 
-// OperationalState returns the OperationalState server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// OperationalState returns the typed OperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
-	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
+	return operationalstatedef.Wrap(d.Server(0x0060))
 }
 
-// FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *IrrigationSystem) FlowMeasurement() *flowmeasurementdef.Server {
-	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+	return flowmeasurementdef.Wrap(d.Server(0x0404))
 }

@@ -41,8 +41,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrNetworks, spec.List[NetworkInfoStruct]([]NetworkInfoStruct{NetworkInfoStruct{NetworkId: []byte{1}, Connected: true}}))
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -52,32 +51,46 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleScanNetworks(func(context.Context, ScanNetworksRequest) (ScanNetworksResponse, error) {
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleScanNetworks(func(context.Context, ScanNetworksRequest) (ScanNetworksResponse, error) {
 		return ScanNetworksResponse{}, nil
-	})
-	s.HandleAddOrUpdateWiFiNetwork(func(context.Context, AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddOrUpdateWiFiNetwork(func(context.Context, AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	})
-	s.HandleAddOrUpdateThreadNetwork(func(context.Context, AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddOrUpdateThreadNetwork(func(context.Context, AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	})
-	s.HandleRemoveNetwork(func(context.Context, RemoveNetworkRequest) (NetworkConfigResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveNetwork(func(context.Context, RemoveNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	})
-	s.HandleConnectNetwork(func(context.Context, ConnectNetworkRequest) (ConnectNetworkResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleConnectNetwork(func(context.Context, ConnectNetworkRequest) (ConnectNetworkResponse, error) {
 		return ConnectNetworkResponse{}, nil
-	})
-	s.HandleReorderNetwork(func(context.Context, ReorderNetworkRequest) (NetworkConfigResponse, error) {
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleReorderNetwork(func(context.Context, ReorderNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	})
+	}); err != nil {
+		t.Error(err)
+	}
 }

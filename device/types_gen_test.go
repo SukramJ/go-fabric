@@ -20,10 +20,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &AggregatorType {
 			t.Errorf("Aggregator: type %v", d.Type().Name)
 		}
-		if s := d.Actions(); s != nil && d.Server(0x0025) != s {
+		if s, srv := d.Actions(), d.Server(0x0025); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Aggregator: optional Actions is not the device's server")
 		}
-		if s := d.CommissionerControl(); s != nil && d.Server(0x0751) != s {
+		if s, srv := d.CommissionerControl(), d.Server(0x0751); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Aggregator: optional CommissionerControl is not the device's server")
 		}
 	} else if !refusesFixture("Aggregator") {
@@ -36,16 +36,16 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &AirPurifierType {
 			t.Errorf("AirPurifier: type %v", d.Type().Name)
 		}
-		if s := d.FanControl(); d.Server(0x0202) == nil || s != nil && d.Server(0x0202) != s {
+		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
 			t.Error("AirPurifier: mandatory FanControl not mounted")
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirPurifier: optional OnOff is not the device's server")
 		}
-		if s := d.HepaFilterMonitoring(); s != nil && d.Server(0x0071) != s {
+		if s, srv := d.HepaFilterMonitoring(), d.Server(0x0071); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirPurifier: optional HepaFilterMonitoring is not the device's server")
 		}
-		if s := d.ActivatedCarbonFilterMonitoring(); s != nil && d.Server(0x0072) != s {
+		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirPurifier: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
 	} else if !refusesFixture("AirPurifier") {
@@ -58,43 +58,43 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &AirQualitySensorType {
 			t.Errorf("AirQualitySensor: type %v", d.Type().Name)
 		}
-		if s := d.AirQuality(); d.Server(0x005B) == nil || s != nil && d.Server(0x005B) != s {
+		if s := d.AirQuality(); s == nil || s.Underlying() != d.Server(0x005B) {
 			t.Error("AirQualitySensor: mandatory AirQuality not mounted")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional TemperatureMeasurement is not the device's server")
 		}
-		if s := d.RelativeHumidityMeasurement(); s != nil && d.Server(0x0405) != s {
+		if s, srv := d.RelativeHumidityMeasurement(), d.Server(0x0405); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional RelativeHumidityMeasurement is not the device's server")
 		}
-		if s := d.CarbonMonoxideConcentrationMeasurement(); s != nil && d.Server(0x040C) != s {
+		if s, srv := d.CarbonMonoxideConcentrationMeasurement(), d.Server(0x040C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional CarbonMonoxideConcentrationMeasurement is not the device's server")
 		}
-		if s := d.CarbonDioxideConcentrationMeasurement(); s != nil && d.Server(0x040D) != s {
+		if s, srv := d.CarbonDioxideConcentrationMeasurement(), d.Server(0x040D); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional CarbonDioxideConcentrationMeasurement is not the device's server")
 		}
-		if s := d.NitrogenDioxideConcentrationMeasurement(); s != nil && d.Server(0x0413) != s {
+		if s, srv := d.NitrogenDioxideConcentrationMeasurement(), d.Server(0x0413); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional NitrogenDioxideConcentrationMeasurement is not the device's server")
 		}
-		if s := d.OzoneConcentrationMeasurement(); s != nil && d.Server(0x0415) != s {
+		if s, srv := d.OzoneConcentrationMeasurement(), d.Server(0x0415); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional OzoneConcentrationMeasurement is not the device's server")
 		}
-		if s := d.Pm25ConcentrationMeasurement(); s != nil && d.Server(0x042A) != s {
+		if s, srv := d.Pm25ConcentrationMeasurement(), d.Server(0x042A); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional Pm25ConcentrationMeasurement is not the device's server")
 		}
-		if s := d.FormaldehydeConcentrationMeasurement(); s != nil && d.Server(0x042B) != s {
+		if s, srv := d.FormaldehydeConcentrationMeasurement(), d.Server(0x042B); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional FormaldehydeConcentrationMeasurement is not the device's server")
 		}
-		if s := d.Pm1ConcentrationMeasurement(); s != nil && d.Server(0x042C) != s {
+		if s, srv := d.Pm1ConcentrationMeasurement(), d.Server(0x042C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional Pm1ConcentrationMeasurement is not the device's server")
 		}
-		if s := d.Pm10ConcentrationMeasurement(); s != nil && d.Server(0x042D) != s {
+		if s, srv := d.Pm10ConcentrationMeasurement(), d.Server(0x042D); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional Pm10ConcentrationMeasurement is not the device's server")
 		}
-		if s := d.TotalVolatileOrganicCompoundsConcentrationMeasurement(); s != nil && d.Server(0x042E) != s {
+		if s, srv := d.TotalVolatileOrganicCompoundsConcentrationMeasurement(), d.Server(0x042E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional TotalVolatileOrganicCompoundsConcentrationMeasurement is not the device's server")
 		}
-		if s := d.RadonConcentrationMeasurement(); s != nil && d.Server(0x042F) != s {
+		if s, srv := d.RadonConcentrationMeasurement(), d.Server(0x042F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional RadonConcentrationMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("AirQualitySensor") {
@@ -107,37 +107,37 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &BasicVideoPlayerType {
 			t.Errorf("BasicVideoPlayer: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("BasicVideoPlayer: mandatory OnOff not mounted")
 		}
-		if s := d.MediaPlayback(); d.Server(0x0506) == nil || s != nil && d.Server(0x0506) != s {
+		if s := d.MediaPlayback(); s == nil || s.Underlying() != d.Server(0x0506) {
 			t.Error("BasicVideoPlayer: mandatory MediaPlayback not mounted")
 		}
-		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+		if s := d.KeypadInput(); s == nil || s.Underlying() != d.Server(0x0509) {
 			t.Error("BasicVideoPlayer: mandatory KeypadInput not mounted")
 		}
-		if s := d.Messages(); s != nil && d.Server(0x0097) != s {
+		if s, srv := d.Messages(), d.Server(0x0097); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional Messages is not the device's server")
 		}
-		if s := d.WakeOnLan(); s != nil && d.Server(0x0503) != s {
+		if s, srv := d.WakeOnLan(), d.Server(0x0503); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional WakeOnLan is not the device's server")
 		}
-		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+		if s, srv := d.Channel(), d.Server(0x0504); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional Channel is not the device's server")
 		}
-		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+		if s, srv := d.TargetNavigator(), d.Server(0x0505); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional TargetNavigator is not the device's server")
 		}
-		if s := d.MediaInput(); s != nil && d.Server(0x0507) != s {
+		if s, srv := d.MediaInput(), d.Server(0x0507); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional MediaInput is not the device's server")
 		}
-		if s := d.LowPower(); s != nil && d.Server(0x0508) != s {
+		if s, srv := d.LowPower(), d.Server(0x0508); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional LowPower is not the device's server")
 		}
-		if s := d.AudioOutput(); s != nil && d.Server(0x050B) != s {
+		if s, srv := d.AudioOutput(), d.Server(0x050B); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional AudioOutput is not the device's server")
 		}
-		if s := d.ContentControl(); s != nil && d.Server(0x050F) != s {
+		if s, srv := d.ContentControl(), d.Server(0x050F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional ContentControl is not the device's server")
 		}
 	} else if !refusesFixture("BasicVideoPlayer") {
@@ -160,16 +160,16 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &BridgedNodeType {
 			t.Errorf("BridgedNode: type %v", d.Type().Name)
 		}
-		if s := d.PowerSourceConfiguration(); s != nil && d.Server(0x002E) != s {
+		if s, srv := d.PowerSourceConfiguration(), d.Server(0x002E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BridgedNode: optional PowerSourceConfiguration is not the device's server")
 		}
-		if s := d.PowerSource(); s != nil && d.Server(0x002F) != s {
+		if s, srv := d.PowerSource(), d.Server(0x002F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BridgedNode: optional PowerSource is not the device's server")
 		}
-		if s := d.AdministratorCommissioning(); s != nil && d.Server(0x003C) != s {
+		if s, srv := d.AdministratorCommissioning(), d.Server(0x003C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BridgedNode: optional AdministratorCommissioning is not the device's server")
 		}
-		if s := d.EcosystemInformation(); s != nil && d.Server(0x0750) != s {
+		if s, srv := d.EcosystemInformation(), d.Server(0x0750); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BridgedNode: optional EcosystemInformation is not the device's server")
 		}
 	} else if !refusesFixture("BridgedNode") {
@@ -182,46 +182,46 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &CastingVideoPlayerType {
 			t.Errorf("CastingVideoPlayer: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("CastingVideoPlayer: mandatory OnOff not mounted")
 		}
-		if s := d.MediaPlayback(); d.Server(0x0506) == nil || s != nil && d.Server(0x0506) != s {
+		if s := d.MediaPlayback(); s == nil || s.Underlying() != d.Server(0x0506) {
 			t.Error("CastingVideoPlayer: mandatory MediaPlayback not mounted")
 		}
-		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+		if s := d.KeypadInput(); s == nil || s.Underlying() != d.Server(0x0509) {
 			t.Error("CastingVideoPlayer: mandatory KeypadInput not mounted")
 		}
-		if s := d.ContentLauncher(); d.Server(0x050A) == nil || s != nil && d.Server(0x050A) != s {
+		if s := d.ContentLauncher(); s == nil || s.Underlying() != d.Server(0x050A) {
 			t.Error("CastingVideoPlayer: mandatory ContentLauncher not mounted")
 		}
-		if s := d.Messages(); s != nil && d.Server(0x0097) != s {
+		if s, srv := d.Messages(), d.Server(0x0097); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional Messages is not the device's server")
 		}
-		if s := d.WakeOnLan(); s != nil && d.Server(0x0503) != s {
+		if s, srv := d.WakeOnLan(), d.Server(0x0503); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional WakeOnLan is not the device's server")
 		}
-		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+		if s, srv := d.Channel(), d.Server(0x0504); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional Channel is not the device's server")
 		}
-		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+		if s, srv := d.TargetNavigator(), d.Server(0x0505); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional TargetNavigator is not the device's server")
 		}
-		if s := d.MediaInput(); s != nil && d.Server(0x0507) != s {
+		if s, srv := d.MediaInput(), d.Server(0x0507); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional MediaInput is not the device's server")
 		}
-		if s := d.LowPower(); s != nil && d.Server(0x0508) != s {
+		if s, srv := d.LowPower(), d.Server(0x0508); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional LowPower is not the device's server")
 		}
-		if s := d.AudioOutput(); s != nil && d.Server(0x050B) != s {
+		if s, srv := d.AudioOutput(), d.Server(0x050B); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional AudioOutput is not the device's server")
 		}
-		if s := d.ApplicationLauncher(); s != nil && d.Server(0x050C) != s {
+		if s, srv := d.ApplicationLauncher(), d.Server(0x050C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional ApplicationLauncher is not the device's server")
 		}
-		if s := d.AccountLogin(); s != nil && d.Server(0x050E) != s {
+		if s, srv := d.AccountLogin(), d.Server(0x050E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional AccountLogin is not the device's server")
 		}
-		if s := d.ContentControl(); s != nil && d.Server(0x050F) != s {
+		if s, srv := d.ContentControl(), d.Server(0x050F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional ContentControl is not the device's server")
 		}
 	} else if !refusesFixture("CastingVideoPlayer") {
@@ -234,7 +234,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ClosureType {
 			t.Errorf("Closure: type %v", d.Type().Name)
 		}
-		if s := d.ClosureControl(); d.Server(0x0104) == nil || s != nil && d.Server(0x0104) != s {
+		if s := d.ClosureControl(); s == nil || s.Underlying() != d.Server(0x0104) {
 			t.Error("Closure: mandatory ClosureControl not mounted")
 		}
 	} else if !refusesFixture("Closure") {
@@ -247,7 +247,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ClosureControllerType {
 			t.Errorf("ClosureController: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ClosureController: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("ClosureController") {
@@ -260,7 +260,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ClosurePanelType {
 			t.Errorf("ClosurePanel: type %v", d.Type().Name)
 		}
-		if s := d.ClosureDimension(); d.Server(0x0105) == nil || s != nil && d.Server(0x0105) != s {
+		if s := d.ClosureDimension(); s == nil || s.Underlying() != d.Server(0x0105) {
 			t.Error("ClosurePanel: mandatory ClosureDimension not mounted")
 		}
 	} else if !refusesFixture("ClosurePanel") {
@@ -273,7 +273,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ColorDimmerSwitchType {
 			t.Errorf("ColorDimmerSwitch: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ColorDimmerSwitch: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("ColorDimmerSwitch") {
@@ -286,13 +286,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ColorTemperatureLightType {
 			t.Errorf("ColorTemperatureLight: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("ColorTemperatureLight: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("ColorTemperatureLight: mandatory LevelControl not mounted")
 		}
-		if s := d.ColorControl(); d.Server(0x0300) == nil || s != nil && d.Server(0x0300) != s {
+		if s := d.ColorControl(); s == nil || s.Underlying() != d.Server(0x0300) {
 			t.Error("ColorTemperatureLight: mandatory ColorControl not mounted")
 		}
 	} else if !refusesFixture("ColorTemperatureLight") {
@@ -305,10 +305,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ContactSensorType {
 			t.Errorf("ContactSensor: type %v", d.Type().Name)
 		}
-		if s := d.BooleanState(); d.Server(0x0045) == nil || s != nil && d.Server(0x0045) != s {
+		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
 			t.Error("ContactSensor: mandatory BooleanState not mounted")
 		}
-		if s := d.BooleanStateConfiguration(); s != nil && d.Server(0x0080) != s {
+		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContactSensor: optional BooleanStateConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("ContactSensor") {
@@ -321,28 +321,28 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ContentAppType {
 			t.Errorf("ContentApp: type %v", d.Type().Name)
 		}
-		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+		if s := d.KeypadInput(); s == nil || s.Underlying() != d.Server(0x0509) {
 			t.Error("ContentApp: mandatory KeypadInput not mounted")
 		}
-		if s := d.ApplicationLauncher(); d.Server(0x050C) == nil || s != nil && d.Server(0x050C) != s {
+		if s := d.ApplicationLauncher(); s == nil || s.Underlying() != d.Server(0x050C) {
 			t.Error("ContentApp: mandatory ApplicationLauncher not mounted")
 		}
-		if s := d.ApplicationBasic(); d.Server(0x050D) == nil || s != nil && d.Server(0x050D) != s {
+		if s := d.ApplicationBasic(); s == nil || s.Underlying() != d.Server(0x050D) {
 			t.Error("ContentApp: mandatory ApplicationBasic not mounted")
 		}
-		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+		if s, srv := d.Channel(), d.Server(0x0504); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional Channel is not the device's server")
 		}
-		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+		if s, srv := d.TargetNavigator(), d.Server(0x0505); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional TargetNavigator is not the device's server")
 		}
-		if s := d.MediaPlayback(); s != nil && d.Server(0x0506) != s {
+		if s, srv := d.MediaPlayback(), d.Server(0x0506); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional MediaPlayback is not the device's server")
 		}
-		if s := d.ContentLauncher(); s != nil && d.Server(0x050A) != s {
+		if s, srv := d.ContentLauncher(), d.Server(0x050A); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional ContentLauncher is not the device's server")
 		}
-		if s := d.AccountLogin(); s != nil && d.Server(0x050E) != s {
+		if s, srv := d.AccountLogin(), d.Server(0x050E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional AccountLogin is not the device's server")
 		}
 	} else if !refusesFixture("ContentApp") {
@@ -355,7 +355,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ControlBridgeType {
 			t.Errorf("ControlBridge: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ControlBridge: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("ControlBridge") {
@@ -368,13 +368,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &CookSurfaceType {
 			t.Errorf("CookSurface: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CookSurface: optional OnOff is not the device's server")
 		}
-		if s := d.TemperatureControl(); s != nil && d.Server(0x0056) != s {
+		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CookSurface: optional TemperatureControl is not the device's server")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CookSurface: optional TemperatureMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("CookSurface") {
@@ -387,7 +387,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &CooktopType {
 			t.Errorf("Cooktop: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("Cooktop: mandatory OnOff not mounted")
 		}
 	} else if !refusesFixture("Cooktop") {
@@ -400,10 +400,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DeviceEnergyManagementType {
 			t.Errorf("DeviceEnergyManagement: type %v", d.Type().Name)
 		}
-		if s := d.DeviceEnergyManagement(); d.Server(0x0098) == nil || s != nil && d.Server(0x0098) != s {
+		if s := d.DeviceEnergyManagement(); s == nil || s.Underlying() != d.Server(0x0098) {
 			t.Error("DeviceEnergyManagement: mandatory DeviceEnergyManagement not mounted")
 		}
-		if s := d.DeviceEnergyManagementMode(); s != nil && d.Server(0x009F) != s {
+		if s, srv := d.DeviceEnergyManagementMode(), d.Server(0x009F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("DeviceEnergyManagement: optional DeviceEnergyManagementMode is not the device's server")
 		}
 	} else if !refusesFixture("DeviceEnergyManagement") {
@@ -416,10 +416,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DimmableLightType {
 			t.Errorf("DimmableLight: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("DimmableLight: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("DimmableLight: mandatory LevelControl not mounted")
 		}
 	} else if !refusesFixture("DimmableLight") {
@@ -432,10 +432,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DimmablePlugInUnitType {
 			t.Errorf("DimmablePlugInUnit: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("DimmablePlugInUnit: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("DimmablePlugInUnit: mandatory LevelControl not mounted")
 		}
 	} else if !refusesFixture("DimmablePlugInUnit") {
@@ -448,7 +448,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DimmerSwitchType {
 			t.Errorf("DimmerSwitch: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("DimmerSwitch: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("DimmerSwitch") {
@@ -461,19 +461,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DishwasherType {
 			t.Errorf("Dishwasher: type %v", d.Type().Name)
 		}
-		if s := d.OperationalState(); d.Server(0x0060) == nil || s != nil && d.Server(0x0060) != s {
+		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
 			t.Error("Dishwasher: mandatory OperationalState not mounted")
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Dishwasher: optional OnOff is not the device's server")
 		}
-		if s := d.TemperatureControl(); s != nil && d.Server(0x0056) != s {
+		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Dishwasher: optional TemperatureControl is not the device's server")
 		}
-		if s := d.DishwasherMode(); s != nil && d.Server(0x0059) != s {
+		if s, srv := d.DishwasherMode(), d.Server(0x0059); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Dishwasher: optional DishwasherMode is not the device's server")
 		}
-		if s := d.DishwasherAlarm(); s != nil && d.Server(0x005D) != s {
+		if s, srv := d.DishwasherAlarm(), d.Server(0x005D); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Dishwasher: optional DishwasherAlarm is not the device's server")
 		}
 	} else if !refusesFixture("Dishwasher") {
@@ -486,7 +486,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DoorLockType {
 			t.Errorf("DoorLock: type %v", d.Type().Name)
 		}
-		if s := d.DoorLock(); d.Server(0x0101) == nil || s != nil && d.Server(0x0101) != s {
+		if s := d.DoorLock(); s == nil || s.Underlying() != d.Server(0x0101) {
 			t.Error("DoorLock: mandatory DoorLock not mounted")
 		}
 	} else if !refusesFixture("DoorLock") {
@@ -499,7 +499,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DoorLockControllerType {
 			t.Errorf("DoorLockController: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("DoorLockController: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("DoorLockController") {
@@ -512,10 +512,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &DoorbellType {
 			t.Errorf("Doorbell: type %v", d.Type().Name)
 		}
-		if s := d.Switch(); d.Server(0x003B) == nil || s != nil && d.Server(0x003B) != s {
+		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
 			t.Error("Doorbell: mandatory Switch not mounted")
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("Doorbell: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("Doorbell") {
@@ -528,13 +528,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ElectricalEnergyTariffType {
 			t.Errorf("ElectricalEnergyTariff: type %v", d.Type().Name)
 		}
-		if s := d.CommodityPrice(); s != nil && d.Server(0x0095) != s {
+		if s, srv := d.CommodityPrice(), d.Server(0x0095); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalEnergyTariff: optional CommodityPrice is not the device's server")
 		}
-		if s := d.ElectricalGridConditions(); s != nil && d.Server(0x00A0) != s {
+		if s, srv := d.ElectricalGridConditions(), d.Server(0x00A0); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalEnergyTariff: optional ElectricalGridConditions is not the device's server")
 		}
-		if s := d.CommodityTariff(); s != nil && d.Server(0x0700) != s {
+		if s, srv := d.CommodityTariff(), d.Server(0x0700); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalEnergyTariff: optional CommodityTariff is not the device's server")
 		}
 	} else if !refusesFixture("ElectricalEnergyTariff") {
@@ -547,13 +547,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ElectricalMeterType {
 			t.Errorf("ElectricalMeter: type %v", d.Type().Name)
 		}
-		if s := d.ElectricalPowerMeasurement(); d.Server(0x0090) == nil || s != nil && d.Server(0x0090) != s {
+		if s := d.ElectricalPowerMeasurement(); s == nil || s.Underlying() != d.Server(0x0090) {
 			t.Error("ElectricalMeter: mandatory ElectricalPowerMeasurement not mounted")
 		}
-		if s := d.ElectricalEnergyMeasurement(); d.Server(0x0091) == nil || s != nil && d.Server(0x0091) != s {
+		if s := d.ElectricalEnergyMeasurement(); s == nil || s.Underlying() != d.Server(0x0091) {
 			t.Error("ElectricalMeter: mandatory ElectricalEnergyMeasurement not mounted")
 		}
-		if s := d.CommodityMetering(); s != nil && d.Server(0x0B07) != s {
+		if s, srv := d.CommodityMetering(), d.Server(0x0B07); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalMeter: optional CommodityMetering is not the device's server")
 		}
 	} else if !refusesFixture("ElectricalMeter") {
@@ -566,13 +566,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ElectricalSensorType {
 			t.Errorf("ElectricalSensor: type %v", d.Type().Name)
 		}
-		if s := d.PowerTopology(); d.Server(0x009C) == nil || s != nil && d.Server(0x009C) != s {
+		if s := d.PowerTopology(); s == nil || s.Underlying() != d.Server(0x009C) {
 			t.Error("ElectricalSensor: mandatory PowerTopology not mounted")
 		}
-		if s := d.ElectricalPowerMeasurement(); s != nil && d.Server(0x0090) != s {
+		if s, srv := d.ElectricalPowerMeasurement(), d.Server(0x0090); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalSensor: optional ElectricalPowerMeasurement is not the device's server")
 		}
-		if s := d.ElectricalEnergyMeasurement(); s != nil && d.Server(0x0091) != s {
+		if s, srv := d.ElectricalEnergyMeasurement(), d.Server(0x0091); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalSensor: optional ElectricalEnergyMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("ElectricalSensor") {
@@ -585,7 +585,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ElectricalUtilityMeterType {
 			t.Errorf("ElectricalUtilityMeter: type %v", d.Type().Name)
 		}
-		if s := d.MeterIdentification(); d.Server(0x0B06) == nil || s != nil && d.Server(0x0B06) != s {
+		if s := d.MeterIdentification(); s == nil || s.Underlying() != d.Server(0x0B06) {
 			t.Error("ElectricalUtilityMeter: mandatory MeterIdentification not mounted")
 		}
 	} else if !refusesFixture("ElectricalUtilityMeter") {
@@ -598,13 +598,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &EnergyEvseType {
 			t.Errorf("EnergyEvse: type %v", d.Type().Name)
 		}
-		if s := d.EnergyEvse(); d.Server(0x0099) == nil || s != nil && d.Server(0x0099) != s {
+		if s := d.EnergyEvse(); s == nil || s.Underlying() != d.Server(0x0099) {
 			t.Error("EnergyEvse: mandatory EnergyEvse not mounted")
 		}
-		if s := d.EnergyEvseMode(); d.Server(0x009D) == nil || s != nil && d.Server(0x009D) != s {
+		if s := d.EnergyEvseMode(); s == nil || s.Underlying() != d.Server(0x009D) {
 			t.Error("EnergyEvse: mandatory EnergyEvseMode not mounted")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("EnergyEvse: optional TemperatureMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("EnergyEvse") {
@@ -617,13 +617,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ExtendedColorLightType {
 			t.Errorf("ExtendedColorLight: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("ExtendedColorLight: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("ExtendedColorLight: mandatory LevelControl not mounted")
 		}
-		if s := d.ColorControl(); d.Server(0x0300) == nil || s != nil && d.Server(0x0300) != s {
+		if s := d.ColorControl(); s == nil || s.Underlying() != d.Server(0x0300) {
 			t.Error("ExtendedColorLight: mandatory ColorControl not mounted")
 		}
 	} else if !refusesFixture("ExtendedColorLight") {
@@ -636,13 +636,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ExtractorHoodType {
 			t.Errorf("ExtractorHood: type %v", d.Type().Name)
 		}
-		if s := d.FanControl(); d.Server(0x0202) == nil || s != nil && d.Server(0x0202) != s {
+		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
 			t.Error("ExtractorHood: mandatory FanControl not mounted")
 		}
-		if s := d.HepaFilterMonitoring(); s != nil && d.Server(0x0071) != s {
+		if s, srv := d.HepaFilterMonitoring(), d.Server(0x0071); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ExtractorHood: optional HepaFilterMonitoring is not the device's server")
 		}
-		if s := d.ActivatedCarbonFilterMonitoring(); s != nil && d.Server(0x0072) != s {
+		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ExtractorHood: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
 	} else if !refusesFixture("ExtractorHood") {
@@ -655,10 +655,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &FanType {
 			t.Errorf("Fan: type %v", d.Type().Name)
 		}
-		if s := d.FanControl(); d.Server(0x0202) == nil || s != nil && d.Server(0x0202) != s {
+		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
 			t.Error("Fan: mandatory FanControl not mounted")
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Fan: optional OnOff is not the device's server")
 		}
 	} else if !refusesFixture("Fan") {
@@ -671,7 +671,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &FlowSensorType {
 			t.Errorf("FlowSensor: type %v", d.Type().Name)
 		}
-		if s := d.FlowMeasurement(); d.Server(0x0404) == nil || s != nil && d.Server(0x0404) != s {
+		if s := d.FlowMeasurement(); s == nil || s.Underlying() != d.Server(0x0404) {
 			t.Error("FlowSensor: mandatory FlowMeasurement not mounted")
 		}
 	} else if !refusesFixture("FlowSensor") {
@@ -684,7 +684,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &GenericSwitchType {
 			t.Errorf("GenericSwitch: type %v", d.Type().Name)
 		}
-		if s := d.Switch(); d.Server(0x003B) == nil || s != nil && d.Server(0x003B) != s {
+		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
 			t.Error("GenericSwitch: mandatory Switch not mounted")
 		}
 	} else if !refusesFixture("GenericSwitch") {
@@ -707,7 +707,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &HumiditySensorType {
 			t.Errorf("HumiditySensor: type %v", d.Type().Name)
 		}
-		if s := d.RelativeHumidityMeasurement(); d.Server(0x0405) == nil || s != nil && d.Server(0x0405) != s {
+		if s := d.RelativeHumidityMeasurement(); s == nil || s.Underlying() != d.Server(0x0405) {
 			t.Error("HumiditySensor: mandatory RelativeHumidityMeasurement not mounted")
 		}
 	} else if !refusesFixture("HumiditySensor") {
@@ -720,10 +720,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &IrrigationSystemType {
 			t.Errorf("IrrigationSystem: type %v", d.Type().Name)
 		}
-		if s := d.OperationalState(); s != nil && d.Server(0x0060) != s {
+		if s, srv := d.OperationalState(), d.Server(0x0060); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("IrrigationSystem: optional OperationalState is not the device's server")
 		}
-		if s := d.FlowMeasurement(); s != nil && d.Server(0x0404) != s {
+		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("IrrigationSystem: optional FlowMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("IrrigationSystem") {
@@ -736,19 +736,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &LaundryDryerType {
 			t.Errorf("LaundryDryer: type %v", d.Type().Name)
 		}
-		if s := d.OperationalState(); d.Server(0x0060) == nil || s != nil && d.Server(0x0060) != s {
+		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
 			t.Error("LaundryDryer: mandatory OperationalState not mounted")
 		}
-		if s := d.LaundryWasherMode(); s != nil && d.Server(0x0051) != s {
+		if s, srv := d.LaundryWasherMode(), d.Server(0x0051); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryDryer: optional LaundryWasherMode is not the device's server")
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryDryer: optional OnOff is not the device's server")
 		}
-		if s := d.LaundryDryerControls(); s != nil && d.Server(0x004A) != s {
+		if s, srv := d.LaundryDryerControls(), d.Server(0x004A); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryDryer: optional LaundryDryerControls is not the device's server")
 		}
-		if s := d.TemperatureControl(); s != nil && d.Server(0x0056) != s {
+		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryDryer: optional TemperatureControl is not the device's server")
 		}
 	} else if !refusesFixture("LaundryDryer") {
@@ -761,19 +761,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &LaundryWasherType {
 			t.Errorf("LaundryWasher: type %v", d.Type().Name)
 		}
-		if s := d.OperationalState(); d.Server(0x0060) == nil || s != nil && d.Server(0x0060) != s {
+		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
 			t.Error("LaundryWasher: mandatory OperationalState not mounted")
 		}
-		if s := d.OnOff(); s != nil && d.Server(0x0006) != s {
+		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryWasher: optional OnOff is not the device's server")
 		}
-		if s := d.LaundryWasherMode(); s != nil && d.Server(0x0051) != s {
+		if s, srv := d.LaundryWasherMode(), d.Server(0x0051); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryWasher: optional LaundryWasherMode is not the device's server")
 		}
-		if s := d.LaundryWasherControls(); s != nil && d.Server(0x0053) != s {
+		if s, srv := d.LaundryWasherControls(), d.Server(0x0053); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryWasher: optional LaundryWasherControls is not the device's server")
 		}
-		if s := d.TemperatureControl(); s != nil && d.Server(0x0056) != s {
+		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryWasher: optional TemperatureControl is not the device's server")
 		}
 	} else if !refusesFixture("LaundryWasher") {
@@ -786,7 +786,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &LightSensorType {
 			t.Errorf("LightSensor: type %v", d.Type().Name)
 		}
-		if s := d.IlluminanceMeasurement(); d.Server(0x0400) == nil || s != nil && d.Server(0x0400) != s {
+		if s := d.IlluminanceMeasurement(); s == nil || s.Underlying() != d.Server(0x0400) {
 			t.Error("LightSensor: mandatory IlluminanceMeasurement not mounted")
 		}
 	} else if !refusesFixture("LightSensor") {
@@ -809,16 +809,16 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &MicrowaveOvenType {
 			t.Errorf("MicrowaveOven: type %v", d.Type().Name)
 		}
-		if s := d.OperationalState(); d.Server(0x0060) == nil || s != nil && d.Server(0x0060) != s {
+		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
 			t.Error("MicrowaveOven: mandatory OperationalState not mounted")
 		}
-		if s := d.MicrowaveOvenMode(); d.Server(0x005E) == nil || s != nil && d.Server(0x005E) != s {
+		if s := d.MicrowaveOvenMode(); s == nil || s.Underlying() != d.Server(0x005E) {
 			t.Error("MicrowaveOven: mandatory MicrowaveOvenMode not mounted")
 		}
-		if s := d.MicrowaveOvenControl(); d.Server(0x005F) == nil || s != nil && d.Server(0x005F) != s {
+		if s := d.MicrowaveOvenControl(); s == nil || s.Underlying() != d.Server(0x005F) {
 			t.Error("MicrowaveOven: mandatory MicrowaveOvenControl not mounted")
 		}
-		if s := d.FanControl(); s != nil && d.Server(0x0202) != s {
+		if s, srv := d.FanControl(), d.Server(0x0202); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("MicrowaveOven: optional FanControl is not the device's server")
 		}
 	} else if !refusesFixture("MicrowaveOven") {
@@ -831,7 +831,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ModeSelectType {
 			t.Errorf("ModeSelect: type %v", d.Type().Name)
 		}
-		if s := d.ModeSelect(); d.Server(0x0050) == nil || s != nil && d.Server(0x0050) != s {
+		if s := d.ModeSelect(); s == nil || s.Underlying() != d.Server(0x0050) {
 			t.Error("ModeSelect: mandatory ModeSelect not mounted")
 		}
 	} else if !refusesFixture("ModeSelect") {
@@ -844,10 +844,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &MountedDimmableLoadControlType {
 			t.Errorf("MountedDimmableLoadControl: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("MountedDimmableLoadControl: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("MountedDimmableLoadControl: mandatory LevelControl not mounted")
 		}
 	} else if !refusesFixture("MountedDimmableLoadControl") {
@@ -860,10 +860,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &MountedOnOffControlType {
 			t.Errorf("MountedOnOffControl: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("MountedOnOffControl: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); s != nil && d.Server(0x0008) != s {
+		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("MountedOnOffControl: optional LevelControl is not the device's server")
 		}
 	} else if !refusesFixture("MountedOnOffControl") {
@@ -876,10 +876,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OccupancySensorType {
 			t.Errorf("OccupancySensor: type %v", d.Type().Name)
 		}
-		if s := d.OccupancySensing(); d.Server(0x0406) == nil || s != nil && d.Server(0x0406) != s {
+		if s := d.OccupancySensing(); s == nil || s.Underlying() != d.Server(0x0406) {
 			t.Error("OccupancySensor: mandatory OccupancySensing not mounted")
 		}
-		if s := d.BooleanStateConfiguration(); s != nil && d.Server(0x0080) != s {
+		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OccupancySensor: optional BooleanStateConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("OccupancySensor") {
@@ -892,10 +892,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OnOffLightType {
 			t.Errorf("OnOffLight: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("OnOffLight: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); s != nil && d.Server(0x0008) != s {
+		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OnOffLight: optional LevelControl is not the device's server")
 		}
 	} else if !refusesFixture("OnOffLight") {
@@ -908,7 +908,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OnOffLightSwitchType {
 			t.Errorf("OnOffLightSwitch: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("OnOffLightSwitch: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("OnOffLightSwitch") {
@@ -921,10 +921,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OnOffPlugInUnitType {
 			t.Errorf("OnOffPlugInUnit: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("OnOffPlugInUnit: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); s != nil && d.Server(0x0008) != s {
+		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OnOffPlugInUnit: optional LevelControl is not the device's server")
 		}
 	} else if !refusesFixture("OnOffPlugInUnit") {
@@ -937,7 +937,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OnOffSensorType {
 			t.Errorf("OnOffSensor: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("OnOffSensor: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("OnOffSensor") {
@@ -950,7 +950,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OtaProviderType {
 			t.Errorf("OtaProvider: type %v", d.Type().Name)
 		}
-		if s := d.OtaSoftwareUpdateProvider(); d.Server(0x0029) == nil || s != nil && d.Server(0x0029) != s {
+		if s := d.OtaSoftwareUpdateProvider(); s == nil || s.Underlying() != d.Server(0x0029) {
 			t.Error("OtaProvider: mandatory OtaSoftwareUpdateProvider not mounted")
 		}
 	} else if !refusesFixture("OtaProvider") {
@@ -963,7 +963,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OtaRequestorType {
 			t.Errorf("OtaRequestor: type %v", d.Type().Name)
 		}
-		if s := d.OtaSoftwareUpdateRequestor(); d.Server(0x002A) == nil || s != nil && d.Server(0x002A) != s {
+		if s := d.OtaSoftwareUpdateRequestor(); s == nil || s.Underlying() != d.Server(0x002A) {
 			t.Error("OtaRequestor: mandatory OtaSoftwareUpdateRequestor not mounted")
 		}
 	} else if !refusesFixture("OtaRequestor") {
@@ -986,7 +986,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &PowerSourceType {
 			t.Errorf("PowerSource: type %v", d.Type().Name)
 		}
-		if s := d.PowerSource(); d.Server(0x002F) == nil || s != nil && d.Server(0x002F) != s {
+		if s := d.PowerSource(); s == nil || s.Underlying() != d.Server(0x002F) {
 			t.Error("PowerSource: mandatory PowerSource not mounted")
 		}
 	} else if !refusesFixture("PowerSource") {
@@ -999,7 +999,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &PressureSensorType {
 			t.Errorf("PressureSensor: type %v", d.Type().Name)
 		}
-		if s := d.PressureMeasurement(); d.Server(0x0403) == nil || s != nil && d.Server(0x0403) != s {
+		if s := d.PressureMeasurement(); s == nil || s.Underlying() != d.Server(0x0403) {
 			t.Error("PressureSensor: mandatory PressureMeasurement not mounted")
 		}
 	} else if !refusesFixture("PressureSensor") {
@@ -1012,22 +1012,22 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &PumpType {
 			t.Errorf("Pump: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("Pump: mandatory OnOff not mounted")
 		}
-		if s := d.PumpConfigurationAndControl(); d.Server(0x0200) == nil || s != nil && d.Server(0x0200) != s {
+		if s := d.PumpConfigurationAndControl(); s == nil || s.Underlying() != d.Server(0x0200) {
 			t.Error("Pump: mandatory PumpConfigurationAndControl not mounted")
 		}
-		if s := d.LevelControl(); s != nil && d.Server(0x0008) != s {
+		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Pump: optional LevelControl is not the device's server")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Pump: optional TemperatureMeasurement is not the device's server")
 		}
-		if s := d.PressureMeasurement(); s != nil && d.Server(0x0403) != s {
+		if s, srv := d.PressureMeasurement(), d.Server(0x0403); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Pump: optional PressureMeasurement is not the device's server")
 		}
-		if s := d.FlowMeasurement(); s != nil && d.Server(0x0404) != s {
+		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Pump: optional FlowMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("Pump") {
@@ -1040,7 +1040,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &PumpControllerType {
 			t.Errorf("PumpController: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("PumpController: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("PumpController") {
@@ -1053,10 +1053,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &RainSensorType {
 			t.Errorf("RainSensor: type %v", d.Type().Name)
 		}
-		if s := d.BooleanState(); d.Server(0x0045) == nil || s != nil && d.Server(0x0045) != s {
+		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
 			t.Error("RainSensor: mandatory BooleanState not mounted")
 		}
-		if s := d.BooleanStateConfiguration(); s != nil && d.Server(0x0080) != s {
+		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RainSensor: optional BooleanStateConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("RainSensor") {
@@ -1069,13 +1069,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &RefrigeratorType {
 			t.Errorf("Refrigerator: type %v", d.Type().Name)
 		}
-		if s := d.RefrigeratorAndTemperatureControlledCabinetMode(); s != nil && d.Server(0x0052) != s {
+		if s, srv := d.RefrigeratorAndTemperatureControlledCabinetMode(), d.Server(0x0052); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Refrigerator: optional RefrigeratorAndTemperatureControlledCabinetMode is not the device's server")
 		}
-		if s := d.RefrigeratorAlarm(); s != nil && d.Server(0x0057) != s {
+		if s, srv := d.RefrigeratorAlarm(), d.Server(0x0057); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Refrigerator: optional RefrigeratorAlarm is not the device's server")
 		}
-		if s := d.ActivatedCarbonFilterMonitoring(); s != nil && d.Server(0x0072) != s {
+		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Refrigerator: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
 	} else if !refusesFixture("Refrigerator") {
@@ -1088,16 +1088,16 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &RoboticVacuumCleanerType {
 			t.Errorf("RoboticVacuumCleaner: type %v", d.Type().Name)
 		}
-		if s := d.RvcRunMode(); d.Server(0x0054) == nil || s != nil && d.Server(0x0054) != s {
+		if s := d.RvcRunMode(); s == nil || s.Underlying() != d.Server(0x0054) {
 			t.Error("RoboticVacuumCleaner: mandatory RvcRunMode not mounted")
 		}
-		if s := d.RvcOperationalState(); d.Server(0x0061) == nil || s != nil && d.Server(0x0061) != s {
+		if s := d.RvcOperationalState(); s == nil || s.Underlying() != d.Server(0x0061) {
 			t.Error("RoboticVacuumCleaner: mandatory RvcOperationalState not mounted")
 		}
-		if s := d.RvcCleanMode(); s != nil && d.Server(0x0055) != s {
+		if s, srv := d.RvcCleanMode(), d.Server(0x0055); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoboticVacuumCleaner: optional RvcCleanMode is not the device's server")
 		}
-		if s := d.ServiceArea(); s != nil && d.Server(0x0150) != s {
+		if s, srv := d.ServiceArea(), d.Server(0x0150); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoboticVacuumCleaner: optional ServiceArea is not the device's server")
 		}
 	} else if !refusesFixture("RoboticVacuumCleaner") {
@@ -1110,28 +1110,28 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &RoomAirConditionerType {
 			t.Errorf("RoomAirConditioner: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("RoomAirConditioner: mandatory OnOff not mounted")
 		}
-		if s := d.Thermostat(); d.Server(0x0201) == nil || s != nil && d.Server(0x0201) != s {
+		if s := d.Thermostat(); s == nil || s.Underlying() != d.Server(0x0201) {
 			t.Error("RoomAirConditioner: mandatory Thermostat not mounted")
 		}
-		if s := d.HepaFilterMonitoring(); s != nil && d.Server(0x0071) != s {
+		if s, srv := d.HepaFilterMonitoring(), d.Server(0x0071); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional HepaFilterMonitoring is not the device's server")
 		}
-		if s := d.ActivatedCarbonFilterMonitoring(); s != nil && d.Server(0x0072) != s {
+		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
-		if s := d.FanControl(); s != nil && d.Server(0x0202) != s {
+		if s, srv := d.FanControl(), d.Server(0x0202); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional FanControl is not the device's server")
 		}
-		if s := d.ThermostatUserInterfaceConfiguration(); s != nil && d.Server(0x0204) != s {
+		if s, srv := d.ThermostatUserInterfaceConfiguration(), d.Server(0x0204); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional ThermostatUserInterfaceConfiguration is not the device's server")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional TemperatureMeasurement is not the device's server")
 		}
-		if s := d.RelativeHumidityMeasurement(); s != nil && d.Server(0x0405) != s {
+		if s, srv := d.RelativeHumidityMeasurement(), d.Server(0x0405); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional RelativeHumidityMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("RoomAirConditioner") {
@@ -1144,52 +1144,52 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &RootNodeType {
 			t.Errorf("RootNode: type %v", d.Type().Name)
 		}
-		if s := d.BasicInformation(); d.Server(0x0028) == nil || s != nil && d.Server(0x0028) != s {
+		if s := d.BasicInformation(); s == nil || s.Underlying() != d.Server(0x0028) {
 			t.Error("RootNode: mandatory BasicInformation not mounted")
 		}
-		if s := d.GeneralCommissioning(); d.Server(0x0030) == nil || s != nil && d.Server(0x0030) != s {
+		if s := d.GeneralCommissioning(); s == nil || s.Underlying() != d.Server(0x0030) {
 			t.Error("RootNode: mandatory GeneralCommissioning not mounted")
 		}
-		if s := d.GeneralDiagnostics(); d.Server(0x0033) == nil || s != nil && d.Server(0x0033) != s {
+		if s := d.GeneralDiagnostics(); s == nil || s.Underlying() != d.Server(0x0033) {
 			t.Error("RootNode: mandatory GeneralDiagnostics not mounted")
 		}
-		if s := d.AdministratorCommissioning(); d.Server(0x003C) == nil || s != nil && d.Server(0x003C) != s {
+		if s := d.AdministratorCommissioning(); s == nil || s.Underlying() != d.Server(0x003C) {
 			t.Error("RootNode: mandatory AdministratorCommissioning not mounted")
 		}
-		if s := d.LocalizationConfiguration(); s != nil && d.Server(0x002B) != s {
+		if s, srv := d.LocalizationConfiguration(), d.Server(0x002B); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional LocalizationConfiguration is not the device's server")
 		}
-		if s := d.TimeFormatLocalization(); s != nil && d.Server(0x002C) != s {
+		if s, srv := d.TimeFormatLocalization(), d.Server(0x002C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional TimeFormatLocalization is not the device's server")
 		}
-		if s := d.UnitLocalization(); s != nil && d.Server(0x002D) != s {
+		if s, srv := d.UnitLocalization(), d.Server(0x002D); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional UnitLocalization is not the device's server")
 		}
-		if s := d.PowerSourceConfiguration(); s != nil && d.Server(0x002E) != s {
+		if s, srv := d.PowerSourceConfiguration(), d.Server(0x002E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional PowerSourceConfiguration is not the device's server")
 		}
-		if s := d.NetworkCommissioning(); s != nil && d.Server(0x0031) != s {
+		if s, srv := d.NetworkCommissioning(), d.Server(0x0031); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional NetworkCommissioning is not the device's server")
 		}
-		if s := d.DiagnosticLogs(); s != nil && d.Server(0x0032) != s {
+		if s, srv := d.DiagnosticLogs(), d.Server(0x0032); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional DiagnosticLogs is not the device's server")
 		}
-		if s := d.SoftwareDiagnostics(); s != nil && d.Server(0x0034) != s {
+		if s, srv := d.SoftwareDiagnostics(), d.Server(0x0034); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional SoftwareDiagnostics is not the device's server")
 		}
-		if s := d.WiFiNetworkDiagnostics(); s != nil && d.Server(0x0036) != s {
+		if s, srv := d.WiFiNetworkDiagnostics(), d.Server(0x0036); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional WiFiNetworkDiagnostics is not the device's server")
 		}
-		if s := d.EthernetNetworkDiagnostics(); s != nil && d.Server(0x0037) != s {
+		if s, srv := d.EthernetNetworkDiagnostics(), d.Server(0x0037); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional EthernetNetworkDiagnostics is not the device's server")
 		}
-		if s := d.TimeSynchronization(); s != nil && d.Server(0x0038) != s {
+		if s, srv := d.TimeSynchronization(), d.Server(0x0038); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional TimeSynchronization is not the device's server")
 		}
-		if s := d.IcdManagement(); s != nil && d.Server(0x0046) != s {
+		if s, srv := d.IcdManagement(), d.Server(0x0046); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional IcdManagement is not the device's server")
 		}
-		if s := d.Groupcast(); s != nil && d.Server(0x0065) != s {
+		if s, srv := d.Groupcast(), d.Server(0x0065); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional Groupcast is not the device's server")
 		}
 	} else if !refusesFixture("RootNode") {
@@ -1202,13 +1202,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &SecondaryNetworkInterfaceType {
 			t.Errorf("SecondaryNetworkInterface: type %v", d.Type().Name)
 		}
-		if s := d.NetworkCommissioning(); d.Server(0x0031) == nil || s != nil && d.Server(0x0031) != s {
+		if s := d.NetworkCommissioning(); s == nil || s.Underlying() != d.Server(0x0031) {
 			t.Error("SecondaryNetworkInterface: mandatory NetworkCommissioning not mounted")
 		}
-		if s := d.WiFiNetworkDiagnostics(); s != nil && d.Server(0x0036) != s {
+		if s, srv := d.WiFiNetworkDiagnostics(), d.Server(0x0036); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SecondaryNetworkInterface: optional WiFiNetworkDiagnostics is not the device's server")
 		}
-		if s := d.EthernetNetworkDiagnostics(); s != nil && d.Server(0x0037) != s {
+		if s, srv := d.EthernetNetworkDiagnostics(), d.Server(0x0037); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SecondaryNetworkInterface: optional EthernetNetworkDiagnostics is not the device's server")
 		}
 	} else if !refusesFixture("SecondaryNetworkInterface") {
@@ -1221,16 +1221,16 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &SmokeCoAlarmType {
 			t.Errorf("SmokeCoAlarm: type %v", d.Type().Name)
 		}
-		if s := d.SmokeCoAlarm(); d.Server(0x005C) == nil || s != nil && d.Server(0x005C) != s {
+		if s := d.SmokeCoAlarm(); s == nil || s.Underlying() != d.Server(0x005C) {
 			t.Error("SmokeCoAlarm: mandatory SmokeCoAlarm not mounted")
 		}
-		if s := d.RelativeHumidityMeasurement(); s != nil && d.Server(0x0405) != s {
+		if s, srv := d.RelativeHumidityMeasurement(), d.Server(0x0405); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SmokeCoAlarm: optional RelativeHumidityMeasurement is not the device's server")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SmokeCoAlarm: optional TemperatureMeasurement is not the device's server")
 		}
-		if s := d.CarbonMonoxideConcentrationMeasurement(); s != nil && d.Server(0x040C) != s {
+		if s, srv := d.CarbonMonoxideConcentrationMeasurement(), d.Server(0x040C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SmokeCoAlarm: optional CarbonMonoxideConcentrationMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("SmokeCoAlarm") {
@@ -1243,10 +1243,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &SoilSensorType {
 			t.Errorf("SoilSensor: type %v", d.Type().Name)
 		}
-		if s := d.SoilMeasurement(); d.Server(0x0430) == nil || s != nil && d.Server(0x0430) != s {
+		if s := d.SoilMeasurement(); s == nil || s.Underlying() != d.Server(0x0430) {
 			t.Error("SoilSensor: mandatory SoilMeasurement not mounted")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SoilSensor: optional TemperatureMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("SoilSensor") {
@@ -1269,10 +1269,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &SpeakerType {
 			t.Errorf("Speaker: type %v", d.Type().Name)
 		}
-		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("Speaker: mandatory OnOff not mounted")
 		}
-		if s := d.LevelControl(); d.Server(0x0008) == nil || s != nil && d.Server(0x0008) != s {
+		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("Speaker: mandatory LevelControl not mounted")
 		}
 	} else if !refusesFixture("Speaker") {
@@ -1285,22 +1285,22 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &TemperatureControlledCabinetType {
 			t.Errorf("TemperatureControlledCabinet: type %v", d.Type().Name)
 		}
-		if s := d.TemperatureControl(); d.Server(0x0056) == nil || s != nil && d.Server(0x0056) != s {
+		if s := d.TemperatureControl(); s == nil || s.Underlying() != d.Server(0x0056) {
 			t.Error("TemperatureControlledCabinet: mandatory TemperatureControl not mounted")
 		}
-		if s := d.TemperatureMeasurement(); s != nil && d.Server(0x0402) != s {
+		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional TemperatureMeasurement is not the device's server")
 		}
-		if s := d.RefrigeratorAndTemperatureControlledCabinetMode(); s != nil && d.Server(0x0052) != s {
+		if s, srv := d.RefrigeratorAndTemperatureControlledCabinetMode(), d.Server(0x0052); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional RefrigeratorAndTemperatureControlledCabinetMode is not the device's server")
 		}
-		if s := d.OvenMode(); s != nil && d.Server(0x0049) != s {
+		if s, srv := d.OvenMode(), d.Server(0x0049); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional OvenMode is not the device's server")
 		}
-		if s := d.OvenCavityOperationalState(); s != nil && d.Server(0x0048) != s {
+		if s, srv := d.OvenCavityOperationalState(), d.Server(0x0048); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional OvenCavityOperationalState is not the device's server")
 		}
-		if s := d.TemperatureAlarm(); s != nil && d.Server(0x0064) != s {
+		if s, srv := d.TemperatureAlarm(), d.Server(0x0064); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional TemperatureAlarm is not the device's server")
 		}
 	} else if !refusesFixture("TemperatureControlledCabinet") {
@@ -1313,10 +1313,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &TemperatureSensorType {
 			t.Errorf("TemperatureSensor: type %v", d.Type().Name)
 		}
-		if s := d.TemperatureMeasurement(); d.Server(0x0402) == nil || s != nil && d.Server(0x0402) != s {
+		if s := d.TemperatureMeasurement(); s == nil || s.Underlying() != d.Server(0x0402) {
 			t.Error("TemperatureSensor: mandatory TemperatureMeasurement not mounted")
 		}
-		if s := d.ThermostatUserInterfaceConfiguration(); s != nil && d.Server(0x0204) != s {
+		if s, srv := d.ThermostatUserInterfaceConfiguration(), d.Server(0x0204); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureSensor: optional ThermostatUserInterfaceConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("TemperatureSensor") {
@@ -1329,13 +1329,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ThermostatType {
 			t.Errorf("Thermostat: type %v", d.Type().Name)
 		}
-		if s := d.Thermostat(); d.Server(0x0201) == nil || s != nil && d.Server(0x0201) != s {
+		if s := d.Thermostat(); s == nil || s.Underlying() != d.Server(0x0201) {
 			t.Error("Thermostat: mandatory Thermostat not mounted")
 		}
-		if s := d.EnergyPreference(); s != nil && d.Server(0x009B) != s {
+		if s, srv := d.EnergyPreference(), d.Server(0x009B); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Thermostat: optional EnergyPreference is not the device's server")
 		}
-		if s := d.ThermostatUserInterfaceConfiguration(); s != nil && d.Server(0x0204) != s {
+		if s, srv := d.ThermostatUserInterfaceConfiguration(), d.Server(0x0204); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Thermostat: optional ThermostatUserInterfaceConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("Thermostat") {
@@ -1348,7 +1348,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &ThermostatControllerType {
 			t.Errorf("ThermostatController: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ThermostatController: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("ThermostatController") {
@@ -1361,7 +1361,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &VideoRemoteControlType {
 			t.Errorf("VideoRemoteControl: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("VideoRemoteControl: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("VideoRemoteControl") {
@@ -1374,10 +1374,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WaterFreezeDetectorType {
 			t.Errorf("WaterFreezeDetector: type %v", d.Type().Name)
 		}
-		if s := d.BooleanState(); d.Server(0x0045) == nil || s != nil && d.Server(0x0045) != s {
+		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
 			t.Error("WaterFreezeDetector: mandatory BooleanState not mounted")
 		}
-		if s := d.BooleanStateConfiguration(); s != nil && d.Server(0x0080) != s {
+		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterFreezeDetector: optional BooleanStateConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("WaterFreezeDetector") {
@@ -1390,13 +1390,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WaterHeaterType {
 			t.Errorf("WaterHeater: type %v", d.Type().Name)
 		}
-		if s := d.WaterHeaterManagement(); d.Server(0x0094) == nil || s != nil && d.Server(0x0094) != s {
+		if s := d.WaterHeaterManagement(); s == nil || s.Underlying() != d.Server(0x0094) {
 			t.Error("WaterHeater: mandatory WaterHeaterManagement not mounted")
 		}
-		if s := d.WaterHeaterMode(); d.Server(0x009E) == nil || s != nil && d.Server(0x009E) != s {
+		if s := d.WaterHeaterMode(); s == nil || s.Underlying() != d.Server(0x009E) {
 			t.Error("WaterHeater: mandatory WaterHeaterMode not mounted")
 		}
-		if s := d.Thermostat(); d.Server(0x0201) == nil || s != nil && d.Server(0x0201) != s {
+		if s := d.Thermostat(); s == nil || s.Underlying() != d.Server(0x0201) {
 			t.Error("WaterHeater: mandatory Thermostat not mounted")
 		}
 	} else if !refusesFixture("WaterHeater") {
@@ -1409,10 +1409,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WaterLeakDetectorType {
 			t.Errorf("WaterLeakDetector: type %v", d.Type().Name)
 		}
-		if s := d.BooleanState(); d.Server(0x0045) == nil || s != nil && d.Server(0x0045) != s {
+		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
 			t.Error("WaterLeakDetector: mandatory BooleanState not mounted")
 		}
-		if s := d.BooleanStateConfiguration(); s != nil && d.Server(0x0080) != s {
+		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterLeakDetector: optional BooleanStateConfiguration is not the device's server")
 		}
 	} else if !refusesFixture("WaterLeakDetector") {
@@ -1425,10 +1425,10 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WaterValveType {
 			t.Errorf("WaterValve: type %v", d.Type().Name)
 		}
-		if s := d.ValveConfigurationAndControl(); d.Server(0x0081) == nil || s != nil && d.Server(0x0081) != s {
+		if s := d.ValveConfigurationAndControl(); s == nil || s.Underlying() != d.Server(0x0081) {
 			t.Error("WaterValve: mandatory ValveConfigurationAndControl not mounted")
 		}
-		if s := d.FlowMeasurement(); s != nil && d.Server(0x0404) != s {
+		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterValve: optional FlowMeasurement is not the device's server")
 		}
 	} else if !refusesFixture("WaterValve") {
@@ -1441,7 +1441,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WindowCoveringType {
 			t.Errorf("WindowCovering: type %v", d.Type().Name)
 		}
-		if s := d.WindowCovering(); d.Server(0x0102) == nil || s != nil && d.Server(0x0102) != s {
+		if s := d.WindowCovering(); s == nil || s.Underlying() != d.Server(0x0102) {
 			t.Error("WindowCovering: mandatory WindowCovering not mounted")
 		}
 	} else if !refusesFixture("WindowCovering") {
@@ -1454,7 +1454,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &WindowCoveringControllerType {
 			t.Errorf("WindowCoveringController: type %v", d.Type().Name)
 		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("WindowCoveringController: mandatory Binding not mounted")
 		}
 	} else if !refusesFixture("WindowCoveringController") {

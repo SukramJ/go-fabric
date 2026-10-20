@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the Switch cluster: one field per attribute
@@ -29,41 +30,89 @@ type Patch struct {
 	MultiPressMax     *uint8 `matter:"0x0002"` // attribute 0x0002
 }
 
-// Server is the typed Switch server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed Switch server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-func init() { spec.RegisterTyped(ClusterID, Wrap) }
+// EmitSwitchLatched emits the SwitchLatched event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitSwitchLatched(endpoint uint16, data SwitchLatchedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventSwitchLatched, data)
+}
+
+// EmitInitialPress emits the InitialPress event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitInitialPress(endpoint uint16, data InitialPressEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventInitialPress, data)
+}
+
+// EmitLongPress emits the LongPress event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitLongPress(endpoint uint16, data LongPressEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventLongPress, data)
+}
+
+// EmitShortRelease emits the ShortRelease event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitShortRelease(endpoint uint16, data ShortReleaseEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventShortRelease, data)
+}
+
+// EmitLongRelease emits the LongRelease event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitLongRelease(endpoint uint16, data LongReleaseEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventLongRelease, data)
+}
+
+// EmitMultiPressOngoing emits the MultiPressOngoing event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitMultiPressOngoing(endpoint uint16, data MultiPressOngoingEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressOngoing, data)
+}
+
+// EmitMultiPressComplete emits the MultiPressComplete event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitMultiPressComplete(endpoint uint16, data MultiPressCompleteEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressComplete, data)
+}

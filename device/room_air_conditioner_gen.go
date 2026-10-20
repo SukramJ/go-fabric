@@ -6,7 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -100,40 +99,62 @@ func NewRoomAirConditioner(opts Options, with ...Option) (*RoomAirConditioner, e
 	return &RoomAirConditioner{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RoomAirConditioner) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
+// Thermostat returns the typed Thermostat server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *RoomAirConditioner) Thermostat() *thermostatdef.Server {
-	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
+	return thermostatdef.Wrap(d.Server(0x0201))
 }
 
-// HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	return serverAs[*hepafiltermonitoringdef.Server](d.Device, 0x0071)
+	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }
 
-// FanControl returns the FanControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// FanControl returns the typed FanControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) FanControl() *fancontroldef.Server {
-	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
+	return fancontroldef.Wrap(d.Server(0x0202))
 }
 
-// ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
+	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *RoomAirConditioner) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
+	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
 }

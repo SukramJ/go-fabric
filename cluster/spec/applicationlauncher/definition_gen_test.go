@@ -34,8 +34,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdLauncherResponse, spec.Response, LauncherResponse{Status: StatusEnum(0), Data: spectest.Ptr([]byte{1})})
 }
 
-// TestTypedServer drives every method of the typed server once, and
-// finds it registered for the cluster.
+// TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
 	if Wrap(nil) != nil {
@@ -45,17 +44,25 @@ func TestTypedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := spec.TypedServer(srv).(*Server); !ok {
-		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
-	}
 	s := Wrap(srv)
+	if Wrap(s) != s || s.Underlying() != srv {
+		t.Error("Wrap does not hold the server once")
+	}
 	if err := s.Set(Patch{}); err != nil {
 		t.Error(err)
 	}
 	_ = s.Get()
 	s.OnChanged(func(State, []uint32) {})()
-	s.OnWrite(func(context.Context, State, uint32) error { return nil })
-	s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
-	s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
-	s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

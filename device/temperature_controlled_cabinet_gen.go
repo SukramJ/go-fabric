@@ -73,32 +73,49 @@ func NewTemperatureControlledCabinet(opts Options, with ...Option) (*Temperature
 	return &TemperatureControlledCabinet{d}, nil
 }
 
-// TemperatureControl returns the TemperatureControl server (mandatory), or nil when the host supplied one of another type.
+// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontroldef.Server {
-	return serverAs[*temperaturecontroldef.Server](d.Device, 0x0056)
+	return temperaturecontroldef.Wrap(d.Server(0x0056))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the RefrigeratorAndTemperatureControlledCabinetMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	return serverAs[*refrigeratorandtemperaturecontrolledcabinetmodedef.Server](d.Device, 0x0052)
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
 }
 
-// OvenMode returns the OvenMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// OvenMode returns the typed OvenMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
-	return serverAs[*ovenmodedef.Server](d.Device, 0x0049)
+	return ovenmodedef.Wrap(d.Server(0x0049))
 }
 
-// OvenCavityOperationalState returns the OvenCavityOperationalState server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// OvenCavityOperationalState returns the typed OvenCavityOperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityoperationalstatedef.Server {
-	return serverAs[*ovencavityoperationalstatedef.Server](d.Device, 0x0048)
+	return ovencavityoperationalstatedef.Wrap(d.Server(0x0048))
 }
 
-// TemperatureAlarm returns the TemperatureAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureAlarm returns the typed TemperatureAlarm server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureAlarm() *temperaturealarmdef.Server {
-	return serverAs[*temperaturealarmdef.Server](d.Device, 0x0064)
+	return temperaturealarmdef.Wrap(d.Server(0x0064))
 }

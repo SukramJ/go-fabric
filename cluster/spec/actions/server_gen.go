@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the Actions cluster: one field per attribute
@@ -29,101 +30,131 @@ type Patch struct {
 	SetupUrl      *string               `matter:"0x0002"` // attribute 0x0002
 }
 
-// Server is the typed Actions server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed Actions server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleInstantAction registers fn for the InstantAction command; nil removes the handler.
-func (s *Server) HandleInstantAction(fn func(ctx context.Context, req InstantActionRequest) (struct{}, error)) {
-	s.Handle(CmdInstantAction, spec.HandlerOf(fn))
+// HandleInstantAction registers fn for the InstantAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleInstantAction(fn func(ctx context.Context, req InstantActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdInstantAction, fn)
 }
 
-// HandleInstantActionWithTransition registers fn for the InstantActionWithTransition command; nil removes the handler.
-func (s *Server) HandleInstantActionWithTransition(fn func(ctx context.Context, req InstantActionWithTransitionRequest) (struct{}, error)) {
-	s.Handle(CmdInstantActionWithTransition, spec.HandlerOf(fn))
+// HandleInstantActionWithTransition registers fn for the InstantActionWithTransition command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleInstantActionWithTransition(fn func(ctx context.Context, req InstantActionWithTransitionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdInstantActionWithTransition, fn)
 }
 
-// HandleStartAction registers fn for the StartAction command; nil removes the handler.
-func (s *Server) HandleStartAction(fn func(ctx context.Context, req StartActionRequest) (struct{}, error)) {
-	s.Handle(CmdStartAction, spec.HandlerOf(fn))
+// HandleStartAction registers fn for the StartAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStartAction(fn func(ctx context.Context, req StartActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStartAction, fn)
 }
 
-// HandleStartActionWithDuration registers fn for the StartActionWithDuration command; nil removes the handler.
-func (s *Server) HandleStartActionWithDuration(fn func(ctx context.Context, req StartActionWithDurationRequest) (struct{}, error)) {
-	s.Handle(CmdStartActionWithDuration, spec.HandlerOf(fn))
+// HandleStartActionWithDuration registers fn for the StartActionWithDuration command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStartActionWithDuration(fn func(ctx context.Context, req StartActionWithDurationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStartActionWithDuration, fn)
 }
 
-// HandleStopAction registers fn for the StopAction command; nil removes the handler.
-func (s *Server) HandleStopAction(fn func(ctx context.Context, req StopActionRequest) (struct{}, error)) {
-	s.Handle(CmdStopAction, spec.HandlerOf(fn))
+// HandleStopAction registers fn for the StopAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStopAction(fn func(ctx context.Context, req StopActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStopAction, fn)
 }
 
-// HandlePauseAction registers fn for the PauseAction command; nil removes the handler.
-func (s *Server) HandlePauseAction(fn func(ctx context.Context, req PauseActionRequest) (struct{}, error)) {
-	s.Handle(CmdPauseAction, spec.HandlerOf(fn))
+// HandlePauseAction registers fn for the PauseAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandlePauseAction(fn func(ctx context.Context, req PauseActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdPauseAction, fn)
 }
 
-// HandlePauseActionWithDuration registers fn for the PauseActionWithDuration command; nil removes the handler.
-func (s *Server) HandlePauseActionWithDuration(fn func(ctx context.Context, req PauseActionWithDurationRequest) (struct{}, error)) {
-	s.Handle(CmdPauseActionWithDuration, spec.HandlerOf(fn))
+// HandlePauseActionWithDuration registers fn for the PauseActionWithDuration command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandlePauseActionWithDuration(fn func(ctx context.Context, req PauseActionWithDurationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdPauseActionWithDuration, fn)
 }
 
-// HandleResumeAction registers fn for the ResumeAction command; nil removes the handler.
-func (s *Server) HandleResumeAction(fn func(ctx context.Context, req ResumeActionRequest) (struct{}, error)) {
-	s.Handle(CmdResumeAction, spec.HandlerOf(fn))
+// HandleResumeAction registers fn for the ResumeAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleResumeAction(fn func(ctx context.Context, req ResumeActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdResumeAction, fn)
 }
 
-// HandleEnableAction registers fn for the EnableAction command; nil removes the handler.
-func (s *Server) HandleEnableAction(fn func(ctx context.Context, req EnableActionRequest) (struct{}, error)) {
-	s.Handle(CmdEnableAction, spec.HandlerOf(fn))
+// HandleEnableAction registers fn for the EnableAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnableAction(fn func(ctx context.Context, req EnableActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnableAction, fn)
 }
 
-// HandleEnableActionWithDuration registers fn for the EnableActionWithDuration command; nil removes the handler.
-func (s *Server) HandleEnableActionWithDuration(fn func(ctx context.Context, req EnableActionWithDurationRequest) (struct{}, error)) {
-	s.Handle(CmdEnableActionWithDuration, spec.HandlerOf(fn))
+// HandleEnableActionWithDuration registers fn for the EnableActionWithDuration command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleEnableActionWithDuration(fn func(ctx context.Context, req EnableActionWithDurationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdEnableActionWithDuration, fn)
 }
 
-// HandleDisableAction registers fn for the DisableAction command; nil removes the handler.
-func (s *Server) HandleDisableAction(fn func(ctx context.Context, req DisableActionRequest) (struct{}, error)) {
-	s.Handle(CmdDisableAction, spec.HandlerOf(fn))
+// HandleDisableAction registers fn for the DisableAction command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleDisableAction(fn func(ctx context.Context, req DisableActionRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdDisableAction, fn)
 }
 
-// HandleDisableActionWithDuration registers fn for the DisableActionWithDuration command; nil removes the handler.
-func (s *Server) HandleDisableActionWithDuration(fn func(ctx context.Context, req DisableActionWithDurationRequest) (struct{}, error)) {
-	s.Handle(CmdDisableActionWithDuration, spec.HandlerOf(fn))
+// HandleDisableActionWithDuration registers fn for the DisableActionWithDuration command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleDisableActionWithDuration(fn func(ctx context.Context, req DisableActionWithDurationRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdDisableActionWithDuration, fn)
 }
 
-func init() { spec.RegisterTyped(ClusterID, Wrap) }
+// EmitStateChanged emits the StateChanged event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
+}
+
+// EmitActionFailed emits the ActionFailed event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitActionFailed(endpoint uint16, data ActionFailedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventActionFailed, data)
+}

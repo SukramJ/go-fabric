@@ -109,67 +109,105 @@ func NewAirQualitySensor(opts Options, with ...Option) (*AirQualitySensor, error
 	return &AirQualitySensor{d}, nil
 }
 
-// AirQuality returns the AirQuality server (mandatory), or nil when the host supplied one of another type.
+// AirQuality returns the typed AirQuality server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
 func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
-	return serverAs[*airqualitydef.Server](d.Device, 0x005B)
+	return airqualitydef.Wrap(d.Server(0x005B))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
+	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
 }
 
-// CarbonMonoxideConcentrationMeasurement returns the CarbonMonoxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
-	return serverAs[*carbonmonoxideconcentrationmeasurementdef.Server](d.Device, 0x040C)
+	return carbonmonoxideconcentrationmeasurementdef.Wrap(d.Server(0x040C))
 }
 
-// CarbonDioxideConcentrationMeasurement returns the CarbonDioxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// CarbonDioxideConcentrationMeasurement returns the typed CarbonDioxideConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxideconcentrationmeasurementdef.Server {
-	return serverAs[*carbondioxideconcentrationmeasurementdef.Server](d.Device, 0x040D)
+	return carbondioxideconcentrationmeasurementdef.Wrap(d.Server(0x040D))
 }
 
-// NitrogenDioxideConcentrationMeasurement returns the NitrogenDioxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// NitrogenDioxideConcentrationMeasurement returns the typed NitrogenDioxideConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendioxideconcentrationmeasurementdef.Server {
-	return serverAs[*nitrogendioxideconcentrationmeasurementdef.Server](d.Device, 0x0413)
+	return nitrogendioxideconcentrationmeasurementdef.Wrap(d.Server(0x0413))
 }
 
-// OzoneConcentrationMeasurement returns the OzoneConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// OzoneConcentrationMeasurement returns the typed OzoneConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationmeasurementdef.Server {
-	return serverAs[*ozoneconcentrationmeasurementdef.Server](d.Device, 0x0415)
+	return ozoneconcentrationmeasurementdef.Wrap(d.Server(0x0415))
 }
 
-// Pm25ConcentrationMeasurement returns the Pm25ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// Pm25ConcentrationMeasurement returns the typed Pm25ConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeasurementdef.Server {
-	return serverAs[*pm25concentrationmeasurementdef.Server](d.Device, 0x042A)
+	return pm25concentrationmeasurementdef.Wrap(d.Server(0x042A))
 }
 
-// FormaldehydeConcentrationMeasurement returns the FormaldehydeConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// FormaldehydeConcentrationMeasurement returns the typed FormaldehydeConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydeconcentrationmeasurementdef.Server {
-	return serverAs[*formaldehydeconcentrationmeasurementdef.Server](d.Device, 0x042B)
+	return formaldehydeconcentrationmeasurementdef.Wrap(d.Server(0x042B))
 }
 
-// Pm1ConcentrationMeasurement returns the Pm1ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// Pm1ConcentrationMeasurement returns the typed Pm1ConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasurementdef.Server {
-	return serverAs[*pm1concentrationmeasurementdef.Server](d.Device, 0x042C)
+	return pm1concentrationmeasurementdef.Wrap(d.Server(0x042C))
 }
 
-// Pm10ConcentrationMeasurement returns the Pm10ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// Pm10ConcentrationMeasurement returns the typed Pm10ConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeasurementdef.Server {
-	return serverAs[*pm10concentrationmeasurementdef.Server](d.Device, 0x042D)
+	return pm10concentrationmeasurementdef.Wrap(d.Server(0x042D))
 }
 
-// TotalVolatileOrganicCompoundsConcentrationMeasurement returns the TotalVolatileOrganicCompoundsConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// TotalVolatileOrganicCompoundsConcentrationMeasurement returns the typed TotalVolatileOrganicCompoundsConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *totalvolatileorganiccompoundsconcentrationmeasurementdef.Server {
-	return serverAs[*totalvolatileorganiccompoundsconcentrationmeasurementdef.Server](d.Device, 0x042E)
+	return totalvolatileorganiccompoundsconcentrationmeasurementdef.Wrap(d.Server(0x042E))
 }
 
-// RadonConcentrationMeasurement returns the RadonConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+// RadonConcentrationMeasurement returns the typed RadonConcentrationMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
 func (d *AirQualitySensor) RadonConcentrationMeasurement() *radonconcentrationmeasurementdef.Server {
-	return serverAs[*radonconcentrationmeasurementdef.Server](d.Device, 0x042F)
+	return radonconcentrationmeasurementdef.Wrap(d.Server(0x042F))
 }

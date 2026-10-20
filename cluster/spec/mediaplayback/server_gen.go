@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // State is the typed state of the MediaPlayback cluster: one field per attribute
@@ -47,111 +48,137 @@ type Patch struct {
 	Null                 []uint32                // attribute ids set to null
 }
 
-// Server is the typed MediaPlayback server: the generated server it embeds,
-// with a typed state, typed change reports, a write veto and typed
-// command handlers. It adds no behavior: every method of the embedded
-// server is its own, Set taking a Patch (the embedded one's is
-// s.Server.Set).
-type Server struct{ *spec.Server }
+// Server is the typed MediaPlayback server over the cluster's server — the
+// generated spec.Server or a self-held one (Underlying) — with a typed
+// state, typed change reports, a write veto, typed command handlers and
+// typed events. It adds no behavior: each method reaches the server's
+// own (spec.Hull forwards contract.ClusterServer and the dispatcher's
+// optional interfaces). Mount the underlying server, not this one.
+type Server struct{ spec.Hull }
 
-// Wrap returns s as the typed server; nil for nil.
-func Wrap(s *spec.Server) *Server {
-	if s == nil {
+// Wrap returns srv as the typed server: nil for nil, a typed server as
+// it is.
+func Wrap(srv contract.ClusterServer) *Server {
+	switch s := srv.(type) {
+	case nil:
 		return nil
+	case *Server:
+		return s
 	}
-	return &Server{s}
+	return &Server{spec.NewHull(srv)}
 }
 
-// Set applies p: every value is checked as spec.Server.SetAttributes
-// checks it, and all of them are stored or none.
-func (s *Server) Set(p Patch) error { return s.SetAttributes(spec.PatchValues(p)) }
+// Set applies p through the server's SetAttributes: every value is
+// checked, and all of them are stored or none; spec.ErrNotSettable for
+// a server without one.
+func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 
-// Get returns the state, read at one instant.
-func (s *Server) Get() State { return spec.StateOf[State](s.Server) }
+// Get returns the state, each attribute as the server reads it.
+func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
 // OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change; it returns the unsubscribe function.
+// changed, after each change the server reports; it returns the
+// unsubscribe function.
 func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
-	return spec.OnChangedOf(s.Server, fn)
+	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto.
-func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) {
-	s.SetBeforeWrite(spec.BeforeWriteOf(s.Server, fn))
+// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
+// that takes none.
+func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
+	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandlePlay registers fn for the Play command; nil removes the handler.
-func (s *Server) HandlePlay(fn func(ctx context.Context, req PlayRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdPlay, spec.HandlerOf(fn))
+// HandlePlay registers fn for the Play command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandlePlay(fn func(ctx context.Context, req PlayRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdPlay, fn)
 }
 
-// HandlePause registers fn for the Pause command; nil removes the handler.
-func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdPause, spec.HandlerOf(fn))
+// HandlePause registers fn for the Pause command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdPause, fn)
 }
 
-// HandleStop registers fn for the Stop command; nil removes the handler.
-func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdStop, spec.HandlerOf(fn))
+// HandleStop registers fn for the Stop command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
-// HandleStartOver registers fn for the StartOver command; nil removes the handler.
-func (s *Server) HandleStartOver(fn func(ctx context.Context, req StartOverRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdStartOver, spec.HandlerOf(fn))
+// HandleStartOver registers fn for the StartOver command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleStartOver(fn func(ctx context.Context, req StartOverRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdStartOver, fn)
 }
 
-// HandlePrevious registers fn for the Previous command; nil removes the handler.
-func (s *Server) HandlePrevious(fn func(ctx context.Context, req PreviousRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdPrevious, spec.HandlerOf(fn))
+// HandlePrevious registers fn for the Previous command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandlePrevious(fn func(ctx context.Context, req PreviousRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdPrevious, fn)
 }
 
-// HandleNext registers fn for the Next command; nil removes the handler.
-func (s *Server) HandleNext(fn func(ctx context.Context, req NextRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdNext, spec.HandlerOf(fn))
+// HandleNext registers fn for the Next command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleNext(fn func(ctx context.Context, req NextRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdNext, fn)
 }
 
-// HandleRewind registers fn for the Rewind command; nil removes the handler.
-func (s *Server) HandleRewind(fn func(ctx context.Context, req RewindRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdRewind, spec.HandlerOf(fn))
+// HandleRewind registers fn for the Rewind command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleRewind(fn func(ctx context.Context, req RewindRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdRewind, fn)
 }
 
-// HandleFastForward registers fn for the FastForward command; nil removes the handler.
-func (s *Server) HandleFastForward(fn func(ctx context.Context, req FastForwardRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdFastForward, spec.HandlerOf(fn))
+// HandleFastForward registers fn for the FastForward command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleFastForward(fn func(ctx context.Context, req FastForwardRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdFastForward, fn)
 }
 
-// HandleSkipForward registers fn for the SkipForward command; nil removes the handler.
-func (s *Server) HandleSkipForward(fn func(ctx context.Context, req SkipForwardRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdSkipForward, spec.HandlerOf(fn))
+// HandleSkipForward registers fn for the SkipForward command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSkipForward(fn func(ctx context.Context, req SkipForwardRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSkipForward, fn)
 }
 
-// HandleSkipBackward registers fn for the SkipBackward command; nil removes the handler.
-func (s *Server) HandleSkipBackward(fn func(ctx context.Context, req SkipBackwardRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdSkipBackward, spec.HandlerOf(fn))
+// HandleSkipBackward registers fn for the SkipBackward command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSkipBackward(fn func(ctx context.Context, req SkipBackwardRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSkipBackward, fn)
 }
 
-// HandleSeek registers fn for the Seek command; nil removes the handler.
-func (s *Server) HandleSeek(fn func(ctx context.Context, req SeekRequest) (PlaybackResponse, error)) {
-	s.Handle(CmdSeek, spec.HandlerOf(fn))
+// HandleSeek registers fn for the Seek command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleSeek(fn func(ctx context.Context, req SeekRequest) (PlaybackResponse, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdSeek, fn)
 }
 
-// HandleActivateAudioTrack registers fn for the ActivateAudioTrack command; nil removes the handler.
-func (s *Server) HandleActivateAudioTrack(fn func(ctx context.Context, req ActivateAudioTrackRequest) (struct{}, error)) {
-	s.Handle(CmdActivateAudioTrack, spec.HandlerOf(fn))
+// HandleActivateAudioTrack registers fn for the ActivateAudioTrack command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleActivateAudioTrack(fn func(ctx context.Context, req ActivateAudioTrackRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdActivateAudioTrack, fn)
 }
 
-// HandleActivateTextTrack registers fn for the ActivateTextTrack command; nil removes the handler.
-func (s *Server) HandleActivateTextTrack(fn func(ctx context.Context, req ActivateTextTrackRequest) (struct{}, error)) {
-	s.Handle(CmdActivateTextTrack, spec.HandlerOf(fn))
+// HandleActivateTextTrack registers fn for the ActivateTextTrack command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleActivateTextTrack(fn func(ctx context.Context, req ActivateTextTrackRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdActivateTextTrack, fn)
 }
 
-// HandleDeactivateTextTrack registers fn for the DeactivateTextTrack command; nil removes the handler.
-func (s *Server) HandleDeactivateTextTrack(fn func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)) {
-	s.Handle(CmdDeactivateTextTrack, spec.HandlerOf(fn))
+// HandleDeactivateTextTrack registers fn for the DeactivateTextTrack command; nil removes the handler;
+// spec.ErrNoHandlers for a server that takes none.
+func (s *Server) HandleDeactivateTextTrack(fn func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)) error {
+	return spec.HandleOn(s.Underlying(), CmdDeactivateTextTrack, fn)
 }
 
-func init() { spec.RegisterTyped(ClusterID, Wrap) }
+// EmitStateChanged emits the StateChanged event on endpoint through the server's Emit;
+// spec.ErrNoEvents for a server without one.
+func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error {
+	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
+}
