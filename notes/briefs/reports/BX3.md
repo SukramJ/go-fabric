@@ -61,7 +61,7 @@ Left as it is, with the reason:
 and `matter.general_diagnostics.data_model_test_optional` for `general_diagnostics.go:364`. For that last one the matter.js sentence
 stays verbatim as the attribute `reason`: two tests count it (`cluster/core/general_diagnostics_features_parity_matterjs_test.go`
 counts occurrences in the output, still one), and `node/system_set_wiring_test.go` read it as the record message, so that one test
-now reads the event name (the only test edit of the brief).
+now reads the event name.
 
 Left: `bridge/subscribe.go:517` and `bridge/receive_dispatch.go:316,324` (`"matter.tx.subscribe."+op`, `"matter.tx."+op+".chunk_rejected"`):
 every `op` passed is a lower-case literal (`event_report`, `report`, `read`, `invoke`, `subscribe`, `subscribe.ongoing`), so the
@@ -83,6 +83,11 @@ Each type below stores `log` (resolved at construction with `cmp.Or(cfg.Logger, 
 | `light.ColorControlServerConfig.Logger` | `ColorControlServer` | 1 |
 | `udp.Config.Logger` | `Listener` | 1 |
 | `mdns.OperationalServiceConfig.Logger`, `mdns.CommissionableServiceConfig.Logger` | `capAdvertisedIntervals` takes the logger | 1 |
+
+One test edit comes with this: `transport/udp/listener_test.go` swapped `slog.Default()` after the listener was built; the
+listener now keeps the logger it was built with, so the test sets `a.log` instead. (A host that calls `slog.SetDefault` after
+building a component of this table keeps the old default in it — the same as the existing constructors that resolve `slog.Default()`
+at construction.)
 
 `node.Config` does not yet pass its logger into these configs; that is wiring (not a string) and is listed for a follow-up, so today
 nothing changes for a host that sets no `Logger`.
@@ -162,7 +167,9 @@ spell `node.X`, the mutex comments) and `### Removed` (the dump).
 
 ## Guards
 
-See the PR description for the exit lines with HEAD; the logs are in `/tmp/g1/` of the run, not committed.
+The exit lines with HEAD are in the PR description. `make reachability` and `make cite-check` were regenerated and committed: the
+unreached count stays at its ratchet 5 (the new exported names are whitelisted), the citation drift keeps its 28 entries and only
+their line numbers moved. `make race` was not run (strings, comments, aliases, one write-once variable).
 
 ## Questions
 
