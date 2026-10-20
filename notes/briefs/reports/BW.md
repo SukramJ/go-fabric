@@ -30,8 +30,4 @@ An exact pattern wins over an `x/...` pattern of the same base (documented in `d
 
 ## Guards
 
-See the PR body for the exit lines with HEAD.
-
-## Guards
-
 Run on the tree of the final commit (only this report differs from what was measured): `make archcheck` 0, `make cover-check` 0, `make test` 0, `make reachability-check` 0, `make lint` 0 (with `GOTMPDIR` set; no timeout this time). The first `cover-check` run failed on `controller/client` `TestRegistryDecommission` ("stored [peer1]") while the machine was loaded by parallel guards; it passed alone three times and in `make test`, and the second `cover-check` run was green. The exit lines with HEAD are in the PR body.
