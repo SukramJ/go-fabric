@@ -16,10 +16,10 @@ import (
 )
 
 // HeldConfig carries the construction parameters of [New]: a LevelControl
-// server that holds its level itself, as matter.js's LevelControlServer
-// keeps currentLevel, onLevel and options in its own state
-// (packages/node/src/behaviors/level-control/LevelControlServer.ts:772-799,
-// State). It is the device layer's default for LevelControl.
+// server that holds its level itself. It is the device layer's default for
+// LevelControl. matter.js's server keeps its attributes in its behavior
+// state (packages/node/src/behaviors/level-control/LevelControlServer.ts:772-799,
+// the State class with managedTransitionTimeHandling).
 type HeldConfig struct {
 	// Features is the FeatureMap: [FeatureOnOff] and [FeatureLighting],
 	// each optional (matter.js's LevelControlServer without features is a
@@ -57,11 +57,11 @@ type HeldConfig struct {
 	Clock clock.Clock
 }
 
-// New returns a LevelControl server that holds its own level: the
-// commands run on the module's transition engine against the server's
-// state, as matter.js's LevelControlServer runs them against its own
-// (LevelControlServer.ts:113-147 initialize). A host that owns the level
-// in its device builds the server over its port with [NewServer] instead.
+// New returns a server that holds its own level: the commands run on the
+// module's transition engine against the server's state. A host that owns
+// the level in its device builds the server over its port with
+// [NewServer] instead. matter.js sets the transitions up over its own state
+// in initialize (LevelControlServer.ts:113-147).
 func New(cfg HeldConfig) (*Server, error) {
 	if extra := cfg.Features &^ (FeatureOnOff | FeatureLighting); extra != 0 {
 		return nil, fmt.Errorf("%w: 0x%X", ErrFeatures, extra)
