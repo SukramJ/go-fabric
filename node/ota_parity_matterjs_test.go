@@ -370,11 +370,11 @@ func (s *otaSite) advance(t *testing.T, d time.Duration) {
 // started again on its store at version.
 func (s *otaSite) restartInto(t *testing.T, version uint32) {
 	t.Helper()
-	if err := s.req.Stop(parityCtx(t)); err != nil {
+	if err := s.site.Run(parityCtx(t), s.req.Stop); err != nil {
 		t.Fatal(err)
 	}
 	s.version.Store(version)
-	if err := s.req.Start(parityCtx(t)); err != nil {
+	if err := s.site.Run(parityCtx(t), s.req.Start); err != nil {
 		t.Fatal(err)
 	}
 }

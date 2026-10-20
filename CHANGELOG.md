@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - `fabrictest`: a device's node runs its client stack on the site. With `node.Client.Enabled` its socket is the device's host address of the in-memory network (port `udp.MatterPort`+1, through the module-internal `internal/nodeseam`) and its DNS-SD cache asks the site, so two devices of one fabric reach each other over CASE; `Device.Peers` is the node's peer set. The client stack's exchanges and peers now run on `node.Config.Clock`.
+- `fabrictest`: a device's operational resolver finds the site's running devices by the fabric and node id their stores hold, not only its controllers, so a node that initiates CASE to another node of its fabric (an OTA requestor reaching its provider) reaches it on the site.
 
 ### Fixed
 

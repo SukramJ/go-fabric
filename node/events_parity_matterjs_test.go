@@ -44,7 +44,7 @@ func TestEventsBehaviorParityMatterJS(t *testing.T) {
 		if len(first) != 1 {
 			t.Fatalf("%d StartUp events before the restart, want 1", len(first))
 		}
-		if err := d.Restart(parityCtx(t)); err != nil {
+		if err := site.Run(parityCtx(t), d.Restart); err != nil {
 			t.Fatal(err)
 		}
 		if got := basicInformationEvents(d, evShutDown); len(got) != 0 {

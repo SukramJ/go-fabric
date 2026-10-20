@@ -194,7 +194,14 @@ type bqOptions struct {
 
 func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 	t.Helper()
-	b := &bqSwitch{site: quietSite(t), log: &bqLog{}}
+	b := &bqSwitch{log: &bqLog{}}
+	if o.client {
+		// Two nodes keep sub-second timers running for minutes of fake time;
+		// a short settle steps them in seconds of wall time.
+		b.site = steppedSite(t)
+	} else {
+		b.site = quietSite(t)
+	}
 	if o.switches == 0 {
 		o.switches = 1
 	}

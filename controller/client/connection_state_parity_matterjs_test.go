@@ -71,7 +71,7 @@ func connectedPair(t *testing.T) (*clientPair, *stateLog) {
 // loseSubscription is loseSubscription (:20-27).
 func (cp *clientPair) loseSubscription(t *testing.T) {
 	t.Helper()
-	if err := cp.pair.Device.Stop(parityCtx(t)); err != nil {
+	if err := cp.site.Run(parityCtx(t), cp.pair.Device.Stop); err != nil {
 		t.Fatal(err)
 	}
 	cp.eventually(t, "the subscription inactive", func() bool { return !cp.node.SubscriptionActive() })
@@ -137,7 +137,7 @@ func TestConnectionStateParityMatterJS(t *testing.T) {
 		cp.loseSubscription(t)
 		cp.eventually(t, "WaitingForDeviceDiscovery", func() bool { return cp.state() == client.WaitingForDeviceDiscovery })
 		mark := log.mark()
-		if err := cp.pair.Device.Start(parityCtx(t)); err != nil {
+		if err := cp.site.Run(parityCtx(t), cp.pair.Device.Start); err != nil {
 			t.Fatal(err)
 		}
 		cp.eventually(t, "the subscription active again", cp.node.SubscriptionActive)

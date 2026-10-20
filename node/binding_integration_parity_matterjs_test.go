@@ -557,12 +557,14 @@ func TestBindingDefaultSubscriptionParityMatterJS(t *testing.T) {
 		s.isolate(true)
 		stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := s.lightDev.Stop(stopCtx); err != nil {
+		if err := s.sw.site.Run(stopCtx, s.lightDev.Stop); err != nil {
 			t.Fatal(err)
 		}
 		s.sw.eventually(t, "the subscription inactive", func() bool { return !sub.Active() })
 		s.isolate(false)
-		if err := s.lightDev.Start(stopCtx); err != nil {
+		// MockTime.resolve(lightNode.start()): the light re-establishes the
+		// switch's former subscription while it starts, on the site's clock.
+		if err := s.sw.site.Run(stopCtx, s.lightDev.Start); err != nil {
 			t.Fatal(err)
 		}
 		s.sw.eventually(t, "the subscription active again", sub.Active)
