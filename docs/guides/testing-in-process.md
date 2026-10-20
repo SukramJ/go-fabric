@@ -155,9 +155,13 @@ then fires; a computation in progress does not see time move under it.
 ```go
 // A change made locally reaches the subscriber once the clock passes the
 // subscription's floor.
-pair.Device.Act(func(*node.Node) error { plug.OnOff().Set(true); return nil })
+pair.Device.Act(func(*node.Node) error { return plug.OnOff().Set(onoffdef.Patch{OnOff: new(true)}) })
 err := site.Eventually(ctx, "the report", func() bool { return reported() })
 ```
+
+`plug.OnOff()` is the plug's typed OnOff server (`onoffdef` is
+`github.com/SukramJ/go-fabric/cluster/spec/onoff`); its `Set` is the
+device's own change, stored and reported.
 
 A test that steps the clock itself calls `site.Fake().Advance`. A ticker
 drops a tick its receiver has not taken, as a real one does, so a countdown

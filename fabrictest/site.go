@@ -45,7 +45,11 @@ type Options struct {
 	Loopback bool
 	// Settle is the quiet period of [Site.Settle]; 0 is [DefaultSettle].
 	Settle time.Duration
-	// Logger receives the hosts' logs; nil discards them.
+	// Logger receives the logs of the hosts the site builds — the nodes,
+	// the controllers and their components; nil discards those. A
+	// component that logs to slog.Default() rather than to the logger it
+	// is given (OperationalCredentials' matter.opcreds.cmd lines, gate 1
+	// G1-18) still reaches the process's default logger.
 	Logger *slog.Logger
 }
 
