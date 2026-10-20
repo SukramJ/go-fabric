@@ -62,6 +62,10 @@ build: ## compile every package (library module — no binaries)
 vet: ## run go vet
 	$(GO) vet ./...
 
+.PHONY: archcheck
+archcheck: ## layers and dependency direction (ADR 0026)
+	$(GO) test -count=1 ./script/archcheck/...
+
 .PHONY: test
 test: ## run the test suite
 	$(GO) test -count=1 ./...
@@ -359,4 +363,4 @@ bluez-check: ## the ble/bluez sub-module: build (Linux and the stub), vet, test,
 	cd $(BLUEZ_DIR) && $(GO) mod verify
 
 .PHONY: ci
-ci: build vet test lint cover-check bluez-check ## everything the pipeline runs
+ci: build vet archcheck test lint cover-check bluez-check ## everything the pipeline runs

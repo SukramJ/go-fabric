@@ -117,6 +117,9 @@ The facade (`node/`, `device/`, `contract/`, the typed cluster packages,
 it is an advanced seam, documented as such. Every layer behind it is held to
 [ADR 0026](adr/0026-architecture-principles.md).
 
+The layers and their allowed direction are held by `script/archcheck`
+([ADR 0026](adr/0026-architecture-principles.md)).
+
 ## Boundaries that are decisions
 
 | Out | Why | Record |

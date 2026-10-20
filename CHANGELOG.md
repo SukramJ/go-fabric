@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `script/archcheck`: the layers of ADR 0026 principle 1 as a Go test (`make archcheck`, part of `make ci`) — `layers.json` assigns every package to a layer, an import that points up fails unless it is a listed exception, and a stale exception or an unassigned package fails too.
+
 ## [0.9.0] — 2026-10-20
 
 Closes milestone 3 (behaviour depth) of the [roadmap](./docs/roadmap.md). Milestone 3, phase 19, brief BR: the behaviour-test port of OTA (`OtaTest.ts` on two `fabrictest` devices of one site), the small generated servers, the open partial cases and the runtime files against matter.js at `862ad75f` — 75 of 159 open cases, the other 84 `missing` with a class in their reason, the planned ratchet from 52 to 37; a node client stack on `fabrictest`, five fixes the ports found (a bound peer's subscription, the DNS-SD interval bounds of a node record, the fabric event of UpdateFabricLabel and SetVIDVerificationStatement, the OTA provider's update-token rules, the OTA requestor's announcement during a query) and four `by_design` entries. The milestone's last wave carries the minor version, as `v0.8.0` did for milestone 2; the `v0.8.9` concept v5 F.5 named is folded into it.

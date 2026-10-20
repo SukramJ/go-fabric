@@ -1,0 +1,21 @@
+{
+  "reading_order": "Layers are listed lowest first. A package belongs to the layer of the most specific pattern matching it, whatever the order here: the longest base path wins, and an exact name wins over an x/... pattern of the same base (so cluster in model-and-protocol beats cluster/... in servers).",
+  "layers": [
+    {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar"]},
+    {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
+    {"name": "security-and-storage", "packages": ["secure/...", "commissioning", "store", "bdx/...", "diagevent", "bootid"]},
+    {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility"]},
+    {"name": "servers", "packages": ["cluster/...", "binding"]},
+    {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/..."]},
+    {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},
+    {"name": "facade", "packages": ["node"]},
+    {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/..."]}
+  ],
+  "exceptions": [
+    {"from": "binding", "to": "controller/exchange", "reason": "the node's client stack lives under controller/ since phase 18d; ADR 0026 principle 12, resolved at gate 1"},
+    {"from": "binding", "to": "controller/handshake", "reason": "as above"},
+    {"from": "binding", "to": "controller/interaction", "reason": "as above"},
+    {"from": "binding", "to": "controller/peer", "reason": "as above"},
+    {"from": "cluster/wire", "to": "cluster/switch", "reason": "deprecated NewGenericSwitch wrapper over switchserver.Server; removed with the deprecation window, see its Deprecated: comment (may be removed in v0.10.0)"}
+  ]
+}
