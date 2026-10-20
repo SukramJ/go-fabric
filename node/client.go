@@ -44,6 +44,10 @@ type Client struct {
 	// up in; nil opens one on the mDNS groups (discovery.Open), which the
 	// node closes on Stop. A Names the host supplies stays the host's.
 	Names *discovery.Names
+
+	// open, set through internal/nodeseam by fabrictest, opens the client
+	// socket in place of udp.New: a socket of the site's in-memory network.
+	open func() (*udp.Listener, error)
 }
 
 // clientStack is the running client stack.
@@ -68,7 +72,13 @@ func (n *Node) newClientStack() (*clientStack, error) {
 			listen = "0.0.0.0:0"
 		}
 	}
-	l, err := udp.New(udp.Config{LocalAddr: listen, PreferIPv4: n.cfg.Network.PreferIPv4})
+	var l *udp.Listener
+	var err error
+	if cfg.open != nil {
+		l, err = cfg.open()
+	} else {
+		l, err = udp.New(udp.Config{LocalAddr: listen, PreferIPv4: n.cfg.Network.PreferIPv4})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("node: client socket: %w", err)
 	}
@@ -77,7 +87,7 @@ func (n *Node) newClientStack() (*clientStack, error) {
 		cs.close(n.life)
 		return nil, err
 	}
-	cs.exchanges, err = exchange.NewManager(l, exchange.Config{Logger: n.logger})
+	cs.exchanges, err = exchange.NewManager(l, exchange.Config{Clock: n.cfg.Clock, Logger: n.logger})
 	if err != nil {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
 	}
@@ -92,7 +102,7 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	// parameters nor our CATs a client record carries.
 	cs.peers, err = peer.NewSet(peer.Context{
 		Exchanges: cs.exchanges, Names: cs.names, Fabrics: n.clientFabric,
-		Resumption: &peer.MemoryResumptionStore{}, Logger: n.logger,
+		Resumption: &peer.MemoryResumptionStore{}, Logger: n.logger, Clock: n.cfg.Clock,
 	})
 	if err != nil {
 		return fail(fmt.Errorf("node: client peers: %w", err))
