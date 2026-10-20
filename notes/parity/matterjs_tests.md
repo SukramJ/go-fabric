@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 74 |
-| partial | 114 |
-| planned | 49 |
+| partial | 115 |
+| planned | 48 |
 | excluded | 87 |
 | total | 324 |
 
@@ -56,7 +56,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
-| [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 1 | 0 | 0 |
@@ -386,7 +386,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| MeasurementServersTest.ts | 64 | planned | — | The measurement servers' unavailable default range and the TemperatureMeasurement bound checks. |
+| MeasurementServersTest.ts | 64 | partial | `cluster/measurement:TestTemperatureServerSaturatesHigh`<br>`cluster/measurement:TestTemperatureServerSaturatesLow` | Missing, by_design BD-Matter-Measurement-StatedRange (a candidate the report proposes): the Go measurement servers project a host reading and state the range of the attribute's encoding (TemperatureMeasurement -27315 to 32766, RelativeHumidity 0 to 10000, Illuminance 1 to 0xFFFE, Pressure 0 to 32766, Flow its constants; L01-D06, L01-D07) where matter.js leaves MinMeasuredValue and MaxMeasuredValue null; no host states a range, so there is no bound to refuse, and a reading beyond the stated range is saturated into it (the two Go tests named), where matter.js refuses the state change. Missing: “TemperatureMeasurementServer reports an unavailable measurement range by default”; “IlluminanceMeasurementServer reports an unavailable measurement range by default”; “PressureMeasurementServer reports an unavailable measurement range by default”; “FlowMeasurementServer reports an unavailable measurement range by default”; “RelativeHumidityMeasurementServer reports an unavailable measurement range by default”; “refuses a maximum that does not exceed the minimum”; “refuses a measurement outside a stated range”. |
 
 ## node/test/behaviors/occupancy-sensing
 
@@ -965,10 +965,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `IcdManagementServerTest.ts` — The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 - `IcdModeTest.ts` — The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
-
-### node/test/behaviors/measurement
-
-- `MeasurementServersTest.ts` — The measurement servers' unavailable default range and the TemperatureMeasurement bound checks.
 
 ### node/test/behaviors/occupancy-sensing
 

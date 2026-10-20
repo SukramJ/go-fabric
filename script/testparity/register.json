@@ -1015,8 +1015,21 @@
     },
     {
       "path": "packages/node/test/behaviors/measurement/MeasurementServersTest.ts",
-      "status": "planned",
-      "reason": "The measurement servers' unavailable default range and the TemperatureMeasurement bound checks.",
+      "status": "partial",
+      "go": [
+        "cluster/measurement:TestTemperatureServerSaturatesHigh",
+        "cluster/measurement:TestTemperatureServerSaturatesLow"
+      ],
+      "missing": [
+        "TemperatureMeasurementServer reports an unavailable measurement range by default",
+        "IlluminanceMeasurementServer reports an unavailable measurement range by default",
+        "PressureMeasurementServer reports an unavailable measurement range by default",
+        "FlowMeasurementServer reports an unavailable measurement range by default",
+        "RelativeHumidityMeasurementServer reports an unavailable measurement range by default",
+        "refuses a maximum that does not exceed the minimum",
+        "refuses a measurement outside a stated range"
+      ],
+      "reason": "Missing, by_design BD-Matter-Measurement-StatedRange (a candidate the report proposes): the Go measurement servers project a host reading and state the range of the attribute's encoding (TemperatureMeasurement -27315 to 32766, RelativeHumidity 0 to 10000, Illuminance 1 to 0xFFFE, Pressure 0 to 32766, Flow its constants; L01-D06, L01-D07) where matter.js leaves MinMeasuredValue and MaxMeasuredValue null; no host states a range, so there is no bound to refuse, and a reading beyond the stated range is saturated into it (the two Go tests named), where matter.js refuses the state change.",
       "snapshotSha": "770e0af190627889e1c3c04ef28d1b188d40d530"
     },
     {
