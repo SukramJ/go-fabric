@@ -951,15 +951,12 @@
     },
     {
       "path": "packages/node/test/behaviors/hepa-filter-monitoring/HepaFilterMonitoringServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/filter:TestParityMatterJS_FilterServers"
+        "cluster/filter:TestParityMatterJS_FilterServers",
+        "cluster/filter:TestHepaFilterMonitoringServerParityMatterJS"
       ],
-      "missing": [
-        "properly types state",
-        "rejects a condition above 100 percent"
-      ],
-      "reason": "The server with and without its features is covered; the refused condition above 100 percent is not.",
+      "reason": "The server with and without its features (cluster/filter:TestParityMatterJS_FilterServers), the condition set on the Condition feature and the refused condition above 100 percent, ErrInvalidValue at construction for matter.js's ConstraintError at the node's start (cluster/filter/hepa_filter_monitoring_server_parity_matterjs_test.go).",
       "snapshotSha": "5b00298f3b031f67d820e6a0e3f98d47edacbb63"
     },
     {

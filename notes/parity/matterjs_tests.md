@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 78 |
-| partial | 121 |
+| ported | 79 |
+| partial | 120 |
 | planned | 38 |
 | excluded | 87 |
 | total | 324 |
@@ -52,7 +52,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
@@ -358,7 +358,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| HepaFilterMonitoringServerTest.ts | 94 | partial | `cluster/filter:TestParityMatterJS_FilterServers` | The server with and without its features is covered; the refused condition above 100 percent is not. Missing: ‚Äúproperly types state‚Äù; ‚Äúrejects a condition above 100 percent‚Äù. |
+| HepaFilterMonitoringServerTest.ts | 94 | ported | `cluster/filter:TestParityMatterJS_FilterServers`<br>`cluster/filter:TestHepaFilterMonitoringServerParityMatterJS` | The server with and without its features (cluster/filter:TestParityMatterJS_FilterServers), the condition set on the Condition feature and the refused condition above 100 percent, ErrInvalidValue at construction for matter.js's ConstraintError at the node's start (cluster/filter/hepa_filter_monitoring_server_parity_matterjs_test.go). |
 
 ## node/test/behaviors/icd-management
 
