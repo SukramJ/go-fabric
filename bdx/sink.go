@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 // Sink receives the bytes of an inbound transfer: written in order, then
@@ -34,9 +35,14 @@ type Sink interface {
 type FileSink struct {
 	Path string
 
-	mu      sync.Mutex
+	// io serialises Write and Close — the file's writes and its sync,
+	// close and rename — and guards tmp and closed. It is held across the
+	// file I/O it serialises and taken by nothing else: Written reads the
+	// atomic count without it, so a progress read never waits for the
+	// disk (ADR 0026 P6).
+	io      sync.Mutex
 	tmp     *os.File
-	written int64
+	written atomic.Int64
 	closed  bool
 }
 
@@ -46,8 +52,8 @@ func NewFileSink(path string) *FileSink { return &FileSink{Path: path} }
 
 // Write implements [io.Writer].
 func (s *FileSink) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.io.Lock()
+	defer s.io.Unlock()
 	if s.closed {
 		return 0, errors.New("bdx: write to a closed file sink")
 	}
@@ -59,21 +65,17 @@ func (s *FileSink) Write(p []byte) (int, error) {
 		s.tmp = f
 	}
 	n, err := s.tmp.Write(p)
-	s.written += int64(n)
+	s.written.Add(int64(n))
 	return n, err
 }
 
 // Written is the number of bytes written so far.
-func (s *FileSink) Written() int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.written
-}
+func (s *FileSink) Written() int64 { return s.written.Load() }
 
 // Close implements [Sink].
 func (s *FileSink) Close(transferErr error) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.io.Lock()
+	defer s.io.Unlock()
 	if s.closed {
 		return nil
 	}
