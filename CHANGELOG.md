@@ -16,6 +16,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `controller/client`: a node's record keeps only the session intervals DNS-SD can advertise, into the record and out of it, as matter.js's `RemoteDescriptor` applies `SessionIntervals.advertisable` both ways (`SessionIntervals.ts:99-118`, `RemoteDescriptor.ts:119`, `:223-227`): SII and SAI whole milliseconds up to an hour, SAT whole milliseconds from 1 to 65535. A stored interval outside those bounds used to be handed back as discovery data.
 - `node`: a bound peer's interaction can subscribe. The client stack keeps a subscription registry on its exchanges and hands it, with the node's clock, to the binding manager's interactions, as matter.js's ClientNode of a server node's peers subscribes through its interaction (`NetworkClient.ts:168-210`, the sustained default subscription). `Resolution.Interaction.Subscribe` answered `ErrNoSubscriptions`.
 
 ## [0.8.8] — 2026-10-20
