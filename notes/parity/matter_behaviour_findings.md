@@ -383,13 +383,7 @@ Device side:
   marks them `assertedAtRoot`, never refuses, logs at debug
   (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
   (With the previous item.)
-- **OTA provider applies the requestor's `NewVersion` unchecked against the
-  token.** `cluster/core/ota_provider.go:558-563` checks consent on the raw
-  value; matter.js #4736 rewrites `NewVersion 0` under a known token to the
-  token's `versionToApply` and refuses (Cancelled) a version that differs
-  from the token's (`OtaSoftwareUpdateProviderServer.ts:419-458`; OtaTest
-  "applies the version of a known update token when the requestor asks for
-  version 0"). (Milestone 3, OTA.)
+
 
 Controller side:
 
