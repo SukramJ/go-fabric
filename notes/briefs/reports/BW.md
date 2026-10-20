@@ -24,6 +24,11 @@ The four `binding` -> `controller/{exchange,handshake,interaction,peer}` edges a
 - `ble/...` stays in support as given; `ble/bluez` is a separate module and is not loaded by `./...`, the pattern simply matches nothing. `script/...` files with `//go:build ignore` are not loaded either.
 - Everything else matched a pattern of the brief (checked by the "unassigned package" failure: only `.` and `conformance` were unmatched).
 
+## Edits outside the brief's path list
+
+- `script/coverfloor/floors.go`: one line, `script/archcheck` with floor 0 ("doc and test only"). `cover-check` fails on a package without a floor entry; the package has no non-test statements.
+- `script/reachability/inventory.json` and `summary.md`: regenerated as the brief anticipated (+1 test package, +3 entry points; unreachable stays 5).
+
 ## Guards
 
 See the PR body for the exit lines with HEAD.
