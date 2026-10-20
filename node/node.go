@@ -711,8 +711,8 @@ func (n *Node) Start(ctx context.Context) error {
 // Stop takes the node offline and releases what New and Start began, in
 // the daemon's shutdown order (main.go:430-450): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
-// node was started), the PASE providers, the CASE reaper, the
-// subscription engine, the re-announce loop, the health probe, the
+// node was started), the PASE providers, the CASE reaper, the session
+// table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
 // bridge, the advertiser and the store the node opened for Store.Path.
 // Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
@@ -741,6 +741,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.sec.pase.Stop()
 	n.window.stop()
 	n.sec.casep.StopReaper()
+	n.sec.sessions.StopReaper()
 	n.sec.subs.Stop()
 	n.stopGroupSender()
 	if n.bdx != nil {
