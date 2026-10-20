@@ -29,7 +29,7 @@ a paired, working Matter node. The consumers that set that bar:
 
 | Consumer | State | What it needs from this module |
 | --- | --- | --- |
-| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; today imports 20 packages of this module directly | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
+| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin; the target after milestone 4 is the facade plus the cluster packages of the servers it customises ([concept v6](./concept-v6-embedding-layer.md), decision 0.4) | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
 | go-ha-matter-bridge (working name; planned separately) | not started; its concept is written when milestone 4 is due | the declarative device kit, the in-process test pair, the adapter module below |
 | the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via a shared adapter module (working name `go-hamatter`: `go-hamqtt`'s Home-Assistant vocabulary → Matter device types; lives outside this module, so `contract/` stays stdlib-only) | not started | the same device kit; energy and appliance device types, which already exist |
 | `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5) |
@@ -185,9 +185,11 @@ for a cluster with a hand-written matter.js server.
 
 ### Milestone 4: The embedding layer
 
-**Detail:** written when milestone 3 is closed, together with the concept
-of the go-ha-matter-bridge and the adapter module, because the three
-shape each other.
+**Detail:** [concept v6](./concept-v6-embedding-layer.md) (German), written
+2026-10-20 when the milestone opened, with the owner's decisions 0.1–0.4 and
+the drafts of the go-ha-matter-bridge and adapter-module concepts (Teil B/C),
+because the three shape each other; the two drafts move to their own
+repositories in phase 22.
 
 | Phase | Content | Proof |
 | --- | --- | --- |
@@ -208,6 +210,8 @@ exceptions stay matter.js's. Consumers: every one; the HA bridge and the
 **Done when.** The comparison's "device model" and "runtime" sections have
 no ◐ left except the behaviour-layer idiom row; loom and one 2mqtt daemon
 build on the facade alone.
+
+**Status 2026-10-20.** Phase 20 planned: concept v6 Teil A — a facade route or a documented advanced seam for every symbol loom reaches below `node/` today, the generated typed cluster layer (`State`, `Patch`, typed `OnChanged` and command handlers per cluster) and the declaration form of the device kit, the reference bridge rewritten on it, the apidiff guard on `golang.org/x/exp/cmd/apidiff` against the last tag; four waves (BS ∥ BT, then BU, BV) as `v0.9.1`–`v0.9.4`, the twelve `until: M4` test files ported where their subject exists.
 
 ### Milestone 5: ICD and the controller remainder
 
