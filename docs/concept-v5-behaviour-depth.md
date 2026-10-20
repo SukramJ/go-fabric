@@ -306,8 +306,8 @@ BQ) in Arbeit. Stand des Registers: 52 `planned`, davon 14 unter
 | Nr. | Frage | Empfehlung | Entscheidung |
 | --- | --- | --- | --- |
 | 19.1 | Wellenschnitt | Zwei Wellen (19a OTA, 19b der Rest) | **Eine Welle.** Brief BR, ein PR, `v0.8.9`; `v0.9.0` schließt Meilenstein 3 danach. |
-| 19.2 | ICD, WebRTC, Thread-Diagnose im Register | ICD → M5, WebRTC + Thread `excluded` | **Wie empfohlen.** `IcdManagementServerTest.ts` (60) und `IcdModeTest.ts` (14) `until: M5 phase 23` (Roadmap Phase 23); `WebRtcTransportRequestorServerTest.ts` (28) und `ThreadNetworkDiagnosticsProvisionalTest.ts` (2) `excluded` (Kamera- und Thread-Entscheidung, `docs/matterjs-comparison.md`). |
-| 19.3 | 23 Laufzeit-Testdateien (277 Fälle) ohne `until` | nach Inhalt klassifizieren | **Wie empfohlen.** Gerätebeobachtbar → Phase 19: `CommissioningWindowTest.ts` 8, `RemoteDescriptorTest.ts` 14, `FabricLabelReconciliationTest.ts` 2, `ConnectionStateTest.ts` 11, `SessionsBehaviorTest.ts` 3, `EventsBehaviorTest.ts` 2 (40). Validierung, Zustands- und Endpoint-Modell → `until: M4`: `ClusterBehaviorFeaturesTest.ts` 15, `MarkChangedTest.ts` 10, `ValuePatcherTest.ts` 8, `conformanceTest.ts` 16, `EndpointNumberConflictTest.ts` 20, `ProtocolServiceTest.ts` 13, `SemanticNamespaceTest.ts` 3, `ConstructionValidationTest.ts` 28, `RuntimeValidationTest.ts` 65, `StandardDeviceTypeCorpusTest.ts` 4, `LargeBridgeTest.ts` 2 (184). Discovery → `until: M5 phase 25`: `CommissioningIdentityTest.ts` 7, `ContinuousDiscoveryTest.ts` 1, `DiscoveryCancelTest.ts` 23, `DiscoveryErrorTest.ts` 13, `DiscoveryTransportsTest.ts` 9 (53). `DclBehaviorTest.ts` 21 → `until: M6 phase 27`. |
+| 19.2 | ICD, WebRTC, Thread-Diagnose im Register | ICD → M5, WebRTC + Thread `excluded` | **Wie empfohlen.** `IcdManagementServerTest.ts` (60) und `IcdModeTest.ts` (14) `until: M5 phase 23` (Roadmap Phase 23); `WebRtcTransportRequestorServerTest.ts` (28) und `ThreadNetworkDiagnosticsProvisionalTest.ts` (2) `until: M6 phase 26` — korrigiert beim Schnitt `v0.8.8` (Owner, 2026-10-20): Roadmap-Phase 26 baut beide, und das Register hat keine passende `excluded`-Klasse; die Empfehlung `excluded` beruhte auf der Kamera- und Thread-Entscheidung in `docs/matterjs-comparison.md`, die nur die Stubs betrifft. |
+| 19.3 | 23 Laufzeit-Testdateien (277 Fälle) ohne `until` | nach Inhalt klassifizieren | **Wie empfohlen.** Gerätebeobachtbar → Phase 19: `CommissioningWindowTest.ts` 8, `RemoteDescriptorTest.ts` 14, `FabricLabelReconciliationTest.ts` 2, `ConnectionStateTest.ts` 11, `SessionsBehaviorTest.ts` 3, `EventsBehaviorTest.ts` 2 (40). Validierung, Zustands- und Endpoint-Modell → `until: M4`: `ClusterBehaviorFeaturesTest.ts` 15, `MarkChangedTest.ts` 10, `ValuePatcherTest.ts` 8, `conformanceTest.ts` 16, `EndpointNumberConflictTest.ts` 20, `ProtocolServiceTest.ts` 13, `SemanticNamespaceTest.ts` 3, `ConstructionValidationTest.ts` 28, `RuntimeValidationTest.ts` 65, `StandardDeviceTypeCorpusTest.ts` 4, `LargeBridgeTest.ts` 2 (184). Discovery → `until: M5 phase 25`: `CommissioningIdentityTest.ts` 7, `ContinuousDiscoveryTest.ts` 1, `DiscoveryCancelTest.ts` 23, `DiscoveryErrorTest.ts` 13, `DiscoveryTransportsTest.ts` 9 (53). `DclBehaviorTest.ts` 21 → `until: M6 phase 27`. | Ergänzung beim Schnitt `v0.8.8` (Owner, 2026-10-20): die Lesekarte (`notes/briefs/reads/read-m3-phase-19.md`) zeigt, dass `CommissioningWindowTest.ts`, `FabricLabelReconciliationTest.ts`, `ConnectionStateTest.ts` und `RemoteDescriptorTest.ts` (35 Fälle) den Controller-Peer prüfen, nicht das Gerät; Entscheidung: **in Phase 19 lassen**, Port gegen `controller/` auf dem fabrictest-Controller. |
 | 19.4 | Was „Register bei 100 % für `packages/node/test/behaviors`" heißt | kein `planned` mehr, jedes `missing` begründet | **Wie empfohlen.** Jede Datei dort ist `ported` oder `partial`; jedes `missing` trägt seinen Grund: js-runtime-only (Transaktionen, Observer-Handles), ein `by_design`-Eintrag, oder `until: M4/M5` mit Findings-Eintrag. Die Roadmap-Zeile ist so präzisiert. |
 
 Die Register-Tags aus 19.2 und 19.3 setzt der Release-Schnitt `v0.8.8`
@@ -329,6 +329,13 @@ führt die Datei `planned` ohne `go`. Die OTA-Reboot-Fälle (`:706-1049`)
 beobachten den Requestor-Knoten über eine Subscription des
 Provider-Knotens (`subscribedPeer`): sie brauchen den Client-Stack eines
 fabrictest-Geräts, den Welle 18d für Binding zuerst benutzt.
+Korrektur beim Schnitt `v0.8.8` (Lesekarte §1): in matter.js hostet der
+*Controller*-Knoten den Provider-Endpunkt mit dem `SoftwareUpdateManager`
+(`ota-utils.ts:202-239`), das Gerät den Requestor; in Go sitzt der Provider
+auf einem Knoten (`node.Config.OTAProvider`) mit Consent-, Apply-Policy- und
+Status-Hooks. Brief BR ordnet die Fälle des Managers (Warteschlange, DCL,
+Reboot-Armer, BDX-Fortschritt) den Go-Hooks zu, wo sie existieren, und
+lässt den Rest `missing` mit Grund und Findings-Eintrag.
 
 **Die kleinen Server.** Acht `planned`-Dateien mit 19 Fällen:
 commodity-tariff 3, energy-evse-mode 3, fan-control 2, measurement 3,
@@ -344,10 +351,12 @@ Extension-Hook und der untypisierte Eintrag sind M4 bzw. `by_design`),
 AtomicWriteHandler 6, Presets 6, DoorLock 1 (monotone Uhr, M4),
 ConfigurationVersion 1 und Groupcast 1 (`by_design`).
 
-**Laufzeit-Dateien (19.3).** 40 Fälle in sechs Dateien, alle
-gerätebeobachtbar: das Kommissionierfenster und der Remote-Descriptor
-(`behavior/system/commissioning`), der Fabric-Label-Abgleich, der
-Verbindungszustand, Sessions und Events.
+**Laufzeit-Dateien (19.3).** 40 Fälle in sechs Dateien: Sessions (3) und
+Events (2) auf dem Server-Knoten; das Kommissionierfenster (8), der
+Fabric-Label-Abgleich (2) und der Verbindungszustand (11) prüfen den
+Controller-Peer einer kommissionierten Paarung, der Remote-Descriptor (14)
+ist ein Controller-Datentyp — Korrektur beim Schnitt `v0.8.8` nach der
+Lesekarte; der Owner lässt sie in Phase 19 (Port gegen `controller/`).
 
 Phase 19 umfasst damit rund 146 Fälle: 50 OTA, 19 kleine Server, 37
 offene Teilfälle, 40 Laufzeit-Fälle.

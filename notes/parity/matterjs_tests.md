@@ -131,7 +131,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | BehaviorAccessorsTypingTest.ts | 384 | excluded | `js-runtime-only` | TypeScript type-level checks of the commandsOf/stateOf/setStateOf accessors; nothing runs on the wire. |
 | BehaviorSchemaValidationTest.ts | 133 | excluded | `js-runtime-only` | Self-consistency of the schemas matter.js's TypeScript behaviors extend; the Go servers are generated from the snapshot and held by the schema parity tests instead. |
 | ClusterBehaviorCacheTest.ts | 110 | excluded | `js-runtime-only` | Caching and sharing of the derived behavior classes .with()/.for() produce. |
-| ClusterBehaviorFeaturesTest.ts | 233 | planned | — | Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match. |
+| ClusterBehaviorFeaturesTest.ts | 233 | planned | until M4 | Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | ClusterBehaviorSemanticsTest.ts | 203 | excluded | `js-runtime-only` | TypeScript type-level checks of state, event and observable typing of cluster behaviors. |
 | ClusterBehaviorTest.ts | 550 | excluded | `js-runtime-only` | The ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes). |
 | ClusterBehaviorVarianceTest.ts | 75 | excluded | `js-runtime-only` | A compile-time variance check of behavior types with no runtime case. |
@@ -146,7 +146,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| MarkChangedTest.ts | 204 | planned | — | markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules. |
+| MarkChangedTest.ts | 204 | planned | until M4 | markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | ReactorsTest.ts | 330 | excluded | `js-runtime-only` | The Reactors machinery (synchronous/asynchronous reactions, online/offline agents). |
 
 ## node/test/behavior/state
@@ -168,14 +168,14 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | --- | --- | --- |
 | ListManagerTest.ts | 690 | partial | `cluster/core:TestFabricFilteredFabricsRead`<br>`bridge:TestAccessControlUnfilteredReadsRedactOtherFabrics`<br>`cluster/core:TestBindingFabricScopedWrite` | The managed list proxy; its fabric-filtered read and fabric-preserving write are Matter-visible and covered on the Go read/write paths, its array-proxy and fabricIndex-supply cases are not. Missing: “basic get/set with primitive datatype”; “basic get/set with struct”; “basic array functions”; “basic array iteration”; “does not filter a list in a fabric-sensitive struct field”; “returns all entries to a command handler”; “fabric-scoped get/set”; “fabric-scoped basic array methods”; “fabric scoped array iteration”; “accepts an entry assigned by index”; “accepts a whole list assigned to a member that had none”; “rejects an invalid entry assigned by index”; “leaves a member that had no list absent when an entry is rejected”; “supplies no fabric for an entry that omits a mandatory fabricIndex”; “accepts an entry appended with push”; “accepts a whole list assigned over an existing one”; “refuses an entry stored with no session to supply the fabric”; “supplies the accessing fabric for an entry that omits it”. |
 | StructManagerTest.ts | 792 | excluded | `js-runtime-only` | The managed struct proxy: nested defaults, id-keyed references, default synthesis for unreported client values and rollback. |
-| ValuePatcherTest.ts | 145 | planned | — | Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with. |
+| ValuePatcherTest.ts | 145 | planned | until M4 | Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 
 ## node/test/behavior/state/validation
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ValueValidatorTest.ts | 567 | partial | `cluster/spec:TestValidateWrite`<br>`cluster/spec:TestRanges`<br>`cluster:TestNegativeWriteParity`<br>`cluster:TestEnumManufacturerRangeParity` | Server-write validation of numeric ranges, enums, reserved and feature-gated bitmap bits is covered by the Go write validator and the negative-write parity table; the client-peer leniency, obsolete-element and id-slot cases are not. Missing: “accepts defined multi-bit field values”; “rejects a reserved gap bit”; “skips enforcement when no encoded value is carried”; “throws on a constraint violation stored only at the field's id slot”; “satisfies conformance for a mandatory field present only at its id slot”; “substitutes in place when the sentinel is stored at the field's id slot”; “substitutes in place when the sentinel is stored at the field's name slot”; “accepts a bit the value leaves clear”; “accepts a bit that states no gate”; “accepts a deprecated bit”; “rejects a bit whose choice is gated on an unsupported feature”; “rejects a bit a group disallows once its gate fails”; “rejects a bit the specification disallows”; “accepts a bit whose conformance names something a value would decide”; “accepts a bit whose conformance the compiler cannot read”; “judges a range of bits by whether the write sets any of them”; “judges a range of a shipped cluster by its feature alone”; “does not judge the bits of a feature map”; “is suppressed where conformance validation is turned off for the attribute”; “ignores the bit on a write from the wire”; “forwards the bit on a client peer write”; “still rejects a structurally invalid bit alongside a non-conformant one on a peer write”; “accepts a list within the bound”; “rejects a list beyond the bound and names the bound”; “rejects an obsolete attribute on a server write”; “forwards an obsolete attribute on a client peer write”; “rejects an obsolete enum value on a server write”; “forwards an obsolete enum value on a client peer write”; “forwards a feature-gated enum value on a client peer write”; “forwards an undefined enum value on a client peer write”; “forwards reserved bitmap bits on a client peer write”; “still rejects a structurally invalid bitmap field even alongside reserved bits on a peer write”; “still rejects a wrong-datatype value on a client peer write”; “still rejects a value-range constraint on a client peer write”; “still rejects a schema-constraint violation on a client peer write”; “rejects a feature-disallowed attribute on a server write”; “forwards a feature-disallowed attribute with a valid value on a client peer write”; “still validates datatype when a forwarded conformance failure would otherwise skip it”. |
-| conformanceTest.ts | 1307 | planned | — | Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers. |
+| conformanceTest.ts | 1307 | planned | until M4 | Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | constraintTest.ts | 573 | partial | `cluster/spec:TestValidateWrite`<br>`cluster/spec:TestRanges`<br>`cluster/spec:TestConstraintInParityMatterJS`<br>`cluster/spec:TestServerListAndStructConstraints` | A table of constraint cases (its it names are the table's group and case keys); literal min/max/range, string length, list-entry and bitmap bounds are covered by the Go write validator, the groups named below are not. Missing: “min with reference”; “min with expression”; “max with reference”; “max with reference (sibling keyed by id)”; “range with expression”; “range with dot-qualified reference”; “percentage bound”; “percentage bound of a list entry”; “bound on a duration”; “entry of a list of durations”; “string length with codepoints”. |
 
 ## node/test/behavior/supervision
@@ -199,18 +199,18 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| CommissioningIdentityTest.ts | 69 | planned | — | The commissioner's vendor/product identity check of an advertised device against the onboarding payload. |
-| ContinuousDiscoveryTest.ts | 91 | planned | — | Continuous discovery creating one node for a device that concurrent discoveries report. |
-| DiscoveryCancelTest.ts | 674 | planned | — | Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. |
-| DiscoveryErrorTest.ts | 377 | planned | — | The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). |
-| DiscoveryTransportsTest.ts | 173 | planned | — | Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. |
+| CommissioningIdentityTest.ts | 69 | planned | until M5 phase 25 | The commissioner's vendor/product identity check of an advertised device against the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3). |
+| ContinuousDiscoveryTest.ts | 91 | planned | until M5 phase 25 | Continuous discovery creating one node for a device that concurrent discoveries report. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3). |
+| DiscoveryCancelTest.ts | 674 | planned | until M5 phase 25 | Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3). |
+| DiscoveryErrorTest.ts | 377 | planned | until M5 phase 25 | The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3). |
+| DiscoveryTransportsTest.ts | 173 | planned | until M5 phase 25 | Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3). |
 | ParallelPaseRaceTest.ts | 146 | partial | `controller/commissioner:TestConnectionStaggerAndWinner`<br>`controller/commissioner:TestConnectionHoldingResponder` | The staggered parallel PASE attempts and the winner are covered by the commissioner's connection tests; the winner's-own-error and stagger-wait endings are not. Missing: “rejects with the winner's own error”; “does not start a staggered attempt once a candidate has won”; “ends pending stagger waits when discovery ends without a win”. |
 
 ## node/test/behavior/system/dcl
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| DclBehaviorTest.ts | 253 | planned | — | The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. |
+| DclBehaviorTest.ts | 253 | planned | until M6 phase 27 | The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3). |
 
 ## node/test/behavior/system/events
 
@@ -364,8 +364,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| IcdManagementServerTest.ts | 1415 | planned | — | The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds. |
-| IcdModeTest.ts | 180 | planned | — | The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23. |
+| IcdManagementServerTest.ts | 1415 | planned | until M5 phase 23 | The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds. |
+| IcdModeTest.ts | 180 | planned | until M5 phase 23 | The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23. |
 
 ## node/test/behaviors/identify
 
@@ -463,7 +463,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ThreadNetworkDiagnosticsProvisionalTest.ts | 37 | planned | — | Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. |
+| ThreadNetworkDiagnosticsProvisionalTest.ts | 37 | planned | until M6 phase 26 | Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2). |
 
 ## node/test/behaviors/time-format-localization
 
@@ -481,7 +481,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| WebRtcTransportRequestorServerTest.ts | 605 | planned | — | The WebRTC transport requestor server, which milestone 6 phase 26 builds. |
+| WebRtcTransportRequestorServerTest.ts | 605 | planned | until M6 phase 26 | The WebRTC transport requestor server, which milestone 6 phase 26 builds. |
 
 ## node/test/behaviors/window-covering
 
@@ -503,7 +503,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | EndpointGetClientTest.ts | 192 | excluded | `js-runtime-only` | The TypeScript Endpoint.get/getStateOf API on a client endpoint. |
 | EndpointGetServerTest.ts | 154 | excluded | `js-runtime-only` | The TypeScript Endpoint.get/getStateOf API on a server endpoint. |
 | EndpointGetTypesTest.ts | 159 | excluded | `js-runtime-only` | Compile-time type checks of the Endpoint get helpers. |
-| EndpointNumberConflictTest.ts | 352 | planned | — | Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it. |
+| EndpointNumberConflictTest.ts | 352 | planned | until M4 | Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | EndpointTest.ts | 456 | excluded | `js-runtime-only` | The TypeScript Endpoint class: agent type, construction options, deep set of state. |
 | EndpointVariableServiceTest.ts | 125 | excluded | `js-runtime-only` | Endpoint properties from the environment, command line and config files. |
 | ErrorsTest.ts | 43 | excluded | `js-runtime-only` | Messages of the TypeScript endpoint error classes. |
@@ -523,7 +523,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | InteractionProtocolTest.ts | 2672 | partial | `im:TestReadParity_DataVersionFilterHit`<br>`im:TestReadParity_DataVersionFilterMiss`<br>`bridge:TestReadRequestAbovePathCeilingIsRejectedWithPathsExhausted`<br>`bridge:TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted`<br>`endpoint:TestHandleWriteRequest_RejectsWildcardAttributePath`<br>`endpoint:TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint`<br>`bridge:TestCheckTimedGate_UntimedRequestWithPriorRejects`<br>`bridge:TestCheckTimedGate_TimedFlagWithoutPriorRejects`<br>`bridge:TestCheckTimedGate_ExpiredDeadlineRejects`<br>`bridge:TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction`<br>`im:TestValidateInvokeBatch`<br>`im:TestValidateInvokeBatch_MaxPathsPerInvoke`<br>`bridge:TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing` | The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Missing: “replies with attributes and events”; “replies with events for wildcard read returns correct order”; “replies with events for wildcard read active version filter”; “replies with attributes with ${testCase} wildcard Filter”; “applies WildcardPathFlags when the filter version is current”; “ignores WildcardPathFlags when the configuration changed past the filter version”; “errors when no path match the requested path's”; “does not answer the subscriber's error status for the initial report with a status”; “write values and return errors on invalid values”; “write chunked array values with Fabric Index handling”; “write chunked array values across multiple messages”; “answers BUSY to another exchange's write of an attribute while a chunked write holds it”; “releases the attribute a chunked write held once the write moves to another attribute”; “skips an attribute a chunked write holds in another exchange's wildcard write”; “answers BUSY to a write that overlaps another exchange's first chunk of the same attribute”; “holds an attribute until the writes of its chunk are done when the chunk moves to another one”; “does not hold the attribute of a write that fits one message”; “write values and return errors on invalid values timed interaction required by attribute”; “write values and return errors on invalid values timed interaction required by attribute success”; “write values and return errors on invalid values timed interaction in group message”; “write values and return errors on invalid values in timed interaction”; “invoke command with empty args”; “invoke command with no args”; “invalid invoke command”; “multi invoke commands are ok”; “multi invoke response is split into multiple messages if needed”; “keeps already-sent chunks when a command on a later endpoint throws”; “sends no response under SuppressResponse when a command throws”; “sends the response under SuppressResponse when a CommandDataIB is generated”; “under SuppressResponse, flushes a held status alongside the forcing CommandDataIB”; “handles StatusResponseError gracefully”; “invoke command with timed interaction as group message”; “invoke command as group message completes dispatch without touching the exchange channel”; “names the group a received group invoke was sent to on its log line”; “does not name a group on the log line of a received unicast invoke”; “group invoke reports accessAllowed:true when the dispatched command returns a non-Success status”; “group invoke reports the source address of its own message”; “invoke command with with timed interaction success”; “invoke command with timed interaction required by command success”. |
-| ProtocolServiceTest.ts | 641 | planned | — | The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation. |
+| ProtocolServiceTest.ts | 641 | planned | until M4 | The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | SuppressResponseTest.ts | 404 | partial | `bridge:TestParityMatterJS_SuppressResponseSuppressesErrorStatuses`<br>`bridge:TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently`<br>`bridge:TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing`<br>`im:TestWriteParity_SuppressResponse` | Suppressed error statuses on the timed gate, the suppressed final chunk and the unsuppressed answers are covered; the InvalidAction, acknowledged-chunk and logging cases are not. Missing: “sends nothing for a suppressed invoke after the timed window expired”; “sends nothing for a suppressed invoke rejected with InvalidAction”; “sends nothing for a suppressed write rejected with InvalidAction”; “sends nothing for an invoke with SuppressResponse TRUE and invalid other fields”; “sends nothing for a write with SuppressResponse TRUE and invalid other fields”; “reports a failure after the peer acknowledged a response chunk of a suppressed invoke”; “answers a write without SuppressResponse”; “answers an invoke whose SuppressResponse cannot be read”; “logs a suppressed status with the suppressed mark”; “logs a sent status with the outbound mark”; “logs a suppressed failure of an unexpected error”; “answers an unexpected error with Failure and no status log line”; “answers a write whose SuppressResponse cannot be read”. |
 
 ## node/test/endpoint/type
@@ -533,20 +533,20 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | EndpointTypeTest.ts | 44 | excluded | `js-runtime-only` | The TypeScript EndpointType.is guard. |
 | MutableEndpointClientClustersTest.ts | 187 | partial | `device:TestClientListCarriesTheMandatoryClientClusters` | The TypeScript endpoint builder's client slot; its one Matter-visible case, the mandatory client clusters a device type adds, is covered. Missing: “defaults clientClusters to empty when not provided”; “accepts an explicit clientClusters slot”; “compiles type-level checks”; “withClientClusters extends the clientClusters slot at runtime”; “routes server-only args to behaviors slot”; “routes client-only args to clientClusters slot”; “routes mixed args correctly”; “routes same cluster server + client in one call to separate slots”; “idempotent on duplicate args”; “type-level: explicit .withClientClusters(...) narrows clientClusters key”; “does not auto-register optional client clusters (on-off-light)”; “auto-registers mandatory and leaves optional un-registered (camera-controller)”; “does not double-add when .with() supplies a mandatory client”. |
 | MutableEndpointTest.ts | 160 | excluded | `js-runtime-only` | The TypeScript MutableEndpoint builder (fields, behaviors, defaults). |
-| SemanticNamespaceTest.ts | 89 | planned | — | The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint. |
+| SemanticNamespaceTest.ts | 89 | planned | until M4 | The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 
 ## node/test/endpoint/validation
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ConstructionValidationTest.ts | 703 | planned | — | Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints. |
+| ConstructionValidationTest.ts | 703 | planned | until M4 | Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | DeviceTypeCompositionTest.ts | 520 | partial | `endpoint:TestParityMatterJSComponentCount`<br>`endpoint:TestParityMatterJSInstanceCountRanges`<br>`endpoint:TestParityMatterJSComponentEndpoints`<br>`endpoint:TestDeviceTypeComponentInstances`<br>`endpoint:TestParityMatterJSChoices` | Component counts, instance matching and choices are covered by the device-type parity tests; nested node scopes, reassignment and the closest-match report are not. Missing: “accepts a refrigerator with a cabinet”; “does not count a child of another device type”; “does not count an endpoint of a nested node”; “reassigns an instance's endpoint so that every instance is filled”; “leaves an instance of conformance ${second} unfilled beside a filled mandatory one”; “reports a mandatory instance no child fills beside an optional one it would”; “reports both a component count and an instance without a number that no child fills”; “judges a composer with its own conditions after a component of a nested node scope in the same pass”; “does not judge a descendant outside the composition scope against the composer”; “reports on the component a child that satisfies no instance, naming the closest”; “judges an optional component that is present”; “reports the root when a descendant asserts a condition that requires a component”; “neither requires nor disallows a member while its condition does not hold”. |
 | DeviceTypeConformanceServiceTest.ts | 487 | partial | `endpoint:TestDeviceTypeViolationReportedOnce`<br>`endpoint:TestDeviceTypeValidatorModes` | Reporting a violation once and the strict mode are covered; re-reporting, the environment-selected mode and the Root-assertion handling are not. Missing: “logs one warning listing every violation of an endpoint”; “names the node as the origin of its warning”; “logs only the new violation of an endpoint it reported before”; “logs a violation again once it disappeared and returned”; “is in warn mode unless the environment says otherwise”; “reads the mode from MATTER_ENDPOINT_VALIDATION”; “rejects an unknown mode, naming the variable, the value and the modes”; “judges on request in off mode, like warn mode, but records nothing”; “returns every violation of each judged endpoint, reported before or not”; “logs at debug and never refuses what only a Root assertion requires, even when strict”; “warns of a violation once it no longer only follows from a Root assertion”; “logs the violations a Root assertion explains apart from the others”; “refuses an endpoint only for the violations no Root assertion explains”; “refuses an endpoint again until it conforms”; “keeps what it reported for an endpoint it refuses”; “logs rather than throws in strict mode when told not to refuse”; “throws a misplaced singleton when validation is not strict”; “throws the first refused endpoint carrying the others and logs none”; “records nothing for an addition it refuses”; “validates every endpoint of a node scope”; “does not judge an endpoint in no node scope”; “validates no node scope for an endpoint in none”; “reports an endpoint's violations again once it is forgotten”; “reports every endpoint again after a factory reset”. |
 | DeviceTypeConformanceTest.ts | 1004 | partial | `endpoint:TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements`<br>`endpoint:TestParityMatterJSMissingServerCluster`<br>`endpoint:TestParityMatterJSFeatureDisallowedByFeatureNotCondition`<br>`endpoint:TestParityMatterJSProvisionalElementNeverMissing`<br>`endpoint:TestParityMatterJSSingletonMisplaced`<br>`endpoint:TestParityMatterJSStructuralConditionSpelling`<br>`endpoint:TestBaseMandatesBinding` | The device-type parity tests port the cluster, feature, provisional, singleton and Base Binding cases; events, client lists, TagList, node conditions and the missing-Binding injection are not ported case by case. Missing: “reports a missing cluster once, not again for its nested requirements”; “reports a disallowed cluster the endpoint carries”; “accepts a disallowed cluster the endpoint does not carry”; “disallows by a feature term whatever condition it is combined with”; “reports a mandatory feature by the feature's code”; “reports a mandatory command the cluster does not implement”; “reports a mandatory element its own definition marks optional but not provisional as missing”; “does not report a requirement whose conformance it cannot decide”; “accepts a mandatory event the cluster emits”; “reports a mandatory event whose emitter survives from a base with the feature on”; “reports a mandatory event the cluster has no emitter for”; “accepts mandatory client clusters in the client list”; “reports a mandatory client cluster missing from the client list”; “reports a cluster missing on both sides once per side”; “skips a device type the model does not know”; “does not report a component's requirements against the composing endpoint”; “is added to an endpoint of a simple device type with a mandatory application client”; “is not added over a behavior with the Binding server's id”; “is added for an application client the developer adds”; “is not added to an endpoint without an application client”; “is neither added nor required where every application client is one a binding never directs”; “is not added to a utility endpoint with an application client”; “is not added to a node endpoint with an application client”; “keeps the Binding server the developer declares”; “is not added to an endpoint of a device type the model does not define, which is not judged”; “is added where the DeviceTypeList states a simple device type the endpoint type does not”; “is added with validation off”; “counts an extended application server for the Server condition”; “does not report Binding on an endpoint Base does not require it of”; “requires TagList of endpoints that duplicate a sibling's device type”; “requires no TagList of an aggregator's bridged devices, which disambiguate by NodeLabel”; “requires neither Binding nor TagList of the node endpoint”; “reports a requirement Base and a device type both state once, as the device type's”; “does not require NetworkCommissioning of a node that does not commission over BLE”; “requires NetworkCommissioning of a node that commissions over BLE”; “accepts a node that commissions over BLE with NetworkCommissioning”; “does not require the diagnostics cluster of a supported network interface”; “accepts the singletons on the endpoint that declares them”; “accepts a RootNode singleton on a bridged node whose device type lists it”; “accepts a cluster that another device type lists as no singleton”; “judges no singleton outside a node scope”; “keeps a nested node scope's singletons to itself”; “constructs an endpoint carrying an outer singleton below a nested node endpoint”; “takes the conditions of the whole tree for an endpoint in no node scope”; “does not treat another device type's condition as known to a requirement”; “aggregates violation errors”; “keeps the refused endpoint out of a violation error's own enumerable properties”. |
 | NodeScopeIndexTest.ts | 590 | excluded | `js-runtime-only` | An incremental index matter.js keeps to avoid rescanning the tree for node scopes. |
-| RuntimeValidationTest.ts | 1421 | planned | — | Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset. |
+| RuntimeValidationTest.ts | 1421 | planned | until M4 | Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | ServerEndpointFactsTest.ts | 177 | partial | `endpoint:TestTopologyFacts`<br>`endpoint:TestParityMatterJSNodeConditions` | The facts the validator reads from a mounted endpoint are covered for device types and parts; feature codes, implemented elements and the network node conditions are not. Missing: “names server and client clusters by their model name”; “reports the features a server supports by code”; “reports the attributes, commands and events a server implements”; “answers the conditions an endpoint states”; “answers CustomNetworkConfig for a node that does not commission over BLE”; “does not answer CustomNetworkConfig for a node that commissions over BLE”; “reports the ${feature} feature of the root's NetworkCommissioning server”; “reports the network interface of a secondary interface's NetworkCommissioning server”; “reports no network interface for a node without NetworkCommissioning”. |
-| StandardDeviceTypeCorpusTest.ts | 605 | planned | — | Every standard device type judged as built, and the Closure TagList requirement. |
+| StandardDeviceTypeCorpusTest.ts | 605 | planned | until M4 | Every standard device type judged as built, and the Closure TagList requirement. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 | ValidationPassTest.ts | 61 | excluded | `js-runtime-only` | A model-scoped lookup cache leaking between validation passes in matter.js. |
 
 ## node/test/endpoints
@@ -555,7 +555,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | --- | --- | --- |
 | BridgeTest.ts | 585 | partial | `cluster/core:TestParityMatterJS_BridgedServer_BridgeMakesChildrenBridged`<br>`endpoint:TestAssembleReusesEndpointIDsAcrossReassembly` | Children of an aggregator becoming bridged, at startup and when added, are covered; the re-init orders, re-adds and the bridge of a bridge are not. Missing: “with multiple dynamic endpoints in different re-init order on restart”; “with multiple dynamic endpoints in different re-init order with reset nextNumber on restart”; “closing and re-adding dynamic endpoints during runtime”; “with multiple dynamic endpoints close and re-add during runtime”; “with multiple dynamic endpoints delete and re-add during runtime”; “names it an aggregator and a bridged node”; “gives each aggregator a full-family PartsList of its own descendants”; “composes a full family when the aggregator device type is not the first”; “keeps the lists as the nested aggregator gains and loses a device”. |
 | ClusterClientIntegrationTest.ts | 112 | partial | `endpoint:TestSpecClientClustersReadBackInTheDescriptor`<br>`device:TestClientListCarriesTheMandatoryClientClusters` | ClientList over the interaction model for a declared and a mandatory client cluster is covered; the same cluster in both lists is not. Missing: “DimmerSwitchDevice: Identify appears in both serverList and clientList”. |
-| LargeBridgeTest.ts | 55 | planned | — | Instantiating, reading and destroying a bridge with many bridged devices in bounded time. |
+| LargeBridgeTest.ts | 55 | planned | until M4 | Instantiating, reading and destroying a bridge with many bridged devices in bounded time. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3). |
 
 ## node/test/loader
 
@@ -913,19 +913,19 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behavior/cluster
 
-- `ClusterBehaviorFeaturesTest.ts` — Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match.
+- `ClusterBehaviorFeaturesTest.ts` — Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/behavior/internal
 
-- `MarkChangedTest.ts` — markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules.
+- `MarkChangedTest.ts` — markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/behavior/state/managed/values
 
-- `ValuePatcherTest.ts` — Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with.
+- `ValuePatcherTest.ts` — Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/behavior/state/validation
 
-- `conformanceTest.ts` — Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers.
+- `conformanceTest.ts` — Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/behavior/system/commissioning
 
@@ -934,15 +934,15 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behavior/system/controller/discovery
 
-- `CommissioningIdentityTest.ts` — The commissioner's vendor/product identity check of an advertised device against the onboarding payload.
-- `ContinuousDiscoveryTest.ts` — Continuous discovery creating one node for a device that concurrent discoveries report.
-- `DiscoveryCancelTest.ts` — Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling.
-- `DiscoveryErrorTest.ts` — The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device).
-- `DiscoveryTransportsTest.ts` — Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload.
+- `CommissioningIdentityTest.ts` — The commissioner's vendor/product identity check of an advertised device against the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).
+- `ContinuousDiscoveryTest.ts` — Continuous discovery creating one node for a device that concurrent discoveries report. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).
+- `DiscoveryCancelTest.ts` — Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).
+- `DiscoveryErrorTest.ts` — The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).
+- `DiscoveryTransportsTest.ts` — Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).
 
 ### node/test/behavior/system/dcl
 
-- `DclBehaviorTest.ts` — The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services.
+- `DclBehaviorTest.ts` — The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).
 
 ### node/test/behavior/system/events
 
@@ -1000,7 +1000,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/behaviors/thread-network-diagnostics
 
-- `ThreadNetworkDiagnosticsProvisionalTest.ts` — Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied.
+- `ThreadNetworkDiagnosticsProvisionalTest.ts` — Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).
 
 ### node/test/behaviors/time-format-localization
 
@@ -1012,25 +1012,25 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/endpoint
 
-- `EndpointNumberConflictTest.ts` — Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it.
+- `EndpointNumberConflictTest.ts` — Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/endpoint/server
 
-- `ProtocolServiceTest.ts` — The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation.
+- `ProtocolServiceTest.ts` — The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/endpoint/type
 
-- `SemanticNamespaceTest.ts` — The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint.
+- `SemanticNamespaceTest.ts` — The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/endpoint/validation
 
-- `ConstructionValidationTest.ts` — Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints.
-- `RuntimeValidationTest.ts` — Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset.
-- `StandardDeviceTypeCorpusTest.ts` — Every standard device type judged as built, and the Closure TagList requirement.
+- `ConstructionValidationTest.ts` — Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
+- `RuntimeValidationTest.ts` — Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
+- `StandardDeviceTypeCorpusTest.ts` — Every standard device type judged as built, and the Closure TagList requirement. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/endpoints
 
-- `LargeBridgeTest.ts` — Instantiating, reading and destroying a bridge with many bridged devices in bounded time.
+- `LargeBridgeTest.ts` — Instantiating, reading and destroying a bridge with many bridged devices in bounded time. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).
 
 ### node/test/node
 
