@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.8.7] — 2026-10-20
+
+Milestone 3, phase 18c, brief BP: the behaviour-test port of Groupcast against matter.js at `862ad75f` — 49 of 50 open cases on a multicast model for `fabrictest`, two fixes the port found, the Identity Protection Key set (key set 0) in the groups manager so a rotated IPK reaches CASE.
+
 ### Added
 
 - `groups`: `Manager.IPKKeys` and `Manager.CurrentIPK` expose key set 0, the Identity Protection Key set, which the manager now holds apart from the operational key sets as matter.js's `KeySets` does (`FabricGroups.ts:35-50`, `KeySets.ts:113-121`): every key for a responder, the second-newest of three for an initiator (§4.14.2.6.1).
@@ -4363,7 +4367,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/SukramJ/go-fabric/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/SukramJ/go-fabric/compare/v0.8.3...v0.8.4
