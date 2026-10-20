@@ -442,7 +442,7 @@ func TestClientNodeParity(t *testing.T) {
 		}
 		cp.eventually(t, "the default subscription after the restart", n.SubscriptionActive)
 		at := cp.site.Clock().Now()
-		cp.light.OnOff().Set(true)
+		cp.light.OnOff().Underlying().(*onoff.Server).Set(true)
 		cp.eventually(t, "OnOff true in the image", func() bool {
 			v, ok := imageValue(n, cp.lightPath(onoff.ClusterID, onoff.AttrOnOff))
 			return ok && v.El.Bool

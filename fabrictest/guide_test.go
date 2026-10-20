@@ -65,7 +65,7 @@ func TestPlugToggles(t *testing.T) {
 			return false
 		}
 	}
-	if err := pair.Device.Act(func(*node.Node) error { plug.OnOff().Set(false); return nil }); err != nil {
+	if err := pair.Device.Act(func(*node.Node) error { plug.OnOff().Underlying().(*onoff.Server).Set(false); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if err := site.Eventually(ctx, "the report", reported); err != nil {

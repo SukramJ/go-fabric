@@ -146,7 +146,7 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 		path   im.ConcreteAttributePath
 		change func()
 	}{
-		"onoff.Server Set": {onOffPath, func() { lamp.OnOff().Set(true) }},
+		"onoff.Server Set": {onOffPath, func() { lamp.OnOff().Underlying().(*onoff.Server).Set(true) }},
 		"host server":      {knobPath, func() { knob.turn(5) }},
 	} {
 		spy := &reportSpy{}

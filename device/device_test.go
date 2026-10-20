@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/onoff"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -87,7 +89,7 @@ func TestWithServerReplacesTheDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Server(onoffdef.ClusterID) != own || d.OnOff() != nil {
+	if d.Server(onoffdef.ClusterID) != own || d.OnOff().Underlying() != own {
 		t.Error("the host's OnOff server is not mounted in place of the default")
 	}
 	if d.LevelControl() == nil {
@@ -178,7 +180,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		levelcontroldef.AttrMinLevel: uint8(1),
 		levelcontroldef.AttrMaxLevel: uint8(254),
 	} {
-		if !lc.Serves(attr) {
+		if !lc.Underlying().(*spec.Server).Serves(attr) {
 			t.Errorf("attribute 0x%04X not served", attr)
 		}
 		if v, _ := lc.MatterRead(attr); v != want {
@@ -228,7 +230,7 @@ func TestElementAlterationsApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lc := serverAs[*levelcontroldef.Server](d, levelcontroldef.ClusterID)
+	lc := serverAs[*spec.Server](d, levelcontroldef.ClusterID)
 	if v, _ := lc.Value(levelcontroldef.AttrMinLevel); v != uint8(1) {
 		t.Errorf("MinLevel %v (%T)", v, v)
 	}
@@ -254,12 +256,12 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 	}
 	var got [][]uint32
 	stop := d.OnChanged(onoffdef.ClusterID, func(ids []uint32) { got = append(got, ids) })
-	d.OnOff().Set(true)
+	d.OnOff().Underlying().(*onoff.Server).Set(true)
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{onoffdef.AttrOnOff}) {
 		t.Errorf("notified %v", got)
 	}
 	stop()
-	d.OnOff().Set(false)
+	d.OnOff().Underlying().(*onoff.Server).Set(false)
 	if len(got) != 1 {
 		t.Error("notified after unsubscribe")
 	}
@@ -517,7 +519,7 @@ func TestWithElements(t *testing.T) {
 		t.Fatal(err)
 	}
 	epm := d.ElectricalPowerMeasurement()
-	if !epm.Serves(epmdef.AttrVoltage) || !epm.Serves(epmdef.AttrActiveCurrent) {
+	if s := epm.Underlying().(*spec.Server); !s.Serves(epmdef.AttrVoltage) || !s.Serves(epmdef.AttrActiveCurrent) {
 		t.Error("the elements opted in are not served")
 	}
 	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),

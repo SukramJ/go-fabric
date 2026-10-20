@@ -423,7 +423,7 @@ func TestLiveBinding(t *testing.T) {
 	announce(t, dutMDNS, cfid, map[uint64]uint16{bindTH2: ports[bindTH2], bindTH3: ports[bindTH3]})
 
 	// Step 5: TH1 writes the two Binding entries on the DUT's switch.
-	b := sw.Binding()
+	b := sw.Binding().Underlying().(*mattercore.Binding)
 	writeBinding := func(entries ...uint64) {
 		t.Helper()
 		list := make(spec.List[bindingdef.TargetStruct], 0, len(entries))
@@ -550,7 +550,7 @@ func TestLiveBinding(t *testing.T) {
 	if err := restarted.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := sw2.Binding().Entries(); len(got) != 2 || got[0].Node != bindTH2 || got[1].Group != group || got[0].FabricIndex != dutFabric {
+	if got := sw2.Binding().Underlying().(*mattercore.Binding).Entries(); len(got) != 2 || got[0].Node != bindTH2 || got[1].Group != group || got[0].FabricIndex != dutFabric {
 		t.Fatalf("the restored Binding list %+v", got)
 	}
 	again := &bindHost{established: map[uint64]binding.Resolution{}}

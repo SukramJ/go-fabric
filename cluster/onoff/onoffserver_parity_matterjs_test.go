@@ -62,7 +62,7 @@ func setupLight(t *testing.T, initial map[uint32]any) *mockLight {
 		t.Fatal(err)
 	}
 	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{l}})
-	return &mockLight{site: site, dev: dev, srv: l.OnOff()}
+	return &mockLight{site: site, dev: dev, srv: l.OnOff().Underlying().(*onoff.Server)}
 }
 
 // act runs fn on the light inside Device.Act: matter.js endpoint.act.

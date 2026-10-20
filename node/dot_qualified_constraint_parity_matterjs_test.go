@@ -120,7 +120,8 @@ func TestDotQualifiedConstraintParity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return d.SoilMeasurement().Server
+			srv, _ := d.SoilMeasurement().Underlying().(*spec.Server)
+			return srv
 		}
 		set := func(t *testing.T, v any) (any, error) {
 			t.Helper()

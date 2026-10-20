@@ -81,19 +81,21 @@ func TestTypedHandleMoveToLevel(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	s := typedServer(t)
-	if s.Accepts(levelcontroldef.CmdMoveToLevel) {
+	if s.Underlying().(*spec.Server).Accepts(levelcontroldef.CmdMoveToLevel) {
 		t.Fatal("MoveToLevel accepted before its handler")
 	}
 	refusal := spec.Errorf(im.StatusConstraintError, "no")
 	var got []levelcontroldef.MoveToLevelRequest
-	s.HandleMoveToLevel(func(_ context.Context, req levelcontroldef.MoveToLevelRequest) (struct{}, error) {
+	if err := s.HandleMoveToLevel(func(_ context.Context, req levelcontroldef.MoveToLevelRequest) (struct{}, error) {
 		got = append(got, req)
 		if req.Level > 200 {
 			return struct{}{}, refusal
 		}
 		return struct{}{}, nil
-	})
-	if !s.Accepts(levelcontroldef.CmdMoveToLevel) {
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Underlying().(*spec.Server).Accepts(levelcontroldef.CmdMoveToLevel) {
 		t.Fatal("MoveToLevel not accepted with its handler")
 	}
 
@@ -123,8 +125,10 @@ func TestTypedHandleMoveToLevel(t *testing.T) {
 		t.Errorf("the handler's refusal: %v", err)
 	}
 
-	s.HandleMoveToLevel(nil)
-	if s.Accepts(levelcontroldef.CmdMoveToLevel) {
+	if err := s.HandleMoveToLevel(nil); err != nil {
+		t.Fatal(err)
+	}
+	if s.Underlying().(*spec.Server).Accepts(levelcontroldef.CmdMoveToLevel) {
 		t.Error("MoveToLevel accepted after its handler was removed")
 	}
 }
@@ -135,13 +139,15 @@ func TestTypedOnWrite(t *testing.T) {
 	s := typedServer(t)
 	refusal := errors.New("the dimmer is locked")
 	var next []levelcontroldef.State
-	s.OnWrite(func(_ context.Context, st levelcontroldef.State, attrID uint32) error {
+	if err := s.OnWrite(func(_ context.Context, st levelcontroldef.State, attrID uint32) error {
 		next = append(next, st)
 		if attrID == levelcontroldef.AttrOnLevel && *st.OnLevel > 150 {
 			return refusal
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.Is(err, refusal) {
 		t.Fatalf("a vetoed write: %v", err)
 	}
@@ -161,59 +167,31 @@ func TestTypedOnWrite(t *testing.T) {
 	if len(next) != 3 || *next[2].OnLevel != 120 {
 		t.Errorf("the veto saw %d states", len(next))
 	}
-	s.OnWrite(nil)
+	if err := s.OnWrite(nil); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(180)); err != nil {
 		t.Errorf("a removed veto: %v", err)
 	}
 }
 
-// TestTypedServerForwardsTheMethodSet holds the typed server to the
-// embedded one: every method of *spec.Server is promoted with its
-// signature — Set excepted, which the typed server declares over a Patch
-// and which no contract interface names — so the dispatcher's assertions
-// on a mounted server find what they find on *spec.Server.
-func TestTypedServerForwardsTheMethodSet(t *testing.T) {
+// TestTypedOverTheSelfHeldServer: the typed server over a server that is
+// not the generated one reads and reports through it and refuses what it
+// cannot reach — here a LevelControl reduced to contract.ClusterServer.
+func TestTypedOverTheSelfHeldServer(t *testing.T) {
 	t.Parallel()
-	shadowed := map[string]bool{"Set": true}
-	inner, outer := reflect.TypeFor[*spec.Server](), reflect.TypeFor[*levelcontroldef.Server]()
-	for m := range inner.Methods() {
-		got, ok := outer.MethodByName(m.Name)
-		switch {
-		case !ok:
-			t.Errorf("%s is not promoted", m.Name)
-		case shadowed[m.Name]:
-		case got.Type.NumIn() != m.Type.NumIn() || got.Type.NumOut() != m.Type.NumOut():
-			t.Errorf("%s: %v, want %v", m.Name, got.Type, m.Type)
-		default:
-			for i := 1; i < m.Type.NumIn(); i++ {
-				if got.Type.In(i) != m.Type.In(i) {
-					t.Errorf("%s: %v, want %v", m.Name, got.Type, m.Type)
-				}
-			}
-		}
+	inner := typedServer(t).Underlying()
+	s := levelcontroldef.Wrap(struct{ contract.ClusterServer }{inner})
+	if got := s.Get(); got.MinLevel != 10 || got.MaxLevel != 200 {
+		t.Errorf("Get through MatterRead: %+v", got)
 	}
-	var srv contract.ClusterServer = typedServer(t)
-	for _, iface := range []reflect.Type{
-		reflect.TypeFor[contract.ClusterDataVersion](),
-		reflect.TypeFor[contract.ClusterAttributeLister](),
-		reflect.TypeFor[contract.ClusterCommandLister](),
-		reflect.TypeFor[contract.ClusterEventLister](),
-		reflect.TypeFor[contract.ClusterAttributeReadPrivilege](),
-		reflect.TypeFor[contract.ClusterAttributeWritePrivilege](),
-		reflect.TypeFor[contract.ClusterCommandInvokePrivilege](),
-		reflect.TypeFor[contract.TimedCommander](),
-		reflect.TypeFor[contract.AttributeChangeNotifier](),
-		reflect.TypeFor[contract.EventReceiver](),
-	} {
-		if !reflect.TypeOf(srv).Implements(iface) {
-			t.Errorf("the typed server does not implement %v", iface)
-		}
+	if err := s.Set(levelcontroldef.Patch{OnLevel: ptr(uint8(20))}); !errors.Is(err, spec.ErrNotSettable) {
+		t.Errorf("Set: %v", err)
 	}
-	for _, name := range []string{"Set"} {
-		for _, iface := range []reflect.Type{reflect.TypeFor[contract.ClusterServer](), reflect.TypeFor[contract.AttributeChangeNotifier]()} {
-			if _, named := iface.MethodByName(name); named {
-				t.Errorf("%v names the shadowed %s", iface, name)
-			}
-		}
+	if err := s.HandleMoveToLevel(nil); !errors.Is(err, spec.ErrNoHandlers) {
+		t.Errorf("HandleMoveToLevel: %v", err)
+	}
+	if err := s.OnWrite(nil); !errors.Is(err, spec.ErrNoWriteVeto) {
+		t.Errorf("OnWrite: %v", err)
 	}
 }

@@ -463,7 +463,7 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 // bound endpoint's subscription reports the new value.
 func (s *boundLightSite) switchLight(t *testing.T, on bool) {
 	t.Helper()
-	if err := s.lightDev.Act(func(*node.Node) error { s.light.OnOff().Set(on); return nil }); err != nil {
+	if err := s.lightDev.Act(func(*node.Node) error { s.light.OnOff().Underlying().(*onoff.Server).Set(on); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	s.sw.eventually(t, "the subscription reports the light", func() bool {

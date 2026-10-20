@@ -105,7 +105,7 @@ func TestAttributeSubscriptionResponseParity(t *testing.T) {
 			levelcontrol.AttrCurrentLevel: uint64(50), levelcontrol.AttrRemainingTime: uint64(5), levelcontrol.AttrOptions: uint64(1),
 			levelcontrol.AttrOnLevel: uint64(100), levelcontrol.AttrStartUpCurrentLevel: uint64(7),
 		}
-		if err := s.m.pair.Device.Act(func(*node.Node) error { return s.light.LevelControl().SetAttributes(five) }); err != nil {
+		if err := s.m.pair.Device.Act(func(*node.Node) error { return s.light.LevelControl().Underlying().(*spec.Server).SetAttributes(five) }); err != nil {
 			t.Fatal(err)
 		}
 		s.flipProbe(t)
@@ -172,7 +172,7 @@ func (s *subscribed) write(t *testing.T, path im.ConcreteAttributePath, v spec.E
 // flipProbe changes the probe locally.
 func (s *subscribed) flipProbe(t *testing.T) {
 	t.Helper()
-	if err := s.m.pair.Device.Act(func(*node.Node) error { s.light.OnOff().Set(true); return nil }); err != nil {
+	if err := s.m.pair.Device.Act(func(*node.Node) error { s.light.OnOff().Underlying().(*onoff.Server).Set(true); return nil }); err != nil {
 		t.Fatal(err)
 	}
 }
