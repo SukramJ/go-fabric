@@ -142,6 +142,10 @@ type persister struct {
 	dirty   []*cache
 	timer   exchange.Timer
 	stopped bool
+	// flushing counts the timer's flushes armed or running, so stop can
+	// wait for one that is writing — matter.js serializes its flushes
+	// through a mutex that close drains (ClientCacheBuffer.ts:94-101).
+	flushing sync.WaitGroup
 }
 
 // save writes keys of c and its version now; a store error is logged, never
@@ -184,8 +188,18 @@ func (p *persister) markDirty(c *cache) {
 		p.dirty = append(p.dirty, c)
 	}
 	if p.timer == nil && !p.stopped {
-		p.timer = p.clock.AfterFunc(p.interval, p.flush)
+		p.armLocked()
 	}
+}
+
+// armLocked arms the flush timer and counts its flush. The caller holds
+// mu.
+func (p *persister) armLocked() {
+	p.flushing.Add(1)
+	p.timer = p.clock.AfterFunc(p.interval, func() {
+		defer p.flushing.Done()
+		p.flush()
+	})
 }
 
 // flushJob is one cache's flush.
@@ -258,16 +272,23 @@ func (p *persister) remove(c *cache) {
 	p.dirty = slices.DeleteFunc(p.dirty, func(x *cache) bool { return x == c })
 }
 
-// stop halts the timer and flushes what is dirty (ClientCacheBuffer.close,
-// :94-101); restart re-arms on the next change.
+// stop halts the timer, waits for a flush the timer already started and
+// flushes what is dirty (ClientCacheBuffer.close, :94-101: the timer loop
+// is awaited, then the final flush drains the mutex); restart re-arms on
+// the next change. Without the wait a flush that had left the node's lock
+// for its writes landed after the erase that followed stop, and the
+// erased node was back in the store.
 func (p *persister) stop() {
 	p.mu.Lock()
 	p.stopped = true
 	if p.timer != nil {
-		p.timer.Stop()
+		if p.timer.Stop() {
+			p.flushing.Done()
+		}
 		p.timer = nil
 	}
 	p.mu.Unlock()
+	p.flushing.Wait()
 	p.flush()
 }
 
@@ -277,6 +298,6 @@ func (p *persister) restart() {
 	defer p.mu.Unlock()
 	p.stopped = false
 	if len(p.dirty) > 0 && p.timer == nil && p.interval > 0 {
-		p.timer = p.clock.AfterFunc(p.interval, p.flush)
+		p.armLocked()
 	}
 }
