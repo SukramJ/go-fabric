@@ -319,6 +319,12 @@ type ThermostatServer struct {
 
 	// changes reports the setpoints a write's reconcile moved.
 	changes cluster.AttributeChanges
+
+	// host, events and veto are the typed server's command handlers,
+	// event path and write veto (thermostat_typed.go).
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 }
 
 // New constructs the cluster. AUTO is silently cleared from the feature
@@ -703,6 +709,9 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	if err != nil {
 		return err
 	}
+	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
+		return err
+	}
 	if attrID == tdef.AttrPresets {
 		return s.writePresets(ctx, v)
 	}
@@ -978,6 +987,9 @@ func (s *ThermostatServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) 
 // MatterScheduleConfiguration, which the server does not serve) AtomicRequest
 // is unsupported (matter.js ThermostatServer.ts:130-132 at 862ad75f).
 func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	switch {
 	case cmdID == tdef.CmdSetpointRaiseLower:
 		return nil, s.handleSetpointRaiseLower(ctx, fields)

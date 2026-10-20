@@ -65,10 +65,10 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleSelectAreas(func(context.Context, SelectAreasRequest) (SelectAreasResponse, error) {
 		return SelectAreasResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSelectAreas: a command the server does not accept was registered")
 	}
-	if err := s.HandleSkipArea(func(context.Context, SkipAreaRequest) (SkipAreaResponse, error) { return SkipAreaResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSkipArea(func(context.Context, SkipAreaRequest) (SkipAreaResponse, error) { return SkipAreaResponse{}, nil }); err == nil {
+		t.Error("HandleSkipArea: a command the server does not accept was registered")
 	}
 }

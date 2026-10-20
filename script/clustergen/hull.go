@@ -284,8 +284,10 @@ func (g *generator) serverTest(w *writer) {
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
 	for _, hc := range cmds {
-		w.p("\tif err := s.%s(func(context.Context, %s) (%s, error) { return %s{}, nil }); err != nil {", hc.method, hc.request, hc.response, hc.response)
-		w.p("\t\tt.Error(err)")
+		// Not in the empty definition's AcceptedCommandList: refused
+		// (spec.ErrNotAccepted).
+		w.p("\tif err := s.%s(func(context.Context, %s) (%s, error) { return %s{}, nil }); err == nil {", hc.method, hc.request, hc.response, hc.response)
+		w.p("\t\tt.Error(\"%s: a command the server does not accept was registered\")", hc.method)
 		w.p("\t}")
 	}
 	for _, he := range g.hullEvents() {

@@ -70,24 +70,24 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleChangeChannel(func(context.Context, ChangeChannelRequest) (ChangeChannelResponse, error) {
 		return ChangeChannelResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleChangeChannel: a command the server does not accept was registered")
 	}
-	if err := s.HandleChangeChannelByNumber(func(context.Context, ChangeChannelByNumberRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleChangeChannelByNumber(func(context.Context, ChangeChannelByNumberRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleChangeChannelByNumber: a command the server does not accept was registered")
 	}
-	if err := s.HandleSkipChannel(func(context.Context, SkipChannelRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSkipChannel(func(context.Context, SkipChannelRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSkipChannel: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetProgramGuide(func(context.Context, GetProgramGuideRequest) (ProgramGuideResponse, error) {
 		return ProgramGuideResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetProgramGuide: a command the server does not accept was registered")
 	}
-	if err := s.HandleRecordProgram(func(context.Context, RecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRecordProgram(func(context.Context, RecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRecordProgram: a command the server does not accept was registered")
 	}
-	if err := s.HandleCancelRecordProgram(func(context.Context, CancelRecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCancelRecordProgram(func(context.Context, CancelRecordProgramRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCancelRecordProgram: a command the server does not accept was registered")
 	}
 }

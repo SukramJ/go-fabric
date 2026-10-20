@@ -52,10 +52,10 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSetCookingParameters(func(context.Context, SetCookingParametersRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetCookingParameters(func(context.Context, SetCookingParametersRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetCookingParameters: a command the server does not accept was registered")
 	}
-	if err := s.HandleAddMoreTime(func(context.Context, AddMoreTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddMoreTime(func(context.Context, AddMoreTimeRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAddMoreTime: a command the server does not accept was registered")
 	}
 }

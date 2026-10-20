@@ -206,6 +206,12 @@ type WindowCoveringServer struct {
 	// changes reports what a travelling movement changes between
 	// requests (contract.AttributeChangeNotifier).
 	changes cluster.AttributeChanges
+
+	// host, events and veto are the typed server's command handlers,
+	// event path and write veto (windowcovering_typed.go).
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 }
 
 // axis is one position-aware axis of the covering: its positions, its
@@ -468,7 +474,7 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // calibration procedure; and ConfigStatus follows ([configStatusLocked]),
 // reported when it moved. In MaintenanceMode the movement commands answer
 // BUSY ([WindowCoveringServer.MatterInvoke]).
-func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
@@ -484,6 +490,9 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 	}
 	if mode&calibration != 0 {
 		return windowCoveringConstraintErr{"windowcovering: Mode CalibrationMode: calibration not supported"}
+	}
+	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
+		return err
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -569,6 +578,9 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 // they return Success without forwarding anywhere. With one, see
 // [WindowCoveringServer.invokeMover].
 func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	c, err := s.parseCommand(cmdID, fields)
 	if err != nil {
 		return nil, err

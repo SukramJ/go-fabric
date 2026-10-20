@@ -54,7 +54,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleNetworkPassphraseRequest(func(context.Context, NetworkPassphraseRequestRequest) (NetworkPassphraseResponse, error) {
 		return NetworkPassphraseResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleNetworkPassphraseRequest: a command the server does not accept was registered")
 	}
 }

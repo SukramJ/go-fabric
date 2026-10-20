@@ -58,11 +58,11 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandlePresentMessagesRequest(func(context.Context, PresentMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePresentMessagesRequest(func(context.Context, PresentMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandlePresentMessagesRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleCancelMessagesRequest(func(context.Context, CancelMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCancelMessagesRequest(func(context.Context, CancelMessagesRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCancelMessagesRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitMessageQueued(0, MessageQueuedEvent{})       // not in the empty definition's EventList: refused
 	_ = s.EmitMessagePresented(0, MessagePresentedEvent{}) // not in the empty definition's EventList: refused

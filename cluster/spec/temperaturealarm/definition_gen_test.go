@@ -54,14 +54,14 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleReset(func(context.Context, ResetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleReset(func(context.Context, ResetRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleReset: a command the server does not accept was registered")
 	}
-	if err := s.HandleModifyEnabledAlarms(func(context.Context, ModifyEnabledAlarmsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleModifyEnabledAlarms(func(context.Context, ModifyEnabledAlarmsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleModifyEnabledAlarms: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetTemperatureAlarmThresholds(func(context.Context, SetTemperatureAlarmThresholdsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetTemperatureAlarmThresholds(func(context.Context, SetTemperatureAlarmThresholdsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetTemperatureAlarmThresholds: a command the server does not accept was registered")
 	}
 	_ = s.EmitNotify(0, NotifyEvent{}) // not in the empty definition's EventList: refused
 }

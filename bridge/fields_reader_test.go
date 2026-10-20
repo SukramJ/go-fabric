@@ -9,12 +9,15 @@ package bridge
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+
 	// Linked so the LevelControl Step case runs against the registry the
 	// reference daemon has.
-	_ "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -500,10 +503,11 @@ func TestCommandFieldsReader_CommissioningComplete(t *testing.T) {
 
 // TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime
 // verifies that both LevelControl command IDs that dispatch to the
-// typed MoveToLevel decoder — MoveToLevel (0x00) and
-// MoveToLevelWithOnOff (0x04) — decode a payload whose TransitionTime
-// context tag 1 is entirely ABSENT (no TLV Null placeholder) into a
-// [wire.MoveToLevelRequest] with TransitionTime nil. Google Home's
+// generated definition — MoveToLevel (0x00) and MoveToLevelWithOnOff
+// (0x04) — decode a payload whose TransitionTime context tag 1 is
+// entirely ABSENT (no TLV Null placeholder) into the generated request
+// with TransitionTime null, its fallback (bridge/fields_definition.go
+// requestFallbacks). Google Home's
 // brightness slider sends exactly this shape, so the absent-tag wire
 // form is a controller-interop contract for the dispatch path, not a
 // decoder corner case. Mirrors matter.js
@@ -538,15 +542,21 @@ func TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime(t *testing
 			if err != nil {
 				t.Fatalf("commandFieldsReader %s: %v", tc.name, err)
 			}
-			req, ok := v.(wire.MoveToLevelRequest)
-			if !ok {
-				t.Fatalf("expected wire.MoveToLevelRequest, got %T", v)
+			var level uint8
+			var transition spec.Nullable[uint16]
+			switch req := v.(type) {
+			case lvldef.MoveToLevelRequest:
+				level, transition = req.Level, req.TransitionTime
+			case lvldef.MoveToLevelWithOnOffRequest:
+				level, transition = req.Level, req.TransitionTime
+			default:
+				t.Fatalf("expected the generated request, got %T", v)
 			}
-			if req.Level != 128 {
-				t.Errorf("Level: want 128, got %d", req.Level)
+			if level != 128 {
+				t.Errorf("Level: want 128, got %d", level)
 			}
-			if req.TransitionTime != nil {
-				t.Errorf("TransitionTime: want nil for absent tag, got %v", *req.TransitionTime)
+			if !transition.Null {
+				t.Errorf("TransitionTime: want null for the absent tag, got %+v", transition)
 			}
 		})
 	}
@@ -888,7 +898,21 @@ func TestDecodeAddTrustedRootCertificateRequest_NonContextTagSkipped(t *testing.
 	}
 }
 
-// ─── decodeMoveToLevelRequest additional branches ─────────────────────────────
+// ─── MoveToLevel through the generated definition ─────────────────────────────
+
+// decodeMoveToLevel decodes MoveToLevel fields after the struct opener as
+// commandFieldsReader does: through the generated definition, with the
+// fallbacks of the omitted fields.
+func decodeMoveToLevel(dec *tlv.Decoder) (lvldef.MoveToLevelRequest, error) {
+	fields, ok, err := decodeByDefinition(im.ConcreteCommandPath{Cluster: lvldef.ClusterID, Command: lvldef.CmdMoveToLevel}, dec, structOpener)
+	if !ok {
+		return lvldef.MoveToLevelRequest{}, errors.New("no definition decodes MoveToLevel")
+	}
+	if err != nil {
+		return lvldef.MoveToLevelRequest{}, err
+	}
+	return fields.(lvldef.MoveToLevelRequest), nil
+}
 
 // TestDecodeMoveToLevelRequest_NonContextTagSkipped verifies that an
 // anonymous-tag element is skipped and the level is still read correctly.
@@ -898,7 +922,7 @@ func TestDecodeMoveToLevelRequest_NonContextTagSkipped(t *testing.T) {
 		enc.PutUint(tlv.AnonymousTag(), 0xFF) // non-context tag → continue
 		enc.PutUint(tlv.ContextTag(0), 100)   // Level
 	})
-	req, err := decodeMoveToLevelRequest(dec)
+	req, err := decodeMoveToLevel(dec)
 	if err != nil {
 		t.Fatalf("decodeMoveToLevelRequest: %v", err)
 	}
@@ -914,7 +938,7 @@ func TestDecodeMoveToLevelRequest_OverflowReturnsError(t *testing.T) {
 	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {
 		enc.PutUint(tlv.ContextTag(0), 0x100) // Level > uint8 max
 	})
-	_, err := decodeMoveToLevelRequest(dec)
+	_, err := decodeMoveToLevel(dec)
 	if err == nil {
 		t.Error("decodeMoveToLevelRequest with Level > 0xFF: want error, got nil")
 	}
@@ -934,15 +958,15 @@ func TestDecodeMoveToLevelRequest_AllFields(t *testing.T) {
 		enc.PutUint(tlv.ContextTag(2), 1)   // OptionsMask
 		enc.PutUint(tlv.ContextTag(3), 1)   // OptionsOverride
 	})
-	req, err := decodeMoveToLevelRequest(dec)
+	req, err := decodeMoveToLevel(dec)
 	if err != nil {
 		t.Fatalf("decodeMoveToLevelRequest: %v", err)
 	}
 	if req.Level != 200 {
 		t.Errorf("Level: want 200, got %d", req.Level)
 	}
-	if req.TransitionTime == nil || *req.TransitionTime != 10 {
-		t.Errorf("TransitionTime: want pointer to 10, got %v", req.TransitionTime)
+	if req.TransitionTime.Null || req.TransitionTime.Value != 10 {
+		t.Errorf("TransitionTime: want 10, got %+v", req.TransitionTime)
 	}
 	if req.OptionsMask != 1 {
 		t.Errorf("OptionsMask: want 1, got %d", req.OptionsMask)
@@ -962,15 +986,15 @@ func TestDecodeMoveToLevelRequest_NullTransitionTime(t *testing.T) {
 		enc.PutUint(tlv.ContextTag(0), 50) // Level
 		enc.PutNull(tlv.ContextTag(1))     // null TransitionTime
 	})
-	req, err := decodeMoveToLevelRequest(dec)
+	req, err := decodeMoveToLevel(dec)
 	if err != nil {
 		t.Fatalf("decodeMoveToLevelRequest: %v", err)
 	}
 	if req.Level != 50 {
 		t.Errorf("Level: want 50, got %d", req.Level)
 	}
-	if req.TransitionTime != nil {
-		t.Errorf("TransitionTime: want nil, got %v", *req.TransitionTime)
+	if !req.TransitionTime.Null {
+		t.Errorf("TransitionTime: want null, got %+v", req.TransitionTime)
 	}
 }
 
@@ -994,15 +1018,15 @@ func TestDecodeMoveToLevelRequest_AbsentTransitionTime(t *testing.T) {
 		enc.PutUint(tlv.ContextTag(2), 1) // OptionsMask
 		enc.PutUint(tlv.ContextTag(3), 0) // OptionsOverride
 	})
-	req, err := decodeMoveToLevelRequest(dec)
+	req, err := decodeMoveToLevel(dec)
 	if err != nil {
 		t.Fatalf("decodeMoveToLevelRequest: %v", err)
 	}
 	if req.Level != 77 {
 		t.Errorf("Level: want 77, got %d", req.Level)
 	}
-	if req.TransitionTime != nil {
-		t.Errorf("TransitionTime: want nil for absent tag, got %v", *req.TransitionTime)
+	if !req.TransitionTime.Null {
+		t.Errorf("TransitionTime: want null for the absent tag (its fallback), got %+v", req.TransitionTime)
 	}
 	if req.OptionsMask != 1 {
 		t.Errorf("OptionsMask: want 1, got %d", req.OptionsMask)
@@ -1131,9 +1155,9 @@ func truncatedContextTagDec() *tlv.Decoder {
 
 func TestDecodeMoveToLevelRequest_DecNextError(t *testing.T) {
 	t.Parallel()
-	_, err := decodeMoveToLevelRequest(truncatedContextTagDec())
+	_, err := decodeMoveToLevel(truncatedContextTagDec())
 	if err == nil {
-		t.Error("decodeMoveToLevelRequest truncated: want error, got nil")
+		t.Error("MoveToLevel truncated: want error, got nil")
 	}
 }
 
@@ -1319,10 +1343,11 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 }
 
 // TestCommandFieldsReader_LevelControlStepAbsentTransitionTime pins that
-// LevelControl's Step / StepWithOnOff keep decoding Google Home's shape —
-// TransitionTime absent, not null — after the generated LevelControl
-// definition is linked: the bridge hands the lenient tag map over instead
-// of the generated decoder's INVALID_COMMAND.
+// LevelControl's Step / StepWithOnOff decode Google Home's shape —
+// TransitionTime absent, not null — through the generated definition:
+// the omitted field takes its fallback, null, instead of the schema's
+// INVALID_COMMAND (notes/parity/by_design.md
+// BD-Matter-LevelControl-LenientDecoders).
 func TestCommandFieldsReader_LevelControlStepAbsentTransitionTime(t *testing.T) {
 	t.Parallel()
 	for _, command := range []uint32{0x02, 0x06} {
@@ -1342,12 +1367,18 @@ func TestCommandFieldsReader_LevelControlStepAbsentTransitionTime(t *testing.T) 
 		if err != nil {
 			t.Fatalf("command 0x%02X: %v", command, err)
 		}
-		m, ok := v.(map[uint8]any)
-		if !ok {
-			t.Fatalf("command 0x%02X: got %T, want the tag map", command, v)
+		var size uint8
+		var transition spec.Nullable[uint16]
+		switch req := v.(type) {
+		case lvldef.StepRequest:
+			size, transition = req.StepSize, req.TransitionTime
+		case lvldef.StepWithOnOffRequest:
+			size, transition = req.StepSize, req.TransitionTime
+		default:
+			t.Fatalf("command 0x%02X: got %T, want the generated request", command, v)
 		}
-		if _, present := m[2]; present {
-			t.Errorf("command 0x%02X: TransitionTime present in %v", command, m)
+		if size != 10 || !transition.Null {
+			t.Errorf("command 0x%02X: StepSize %d, TransitionTime %+v, want 10 and null", command, size, transition)
 		}
 	}
 }

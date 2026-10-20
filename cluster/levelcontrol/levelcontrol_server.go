@@ -369,6 +369,15 @@ type Server struct {
 	lighting bool
 	inst     *spec.Instance
 
+	// held is the server's own state when [New] built it; nil over a
+	// host's [LevelSource].
+	held *heldLevel
+	// host, events and veto are the typed server's command handlers,
+	// event path and write veto (typed.go).
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
+
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
 
@@ -400,6 +409,8 @@ type Server struct {
 	// subscribed while there is one.
 	listeners int
 	unsubSrc  func()
+	// wasOn is the OnOff a held server last saw (followOnOff).
+	wasOn bool
 }
 
 // Compile-time assertions.
@@ -426,7 +437,7 @@ func NewServer(cfg Config) *Server {
 		Attributes: []uint32{AttrMinLevel, AttrMaxLevel},
 	})
 	if cfg.Transitions != nil {
-		s.initTransitions(*cfg.Transitions)
+		s.initEngine(*cfg.Transitions, true)
 	}
 	return s
 }
@@ -586,6 +597,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	if err := s.veto.Check(ctx, attrID, storedUint8(v)); err != nil {
+		return err
+	}
 	switch attrID {
 	case AttrOptions:
 		n, _ := v.(uint64)                   // a map8 per ValidateWrite
@@ -608,6 +622,16 @@ func (s *Server) peer(attrID uint32) (any, bool) {
 		return s.minLevel(), true
 	}
 	return LevelMax, true
+}
+
+// storedUint8 is a validated value of the three writable attributes —
+// each a (nullable) uint8 or map8 — in its stored form, as the write veto
+// receives it: a uint8, nil for null.
+func storedUint8(v any) any {
+	if p := nullableUint8Of(v); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // nullableUint8Of is a validated nullable uint8: nil for null.
@@ -666,6 +690,9 @@ func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWrite
 // The DataVersion is bumped only after the command succeeded: a refused
 // command changed nothing a subscriber caches.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	switch cmdID {
 	case CmdMoveToLevel, CmdMoveToLevelWithOnOff:
 		return s.invokeMoveToLevel(ctx, cmdID, fields)
@@ -845,7 +872,7 @@ func checkStepMode(name string, mode uint8) error {
 // the [LevelSource] takes, and the raw payload goes through
 // [wire.DecodeMoveToLevel].
 func moveToLevelRequestFrom(name string, fields any) (MoveToLevelRequest, error) {
-	switch v := fields.(type) {
+	switch v := generatedValue(fields).(type) {
 	case nil:
 		return MoveToLevelRequest{}, missingFields(name)
 	case MoveToLevelRequest:
@@ -878,6 +905,40 @@ func moveToLevelRequestFrom(name string, fields any) (MoveToLevelRequest, error)
 	}
 }
 
+// generatedValue is a generated request given by pointer as its value,
+// so the converters take both forms; a nil pointer is no payload. Any
+// other payload is returned as it is.
+func generatedValue(fields any) any {
+	switch v := fields.(type) {
+	case *lvldef.MoveToLevelRequest:
+		return derefOrNil(v)
+	case *lvldef.MoveToLevelWithOnOffRequest:
+		return derefOrNil(v)
+	case *lvldef.MoveRequest:
+		return derefOrNil(v)
+	case *lvldef.MoveWithOnOffRequest:
+		return derefOrNil(v)
+	case *lvldef.StepRequest:
+		return derefOrNil(v)
+	case *lvldef.StepWithOnOffRequest:
+		return derefOrNil(v)
+	case *lvldef.StopRequest:
+		return derefOrNil(v)
+	case *lvldef.StopWithOnOffRequest:
+		return derefOrNil(v)
+	default:
+		return fields
+	}
+}
+
+// derefOrNil is *p, or nil for a nil p.
+func derefOrNil[T any](p *T) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 // moveToLevelFromTagMap reads the four MoveToLevel fields out of the
 // generic tag map (element :73-77).
 func moveToLevelFromTagMap(name string, m map[uint8]any) (MoveToLevelRequest, error) {
@@ -900,7 +961,7 @@ func moveToLevelFromTagMap(name string, m map[uint8]any) (MoveToLevelRequest, er
 // moveRequestFrom mirrors [moveToLevelRequestFrom] for Move /
 // MoveWithOnOff, reusing [wire.DecodeMove] for the raw-payload shape.
 func moveRequestFrom(name string, fields any) (MoveRequest, error) {
-	switch v := fields.(type) {
+	switch v := generatedValue(fields).(type) {
 	case nil:
 		return MoveRequest{}, missingFields(name)
 	case MoveRequest:
@@ -949,7 +1010,7 @@ func moveFromTagMap(name string, m map[uint8]any) (MoveRequest, error) {
 // stepRequestFrom mirrors [moveToLevelRequestFrom] for Step /
 // StepWithOnOff, reusing [wire.DecodeStep] for the raw-payload shape.
 func stepRequestFrom(name string, fields any) (StepRequest, error) {
-	switch v := fields.(type) {
+	switch v := generatedValue(fields).(type) {
 	case nil:
 		return StepRequest{}, missingFields(name)
 	case StepRequest:
@@ -1007,7 +1068,7 @@ func stepFromTagMap(name string, m map[uint8]any) (StepRequest, error) {
 // stopRequestFrom mirrors [moveToLevelRequestFrom] for Stop /
 // StopWithOnOff, reusing [wire.DecodeStop] for the raw-payload shape.
 func stopRequestFrom(name string, fields any) (StopRequest, error) {
-	switch v := fields.(type) {
+	switch v := generatedValue(fields).(type) {
 	case nil:
 		return StopRequest{}, missingFields(name)
 	case StopRequest:

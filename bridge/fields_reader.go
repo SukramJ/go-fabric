@@ -14,19 +14,19 @@ import (
 )
 
 // commandFieldsReader is the [im.CommandFieldsReader] the bridge plugs
-// into [im.UnmarshalInvokeRequestTLV]. It dispatches on
-// (path.Cluster, path.Command) and returns the cluster-native fields
-// struct expected by the matching cluster server.
+// into [im.UnmarshalInvokeRequestTLV]. A request of a cluster with a
+// registered generated definition decodes through it
+// ([decodeByDefinition]) into the generated request struct
+// (<cluster>def.<Command>Request) every self-held server takes as its
+// primary form — one decoder, from one source (ADR 0026 principle 3).
+// Ahead of it run only the hand-written readers of the commissioning,
+// group and scene requests, whose servers are written against their
+// cluster/core request structs (notes/parity/by_design.md
+// BD-Matter-Commissioning-HandDecoders, BD-Matter-AdminCommissioning-OpenWindowParams);
+// a command no definition decodes is salvaged as a tag map.
 //
-// Unrecognised commands return (nil, nil) — the IM layer threads nil
-// through to the cluster server, and the server is responsible for
-// rejecting per-command. Decode failures wrap with the cluster /
-// command identifier so operator triage stays specific.
-//
-// Coverage matches what chip-tool sends during commissioning + the
-// post-commissioning command set on the bridge's root endpoint.
-// Add a switch case when wiring a new cluster command that carries
-// fields (status-only commands need nothing here).
+// Decode failures wrap with the cluster / command identifier so operator
+// triage stays specific.
 func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) { //nolint:gocyclo,funlen // a dispatch table: one case per typed command decoder
 	switch path.Cluster {
 	case 0x0030: // GeneralCommissioning
@@ -77,49 +77,11 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 		if fields, ok, err := scenesFieldsReader(path, dec); ok {
 			return fields, err
 		}
-	case wire.FanControlClusterID:
-		if path.Command == wire.FanControlCmdStep {
-			return decodeFanStepRequest(dec)
-		}
-	case wire.LaundryWasherModeClusterID, wire.RvcRunModeClusterID, wire.RvcCleanModeClusterID, wire.DishwasherModeClusterID:
-		if path.Command == wire.ModeBaseCmdChangeToMode {
-			return decodeChangeToModeRequest(dec)
-		}
-	case 0x0008: // LevelControl
-		switch path.Command {
-		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff
-			return decodeMoveToLevelRequest(dec)
-		}
-		// Move, Step, Stop and their WithOnOff forms stay on the lenient
-		// tag map, ahead of the generated LevelControl definition: Google
-		// Home omits the mandatory-but-nullable TransitionTime of Step
-		// entirely, which the generated decoder answers INVALID_COMMAND
-		// (notes/parity/by_design.md, the permissive command-field
-		// decoding; BD-Matter-LevelControl-LenientDecoders).
-		return decodeGenericTagMap(dec)
-	case 0x0101: // DoorLock
-		return decodeDoorLockFields(path.Command, dec, el)
-	case 0x0300: // ColorControl
-		// These four keep their hand-written decoders and cluster/wire
-		// structs, the shape host ColorControl servers were written
-		// against; the other ColorControl commands decode through the
-		// generated definition below (cluster/spec/colorcontrol) —
-		// notes/parity/by_design.md BD-Matter-ColorControl-LegacyDecoders.
-		switch path.Command {
-		case wire.ColorCtrlCmdMoveToHue:
-			return decodeMoveToHueFields(dec)
-		case wire.ColorCtrlCmdMoveToSaturation:
-			return decodeMoveToSaturationFields(dec)
-		case wire.ColorCtrlCmdMoveToHueAndSaturation:
-			return decodeMoveToHueAndSaturationFields(dec)
-		case wire.ColorCtrlCmdMoveToColorTemperature:
-			return decodeMoveToColorTemperatureFields(dec)
-		}
 	}
-	// A cluster with a generated definition (cluster/spec/...) decodes its
-	// request payloads through it, with the statuses matter.js's request
-	// schema answers a rejected payload with.
-	if fields, ok, err := spec.DecodeRequest(path.Cluster, path.Command, dec, el); ok {
+	// Every other cluster with a generated definition (cluster/spec/...)
+	// decodes its request payloads through it, with the statuses
+	// matter.js's request schema answers a rejected payload with.
+	if fields, ok, err := decodeByDefinition(path, dec, el); ok {
 		return fields, err
 	}
 	// Unknown command-path: salvage as a tag-keyed map[uint8]any so the
@@ -164,209 +126,6 @@ func fieldUint16(cmd, field string, el tlv.Element) (uint16, error) {
 		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint16 max", cmd, field, el.Uint)}
 	}
 	return uint16(el.Uint), nil
-}
-
-// decodeMoveToLevelRequest reads LevelControl.MoveToLevel /
-// MoveToLevelWithOnOff fields (Matter §1.6.7.1). Tags: [0] uint8
-// Level, [1] uint16 TransitionTime (nullable), [2] bitmap8
-// OptionsMask, [3] bitmap8 OptionsOverride. The Options bitmaps must
-// reach the cluster server: matter.js gates the non-WithOnOff variant
-// on the effective ExecuteIfOff option (LevelControlServer.ts:596
-// #optionsAllowExecution), so the server needs the full
-// [wire.MoveToLevelRequest], not the bare Level byte.
-func decodeMoveToLevelRequest(dec *tlv.Decoder) (wire.MoveToLevelRequest, error) {
-	var req wire.MoveToLevelRequest
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return req, fmt.Errorf("MoveToLevel: %w", err)
-		}
-		if el.IsEndContainer {
-			return req, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case 0:
-			if req.Level, err = fieldUint8("MoveToLevel", "Level", el); err != nil {
-				return req, err
-			}
-		case 1:
-			if !el.IsNull {
-				v, err := fieldUint16("MoveToLevel", "TransitionTime", el)
-				if err != nil {
-					return req, err
-				}
-				req.TransitionTime = &v
-			}
-		case 2:
-			if req.OptionsMask, err = fieldUint8("MoveToLevel", "OptionsMask", el); err != nil {
-				return req, err
-			}
-		case 3:
-			if req.OptionsOverride, err = fieldUint8("MoveToLevel", "OptionsOverride", el); err != nil {
-				return req, err
-			}
-		}
-	}
-}
-
-// decodeMoveToHueFields reads ColorControl.MoveToHue fields (Matter §3.2.7.4).
-// Tags: [0] uint8 Hue, [1] enum8 Direction, [2] uint16 TransitionTime,
-// [3] map8 OptionsMask, [4] map8 OptionsOverride.
-func decodeMoveToHueFields(dec *tlv.Decoder) (wire.MoveToHueRequest, error) {
-	var req wire.MoveToHueRequest
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return req, fmt.Errorf("MoveToHue: %w", err)
-		}
-		if el.IsEndContainer {
-			return req, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case 0:
-			if req.Hue, err = fieldUint8("MoveToHue", "Hue", el); err != nil {
-				return req, err
-			}
-		case 1:
-			if req.Direction, err = fieldUint8("MoveToHue", "Direction", el); err != nil {
-				return req, err
-			}
-		case 2:
-			if req.TransitionTime, err = fieldUint16("MoveToHue", "TransitionTime", el); err != nil {
-				return req, err
-			}
-		case 3:
-			if req.OptionsMask, err = fieldUint8("MoveToHue", "OptionsMask", el); err != nil {
-				return req, err
-			}
-		case 4:
-			if req.OptionsOverride, err = fieldUint8("MoveToHue", "OptionsOverride", el); err != nil {
-				return req, err
-			}
-		}
-	}
-}
-
-// decodeMoveToSaturationFields reads ColorControl.MoveToSaturation fields
-// (Matter §3.2.7.7). Tags: [0] uint8 Saturation, [1] uint16 TransitionTime,
-// [2] map8 OptionsMask, [3] map8 OptionsOverride.
-func decodeMoveToSaturationFields(dec *tlv.Decoder) (wire.MoveToSaturationRequest, error) {
-	var req wire.MoveToSaturationRequest
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return req, fmt.Errorf("MoveToSaturation: %w", err)
-		}
-		if el.IsEndContainer {
-			return req, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case 0:
-			if req.Saturation, err = fieldUint8("MoveToSaturation", "Saturation", el); err != nil {
-				return req, err
-			}
-		case 1:
-			if req.TransitionTime, err = fieldUint16("MoveToSaturation", "TransitionTime", el); err != nil {
-				return req, err
-			}
-		case 2:
-			if req.OptionsMask, err = fieldUint8("MoveToSaturation", "OptionsMask", el); err != nil {
-				return req, err
-			}
-		case 3:
-			if req.OptionsOverride, err = fieldUint8("MoveToSaturation", "OptionsOverride", el); err != nil {
-				return req, err
-			}
-		}
-	}
-}
-
-// decodeMoveToHueAndSaturationFields reads ColorControl.MoveToHueAndSaturation
-// fields (Matter §3.2.7.10). Tags: [0] uint8 Hue, [1] uint8 Saturation,
-// [2] uint16 TransitionTime, [3] map8 OptionsMask, [4] map8 OptionsOverride.
-func decodeMoveToHueAndSaturationFields(dec *tlv.Decoder) (wire.MoveToHueAndSaturationRequest, error) {
-	var req wire.MoveToHueAndSaturationRequest
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return req, fmt.Errorf("MoveToHueAndSaturation: %w", err)
-		}
-		if el.IsEndContainer {
-			return req, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case 0:
-			if req.Hue, err = fieldUint8("MoveToHueAndSaturation", "Hue", el); err != nil {
-				return req, err
-			}
-		case 1:
-			if req.Saturation, err = fieldUint8("MoveToHueAndSaturation", "Saturation", el); err != nil {
-				return req, err
-			}
-		case 2:
-			if req.TransitionTime, err = fieldUint16("MoveToHueAndSaturation", "TransitionTime", el); err != nil {
-				return req, err
-			}
-		case 3:
-			if req.OptionsMask, err = fieldUint8("MoveToHueAndSaturation", "OptionsMask", el); err != nil {
-				return req, err
-			}
-		case 4:
-			if req.OptionsOverride, err = fieldUint8("MoveToHueAndSaturation", "OptionsOverride", el); err != nil {
-				return req, err
-			}
-		}
-	}
-}
-
-// decodeMoveToColorTemperatureFields reads ColorControl.MoveToColorTemperature
-// fields (Matter §3.2.7.21). Tags: [0] uint16 ColorTemperatureMireds,
-// [1] uint16 TransitionTime, [2] map8 OptionsMask, [3] map8 OptionsOverride
-// — the two the ExecuteIfOff gate folds onto the Options attribute.
-func decodeMoveToColorTemperatureFields(dec *tlv.Decoder) (wire.MoveToColorTemperatureRequest, error) {
-	var req wire.MoveToColorTemperatureRequest
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return req, fmt.Errorf("MoveToColorTemperature: %w", err)
-		}
-		if el.IsEndContainer {
-			return req, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case 0:
-			if req.ColorTemperatureMireds, err = fieldUint16("MoveToColorTemperature", "ColorTemperatureMireds", el); err != nil {
-				return req, err
-			}
-		case 1:
-			if req.TransitionTime, err = fieldUint16("MoveToColorTemperature", "TransitionTime", el); err != nil {
-				return req, err
-			}
-		case 2:
-			if req.OptionsMask, err = fieldUint8("MoveToColorTemperature", "OptionsMask", el); err != nil {
-				return req, err
-			}
-		case 3:
-			if req.OptionsOverride, err = fieldUint8("MoveToColorTemperature", "OptionsOverride", el); err != nil {
-				return req, err
-			}
-		}
-	}
 }
 
 // decodeGenericTagMap drains the current container into a

@@ -54,7 +54,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleContentAppMessage(func(context.Context, ContentAppMessageRequest) (ContentAppMessageResponse, error) {
 		return ContentAppMessageResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleContentAppMessage: a command the server does not accept was registered")
 	}
 }

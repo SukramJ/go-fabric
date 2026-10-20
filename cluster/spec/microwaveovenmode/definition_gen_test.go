@@ -57,7 +57,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleChangeToMode(func(context.Context, ChangeToModeRequest) (ChangeToModeResponse, error) {
 		return ChangeToModeResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleChangeToMode: a command the server does not accept was registered")
 	}
 }

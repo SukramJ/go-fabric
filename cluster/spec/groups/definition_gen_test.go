@@ -60,26 +60,26 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleAddGroup(func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddGroup(func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil }); err == nil {
+		t.Error("HandleAddGroup: a command the server does not accept was registered")
 	}
-	if err := s.HandleViewGroup(func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleViewGroup(func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil }); err == nil {
+		t.Error("HandleViewGroup: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetGroupMembership(func(context.Context, GetGroupMembershipRequest) (GetGroupMembershipResponse, error) {
 		return GetGroupMembershipResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetGroupMembership: a command the server does not accept was registered")
 	}
 	if err := s.HandleRemoveGroup(func(context.Context, RemoveGroupRequest) (RemoveGroupResponse, error) {
 		return RemoveGroupResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRemoveGroup: a command the server does not accept was registered")
 	}
-	if err := s.HandleRemoveAllGroups(func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRemoveAllGroups(func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRemoveAllGroups: a command the server does not accept was registered")
 	}
-	if err := s.HandleAddGroupIfIdentifying(func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddGroupIfIdentifying(func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAddGroupIfIdentifying: a command the server does not accept was registered")
 	}
 }

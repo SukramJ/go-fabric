@@ -51,7 +51,7 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSetTemperature(func(context.Context, SetTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetTemperature(func(context.Context, SetTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetTemperature: a command the server does not accept was registered")
 	}
 }

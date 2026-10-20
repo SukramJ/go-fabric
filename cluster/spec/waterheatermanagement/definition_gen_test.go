@@ -55,11 +55,11 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleBoost(func(context.Context, BoostRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleBoost(func(context.Context, BoostRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleBoost: a command the server does not accept was registered")
 	}
-	if err := s.HandleCancelBoost(func(context.Context, CancelBoostRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCancelBoost(func(context.Context, CancelBoostRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCancelBoost: a command the server does not accept was registered")
 	}
 	_ = s.EmitBoostStarted(0, BoostStartedEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitBoostEnded(0, BoostEndedEvent{})     // not in the empty definition's EventList: refused

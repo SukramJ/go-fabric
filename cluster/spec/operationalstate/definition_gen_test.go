@@ -63,23 +63,23 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandlePause(func(context.Context, PauseRequest) (OperationalCommandResponse, error) {
 		return OperationalCommandResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandlePause: a command the server does not accept was registered")
 	}
 	if err := s.HandleStop(func(context.Context, StopRequest) (OperationalCommandResponse, error) {
 		return OperationalCommandResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleStop: a command the server does not accept was registered")
 	}
 	if err := s.HandleStart(func(context.Context, StartRequest) (OperationalCommandResponse, error) {
 		return OperationalCommandResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleStart: a command the server does not accept was registered")
 	}
 	if err := s.HandleResume(func(context.Context, ResumeRequest) (OperationalCommandResponse, error) {
 		return OperationalCommandResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleResume: a command the server does not accept was registered")
 	}
 	_ = s.EmitOperationalError(0, OperationalErrorEvent{})       // not in the empty definition's EventList: refused
 	_ = s.EmitOperationCompletion(0, OperationCompletionEvent{}) // not in the empty definition's EventList: refused

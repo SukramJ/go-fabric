@@ -402,7 +402,7 @@ func (p *demoPump) reportEvent(event uint32) error {
 		return fmt.Errorf("pump %s is not mounted yet", p.name)
 	}
 	slog.Info("pump.event", slog.String("device", p.name), slog.Int("event", int(event)))
-	return srv.Emit(event)
+	return srv.Emit(srv.Endpoint(), event, nil)
 }
 
 // --- device: an air purifier -------------------------------------------------

@@ -65,32 +65,32 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleScanNetworks(func(context.Context, ScanNetworksRequest) (ScanNetworksResponse, error) {
 		return ScanNetworksResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleScanNetworks: a command the server does not accept was registered")
 	}
 	if err := s.HandleAddOrUpdateWiFiNetwork(func(context.Context, AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleAddOrUpdateWiFiNetwork: a command the server does not accept was registered")
 	}
 	if err := s.HandleAddOrUpdateThreadNetwork(func(context.Context, AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleAddOrUpdateThreadNetwork: a command the server does not accept was registered")
 	}
 	if err := s.HandleRemoveNetwork(func(context.Context, RemoveNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRemoveNetwork: a command the server does not accept was registered")
 	}
 	if err := s.HandleConnectNetwork(func(context.Context, ConnectNetworkRequest) (ConnectNetworkResponse, error) {
 		return ConnectNetworkResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleConnectNetwork: a command the server does not accept was registered")
 	}
 	if err := s.HandleReorderNetwork(func(context.Context, ReorderNetworkRequest) (NetworkConfigResponse, error) {
 		return NetworkConfigResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleReorderNetwork: a command the server does not accept was registered")
 	}
 }

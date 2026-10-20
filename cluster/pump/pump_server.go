@@ -32,6 +32,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -285,6 +287,8 @@ type Server struct {
 	src      StateSource
 	cfg      Config
 	inst     *spec.Instance
+	host     spec.HostHandlers
+	veto     spec.WriteVeto
 
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
@@ -300,6 +304,10 @@ var (
 	_ contract.ClusterEventLister             = (*Server)(nil)
 	_ contract.EventReceiver                  = (*Server)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*Server)(nil)
+	_ spec.AttributeSetter                    = (*Server)(nil)
+	_ spec.CommandRegistrar                   = (*Server)(nil)
+	_ spec.EventEmitting                      = (*Server)(nil)
+	_ spec.BeforeWriteSetter                  = (*Server)(nil)
 )
 
 // NewServer validates cfg against the cluster's conformance and returns
@@ -385,6 +393,40 @@ func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 // MatterInvoke rejects every command: the cluster defines none.
 func (*Server) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, im.UnsupportedCommandf("pump: unknown command 0x%02X", cmdID)
+}
+
+// SetAttributes implements [spec.AttributeSetter]. The values are checked
+// against the attributes' types and constraints first, all or nothing;
+// none is then the server's to set: the moving attributes (PumpStatus,
+// the effective modes, Capacity, Speed, the lifetime counters, Power,
+// OperationMode, ControlMode) are the [StateSource]'s — the host reports
+// a change through it — and the limits are fixed by [Config.Limits].
+// Each refuses with [spec.ErrNotHeld]; an empty map changes nothing.
+func (s *Server) SetAttributes(values map[uint32]any) error {
+	ids := slices.Sorted(maps.Keys(values))
+	for _, id := range ids {
+		if _, err := s.inst.CheckSet(id, values[id], nil); err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 {
+		return fmt.Errorf("%w: pump: attribute 0x%04X is the StateSource's or the Config's", spec.ErrNotHeld, ids[0])
+	}
+	return nil
+}
+
+// Handle implements [spec.CommandRegistrar]. The cluster defines no
+// command, so every handler is refused with [spec.ErrNotAccepted].
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return s.host.Register(s.inst, cmdID, fn)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]: fn vetoes a
+// controller's write of OperationMode, ControlMode or a lifetime counter
+// after the definition's checks and before it reaches the setter, with the
+// value in its stored form (a uint8 enum, a uint32 counter, nil for null).
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.veto.Set(fn)
 }
 
 // MatterRead resolves an attribute.
@@ -488,6 +530,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	if err := s.veto.Check(ctx, attrID, storedForm(attrID, v)); err != nil {
+		return err
+	}
 	n, _ := v.(uint64) // an enum8 or a counter per ValidateWrite; nil for null
 	switch attrID {
 	case AttrOperationMode:
@@ -506,6 +551,20 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		return fmt.Errorf("pump: attribute 0x%04X write: %w", attrID, err)
 	}
 	s.tracker().Bump()
+	return nil
+}
+
+// storedForm is a value [spec.Instance.ValidateWrite] normalised, in the
+// stored form a write veto receives: the two modes as their enum8 (a
+// uint8), a lifetime counter as a uint32, nil for null.
+func storedForm(attrID uint32, v any) any {
+	if attrID == AttrOperationMode || attrID == AttrControlMode {
+		n, _ := v.(uint64)
+		return uint8(n) //nolint:gosec // an enum8 per ValidateWrite
+	}
+	if c := counter(v); c != nil {
+		return *c
+	}
 	return nil
 }
 
@@ -543,26 +602,38 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Unlock()
 }
 
-// SetEndpoint stamps the endpoint the events are addressed to.
+// SetEndpoint stamps the endpoint the server is mounted on (the bridge
+// calls it at assembly); [Server.Endpoint] reads it back.
 func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
 }
 
-// Emit raises one of the declared alarm events, at the priority matter.js
-// declares for it. The payload is fieldless. Without an emitter wired
-// the event is dropped; an event not in Config.Events is refused, so
+// Endpoint returns the endpoint the server is mounted on, as stamped by
+// [Server.SetEndpoint]; 0 before the bridge assembled it.
+func (s *Server) Endpoint() uint16 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.endpoint
+}
+
+// Emit implements [spec.EventEmitting]: it raises one of the declared
+// alarm events on endpoint, at the priority matter.js declares for it.
+// Every alarm event of the cluster is fieldless: data nil (or a
+// [clusterwire.FieldlessEvent] or the generated event struct) sends the
+// empty structure. Without an emitter wired the event is dropped; an
+// event not in Config.Events is refused ([ErrEventUndeclared]), so
 // EventList never under-reports what the server sends.
-func (s *Server) Emit(event uint32) error {
-	if !s.inst.Emits(event) {
-		return fmt.Errorf("%w: 0x%02X", ErrEventUndeclared, event)
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	if !s.inst.Emits(eventID) {
+		return fmt.Errorf("%w: %w: 0x%02X", ErrEventUndeclared, spec.ErrNotEmitted, eventID)
 	}
 	s.mu.Lock()
-	emitter, endpoint := s.emitter, s.endpoint
+	emitter := s.emitter
 	s.mu.Unlock()
 	if emitter != nil {
-		emitter.MatterEmitEvent(endpoint, ClusterID, event, clusterwire.FieldlessEvent{}, s.inst.EventPriority(event))
+		emitter.MatterEmitEvent(endpoint, ClusterID, eventID, clusterwire.FieldlessEvent{}, s.inst.EventPriority(eventID))
 	}
 	return nil
 }

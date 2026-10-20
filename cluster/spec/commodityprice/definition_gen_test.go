@@ -61,13 +61,13 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleGetDetailedPriceRequest(func(context.Context, GetDetailedPriceRequestRequest) (GetDetailedPriceResponse, error) {
 		return GetDetailedPriceResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetDetailedPriceRequest: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetDetailedForecastRequest(func(context.Context, GetDetailedForecastRequestRequest) (GetDetailedForecastResponse, error) {
 		return GetDetailedForecastResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetDetailedForecastRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitPriceChange(0, PriceChangeEvent{}) // not in the empty definition's EventList: refused
 }

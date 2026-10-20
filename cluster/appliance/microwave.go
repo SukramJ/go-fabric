@@ -310,7 +310,7 @@ func (s *MicrowaveServer) maxWattIndex() uint8 {
 // setCookingParameters is chip's HandleSetCookingParameters
 // (MicrowaveOvenControlCluster.cpp:195-318).
 func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) (any, error) {
-	req, ok := fields.(mwo.SetCookingParametersRequest)
+	req, ok := spec.RequestOf[mwo.SetCookingParametersRequest](fields)
 	if !ok {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: SetCookingParameters fields %T", fields)
 	}
@@ -390,7 +390,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 // addMoreTime is chip's HandleAddMoreTime
 // (MicrowaveOvenControlCluster.cpp:320-339).
 func (s *MicrowaveServer) addMoreTime(ctx context.Context, fields any) (any, error) {
-	req, ok := fields.(mwo.AddMoreTimeRequest)
+	req, ok := spec.RequestOf[mwo.AddMoreTimeRequest](fields)
 	if !ok {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: AddMoreTime fields %T", fields)
 	}

@@ -21,6 +21,7 @@ import (
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
 	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
 	matterpump "github.com/SukramJ/go-fabric/cluster/pump"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -451,7 +452,7 @@ func TestFanStepDecoderRejectsMalformedFields(t *testing.T) {
 	dec := tlv.NewDecoder(b)
 	open, _ := dec.Next()
 	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
-	if err != nil || got != (clusterwire.FanStepRequest{Direction: 1, LowestOff: true}) {
+	if req, ok := got.(fandef.StepRequest); err != nil || !ok || req.Direction != 1 || req.Wrap != nil || req.LowestOff != nil {
 		t.Errorf("Step with extra fields = %+v, %v", got, err)
 	}
 }
@@ -523,7 +524,7 @@ func TestPumpOverTheWire(t *testing.T) {
 		t.Errorf("MaxSpeed TLV type 0x%02X value %d, want a one-byte unsigned 0", data.El.Type, data.El.Uint)
 	}
 	// The host raises DryRunning; it reads back as an empty structure.
-	if err := srv.Emit(matterpump.EventDryRunning); err != nil {
+	if err := srv.Emit(srv.Endpoint(), matterpump.EventDryRunning, nil); err != nil {
 		t.Fatal(err)
 	}
 	events := h.readEvents(ep, matterpump.ClusterID)

@@ -146,24 +146,33 @@ var (
 		notify: func(a, i, s, m uint32) any {
 			return dwa.NotifyEvent{Active: dwa.AlarmBitmap(a), Inactive: dwa.AlarmBitmap(i), State: dwa.AlarmBitmap(s), Mask: dwa.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(dwa.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(dwa.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[dwa.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[dwa.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 	refrigerator = variant{
 		def: rfa.Definition,
 		notify: func(a, i, s, m uint32) any {
 			return rfa.NotifyEvent{Active: rfa.AlarmBitmap(a), Inactive: rfa.AlarmBitmap(i), State: rfa.AlarmBitmap(s), Mask: rfa.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(rfa.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(rfa.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[rfa.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[rfa.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 	temperature = variant{
 		def: tma.Definition,
 		notify: func(a, i, s, m uint32) any {
 			return tma.NotifyEvent{Active: tma.AlarmBitmap(a), Inactive: tma.AlarmBitmap(i), State: tma.AlarmBitmap(s), Mask: tma.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(tma.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(tma.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[tma.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[tma.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 )
 

@@ -35,10 +35,12 @@ type (
 	AttributeSetter interface {
 		SetAttributes(values map[uint32]any) error
 	}
-	// CommandRegistrar is a server that takes command handlers
-	// ([Server.Handle]).
+	// CommandRegistrar is a server that takes command handlers: the
+	// host's handler replaces the server's own handling of the command,
+	// nil hands it back, and a command the server does not accept is
+	// refused ([ErrNotAccepted]) — [Server.Handle], [HostHandlers].
 	CommandRegistrar interface {
-		Handle(cmdID uint32, fn CommandHandler)
+		Handle(cmdID uint32, fn CommandHandler) error
 	}
 	// EventEmitting is a server that emits its cluster's events
 	// ([Server.Emit]).
@@ -204,16 +206,17 @@ func OnWriteOf[S any](srv contract.ClusterServer, fn func(ctx context.Context, n
 }
 
 // HandleOn registers a typed handler for the request command cmdID on srv
-// ([HandlerOf]); nil removes the handler. [ErrNoHandlers] for a server
-// that is no [CommandRegistrar].
+// ([HandlerOf]), replacing the server's own handling of it; nil hands the
+// command back to the server. [ErrNoHandlers] for a server that is no
+// [CommandRegistrar], the server's refusal ([ErrNotAccepted]) for a
+// command it does not accept.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func HandleOn[Req, Resp any](srv contract.ClusterServer, cmdID uint32, fn func(ctx context.Context, req Req) (Resp, error)) error {
 	reg, ok := srv.(CommandRegistrar)
 	if !ok {
 		return fmt.Errorf("%w: %T", ErrNoHandlers, srv)
 	}
-	reg.Handle(cmdID, HandlerOf(fn))
-	return nil
+	return reg.Handle(cmdID, HandlerOf(fn))
 }
 
 // EmitOn emits the event eventID with data on endpoint through srv's own

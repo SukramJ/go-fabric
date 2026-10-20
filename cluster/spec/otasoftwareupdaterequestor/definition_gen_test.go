@@ -56,8 +56,8 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleAnnounceOtaProvider(func(context.Context, AnnounceOtaProviderRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAnnounceOtaProvider(func(context.Context, AnnounceOtaProviderRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAnnounceOtaProvider: a command the server does not accept was registered")
 	}
 	_ = s.EmitStateTransition(0, StateTransitionEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitVersionApplied(0, VersionAppliedEvent{})   // not in the empty definition's EventList: refused

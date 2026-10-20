@@ -68,41 +68,41 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleInstantAction: a command the server does not accept was registered")
 	}
-	if err := s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleInstantActionWithTransition: a command the server does not accept was registered")
 	}
-	if err := s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStartAction: a command the server does not accept was registered")
 	}
-	if err := s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStartActionWithDuration: a command the server does not accept was registered")
 	}
-	if err := s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStopAction: a command the server does not accept was registered")
 	}
-	if err := s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandlePauseAction: a command the server does not accept was registered")
 	}
-	if err := s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandlePauseActionWithDuration: a command the server does not accept was registered")
 	}
-	if err := s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleResumeAction: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnableAction: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnableActionWithDuration: a command the server does not accept was registered")
 	}
-	if err := s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDisableAction: a command the server does not accept was registered")
 	}
-	if err := s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDisableActionWithDuration: a command the server does not accept was registered")
 	}
 	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitActionFailed(0, ActionFailedEvent{}) // not in the empty definition's EventList: refused

@@ -79,55 +79,55 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleUpdatePin(func(context.Context, UpdatePinRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUpdatePin(func(context.Context, UpdatePinRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUpdatePin: a command the server does not accept was registered")
 	}
-	if err := s.HandleResetPin(func(context.Context, ResetPinRequest) (ResetPinResponse, error) { return ResetPinResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleResetPin(func(context.Context, ResetPinRequest) (ResetPinResponse, error) { return ResetPinResponse{}, nil }); err == nil {
+		t.Error("HandleResetPin: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnable(func(context.Context, EnableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnable(func(context.Context, EnableRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnable: a command the server does not accept was registered")
 	}
-	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDisable: a command the server does not accept was registered")
 	}
-	if err := s.HandleAddBonusTime(func(context.Context, AddBonusTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddBonusTime(func(context.Context, AddBonusTimeRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAddBonusTime: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetScreenDailyTime(func(context.Context, SetScreenDailyTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetScreenDailyTime(func(context.Context, SetScreenDailyTimeRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetScreenDailyTime: a command the server does not accept was registered")
 	}
-	if err := s.HandleBlockUnratedContent(func(context.Context, BlockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleBlockUnratedContent(func(context.Context, BlockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleBlockUnratedContent: a command the server does not accept was registered")
 	}
-	if err := s.HandleUnblockUnratedContent(func(context.Context, UnblockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUnblockUnratedContent(func(context.Context, UnblockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUnblockUnratedContent: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetOnDemandRatingThreshold(func(context.Context, SetOnDemandRatingThresholdRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetOnDemandRatingThreshold(func(context.Context, SetOnDemandRatingThresholdRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetOnDemandRatingThreshold: a command the server does not accept was registered")
 	}
 	if err := s.HandleSetScheduledContentRatingThreshold(func(context.Context, SetScheduledContentRatingThresholdRequest) (struct{}, error) {
 		return struct{}{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSetScheduledContentRatingThreshold: a command the server does not accept was registered")
 	}
-	if err := s.HandleAddBlockChannels(func(context.Context, AddBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddBlockChannels(func(context.Context, AddBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAddBlockChannels: a command the server does not accept was registered")
 	}
-	if err := s.HandleRemoveBlockChannels(func(context.Context, RemoveBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRemoveBlockChannels(func(context.Context, RemoveBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRemoveBlockChannels: a command the server does not accept was registered")
 	}
-	if err := s.HandleAddBlockApplications(func(context.Context, AddBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddBlockApplications(func(context.Context, AddBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleAddBlockApplications: a command the server does not accept was registered")
 	}
-	if err := s.HandleRemoveBlockApplications(func(context.Context, RemoveBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRemoveBlockApplications(func(context.Context, RemoveBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRemoveBlockApplications: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetBlockContentTimeWindow(func(context.Context, SetBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetBlockContentTimeWindow(func(context.Context, SetBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetBlockContentTimeWindow: a command the server does not accept was registered")
 	}
-	if err := s.HandleRemoveBlockContentTimeWindow(func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRemoveBlockContentTimeWindow(func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRemoveBlockContentTimeWindow: a command the server does not accept was registered")
 	}
 	_ = s.EmitRemainingScreenTimeExpired(0, RemainingScreenTimeExpiredEvent{})         // not in the empty definition's EventList: refused
 	_ = s.EmitEnteringBlockContentTimeWindow(0, EnteringBlockContentTimeWindowEvent{}) // not in the empty definition's EventList: refused

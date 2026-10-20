@@ -384,7 +384,7 @@ func (s *Server) SetCurrentSensitivityLevel(level uint8) error {
 // out is cleared from AlarmsActive and AlarmsSuppressed, and a cleared bit
 // emits AlarmsStateChanged.
 func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error) {
-	req, ok := fields.(def.EnableDisableAlarmRequest)
+	req, ok := spec.RequestOf[def.EnableDisableAlarmRequest](fields)
 	if !ok {
 		return nil, statusErr(im.StatusInvalidCommand, "EnableDisableAlarm payload %T", fields)
 	}
@@ -448,7 +448,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 // that changes nothing; otherwise the modes join AlarmsSuppressed and
 // AlarmsStateChanged is emitted.
 func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
-	req, ok := fields.(def.SuppressAlarmRequest)
+	req, ok := spec.RequestOf[def.SuppressAlarmRequest](fields)
 	if !ok {
 		return nil, statusErr(im.StatusInvalidCommand, "SuppressAlarm payload %T", fields)
 	}

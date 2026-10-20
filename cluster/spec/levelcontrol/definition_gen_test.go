@@ -59,31 +59,31 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToLevel: a command the server does not accept was registered")
 	}
-	if err := s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMove: a command the server does not accept was registered")
 	}
-	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStep: a command the server does not accept was registered")
 	}
-	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStop: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToLevelWithOnOff: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveWithOnOff: a command the server does not accept was registered")
 	}
-	if err := s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStepWithOnOff: a command the server does not accept was registered")
 	}
-	if err := s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStopWithOnOff: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToClosestFrequency: a command the server does not accept was registered")
 	}
 }

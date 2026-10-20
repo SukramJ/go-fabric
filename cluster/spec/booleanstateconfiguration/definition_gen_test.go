@@ -54,11 +54,11 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSuppressAlarm(func(context.Context, SuppressAlarmRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSuppressAlarm(func(context.Context, SuppressAlarmRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSuppressAlarm: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnableDisableAlarm(func(context.Context, EnableDisableAlarmRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnableDisableAlarm(func(context.Context, EnableDisableAlarmRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnableDisableAlarm: a command the server does not accept was registered")
 	}
 	_ = s.EmitAlarmsStateChanged(0, AlarmsStateChangedEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitSensorFault(0, SensorFaultEvent{})               // not in the empty definition's EventList: refused

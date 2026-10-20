@@ -67,22 +67,22 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetUtcTime: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetTrustedTimeSource: a command the server does not accept was registered")
 	}
 	if err := s.HandleSetTimeZone(func(context.Context, SetTimeZoneRequest) (SetTimeZoneResponse, error) {
 		return SetTimeZoneResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSetTimeZone: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetDstOffset: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetDefaultNtp: a command the server does not accept was registered")
 	}
 	_ = s.EmitDstTableEmpty(0, DstTableEmptyEvent{})                       // not in the empty definition's EventList: refused
 	_ = s.EmitDstStatus(0, DstStatusEvent{})                               // not in the empty definition's EventList: refused

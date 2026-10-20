@@ -54,11 +54,11 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleOpen(func(context.Context, OpenRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOpen(func(context.Context, OpenRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOpen: a command the server does not accept was registered")
 	}
-	if err := s.HandleClose(func(context.Context, CloseRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClose(func(context.Context, CloseRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClose: a command the server does not accept was registered")
 	}
 	_ = s.EmitValveStateChanged(0, ValveStateChangedEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitValveFault(0, ValveFaultEvent{})               // not in the empty definition's EventList: refused

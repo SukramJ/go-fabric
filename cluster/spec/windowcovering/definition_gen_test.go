@@ -55,19 +55,19 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleUpOrOpen(func(context.Context, UpOrOpenRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUpOrOpen(func(context.Context, UpOrOpenRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUpOrOpen: a command the server does not accept was registered")
 	}
-	if err := s.HandleDownOrClose(func(context.Context, DownOrCloseRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDownOrClose(func(context.Context, DownOrCloseRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDownOrClose: a command the server does not accept was registered")
 	}
-	if err := s.HandleStopMotion(func(context.Context, StopMotionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStopMotion(func(context.Context, StopMotionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStopMotion: a command the server does not accept was registered")
 	}
-	if err := s.HandleGoToLiftPercentage(func(context.Context, GoToLiftPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleGoToLiftPercentage(func(context.Context, GoToLiftPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleGoToLiftPercentage: a command the server does not accept was registered")
 	}
-	if err := s.HandleGoToTiltPercentage(func(context.Context, GoToTiltPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleGoToTiltPercentage(func(context.Context, GoToTiltPercentageRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleGoToTiltPercentage: a command the server does not accept was registered")
 	}
 }
