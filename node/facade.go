@@ -8,9 +8,11 @@ import (
 
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -118,3 +120,52 @@ func ValidateSetupPIN(pin uint32) error {
 	}
 	return nil
 }
+
+// Host ports and values named by the Config fields (G1-6): the same types as
+// the lower packages' own, owned here so `go doc` shows node.X and a host
+// implements node.OTAImageSource without importing cluster/core.
+
+// OTAImageSource is the type of [OTAProviderConfig].ImageSource: where the provider reads the images it offers ([mattercore.OTAImageSource]).
+type OTAImageSource = mattercore.OTAImageSource
+
+// OTAConsent is the type of [OTAProviderConfig].Consent: the user-consent port of the provider ([mattercore.OTAConsent]).
+type OTAConsent = mattercore.OTAConsent
+
+// OTAConsentState is what an [OTAConsent] answers ([mattercore.OTAConsentState]).
+type OTAConsentState = mattercore.OTAConsentState
+
+// OTAApplyPolicy is the type of [OTAProviderConfig].ApplyPolicy: when a requestor may apply a downloaded image ([mattercore.OTAApplyPolicy]).
+type OTAApplyPolicy = mattercore.OTAApplyPolicy
+
+// OTAPeer names the requestor an [OTAProviderConfig] callback is about ([mattercore.OTAPeer]).
+type OTAPeer = mattercore.OTAPeer
+
+// OTAUpdateStatus is the status [OTAProviderConfig].OnStatusChange reports for a requestor ([mattercore.OTAUpdateStatus]).
+type OTAUpdateStatus = mattercore.OTAUpdateStatus
+
+// OtaApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
+type OtaApplier = mattercore.OtaApplier
+
+// WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).
+type WiFiReporter = mattercore.WiFiReporter
+
+// CommissioningApprover is the type of [CommissionerControlConfig].Approver: the host's decision on a commissioning request ([mattercore.CommissioningApprover]).
+type CommissioningApprover = mattercore.CommissioningApprover
+
+// ReverseCommissioner is the type of [CommissionerControlConfig].Commissioner: the host's commissioner of the requesting node ([mattercore.ReverseCommissioner]).
+type ReverseCommissioner = mattercore.ReverseCommissioner
+
+// CapabilityMinimaStruct is the type of [Config].CapabilityMinima: the BasicInformation CapabilityMinima ([mattercore.CapabilityMinimaStruct]).
+type CapabilityMinimaStruct = mattercore.CapabilityMinimaStruct
+
+// GeneralDiagnosticsFeatures is the type of [Config].GeneralDiagnosticsFeatures: the feature selection of the root GeneralDiagnostics ([mattercore.GeneralDiagnosticsFeatures]).
+type GeneralDiagnosticsFeatures = mattercore.GeneralDiagnosticsFeatures
+
+// DeviceTypeValidationMode is the type of [Config].DeviceTypeValidation: how the node treats a device type that breaks its conformance ([endpoint.DeviceTypeValidationMode]).
+type DeviceTypeValidationMode = endpoint.DeviceTypeValidationMode
+
+// WindowStatus is the AdministratorCommissioning view [WindowSnapshot].Administrator carries ([wire.WindowStatusSnapshot]).
+type WindowStatus = wire.WindowStatusSnapshot
+
+// AttestationChain is the type of [Attestation].Chain: the DAC, its key and the PAI ([attestation.Chain]).
+type AttestationChain = attestation.Chain

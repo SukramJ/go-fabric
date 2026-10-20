@@ -326,7 +326,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 // attestationMaterial returns the configured chain and CD, or the CSA
 // test material for the vendor and product (wiring.go:132-163).
-func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
+func attestationMaterial(cfg *Config) (*AttestationChain, []byte, error) {
 	pd := cfg.ProductDescription
 	chain := cfg.Attestation.Chain
 	if chain == nil {

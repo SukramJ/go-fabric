@@ -19,7 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -54,7 +53,7 @@ type Config struct {
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
 	// warn mode.
-	DeviceTypeValidation endpoint.DeviceTypeValidationMode
+	DeviceTypeValidation DeviceTypeValidationMode
 	// Attestation is the device attestation material; the zero value is
 	// the CSA test chain and test Certification Declaration for the
 	// configured vendor and product (attestation.BuildTestChain,
@@ -135,7 +134,7 @@ type Config struct {
 	// (GeneralDiagnosticsServer.ts:51-52). Without DataModelTest a
 	// MaxPathsPerInvoke above one fails [Node.Start]
 	// (mattercore.GeneralDiagnostics.CheckDataModelTest).
-	GeneralDiagnosticsFeatures *mattercore.GeneralDiagnosticsFeatures
+	GeneralDiagnosticsFeatures *GeneralDiagnosticsFeatures
 	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
 	// the root BasicInformation advertises it, the PASE and CASE session
 	// parameters carry it and the invoke path refuses a larger batch with
@@ -150,7 +149,7 @@ type Config struct {
 	// revision-6 fields, BasicInformationServer.ts initialize), a value
 	// the host sets wins (CapabilityMinimaTest.ts "caller-provided values
 	// win").
-	CapabilityMinima mattercore.CapabilityMinimaStruct
+	CapabilityMinima CapabilityMinimaStruct
 	// Client is the node's client stack ([Client]): the socket, exchanges
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
@@ -259,8 +258,8 @@ type WiFiCommissioning struct {
 // WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
 type WiFi struct {
 	// Reporter answers the cluster's reads and ResetCounts
-	// (mattercore.WiFiReporter); nil mounts no cluster.
-	Reporter mattercore.WiFiReporter
+	// (WiFiReporter); nil mounts no cluster.
+	Reporter WiFiReporter
 	// Features is the cluster's FeatureMap: wifidiagdef.FeaturePacketCounts
 	// (PKTCNT) and wifidiagdef.FeatureErrorCounts (ERRCNT, which brings
 	// ResetCounts).
@@ -388,7 +387,7 @@ type Attestation struct {
 	BlockCommissioningOnError bool
 	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
 	// host with a chain of its own (an HSM-held key, say) sets it here.
-	Chain *attestation.Chain
+	Chain *AttestationChain
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
 	CertificationDeclaration []byte
@@ -403,7 +402,7 @@ type OtaConfig struct {
 	Harness bool
 	// Applier carries out an update; nil is the daemon's applier, which
 	// validates the image and keeps it under Dir/applied.
-	Applier mattercore.OtaApplier
+	Applier OtaApplier
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.

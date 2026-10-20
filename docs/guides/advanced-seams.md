@@ -26,7 +26,9 @@ A host names none of the packages below for these:
 | Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers` |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
-| Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OtaApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
+| Bindings (seam) | `Node.Bindings()` returns the `*binding.Manager` that resolves the Binding servers' entries into peers; no facade route yet |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
 An alias is the type of the lower package under a second name, not a new

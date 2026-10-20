@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
 
@@ -101,7 +102,7 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // endpoint's number then, as matter.js erases a deleted endpoint's storage
 // (ServerEndpointInitializer.ts eraseDescendant, cited at
 // endpoint.Snapshot.ModelComplete); a re-add gets a fresh number.
-func (a *Aggregator) Remove(ctx context.Context, key endpoint.SourceKey) error {
+func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
 	}
@@ -151,7 +152,7 @@ func (a *Aggregator) Endpoints() []Endpoint {
 // bridged endpoint with key (and the node's, as the bridge does) and
 // persists both, so the version never decreases across a restart — the
 // daemon's configChange (main.go:299-313).
-func (a *Aggregator) IncreaseConfigurationVersion(key endpoint.SourceKey) error {
+func (a *Aggregator) IncreaseConfigurationVersion(key device.SourceKey) error {
 	topo := a.n.br.Topology()
 	if topo == nil {
 		return errors.New("node: no topology yet")
@@ -175,7 +176,7 @@ func (a *Aggregator) IncreaseConfigurationVersion(key endpoint.SourceKey) error 
 // afterwards) with the bridged devices raised under the shared context
 // (BridgedDeviceBasicInformationServer.ts:72-90); the bridge's
 // IncreaseNodeConfigurationVersionWith does the raising.
-func (a *Aggregator) IncreaseConfigurationVersions(keys ...endpoint.SourceKey) error {
+func (a *Aggregator) IncreaseConfigurationVersions(keys ...device.SourceKey) error {
 	topo := a.n.br.Topology()
 	if topo == nil {
 		return errors.New("node: no topology yet")
