@@ -804,8 +804,14 @@
     },
     {
       "path": "packages/node/test/behaviors/energy-evse-mode/EnergyEvsModeServerTest.ts",
-      "status": "planned",
-      "reason": "Local mode tags and the inherited mode-base commands of EnergyEvseModeServer.",
+      "status": "partial",
+      "go": [
+        "cluster/modebase:TestEnergyEvseModeServerParityMatterJS"
+      ],
+      "missing": [
+        "supports extension of inherited commands"
+      ],
+      "reason": "The local mode tags and the inherited ChangeToMode run on the EnergyEvseMode server built with createNode's modes (cluster/modebase/energyevsemode_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding changeToMode, checked with satisfies; no runtime).",
       "snapshotSha": "3b632e519b04ab3c06d51d697b8c3c35549ff080"
     },
     {

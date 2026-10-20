@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 73 |
-| partial | 113 |
-| planned | 51 |
+| partial | 114 |
+| planned | 50 |
 | excluded | 87 |
 | total | 324 |
 
@@ -46,7 +46,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 2 | 0 | 0 | 0 |
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
@@ -321,7 +321,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| EnergyEvsModeServerTest.ts | 79 | planned | ‚Äî | Local mode tags and the inherited mode-base commands of EnergyEvseModeServer. |
+| EnergyEvsModeServerTest.ts | 79 | partial | `cluster/modebase:TestEnergyEvseModeServerParityMatterJS` | The local mode tags and the inherited ChangeToMode run on the EnergyEvseMode server built with createNode's modes (cluster/modebase/energyevsemode_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding changeToMode, checked with satisfies; no runtime). Missing: ‚Äúsupports extension of inherited commands‚Äù. |
 
 ## node/test/behaviors/fan-control
 
@@ -960,10 +960,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` ‚Äî A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.
-
-### node/test/behaviors/energy-evse-mode
-
-- `EnergyEvsModeServerTest.ts` ‚Äî Local mode tags and the inherited mode-base commands of EnergyEvseModeServer.
 
 ### node/test/behaviors/fan-control
 
