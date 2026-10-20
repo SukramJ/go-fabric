@@ -240,6 +240,13 @@ type signer struct {
 type CA struct {
 	cfg Config
 
+	// issue serialises GenerateNOC: a serial number is taken, the NOC
+	// signed and the counter saved before the next issue starts. It is
+	// held across the signing and the save, which may reach a host's
+	// signer (Config.RootSigner) or store, and is taken by nothing else.
+	issue sync.Mutex
+	// mu guards the fields below; it is released for the signing and the
+	// save (ADR 0026 P6).
 	mu         sync.Mutex
 	rootCertID uint64
 	rootKey    crypto.Signer // nil: offline root with an ICAC
@@ -613,11 +620,14 @@ func (c *CA) GenerateNOC(pub []byte, fabricID, nodeID uint64, cats []uint32) ([]
 	if _, err := ecdh.P256().NewPublicKey(pub); err != nil {
 		return nil, fmt.Errorf("ca: NOC subject key: %w", err)
 	}
+	c.issue.Lock()
+	defer c.issue.Unlock()
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	id := c.nextID
 	c.nextID++
 	s := c.signingParameters()
+	stored := c.stored()
+	c.mu.Unlock()
 	if s.key == nil {
 		return nil, errors.New("ca: no signing key: the root key is offline and there is no ICAC")
 	}
@@ -643,7 +653,7 @@ func (c *CA) GenerateNOC(pub []byte, fabricID, nodeID uint64, cats []uint32) ([]
 		return nil, err
 	}
 	if c.cfg.Store != nil {
-		if err := c.cfg.Store.Save(c.stored()); err != nil {
+		if err := c.cfg.Store.Save(stored); err != nil {
 			return nil, fmt.Errorf("ca: save the certificate counter: %w", err)
 		}
 	}
