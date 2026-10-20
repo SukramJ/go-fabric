@@ -634,6 +634,20 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   `missing` for this. (Milestone 4, a host option: a feature selection
   changes the FeatureMap a controller sees, and the event needs the
   bridge's change observation `booleanStateEvents` has for BooleanState.)
+- **The node's session intervals are not configurable.** matter.js takes
+  `sessions.intervals` (idle and active interval, active threshold) into
+  the SessionManager's parameters (`SessionsBehaviorTest.ts:15-25`); the
+  Go node states `bridge.DefaultSessionParameters` in Sigma2
+  (`node/security.go` `responderSessionParams`) and `node.Config` has no
+  field for them. One `SessionsBehaviorTest.ts` case is `missing` for
+  this; its sibling of the wall clock waits on the monotonic reading
+  below. (Milestone 4, a node option.)
+- **The event store is volatile only.** matter.js keeps the events of a
+  former run with `events: { nonvolatile: true }`
+  (`EventsBehaviorTest.ts:45-54`); the Go node's event log lives in
+  memory and persists only the event-number ceiling. One
+  `EventsBehaviorTest.ts` case is `missing` for this. (Milestone 4, a
+  node option over the store.)
 
 Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
 Line numbers at `862ad75f`.

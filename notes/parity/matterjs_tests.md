@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 75 |
-| partial | 118 |
-| planned | 44 |
+| partial | 119 |
+| planned | 43 |
 | excluded | 87 |
 | total | 324 |
 
@@ -35,7 +35,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/system/icd](#nodetestbehaviorsystemicd) | 5 | 0 | 0 | 0 | 5 |
 | [node/test/behavior/system/network](#nodetestbehaviorsystemnetwork) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behavior/system/remote](#nodetestbehaviorsystemremote) | 3 | 0 | 0 | 0 | 3 |
-| [node/test/behavior/system/sessions](#nodetestbehaviorsystemsessions) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behavior/system/sessions](#nodetestbehaviorsystemsessions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/subscriptions](#nodetestbehaviorsystemsubscriptions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/access-control](#nodetestbehaviorsaccess-control) | 2 | 0 | 1 | 1 | 0 |
 | [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 2 | 1 | 0 | 0 |
@@ -247,7 +247,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| SessionsBehaviorTest.ts | 63 | planned | — | Configured session intervals reaching the session manager, defaults kept for the unset ones, and reported session activity. |
+| SessionsBehaviorTest.ts | 63 | partial | `node:TestSessionsBehaviorParityMatterJS` | The defaults of the intervals left unset run on a commissioned fabrictest pair, the node's session parameters being what its CASE responder states and the controller's peer reports (node/sessions_parity_matterjs_test.go). Missing: "applies configured intervals …", M4: findings entry "The node's session intervals are not configurable" (node.Config has no sessions.intervals); "reports session activity on the wall clock", M4: findings entry "clock.Clock has no monotonic reading" (MockTime.stepWallClock has no clocktest.Fake form). Missing: “applies configured intervals to the SessionManager”; “reports session activity on the wall clock”. |
 
 ## node/test/behavior/system/subscriptions
 
@@ -952,10 +952,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `ConnectionStateTest.ts` — The controller's per-peer connection state (Connected, Reconnecting, WaitingForDeviceDiscovery, Disconnected) and its transitions.
 - `FabricLabelReconciliationTest.ts` — The controller pushing a drifted fabric label to a peer on start.
-
-### node/test/behavior/system/sessions
-
-- `SessionsBehaviorTest.ts` — Configured session intervals reaching the session manager, defaults kept for the unset ones, and reported session activity.
 
 ### node/test/behaviors/access-control
 

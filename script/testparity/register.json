@@ -521,8 +521,15 @@
     },
     {
       "path": "packages/node/test/behavior/system/sessions/SessionsBehaviorTest.ts",
-      "status": "planned",
-      "reason": "Configured session intervals reaching the session manager, defaults kept for the unset ones, and reported session activity.",
+      "status": "partial",
+      "go": [
+        "node:TestSessionsBehaviorParityMatterJS"
+      ],
+      "missing": [
+        "applies configured intervals to the SessionManager",
+        "reports session activity on the wall clock"
+      ],
+      "reason": "The defaults of the intervals left unset run on a commissioned fabrictest pair, the node's session parameters being what its CASE responder states and the controller's peer reports (node/sessions_parity_matterjs_test.go). Missing: \"applies configured intervals …\", M4: findings entry \"The node's session intervals are not configurable\" (node.Config has no sessions.intervals); \"reports session activity on the wall clock\", M4: findings entry \"clock.Clock has no monotonic reading\" (MockTime.stepWallClock has no clocktest.Fake form).",
       "snapshotSha": "3acabc55adce8bd9b19cb1ccbfc9d7bf6a62fa90"
     },
     {
