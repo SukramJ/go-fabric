@@ -7467,21 +7467,21 @@
       "identifier": "TestTypedConvert",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/typed_internal_test.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "cluster/spec",
       "identifier": "TestTypedFieldsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/typed_internal_test.go",
-      "line": 79
+      "line": 80
     },
     {
       "package": "cluster/spec",
       "identifier": "TestTypedVetoError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/typed_internal_test.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "cluster/spec",
