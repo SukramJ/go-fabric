@@ -113,6 +113,7 @@ nav:
           - "ADR 0023 — Apache License 2.0 and a contributor licence agreement": adr/0023-apache-2-and-the-cla.md
           - "ADR 0024 — BLE commissioning in the controller role": adr/0024-ble-commissioning-in-the-controller.md
           - "ADR 0025 — Design principles of the facade": adr/0025-facade-design-principles.md
+          - "ADR 0026 — Architecture principles of the module": adr/0026-architecture-principles.md
       - matter.js comparison: matterjs-comparison.md
       - Parity contract: matter-parity-contract.md
       - Certifiability: certifiability.md
