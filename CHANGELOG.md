@@ -27,6 +27,7 @@ Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the 
 
 ### Changed
 
+- `examples/reference-bridge`: the daemon builds its node through the facade routes — the node opens `--db` (`Store.Path`), builds the advertiser (`Network.MDNS` from `--advertise` and `--mdns-os-hostname`), loads `--attestation-dir` through `node.LoadAttestation`, logs an unhealthy listener (`Config.Health`) and checks its flags with `node.MaxDiscriminator` and `node.ValidateSetupPIN`. `main.go` imports none of `bridge`, `mdns`, `secure/*`, `store` or `bootid`.
 - `node`: a nil `Config.Advertiser` advertises: the node builds `mdns.Zeroconf` with the subtype responder (what the reference daemon wired by hand), as a matter.js ServerNode advertises on the IP network unless configured otherwise (`NetworkServer.ts:207-209`, `ServerEnvironment.ts:155`). It used to be `mdns.NewNoop()`, which published nothing; a host that wants that sets `Network.MDNS.Disabled`. Every in-repo `node.Config` already states its advertiser or sets `Disabled` (`fabrictest` sets its own).
 
 ### Deprecated

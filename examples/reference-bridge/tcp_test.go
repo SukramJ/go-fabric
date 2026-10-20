@@ -6,13 +6,13 @@ package main
 import (
 	"testing"
 
-	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // TestParseTCPFlag mirrors matter.js NetworkServer.ts:261-272
 // resolveTcpConfig: true → both, false / unset → none, else the roles.
 func TestParseTCPFlag(t *testing.T) {
-	cases := map[string]matterbridge.TCPConfig{
+	cases := map[string]node.TCPConfig{
 		"true":               {Incoming: true, Outgoing: true},
 		"false":              {},
 		"":                   {},

@@ -20655,7 +20655,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 360
+      "line": 356
     },
     {
       "package": "examples/reference-bridge",
@@ -20669,7 +20669,7 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 186
+      "line": 187
     },
     {
       "package": "examples/reference-bridge",
@@ -20683,7 +20683,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 318
+      "line": 314
     },
     {
       "package": "examples/reference-bridge",
@@ -20697,7 +20697,7 @@
       "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 389
+      "line": 385
     },
     {
       "package": "examples/reference-bridge",
@@ -20718,7 +20718,7 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "examples/reference-bridge",
@@ -20970,7 +20970,7 @@
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 155
+      "line": 156
     },
     {
       "package": "examples/reference-bridge",
@@ -20984,14 +20984,14 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 92
+      "line": 93
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 335
+      "line": 331
     },
     {
       "package": "examples/reference-bridge",

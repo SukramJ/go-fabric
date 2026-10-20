@@ -240,10 +240,12 @@ hand, both halves it had to hand-write moved into the module:
   requirement of `go-fabric`, so persisting adds no new dependency.
 - **The module owns the DDL.** `store.Schema()` and `sqlitestore.Schema()`
   return the embedded text each package's own queries are written against;
-  `Apply` runs it. `persist.go` calls both and writes no SQL, and the node
-  applies them again on the handle it is given, so a schema change arrives
-  with the dependency bump. A host with a migration tool
-  feeds the two scripts through that instead.
+  `Apply` runs it. The node opens this example's file itself
+  (`node.Store.Path`, `modernc.org/sqlite` with foreign keys and a busy
+  timeout) and applies both on every boot, so a schema change arrives
+  with the dependency bump and this example writes no SQL. A host with a
+  migration tool feeds the two scripts through that instead and hands the
+  node its own handle (`node.Store.DB`).
 - **Numbers only ever advance.** The high-water mark lives in
   `matter_endpoint_allocation`, and `RemoveEndpoint` never returns a number
   to the pool.

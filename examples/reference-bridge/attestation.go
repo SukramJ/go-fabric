@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/secure/attestation"
 )
 
 // attestationFiles names the four files --attestation-dir holds. A
 // vendor's PKI hands over exactly these; the loader accepts PEM or DER
 // for each regardless of the suffix.
-func attestationFiles(dir string) attestation.ChainFiles {
-	return attestation.ChainFiles{
+func attestationFiles(dir string) node.AttestationFiles {
+	return node.AttestationFiles{
 		DACPath:    filepath.Join(dir, "dac.pem"),
 		DACKeyPath: filepath.Join(dir, "dac-key.pem"),
 		PAIPath:    filepath.Join(dir, "pai.pem"),
@@ -27,19 +26,19 @@ func attestationFiles(dir string) attestation.ChainFiles {
 // loadAttestation is the daemon's --attestation-dir: empty keeps the
 // node's default, the CSA test chain (pairable everywhere, not
 // shippable); a directory loads the vendor chain through
-// attestation.LoadChainFiles, and a chain that does not load is a
-// start-up error rather than a silent fall-back — a daemon told to
-// serve a vendor identity must not pair as the test vendor.
+// node.LoadAttestation, and a chain that does not load is a start-up
+// error naming the flag rather than a silent fall-back — a daemon told
+// to serve a vendor identity must not pair as the test vendor.
 func loadAttestation(dir string) (node.Attestation, error) {
 	if dir == "" {
 		return node.Attestation{}, nil
 	}
-	chain, cd, err := attestation.LoadChainFiles(attestationFiles(dir))
+	att, err := node.LoadAttestation(attestationFiles(dir))
 	if err != nil {
-		if errors.Is(err, attestation.ErrNoChainConfigured) {
+		if errors.Is(err, node.ErrNoChainConfigured) {
 			return node.Attestation{}, nil
 		}
 		return node.Attestation{}, fmt.Errorf("--attestation-dir %s: %w", dir, err)
 	}
-	return node.Attestation{Chain: chain, CertificationDeclaration: cd}, nil
+	return att, nil
 }
