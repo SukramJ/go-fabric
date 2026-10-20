@@ -726,6 +726,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
+	if n.root.otaApplier != nil {
+		n.root.otaApplier.close()
+	}
 	if n.started {
 		if err := storeOperationalTime(ctx, n.st, n.root.GeneralDiagnostics); err != nil {
 			n.logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
