@@ -1805,7 +1805,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 533,
+    "line": 545,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
