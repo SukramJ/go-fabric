@@ -354,8 +354,15 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/CommissioningWindowTest.ts",
-      "status": "planned",
-      "reason": "The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case.",
+      "status": "partial",
+      "go": [
+        "examples/reference-controller/cli:TestCommissioningWindowParityMatterJS"
+      ],
+      "missing": [
+        "invokes openBasicCommissioningWindow when the peer supports the basic feature",
+        "tolerates a WindowNotOpen error on the pre-emptive revoke"
+      ],
+      "reason": "The window helpers are the reference controller's openEnhancedWindow and openBasicWindow (examples/reference-controller/cli/window.go, mirroring CommissioningClient's) over the registry's client.Node of a commissioned fabrictest device; the request matter.js spies on is observed as the device's window (open, its advertised discriminator, a supplied verifier, the requested duration) and as a second administrator commissioning with the returned passcode, the admin-fabric cases as the device window's AdminFabricIndex after the administrator decommissions itself and after another administrator removes its own fabric (examples/reference-controller/cli/window_parity_matterjs_test.go). Missing: the two Basic cases (the second is the \"tolerates …\" of the describe openBasicCommissioningWindow, :167), M4: findings entry \"No Basic commissioning window (BC)\" (a node cannot serve the Basic feature).",
       "snapshotSha": "2f362119b40600a132651fbdfe3a07bd98c5b612"
     },
     {

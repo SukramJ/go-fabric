@@ -64,7 +64,7 @@ type Entry struct {
 
 var (
 	shaPattern   = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	goRefPattern = regexp.MustCompile(`^[a-z0-9_]+(?:/[a-z0-9_]+)*:Test[A-Za-z0-9_]*$`)
+	goRefPattern = regexp.MustCompile(`^[a-z0-9_-]+(?:/[a-z0-9_-]+)*:Test[A-Za-z0-9_]*$`)
 	// untilPattern is the shape of an until: a roadmap milestone, with or
 	// without its phase. A planned entry carries one when its subject is
 	// work of a later phase (the device ICD role of milestone 5), so the
