@@ -1779,6 +1779,11 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// the serve context's cancel above ends it, and it is gone before the
 	// advertiser closes.
 	b.reannounces.Wait()
+	// A BDX responder (an OTA image transfer) runs under the handler
+	// context the cancel above ended; it is gone before Stop returns.
+	if !b.waitBDXResponders(ctx) {
+		b.logger.Warn("matter.bridge.stop.bdx_responder_timeout", slog.String("err", ctx.Err().Error()))
+	}
 
 	// Best-effort mDNS withdraw + close. Errors here are logged but
 	// don't block teardown — an mDNS that cannot be reached on shutdown

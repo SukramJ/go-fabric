@@ -30,9 +30,57 @@ type BDXResponder interface {
 // bdxRouting is the attached responder and the exchanges peers opened on
 // it, keyed by session and exchange id.
 type bdxRouting struct {
+	// mu guards responder and active.
 	mu        sync.RWMutex
 	responder BDXResponder
 	exchanges sync.Map // secureExchangeKey → *initiatedSecureExchange (responder role)
+	// active counts the responder goroutines running an exchange; idle,
+	// on mu, signals it reached zero, which Stop waits for
+	// (waitBDXResponders).
+	active int
+	idle   sync.Cond
+}
+
+// goResponder runs fn, one exchange's responder, on a goroutine the
+// bridge owns: Stop waits for it after the handler context's cancel.
+func (b *Bridge) goResponder(fn func()) {
+	b.bdx.mu.Lock()
+	b.bdx.active++
+	b.bdx.mu.Unlock()
+	go func() {
+		defer func() {
+			b.bdx.mu.Lock()
+			b.bdx.active--
+			if b.bdx.active == 0 {
+				b.bdx.idle.Broadcast()
+			}
+			b.bdx.mu.Unlock()
+		}()
+		fn()
+	}()
+}
+
+// waitBDXResponders waits, bounded by ctx, until no responder goroutine
+// runs; it reports whether none does.
+func (b *Bridge) waitBDXResponders(ctx context.Context) bool {
+	idle := make(chan struct{})
+	go func() {
+		b.bdx.mu.Lock()
+		if b.bdx.idle.L == nil {
+			b.bdx.idle.L = &b.bdx.mu
+		}
+		for b.bdx.active > 0 {
+			b.bdx.idle.Wait()
+		}
+		b.bdx.mu.Unlock()
+		close(idle)
+	}()
+	select {
+	case <-idle:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // AttachBDXResponder installs the responder for the BDX exchanges peers
@@ -105,10 +153,10 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 		// this one is a duplicate the replay window did not see yet.
 		return true
 	}
-	go func() {
+	b.goResponder(func() {
 		defer func() { _ = ex.Close() }()
 		responder.HandleExchange(ctx, peer, msg, ex)
-	}()
+	})
 	// The *Init is message 0: the responder has answered it once it waits
 	// for the next.
 	ex.turn.await(0, ex.done)
