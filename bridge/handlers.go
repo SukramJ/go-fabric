@@ -7,10 +7,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -744,9 +742,6 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		// StatusReport Success arrives. Mirrors matter.js
 		// CaseServer.ts line 200-202 (session added before waitForSuccess).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
-		slog.Default().Debug("matter.tx.sigma2resume.wire",
-			slog.Int("len", len(out)),
-			slog.String("hex_first128", hex.EncodeToString(peekBytes(out, 128))))
 
 		// Every resume that yields a session id the adapter has not
 		// registered installs its keys: the first one on a fresh adapter,
@@ -791,9 +786,6 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	}
 	a.mu.Unlock()
 
-	slog.Default().Debug("matter.tx.sigma2.wire",
-		slog.Int("len", len(out)),
-		slog.String("hex_first128", hex.EncodeToString(peekBytes(out, 128))))
 	return mrp.SCOpcodeSigma2, out, nil
 }
 
@@ -806,13 +798,6 @@ func caseFailureProtocolCode(err error) uint16 {
 		return mrp.SCStatusProtocolNoSharedTrustRoots
 	}
 	return mrp.SCStatusProtocolInvalidParameter
-}
-
-func peekBytes(b []byte, n int) []byte {
-	if len(b) <= n {
-		return b
-	}
-	return b[:n]
 }
 
 // ProcessSigma3 hands the wire payload to [sigma.Responder.ProcessSigma3].
