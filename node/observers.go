@@ -48,8 +48,12 @@ type Observers struct {
 	// OnFabricUpdated runs after an UpdateNOC (or the fail-safe rollback
 	// of one) changed a fabric's operational identity and the facade
 	// moved the CASE identity and the operational record and closed the
-	// fabric's other sessions. Mirrors matter.js FabricManager
-	// `events.replaced` (FabricManager.ts:236, :377).
+	// fabric's other sessions, and after an UpdateFabricLabel or a
+	// SetVIDVerificationStatement changed a fabric under the same
+	// identity (nothing for the facade to move). Mirrors matter.js
+	// FabricManager `events.replaced` (FabricManager.ts:236-246, :377),
+	// which a fabric's persist emits too, and CommissioningServer's
+	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141).
 	OnFabricUpdated func(FabricInfo) error
 	// OnCommissioningComplete runs after a successful
 	// CommissioningComplete and the facade's own handling of it (pending

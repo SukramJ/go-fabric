@@ -172,6 +172,10 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 		return nil, fmt.Errorf("matter: SetVIDVerificationStatement: persist: %w", err)
 	}
 	o.dataVersion.Bump()
+	// The fabric changed: matter.js Fabric.updateVendorVerificationData
+	// persists it and the node reports an "updated" fabric (Fabric.ts:208-243,
+	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:522).
+	o.fabricChanged(ctx, fabricIndex)
 	return nil, nil
 }
 

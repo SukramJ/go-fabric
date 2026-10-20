@@ -139,6 +139,18 @@ type OperationalCredentials struct {
 	// re-CASE enforcement must wire the hook.
 	onFabricUpdated func(ctx context.Context, fabricIndex uint8)
 
+	// onFabricChanged fires after UpdateFabricLabel or
+	// SetVIDVerificationStatement changed a fabric the node keeps under
+	// the same operational identity. Mirrors matter.js Fabric.setLabel and
+	// updateVendorVerificationData persisting the fabric
+	// (packages/protocol/src/fabric/Fabric.ts:193-201, :208-243), whose
+	// persist callback emits FabricManager's replaced event
+	// (FabricManager.ts:236-246), which OperationalCredentialsServer
+	// hands to CommissioningServer as an "updated" fabric change
+	// (OperationalCredentialsServer.ts:579-582, :596;
+	// CommissioningServer.ts:118-141).
+	onFabricChanged func(ctx context.Context, fabricIndex uint8)
+
 	// onMDNSReannounce, when non-nil, is called after a successful
 	// RemoveFabric so the mDNS advertiser withdraws the per-fabric
 	// _matter._tcp record and republishes without the removed fabric.
@@ -494,6 +506,25 @@ func (o *OperationalCredentials) SetOnFabricUpdated(hook func(ctx context.Contex
 	o.mu.Lock()
 	o.onFabricUpdated = hook
 	o.mu.Unlock()
+}
+
+// SetOnFabricChanged wires the hook UpdateFabricLabel and
+// SetVIDVerificationStatement fire after they changed a fabric. Pass nil
+// to detach.
+func (o *OperationalCredentials) SetOnFabricChanged(hook func(ctx context.Context, fabricIndex uint8)) {
+	o.mu.Lock()
+	o.onFabricChanged = hook
+	o.mu.Unlock()
+}
+
+// fabricChanged runs the onFabricChanged hook.
+func (o *OperationalCredentials) fabricChanged(ctx context.Context, fabricIndex uint8) {
+	o.mu.RLock()
+	hook := o.onFabricChanged
+	o.mu.RUnlock()
+	if hook != nil {
+		hook(ctx, fabricIndex)
+	}
 }
 
 // clearPendingState zeroes all pending-commissioning fields. Called on
@@ -2120,11 +2151,21 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 			}
 		}
 	}
+	// matter.js Fabric.setLabel persists, and so reports, only a label
+	// that changed (Fabric.ts:197-199).
+	prev, prevErr := o.store.GetFabric(ctx, idx)
+	relabelled := prevErr != nil || prev.Label != req.Label
 	if err := o.store.UpdateFabricLabel(ctx, idx, req.Label); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	// Bump DataVersion after successful label update — fabric list changed.
 	o.dataVersion.Bump()
+	// The fabric changed: matter.js Fabric.setLabel persists it and the
+	// node reports an "updated" fabric (Fabric.ts:193-201,
+	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:404).
+	if relabelled {
+		o.fabricChanged(ctx, idx)
+	}
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
 }
 
