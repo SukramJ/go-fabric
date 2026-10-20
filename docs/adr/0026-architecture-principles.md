@@ -51,7 +51,11 @@ hold gets the guard (principle 11).
    (`node`); and test support, examples and scripts above everything. A
    package imports only its own layer or a lower one. The one upward edge
    of today (`binding` → `controller/*`) is the first exception on the
-   archcheck ratchet, to be resolved by principle 12.
+   archcheck ratchet, to be resolved by principle 12. `cluster/spec/*` and
+   `cluster/wire` are model packages under the servers' directory;
+   archcheck assigns them to the model layer (the exact pattern wins) and
+   they stay where they are: a move to `spec/` would rename 119 public
+   packages for no host gain (decided at gate 1, 2026-10-20).
 2. **One composition root per role.** `bridge` composes the device side
    and `node` is the facade over it; `controller/*` composes the
    controller role. No other package wires ports; a package that needs a
@@ -68,8 +72,12 @@ hold gets the guard (principle 11).
 4. **Time and randomness are injected.** Every package that waits, times
    out, retries or stamps reads the `clock` port; `time.Now()` and
    `time.After` in non-test code are defects (three remain today and are
-   findings). Randomness comes from `crypto/rand` through one function per
-   package, replaceable in tests only through a declared seam.
+   findings). Randomness comes from `crypto/rand` directly; a declared
+   seam (a function field or parameter) exists only where a test needs
+   determinism (changed at gate 1, 2026-10-20: the module reads
+   `crypto/rand` in 33 files and has seams where SPAKE2, MRP, the group
+   counters and the controller's jitter need them; one seam per package
+   bought nothing).
 5. **Every goroutine has an owner.** The owner starts it, hands it a
    context or a done channel, waits for it on stop, and stop is
    synchronous and idempotent. No goroutine outlives its owner;
@@ -85,8 +93,14 @@ hold gets the guard (principle 11).
    groups, subscriptions, settings), `endpoint.Store` (endpoint numbers)
    and the controller's client store are the three interfaces; SQLite is
    the shipped implementation, and a second implementation (phase 21)
-   proves the seam. No package opens a file or keeps state across a
-   restart by any other path.
+   proves the seam. Four file-based seams stand beside it, each behind
+   one path a host configures (named at gate 1, 2026-10-20): the OTA
+   download and applied-image directories (`node/ota.go`,
+   `cluster/core/ota_requestor_query.go`), the DCL file store
+   (`controller/dcl/store.go`), the controller's CA key file
+   (`controller/ca/keyfile`) and the attestation chain files
+   (`secure/attestation/files.go`). No package opens a file or keeps
+   state across a restart by any other path.
 8. **Errors are values with one style.** A sentinel or typed error per
    condition, its message prefixed with the package name, wrapped with
    `%w` on the way up; a wire status (an Interaction Model status code) is
@@ -135,9 +149,11 @@ audit's known questions are the edges named in the context above.
   CI test job run it without a new required check), with
   `script/archcheck/layers.json` as the rule file and an exception list
   that may only shrink.
-- The three `time.Now()` residues, the `im` import of every server, the
-  `cluster/spec` placement, `controller/client`'s imports of `device` and
-  `endpoint`, and the client stack under `controller/` are the first
-  audit's findings to judge, not pre-decided here.
+- The first audit (`notes/briefs/reports/G1.md`, 2026-10-20) judged the
+  questions above: the two remaining raw `time.Now` sites are kernel
+  socket deadlines and stay; the `im` import of every server is the
+  status vocabulary and holds; `cluster/spec` stays; the client stack
+  moves to a role-neutral `client/` tree (wave BX4); `controller/client`'s
+  imports of `device` and `endpoint` are read in that wave.
 - A principle that proves wrong is changed in this ADR with the date and
   the reason, never worked around in a wave.
