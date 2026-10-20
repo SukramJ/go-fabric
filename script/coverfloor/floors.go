@@ -185,6 +185,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
 		min: 68,
