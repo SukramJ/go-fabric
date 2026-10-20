@@ -27,6 +27,7 @@ DIRS = {
     "cluster/cover": ["windowcovering"],
     "cluster/light": ["colorcontrol"],
     "cluster/lock": ["doorlock"],
+    "contract": ["matter"],
     "cluster/spec": [],
     "cluster/thermo": ["thermostat", "temperaturecontrol"],
     "cluster/wire": ["matter"],
@@ -86,10 +87,12 @@ def main():
 
             out = CALL.sub(fix, src)
             # error texts built outside errors.New/fmt.Errorf (typed errors,
-            # im.UnsupportedCommandf, ...): only the leading `matter: ` of a
-            # string literal, which is the old package-wide prefix.
-            for old in ("matter store", "matter"):
-                if old in subs:
+            # spec.Errorf status texts, im.UnsupportedCommandf, ...): the
+            # leading `<sub-prefix>: ` of a string literal becomes the package
+            # name (owner decision: one style, the package name, not the
+            # cluster name).
+            for old in sorted(subs, key=len, reverse=True):
+                if old:
                     pat = re.compile(r'"' + re.escape(old) + r': ')
 
                     def lit(m):

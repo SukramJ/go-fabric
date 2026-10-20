@@ -123,7 +123,7 @@ func presetsValue(v any) ([]Preset, error) {
 	case []Preset:
 		return x, nil
 	}
-	return nil, spec.Errorf(im.StatusConstraintError, "thermostat: Presets value %T is not a list of PresetStruct", v)
+	return nil, spec.Errorf(im.StatusConstraintError, "thermo: Presets value %T is not a list of PresetStruct", v)
 }
 
 // handleKey is a handle's map key (matter.js Bytes.toHex).
@@ -395,7 +395,7 @@ func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) e
 // refusal, with its IM status. presets is not modified.
 func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) error {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: Presets needs the Presets feature")
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: Presets needs the Presets feature")
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -422,7 +422,7 @@ func (s *ThermostatServer) ActivePresetHandle() []byte {
 // nothing else; it is saved and announced.
 func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []byte) error {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: ActivePresetHandle needs the Presets feature")
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: ActivePresetHandle needs the Presets feature")
 	}
 	if handle != nil {
 		if _, err := s.inst.CheckValue(tdef.AttrActivePresetHandle, handle, nil); err != nil {
@@ -489,7 +489,7 @@ func presetRequest(fields any) (tdef.SetActivePresetRequestRequest, error) {
 			return *v, nil
 		}
 	}
-	return tdef.SetActivePresetRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: SetActivePresetRequest carried %T", fields)
+	return tdef.SetActivePresetRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermo: SetActivePresetRequest carried %T", fields)
 }
 
 // handleSetActivePresetRequest is matter.js setActivePresetRequest

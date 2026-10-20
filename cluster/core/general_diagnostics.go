@@ -79,6 +79,9 @@ const (
 type GeneralDiagnostics struct {
 	mu sync.RWMutex
 
+	// log is the server's logger, set by [GeneralDiagnostics.SetLogger].
+	log atomic.Pointer[slog.Logger]
+
 	clock      clock.Clock
 	startTime  time.Time
 	bootReason uint8
@@ -917,11 +920,11 @@ func (g *GeneralDiagnostics) EmitBootReason() {
 	bootReason := g.bootReason
 	g.mu.RUnlock()
 	if emitter == nil {
-		slog.Default().Warn("matter.general_diagnostics.emit_bootreason_skipped",
+		g.logger().Warn("matter.general_diagnostics.emit_bootreason_skipped",
 			slog.String("reason", "emitter nil — wiring race"))
 		return
 	}
-	slog.Default().Info("matter.general_diagnostics.emit_bootreason",
+	g.logger().Info("matter.general_diagnostics.emit_bootreason",
 		slog.Any("endpoint", endpoint), slog.Any("boot_reason", bootReason))
 	emitter.MatterEmitEvent(endpoint, gendiagClusterID, gendiagEventBootReason,
 		BootReasonEvent{BootReason: bootReason},
@@ -1056,4 +1059,16 @@ func classifyInterface(name string) uint8 {
 		return InterfaceTypeEthernet
 	}
 	return InterfaceTypeUnspecified
+}
+
+// SetLogger sets the logger the server's diagnostics go to; nil is
+// slog.Default(). It is safe to call at any time.
+func (g *GeneralDiagnostics) SetLogger(l *slog.Logger) { g.log.Store(l) }
+
+// logger is the GeneralDiagnostics's logger, slog.Default() until SetLogger gives it one.
+func (g *GeneralDiagnostics) logger() *slog.Logger {
+	if l := g.log.Load(); l != nil {
+		return l
+	}
+	return slog.Default()
 }

@@ -295,7 +295,7 @@ func (s *ControlServer) MatterInvoke(
 		return nil, s.invokeStop(ctx)
 	case closuredef.CmdCalibrate:
 		return nil, closureUnsupportedCommandErr{
-			"closurecontrol: Calibrate requires the Calibration feature, which this server does not advertise",
+			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
 		}
 	default:
 		return nil, fmt.Errorf("closure: unknown command 0x%02X", cmdID)
@@ -313,7 +313,7 @@ func (s *ControlServer) MatterInvoke(
 func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	req, err := moveToRequest(fields)
 	if errors.Is(err, wire.ErrClosureControlMalformed) {
-		return closureInvalidCommandErr{"closurecontrol: MoveTo carries none of Position, Latch and Speed"}
+		return closureInvalidCommandErr{"closure: MoveTo carries none of Position, Latch and Speed"}
 	}
 	if err != nil {
 		return err
@@ -387,11 +387,11 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 // controller was never told about.
 func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) error {
 	if !slices.ContainsFunc(closuredef.TargetPositionEnumDef.Values, func(v spec.EnumValue) bool { return v.Value == uint64(p) }) {
-		return closureConstraintErr{fmt.Sprintf("closurecontrol: MoveTo position %d is not a TargetPositionEnum value", p)}
+		return closureConstraintErr{fmt.Sprintf("closure: MoveTo position %d is not a TargetPositionEnum value", p)}
 	}
 	if !s.inst.EnumSupported(closuredef.TargetPositionEnumDef, uint64(p)) {
 		return closureConstraintErr{
-			fmt.Sprintf("closurecontrol: MoveTo position %d needs a feature this server does not advertise", p),
+			fmt.Sprintf("closure: MoveTo position %d needs a feature this server does not advertise", p),
 		}
 	}
 	return nil

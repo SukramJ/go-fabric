@@ -26,7 +26,7 @@ func (s *DoorLockServer) validateSetCredential(req lockdef.SetCredentialRequest)
 	}
 	if !req.UserIndex.Null {
 		if maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported); req.UserIndex.Value > maxUsers {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: UserIndex %d is outside 1 to %d", req.UserIndex.Value, maxUsers)
+			return spec.Errorf(im.StatusInvalidCommand, "lock: UserIndex %d is outside 1 to %d", req.UserIndex.Value, maxUsers)
 		}
 	}
 	if !req.UserStatus.Null {
@@ -251,7 +251,7 @@ func (s *DoorLockServer) clearCredentialLocked(ctx context.Context, req lockdef.
 	}
 	c := req.Credential.Value
 	if c.CredentialType == lockdef.CredentialTypeProgrammingPin {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: cannot clear the programming PIN")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: cannot clear the programming PIN")
 	}
 	if c.CredentialIndex == clearAll {
 		s.clearAllCredentialsOfTypeLocked(ctx, c.CredentialType)
@@ -259,7 +259,7 @@ func (s *DoorLockServer) clearCredentialLocked(ctx context.Context, req lockdef.
 	}
 	credType := uint8(c.CredentialType)
 	if s.findCredential(credType, c.CredentialIndex) == nil {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: credential not found")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: credential not found")
 	}
 	owner := s.ownerOf(credType, c.CredentialIndex)
 	s.removeCredentialFromUsersLocked(credType, c.CredentialIndex)
@@ -449,7 +449,7 @@ func (s *DoorLockServer) matches(c store.DoorLockCredential, data []byte) bool {
 func (s *DoorLockServer) addCredentialLocked(credType uint8, index uint16, data []byte, fabricIndex uint8) error {
 	enc, err := s.cipher.Encrypt(data)
 	if err != nil {
-		return spec.Errorf(im.StatusFailure, "doorlock: encrypt the credential: %v", err)
+		return spec.Errorf(im.StatusFailure, "lock: encrypt the credential: %v", err)
 	}
 	s.data.Credentials = append(s.data.Credentials, store.DoorLockCredential{
 		Type: credType, Index: index, Data: enc, CreatorFabricIndex: fabricIndex, LastModifiedFabricIndex: fabricIndex,
@@ -462,7 +462,7 @@ func (s *DoorLockServer) addCredentialLocked(credType uint8, index uint16, data 
 func (s *DoorLockServer) updateCredentialDataLocked(credType uint8, index uint16, data []byte, fabricIndex uint8) error {
 	enc, err := s.cipher.Encrypt(data)
 	if err != nil {
-		return spec.Errorf(im.StatusFailure, "doorlock: encrypt the credential: %v", err)
+		return spec.Errorf(im.StatusFailure, "lock: encrypt the credential: %v", err)
 	}
 	if c := s.findCredential(credType, index); c != nil {
 		c.Data, c.LastModifiedFabricIndex = enc, fabricIndex

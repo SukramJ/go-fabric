@@ -478,7 +478,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
-			return windowCoveringConstraintErr{fmt.Sprintf("windowcovering: Mode %v exceeds constraint max 15: %v", value, err)}
+			return windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
 		}
 		return err
 	}
@@ -489,7 +489,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 		mode &^= calibration
 	}
 	if mode&calibration != 0 {
-		return windowCoveringConstraintErr{"windowcovering: Mode CalibrationMode: calibration not supported"}
+		return windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -505,7 +505,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 // maintenanceErr answers a movement command in MaintenanceMode.
 type maintenanceErr struct{}
 
-func (maintenanceErr) Error() string                   { return "windowcovering: device is in maintenance mode" }
+func (maintenanceErr) Error() string                   { return "cover: device is in maintenance mode" }
 func (maintenanceErr) MatterStatusCode() im.StatusCode { return im.StatusBusy }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
@@ -548,7 +548,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		return command{stop: true}, nil
 	case wire.WindowCoveringCmdGoToLiftPercentage:
 		if s.lift == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "windowcovering: GoToLiftPercentage without the Lift feature")
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToLiftPercentage")
 		if err != nil {
@@ -557,7 +557,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		return command{lift: &pct}, nil
 	case wire.WindowCoveringCmdGoToTiltPercentage:
 		if s.tilt == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "windowcovering: GoToTiltPercentage without the Tilt feature")
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToTiltPercentage")
 		if err != nil {
@@ -669,7 +669,7 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 	if errors.As(err, &sc) {
 		return err
 	}
-	return spec.Errorf(im.StatusFailure, "windowcovering: command 0x%02X refused: %v", cmdID, err)
+	return spec.Errorf(im.StatusFailure, "cover: command 0x%02X refused: %v", cmdID, err)
 }
 
 // SetCurrentPosition records the positions the device reports: lift is
@@ -920,7 +920,7 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 	}
 	// Constraint max 10000 per matter.js window-covering-cluster.element.ts:72, :76.
 	if pct > 10000 {
-		return 0, windowCoveringConstraintErr{fmt.Sprintf("windowcovering: %s value %d exceeds constraint max 10000", cmd, pct)}
+		return 0, windowCoveringConstraintErr{fmt.Sprintf("cover: %s value %d exceeds constraint max 10000", cmd, pct)}
 	}
 	return pct, nil
 }

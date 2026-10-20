@@ -241,7 +241,7 @@ func atomicRequest(fields any) (tdef.AtomicRequestRequest, error) {
 			return *v, nil
 		}
 	}
-	return tdef.AtomicRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: AtomicRequest carried %T", fields)
+	return tdef.AtomicRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermo: AtomicRequest carried %T", fields)
 }
 
 // handleAtomicRequest is matter.js ThermostatBaseServer.atomicRequest
@@ -263,7 +263,7 @@ func (s *ThermostatServer) handleAtomicRequest(ctx context.Context, fields any) 
 		// matter.js's request schema refuses a value outside
 		// RequestTypeEnum before the handler runs (a ValidationError,
 		// ConstraintError).
-		return nil, spec.Errorf(im.StatusConstraintError, "thermostat: AtomicRequest RequestType %d is not a RequestTypeEnum value", req.RequestType)
+		return nil, spec.Errorf(im.StatusConstraintError, "thermo: AtomicRequest RequestType %d is not a RequestTypeEnum value", req.RequestType)
 	}
 }
 
@@ -289,18 +289,18 @@ func (s *ThermostatServer) validateAtomicRequest(ctx context.Context, req tdef.A
 	// an operational session.
 	peer, ok := atomicPeerOf(ctx)
 	if !ok || peer.fabricIndex == 0 {
-		return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: AtomicRequest requires an operational session")
+		return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermo: AtomicRequest requires an operational session")
 	}
 	if len(req.AttributeRequests) == 0 {
-		return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: no attribute requests provided")
+		return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermo: no attribute requests provided")
 	}
 	seen := map[uint32]bool{}
 	for _, attr := range req.AttributeRequests {
 		if !s.atomicSupported(attr) {
-			return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: attribute 0x%04X not supported by cluster", attr)
+			return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermo: attribute 0x%04X not supported by cluster", attr)
 		}
 		if seen[attr] {
-			return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: duplicate attribute in attribute requests")
+			return atomicPeer{}, spec.Errorf(im.StatusInvalidCommand, "thermo: duplicate attribute in attribute requests")
 		}
 		seen[attr] = true
 	}
@@ -317,14 +317,14 @@ func (s *ThermostatServer) existingAtomicState(ctx context.Context, req tdef.Ato
 	}
 	st := s.atomic.forPeer(s.clk.Now(), peer)
 	if st == nil {
-		return nil, spec.Errorf(im.StatusInvalidInState, "thermostat: no atomic write in progress for this peer")
+		return nil, spec.Errorf(im.StatusInvalidInState, "thermo: no atomic write in progress for this peer")
 	}
 	if len(st.attrs) != len(req.AttributeRequests) {
-		return nil, spec.Errorf(im.StatusInvalidInState, "thermostat: attribute requests do not match existing atomic write")
+		return nil, spec.Errorf(im.StatusInvalidInState, "thermo: attribute requests do not match existing atomic write")
 	}
 	for _, attr := range st.attrs {
 		if !slices.Contains(req.AttributeRequests, attr) {
-			return nil, spec.Errorf(im.StatusInvalidInState, "thermostat: attribute requests do not match existing atomic write")
+			return nil, spec.Errorf(im.StatusInvalidInState, "thermo: attribute requests do not match existing atomic write")
 		}
 	}
 	return st, nil
@@ -341,10 +341,10 @@ func (s *ThermostatServer) beginWrite(ctx context.Context, req tdef.AtomicReques
 	// §7.15.6.4.1 step 1: a peer holding an atomic write on the cluster and
 	// endpoint is refused at command level (:170-176).
 	if s.atomic.forPeer(now, peer) != nil {
-		return nil, spec.Errorf(im.StatusInvalidInState, "thermostat: an atomic write is already in progress for this peer on this cluster and endpoint")
+		return nil, spec.Errorf(im.StatusInvalidInState, "thermo: an atomic write is already in progress for this peer on this cluster and endpoint")
 	}
 	if req.Timeout == nil {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "thermostat: timeout missing for BeginWrite request")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "thermo: timeout missing for BeginWrite request")
 	}
 
 	// The location of the access check: the endpoint the command runs at
@@ -457,14 +457,14 @@ func (s *ThermostatServer) writeAtomicAttribute(ctx context.Context, attrID uint
 	now := s.clk.Now()
 	st := s.atomic.forAttribute(now, attrID)
 	if st == nil {
-		return spec.Errorf(im.StatusInvalidInState, "thermostat: there is no atomic write in progress for this attribute")
+		return spec.Errorf(im.StatusInvalidInState, "thermo: there is no atomic write in progress for this attribute")
 	}
 	peer, ok := atomicPeerOf(ctx)
 	if !ok {
-		return spec.Errorf(im.StatusInvalidInState, "thermostat: there is no atomic write in progress for this peer")
+		return spec.Errorf(im.StatusInvalidInState, "thermo: there is no atomic write in progress for this peer")
 	}
 	if st.peer != peer {
-		return spec.Errorf(im.StatusBusy, "thermostat: attribute is part of an atomic write in progress for a different peer")
+		return spec.Errorf(im.StatusBusy, "thermo: attribute is part of an atomic write in progress for a different peer")
 	}
 	if err := validate(v); err != nil {
 		return err

@@ -205,10 +205,10 @@ func (s *TemperatureControlServer) checkConfig() error {
 func (s *TemperatureControlServer) checkTarget(t int16) error {
 	c := s.cfg
 	if t < c.MinTemperature || t > c.MaxTemperature {
-		return constraintError(fmt.Sprintf("temperaturecontrol: TargetTemperature %d outside %d..%d", t, c.MinTemperature, c.MaxTemperature))
+		return constraintError(fmt.Sprintf("thermo: TargetTemperature %d outside %d..%d", t, c.MinTemperature, c.MaxTemperature))
 	}
 	if s.Serves(tc.AttrStep) && (int32(t)-int32(c.MinTemperature))%int32(c.Step) != 0 {
-		return constraintError(fmt.Sprintf("temperaturecontrol: TargetTemperature %d not on a step of %d from %d", t, c.Step, c.MinTemperature))
+		return constraintError(fmt.Sprintf("thermo: TargetTemperature %d not on a step of %d from %d", t, c.Step, c.MinTemperature))
 	}
 	return nil
 }
@@ -218,7 +218,7 @@ func (s *TemperatureControlServer) checkTarget(t int16) error {
 func (s *TemperatureControlServer) checkLevel(l uint8) error {
 	limit := s.Definition().Attribute(tc.AttrSelectedTemperatureLevel).Constraint.Max.Int
 	if int(l) >= len(s.cfg.SupportedTemperatureLevels) || int64(l) > limit {
-		return constraintError(fmt.Sprintf("temperaturecontrol: TargetTemperatureLevel %d, %d levels supported", l, len(s.cfg.SupportedTemperatureLevels)))
+		return constraintError(fmt.Sprintf("thermo: TargetTemperatureLevel %d, %d levels supported", l, len(s.cfg.SupportedTemperatureLevels)))
 	}
 	return nil
 }
@@ -271,11 +271,11 @@ func (s *TemperatureControlServer) MatterWrite(_ context.Context, attrID uint32,
 // the requested one. The command answers with a status only.
 func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("temperaturecontrol: command 0x%02X is not supported", cmdID)
+		return nil, im.UnsupportedCommandf("thermo: command 0x%02X is not supported", cmdID)
 	}
 	req, ok := fields.(tc.SetTemperatureRequest)
 	if !ok {
-		return nil, invalidCommand(fmt.Sprintf("temperaturecontrol: SetTemperature fields %T", fields))
+		return nil, invalidCommand(fmt.Sprintf("thermo: SetTemperature fields %T", fields))
 	}
 	number := s.HasFeature("TN")
 	// Only the own feature's field is read; the other is ignored, as chip's
@@ -289,9 +289,9 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 	// A missing field of the own feature: INVALID_COMMAND, as chip
 	// answers it (TemperatureControlCluster.cpp:176, :196).
 	case number && req.TargetTemperature == nil:
-		return nil, invalidCommand("temperaturecontrol: TargetTemperature missing")
+		return nil, invalidCommand("thermo: TargetTemperature missing")
 	case !number && req.TargetTemperatureLevel == nil:
-		return nil, invalidCommand("temperaturecontrol: TargetTemperatureLevel missing")
+		return nil, invalidCommand("thermo: TargetTemperatureLevel missing")
 	}
 	var err error
 	if number {
@@ -306,7 +306,7 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 		if errors.Is(err, ErrTemperatureRefused) {
 			// INVALID_IN_STATE, as chip answers a change the device
 			// cannot accept (TemperatureControlCluster.cpp:191, :215).
-			return nil, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("temperaturecontrol: SetTemperature: %v", err)}
+			return nil, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("thermo: SetTemperature: %v", err)}
 		}
 		return nil, fmt.Errorf("thermo: SetTemperature: %w", err)
 	}
