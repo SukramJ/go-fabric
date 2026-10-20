@@ -208,3 +208,12 @@ their line numbers moved. `make race` was not run: no shared write beyond constr
   `general_commissioning.go`, `secure/sigma/initiator.go`) and the 22 others listed in section 3 (more than seven guarded fields, irregular or missing Lock sites).
 - `core.BridgedConfig.Logger` has no caller that sets it from the node (no logger in reach in `endpoint.ClusterServers`).
 - The `OTA*` and `DeviceTypeValidation*` constants next to the new aliases are not re-exported.
+
+## Flakes seen during the guard runs (not from this branch)
+
+- `controller/client` `TestRegistryDecommission` (`registry_test.go:328`, "stored [peer1]") fails within `-count=40` on `main` as well
+  (checked on an extract of `origin/main`); `controller/client` has only mutex comments in this PR. Once it failed `make ci`'s
+  `cover-check`.
+- One `make ci` run hit the 10 min test timeout in `controller/client` (`TestClientConnectivityParity/…` stuck 8+ minutes) under
+  load; the package passes alone in 111 s and in the next runs. A cold golangci-lint cache exceeded its 5 min timeout once.
+- Earlier: `node` `TestOtaParityMatterJS/reports_the_update_applied_once_restarted…` (timing) once.
