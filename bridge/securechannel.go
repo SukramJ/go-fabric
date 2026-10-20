@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net"
@@ -1084,8 +1083,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 		b.logger.Debug("matter.rx.sc.status_report",
 			slog.String("src", srcString(src)),
 			slog.Int("session_id", int(requestHdr.SessionID)),
-			slog.Int("payload_bytes", len(payload)),
-			slog.String("hex", hex.EncodeToString(payload)))
+			slog.Int("payload_bytes", len(payload)))
 		return nil
 	}
 	// Deferred: the route goes after the session, and with the session's

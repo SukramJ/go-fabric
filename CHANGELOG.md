@@ -36,6 +36,10 @@ pseudo-version of `main`.
 - Store and network I/O no longer runs under a lock that readers take: the `groups` manager reads and writes its store under a store queue of its own, so the group receive path and the IPK lookups never wait for SQLite; the event log persists its counter ceiling outside its lock; the reliable-send tracker retransmits outside its lock and does not resend an entry acknowledged meanwhile; `bdx.FileSink.Written` no longer waits for a write (G1-16).
 - Tests that bounded event-driven waits with wall time a loaded machine could outrun (`TestStartReaper_*` now on a fake clock, `TestDiagLogsBDX_Transfer`, `TestRegistryDecommission`, `TestLiveSustainedSurvivesRestart`, `TestNetworkLossAndDelay`) (G1-19).
 
+### Removed
+
+- `bridge`: the debug log `matter.rx.sc.status_report` (an unexpected or unsecured Secure Channel StatusReport) no longer carries the whole payload as hex; source, session id and payload length stay (G1-17).
+
 ## [0.9.1] — 2026-10-20
 
 Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the reference consumer reaches below `node/` has a facade route or is a documented advanced seam (`docs/guides/advanced-seams.md`). With it the archcheck guard (brief BW, pull request 196: the layers of ADR 0026 and their direction as a test in `make ci`) and the two architecture decision records of 2026-10-20, [ADR 0025](./docs/adr/0025-facade-design-principles.md) (the facade's design principles) and [ADR 0026](./docs/adr/0026-architecture-principles.md) (the module's architecture principles).
