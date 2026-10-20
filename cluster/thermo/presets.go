@@ -473,7 +473,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	presets := s.presets
 	s.mu.Unlock()
 	if err := s.savePresets(ctx, presets, nil); err != nil {
-		slog.Default().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
+		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.Notify(tdef.AttrActivePresetHandle)
 }
@@ -528,7 +528,7 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 	if !req.PresetHandle.Null {
 		handle = bytes.Clone(req.PresetHandle.Value)
 	}
-	slog.Default().Info("matter.thermostat.active_preset", slog.String("preset_handle", handleKey(handle)))
+	s.logger().Info("matter.thermostat.active_preset", slog.String("preset_handle", handleKey(handle)))
 
 	if preset != nil {
 		next := st
@@ -607,7 +607,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 	if active != nil && !slices.ContainsFunc(presets, func(p Preset) bool {
 		return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, active)
 	}) {
-		slog.Default().Warn("matter.thermostat.active_preset_cleared",
+		s.logger().Warn("matter.thermostat.active_preset_cleared",
 			slog.String("active_preset_handle", handleKey(active)), slog.String("reason", "matches no preset, reporting no active preset"))
 		active, cleared = nil, true
 	}

@@ -4,6 +4,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -39,6 +40,9 @@ import (
 //     topology).
 type BasicInformation struct {
 	mu sync.RWMutex
+
+	// log is the cluster's logger ([Config.Logger]; slog.Default() when nil).
+	log *slog.Logger
 
 	// def is the generated definition bound to the optional attributes
 	// this instance serves (see instanceOptions).
@@ -217,6 +221,8 @@ type Config struct {
 	CapabilityMinima     CapabilityMinimaStruct
 	ConfigurationVersion uint32
 	MaxPathsPerInvoke    uint16
+	// Logger receives the cluster's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // NewBasicInformation constructs the cluster from cfg. Returns an
@@ -318,6 +324,7 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		swStr = strconv.FormatUint(uint64(swVersion), 10)
 	}
 	bi := &BasicInformation{
+		log:                  cmp.Or(cfg.Logger, slog.Default()),
 		dataModelRevision:    dmr,
 		vendorName:           cfg.VendorName,
 		vendorID:             cfg.VendorID,
@@ -341,7 +348,7 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		configurationVersion: cfgVer,
 		maxPathsPerInvoke:    maxPaths,
 	}
-	validateBasicInfoAttributes(cfg)
+	validateBasicInfoAttributes(cfg, bi.log)
 	bi.def = mustInstance(bidef.Definition, bi.instanceOptions())
 	return bi, nil
 }
@@ -458,29 +465,29 @@ func SoftwareVersionFromString(version string) uint32 {
 // configurations caught at construction time. All checks are defensive and
 // advisory — none block construction, and each has a printable fallback, so
 // they log at debug rather than warn to avoid operational noise.
-func validateBasicInfoAttributes(cfg Config) {
+func validateBasicInfoAttributes(cfg Config, log *slog.Logger) {
 	if cfg.UniqueID != "" && cfg.UniqueID == cfg.SerialNumber {
-		slog.Default().Debug("matter.basic_information.validate",
+		log.Debug("matter.basic_information.validate",
 			slog.String("field", "UniqueID/SerialNumber"),
 			slog.String("reason", "pinned UniqueID equals SerialNumber — controller caches key on the pair, so they should differ"))
 	}
 	if cfg.SerialNumber != "" && cfg.SerialNumber == fmt.Sprintf("%04X-%04X", cfg.VendorID, cfg.ProductID) {
-		slog.Default().Debug("matter.basic_information.validate",
+		log.Debug("matter.basic_information.validate",
 			slog.String("field", "UniqueID/SerialNumber"),
 			slog.String("reason", "UniqueID and SerialNumber are identical — they should differ for controller caches"))
 	}
 	if strings.TrimSpace(cfg.VendorName) == "" {
-		slog.Default().Debug("matter.basic_information.validate",
+		log.Debug("matter.basic_information.validate",
 			slog.String("field", "VendorName"),
 			slog.String("reason", "VendorName is empty — controllers may display an unknown vendor"))
 	}
 	if strings.TrimSpace(cfg.ProductName) == "" {
-		slog.Default().Debug("matter.basic_information.validate",
+		log.Debug("matter.basic_information.validate",
 			slog.String("field", "ProductName"),
 			slog.String("reason", "ProductName is empty — controllers may display an unknown product"))
 	}
 	if cfg.HardwareVersionStr == "" {
-		slog.Default().Debug("matter.basic_information.validate",
+		log.Debug("matter.basic_information.validate",
 			slog.String("field", "HardwareVersionStr"),
 			slog.String("reason", "HardwareVersionStr is empty — a fallback will be generated but callers should supply a real version string"))
 	}
@@ -971,11 +978,11 @@ func (b *BasicInformation) EmitStartUp() {
 	swVersion := b.softwareVersion
 	b.mu.RUnlock()
 	if emitter == nil {
-		slog.Default().Warn("matter.basic_information.emit_startup_skipped",
+		b.logger().Warn("matter.basic_information.emit_startup_skipped",
 			slog.String("reason", "emitter nil — wiring race"))
 		return
 	}
-	slog.Default().Info("matter.basic_information.emit_startup",
+	b.logger().Info("matter.basic_information.emit_startup",
 		slog.Any("endpoint", endpoint), slog.Any("sw_version", swVersion))
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventStartUp,
 		StartUpEvent{SoftwareVersion: swVersion},
@@ -1065,4 +1072,13 @@ func (b *BasicInformation) RestoreConfigurationVersion(v uint32) {
 		b.configurationVersion = v
 		b.dataVersion.Bump()
 	}
+}
+
+// logger is the BasicInformation's logger; a value built without its constructor
+// logs through slog.Default().
+func (b *BasicInformation) logger() *slog.Logger {
+	if b.log != nil {
+		return b.log
+	}
+	return slog.Default()
 }

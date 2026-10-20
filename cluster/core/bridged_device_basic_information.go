@@ -4,6 +4,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -30,6 +31,8 @@ import (
 //   - Reachable is mutable based on bridged-device availability.
 //   - UniqueID is mandatory (vs. optional on BasicInformation).
 type BridgedDeviceBasicInformation struct {
+	// log is the cluster's logger ([BridgedConfig.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// def is the generated definition bound to the optional attributes
 	// this instance serves (see instanceOptions).
 	def           *spec.Instance
@@ -162,6 +165,8 @@ type BridgedConfig struct {
 	// writes, after validation — where the owner of the endpoint keeps it
 	// (a server rebuilt per dispatch cannot keep it itself).
 	OnNodeLabelWrite func(label string)
+	// Logger receives the cluster's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // NewBridgedDeviceBasicInformation constructs the cluster from cfg.
@@ -200,6 +205,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 	// state field initialised from the caller-supplied value.
 	reachable := cfg.Reachable
 	b := &BridgedDeviceBasicInformation{
+		log:               cmp.Or(cfg.Logger, slog.Default()),
 		vendorName:        cfg.VendorName,
 		vendorID:          cfg.VendorID,
 		productName:       cfg.ProductName,
@@ -220,7 +226,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
 		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
-	validateBridgedBasicInfoAttributes(cfg, serialNumber)
+	validateBridgedBasicInfoAttributes(cfg, serialNumber, b.log)
 	b.def = mustInstance(bdbidef.Definition, b.instanceOptions())
 	return b, nil
 }
@@ -272,7 +278,7 @@ func (b *BridgedDeviceBasicInformation) inst() *spec.Instance {
 // validateBridgedBasicInfoAttributes emits slog warnings for suspicious
 // BridgedConfig values caught at construction time. All checks are
 // defensive diagnostics; none block construction.
-func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string) {
+func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string, log *slog.Logger) {
 	// When SerialNumber was not set by the caller it is backfilled from
 	// UniqueID (see constructor). Warn when the two fields collide so
 	// operators can identify over-reused identifiers in multi-device setups.
@@ -280,7 +286,7 @@ func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string
 	// (cfg.SerialNumber != "") and it happens to equal UniqueID — the
 	// intentional backfill path (cfg.SerialNumber == "") is silent.
 	if cfg.SerialNumber != "" && resolvedSerial == cfg.UniqueID {
-		slog.Default().Warn(
+		log.Warn(
 			"matter.bridged_device_basic_information.validate",
 			slog.String("field", "SerialNumber"),
 			slog.String("reason", "SerialNumber equals UniqueID — they should differ for controller caches"),
@@ -293,7 +299,7 @@ func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string
 	// rather than block — bridged metadata is advisory, not a commissioned
 	// identity.
 	if cfg.VendorID != 0 && cfg.VendorID > 0xFFF4 {
-		slog.Default().Warn(
+		log.Warn(
 			"matter.bridged_device_basic_information.validate",
 			slog.String("field", "VendorID"),
 			slog.String("reason", "VendorID outside 0x0001-0xFFF4 is not a valid device identity"),
@@ -556,3 +562,12 @@ func (b *BridgedDeviceBasicInformation) SetEndpoint(endpoint uint16) {
 // as GenericSwitch, so the bridge's SetMatterEventEmitter loop in
 // bridge.go (the topology-assembly walk) auto-injects the emitter.
 var _ contract.EventReceiver = (*BridgedDeviceBasicInformation)(nil)
+
+// logger is the BridgedDeviceBasicInformation's logger; a value built without its constructor
+// logs through slog.Default().
+func (b *BridgedDeviceBasicInformation) logger() *slog.Logger {
+	if b.log != nil {
+		return b.log
+	}
+	return slog.Default()
+}

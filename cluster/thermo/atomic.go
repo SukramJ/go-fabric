@@ -189,13 +189,13 @@ func (w *atomicWrites) forAttribute(now time.Time, attrID uint32) *atomicWriteSt
 
 // closeFabric closes the states of fabricIndex's peers — matter.js
 // #handleFabricRemoval (AtomicWriteHandler.ts:378-388).
-func (w *atomicWrites) closeFabric(fabricIndex uint8) {
+func (w *atomicWrites) closeFabric(fabricIndex uint8, log *slog.Logger) {
 	w.mu.Lock()
 	all := slices.Clone(w.states)
 	w.mu.Unlock()
 	for _, s := range all {
 		if s.peer.fabricIndex == fabricIndex {
-			slog.Default().Debug("matter.thermostat.atomic_write_closed",
+			log.Debug("matter.thermostat.atomic_write_closed",
 				slog.Int("fabric_index", int(fabricIndex)), slog.Uint64("node_id", s.peer.nodeID),
 				slog.String("reason", "fabric removed"))
 			s.close()
@@ -416,7 +416,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		if v, ok := st.staged(attr); ok && attr == tdef.AttrPresets {
 			staged, _ := v.([]Preset) // writePresets stages a []Preset
 			if err := s.commitPresets(ctx, staged); err != nil {
-				status = tdef.Status(statusOf(err, "committing attribute Presets"))
+				status = tdef.Status(statusOf(err, "committing attribute Presets", s.logger()))
 			}
 		}
 		if status != tdef.StatusSuccess {
@@ -434,12 +434,12 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // statusOf is the status an attribute reports for an error raised while
 // committing it — matter.js #statusOf (AtomicWriteHandler.ts:345-353): a
 // refusal carrying a Matter status reports it, any other error FAILURE.
-func statusOf(err error, step string) im.StatusCode {
+func statusOf(err error, step string, log *slog.Logger) im.StatusCode {
 	if sc, ok := asStatus(err); ok {
-		slog.Default().Debug("matter.thermostat.atomic_commit_failed", slog.String("step", step), slog.String("reason", err.Error()))
+		log.Debug("matter.thermostat.atomic_commit_failed", slog.String("step", step), slog.String("reason", err.Error()))
 		return sc
 	}
-	slog.Default().Warn("matter.thermostat.atomic_commit_failed", slog.String("step", step), slog.String("reason", err.Error()))
+	log.Warn("matter.thermostat.atomic_commit_failed", slog.String("step", step), slog.String("reason", err.Error()))
 	return im.StatusFailure
 }
 
@@ -491,4 +491,6 @@ func (s *ThermostatServer) pendingAtomicValue(ctx context.Context, attrID uint32
 // matter.js AtomicWriteHandler observes FabricManager.events.deleting
 // (AtomicWriteHandler.ts:75, :378-388). The bridge calls it for every
 // cluster server of a device endpoint when a fabric is removed.
-func (s *ThermostatServer) MatterFabricRemoved(fabricIndex uint8) { s.atomic.closeFabric(fabricIndex) }
+func (s *ThermostatServer) MatterFabricRemoved(fabricIndex uint8) {
+	s.atomic.closeFabric(fabricIndex, s.logger())
+}

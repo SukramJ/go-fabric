@@ -26,6 +26,7 @@
 package cover
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -166,6 +167,8 @@ type Config struct {
 	// Clock paces a travelling movement's steps (MoveStep); nil is
 	// [clock.System].
 	Clock clock.Clock
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // moveSteps is the number of steps a travelling movement takes
@@ -181,6 +184,8 @@ const moveSteps = 6
 // cluster without a device behind it. With a Mover the commands reach the
 // device.
 type WindowCoveringServer struct {
+	// log is the server's logger ([Config.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// op serialises the commands while a Mover runs, so a command
 	// restoring its target never races another; mu guards the values and
 	// is not held while the Mover runs.
@@ -317,6 +322,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		}
 	}
 	s := &WindowCoveringServer{
+		log:            cmp.Or(cfg.Logger, slog.Default()),
 		inst:           inst,
 		features:       features,
 		wcType:         cfg.Type,
@@ -718,7 +724,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 		}
 		v := *in.v
 		if v > 10000 {
-			slog.Default().Warn(clampMsg, slog.Int("value", int(v)), slog.Int("stored", 10000))
+			s.logger().Warn(clampMsg, slog.Int("value", int(v)), slog.Int("stored", 10000))
 			v = 10000
 		}
 		if changed, attrs := store(in.a, v); changed {
@@ -738,7 +744,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 	if status > 63 {
-		slog.Default().Warn("matter.windowcovering.inbound_operational_status_masked",
+		s.logger().Warn("matter.windowcovering.inbound_operational_status_masked",
 			slog.Int("value", int(status)), slog.Int("stored", int(status&63)))
 		status &= 63
 	}
@@ -917,4 +923,13 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 		return 0, windowCoveringConstraintErr{fmt.Sprintf("windowcovering: %s value %d exceeds constraint max 10000", cmd, pct)}
 	}
 	return pct, nil
+}
+
+// logger is the WindowCoveringServer's logger; a value built without its constructor
+// logs through slog.Default().
+func (s *WindowCoveringServer) logger() *slog.Logger {
+	if s.log != nil {
+		return s.log
+	}
+	return slog.Default()
 }
