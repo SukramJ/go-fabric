@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 72 |
-| partial | 113 |
+| ported | 73 |
+| partial | 112 |
 | planned | 52 |
 | excluded | 87 |
 | total | 324 |
@@ -39,7 +39,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/system/subscriptions](#nodetestbehaviorsystemsubscriptions) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/access-control](#nodetestbehaviorsaccess-control) | 2 | 0 | 1 | 1 | 0 |
 | [node/test/behaviors/basic-information](#nodetestbehaviorsbasic-information) | 3 | 2 | 1 | 0 | 0 |
-| [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 1 | 2 | 0 | 0 |
+| [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
@@ -274,7 +274,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BindingIntegrationTest.ts | 857 | partial | `node:TestLiveBinding`<br>`binding:TestDormantThenWoken`<br>`node:TestBindingIntegrationParityMatterJS`<br>`node:TestBindingIntegrationGroupSendsParityMatterJS` | The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). Missing: the default subscription of a bound client (a Register candidate): the subscription the host sets on the bound ClientNode (NetworkClient defaultSubscription, autoSubscribe) has its Go counterpart in Resolution.Interaction.Subscribe with Sustain (controller/interaction/sustained.go), but fabrictest carries no node client stack — node/client.go opens a kernel socket and its own DNS-SD cache — so two nodes cannot reach each other over CASE on a site. Missing: “receives reports without data of the peer's root endpoint”; “detects a lost peer by the subscription timeout and resubscribes once it is back”; “detects a restarting peer by the subscription timeout and resubscribes after its restart”. |
+| BindingIntegrationTest.ts | 857 | ported | `node:TestLiveBinding`<br>`binding:TestDormantThenWoken`<br>`node:TestBindingIntegrationParityMatterJS`<br>`node:TestBindingIntegrationGroupSendsParityMatterJS`<br>`node:TestBindingDefaultSubscriptionParityMatterJS` | The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). The default subscription of a bound client runs on two fabrictest devices of one fabric, the switch's node client stack on the site: the subscription NetworkClient sets on the bound ClientNode (defaultSubscription, autoSubscribe, a SustainedSubscription) is Resolution.Interaction.Subscribe with Sustain at the WiFi ceiling the ClientNode asks (PhysicalDeviceProperties.ts:24); the isolation is Network.Filter, the restart Device.Stop and Start. |
 | BindingManagerTest.ts | 1375 | partial | `binding:TestDropReasons`<br>`binding:TestDormantThenWoken`<br>`binding:TestParkedAgainWithoutObserver`<br>`binding:TestClientEstablishedOnSession`<br>`binding:TestUnregister`<br>`binding:TestGroupWaitsForKey`<br>`binding:TestAttachDetachClose`<br>`binding:TestBindingManagerParityMatterJS`<br>`binding:TestBindingManagerClientSelectionParityMatterJS`<br>`binding:TestBindingManagerWithoutObserverParityMatterJS`<br>`node:TestBindingManagerNodeParityMatterJS` | The manager's cases run on its unit harness (binding/manager_parity_matterjs_test.go: client selection, dormant entries, the group-key rules, an unregister while the group resolves — a fix) and on a commissioned fabrictest node (node/binding_manager_parity_matterjs_test.go: the register queue before online, two servers sharing one group sender, a client-only cluster, the fabric replaced by UpdateNOC). Missing: js-runtime-only: Environment.get installs the manager; manager.close() alone emits no removed, while the Go Manager.Close is the node's shutdown and disposes every server first (BindingServer.ts:160-163), emitting removed (a by_design candidate); js-runtime-only: the per-fabric observer of the fabric's group key maps, which the Go manager does not hold — the node pushes GroupKeysChanged (node/client.go). Missing: “lazy-installs into node.env on first get”; “close clears queue, pending subscriptions, and maps without emitting”; “stops watching a fabric's group keys once the fabric is deleted”. |
 | BindingServerTest.ts | 223 | ported | `binding:TestAttachDetachClose`<br>`binding:TestDormantThenWoken`<br>`cluster/core:TestBindingPersist`<br>`cluster/core:TestBindingServerParityMatterJS` | Replay, write diff, close and the dormant-until-observed entry are covered; a stored entry for an observer that attaches after the entries registered resolves once it does (cluster/core/binding_parity_matterjs_test.go). |
 

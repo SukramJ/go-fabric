@@ -188,6 +188,8 @@ type bqOptions struct {
 	clients []uint32
 	// prepare, when set, runs with the node before every start.
 	prepare func(n *node.Node)
+	// client runs the node's client stack on the site (node.Client).
+	client bool
 }
 
 func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
@@ -208,9 +210,12 @@ func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 		bridged = append(bridged, sw)
 	}
 	b.pair = b.site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
-		Bridged:   bridged,
-		Configure: func(cfg *node.Config) { cfg.Logger = slog.New(&bqHandler{log: b.log}) },
-		Prepare:   o.prepare,
+		Bridged: bridged,
+		Configure: func(cfg *node.Config) {
+			cfg.Logger = slog.New(&bqHandler{log: b.log})
+			cfg.Client.Enabled = o.client
+		},
+		Prepare: o.prepare,
 	}})
 	b.dev = b.pair.Device
 	for i := range o.switches {

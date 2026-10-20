@@ -621,19 +621,15 @@
     },
     {
       "path": "packages/node/test/behaviors/binding/BindingIntegrationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "node:TestLiveBinding",
         "binding:TestDormantThenWoken",
         "node:TestBindingIntegrationParityMatterJS",
-        "node:TestBindingIntegrationGroupSendsParityMatterJS"
+        "node:TestBindingIntegrationGroupSendsParityMatterJS",
+        "node:TestBindingDefaultSubscriptionParityMatterJS"
       ],
-      "missing": [
-        "receives reports without data of the peer's root endpoint",
-        "detects a lost peer by the subscription timeout and resubscribes once it is back",
-        "detects a restarting peer by the subscription timeout and resubscribes after its restart"
-      ],
-      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). Missing: the default subscription of a bound client (a Register candidate): the subscription the host sets on the bound ClientNode (NetworkClient defaultSubscription, autoSubscribe) has its Go counterpart in Resolution.Interaction.Subscribe with Sustain (controller/interaction/sustained.go), but fabrictest carries no node client stack — node/client.go opens a kernel socket and its own DNS-SD cache — so two nodes cannot reach each other over CASE on a site.",
+      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). The default subscription of a bound client runs on two fabrictest devices of one fabric, the switch's node client stack on the site: the subscription NetworkClient sets on the bound ClientNode (defaultSubscription, autoSubscribe, a SustainedSubscription) is Resolution.Interaction.Subscribe with Sustain at the WiFi ceiling the ClientNode asks (PhysicalDeviceProperties.ts:24); the isolation is Network.Filter, the restart Device.Stop and Start.",
       "snapshotSha": "12d2db88432bfd7bab871aae408d06551a7cfa24"
     },
     {
