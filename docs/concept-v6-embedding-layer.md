@@ -345,3 +345,27 @@ Meilenstein 4 mit Phase 22.
   Meilenstein 4, nicht ein „Done when" von Phase 20 allein.
 - **Sicherheitspfade.** `AccessControlCustomExtensionTest.ts` und die
   ACL-Anwendung in einem Schritt bleiben mein Lesen (Phase 21 oder später).
+
+## Ergänzungen (Owner, 2026-10-20, nach dem Review des Konzepts)
+
+- **Grundsatz.** Die Facade ist der Blick des Entwicklers auf go-fabric;
+  alles dahinter muss funktionieren, die Facade ist die Darstellung nach
+  außen. Bequemlichkeit ist kein Maßstab, innen wie außen. Ausformuliert
+  in [ADR 0025](./adr/0025-facade-design-principles.md) (zwölf Prinzipien;
+  Entscheidungen: Callbacks inline mit asynchroner Option, Seams unter
+  demselben Fenster, Spec-Vokabular, beide Rollen).
+- **BT erweitert (während der Welle):** die Hülle über jeden
+  `contract.ClusterServer` (Set über ein optionales Interface), jeder
+  Accessor liefert die Hülle, typisierte `Emit<Event>`.
+- **BS erweitert:** `docs/guides/migrating-to-the-facade.md`, Symbol →
+  Route, loom `v0.6.0` als Beispiel.
+- **BU zusätzlich:** die Deklaration als Daten (`device.FromSpec`), der
+  Lebenszyklus (`SetReachable`, `Rename`, `Replace`), die Callback-Regel
+  mit `…Async`-Variante, die Seite „Die Sicht des Hosts“ (eine Bridge in
+  rund 60 Zeilen).
+- **BV zusätzlich:** typisierte Controller-Reads in `fabrictest` auf
+  denselben generierten Typen (`site.Controller().Read(dev).<Cluster>()`).
+- **Zwei Architektur-Tore** (ADR 0025): nach dem Merge von BS und BT, vor
+  BU — Report mit einem Abschnitt je Prinzip, ein unvoreingenommener
+  Leser als Konsument; Befunde als eigene Welle vor BU; das zweite Tor
+  vor `v0.10.0` über die ganze Facade einschließlich `controller/`.
