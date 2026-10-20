@@ -333,9 +333,14 @@ type BasicInformation struct {
 // Store names the node's persistence. With DB the node applies both
 // schemas (store.Apply, sqlitestore.Apply) and opens the two stores on it,
 // as the daemon's openDB does (persist.go:45-60); the caller picks the
-// SQLite driver and owns the handle. Credentials and Endpoints override
-// the stores built from DB, or stand in for it when DB is nil.
+// SQLite driver and owns the handle. With Path the node opens that SQLite
+// file itself and treats it as DB. Credentials and Endpoints override the
+// stores built from DB or Path, or stand in for them when both are unset.
 type Store struct {
+	// Path is a SQLite file the node opens (creating it on first use)
+	// with the pure-Go driver modernc.org/sqlite, foreign keys on and a
+	// 5 s busy timeout; [Node.Stop] closes it. It excludes DB.
+	Path        string
 	DB          *sql.DB
 	Credentials *store.Store
 	Endpoints   endpoint.Store
@@ -412,8 +417,11 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
 		errs = append(errs, errors.New("BasicInformation.NodeLabel must be non-empty"))
 	}
-	if c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil) {
-		errs = append(errs, errors.New("Store needs DB, or both Credentials and Endpoints"))
+	switch {
+	case c.Store.Path != "" && c.Store.DB != nil:
+		errs = append(errs, errors.New("Store takes Path or DB, not both"))
+	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
+		errs = append(errs, errors.New("Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))

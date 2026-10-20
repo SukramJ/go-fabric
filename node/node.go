@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -46,9 +47,12 @@ const stopTimeout = 5 * time.Second
 // Node is a Matter node: the bridge, its root and Aggregator endpoints and
 // every port [bridge] documents, wired in the documented order.
 type Node struct {
-	cfg        Config
-	logger     *slog.Logger
-	st         *store.Store
+	cfg    Config
+	logger *slog.Logger
+	st     *store.Store
+	// ownedDB is the handle opened for Config.Store.Path, closed by Stop;
+	// nil for a host's own.
+	ownedDB    *sql.DB
 	groups     *groups.Manager
 	assembler  *endpoint.Assembler
 	br         *bridge.Bridge
@@ -131,6 +135,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	defer func() {
 		if !ok {
 			n.cancel()
+			n.closeOwnedDB()
 		}
 	}()
 
@@ -327,6 +332,14 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 // openStores resolves cfg.Store: the overrides, or the two stores on DB
 // with their schemas applied (persist.go:45-60).
 func (n *Node) openStores(ctx context.Context) error {
+	if path := n.cfg.Store.Path; path != "" {
+		db, err := openStorePath(path)
+		if err != nil {
+			return err
+		}
+		n.ownedDB = db
+		n.cfg.Store.DB = db
+	}
 	sc := n.cfg.Store
 	n.st = sc.Credentials
 	if sc.DB != nil {
@@ -344,6 +357,17 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// closeOwnedDB closes the handle the node opened for Store.Path; a no-op
+// for a host's own handle.
+func (n *Node) closeOwnedDB() {
+	if n.ownedDB == nil {
+		return
+	}
+	if err := n.ownedDB.Close(); err != nil {
+		n.logger.Warn("node.store.close", slog.String("err", err.Error()))
+	}
 }
 
 // advertisement is the commissionable record of the node's own window
@@ -651,7 +675,8 @@ func (n *Node) Start(ctx context.Context) error {
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the
 // subscription engine, the re-announce loop, the health probe, the
-// bridge and the advertiser. Stop is idempotent
+// bridge, the advertiser and the store the node opened for Store.Path.
+// Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
@@ -692,6 +717,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()
+	n.closeOwnedDB()
 	if err != nil {
 		return fmt.Errorf("node: bridge stop: %w", err)
 	}
