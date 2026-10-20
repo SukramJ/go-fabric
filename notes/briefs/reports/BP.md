@@ -186,3 +186,23 @@ Binding, `AccessControlCustomExtensionTest.ts`, `secure/`,
   conditions). The module builds only that root, so the Listener-only case
   (`:358-405`) has nothing to run on — a configuration matter.js offers
   that a bridge does not need.
+
+## Decided in review (2026-10-20)
+
+- Every cited fix line read against the pin: fix 1 `GroupcastServer.ts:253-258`
+  (the policy before the group table writes) and `:280-283`; fix 2
+  `ServerGroupNetworking.ts:39-40`, `:136-140`, `:159-176`; the seam's
+  `MockUdpSocket` counterpart; `MaxMcastAddrCount` 44 (`GroupcastServer.ts:933`).
+  All hold.
+- The six decisions stand as made: the two property writes of JoinGroup
+  are matter.js's order; the log key `matter.groups.join_failed` at
+  info/debug is matter.js's level (the CHANGELOG names the old key);
+  "without a transaction conflict" as no error-level log plus the result;
+  "fabric is replaced" as UpdateNOC on the same fabric id; the IanaOnly
+  cases on the full server; `MaxMcastAddrCount` as a config field.
+- by_design: `BD-Matter-Groupcast-RootFeatureSet` (the Listener-only case
+  stays `missing`). The testing source address's zone is no divergence:
+  the event carries the 16 bytes either way, no entry.
+- `SendMulticast` on the model: a harness follow-up, not a parity gap —
+  brief BQ or phase 19 takes it when a ported case needs a group send on
+  fabrictest; no register entry.

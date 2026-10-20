@@ -3628,3 +3628,20 @@ second-newest for both as initiator (`:641-671`): the key the peer used
 for the destination identifier is the key it salts with (§4.14.2.5,
 §4.14.2.6.1). The deviation is the salt's key only; the candidate set and
 the current-key rule are matter.js's.
+
+### BD-Matter-Groupcast-RootFeatureSet — the Groupcast server carries Listener, Sender and PerGroup
+
+matter.js builds `GroupcastServer` with any feature subset and its tests
+run a Listener-only and an IANA-only root (`GroupcastServerTest.ts:38-51`);
+its own RootEndpoint installs Listener, Sender and PerGroup
+(`GroupcastServer.ts:81-83`: Listener and Sender meet the Root Node
+GroupcastListenerCond and GroupcastSenderCond of Matter 1.6.1, PerGroup
+keeps the groups the Groups cluster created on their per-group address).
+The Go `cluster/core` Groupcast server has that one feature set: the
+module serves root nodes, where the conditions make Listener and Sender
+mandatory together, so a Listener-only server is a test configuration
+without a device. The matter.js case "removes a group a wildcard request
+empties without the Sender feature" (`GroupcastServerTest.ts:358-405`,
+the loop's second title) stays `missing` in the register with this entry
+as its reason. A host-selectable feature set is milestone 4's node
+options, with the other feature selections.
