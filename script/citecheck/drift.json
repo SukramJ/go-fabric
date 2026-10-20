@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 355,
+    "line": 353,
     "citation": "PaseServer.ts:155-157",
     "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
     "identifier": "SessionParameters",
@@ -235,7 +235,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 951,
+    "line": 936,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",

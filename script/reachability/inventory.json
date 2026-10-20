@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6038,
+  "entry_points": 6036,
   "entry_packages": [
     ".",
     "bdx",
@@ -227,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13923,
+    "total_exported": 13920,
     "reachable": 9711,
-    "whitelisted": 4207,
+    "whitelisted": 4204,
     "unreachable": 5
   },
   "by_package": [
@@ -4133,27 +4133,6 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestPeekBytes_ExactlyN",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/securechannel_noop_test.go",
-      "line": 83
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestPeekBytes_LongerThanN",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/securechannel_noop_test.go",
-      "line": 92
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestPeekBytes_ShorterThanN",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/securechannel_noop_test.go",
-      "line": 74
-    },
-    {
-      "package": "bridge",
       "identifier": "TestPerExchangeCaseProvider_EvictHookForgetsSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
@@ -4661,21 +4640,21 @@
       "identifier": "TestResolveCaseHandler_NoProvider_ReturnsSingleton",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_noop_test.go",
-      "line": 106
+      "line": 74
     },
     {
       "package": "bridge",
       "identifier": "TestResolveCaseHandler_ProviderOverridesSingleton",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_noop_test.go",
-      "line": 117
+      "line": 85
     },
     {
       "package": "bridge",
       "identifier": "TestResolveCaseHandler_ProviderReturningNilFallsBack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_noop_test.go",
-      "line": 130
+      "line": 98
     },
     {
       "package": "bridge",
@@ -5669,7 +5648,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 554
+      "line": 557
     },
     {
       "package": "cluster/core",
@@ -5690,7 +5669,7 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 689
+      "line": 692
     },
     {
       "package": "cluster/core",
@@ -5893,7 +5872,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 723
+      "line": 726
     },
     {
       "package": "cluster/core",
@@ -25161,6 +25140,13 @@
     },
     {
       "package": "node",
+      "identifier": "OTAApplier",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 147
+    },
+    {
+      "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
@@ -25200,13 +25186,6 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
       "line": 144
-    },
-    {
-      "package": "node",
-      "identifier": "OtaApplier",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "node/facade.go",
-      "line": 147
     },
     {
       "package": "node",
