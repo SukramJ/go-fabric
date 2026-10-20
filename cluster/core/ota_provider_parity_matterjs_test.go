@@ -292,7 +292,7 @@ func TestParityMatterJS_OTAProviderQueryInProgress(t *testing.T) {
 
 	// :2524-2591. The transfer runs on the query's own session: the update
 	// in progress is kept, the query is Busy.
-	t.Run("queryImage Case C: in-progress with active BDX session → in-progress state preserved", func(t *testing.T) {
+	t.Run("queryImage Case C: in-progress with active BDX session → in-progress state preserved when BDX active", func(t *testing.T) {
 		t.Parallel()
 		f := newOTAFixture(t, nil)
 		r := f.query(t, 7, bdxQuery())

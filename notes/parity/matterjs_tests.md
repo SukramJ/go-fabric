@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 80 |
-| partial | 119 |
-| planned | 38 |
+| partial | 120 |
+| planned | 37 |
 | excluded | 87 |
 | total | 324 |
 
@@ -60,7 +60,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
@@ -410,7 +410,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OtaTest.ts | 2819 | planned | — | The OTA requestor flow (query, Busy retries, apply, reboot, consent), which milestone 3 phase 19 ports. |
+| OtaTest.ts | 2819 | partial | `node:TestOtaParityMatterJS`<br>`node:TestOtaBusyParityMatterJS`<br>`cluster/core:TestParityMatterJS_OTAProviderApplyConsentAndToken`<br>`cluster/core:TestParityMatterJS_OTAProviderApplyDelay`<br>`cluster/core:TestParityMatterJS_OTAProviderQueryInProgress`<br>`cluster/core:TestParityMatterJS_OTAProviderDoneClearsConsent`<br>`cluster/core:TestOTARequestor_AnnouncementDuringQuery` | The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe (the provider's Busy is its consent port obtaining). The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. Missing, controller-side SoftwareUpdateManager (a Register candidate; no Go manager in this wave): its reboot detection (RebootResubscribeArmer, handlePeerShutdown, closeForPeer, the reportStarted signal it reads, the failed-apply detection on startUp, suppressNextStartUp), its consent queue (removeConsent, addUpdateConsent, queuedUpdates, the Cancelled reset), its transfer options (bdxTransferOptionsFor), its update check of nodes without a requestor, its stalled detection by BDX progress and by the apply delay, its outcome after the resubscription (updateFailed, updateDone), triggerUpdateOnNode's skip of a running transfer and the DCL store cleanup of test images; the queryImage Case B record of the suppressed startUp is the manager's too. Missing: “OTA reboot: closes older sessions and does not re-subscribe a device that feeds its subscription”; “OTA reboot: force re-subscribes (Mechanism B) when the subscription is not fed within the grace window”; “a real inbound subscription report announces the session it arrived over”; “OTA reboot: the failed-apply detection path does not disarm the peer”; “Cancel a software update before download by removing consent”; “resolves transfer options from the consent, then from state”; “lets a later consent change and clear the options of a queued update”; “rejects invalid transfer options before touching any state”; “Queue processes a single update via addUpdateConsent”; “Does not report updates for nodes without OTA requestor”; “Cancelled status resets queue entry for retry”; “does not count an update as stalled while the device waits out its apply delay”; “Apply failure detected when startUp fires after Applying state”; “fails an applied update when the node resubscribes with its previous version (apply delay none)”; “fails an applied update when the node resubscribes with its previous version (apply delay 2 min)”; “keeps an applied update when the node resubscribes at or above the target version”; “keeps an applied update while the controller resubscribes before its restart deadline”; “keeps an applied update while the controller resubscribes during its apply delay”; “keeps an applied update when the node goes away as the restart deadline passes”; “keeps an update that waits for its apply when the controller resubscribes”; “triggerUpdateOnNode skips announcement when BDX session is active”; “A running BDX transfer keeps a long download out of the stalled state”; “A retried BDX transfer counts as progress although its byte counter restarts”; “A running BDX transfer keeps its in-progress entry alive, including a session opened for a retry”; “An open BDX session that never transfers a block does not count as progress”; “A BDX transfer that stops moving data is reset for retry”; “suppressNextStartUp: suppresses startUp on matching session ID”; “suppressNextStartUp: different session ID does NOT suppress startUp”; “Cleanup purges stored test-mode OTA when allowTestOtaImages is disabled, preserves prod/local”. |
 
 ## node/test/behaviors/power-source
 
@@ -947,10 +947,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `IcdManagementServerTest.ts` — The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 - `IcdModeTest.ts` — The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
-
-### node/test/behaviors/ota
-
-- `OtaTest.ts` — The OTA requestor flow (query, Busy retries, apply, reboot, consent), which milestone 3 phase 19 ports.
 
 ### node/test/behaviors/thread-network-diagnostics
 
