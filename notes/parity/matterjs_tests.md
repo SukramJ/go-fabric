@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 74 |
-| partial | 116 |
-| planned | 47 |
+| partial | 117 |
+| planned | 46 |
 | excluded | 87 |
 | total | 324 |
 
@@ -61,7 +61,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
@@ -416,7 +416,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| PowerSourceServerTest.ts | 38 | planned | ‚Äî | PowerSourceServer augmenting the descriptor of its endpoint. |
+| PowerSourceServerTest.ts | 38 | partial | `endpoint:TestSpecPartsComposeAChildEndpoint` | Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart (a candidate the report proposes): matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named). Missing: ‚Äúsuccessfully augments descriptor‚Äù. |
 
 ## node/test/behaviors/rvc-operational-state
 
@@ -969,10 +969,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/ota
 
 - `OtaTest.ts` ‚Äî The OTA requestor flow (query, Busy retries, apply, reboot, consent), which milestone 3 phase 19 ports.
-
-### node/test/behaviors/power-source
-
-- `PowerSourceServerTest.ts` ‚Äî PowerSourceServer augmenting the descriptor of its endpoint.
 
 ### node/test/behaviors/rvc-operational-state
 

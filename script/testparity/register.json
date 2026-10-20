@@ -1077,8 +1077,14 @@
     },
     {
       "path": "packages/node/test/behaviors/power-source/PowerSourceServerTest.ts",
-      "status": "planned",
-      "reason": "PowerSourceServer augmenting the descriptor of its endpoint.",
+      "status": "partial",
+      "go": [
+        "endpoint:TestSpecPartsComposeAChildEndpoint"
+      ],
+      "missing": [
+        "successfully augments descriptor"
+      ],
+      "reason": "Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart (a candidate the report proposes): matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
       "snapshotSha": "10432eff46484005a9b53521644582b2b4aa7a2a"
     },
     {
