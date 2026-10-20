@@ -27,7 +27,6 @@ import (
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -800,22 +799,8 @@ func (n *Node) Groups() *groups.Manager { return n.groups }
 // `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
 // daemon prints them (main.go:504-518).
 func (n *Node) PairingCodes() (qr, manual string, err error) {
-	cm, pd := n.cfg.Commissioning, n.cfg.ProductDescription
-	qr, err = setup.QRCode(setup.Payload{
-		VendorID:      pd.VendorID,
-		ProductID:     pd.ProductID,
-		Discriminator: cm.Discriminator,
-		Passcode:      cm.Passcode,
-		DiscoveryCaps: setup.DiscoveryOnIP,
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("node: qr payload: %w", err)
-	}
-	manual, err = setup.ManualCode(cm.Discriminator, cm.Passcode)
-	if err != nil {
-		return "", "", fmt.Errorf("node: manual code: %w", err)
-	}
-	return qr, manual, nil
+	cm := n.cfg.Commissioning
+	return pairingCodes(n.cfg.ProductDescription, cm.Discriminator, cm.Passcode)
 }
 
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic

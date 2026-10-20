@@ -74,6 +74,62 @@ func TestFacadeCommissioningBounds(t *testing.T) {
 	}
 }
 
+// NewCommissioningCredentials draws a secret Config.Validate accepts, a
+// fresh one each call, and PairingCodesFor encodes a window's credentials
+// as PairingCodes encodes the configured ones.
+func TestFacadeCommissioningCredentials(t *testing.T) {
+	seen := map[uint32]bool{}
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db")))
+	for range 32 {
+		cm, err := node.NewCommissioningCredentials()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg := cfg
+		cfg.Commissioning = cm
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("credentials %+v: %v", cm, err)
+		}
+		if cm.PBKDFIterations != node.PBKDFIterationsMin || len(cm.Salt) != node.PBKDFSaltMin {
+			t.Fatalf("iterations %d, salt %d bytes", cm.PBKDFIterations, len(cm.Salt))
+		}
+		seen[cm.Passcode] = true
+	}
+	if len(seen) < 2 {
+		t.Fatal("NewCommissioningCredentials drew one passcode only")
+	}
+
+	n := newNode(t, cfg)
+	qr, manual, err := n.PairingCodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cm := cfg.Commissioning
+	qr2, manual2, err := n.PairingCodesFor(node.WindowCredentials{Discriminator: cm.Discriminator, Passcode: cm.Passcode})
+	if err != nil || qr2 != qr || manual2 != manual {
+		t.Fatalf("PairingCodesFor the configured secret = %q %q %v, want %q %q", qr2, manual2, err, qr, manual)
+	}
+	other := node.WindowCredentials{Discriminator: 0x123, Passcode: 34567890}
+	qr3, manual3, err := n.PairingCodesFor(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantQR, err := setup.QRCode(setup.Payload{
+		VendorID: cfg.ProductDescription.VendorID, ProductID: cfg.ProductDescription.ProductID,
+		Discriminator: other.Discriminator, Passcode: other.Passcode, DiscoveryCaps: setup.DiscoveryOnIP,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantManual, err := setup.ManualCode(other.Discriminator, other.Passcode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qr3 != wantQR || manual3 != wantManual {
+		t.Fatalf("PairingCodesFor = %q %q, want %q %q", qr3, manual3, wantQR, wantManual)
+	}
+}
+
 // The aliases are the lower packages' types: the accessors' values and the
 // Config fields pass to code written against the originals unconverted.
 func TestFacadeAliases(t *testing.T) {
