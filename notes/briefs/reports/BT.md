@@ -262,3 +262,17 @@ are BS's/BU's.
 - A plain veto error answers FAILURE rather than the dispatcher's text
   heuristic (matter.js's mapping of a thrown plain `Error` not checked in
   this wave — verify before an entry).
+
+## Decided in review (2026-10-20)
+
+- The veto's semantics are a recorded divergence: `BD-Matter-TypedServer-WriteVeto`
+  (controller writes only; a plain veto error answers the attribute with
+  FAILURE, where matter.js's uncaught error fails the whole request —
+  `AttributeWriteResponse.ts:452-460`, `InteractionMessenger.ts:431-459`,
+  `Datasource.ts:1172-1195`, `Participant.ts:16-23` read at the pin).
+- Versions (owner): this wave is not tagged alone; it lands with brief BU
+  as `v0.10.0`; milestone 4 closes with `v0.11.0`.
+- The self-held servers gain `AttributeSetter`, `CommandRegistrar` and
+  `EventEmitting` in brief BU, so the `Underlying()` assertions go before
+  `v0.10.0`; a typed server is never mountable; `Set` without a context
+  stands; `Get()`'s zero on a type mismatch is a gate-1 audit item.
