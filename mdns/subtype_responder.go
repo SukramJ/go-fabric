@@ -355,6 +355,8 @@ func (r *SubtypeResponder) serveV4(ctx context.Context) {
 			return
 		default:
 		}
+		// Raw time.Now: the kernel judges a socket deadline against the wall
+		// clock, so no injected clock can stand in (clock/noraw_test.go).
 		_ = r.pc4.SetReadDeadline(time.Now().Add(time.Second))
 		n, cm, src, err := r.pc4.ReadFrom(buf)
 		if err != nil {
@@ -381,6 +383,8 @@ func (r *SubtypeResponder) serveV6(ctx context.Context) {
 			return
 		default:
 		}
+		// Raw time.Now: the kernel judges a socket deadline against the wall
+		// clock, so no injected clock can stand in (clock/noraw_test.go).
 		_ = r.pc6.SetReadDeadline(time.Now().Add(time.Second))
 		n, cm, src, err := r.pc6.ReadFrom(buf)
 		if err != nil {
