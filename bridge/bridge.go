@@ -1812,6 +1812,12 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// [Symbol.asyncDispose]).
 	quiesceServers(b.Topology(), nil)
 
+	// The commissioning window's expiry timer goes with the bridge: no
+	// timer stays armed on its clock after Stop (ADR 0026 P5).
+	if w := b.CommissioningWindow(); w != nil {
+		w.stopTimer()
+	}
+
 	return nil
 }
 
