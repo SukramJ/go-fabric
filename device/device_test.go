@@ -228,7 +228,7 @@ func TestElementAlterationsApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lc := serverAs[*spec.Server](d, levelcontroldef.ClusterID)
+	lc := serverAs[*levelcontroldef.Server](d, levelcontroldef.ClusterID)
 	if v, _ := lc.Value(levelcontroldef.AttrMinLevel); v != uint8(1) {
 		t.Errorf("MinLevel %v (%T)", v, v)
 	}
