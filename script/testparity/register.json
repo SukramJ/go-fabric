@@ -614,23 +614,16 @@
       "status": "partial",
       "go": [
         "node:TestLiveBinding",
-        "binding:TestDormantThenWoken"
+        "binding:TestDormantThenWoken",
+        "node:TestBindingIntegrationParityMatterJS",
+        "node:TestBindingIntegrationGroupSendsParityMatterJS"
       ],
       "missing": [
         "receives reports without data of the peer's root endpoint",
         "detects a lost peer by the subscription timeout and resubscribes once it is back",
-        "detects a restarting peer by the subscription timeout and resubscribes after its restart",
-        "kind=group: binding resolves to ClientGroup with OnOffClient installed on materialized endpoint",
-        "records no cache fabric filter for a group",
-        "sends a command through a binding as a group command without an endpoint",
-        "names the group on the log line of a group command it sends",
-        "refuses a timed invoke on a group",
-        "resolves a command with a response to undefined on a group",
-        "resolves a group binding written before the sender holds the group's key once it does, and sends",
-        "fails a group send for which the sender holds no key",
-        "refuses a group invoke that names an endpoint"
+        "detects a restarting peer by the subscription timeout and resubscribes after its restart"
       ],
-      "reason": "A written binding reaching a peer and a self-binding resolving locally are covered; the subscription-backed client, group sends and their refusals are not.",
+      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). Missing: the default subscription of a bound client (a Register candidate): the subscription the host sets on the bound ClientNode (NetworkClient defaultSubscription, autoSubscribe) has its Go counterpart in Resolution.Interaction.Subscribe with Sustain (controller/interaction/sustained.go), but fabrictest carries no node client stack — node/client.go opens a kernel socket and its own DNS-SD cache — so two nodes cannot reach each other over CASE on a site.",
       "snapshotSha": "12d2db88432bfd7bab871aae408d06551a7cfa24"
     },
     {
