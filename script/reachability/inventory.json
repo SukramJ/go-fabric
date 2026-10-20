@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5898,
+  "entry_points": 5901,
   "entry_packages": [
     ".",
     "bdx",
@@ -200,6 +200,7 @@
     "node",
     "parity",
     "schema",
+    "script/archcheck",
     "script/citecheck",
     "script/clustergen",
     "script/coverfloor",

@@ -111,6 +111,14 @@ mechanical and guarded by tests that fail on drift.
 
 Everything outside `internal/` is public API under the
 [deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability).
+The facade (`node/`, `device/`, `contract/`, the typed cluster packages,
+`controller/`) is built and reviewed to the principles of
+[ADR 0025](adr/0025-facade-design-principles.md); what stays public below
+it is an advanced seam, documented as such. Every layer behind it is held to
+[ADR 0026](adr/0026-architecture-principles.md).
+
+The layers and their allowed direction are held by `script/archcheck`
+([ADR 0026](adr/0026-architecture-principles.md)).
 
 ## Boundaries that are decisions
 
