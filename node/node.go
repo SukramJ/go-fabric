@@ -121,6 +121,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	if err := cfg.loadAttestationFiles(); err != nil {
+		return nil, err
+	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}

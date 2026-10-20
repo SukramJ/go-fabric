@@ -348,7 +348,13 @@ type Store struct {
 
 // Attestation is the device attestation material.
 type Attestation struct {
-	// Chain is the DAC, its key and the PAI; nil is the CSA test chain.
+	// Files names a vendor chain on disk; [New] loads it
+	// ([LoadAttestation]) into Chain and CertificationDeclaration, which
+	// it excludes. Files that name nothing keep the CSA test chain; a
+	// chain that does not load fails New.
+	Files *AttestationFiles
+	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
+	// host with a chain of its own (an HSM-held key, say) sets it here.
 	Chain *attestation.Chain
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
@@ -431,6 +437,9 @@ func (c *Config) Validate() error {
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	}
+	if c.Attestation.Files != nil && (c.Attestation.Chain != nil || c.Attestation.CertificationDeclaration != nil) {
+		errs = append(errs, errors.New("Attestation.Files excludes Chain and CertificationDeclaration"))
 	}
 	if c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5894,
+  "entry_points": 5895,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13281,
-    "reachable": 9219,
-    "whitelisted": 4057,
+    "total_exported": 13285,
+    "reachable": 9222,
+    "whitelisted": 4058,
     "unreachable": 5
   },
   "by_package": [
@@ -24240,6 +24240,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
       "line": 37
+    },
+    {
+      "package": "node",
+      "identifier": "TestAttestationFilesLoad",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/attestation_internal_test.go",
+      "line": 50
     },
     {
       "package": "node",
