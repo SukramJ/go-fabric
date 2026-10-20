@@ -29,7 +29,8 @@ type Dialer struct {
 
 // Dial connects to addr ("host:port"; IPv6 first, as net.Dialer
 // resolves) and starts reading it, handing every message to handler.
-// Close the returned connection when done.
+// Close the returned connection when done, and [Conn.Wait] for its
+// reader and handler calls: the caller owns them.
 func (d *Dialer) Dial(ctx context.Context, addr string, handler Handler) (*Conn, error) {
 	if handler == nil {
 		return nil, errors.New("tcp: nil handler")
