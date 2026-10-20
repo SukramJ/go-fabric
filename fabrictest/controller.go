@@ -302,7 +302,7 @@ func (st *stack) close(ctx context.Context) {
 		st.set.Close(ctx)
 	}
 	if st.mgr != nil {
-		st.mgr.Close()
+		_ = st.mgr.Shutdown(ctx)
 	}
 	if st.stop != nil {
 		st.stop()

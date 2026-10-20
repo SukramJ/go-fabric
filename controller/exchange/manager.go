@@ -97,6 +97,14 @@ type Manager struct {
 	// session sends with (SessionManager.ts:265, :439).
 	counter *mrp.Counter
 
+	// work is the goroutines the manager starts — the protocol handler of
+	// each inbound exchange and the close of an evicted exchange — added
+	// under mu while the manager is open and waited for by
+	// [Manager.Shutdown].
+	work sync.WaitGroup
+
+	// mu guards closed, the handler, session and exchange tables and the
+	// id counters below.
 	mu             sync.Mutex
 	closed         bool
 	handlers       map[uint16]ProtocolHandler
@@ -439,9 +447,46 @@ func (m *Manager) CloseSession(ctx context.Context, s *Session) {
 // (Matter §4.10.1.3).
 const statusCloseSession uint16 = 0x0003
 
-// Close closes every exchange and session without telling the peers. It
-// is idempotent; the manager accepts no new session afterwards.
-func (m *Manager) Close() {
+// Close closes every exchange and session without telling the peers and
+// waits for the goroutines the manager started: [Manager.Shutdown] without
+// a bound.
+func (m *Manager) Close() { _ = m.Shutdown(context.Background()) }
+
+// Shutdown closes every exchange and session without telling the peers,
+// then waits, bounded by ctx, for the protocol handlers of inbound
+// exchanges to return — closing their exchanges ends any wait on the
+// peer, so a handler returns unless host code it calls blocks. It
+// returns ctx's error when a handler still runs. It is idempotent; the
+// manager accepts no new session and starts no handler afterwards.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	m.closeAll()
+	idle := make(chan struct{})
+	go func() {
+		m.work.Wait()
+		close(idle)
+	}()
+	select {
+	case <-idle:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("exchange: shutdown: %w", ctx.Err())
+	}
+}
+
+// goWork runs fn on a goroutine [Manager.Shutdown] waits for, unless the
+// manager is closed; it reports whether fn was started.
+func (m *Manager) goWork(fn func()) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return false
+	}
+	m.work.Go(fn)
+	return true
+}
+
+// closeAll marks the manager closed and closes every session.
+func (m *Manager) closeAll() {
 	m.mu.Lock()
 	m.closed = true
 	all := make([]*Session, 0, len(m.sessions)+len(m.unsecured))
@@ -510,7 +555,9 @@ func (m *Manager) cleanupSessionExchanges(s *Session) {
 		}
 	}
 	m.log.Debug("matter.controller.exchange_evicted", slog.Int("session", int(s.id)), slog.Int("exchange", int(lru.id)))
-	go lru.Close()
+	// On a goroutine of the manager: the caller is the receive path or an
+	// Initiate. A closed manager closed the session's exchanges already.
+	m.goWork(lru.Close)
 }
 
 // HandleDatagram processes one received datagram; it is the
@@ -749,19 +796,23 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 // (ExchangeManager.ts:423-437: fromInitialMessage, #addExchange,
 // onMessageReceived, then onNewExchange). Once h returns the exchange is
 // closed, and an inbound unsecured session no exchange holds any longer is
-// closed with it (:205-217).
+// closed with it (:205-217). The handler runs on a goroutine of the
+// manager, which [Manager.Shutdown] waits for; a manager closed meanwhile
+// starts no handler and closes the exchange.
 func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	x := m.accept(s, msg)
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
-	go func() {
+	if !m.goWork(func() {
 		h(x, msg)
 		x.Close()
 		if s.inbound {
 			<-x.Done()
 			m.releaseInbound(s)
 		}
-	}()
+	}) {
+		x.Close()
+	}
 }
 
 // refusePASE answers a PBKDFParamRequest with a StatusReport
