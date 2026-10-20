@@ -56,7 +56,7 @@ func TestResponderSessionParamsCarryTCP(t *testing.T) {
 
 			sessions := operational.NewManager(testStore(t))
 			// CASE: Sigma2's responderSessionParams (CaseServer.ts:272).
-			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default()), p, slog.New(slog.DiscardHandler))
+			ca, err := buildCaseAdapter(sessions, newCaseIdentities(slog.Default(), nil), p, slog.New(slog.DiscardHandler))
 			if err != nil {
 				t.Fatal(err)
 			}

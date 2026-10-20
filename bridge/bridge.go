@@ -392,12 +392,16 @@ type Bridge struct {
 	// multicast groups to join; noop until AttachGroupMessaging.
 	groupMessaging GroupMessaging
 	// groupNetMu serialises the multicast-membership reconciler over
-	// groupMember (the started socket), groupJoined (addresses joined)
-	// and groupJoinRetry (the pending retry after a failed join).
-	groupNetMu     sync.Mutex
-	groupMember    multicastMember
-	groupJoined    map[string]net.IP
-	groupJoinRetry clock.Timer
+	// groupMember (the started socket), groupJoined (addresses joined),
+	// groupJoinFailed (addresses whose join failed and is retried) and
+	// groupJoinRetry (the pending retry after a failed join).
+	groupNetMu  sync.Mutex
+	groupMember multicastMember
+	groupJoined map[string]net.IP
+	// groupJoinFailed are the wanted addresses whose last join failed: a
+	// failure streak logs at info once, its repeats at debug.
+	groupJoinFailed map[string]struct{}
+	groupJoinRetry  clock.Timer
 
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for

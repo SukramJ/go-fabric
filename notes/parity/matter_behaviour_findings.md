@@ -581,16 +581,6 @@ Controller side:
 Found by the phase-18b security and commissioning port (brief BO, PR #184, 2026-10-19).
 Line numbers at `862ad75f`.
 
-- **A rotated IPK does not reach CASE.** A KeySetWrite of key set 0 is
-  accepted and stored (`cluster/core/group_key_management.go`
-  `handleKeySetWrite` checks the epoch fields, not the id); the CASE
-  destination identifier takes the fabric identity's IPK installed at AddNOC
-  (`secure/sigma/initiator.go:197`, `ComputeDestinationID`), where matter.js
-  takes the second-newest operational key of key set 0, the only one when
-  there is one (`KeySets.ts:113-121`, §4.14.2.6.1). An administrator
-  rotating the IPK loses CASE to the node. The two key-set-0 cases of
-  `KeySetsTest.ts` are `missing` for this. (Wave 18c, a `secure/` change by
-  the owner; decided 2026-10-19.)
 - **The effective ACL is applied entry by entry.** matter.js applies a
   written ACL to the manager when the interaction ends
   (`AccessControlServer.ts:545-560` `#handleInteractionBegin`/`End`,

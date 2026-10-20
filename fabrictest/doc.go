@@ -47,6 +47,15 @@
 //     datagrams ([NetOptions]). The site answers the controllers' DNS-SD
 //     queries from what the devices publish: the commissionable record
 //     while a window is open, the operational record per fabric.
+//   - Multicast ([Network.Members], [Device.MulticastGroups],
+//     [Network.WatchMemberships], [Network.FailJoins]) follows matter.js's
+//     MockNetwork (packages/general/src/net/mock/MockNetwork.ts): a host's
+//     production listener joins and leaves IPv6 multicast groups on the
+//     in-memory network, which keeps them per host address — past the
+//     socket's close, as MockNetwork keeps them on the host — and delivers a
+//     datagram sent to a group to every host holding it. A test asserts the
+//     groups a node joined, the joins and leaves it made, and injects join
+//     failures; the site has one interface per host and routes nothing.
 //   - [Options].Loopback puts every host on a real UDP socket on [::1]
 //     instead, for a test that needs sockets.
 //

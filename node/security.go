@@ -17,11 +17,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -43,6 +45,15 @@ type caseFabric struct {
 	identity      *sigma.Identity
 	verifier      sigma.PeerVerifier
 	rootPublicKey []byte
+	// addNOCIPK is the operational IPK derived from AddNOC's IPKValue,
+	// the identity's key until key set 0 is rotated.
+	addNOCIPK [16]byte
+	// ipks are the destination identifier's candidate keys: every
+	// operational key of key set 0 (matter.js Fabric.destinationIdsFor,
+	// Fabric.ts:399-403, `keySets.allKeysForId(0)`; chip
+	// CASESession.cpp:962-990 tries every IPK epoch key) and addNOCIPK.
+	// identity.IPK is the current one among them (ipkCandidates).
+	ipks [][16]byte
 }
 
 // caseIdentities holds one [caseFabric] per installed fabric and resolves an
@@ -58,27 +69,111 @@ type caseIdentities struct {
 	logger *slog.Logger
 	// clock is the certificate verifiers' time; nil is clock.System.
 	clock clock.Clock
+	// groups holds key set 0, the IPK key set, per fabric; nil keeps the
+	// AddNOC key alone.
+	groups *groups.Manager
 }
 
-func newCaseIdentities(logger *slog.Logger) *caseIdentities {
-	return &caseIdentities{byIdx: make(map[uint8]*caseFabric), logger: logger}
+func newCaseIdentities(logger *slog.Logger, g *groups.Manager) *caseIdentities {
+	return &caseIdentities{byIdx: make(map[uint8]*caseFabric), logger: logger, groups: g}
 }
 
 // ResolveSigma1Destination implements [sigma.IdentityResolver]: it recomputes
-// each installed fabric's destinationID and returns the one the initiator
-// addressed.
+// each installed fabric's destinationID under every key of its key set 0
+// and returns the one the initiator addressed, keyed on the key that
+// matched. Mirrors matter.js FabricManager.findFabricFromDestinationId
+// (FabricManager.ts:325-331) over Fabric.destinationIdsFor (Fabric.ts:399-403,
+// every key of key set 0); the matched key then salts Sigma2 and Sigma3 as
+// chip CASESession.cpp:973-990 caches it (matter.js keys the salts on the
+// AddNOC IPK alone, CaseServer.ts:240-284 — `BD-Matter-CASE-SaltOnMatchedIPK`).
 func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (*sigma.Identity, sigma.PeerVerifier, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, f := range c.byIdx {
-		candidate := sigma.ComputeDestinationID(
-			f.identity.IPK, initiatorRandom, f.rootPublicKey, f.identity.FabricID, f.identity.NodeID,
-		)
-		if candidate == destinationID {
-			return f.identity, f.verifier, true
+		for _, ipk := range f.ipks {
+			candidate := sigma.ComputeDestinationID(
+				ipk, initiatorRandom, f.rootPublicKey, f.identity.FabricID, f.identity.NodeID,
+			)
+			if candidate != destinationID {
+				continue
+			}
+			if ipk == f.identity.IPK {
+				return f.identity, f.verifier, true
+			}
+			matched := *f.identity
+			matched.IPK = ipk
+			return &matched, f.verifier, true
 		}
 	}
 	return nil, nil, false
+}
+
+// ipkCandidates returns the fabric's destination identifier keys and the
+// current one: the keys of key set 0 from the group manager (empty when it
+// holds none, as a store that predates AddNOC writing key set 0) and
+// addNOCIPK, which matter.js seeds key set 0 with (FabricGroups.ts:35-50)
+// and which stays a candidate so an initiator on the AddNOC key is
+// answered whatever the group state. The current key is matter.js
+// Fabric.currentDestinationIdFor's (Fabric.ts:391-393: the second-newest
+// of three, else the only one), the AddNOC key without key set 0.
+func (c *caseIdentities) ipkCandidates(ctx context.Context, fabricIndex uint8, addNOCIPK [16]byte) (current [16]byte, ipks [][16]byte) {
+	current = addNOCIPK
+	if c.groups == nil {
+		return current, [][16]byte{addNOCIPK}
+	}
+	keys, err := c.groups.IPKKeys(ctx, fabricIndex)
+	if err != nil {
+		c.logger.Warn("case.identity.ipk_keys_failed", slog.Int("fabric_index", int(fabricIndex)), slog.String("err", err.Error()))
+	}
+	for _, k := range keys {
+		if len(k) != sigma.OperationalIPKSize {
+			continue
+		}
+		var ipk [16]byte
+		copy(ipk[:], k)
+		if !slices.Contains(ipks, ipk) {
+			ipks = append(ipks, ipk)
+		}
+	}
+	if cur, err := c.groups.CurrentIPK(ctx, fabricIndex); err == nil && len(cur) == sigma.OperationalIPKSize {
+		copy(current[:], cur)
+	}
+	if !slices.Contains(ipks, addNOCIPK) {
+		ipks = append(ipks, addNOCIPK)
+	}
+	return current, ipks
+}
+
+// refreshIPK re-reads an installed fabric's key set 0 after a KeySetWrite
+// or KeySetRemove reloaded the fabric's group state (the group manager's
+// OnGroupcastChanged): the identity a later Sigma1 resolves to keys on the
+// rotated set. A responder in flight keeps the identity it resolved.
+func (c *caseIdentities) refreshIPK(ctx context.Context, fabricIndex uint8) {
+	c.mu.RLock()
+	f, ok := c.byIdx[fabricIndex]
+	c.mu.RUnlock()
+	if !ok || f.identity == nil {
+		return
+	}
+	current, ipks := c.ipkCandidates(ctx, fabricIndex, f.addNOCIPK)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.byIdx[fabricIndex] != f {
+		return
+	}
+	if current == f.identity.IPK && slices.Equal(ipks, f.ipks) {
+		return
+	}
+	identity := *f.identity
+	identity.IPK = current
+	entry := *f
+	entry.identity = &identity
+	entry.ipks = ipks
+	c.byIdx[fabricIndex] = &entry
+	if c.latest == f {
+		c.latest = &entry
+	}
+	c.logger.Info("case.identity.ipk_rotated", slog.Int("fabric_index", int(fabricIndex)), slog.Int("keys", len(ipks)))
 }
 
 // ResolveFabricIndex implements [sigma.FabricIndexResolver]: a resumed
@@ -172,11 +267,13 @@ func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex 
 		return fmt.Errorf("peer verifier %d: %w", fabricIndex, err)
 	}
 	// The stored IPK is the raw AddNOC.IPKValue; the handshake keys on the
-	// derived operational one.
-	opIPK, err := sigma.DeriveOperationalIPK(identity.IPK, fabric.CompressedID)
+	// derived operational one — the current key of key set 0 once it is
+	// rotated (ipkCandidates).
+	addNOCIPK, err := sigma.DeriveOperationalIPK(identity.IPK, fabric.CompressedID)
 	if err != nil {
 		return fmt.Errorf("operational ipk %d: %w", fabricIndex, err)
 	}
+	opIPK, ipks := c.ipkCandidates(ctx, fabricIndex, addNOCIPK)
 
 	entry := &caseFabric{
 		identity: &sigma.Identity{
@@ -191,6 +288,8 @@ func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex 
 		},
 		verifier:      verifier,
 		rootPublicKey: append([]byte(nil), fabric.RootPublicKey...),
+		addNOCIPK:     addNOCIPK,
+		ipks:          ipks,
 	}
 	c.mu.Lock()
 	c.byIdx[fabricIndex] = entry

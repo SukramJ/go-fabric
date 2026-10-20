@@ -13,8 +13,9 @@ package groups
 // group mapped to the key set, and containsOperationalKey is the
 // HasValidMapping Decode reports. Session ids are derived from the keys in
 // Go, not set as matter.js's 100/101/102, so a slot is identified by its
-// start time. Key set 0 is the IPK, which the manager does not hold
-// (loadFabric); the forId and allKeysForId cases use key set 1.
+// start time. Key set 0 is the IPK, which the manager holds apart from the
+// operational key sets (fabricGroups.ipk, read by currentIPK); the forId and
+// allKeysForId cases use key set 1.
 
 import (
 	"context"
@@ -196,6 +197,59 @@ func TestKeySetsCurrentKeyForID(t *testing.T) {
 		_, err := current(t, s)
 		if !errors.Is(err, ErrKeyNotStarted) || !strings.Contains(err.Error(), "group key set 5") {
 			t.Fatalf("current key: %v, want GroupKeyNotStartedError for key set 5", err)
+		}
+	})
+
+	// The IPK key set: currentIPK, matter.js currentKeyForId(0), identified
+	// by the slot's epoch key (session ids 100/101 are slots 0/1 in Go).
+	currentIPK := func(t *testing.T, set store.GroupKeySet) []byte {
+		t.Helper()
+		m, _ := keySetsManager(t, nil, set)
+		k, err := m.CurrentIPK(context.Background(), 1)
+		if err != nil {
+			t.Fatalf("CurrentIPK: %v", err)
+		}
+		return k
+	}
+
+	t.Run("returns the only key for the default key set", func(t *testing.T) {
+		t.Parallel()
+		s := keySetsDefault(0)
+		if got, want := currentIPK(t, s), keySetsOpKey(t, s.EpochKey0); !slices.Equal(got, want) { // session id 100: slot 0
+			t.Fatalf("current IPK = %x, want slot 0 %x", got, want)
+		}
+	})
+
+	t.Run("returns the second-newest key for the IPK key set (§4.14.2.6)", func(t *testing.T) {
+		t.Parallel()
+		s := keySetsThree(0, nowUs-3*keySetsHourUs, nowUs-2*keySetsHourUs, nowUs-keySetsHourUs)
+		if got, want := currentIPK(t, s), keySetsOpKey(t, s.EpochKey1); !slices.Equal(got, want) { // session id 101: slot 1
+			t.Fatalf("current IPK = %x, want slot 1 %x", got, want)
+		}
+		m, _ := keySetsManager(t, nil, s)
+		keys, err := m.IPKKeys(context.Background(), 1)
+		if err != nil || len(keys) != 3 {
+			t.Fatalf("IPKKeys = %d keys, %v; want the three of key set 0 (allKeysForId(0))", len(keys), err)
+		}
+	})
+
+	// Go: without a key set 0 row (a store that predates AddNOC writing it)
+	// there is no current IPK, matter.js's MatterFlowError "No operational
+	// keys found for groupKeySet 0"; an unknown fabric is ErrNoFabric.
+	t.Run("no key set 0, unknown fabric", func(t *testing.T) {
+		t.Parallel()
+		m, _ := keySetsManager(t, nil, keySetsDefault(1))
+		if keys, err := m.IPKKeys(context.Background(), 1); err != nil || len(keys) != 0 {
+			t.Fatalf("IPKKeys without key set 0 = %d keys, %v; want none", len(keys), err)
+		}
+		if _, err := m.CurrentIPK(context.Background(), 1); !errors.Is(err, ErrNoKey) || !strings.Contains(err.Error(), "groupKeySet 0") {
+			t.Fatalf("CurrentIPK without key set 0: %v, want ErrNoKey for groupKeySet 0", err)
+		}
+		if _, err := m.IPKKeys(context.Background(), 9); !errors.Is(err, ErrNoFabric) {
+			t.Fatalf("IPKKeys of fabric 9: %v, want ErrNoFabric", err)
+		}
+		if _, err := m.CurrentIPK(context.Background(), 9); !errors.Is(err, ErrNoFabric) {
+			t.Fatalf("CurrentIPK of fabric 9: %v, want ErrNoFabric", err)
 		}
 	})
 }

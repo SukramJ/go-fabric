@@ -10,6 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `groups`: `Manager.IPKKeys` and `Manager.CurrentIPK` expose key set 0, the Identity Protection Key set, which the manager now holds apart from the operational key sets as matter.js's `KeySets` does (`FabricGroups.ts:35-50`, `KeySets.ts:113-121`): every key for a responder, the second-newest of three for an initiator (§4.14.2.6.1).
+- `fabrictest`: a multicast model after matter.js's `MockNetwork`. A host's production listener joins and leaves IPv6 multicast groups on the in-memory network (`transport/udp` hands the membership to a socket that carries its own), which delivers a datagram sent to a group to every host holding it; `Device.MulticastGroups`, `Network.Members`, `Network.WatchMemberships` (`recordMembershipChanges`) and `Network.FailJoins` (a throwing `addMembership`) are the assertion and failure-injection surface.
+- `cluster/core`: `GroupcastConfig.MaxMcastAddrCount` sets the MaxMcastAddrCount attribute and limit (0 keeps 44), as a matter.js node overrides `GroupcastServer` State `maxMcastAddrCount` (`GroupcastServer.ts:933`).
+
+### Fixed
+
+- `node`: a rotated IPK reaches CASE. The responder resolves a Sigma1 under every key of key set 0 and keys Sigma2 and Sigma3 on the key that matched (`Fabric.ts:399-403`, `FabricManager.ts:325-331`; chip `CASESession.cpp:973-990`); the node's own identity keys on the current key of key set 0 (`Fabric.ts:391-393`); a KeySetWrite or KeySetRemove of key set 0 rotates both. The identity used to stay on the IPK of AddNOC, so an administrator rotating the IPK lost CASE to the node. The AddNOC key stays a candidate.
+- `cluster/core`: Groupcast JoinGroup applies the group's multicast policy before it writes the endpoints, so a new IanaAddr group joins FF05::FA straight away instead of joining its per-group address first and rebinding (`GroupcastServer.ts:253-258`).
+- `bridge`: a failing multicast join logs once at info per failure streak (`matter.groups.join_failed`) and at debug while the retries keep failing; the streak ends when the join succeeds or the address is no longer wanted (`ServerGroupNetworking.ts:39-40`, `:136-140`, `:159-176`). Every failed attempt used to log a warning (`matter.groups.join`), every 30 s.
+
 ## [0.8.6] — 2026-10-19
 
 Milestone 3, phase 18b, brief BO: the behaviour-test ports of AccessControl Auxiliary, OperationalCredentials, GroupKeyManagement and the system commissioning tests (CommissioningWindowLifetime, CommissioningRestart, FabricBeforeStart) against matter.js at `862ad75f` — 30 of 42 open cases, two fixes the ports and the GeneralCommissioning audit found, the node wirings left by 18a, the GeneralCommissioning and AdministratorCommissioning audit.

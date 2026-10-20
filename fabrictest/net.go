@@ -67,6 +67,12 @@ type Network struct {
 	rnd     *rand.Rand
 	filter  func(Datagram) bool
 	sockets map[netip.AddrPort]*socket
+	// members is the multicast groups each host address holds
+	// (multicast.go).
+	members     map[netip.Addr]map[netip.Addr]struct{}
+	joinError   func(group net.IP) error
+	watchers    map[uint64]func(MembershipChange)
+	nextWatcher uint64
 
 	// sent counts every datagram handed to the network, delivered or not.
 	sent atomic.Uint64
@@ -74,10 +80,12 @@ type Network struct {
 
 func newNetwork(clk clock.Clock, opts NetOptions) *Network {
 	return &Network{
-		clk:     clk,
-		opts:    opts,
-		rnd:     rand.New(rand.NewPCG(opts.Seed, opts.Seed^0x9E3779B97F4A7C15)), //nolint:gosec // a test network's draws, not a secret
-		sockets: make(map[netip.AddrPort]*socket),
+		clk:      clk,
+		opts:     opts,
+		rnd:      rand.New(rand.NewPCG(opts.Seed, opts.Seed^0x9E3779B97F4A7C15)), //nolint:gosec // a test network's draws, not a secret
+		sockets:  make(map[netip.AddrPort]*socket),
+		members:  make(map[netip.Addr]map[netip.Addr]struct{}),
+		watchers: make(map[uint64]func(MembershipChange)),
 	}
 }
 
@@ -173,10 +181,18 @@ func (n *Network) send(src, dst *net.UDPAddr, payload []byte) {
 
 // queue puts d on its addressee's receive queue: the socket open on the
 // address when d arrives, so a host that restarted in between receives
-// it. No socket, or a full queue, drops it.
+// it — for a multicast group the socket on d's port of every host that
+// holds the group then (multicast.go). No socket, or a full queue, drops
+// it.
 func (n *Network) queue(d Datagram) {
 	key, ok := addrPort(d.To)
 	if !ok {
+		return
+	}
+	if key.Addr().IsMulticast() {
+		for _, s := range n.memberSockets(key.Addr(), key.Port()) {
+			deliver(s, d)
+		}
 		return
 	}
 	n.mu.Lock()
@@ -185,6 +201,12 @@ func (n *Network) queue(d Datagram) {
 	if s == nil {
 		return
 	}
+	deliver(s, d)
+}
+
+// deliver puts d on the receive queue of s; a closed socket or a full
+// queue drops it.
+func deliver(s *socket, d Datagram) {
 	select {
 	case <-s.done:
 	case s.in <- d:
