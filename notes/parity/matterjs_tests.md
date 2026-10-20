@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 73 |
+| ported | 74 |
 | partial | 114 |
-| planned | 50 |
+| planned | 49 |
 | excluded | 87 |
 | total | 324 |
 
@@ -47,7 +47,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 2 | 0 | 0 | 0 |
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/energy-evse-mode](#nodetestbehaviorsenergy-evse-mode) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/fan-control](#nodetestbehaviorsfan-control) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/general-diagnostics](#nodetestbehaviorsgeneral-diagnostics) | 2 | 1 | 1 | 0 | 0 |
 | [node/test/behaviors/group-key-management](#nodetestbehaviorsgroup-key-management) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
@@ -327,7 +327,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| FanControlTest.ts | 37 | planned | â€” | Local mode tags and the not-off-only command set of FanControlServer by default. |
+| FanControlTest.ts | 37 | ported | `cluster/fan:TestFanControlServerParityMatterJS` | The server built over a host fan in FanMode On on OffLowMedHigh, and On on the OnOff an air purifier mounts with its default (not OffOnly) features (cluster/fan/fancontrol_server_parity_matterjs_test.go). |
 
 ## node/test/behaviors/general-diagnostics
 
@@ -960,10 +960,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` â€” A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.
-
-### node/test/behaviors/fan-control
-
-- `FanControlTest.ts` â€” Local mode tags and the not-off-only command set of FanControlServer by default.
 
 ### node/test/behaviors/icd-management
 

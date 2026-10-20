@@ -816,8 +816,11 @@
     },
     {
       "path": "packages/node/test/behaviors/fan-control/FanControlTest.ts",
-      "status": "planned",
-      "reason": "Local mode tags and the not-off-only command set of FanControlServer by default.",
+      "status": "ported",
+      "go": [
+        "cluster/fan:TestFanControlServerParityMatterJS"
+      ],
+      "reason": "The server built over a host fan in FanMode On on OffLowMedHigh, and On on the OnOff an air purifier mounts with its default (not OffOnly) features (cluster/fan/fancontrol_server_parity_matterjs_test.go).",
       "snapshotSha": "1a06e54ae96892bf2537a0b7a52b6ac5856382cb"
     },
     {
