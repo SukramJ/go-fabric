@@ -4,6 +4,7 @@
 package spec
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -104,7 +105,7 @@ func TestTypedFieldsOf(t *testing.T) {
 func TestTypedVetoError(t *testing.T) {
 	t.Parallel()
 	e := &vetoError{err: errFlash}
-	if e.Error() != "flash" || e.Unwrap() != errFlash {
+	if e.Error() != "flash" || !errors.Is(e.Unwrap(), errFlash) {
 		t.Errorf("veto error %v", e)
 	}
 }

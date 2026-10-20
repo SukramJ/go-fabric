@@ -62,9 +62,10 @@ type hullOmitted struct {
 // hullAttributes splits the definition's attributes into the State's
 // fields and the ones it cannot express.
 func (g *generator) hullAttributes() ([]hullField, []hullOmitted) {
-	var fields []hullField
+	attrs := g.attributes()
+	fields := make([]hullField, 0, len(attrs))
 	var omitted []hullOmitted
-	for _, a := range g.attributes() {
+	for _, a := range attrs {
 		v := &a.Effective.value
 		t := g.attrType[a.ID]
 		switch {
