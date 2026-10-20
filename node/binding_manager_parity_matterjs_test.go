@@ -196,7 +196,7 @@ func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 	if o.switches == 0 {
 		o.switches = 1
 	}
-	var bridged []node.Endpoint
+	bridged := make([]node.Endpoint, 0, o.switches)
 	for i := range o.switches {
 		key := "switch:" + string(rune('1'+i))
 		sw, err := device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: b.site.Clock()},

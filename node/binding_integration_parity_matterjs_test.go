@@ -75,8 +75,9 @@ func (g *groupDatagrams) all() []fabrictest.Datagram {
 // returns the InvokeRequests they carry.
 func (b *bqSwitch) sentInvokes(t *testing.T, g *groupDatagrams) []im.InvokeRequest {
 	t.Helper()
-	var out []im.InvokeRequest
-	for _, d := range g.all() {
+	sent := g.all()
+	out := make([]im.InvokeRequest, 0, len(sent))
+	for _, d := range sent {
 		msg, err := b.dev.Node().Groups().Decode(parityCtx(t), d.Payload)
 		if err != nil {
 			t.Fatalf("opening the group datagram: %v", err)

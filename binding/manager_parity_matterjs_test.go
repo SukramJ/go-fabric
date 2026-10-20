@@ -71,7 +71,8 @@ func deviceClients(t *testing.T, dt uint32, with ...uint32) []uint32 {
 		t.Fatalf("no device type 0x%04X in the schema", dt)
 	}
 	var out []uint32
-	for _, r := range def.Requirements {
+	for i := range def.Requirements {
+		r := &def.Requirements[i]
 		if r.Element == schema.RequirementClientCluster && r.HasID && r.Conformance.Op == "M" && !slices.Contains(out, r.ID) {
 			out = append(out, r.ID)
 		}
@@ -188,7 +189,10 @@ func (g *hookedGroups) Sender(ctx context.Context, fabricIndex uint8, group uint
 // (BindingManagerTest.ts:109-885), the cases that run on the manager alone.
 func TestBindingManagerParityMatterJS(t *testing.T) {
 	t.Parallel()
-	switchClients := func(t *testing.T) []uint32 { return deviceClients(t, dtOnOffLightSwitch) }
+	switchClients := func(t *testing.T) []uint32 {
+		t.Helper()
+		return deviceClients(t, dtOnOffLightSwitch)
+	}
 
 	// :179-209.
 	t.Run("resolves kind=client for remote nodeId — no emission until peer lifecycle.online fires", func(t *testing.T) {
@@ -337,8 +341,9 @@ func TestBindingManagerParityMatterJS(t *testing.T) {
 		h.m.Unregister(paritySwitchEP, groupEntry(48))
 		close(release)
 		h.flush()
-		var groups []uint16
-		for _, r := range h.takeEstablished() {
+		established := h.takeEstablished()
+		groups := make([]uint16, 0, len(established))
+		for _, r := range established {
 			groups = append(groups, r.Entry.Group)
 		}
 		if !slices.Equal(groups, []uint16{49}) {
@@ -377,6 +382,7 @@ func TestBindingManagerClientSelectionParityMatterJS(t *testing.T) {
 	t.Parallel()
 	// switchWithMoreClients (:887-891).
 	moreClients := func(t *testing.T) []uint32 {
+		t.Helper()
 		return deviceClients(t, dtOnOffLightSwitch, clGroups, clOTAProvider, clWebRTCProvider)
 	}
 	// resolveClientEntry (:893-913): a remote entry on endpoint 1, the peer
@@ -502,7 +508,10 @@ func TestBindingManagerClientSelectionParityMatterJS(t *testing.T) {
 // sees afterwards (nothing established, nothing removed) is asserted.
 func TestBindingManagerWithoutObserverParityMatterJS(t *testing.T) {
 	t.Parallel()
-	switchClients := func(t *testing.T) []uint32 { return deviceClients(t, dtOnOffLightSwitch) }
+	switchClients := func(t *testing.T) []uint32 {
+		t.Helper()
+		return deviceClients(t, dtOnOffLightSwitch)
+	}
 
 	// :1154-1178. `node.peers.get(groupAddress)` is the group sender's
 	// lookup.

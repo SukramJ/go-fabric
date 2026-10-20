@@ -77,7 +77,8 @@ func TestBindingServerParityMatterJS(t *testing.T) {
 			t.Fatal("no OnOffLightSwitch in the schema")
 		}
 		var clients []uint32
-		for _, r := range def.Requirements {
+		for i := range def.Requirements {
+			r := &def.Requirements[i]
 			if r.Element == schema.RequirementClientCluster && r.HasID && r.Conformance.Op == "M" {
 				clients = append(clients, r.ID)
 			}
