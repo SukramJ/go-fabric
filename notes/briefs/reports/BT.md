@@ -145,6 +145,28 @@ One earlier run also failed to link for a full `/tmp` (stale `go-build`
 directories of killed runs, removed). CI on the pull request is the
 clean run.
 
+## After the review of #198
+
+`spec.Hull`/`NewHull` became `spec.Wrapper`/`NewWrapper` (64b16db1): it
+holds the server and exposes `Underlying()` only; the forwarding methods,
+their absent-interface defaults and the assertion list are gone. The
+typed server is not a `contract.ClusterServer` (`TestWrapper`,
+`TestTypedServerIsNotMountable`), so `Wrap`'s identity case is now
+impossible by type and was dropped; its nil case stays. Regenerated
+(e8aecee2); the call sites that reached the server through forwarded
+methods go through `Underlying()` (311e0a66). `make archcheck` does not
+exist on this branch (it is not in the Makefile at 7084a60), so it did
+not run.
+
+| guard | HEAD | exit |
+| --- | --- | --- |
+| `go test ./cluster/spec/... ./device/... ./script/clustergen/... ./script/devicegen/...` | 311e0a66 | 0 |
+| `go test ./cluster/fan/ ./fabrictest/ ./node/ ./controller/client/ ./examples/...` | 311e0a66 | 0 |
+| `go vet ./...` | 311e0a66 | 0 |
+| `make lint` | 311e0a66 | 0 |
+| `make reachability-check` | 311e0a66 | 0 (unreached 5) |
+| `make cite-check` | 311e0a66 | 0 |
+
 ## Differences to the brief
 
 1. The device does not mount the typed server; accessors wrap on access,
