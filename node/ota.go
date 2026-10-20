@@ -142,7 +142,7 @@ func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error
 	case h.SoftwareVersion != version:
 		return h, fmt.Errorf("ota: image is version %d but the provider announced %d", h.SoftwareVersion, version)
 	case h.PayloadSize == 0:
-		return h, errors.New("ota: image carries no payload")
+		return h, errors.New("node: ota: image carries no payload")
 	case h.VendorID != 0 && h.VendorID != a.vendorID:
 		return h, fmt.Errorf("ota: image is for vendor 0x%04x, this node is 0x%04x", h.VendorID, a.vendorID)
 	case h.ProductID != 0 && h.ProductID != a.productID:

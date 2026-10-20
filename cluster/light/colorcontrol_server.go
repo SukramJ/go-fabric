@@ -304,7 +304,7 @@ var (
 // ErrColorFeatures reports a feature selection the ColorControl
 // conformance does not allow: EHUE without HS, CL without EHUE, or an
 // initial colour mode of a feature the server does not have.
-var ErrColorFeatures = errors.New("colorcontrol: feature selection")
+var ErrColorFeatures = errors.New("light: feature selection")
 
 // The defaults matter.js's ColorControlServer State carries for the
 // attributes whose specification default went away in Matter 1.4.2.

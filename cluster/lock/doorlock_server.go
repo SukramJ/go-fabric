@@ -91,7 +91,7 @@ const defaultSupportedOperatingModes = lockdef.OperatingModesAlwaysSet | lockdef
 
 // ErrConfig reports a configuration the cluster's model, or matter.js's
 // initialize, refuses.
-var ErrConfig = errors.New("doorlock: configuration outside the cluster's model")
+var ErrConfig = errors.New("lock: configuration outside the cluster's model")
 
 // LockOperationEvent is the cluster-native payload for the DoorLock
 // LockOperation event (id 0x02, priority critical) per Matter §5.2.10.3
@@ -110,7 +110,7 @@ type LockOperationEvent struct {
 	SourceNode        *uint64
 }
 
-var errUnknownCommand = errors.New("doorlock: unknown command")
+var errUnknownCommand = errors.New("lock: unknown command")
 
 // StateSource is the read-side interface a model-layer lock DP must
 // satisfy so DoorLockServer can project its Matter attribute surface.
@@ -550,7 +550,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	if s.auth != nil {
 		saved, ok, err := s.auth.LoadDoorLockAuth(ctx, s.authKey)
 		if err != nil {
-			return fmt.Errorf("doorlock: load records: %w", err)
+			return fmt.Errorf("lock: load records: %w", err)
 		}
 		if ok {
 			s.data = saved
@@ -561,7 +561,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	for i := range data.Credentials {
 		enc, err := s.cipher.Encrypt(data.Credentials[i].Data)
 		if err != nil {
-			return fmt.Errorf("doorlock: encrypt an initial credential: %w", err)
+			return fmt.Errorf("lock: encrypt an initial credential: %w", err)
 		}
 		data.Credentials[i].Data = enc
 	}
@@ -576,7 +576,7 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	if s.auth != nil {
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
-			return nil, fmt.Errorf("doorlock: read the credential key: %w", err)
+			return nil, fmt.Errorf("lock: read the credential key: %w", err)
 		}
 		if ok {
 			key, err := hex.DecodeString(v)
@@ -588,11 +588,11 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	}
 	key := make([]byte, credentialKeySize)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("doorlock: generate the credential key: %w", err)
+		return nil, fmt.Errorf("lock: generate the credential key: %w", err)
 	}
 	if s.auth != nil {
 		if err := s.auth.SetSetting(ctx, store.SettingDoorLockCredentialKey, hex.EncodeToString(key)); err != nil {
-			return nil, fmt.Errorf("doorlock: store the credential key: %w", err)
+			return nil, fmt.Errorf("lock: store the credential key: %w", err)
 		}
 	}
 	return key, nil

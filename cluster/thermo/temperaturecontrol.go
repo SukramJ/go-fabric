@@ -103,8 +103,8 @@ type TemperatureControlConfig struct {
 
 // TemperatureControl configuration errors.
 var (
-	ErrNoTemperatureSetter     = errors.New("temperaturecontrol: a TemperatureSetter is required")
-	ErrTemperatureControlValue = errors.New("temperaturecontrol: value outside the cluster's model")
+	ErrNoTemperatureSetter     = errors.New("thermo: a TemperatureSetter is required")
+	ErrTemperatureControlValue = errors.New("thermo: value outside the cluster's model")
 )
 
 // ErrTemperatureRefused is what a [TemperatureSetter] returns (or wraps)
@@ -113,7 +113,7 @@ var (
 // setting after it has begun operation". The server answers
 // INVALID_IN_STATE, as connectedhomeip's HandleSetTemperature does
 // (TemperatureControlCluster.cpp:191, :215).
-var ErrTemperatureRefused = errors.New("temperaturecontrol: the device cannot accept the change now")
+var ErrTemperatureRefused = errors.New("thermo: the device cannot accept the change now")
 
 // TemperatureControlServer implements [contract.ClusterServer] for
 // TemperatureControl. The lists, globals and privileges are the embedded
@@ -150,7 +150,7 @@ func NewTemperatureControl(cfg TemperatureControlConfig) (*TemperatureControlSer
 	}
 	inst, err := spec.New(tc.Definition, spec.Options{Features: uint32(cfg.Features)})
 	if err != nil {
-		return nil, fmt.Errorf("temperaturecontrol: %w", err)
+		return nil, fmt.Errorf("thermo: %w", err)
 	}
 	s := &TemperatureControlServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
 	s.cfg.SupportedTemperatureLevels = slices.Clone(cfg.SupportedTemperatureLevels)
@@ -307,7 +307,7 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 			// cannot accept (TemperatureControlCluster.cpp:191, :215).
 			return nil, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("temperaturecontrol: SetTemperature: %v", err)}
 		}
-		return nil, fmt.Errorf("temperaturecontrol: SetTemperature: %w", err)
+		return nil, fmt.Errorf("thermo: SetTemperature: %w", err)
 	}
 	// The requested value becomes the attribute's, as chip's
 	// SetTemperatureSetpoint / SetSelectedTemperatureLevel set it

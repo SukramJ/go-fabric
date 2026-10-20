@@ -104,35 +104,35 @@ func parseDeclaration(b []byte) (*declaration, error) {
 		return nil, err
 	}
 	if len(contentInfo.elements) < 2 {
-		return nil, errors.New("invalid CMS ContentInfo structure")
+		return nil, errors.New("attestation: invalid CMS ContentInfo structure")
 	}
 	wrapper := contentInfo.elements[1]
 	if wrapper.tag != 0xa0 || len(wrapper.elements) < 1 {
-		return nil, errors.New("invalid CMS SignedData wrapper")
+		return nil, errors.New("attestation: invalid CMS SignedData wrapper")
 	}
 	signedData := wrapper.elements[0].elements
 	if len(signedData) < 4 {
-		return nil, errors.New("invalid CMS SignedData structure")
+		return nil, errors.New("attestation: invalid CMS SignedData structure")
 	}
 	encap := signedData[2].elements
 	if len(encap) < 2 {
-		return nil, errors.New("invalid encapContentInfo structure")
+		return nil, errors.New("attestation: invalid encapContentInfo structure")
 	}
 	eContentWrapper := encap[1]
 	if eContentWrapper.tag != 0xa0 || len(eContentWrapper.elements) < 1 {
-		return nil, errors.New("invalid eContent wrapper in encapContentInfo")
+		return nil, errors.New("attestation: invalid eContent wrapper in encapContentInfo")
 	}
 	eContent := eContentWrapper.elements[0].bytes
 	signerInfos := signedData[3].elements
 	if len(signerInfos) < 1 {
-		return nil, errors.New("no SignerInfo found in SignedData")
+		return nil, errors.New("attestation: no SignerInfo found in SignedData")
 	}
 	signerInfo := signerInfos[0].elements
 	if len(signerInfo) < 5 {
-		return nil, errors.New("invalid SignerInfo structure")
+		return nil, errors.New("attestation: invalid SignerInfo structure")
 	}
 	if signerInfo[1].tag != 0x80 {
-		return nil, errors.New("expected SubjectKeyIdentifier context tag [0] in SignerInfo")
+		return nil, errors.New("attestation: expected SubjectKeyIdentifier context tag [0] in SignerInfo")
 	}
 	content, err := decodeCDContent(eContent)
 	if err != nil {

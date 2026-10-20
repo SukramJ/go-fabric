@@ -176,7 +176,7 @@ func LoadScenesState(data []byte, persist func([]byte)) (*ScenesState, error) {
 		return s, nil
 	}
 	if err := json.Unmarshal(data, &s.table); err != nil {
-		return s, fmt.Errorf("matter: ScenesManagement: restore scene table: %w", err)
+		return s, fmt.Errorf("core: ScenesManagement: restore scene table: %w", err)
 	}
 	return s, nil
 }
@@ -344,7 +344,7 @@ type ScenesManagement struct {
 // NewScenesManagement returns the server; cfg.State is required.
 func NewScenesManagement(cfg ScenesConfig) (*ScenesManagement, error) {
 	if cfg.State == nil {
-		return nil, errors.New("matter: ScenesManagement: state is required")
+		return nil, errors.New("core: ScenesManagement: state is required")
 	}
 	return &ScenesManagement{cfg: cfg}, nil
 }
@@ -483,7 +483,7 @@ var scenesInst = mustInstance(scenesdef.Definition, spec.Options{
 // MatterWrite implements [contract.ClusterServer]: nothing is writable.
 func (s *ScenesManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := scenesInst.ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("matter: ScenesManagement attribute 0x%04X is read-only", attrID), status: err}
+	return refusedWrite{sentinel: fmt.Errorf("core: ScenesManagement attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -604,7 +604,7 @@ type scenesStatusError struct {
 	msg    string
 }
 
-func (e scenesStatusError) Error() string                   { return "matter: ScenesManagement: " + e.msg }
+func (e scenesStatusError) Error() string                   { return "core: ScenesManagement: " + e.msg }
 func (e scenesStatusError) MatterStatusCode() im.StatusCode { return e.status }
 
 // MatterInvoke implements [contract.ClusterServer]. Every command is
@@ -668,7 +668,7 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 		}
 		return s.copyScene(ctx, fabric, req), nil
 	}
-	return nil, im.UnsupportedCommandf("matter: ScenesManagement command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: ScenesManagement command 0x%02X not supported", cmdID)
 }
 
 // groupValid is matter.js #assertSceneCommandParameter's group check.

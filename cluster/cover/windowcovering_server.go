@@ -67,17 +67,17 @@ const ServedLiftTiltFeatureMap = ServedFeatureMap | ServedTiltFeatureMap
 
 // ErrFeatureMap reports a Config.FeatureMap other than [ServedFeatureMap],
 // [ServedTiltFeatureMap] or [ServedLiftTiltFeatureMap].
-var ErrFeatureMap = errors.New("windowcovering: FeatureMap names features this server does not serve")
+var ErrFeatureMap = errors.New("cover: FeatureMap names features this server does not serve")
 
 // ErrMoverWithMoveStep reports a [Config] that sets both a Mover and a
 // MoveStep: the device moves, the server does not simulate it.
-var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.MoveStep exclude each other")
+var ErrMoverWithMoveStep = errors.New("cover: Config.Mover and Config.MoveStep exclude each other")
 
 // ErrEnumValue reports a Config.Type or Config.EndProductType the
 // FeatureMap's conformance disallows: a shutter (Shutter, SwingingShutter:
 // "LF & !TL | !LF & TL") that lifts and tilts, a roller shade ("LF & !TL")
 // on a covering that tilts too.
-var ErrEnumValue = errors.New("windowcovering: Type or EndProductType not allowed under the FeatureMap")
+var ErrEnumValue = errors.New("cover: Type or EndProductType not allowed under the FeatureMap")
 
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
@@ -559,7 +559,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		}
 		return command{tilt: &pct}, nil
 	default:
-		return command{}, fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
+		return command{}, fmt.Errorf("cover: unknown command 0x%02X", cmdID)
 	}
 }
 
@@ -865,52 +865,52 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 		pct = v.LiftPercent100thsValue
 	case *wcdef.GoToLiftPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
 	case wire.GoToLiftPercentageRequest:
 		pct = v.LiftPercent100thsValue
 	case *wire.GoToLiftPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
 	case wcdef.GoToTiltPercentageRequest:
 		pct = v.TiltPercent100thsValue
 	case *wcdef.GoToTiltPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
 	case wire.GoToTiltPercentageRequest:
 		pct = v.TiltPercent100thsValue
 	case *wire.GoToTiltPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
 	case map[uint8]any:
 		raw, ok := v[goToPercentageFieldValue]
 		if !ok {
-			return 0, fmt.Errorf("windowcovering: %s missing Percent100thsValue (field 0)", cmd)
+			return 0, fmt.Errorf("cover: %s missing Percent100thsValue (field 0)", cmd)
 		}
 		n, isUint := raw.(uint64)
 		if !isUint || n > math.MaxUint16 {
-			return 0, fmt.Errorf("windowcovering: %s Percent100thsValue %v (%T) is not a uint16", cmd, raw, raw)
+			return 0, fmt.Errorf("cover: %s Percent100thsValue %v (%T) is not a uint16", cmd, raw, raw)
 		}
 		pct = uint16(n)
 	case map[string]any:
 		raw, ok := v["percent"]
 		if !ok {
-			return 0, fmt.Errorf("windowcovering: %s missing percent field", cmd)
+			return 0, fmt.Errorf("cover: %s missing percent field", cmd)
 		}
 		var castOK bool
 		pct, castOK = raw.(uint16)
 		if !castOK {
-			return 0, fmt.Errorf("windowcovering: %s percent expected uint16, got %T", cmd, raw)
+			return 0, fmt.Errorf("cover: %s percent expected uint16, got %T", cmd, raw)
 		}
 	default:
-		return 0, fmt.Errorf("windowcovering: %s expected map[uint8]any, a GoTo…PercentageRequest, uint16 or map[string]any, got %T", cmd, fields)
+		return 0, fmt.Errorf("cover: %s expected map[uint8]any, a GoTo…PercentageRequest, uint16 or map[string]any, got %T", cmd, fields)
 	}
 	// Constraint max 10000 per matter.js window-covering-cluster.element.ts:72, :76.
 	if pct > 10000 {

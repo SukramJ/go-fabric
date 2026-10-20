@@ -131,7 +131,7 @@ type ReachableChangedEvent = bdbidef.ReachableChangedEvent
 
 // errBridgedBasicInfoUnknown is returned for unsupported writes /
 // unknown attributes.
-var errBridgedBasicInfoUnknown = errors.New("matter: BridgedDeviceBasicInformation unknown / read-only attribute")
+var errBridgedBasicInfoUnknown = errors.New("core: BridgedDeviceBasicInformation unknown / read-only attribute")
 
 // BridgedConfig carries the bridged device's static metadata. NodeLabel
 // + Reachable + UniqueID are mandatory; the rest are optional.
@@ -181,10 +181,10 @@ type BridgedConfig struct {
 // observed Apple HAP-mapper requirement.
 func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInformation, error) {
 	if cfg.UniqueID == "" {
-		return nil, errors.New("matter: BridgedDeviceBasicInformation Config.UniqueID must be non-empty")
+		return nil, errors.New("core: BridgedDeviceBasicInformation Config.UniqueID must be non-empty")
 	}
 	if cfg.NodeLabel == "" {
-		return nil, errors.New("matter: BridgedDeviceBasicInformation Config.NodeLabel must be non-empty")
+		return nil, errors.New("core: BridgedDeviceBasicInformation Config.NodeLabel must be non-empty")
 	}
 	serialNumber := cfg.SerialNumber
 	if serialNumber == "" {
@@ -447,10 +447,10 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 	}
 	s, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("matter: NodeLabel write expected string, got %T", value)
+		return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 	}
 	if len(s) > 32 {
-		return errors.New("matter: NodeLabel exceeds 32 utf-8 bytes")
+		return errors.New("core: NodeLabel exceeds 32 utf-8 bytes")
 	}
 	b.mu.Lock()
 	b.nodeLabel = s
@@ -468,7 +468,7 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 // MatterInvoke always rejects — BridgedDeviceBasicInformation has no
 // commands.
 func (b *BridgedDeviceBasicInformation) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: BridgedDeviceBasicInformation has no commands (got 0x%02X)", cmdID)
+	return nil, im.UnsupportedCommandf("core: BridgedDeviceBasicInformation has no commands (got 0x%02X)", cmdID)
 }
 
 // MatterReportable returns the list of subscribe-able attributes.

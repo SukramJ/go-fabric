@@ -77,13 +77,13 @@ const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | Thermosta
 	ThermostatFeatureOCC | ThermostatFeaturePRES
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
-var ErrFeatures = errors.New("thermostat: feature selection not served")
+var ErrFeatures = errors.New("thermo: feature selection not served")
 
 // ErrSetpoints reports a ThermostatConfig whose setpoint limits and
 // initial setpoints violate the setpoint rules in a way [New] cannot
 // repair — an absolute minimum above its maximum, or an AUTO deadband the
 // absolute limits leave no room for.
-var ErrSetpoints = errors.New("thermostat: setpoint configuration cannot be fixed")
+var ErrSetpoints = errors.New("thermo: setpoint configuration cannot be fixed")
 
 // Thermostat attribute IDs.
 const (
@@ -1265,7 +1265,7 @@ func (s *ThermostatServer) SetOccupied(occupied bool) {
 func (s *ThermostatServer) SetAbsoluteSetpointLimit(attrID uint32, v int16) error {
 	heat := attrID == thermoAttrAbsMinHeatSetpointLimit || attrID == thermoAttrAbsMaxHeatSetpointLimit
 	if !heat && attrID != thermoAttrAbsMinCoolSetpointLimit && attrID != thermoAttrAbsMaxCoolSetpointLimit {
-		return fmt.Errorf("thermostat: 0x%04X is not an absolute setpoint limit", attrID)
+		return fmt.Errorf("thermo: 0x%04X is not an absolute setpoint limit", attrID)
 	}
 	if !s.inst.Serves(attrID) {
 		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: attribute 0x%04X is not served", attrID)

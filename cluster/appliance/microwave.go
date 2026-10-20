@@ -117,8 +117,8 @@ type MicrowaveConfig struct {
 
 // MicrowaveOvenControl configuration errors.
 var (
-	ErrNoOven         = errors.New("microwaveovencontrol: an Oven is required")
-	ErrMicrowaveValue = errors.New("microwaveovencontrol: value outside the cluster's model")
+	ErrNoOven         = errors.New("appliance: an Oven is required")
+	ErrMicrowaveValue = errors.New("appliance: value outside the cluster's model")
 )
 
 // MicrowaveServer implements [contract.ClusterServer] for
@@ -167,7 +167,7 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 	}
 	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
-		return nil, fmt.Errorf("microwaveovencontrol: %w", err)
+		return nil, fmt.Errorf("appliance: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
 	cookTime := cfg.CookTime

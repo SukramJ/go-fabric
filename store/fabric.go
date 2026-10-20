@@ -71,7 +71,7 @@ type FabricRecord struct {
 func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, fmt.Errorf("matter store: add fabric: begin tx: %w", err)
+		return 0, fmt.Errorf("store: add fabric: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -106,7 +106,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.Label,
 		rec.CompressedID[:],
 	); err != nil {
-		return 0, fmt.Errorf("matter store: add fabric: insert: %w", err)
+		return 0, fmt.Errorf("store: add fabric: insert: %w", err)
 	}
 
 	// Advance the persistent counter past the just-allocated index.
@@ -130,7 +130,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("matter store: add fabric: commit: %w", err)
+		return 0, fmt.Errorf("store: add fabric: commit: %w", err)
 	}
 	return idx, nil
 }
@@ -146,7 +146,7 @@ FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
 		return FabricRecord{}, ErrFabricNotFound
 	}
 	if err != nil {
-		return FabricRecord{}, fmt.Errorf("matter store: get fabric: %w", err)
+		return FabricRecord{}, fmt.Errorf("store: get fabric: %w", err)
 	}
 	return rec, nil
 }
@@ -157,7 +157,7 @@ func (s *Store) ListFabrics(ctx context.Context) ([]FabricRecord, error) {
 SELECT fabric_index, fabric_id, node_id, root_public_key, root_cert, vendor_id, label, compressed_id
 FROM matter_fabrics ORDER BY fabric_index ASC`)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list fabrics: %w", err)
+		return nil, fmt.Errorf("store: list fabrics: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -165,12 +165,12 @@ FROM matter_fabrics ORDER BY fabric_index ASC`)
 	for rows.Next() {
 		rec, err := scanFabric(rows)
 		if err != nil {
-			return nil, fmt.Errorf("matter store: list fabrics: scan: %w", err)
+			return nil, fmt.Errorf("store: list fabrics: scan: %w", err)
 		}
 		out = append(out, rec)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list fabrics: rows: %w", err)
+		return nil, fmt.Errorf("store: list fabrics: rows: %w", err)
 	}
 	return out, nil
 }
@@ -182,11 +182,11 @@ func (s *Store) UpdateFabricLabel(ctx context.Context, fabricIndex uint8, label 
 UPDATE matter_fabrics SET label = ?, updated_at = CURRENT_TIMESTAMP
 WHERE fabric_index = ?`, label, fabricIndex)
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric label: %w", err)
+		return fmt.Errorf("store: update fabric label: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric label: rows affected: %w", err)
+		return fmt.Errorf("store: update fabric label: rows affected: %w", err)
 	}
 	if n == 0 {
 		return ErrFabricNotFound
@@ -203,11 +203,11 @@ func (s *Store) UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, ven
 UPDATE matter_fabrics SET vendor_id = ?, updated_at = CURRENT_TIMESTAMP
 WHERE fabric_index = ?`, vendorID, fabricIndex)
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric vendor id: %w", err)
+		return fmt.Errorf("store: update fabric vendor id: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric vendor id: rows affected: %w", err)
+		return fmt.Errorf("store: update fabric vendor id: rows affected: %w", err)
 	}
 	if n == 0 {
 		return ErrFabricNotFound
@@ -227,11 +227,11 @@ func (s *Store) UpdateFabricNodeID(ctx context.Context, fabricIndex uint8, nodeI
 UPDATE matter_fabrics SET node_id = ?, updated_at = CURRENT_TIMESTAMP
 WHERE fabric_index = ?`, uint64ToBE(nodeID), fabricIndex)
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric node id: %w", err)
+		return fmt.Errorf("store: update fabric node id: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("matter store: update fabric node id: rows affected: %w", err)
+		return fmt.Errorf("store: update fabric node id: rows affected: %w", err)
 	}
 	if n == 0 {
 		return ErrFabricNotFound
@@ -245,11 +245,11 @@ WHERE fabric_index = ?`, uint64ToBE(nodeID), fabricIndex)
 func (s *Store) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
 	if err != nil {
-		return fmt.Errorf("matter store: remove fabric: %w", err)
+		return fmt.Errorf("store: remove fabric: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("matter store: remove fabric: rows affected: %w", err)
+		return fmt.Errorf("store: remove fabric: rows affected: %w", err)
 	}
 	if n == 0 {
 		return ErrFabricNotFound
@@ -272,7 +272,7 @@ func nextFabricIndexFromCounter(ctx context.Context, tx *sql.Tx) (uint8, error) 
 	// Collect occupied indices so we can skip them.
 	rows, err := tx.QueryContext(ctx, `SELECT fabric_index FROM matter_fabrics ORDER BY fabric_index ASC`)
 	if err != nil {
-		return 0, fmt.Errorf("matter store: next fabric index (counter): list: %w", err)
+		return 0, fmt.Errorf("store: next fabric index (counter): list: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -280,14 +280,14 @@ func nextFabricIndexFromCounter(ctx context.Context, tx *sql.Tx) (uint8, error) 
 	for rows.Next() {
 		var got int
 		if scanErr := rows.Scan(&got); scanErr != nil {
-			return 0, fmt.Errorf("matter store: next fabric index (counter): scan: %w", scanErr)
+			return 0, fmt.Errorf("store: next fabric index (counter): scan: %w", scanErr)
 		}
 		if got >= 1 && got <= 254 {
 			occupied[uint8(got)] = struct{}{} //nolint:gosec // bounded by check; see #20
 		}
 	}
 	if rErr := rows.Err(); rErr != nil {
-		return 0, fmt.Errorf("matter store: next fabric index (counter): rows: %w", rErr)
+		return 0, fmt.Errorf("store: next fabric index (counter): rows: %w", rErr)
 	}
 
 	if len(occupied) >= 254 {
@@ -313,7 +313,7 @@ func nextFabricIndexFromCounter(ctx context.Context, tx *sql.Tx) (uint8, error) 
 func nextFreeFabricIndex(ctx context.Context, tx *sql.Tx) (uint8, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT fabric_index FROM matter_fabrics ORDER BY fabric_index ASC`)
 	if err != nil {
-		return 0, fmt.Errorf("matter store: next fabric index: %w", err)
+		return 0, fmt.Errorf("store: next fabric index: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -321,12 +321,12 @@ func nextFreeFabricIndex(ctx context.Context, tx *sql.Tx) (uint8, error) {
 	for rows.Next() {
 		var got int
 		if err := rows.Scan(&got); err != nil {
-			return 0, fmt.Errorf("matter store: next fabric index: scan: %w", err)
+			return 0, fmt.Errorf("store: next fabric index: scan: %w", err)
 		}
 		// CHECK constraint on fabric_index narrows got to [1, 254];
 		// the cast is therefore safe.
 		if got < 1 || got > 254 {
-			return 0, fmt.Errorf("matter store: next fabric index: stored value %d out of range", got)
+			return 0, fmt.Errorf("store: next fabric index: stored value %d out of range", got)
 		}
 		if uint8(got) != want { //nolint:gosec // bounded by the range check above; see #20
 			return want, nil
@@ -339,7 +339,7 @@ func nextFreeFabricIndex(ctx context.Context, tx *sql.Tx) (uint8, error) {
 		want++
 	}
 	if err := rows.Err(); err != nil {
-		return 0, fmt.Errorf("matter store: next fabric index: rows: %w", err)
+		return 0, fmt.Errorf("store: next fabric index: rows: %w", err)
 	}
 	if want > 254 {
 		return 0, ErrFabricExhausted
@@ -363,13 +363,13 @@ func scanFabric(r scanRow) (FabricRecord, error) {
 		return FabricRecord{}, err
 	}
 	if len(fabricID) != 8 {
-		return FabricRecord{}, fmt.Errorf("matter store: fabric_id length=%d, want 8", len(fabricID))
+		return FabricRecord{}, fmt.Errorf("store: fabric_id length=%d, want 8", len(fabricID))
 	}
 	if len(nodeID) != 8 {
-		return FabricRecord{}, fmt.Errorf("matter store: node_id length=%d, want 8", len(nodeID))
+		return FabricRecord{}, fmt.Errorf("store: node_id length=%d, want 8", len(nodeID))
 	}
 	if len(compID) != 8 {
-		return FabricRecord{}, fmt.Errorf("matter store: compressed_id length=%d, want 8", len(compID))
+		return FabricRecord{}, fmt.Errorf("store: compressed_id length=%d, want 8", len(compID))
 	}
 	rec.FabricID = binary.BigEndian.Uint64(fabricID)
 	rec.NodeID = binary.BigEndian.Uint64(nodeID)

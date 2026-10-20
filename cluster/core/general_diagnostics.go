@@ -356,7 +356,7 @@ func (g *GeneralDiagnostics) def() *spec.Instance {
 func (g *GeneralDiagnostics) CheckDataModelTest(maxPathsPerInvoke uint16, logger *slog.Logger) error {
 	if g.noDataModelTest {
 		if maxPathsPerInvoke > 1 {
-			return fmt.Errorf("matter: the DataModelTest feature is mandatory with a maxPathsPerInvoke of %d; select it with GeneralDiagnosticsFeatures.DataModelTest or set maxPathsPerInvoke to 1", maxPathsPerInvoke)
+			return fmt.Errorf("core: the DataModelTest feature is mandatory with a maxPathsPerInvoke of %d; select it with GeneralDiagnosticsFeatures.DataModelTest or set maxPathsPerInvoke to 1", maxPathsPerInvoke)
 		}
 		return nil
 	}
@@ -502,7 +502,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 // as the definition judges them.
 func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := g.def().ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("matter: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID), status: err}
+	return refusedWrite{sentinel: fmt.Errorf("core: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
 // MatterInvoke handles GeneralDiagnostics commands per Matter §11.12.7.
@@ -536,13 +536,13 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		return resp, nil
 	case gendiagCmdPayloadTestRequest:
 		if g.noDataModelTest {
-			return nil, im.UnsupportedCommandf("matter: GeneralDiagnostics PayloadTestRequest needs the DataModelTest feature")
+			return nil, im.UnsupportedCommandf("core: GeneralDiagnostics PayloadTestRequest needs the DataModelTest feature")
 		}
 		return g.payloadTestRequest(fields)
 	case gendiagCmdTestEventTrigger:
 		return nil, g.testEventTrigger(ctx, fields)
 	}
-	return nil, im.UnsupportedCommandf("matter: GeneralDiagnostics command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: GeneralDiagnostics command 0x%02X not supported", cmdID)
 }
 
 // DeviceLoadStruct is DeviceLoadStatus' value, the generated struct of
@@ -637,13 +637,13 @@ const TestEnableKeySize = 16
 // all zero, the value matter.js treats as "not enabled".
 func (g *GeneralDiagnostics) EnableTestEventTriggers(key []byte, handler TestEventTriggerHandler) error {
 	if len(key) != TestEnableKeySize {
-		return fmt.Errorf("matter: test enable key is %d bytes, want %d", len(key), TestEnableKeySize)
+		return fmt.Errorf("core: test enable key is %d bytes, want %d", len(key), TestEnableKeySize)
 	}
 	if allZero(key) {
-		return errors.New("matter: an all-zero test enable key means test event triggers are disabled")
+		return errors.New("core: an all-zero test enable key means test event triggers are disabled")
 	}
 	if handler == nil {
-		return errors.New("matter: test event triggers need a handler")
+		return errors.New("core: test event triggers need a handler")
 	}
 	g.mu.Lock()
 	g.testEnableKey = append([]byte(nil), key...)
@@ -777,7 +777,7 @@ type gendiagStatusErr struct {
 	msg  string
 }
 
-func (e gendiagStatusErr) Error() string                   { return "matter: GeneralDiagnostics " + e.msg }
+func (e gendiagStatusErr) Error() string                   { return "core: GeneralDiagnostics " + e.msg }
 func (e gendiagStatusErr) MatterStatusCode() im.StatusCode { return e.code }
 
 var _ im.StatusCodeError = gendiagStatusErr{}

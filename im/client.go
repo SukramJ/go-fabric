@@ -409,7 +409,7 @@ func readAttributeReports(dec *tlv.Decoder, valueReader AttributeValueReader) ([
 			return out, nil
 		}
 		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
-			return nil, errors.New("AttributeReportIB is not a structure")
+			return nil, errors.New("im: AttributeReportIB is not a structure")
 		}
 		rep, err := readAttributeReport(dec, valueReader)
 		if err != nil {
@@ -472,7 +472,7 @@ func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader
 			rep.DataVersion, rep.HasDataVersion = uint32(el.Uint&0xFFFFFFFF), true
 		case tagAttributeDataPath:
 			if !el.IsContainer || el.Type != tlv.TypeList {
-				return errors.New("AttributeDataIB path is not a list")
+				return errors.New("im: AttributeDataIB path is not a list")
 			}
 			if rep.Path, rep.TagCompression, err = readReportPathFields(dec); err != nil {
 				return err
@@ -507,7 +507,7 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 			return out, nil
 		}
 		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
-			return nil, errors.New("EventReportIB is not a structure")
+			return nil, errors.New("im: EventReportIB is not a structure")
 		}
 		var rep EventReport
 		for {
@@ -589,7 +589,7 @@ func readEventDataFields(dec *tlv.Decoder, rep *EventReport, eventReader EventDa
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagEventDataPath:
 			if !el.IsContainer || el.Type != tlv.TypeList {
-				return errors.New("EventDataIB path is not a list")
+				return errors.New("im: EventDataIB path is not a list")
 			}
 			if rep.Path, err = readEventPathFields(dec); err != nil {
 				return err

@@ -35,7 +35,7 @@ type PresetType = tdef.PresetTypeStruct
 // ErrPresets reports a ThermostatConfig whose presets the server refuses:
 // a NumberOfPresets or PresetTypes outside their constraints, configured
 // presets the write rules refuse, or a [PresetStore] that fails to load.
-var ErrPresets = errors.New("thermostat: preset configuration refused")
+var ErrPresets = errors.New("thermo: preset configuration refused")
 
 // presetHandleLength is the length of a handle the server issues —
 // matter.js `entropy.randomBytes(16)` (ThermostatServer.ts:1526).
@@ -66,11 +66,11 @@ func EncodePresets(presets []Preset) []byte {
 func DecodePresets(b []byte) ([]Preset, error) {
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
 	if err != nil {
-		return nil, fmt.Errorf("thermostat: decode presets: %w", err)
+		return nil, fmt.Errorf("thermo: decode presets: %w", err)
 	}
 	v, err := tdef.Definition.Attribute(tdef.AttrPresets).Decode(n)
 	if err != nil {
-		return nil, fmt.Errorf("thermostat: decode presets: %w", err)
+		return nil, fmt.Errorf("thermo: decode presets: %w", err)
 	}
 	list, _ := v.(spec.List[Preset])
 	return []Preset(list), nil
@@ -293,7 +293,7 @@ func normalizePresetCommit(presets, old []Preset, seeding bool, issued map[strin
 		if p.PresetHandle.Null {
 			h := make([]byte, presetHandleLength)
 			if _, err := rand.Read(h); err != nil {
-				return fmt.Errorf("thermostat: issue a preset handle: %w", err)
+				return fmt.Errorf("thermo: issue a preset handle: %w", err)
 			}
 			p.PresetHandle = spec.ValueOf(h)
 			issued[handleKey(h)] = true
@@ -341,7 +341,7 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 		return nil
 	}
 	if err := s.presetStore.SavePresets(ctx, EncodePresets(presets), bytes.Clone(active)); err != nil {
-		return fmt.Errorf("thermostat: save presets: %w", err)
+		return fmt.Errorf("thermo: save presets: %w", err)
 	}
 	return nil
 }

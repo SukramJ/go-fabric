@@ -47,7 +47,7 @@ type Cipher interface {
 const credentialKeySize = 16
 
 // errCiphertext reports stored credential data the key does not open.
-var errCiphertext = errors.New("doorlock: credential data does not decrypt")
+var errCiphertext = errors.New("lock: credential data does not decrypt")
 
 // gcmCipher is AES-128-GCM with a random nonce per encryption, the nonce
 // ahead of the sealed data. matter.js encrypts with AES-128-CCM
@@ -63,11 +63,11 @@ func NewCredentialCipher(key []byte) (Cipher, error) {
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("doorlock: credential cipher: %w", err)
+		return nil, fmt.Errorf("lock: credential cipher: %w", err)
 	}
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("doorlock: credential cipher: %w", err)
+		return nil, fmt.Errorf("lock: credential cipher: %w", err)
 	}
 	return gcmCipher{aead}, nil
 }
@@ -75,7 +75,7 @@ func NewCredentialCipher(key []byte) (Cipher, error) {
 func (c gcmCipher) Encrypt(plain []byte) ([]byte, error) {
 	nonce := make([]byte, c.aead.NonceSize(), c.aead.NonceSize()+len(plain)+c.aead.Overhead())
 	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("doorlock: credential nonce: %w", err)
+		return nil, fmt.Errorf("lock: credential nonce: %w", err)
 	}
 	return c.aead.Seal(nonce, nonce, plain, nil), nil
 }

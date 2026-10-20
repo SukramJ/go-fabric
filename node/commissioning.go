@@ -367,7 +367,7 @@ type paseCloser struct{ sessions *operational.Manager }
 // ClosePaseSessions implements [bridge.PaseSessionCloser].
 func (c paseCloser) ClosePaseSessions(context.Context) error {
 	if c.sessions == nil {
-		return errors.New("no session manager")
+		return errors.New("node: no session manager")
 	}
 	c.sessions.CloseFabric(0)
 	return nil

@@ -181,7 +181,7 @@ const (
 
 // errBasicInfoUnknown is returned when a write hits an unwritable or
 // unknown attribute.
-var errBasicInfoUnknown = errors.New("matter: BasicInformation unknown / read-only attribute")
+var errBasicInfoUnknown = errors.New("core: BasicInformation unknown / read-only attribute")
 
 // Config carries the bridge's static identity. The fields map 1:1 to
 // the Matter BasicInformation attributes; non-empty values pass
@@ -229,13 +229,13 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// (`vendorId === 0 || vendorId > 0xfff4` → ImplementationError); 0xFFF5-0xFFFF
 	// are reserved test/anchor IDs that are not valid product identities.
 	if cfg.VendorID == 0 || cfg.VendorID > 0xFFF4 {
-		return nil, fmt.Errorf("matter: BasicInformation Config.VendorID 0x%04X is not a valid device identity; it must be in 0x0001-0xFFF4", cfg.VendorID)
+		return nil, fmt.Errorf("core: BasicInformation Config.VendorID 0x%04X is not a valid device identity; it must be in 0x0001-0xFFF4", cfg.VendorID)
 	}
 	if cfg.ProductID == 0 {
-		return nil, errors.New("matter: BasicInformation Config.ProductID must be non-zero")
+		return nil, errors.New("core: BasicInformation Config.ProductID must be non-zero")
 	}
 	if cfg.NodeLabel == "" {
-		return nil, errors.New("matter: BasicInformation Config.NodeLabel must be non-empty")
+		return nil, errors.New("core: BasicInformation Config.NodeLabel must be non-empty")
 	}
 	// A pinned UniqueID goes on the wire verbatim, so it has to satisfy
 	// the attribute's own constraint: Matter §11.1.5.13 caps UniqueID at
@@ -244,7 +244,7 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// packages/node/src/behaviors/basic-information/basic-information-validators.ts:42-44,
 	// and so does validateBasicInfoAttributes below.)
 	if len(cfg.UniqueID) > 32 {
-		return nil, fmt.Errorf("matter: BasicInformation Config.UniqueID exceeds 32 utf-8 bytes (got %d)", len(cfg.UniqueID))
+		return nil, fmt.Errorf("core: BasicInformation Config.UniqueID exceeds 32 utf-8 bytes (got %d)", len(cfg.UniqueID))
 	}
 	loc := cfg.Location
 	if loc == "" {
@@ -754,7 +754,7 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 	case basicInfoAttrNodeLabel:
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("matter: NodeLabel write expected string, got %T", value)
+			return fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 		}
 		if err := b.checkLabelWrite(attrID, s); err != nil {
 			return err
@@ -768,7 +768,7 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 	case basicInfoAttrLocation:
 		s, ok := value.(string)
 		if !ok {
-			return fmt.Errorf("matter: Location write expected string, got %T", value)
+			return fmt.Errorf("core: Location write expected string, got %T", value)
 		}
 		if err := b.checkLabelWrite(attrID, s); err != nil {
 			return err
@@ -804,14 +804,14 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 // the refusal used to surface as FAILURE.
 func (b *BasicInformation) checkLabelWrite(attrID uint32, s string) error {
 	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
-		return refusedWrite{sentinel: fmt.Errorf("matter: BasicInformation 0x%04X write of %d bytes", attrID, len(s)), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: BasicInformation 0x%04X write of %d bytes", attrID, len(s)), status: err}
 	}
 	return nil
 }
 
 // MatterInvoke always rejects — BasicInformation has no commands.
 func (b *BasicInformation) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: BasicInformation has no commands (got 0x%02X)", cmdID)
+	return nil, im.UnsupportedCommandf("core: BasicInformation has no commands (got 0x%02X)", cmdID)
 }
 
 // MatterReportable lists the subscribe-able attributes.
@@ -840,7 +840,7 @@ func (b *BasicInformation) MatterAttributes() []uint32 { return b.inst().MatterA
 // must not echo back into the store.
 func (b *BasicInformation) SetNodeLabel(s string) error {
 	if len(s) > 32 {
-		return errors.New("matter: NodeLabel exceeds 32 utf-8 bytes")
+		return errors.New("core: NodeLabel exceeds 32 utf-8 bytes")
 	}
 	b.mu.Lock()
 	b.nodeLabel = s
@@ -870,7 +870,7 @@ func (b *BasicInformation) OtaNodeInformation() OtaNodeInformation {
 // held to its "1 to 64" (basic-information.element.ts).
 func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString string) error {
 	if versionString == "" || len(versionString) > 64 {
-		return fmt.Errorf("matter: SoftwareVersionString must be 1 to 64 bytes (got %d)", len(versionString))
+		return fmt.Errorf("core: SoftwareVersionString must be 1 to 64 bytes (got %d)", len(versionString))
 	}
 	b.mu.Lock()
 	b.softwareVersion = version
@@ -885,7 +885,7 @@ func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString stri
 // path; does NOT fire the persistence hook.
 func (b *BasicInformation) SetLocation(s string) error {
 	if len(s) != 2 {
-		return fmt.Errorf("matter: Location must be ISO-3166 2-letter (got len=%d)", len(s))
+		return fmt.Errorf("core: Location must be ISO-3166 2-letter (got len=%d)", len(s))
 	}
 	b.mu.Lock()
 	b.location = s

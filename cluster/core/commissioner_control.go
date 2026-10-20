@@ -195,8 +195,8 @@ type CommissionerControl struct {
 }
 
 var (
-	errNilApprover     = errors.New("an approver is required")
-	errNilCommissioner = errors.New("a commissioner is required")
+	errNilApprover     = errors.New("core: an approver is required")
+	errNilCommissioner = errors.New("core: a commissioner is required")
 )
 
 // NewCommissionerControl builds a CommissionerControl server.

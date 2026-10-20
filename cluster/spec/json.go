@@ -325,7 +325,7 @@ func octets(s string, typed bool) ([]byte, error) {
 	case typed:
 		return hex.DecodeString(s)
 	}
-	return nil, errors.New("not an octet string")
+	return nil, errors.New("spec: not an octet string")
 }
 
 func encodeStruct(tag tlv.Tag, st *Struct, m map[string]any, path string) (Node, error) {

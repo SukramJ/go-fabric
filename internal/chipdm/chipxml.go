@@ -839,7 +839,7 @@ func expressionOf(n *xmlNode) (*Conf, error) {
 	case "enum":
 		v, ok := n.attr("value")
 		if !ok {
-			return nil, errors.New("<enum> in conformance has no value")
+			return nil, errors.New("chipdm: <enum> in conformance has no value")
 		}
 		return &Conf{Op: opName, Atom: v}, nil
 	case "literal", "number", "value":
@@ -874,7 +874,7 @@ func revisionOf(n *xmlNode) (*Conf, bool, error) {
 		return nil, false, err
 	}
 	if rev == nil {
-		return nil, false, errors.New("revision conformance without a revision")
+		return nil, false, errors.New("chipdm: revision conformance without a revision")
 	}
 	return &Conf{Op: opRevision, Rev: asInt(*rev)}, true, nil
 }
@@ -1165,11 +1165,11 @@ func constraintExpr(n *xmlNode, inExpr bool) (string, error) {
 			op = constraintOperations[strings.TrimSpace(opNode.Text)]
 		}
 		if op == "" {
-			return "", errors.New("unsupported constraint operation")
+			return "", errors.New("chipdm: unsupported constraint operation")
 		}
 		left, right := n.child("left"), n.child("right")
 		if left == nil || right == nil {
-			return "", errors.New("<compute> lacks an operand")
+			return "", errors.New("chipdm: <compute> lacks an operand")
 		}
 		lhs, err := nestedBound(left)
 		if err != nil {

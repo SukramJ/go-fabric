@@ -651,7 +651,7 @@ func (p *confParser) choice(expr *Conf) (*Conf, error) {
 
 func (p *confParser) atomic() (*Conf, error) {
 	if p.done() {
-		return nil, errors.New("conformance: expression expected")
+		return nil, errors.New("chipdm: conformance: expression expected")
 	}
 	t := p.tok()
 	switch t.kind {
@@ -675,7 +675,7 @@ func (p *confParser) atomic() (*Conf, error) {
 					return &Conf{Op: opRevision, Rev: n}, nil
 				}
 			}
-			return nil, errors.New("conformance: malformed revision conformance")
+			return nil, errors.New("chipdm: conformance: malformed revision conformance")
 		}
 		return &Conf{Op: opName, Atom: t.text}, nil
 	case "value":
@@ -695,7 +695,7 @@ func (p *confParser) atomic() (*Conf, error) {
 			return nil, err
 		}
 		if !p.at(")") {
-			return nil, errors.New("conformance: unterminated group")
+			return nil, errors.New("chipdm: conformance: unterminated group")
 		}
 		p.next()
 		return inner, nil

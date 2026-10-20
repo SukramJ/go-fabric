@@ -740,7 +740,7 @@ type rejectingVerifier struct{}
 
 // VerifyAndExtractPubKey implements [sigma.PeerVerifier].
 func (rejectingVerifier) VerifyAndExtractPubKey(_, _ []byte) (*ecdsa.PublicKey, error) {
-	return nil, errors.New("no fabric installed yet: commission the bridge before opening a CASE session")
+	return nil, errors.New("node: no fabric installed yet: commission the bridge before opening a CASE session")
 }
 
 // operationalResolver is the mDNS resolver of the node's CASE initiator,

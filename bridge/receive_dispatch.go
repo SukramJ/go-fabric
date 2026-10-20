@@ -27,7 +27,7 @@ import (
 // ReportData chunk with an error StatusResponse; the interaction is
 // abandoned, exactly as matter.js's waitForSuccess throws
 // (packages/protocol/src/interaction/InteractionMessenger.ts:183-196).
-var errChunkRejected = errors.New("receive: peer rejected ReportData chunk")
+var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 
 // errChunkUnanswered is returned by a chunk loop when the peer never
 // answered a ReportData chunk within the exchange timeout. matter.js
@@ -35,7 +35,7 @@ var errChunkRejected = errors.New("receive: peer rejected ReportData chunk")
 // PeerMessageMissingError); continuing would stream every remaining
 // chunk to a peer that is not listening, holding the dispatch slot for
 // the whole report.
-var errChunkUnanswered = errors.New("receive: peer did not answer ReportData chunk")
+var errChunkUnanswered = errors.New("bridge: peer did not answer ReportData chunk")
 
 // absorbStatusResponse handles an inbound StatusResponse opcode.
 // StatusResponse is the spec-mandated ACK for a ReportData /

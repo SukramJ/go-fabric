@@ -71,7 +71,7 @@ func NewEthernetNetworkDiagnostics(cfg EthernetNetworkDiagnosticsConfig) (*spec.
 }
 
 // ErrNilReporter rejects a diagnostics server built without its host port.
-var ErrNilReporter = errors.New("a reporter is required")
+var ErrNilReporter = errors.New("core: a reporter is required")
 
 // ethernetSource answers the served attributes from the host, in the
 // stored form the reply encoder writes: a uint8 for the enum, nil for

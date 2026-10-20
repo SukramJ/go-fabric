@@ -151,7 +151,7 @@ func (d *githubDir) load(ctx context.Context) error {
 		return err
 	}
 	if resp.Tree == nil {
-		return errors.New("no tree in fetch response")
+		return errors.New("dcl: no tree in fetch response")
 	}
 	d.mu.Lock()
 	d.contents = make(map[string]githubEntry, len(resp.Tree))

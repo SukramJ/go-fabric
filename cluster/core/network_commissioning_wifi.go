@@ -105,7 +105,7 @@ const (
 // networking status, network id and connect error null.
 func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetworkCommissioning, error) {
 	if cfg.Driver == nil {
-		return nil, errors.New("matter: Wi-Fi NetworkCommissioning needs a driver")
+		return nil, errors.New("core: Wi-Fi NetworkCommissioning needs a driver")
 	}
 	w := &WiFiNetworkCommissioning{
 		driver: cfg.Driver, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
@@ -241,11 +241,11 @@ func (w *WiFiNetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 func (w *WiFiNetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != netcommAttrInterfaceEnabled {
 		_, err := wifiNetcommInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("matter: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(bool)
 	if !ok {
-		return fmt.Errorf("matter: InterfaceEnabled write expected bool, got %T", value)
+		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
 	w.mu.Lock()
 	w.interfaceEnabled = v
@@ -273,42 +273,42 @@ func (w *WiFiNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint3
 	w.mu.Lock()
 	if w.busy {
 		w.mu.Unlock()
-		return nil, netcommStatus(im.StatusBusy, "matter: NetworkCommissioning is busy")
+		return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
 	}
 	w.mu.Unlock()
 	switch cmdID {
 	case netcommdef.CmdScanNetworks:
 		req, ok := fields.(netcommdef.ScanNetworksRequest)
 		if !ok {
-			return nil, netcommStatus(im.StatusInvalidCommand, "matter: ScanNetworks fields %T", fields)
+			return nil, netcommStatus(im.StatusInvalidCommand, "core: ScanNetworks fields %T", fields)
 		}
 		return w.scanNetworks(ctx, req)
 	case netcommdef.CmdAddOrUpdateWiFiNetwork:
 		req, ok := fields.(netcommdef.AddOrUpdateWiFiNetworkRequest)
 		if !ok {
-			return nil, netcommStatus(im.StatusInvalidCommand, "matter: AddOrUpdateWiFiNetwork fields %T", fields)
+			return nil, netcommStatus(im.StatusInvalidCommand, "core: AddOrUpdateWiFiNetwork fields %T", fields)
 		}
 		return w.addOrUpdate(req)
 	case netcommdef.CmdRemoveNetwork:
 		req, ok := fields.(netcommdef.RemoveNetworkRequest)
 		if !ok {
-			return nil, netcommStatus(im.StatusInvalidCommand, "matter: RemoveNetwork fields %T", fields)
+			return nil, netcommStatus(im.StatusInvalidCommand, "core: RemoveNetwork fields %T", fields)
 		}
 		return w.remove(req)
 	case netcommdef.CmdConnectNetwork:
 		req, ok := fields.(netcommdef.ConnectNetworkRequest)
 		if !ok {
-			return nil, netcommStatus(im.StatusInvalidCommand, "matter: ConnectNetwork fields %T", fields)
+			return nil, netcommStatus(im.StatusInvalidCommand, "core: ConnectNetwork fields %T", fields)
 		}
 		return w.connect(ctx, req)
 	case netcommdef.CmdReorderNetwork:
 		req, ok := fields.(netcommdef.ReorderNetworkRequest)
 		if !ok {
-			return nil, netcommStatus(im.StatusInvalidCommand, "matter: ReorderNetwork fields %T", fields)
+			return nil, netcommStatus(im.StatusInvalidCommand, "core: ReorderNetwork fields %T", fields)
 		}
 		return w.reorder(req)
 	}
-	return nil, im.UnsupportedCommandf("matter: NetworkCommissioning command 0x%02X not supported (Wi-Fi)", cmdID)
+	return nil, im.UnsupportedCommandf("core: NetworkCommissioning command 0x%02X not supported (Wi-Fi)", cmdID)
 }
 
 func (w *WiFiNetworkCommissioning) breadcrumb(bc *uint64) {
@@ -363,7 +363,7 @@ func (w *WiFiNetworkCommissioning) scanNetworks(ctx context.Context, req netcomm
 		w.setStatusLocked(netcommdef.NetworkCommissioningStatusUnknownError)
 		w.dataVersion.Bump()
 		w.mu.Unlock()
-		return nil, netcommStatus(im.StatusConstraintError, "matter: ScanNetworks SSID of %d bytes", len(ssid))
+		return nil, netcommStatus(im.StatusConstraintError, "core: ScanNetworks SSID of %d bytes", len(ssid))
 	}
 	w.busy = true
 	w.mu.Unlock()
@@ -422,13 +422,13 @@ func validCredentials(c []byte) bool {
 // writes the breadcrumb and changes the list.
 func (w *WiFiNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateWiFiNetworkRequest) (any, error) {
 	if !w.failSafeArmed() {
-		return nil, netcommStatus(im.StatusFailsafeRequired, "matter: AddOrUpdateWiFiNetwork needs an armed failsafe")
+		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateWiFiNetwork needs an armed failsafe")
 	}
 	if len(req.Ssid) == 0 || len(req.Ssid) > maxWiFiSSIDLength {
-		return nil, netcommStatus(im.StatusConstraintError, "matter: AddOrUpdateWiFiNetwork ssid")
+		return nil, netcommStatus(im.StatusConstraintError, "core: AddOrUpdateWiFiNetwork ssid")
 	}
 	if !validCredentials(req.Credentials) {
-		return nil, netcommStatus(im.StatusConstraintError, "matter: AddOrUpdateWiFiNetwork credentials of %d bytes", len(req.Credentials))
+		return nil, netcommStatus(im.StatusConstraintError, "core: AddOrUpdateWiFiNetwork credentials of %d bytes", len(req.Credentials))
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -458,7 +458,7 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(req netcommdef.AddOrUpdateWiFiNet
 // network id and connect error are cleared.
 func (w *WiFiNetworkCommissioning) remove(req netcommdef.RemoveNetworkRequest) (any, error) {
 	if !w.failSafeArmed() {
-		return nil, netcommStatus(im.StatusFailsafeRequired, "matter: RemoveNetwork needs an armed failsafe")
+		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -504,10 +504,10 @@ func (w *WiFiNetworkCommissioning) reorder(req netcommdef.ReorderNetworkRequest)
 // connected and writes the breadcrumb.
 func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.ConnectNetworkRequest) (any, error) {
 	if len(req.NetworkId) > maxNetworkIDLength {
-		return nil, netcommStatus(im.StatusConstraintError, "matter: ConnectNetwork network id of %d bytes", len(req.NetworkId))
+		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
 	}
 	if !w.failSafeArmed() {
-		return nil, netcommStatus(im.StatusFailsafeRequired, "matter: ConnectNetwork needs an armed failsafe")
+		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
 	i := w.indexLocked(req.NetworkId)

@@ -163,10 +163,10 @@ type DimensionConfig struct {
 
 // ClosureDimension errors.
 var (
-	ErrNoDimensionHandler = errors.New("closuredimension: a DimensionHandler is required")
+	ErrNoDimensionHandler = errors.New("closure: a DimensionHandler is required")
 	// ErrDimensionValue: a value chip's setters refuse (CHIP_ERROR_
 	// INVALID_ARGUMENT or CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE).
-	ErrDimensionValue = errors.New("closuredimension: value outside the cluster's rules")
+	ErrDimensionValue = errors.New("closure: value outside the cluster's rules")
 )
 
 // DimensionServer implements [contract.ClusterServer] for
@@ -207,7 +207,7 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	}
 	inst, err := spec.New(cd.Definition, spec.Options{Features: uint32(cfg.Features)})
 	if err != nil {
-		return nil, fmt.Errorf("closuredimension: %w", err)
+		return nil, fmt.Errorf("closure: %w", err)
 	}
 	switch {
 	case cfg.Clock != nil:

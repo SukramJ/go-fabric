@@ -414,7 +414,7 @@ var oidECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 func verifyCRLSignature(signer *x509.Certificate, tbs, algorithm, value []byte) error {
 	alg, err := derDecode(algorithm)
 	if err != nil || len(alg.elements) == 0 || alg.elements[0].tag != derObjectID {
-		return errors.New("signature algorithm identifier holds no OID")
+		return errors.New("dcl: signature algorithm identifier holds no OID")
 	}
 	var oid asn1.ObjectIdentifier
 	if _, err := asn1.Unmarshal(derEncode(alg.elements[0]), &oid); err != nil || !oid.Equal(oidECDSAWithSHA256) {
@@ -422,11 +422,11 @@ func verifyCRLSignature(signer *x509.Certificate, tbs, algorithm, value []byte) 
 	}
 	key, err := attestation.P256Key(signer)
 	if err != nil {
-		return errors.New("signature is ecdsa-with-SHA256 but the signer key is not ECDSA-P256")
+		return errors.New("dcl: signature is ecdsa-with-SHA256 but the signer key is not ECDSA-P256")
 	}
 	digest := sha256.Sum256(tbs)
 	if !ecdsa.VerifyASN1(key, digest[:], value) {
-		return errors.New("signature does not verify")
+		return errors.New("dcl: signature does not verify")
 	}
 	return nil
 }

@@ -475,16 +475,16 @@ func (c *Config) Validate() error {
 	}
 	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
-		errs = append(errs, errors.New("ProductDescription.VendorID and ProductID must be non-zero"))
+		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
 	}
 	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
-		errs = append(errs, errors.New("BasicInformation.NodeLabel must be non-empty"))
+		errs = append(errs, errors.New("node: BasicInformation.NodeLabel must be non-empty"))
 	}
 	switch {
 	case c.Store.Path != "" && c.Store.DB != nil:
-		errs = append(errs, errors.New("Store takes Path or DB, not both"))
+		errs = append(errs, errors.New("node: Store takes Path or DB, not both"))
 	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
-		errs = append(errs, errors.New("Store needs Path, DB, or both Credentials and Endpoints"))
+		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
@@ -496,9 +496,9 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
-		errs = append(errs, errors.New("Attestation.Files excludes Chain and CertificationDeclaration"))
+		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
-		errs = append(errs, errors.New("Attestation.BlockCommissioningOnError needs Files"))
+		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
 	if c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
@@ -507,7 +507,7 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
-		errs = append(errs, errors.New("OTA.Dir must be set"))
+		errs = append(errs, errors.New("node: OTA.Dir must be set"))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)

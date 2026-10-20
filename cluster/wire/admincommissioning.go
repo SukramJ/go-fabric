@@ -508,7 +508,7 @@ func openWindowParams(fields any) (OpenWindowParams, bool) {
 type admCommBusyErr struct{}
 
 func (admCommBusyErr) Error() string {
-	return "matter: AdministratorCommissioning busy (no controller wired)"
+	return "wire: AdministratorCommissioning busy (no controller wired)"
 }
 
 // MatterStatusCode / MatterClusterStatus: FAILURE with the cluster-specific
@@ -527,7 +527,7 @@ func (admCommBusyErr) MatterClusterStatus() uint8      { return 0x02 } // Busy
 type admCommPakeErr struct{}
 
 func (admCommPakeErr) Error() string {
-	return "matter: AdministratorCommissioning PAKE parameter out of range"
+	return "wire: AdministratorCommissioning PAKE parameter out of range"
 }
 func (admCommPakeErr) MatterStatusCode() im.StatusCode { return im.StatusFailure }
 func (admCommPakeErr) MatterClusterStatus() uint8      { return 0x03 } // PAKEParameterError
@@ -542,7 +542,7 @@ func (admCommPakeErr) MatterClusterStatus() uint8      { return 0x03 } // PAKEPa
 type admCommWindowNotOpenErr struct{}
 
 func (admCommWindowNotOpenErr) Error() string {
-	return "matter: AdministratorCommissioning window not open"
+	return "wire: AdministratorCommissioning window not open"
 }
 func (admCommWindowNotOpenErr) MatterStatusCode() im.StatusCode { return im.StatusFailure }
 func (admCommWindowNotOpenErr) MatterClusterStatus() uint8      { return 0x04 } // WindowNotOpen
@@ -556,7 +556,7 @@ func (admCommWindowNotOpenErr) MatterClusterStatus() uint8      { return 0x04 } 
 type admCommInvalidFieldsErr struct{}
 
 func (admCommInvalidFieldsErr) Error() string {
-	return "matter: AdministratorCommissioning fields malformed"
+	return "wire: AdministratorCommissioning fields malformed"
 }
 func (admCommInvalidFieldsErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
 
@@ -581,7 +581,7 @@ var (
 //   - [ErrAdmCommWindowNotOpen]       → §11.19.8.3 WindowNotOpen cluster-specific failure
 var (
 	errAdmCommBusy               = admCommBusyErr{}
-	errAdmCommUnsupportedCommand = im.UnsupportedCommandf("matter: AdministratorCommissioning command unsupported")
+	errAdmCommUnsupportedCommand = im.UnsupportedCommandf("wire: AdministratorCommissioning command unsupported")
 	errAdmCommInvalidFields      = admCommInvalidFieldsErr{}
 	// errAdmCommPakeParameter mirrors Matter §11.19.7.3
 	// PakeParameterError (0x02). Surfaces when OpenCommissioningWindow
