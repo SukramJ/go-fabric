@@ -115,13 +115,13 @@ func TestTypedHandleMoveToLevel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp, err := s.MatterInvoke(ctx, levelcontroldef.CmdMoveToLevel, fields); resp != nil || err != nil {
+	if resp, err := s.Underlying().MatterInvoke(ctx, levelcontroldef.CmdMoveToLevel, fields); resp != nil || err != nil {
 		t.Errorf("MoveToLevel answered %#v, %v", resp, err)
 	}
 	if len(got) != 1 || got[0] != want {
 		t.Errorf("the handler received %+v, want %+v", got, want)
 	}
-	if _, err := s.MatterInvoke(ctx, levelcontroldef.CmdMoveToLevel, levelcontroldef.MoveToLevelRequest{Level: 250}); !errors.Is(err, refusal) {
+	if _, err := s.Underlying().MatterInvoke(ctx, levelcontroldef.CmdMoveToLevel, levelcontroldef.MoveToLevelRequest{Level: 250}); !errors.Is(err, refusal) {
 		t.Errorf("the handler's refusal: %v", err)
 	}
 
@@ -148,17 +148,17 @@ func TestTypedOnWrite(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.Is(err, refusal) {
+	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.Is(err, refusal) {
 		t.Fatalf("a vetoed write: %v", err)
 	}
 	var sce im.StatusCodeError
-	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure {
+	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure {
 		t.Errorf("a plain veto answers %v", err)
 	}
 	if got := s.Get(); got.OnLevel != nil {
 		t.Errorf("a vetoed write stored %d", *got.OnLevel)
 	}
-	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(120)); err != nil {
+	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(120)); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.Get(); got.OnLevel == nil || *got.OnLevel != 120 {
@@ -170,7 +170,7 @@ func TestTypedOnWrite(t *testing.T) {
 	if err := s.OnWrite(nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(180)); err != nil {
+	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(180)); err != nil {
 		t.Errorf("a removed veto: %v", err)
 	}
 }
@@ -193,5 +193,15 @@ func TestTypedOverTheSelfHeldServer(t *testing.T) {
 	}
 	if err := s.OnWrite(nil); !errors.Is(err, spec.ErrNoWriteVeto) {
 		t.Errorf("OnWrite: %v", err)
+	}
+}
+
+// TestTypedServerIsNotMountable: the typed server is no
+// contract.ClusterServer, so a host cannot mount it in place of the
+// server it wraps.
+func TestTypedServerIsNotMountable(t *testing.T) {
+	t.Parallel()
+	if reflect.TypeFor[*levelcontroldef.Server]().Implements(reflect.TypeFor[contract.ClusterServer]()) {
+		t.Error("*levelcontroldef.Server implements contract.ClusterServer")
 	}
 }

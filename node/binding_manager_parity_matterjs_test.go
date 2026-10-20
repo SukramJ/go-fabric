@@ -248,7 +248,7 @@ func (b *bqSwitch) writeBinding(t *testing.T, i int, entries ...core.TargetStruc
 		entries = []core.TargetStruct{}
 	}
 	if err := b.dev.Act(func(*node.Node) error {
-		return b.switches[i].Binding().MatterWrite(im.WithFabricFilter(parityCtx(t), false, b.fabric), bindingdef.AttrBinding, entries)
+		return b.switches[i].Binding().Underlying().MatterWrite(im.WithFabricFilter(parityCtx(t), false, b.fabric), bindingdef.AttrBinding, entries)
 	}); err != nil {
 		t.Fatalf("Binding write: %v", err)
 	}

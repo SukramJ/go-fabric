@@ -25,11 +25,11 @@ func TestDefaultServerCommandsUnimplementedUntilHandled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lc := d.LevelControl()
+	lc, _ := d.LevelControl().Underlying().(*spec.Server)
 	if got := lc.MatterAcceptedCommands(); len(got) != 0 {
 		t.Fatalf("AcceptedCommandList %v before any handler", got)
 	}
-	lc.Underlying().(*spec.Server).Handle(levelcontroldef.CmdMoveToLevel, func(context.Context, any) (any, error) { return nil, nil })
+	lc.Handle(levelcontroldef.CmdMoveToLevel, func(context.Context, any) (any, error) { return nil, nil })
 	if got := lc.MatterAcceptedCommands(); !slices.Equal(got, []uint32{levelcontroldef.CmdMoveToLevel}) {
 		t.Fatalf("AcceptedCommandList %v after Handle", got)
 	}

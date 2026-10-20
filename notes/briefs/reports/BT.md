@@ -21,8 +21,8 @@ Example: `cluster/spec/levelcontrol/server_gen.go`, 154 lines, 7 982 bytes.
   nullable as a pointer, lists as slices; a `matter:"0x…"` tag and an
   `// attribute 0x…` comment per field. `Patch`: the same fields as
   pointers (nil leaves), `Null []uint32` where a nullable attribute exists.
-- `Server struct{ spec.Hull }`: `Wrap(contract.ClusterServer)` (nil for
-  nil, a typed server as it is), `Underlying()`, `Set(Patch) error`,
+- `Server struct{ spec.Wrapper }`: `Wrap(contract.ClusterServer)` (nil
+  for nil), `Underlying()`, `Set(Patch) error`,
   `Get() State`, `OnChanged(func(State, []uint32)) func()`,
   `OnWrite(func(ctx, next State, attrID) error) error`,
   `Handle<Command>(func(ctx, <Cmd>Request) (<Resp>, error)) error` per
@@ -31,8 +31,11 @@ Example: `cluster/spec/levelcontrol/server_gen.go`, 154 lines, 7 982 bytes.
   per event (127 emitters across the committed packages).
 - Every generated method is one line over `cluster/spec/typed.go`
   (`SetPatch`, `StateOf`, `OnChangedOf`, `OnWriteOf`, `HandleOn`,
-  `EmitOn`, `PatchValues`, `HandlerOf`) and `cluster/spec/hull.go`
-  (`Hull`); the value conversion (width integer → enum/bitmap,
+  `EmitOn`, `PatchValues`, `HandlerOf`); `cluster/spec/wrapper.go`
+  (`Wrapper`) only holds the server. The typed server is not a
+  `contract.ClusterServer` (asserted by reflect in `cluster/spec` and
+  `cluster/spec/levelcontrol`), so it cannot be mounted; a typed server is
+  never wrapped twice for the same reason. The value conversion (width integer → enum/bitmap,
   `spec.List[T]` → `[]T`, generic lists entry by entry, nil → nil pointer /
   null `Nullable`) is tested once (`typed_internal_test.go`).
 - The `// Mirrors` comments are in `hull.go` only: `Endpoint.ts:256-262`
@@ -144,15 +147,16 @@ clean run.
 
 ## Differences to the brief
 
-1. The device does not mount the typed server; accessors wrap on access.
-   `Hull` forwards every optional interface (the addendum), so its method
-   set claims them all, but the dispatcher skips a check for an *absent*
-   lister (`endpoint/dispatcher.go:407`, `:431`, `:494`, `:614-618`,
-   `:781`, `:992`), which no forwarded value can express — a mounted hull
-   over a server without one would change the wire. Mounting the
-   underlying server keeps the dispatcher's view identical; `Hull`'s doc
-   says to mount `Underlying()`. Wrapping at mount also broke type
-   assertions on mounted servers (`fleet.go:738`, `device_test.go:231`).
+1. The device does not mount the typed server; accessors wrap on access,
+   and the typed server forwards nothing (the addendum's forwarding
+   requirement is withdrawn in review). The dispatcher skips a check for
+   an *absent* lister (`endpoint/dispatcher.go:407`, `:431`, `:494`,
+   `:614-618`, `:781`, `:992`), which no forwarded value can express — a
+   mounted wrapper over a server without one would change the wire.
+   Wrapping at mount also broke type assertions on mounted servers
+   (`fleet.go:738`, `device_test.go:231`). A call that used to reach the
+   server through the accessor (`MatterRead`, `MatterAcceptedCommands`, …)
+   now goes through `Underlying()` — the compile fixes below.
 2. The generated `definition_gen_test.go` gains `TestTypedServer` (every
    hull method once, over a server of an empty definition with the
    cluster's id). The brief said no per-package hull test; without it the
@@ -164,25 +168,16 @@ clean run.
    `ErrNoHandlers`) — the addendum's rule for `Set`, applied to every
    operation that needs an optional interface; `spec.BeforeWriteSetter` and
    `ErrNoWriteVeto` are additions of mine for that.
-5. The hull holds the server in an embedded `spec.Hull` rather than a
-   field `srv` of each generated type, so the forwarding is written and
-   tested once (`TestHullForwards`), not generated 119 times.
+5. The server is held in an embedded `spec.Wrapper` rather than a field
+   `srv` of each generated type, so `Underlying()` is written once.
 6. LevelControl defines no event at the pin; the hand-written event case
    is `cluster/spec/booleanstate/server_typed_test.go` (StateChange).
 
 ## Decisions for the owner
 
-- **The forwarding list** (`spec.Hull`): `contract.ClusterServer`,
-  `ClusterDataVersion` (absent: 0), `ClusterAttributeLister` (absent: the
-  reportable attributes), `ClusterCommandLister` and `ClusterEventLister`
-  (absent: none), `ClusterAttributeReadPrivilege` (absent: view, 1),
-  `ClusterAttributeWritePrivilege` and `ClusterCommandInvokePrivilege`
-  (absent: 0, no extra requirement), `TimedCommander` (absent: false),
-  `FabricScopedReader` (absent: `MatterRead`), `AttributeChangeNotifier`
-  and `ChangeNotifier` (each adapting the other; absent: no reports),
-  `SelfReportedAttributeLister` (absent: none), `ClusterQuiescer` and
-  `EventReceiver` (absent: nothing). Left out: `SwitchEventEmitter` and
-  `SwitchPositionSink` (one cluster's, reached through `Underlying()`).
+- **No forwarding** (review of #198): `spec.Wrapper` holds the server and
+  exposes `Underlying()` only; the typed server is not a
+  `contract.ClusterServer` and is never mounted.
 - **What the hull can do over which server**: the generated `spec.Server`
   — Set, Handle, Emit, OnWrite all. Self-held servers that embed
   `*spec.Server` (DoorLock, the media servers, Actions, CommissionerControl,
@@ -227,19 +222,15 @@ fabric-scoped attributes. `docs/adr/0018` (`:154`) and the device pages
 still describe the `*spec.Server` / `*onoff.Server` accessor types — docs
 are BS's/BU's.
 
-## Questions
+## Questions (answered in review)
 
-1. Should the self-held servers (OnOff first) implement
-   `spec.AttributeSetter`, `CommandRegistrar` and `EventEmitting` in BU, so
-   `d.OnOff().Set(onoffdef.Patch{OnOff: ptr(true)})` works and the
-   `Underlying()` assertions in the compile fixes can go?
-2. Should a typed server be mountable — which needs the dispatcher to tell
-   an absent optional interface from a forwarded one (a `contract`-level
-   unwrap, e.g. `interface{ Underlying() contract.ClusterServer }` the
-   assembler honours)? That is `contract/` and `endpoint/`, outside BT.
-3. Should the veto also cover a host's own `Set` (matter.js `$Changing`
-   does), or stay a controller-write veto?
-4. Release number: `v0.9.2` (brief) or `v0.10.0` (the break rule)?
+1. The self-held servers get `AttributeSetter`, `CommandRegistrar` and
+   `EventEmitting` in BU: yes.
+2. A typed server is never mountable: now enforced (no
+   `contract.ClusterServer`).
+3. The veto stays on controller writes only; the coordinator writes the
+   `by_design` entry.
+4. The release number is the owner's decision.
 
 ## by_design candidates
 

@@ -63,7 +63,7 @@ func TestFeatureSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.OnOff().MatterRead(spec.AttrFeatureMap); v != uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior) {
+	if v, _ := d.OnOff().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior) {
 		t.Errorf("FeatureMap %v", v)
 	}
 	// The mandated features alone, by default.
@@ -71,7 +71,7 @@ func TestFeatureSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.LevelControl().MatterRead(spec.AttrFeatureMap); v != uint32(levelcontroldef.FeatureOnOff|levelcontroldef.FeatureLighting) {
+	if v, _ := d.LevelControl().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(levelcontroldef.FeatureOnOff|levelcontroldef.FeatureLighting) {
 		t.Errorf("LevelControl FeatureMap %v", v)
 	}
 	// A mandatory-with-extension cluster takes the host's selection.
@@ -168,7 +168,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		levelcontroldef.AttrCurrentLevel: uint8(42),
 		spec.AttrFeatureMap:              uint32(levelcontroldef.FeatureOnOff | levelcontroldef.FeatureLighting),
 	} {
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -183,7 +183,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		if !lc.Underlying().(*spec.Server).Serves(attr) {
 			t.Errorf("attribute 0x%04X not served", attr)
 		}
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -205,7 +205,7 @@ func TestDimmableLightServesMinAndMaxLevel(t *testing.T) {
 		levelcontroldef.AttrMinLevel: uint8(1),
 		levelcontroldef.AttrMaxLevel: uint8(254),
 	} {
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -502,7 +502,7 @@ func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.EnergyEvse().MatterRead(spec.AttrFeatureMap); v != uint32(evsedef.FeatureChargingPreferences) {
+	if v, _ := d.EnergyEvse().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(evsedef.FeatureChargingPreferences) {
 		t.Errorf("EnergyEvse FeatureMap %v", v)
 	}
 }
