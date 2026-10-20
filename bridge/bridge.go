@@ -428,6 +428,10 @@ type Bridge struct {
 	pumpCancel          context.CancelFunc // optional; nil when no AckTracker wired
 	pumpDone            chan struct{}
 	started             bool
+	// reannounces is the session re-announce goroutines
+	// (triggerSessionReannounce), added under mu while started and waited
+	// for by Stop before the advertiser closes.
+	reannounces sync.WaitGroup
 
 	// routing bundles the exchange-src / timed-deadline / sub-target /
 	// status-response-wait tables the receive, ack-pump, and subscribe
@@ -1770,6 +1774,11 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		}
 		pumpStopCancel()
 	}
+
+	// A session re-announce still running publishes on the advertiser;
+	// the serve context's cancel above ends it, and it is gone before the
+	// advertiser closes.
+	b.reannounces.Wait()
 
 	// Best-effort mDNS withdraw + close. Errors here are logged but
 	// don't block teardown — an mDNS that cannot be reached on shutdown
