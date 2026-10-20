@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 74 |
-| partial | 115 |
-| planned | 48 |
+| partial | 116 |
+| planned | 47 |
 | excluded | 87 |
 | total | 324 |
 
@@ -57,7 +57,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
@@ -392,7 +392,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OccupancySensingServerTest.ts | 55 | planned | ‚Äî | OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature. |
+| OccupancySensingServerTest.ts | 55 | partial | `cluster/measurement:TestOccupancySensingServerParityMatterJS` | The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry "OccupancySensing has no feature selection": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize). Missing: ‚Äúemits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled‚Äù. |
 
 ## node/test/behaviors/on-off
 
@@ -965,10 +965,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 - `IcdManagementServerTest.ts` ‚Äî The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
 - `IcdModeTest.ts` ‚Äî The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
-
-### node/test/behaviors/occupancy-sensing
-
-- `OccupancySensingServerTest.ts` ‚Äî OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature.
 
 ### node/test/behaviors/ota
 

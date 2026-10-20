@@ -621,6 +621,20 @@ Line numbers at `862ad75f`.
   check matter.js has not. (Milestone 3, phase 19; decide together with the
   SetRegulatoryConfig CountryCode item below.)
 
+Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
+`862ad75f`.
+
+- **OccupancySensing has no feature selection.** The Go server serves
+  PassiveInfrared alone (`cluster/measurement/definitions.go`
+  `occupancyInst`), so neither another detector type nor the
+  OccupancyEvent feature can be chosen, and no OccupancyChanged event is
+  emitted, where matter.js emits it on `occupancy$Changed` with the
+  feature (`OccupancySensingServer.ts` `initialize`,
+  `#emitOccupancyChanged`). One `OccupancySensingServerTest.ts` case is
+  `missing` for this. (Milestone 4, a host option: a feature selection
+  changes the FeatureMap a controller sees, and the event needs the
+  bridge's change observation `booleanStateEvents` has for BooleanState.)
+
 Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
 Line numbers at `862ad75f`.
 

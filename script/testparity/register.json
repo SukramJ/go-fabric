@@ -1034,8 +1034,14 @@
     },
     {
       "path": "packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts",
-      "status": "planned",
-      "reason": "OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature.",
+      "status": "partial",
+      "go": [
+        "cluster/measurement:TestOccupancySensingServerParityMatterJS"
+      ],
+      "missing": [
+        "emits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled"
+      ],
+      "reason": "The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry \"OccupancySensing has no feature selection\": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize).",
       "snapshotSha": "51868775f7d7a9ae1566f27af0fd4a3615801269"
     },
     {
