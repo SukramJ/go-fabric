@@ -450,7 +450,10 @@ const statusCloseSession uint16 = 0x0003
 // Close closes every exchange and session without telling the peers and
 // waits for the goroutines the manager started: [Manager.Shutdown] without
 // a bound.
-func (m *Manager) Close() { _ = m.Shutdown(context.Background()) }
+func (m *Manager) Close() {
+	m.closeAll()
+	m.work.Wait()
+}
 
 // Shutdown closes every exchange and session without telling the peers,
 // then waits, bounded by ctx, for the protocol handlers of inbound

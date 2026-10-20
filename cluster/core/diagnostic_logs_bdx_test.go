@@ -79,11 +79,10 @@ func (o *dlOpener) OpenSessionExchange(_ context.Context, sessionID uint16) (bdx
 // SendAccept, then the blocks into the returned buffer.
 func (o *dlOpener) receive(t *testing.T, refuse bool) (*bytes.Buffer, chan error, bdx.Init) {
 	t.Helper()
-	var p *dlPipe
 	// The exchange opens on the server's own goroutine; a server that
 	// never opens one hangs the test until go test's timeout dumps it —
 	// no wall-clock bound that a loaded machine could outrun.
-	p = <-o.peers
+	p := <-o.peers
 	first, err := p.Receive(context.Background())
 	if err != nil || bdx.MessageType(first.Opcode) != bdx.MessageSendInit {
 		t.Fatalf("first message %+v %v", first, err)
