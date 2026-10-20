@@ -87,12 +87,11 @@ func (m *Manager) MulticastAddressFor(ctx context.Context, fabricIndex uint8, gr
 	if groupID == 0 {
 		return nil, ErrInvalidGroupID
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer m.mu.RUnlock()
 	return f.multicastAddress(groupID), nil
 }
 
@@ -156,13 +155,17 @@ func (m *Manager) fabricMembershipsLocked(f *fabricGroups) []GroupcastMembership
 // of a group with member endpoints moves its multicast membership, as
 // ServerGroupNetworking rebinds on a policy change.
 func (m *Manager) SetGroupProperties(ctx context.Context, fabricIndex uint8, groupID uint16, policy *uint8, hasAuxiliaryACL *bool) error {
-	m.mu.Lock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	// Computed under mu, written to the store under storeMu alone,
+	// installed under mu again (Manager.storeMu).
+	m.storeMu.Lock()
+	f, err := m.fabricStore(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return err
 	}
+	m.mu.RLock()
 	prev, existed := f.props[groupID]
+	m.mu.RUnlock()
 	next := GroupProperties{McastAddrPolicy: DefaultMcastAddrPolicy}
 	if existed {
 		next = prev
@@ -174,18 +177,20 @@ func (m *Manager) SetGroupProperties(ctx context.Context, fabricIndex uint8, gro
 		next.HasAuxiliaryACL = *hasAuxiliaryACL
 	}
 	if existed && next == prev {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return nil
 	}
 	if err := m.st.UpsertGroupcastGroup(ctx, store.GroupcastGroup{
 		FabricIndex: fabricIndex, GroupID: groupID, McastAddrPolicy: next.McastAddrPolicy, HasAuxiliaryACL: next.HasAuxiliaryACL,
 	}); err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return fmt.Errorf("groups: persist groupcast group %d: %w", groupID, err)
 	}
+	m.mu.Lock()
 	f.props[groupID] = next
 	rebind := (prev.McastAddrPolicy != next.McastAddrPolicy || !existed) && f.hasEndpoints(groupID)
 	m.mu.Unlock()
+	m.storeMu.Unlock()
 	m.logger.Info("groups.groupcast_properties",
 		slog.Int("fabric_index", int(fabricIndex)), slog.Int("group_id", int(groupID)),
 		slog.Int("policy", int(next.McastAddrPolicy)), slog.Bool("auxiliary_acl", next.HasAuxiliaryACL))
@@ -199,24 +204,28 @@ func (m *Manager) SetGroupProperties(ctx context.Context, fabricIndex uint8, gro
 // RemoveGroupProperties deletes the Groupcast properties of a group.
 // Mirrors matter.js GroupcastServer #removeGroupProperties.
 func (m *Manager) RemoveGroupProperties(ctx context.Context, fabricIndex uint8, groupID uint16) error {
-	m.mu.Lock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	m.storeMu.Lock()
+	f, err := m.fabricStore(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return err
 	}
+	m.mu.RLock()
 	prev, existed := f.props[groupID]
+	m.mu.RUnlock()
 	if !existed {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return nil
 	}
 	if err := m.st.RemoveGroupcastGroup(ctx, fabricIndex, groupID); err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return fmt.Errorf("groups: remove groupcast group %d: %w", groupID, err)
 	}
+	m.mu.Lock()
 	delete(f.props, groupID)
 	rebind := prev.McastAddrPolicy != DefaultMcastAddrPolicy && f.hasEndpoints(groupID)
 	m.mu.Unlock()
+	m.storeMu.Unlock()
 	m.notifyGroupcast(ctx, fabricIndex)
 	if rebind {
 		m.notify()
