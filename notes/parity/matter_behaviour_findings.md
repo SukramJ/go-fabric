@@ -598,14 +598,7 @@ Line numbers at `862ad75f`.
 - **No extension access-check hook.** `extensionEntryAccessCheck`
   (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
   has none. (Milestone 4, with `AccessControlCustomExtensionTest.ts`.)
-- **A fabric label or vendor-ID change raises no fabric event.** matter.js
-  emits `fabricsChanged(index, "updated")` for every updated fabric
-  (`OperationalCredentialsServer.ts:579-582` →
-  `CommissioningServer.ts:118-141`); the Go `Observers.OnFabricUpdated`
-  follows UpdateNOC only and its facade handler closes sessions, so
-  UpdateFabricLabel and SetVIDVerificationStatement notify nothing. The two
-  "final fabric change" cases of `OperationalCredentialsServerTest.ts` are
-  `missing` for this. (Milestone 3, phase 19.)
+
 - **AdministratorCommissioning checks in another order.** matter.js: an open
   window → Busy, a timeout outside 180–900 s → InvalidCommand, an armed
   fail-safe → Busy (`AdministratorCommissioningServer.ts:191-212`), then a
