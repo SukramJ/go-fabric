@@ -388,11 +388,40 @@ func (d *Device) advertised() (mdns.Advertiser, net.IP, string) {
 // when it re-establishes a subscription (bridge.OperationalResolver).
 type siteResolver struct{ s *Site }
 
-func (r siteResolver) ResolveOperational(_ context.Context, compressedFabricID [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
+func (r siteResolver) ResolveOperational(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
 	for _, c := range r.s.Controllers() {
 		if c.answers(compressedFabricID, nodeID) {
 			return []*net.UDPAddr{c.Addr()}, nil
 		}
 	}
-	return nil, fmt.Errorf("fabrictest: no controller %016X-%016X on the site", compressedFabricID, nodeID)
+	// A device of the site, as its operational record names it: a node's
+	// initiator (an OTA requestor reaching its provider) resolves another
+	// node of its fabric.
+	for _, d := range r.s.Devices() {
+		if d.answers(ctx, compressedFabricID, nodeID) {
+			return []*net.UDPAddr{d.Addr()}, nil
+		}
+	}
+	return nil, fmt.Errorf("fabrictest: no node %016X-%016X on the site", compressedFabricID, nodeID)
+}
+
+// answers reports whether the running device is node nodeID of the fabric
+// with compressedFabricID.
+func (d *Device) answers(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) bool {
+	d.mu.Lock()
+	n, running := d.n, d.running
+	d.mu.Unlock()
+	if !running || n == nil {
+		return false
+	}
+	fabrics, err := n.Fabrics(ctx)
+	if err != nil {
+		return false
+	}
+	for _, f := range fabrics {
+		if f.CompressedID == compressedFabricID && f.NodeID == nodeID {
+			return true
+		}
+	}
+	return false
 }
