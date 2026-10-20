@@ -361,7 +361,8 @@ func (g *GeneralDiagnostics) CheckDataModelTest(maxPathsPerInvoke uint16, logger
 		return nil
 	}
 	if maxPathsPerInvoke == 1 && logger != nil {
-		logger.Info("The DataModelTest feature is enabled but is only required when maxPathsPerInvoke is greater than 1; disable it with GeneralDiagnosticsFeatures if you do not want to advertise it")
+		logger.Info("matter.general_diagnostics.data_model_test_optional",
+			slog.String("reason", "The DataModelTest feature is enabled but is only required when maxPathsPerInvoke is greater than 1; disable it with GeneralDiagnosticsFeatures if you do not want to advertise it"))
 	}
 	return nil
 }

@@ -337,7 +337,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	m.mu.Unlock()
 
 	m.logger.Debug(
-		"matter subscription added",
+		"im.subscription.added",
 		slog.Uint64("id", uint64(id)),
 		slog.Int("fabric", int(req.FabricIndex)),
 		slog.Int("min", int(minFloor)),
