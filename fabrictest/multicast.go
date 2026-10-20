@@ -25,6 +25,15 @@ import (
 // dropping a membership leaves it visible ([Device.MulticastGroups]) —
 // a kernel drops it with the socket.
 //
+// A node's group messages leave through its bridge's socket: the device
+// hands that socket to the node's group state as its transport
+// ([Device.Start]), so a group send is one datagram from the host's
+// address to the group, which [Network.Filter] sees and every member
+// receives — matter.js sends group messages from the node's operational
+// socket the same way (MockUdpSocket.send). The production node sends
+// from a socket of its own (node/groupsend.go), which on a site would be
+// a kernel socket off the network.
+//
 // There is one interface per host and nothing routes: a group is joined
 // on the site's one network or not at all. A membership the real stack
 // joins per interface (transport/udp.Listener joins on every up,
@@ -242,4 +251,26 @@ func (s *socket) LeaveGroup(group net.IP) error {
 	default:
 	}
 	return s.net.leave(s, group)
+}
+
+// SendMulticast is the send half of the socket's multicast surface the
+// production listener delegates to (transport/udp Listener.SendMulticast):
+// the datagram goes onto the network from the socket's address to the
+// group on port, through the network's filter and delivery options, and
+// reaches the socket on that port of every host holding the group. Mirrors
+// matter.js MockUdpSocket.send (packages/general/src/net/mock/
+// MockUdpSocket.ts:87-97 at 862ad75f), which hands the packet to the
+// simulator's router, and MockNetwork.shouldReceive (MockNetwork.ts:79-81),
+// which takes it for a host that joined its group.
+func (s *socket) SendMulticast(group net.IP, port int, payload []byte) error {
+	if _, ok := groupKey(group); !ok {
+		return fmt.Errorf("fabrictest: %v is not an IPv6 multicast address", group)
+	}
+	select {
+	case <-s.done:
+		return net.ErrClosed
+	default:
+	}
+	s.net.send(s.local, &net.UDPAddr{IP: slices.Clone(group), Port: port}, payload)
+	return nil
 }

@@ -15,8 +15,9 @@ import "net"
 
 // PacketConn is what a udp.Listener reads and writes: the subset of
 // *net.UDPConn the listener uses. A listener over a PacketConn that is not
-// a *net.UDPConn has no multicast: JoinGroup, LeaveGroup and SendMulticast
-// report udp.ErrNoMulticastInterface.
+// a *net.UDPConn has no multicast — JoinGroup, LeaveGroup and SendMulticast
+// report udp.ErrNoMulticastInterface — unless it carries the three itself,
+// as fabrictest's in-memory socket does.
 type PacketConn interface {
 	ReadFromUDP(b []byte) (int, *net.UDPAddr, error)
 	WriteToUDP(b []byte, addr *net.UDPAddr) (int, error)

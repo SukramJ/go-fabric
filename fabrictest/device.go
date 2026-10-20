@@ -134,9 +134,16 @@ func (d *Device) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("node: %w", err)
 	}
+	// operational is the bridge's socket on the in-memory network, which
+	// the node's group messages leave through once it started.
+	var operational *udp.Listener
 	if nw := d.site.net; nw != nil {
 		addr := hostAddr(d.index)
-		if !bridgeseam.UseListener(n.Bridge(), func() (*udp.Listener, error) { return nw.listen(addr) }) {
+		if !bridgeseam.UseListener(n.Bridge(), func() (*udp.Listener, error) {
+			l, err := nw.listen(addr)
+			operational = l
+			return l, err
+		}) {
 			return errors.New("fabrictest: the in-memory network carries UDP only (node.Network.TCP.Incoming is set)")
 		}
 	}
@@ -150,6 +157,12 @@ func (d *Device) Start(ctx context.Context) error {
 	}
 	if err := n.Start(ctx); err != nil {
 		return fmt.Errorf("start: %w", err)
+	}
+	if operational != nil {
+		// The node's group sender opened a kernel socket of its own
+		// (node/groupsend.go); on the in-memory network its group messages
+		// leave through the bridge's socket instead (multicast.go).
+		n.Groups().SetTransport(operational)
 	}
 	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
 	if err != nil {
