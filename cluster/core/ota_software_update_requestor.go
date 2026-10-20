@@ -78,15 +78,18 @@ type OTASoftwareUpdateRequestor struct {
 	inProgress *updateInProgress
 
 	// Internal state (:1397-1429).
-	timer            *queryTimer
-	queryRunning     bool
-	selected         *otadef.ProviderLocation
-	providerRetries  int
-	pendingApply     *pendingApply
-	runCtx           context.Context
-	cancelRun        context.CancelFunc
-	wg               sync.WaitGroup
-	started, stopped bool
+	timer           *queryTimer
+	queryRunning    bool
+	selected        *otadef.ProviderLocation
+	providerRetries int
+	pendingApply    *pendingApply
+	// announcedDuringQuery are the announcements that arrived while a
+	// query ran, handled once it ends (announceOtaProvider).
+	announcedDuringQuery []otaAnnouncement
+	runCtx               context.Context
+	cancelRun            context.CancelFunc
+	wg                   sync.WaitGroup
+	started, stopped     bool
 }
 
 // OTARequestorConfig configures [NewOTASoftwareUpdateRequestor].
@@ -546,7 +549,36 @@ func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uin
 		return nil, otaStatusError{im.StatusInvalidCommand, fmt.Sprintf("AnnounceOTAProvider fields %T", fields)}
 	}
 	_, fabric := im.FabricFilterFromContext(ctx)
+	if fabric == 0 {
+		return nil, r.announceOtaProvider(ctx, fabric, req)
+	}
+	// An announcement that arrives while a query runs is handled once the
+	// query ended, so the query it schedules neither overlaps the running
+	// one nor is skipped by it (performUpdateQuery). matter.js handles it
+	// after the query because the announcement's state change
+	// (#addActiveOtaProvider) waits for the transaction the running query
+	// holds (OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582 at
+	// 862ad75f; OtaTest.ts "handles an announcement only after a running
+	// query, so no second query overlaps it"); the Go requestor answers the
+	// command at once and defers the handling, rather than holding the
+	// answer for as long as a query runs.
+	r.mu.Lock()
+	if r.queryRunning {
+		r.announcedDuringQuery = append(r.announcedDuringQuery, otaAnnouncement{ctx: context.WithoutCancel(ctx), fabric: fabric, req: req})
+		r.mu.Unlock()
+		r.logger.Info("matter.ota.announcement_after_query", slog.Uint64("provider", req.ProviderNodeId))
+		return nil, nil
+	}
+	r.mu.Unlock()
 	return nil, r.announceOtaProvider(ctx, fabric, req)
+}
+
+// otaAnnouncement is an AnnounceOTAProvider handled after the running
+// query.
+type otaAnnouncement struct {
+	ctx    context.Context
+	fabric uint8
+	req    otadef.AnnounceOtaProviderRequest
 }
 
 // announceOtaProvider mirrors announceOtaProvider (:376-420).

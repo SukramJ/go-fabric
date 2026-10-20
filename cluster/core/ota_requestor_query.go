@@ -146,7 +146,16 @@ func (r *OTASoftwareUpdateRequestor) runUpdateQuery(ctx context.Context) (pendin
 		r.mu.Lock()
 		r.queryRunning = false
 		pending, r.pendingApply = r.pendingApply, nil
+		announced := r.announcedDuringQuery
+		r.announcedDuringQuery = nil
 		r.mu.Unlock()
+		// The announcements of the query's time, handled after it as
+		// matter.js's wait for its transaction (MatterInvoke).
+		for _, a := range announced {
+			if err := r.announceOtaProvider(a.ctx, a.fabric, a.req); err != nil {
+				r.logger.Info("matter.ota.announcement_failed", slog.String("err", err.Error()))
+			}
+		}
 	}()
 	r.queryForUpdate(ctx)
 	return nil
