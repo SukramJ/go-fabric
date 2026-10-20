@@ -62,8 +62,12 @@ type Node struct {
 	// stopReannounce ends the re-announce loop Start began; nil when none
 	// runs (reannounce.go).
 	stopReannounce func()
-	bootReason     uint8
-	persisted      persisted
+	// health is the probe Start began (Config.Health); nil when none runs
+	// (health.go).
+	healthMu   sync.Mutex
+	health     *healthProbe
+	bootReason uint8
+	persisted  persisted
 	// endpoints is the endpoint-level persistence the facade's assembler
 	// and Aggregator use: Config.EndpointPersistence, else persisted.
 	endpoints EndpointPersistence
@@ -574,6 +578,7 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 	n.startGroupSender()
 	n.startReannounce()
+	n.startHealthProbe()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -645,8 +650,8 @@ func (n *Node) Start(ctx context.Context) error {
 // the daemon's shutdown order (main.go:430-450): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the
-// subscription engine, the re-announce loop, the bridge and the
-// advertiser. Stop is idempotent
+// subscription engine, the re-announce loop, the health probe, the
+// bridge and the advertiser. Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
@@ -682,6 +687,7 @@ func (n *Node) Stop(ctx context.Context) error {
 		n.commissionerControl.Close()
 	}
 	n.stopReannounceLoop()
+	n.stopHealthProbe()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
 	n.cancel()
@@ -707,6 +713,11 @@ func (n *Node) Run(ctx context.Context) error {
 // Bridge returns the bridge, for a host that needs a port the facade does
 // not cover (ADR 0018 decision 5).
 func (n *Node) Bridge() *bridge.Bridge { return n.br }
+
+// LocalAddr returns the bound `host:port` of the node's operational UDP
+// listener — empty before [Node.Start] and after [Node.Stop]
+// (bridge.Bridge.LocalAddr). It is what the health probe checks.
+func (n *Node) LocalAddr() string { return n.br.LocalAddr() }
 
 // Root returns the root endpoint's servers.
 func (n *Node) Root() *RootClusters { return n.root }

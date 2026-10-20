@@ -152,6 +152,9 @@ type Config struct {
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
 	Client Client
+	// Health runs the node's health probe ([Health], [Node.Health]); the
+	// zero value runs none.
+	Health Health
 	// Observers are the host's callbacks on fabric and commissioning
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.
@@ -420,6 +423,9 @@ func (c *Config) Validate() error {
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	}
+	if c.Health.Interval < 0 {
+		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
 	}
 	if c.Network.ReannounceInterval < 0 {
 		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
