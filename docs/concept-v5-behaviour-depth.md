@@ -11,7 +11,7 @@ großen Protokoll-Ports. Meilenstein 3 nutzt es für das, woran die
 Logik, jeder gegen sein Go-Gegenstück geprüft, mit der portierten
 matter.js-Testdatei als Beweis ([Roadmap, Meilenstein 3](./roadmap.md#milestone-3-behaviour-depth)).
 Dieses Dokument plant **Phase 17** (Teil A–D, abgeschlossen mit `v0.8.4`)
-und **Phase 18** (Teil E); Phase 19 bekommt ihren Abschnitt, wenn sie dran ist.
+**Phase 18** (Teil E, abgeschlossen mit `v0.8.8`) und **Phase 19** (Teil F).
 
 ## 0. Entscheidungen des Owners (2026-10-19)
 
@@ -292,3 +292,106 @@ mit der vierten. `v0.9.0` schließt Meilenstein 3 nach Phase 19 (unverändert A.
   OPCREDS-Familie vor dem Push.
 - **Umfang.** 185 offene Fälle in vier Wellen; Tranchenregel wie Teil D.
 
+
+## Teil F: Phase 19 — OTA und der Rest der Behaviour-Tests
+
+Geschrieben am 2026-10-20, nach `v0.8.7` (18c) und mit Welle 18d (Brief
+BQ) in Arbeit. Stand des Registers: 52 `planned`, davon 14 unter
+`packages/node/test/behaviors`, 23 Laufzeit-Testdateien unter
+`node/test/behavior/*`, `endpoint/*`, `endpoints/*` ohne Zuordnung, und 84
+`missing`-Fälle in 22 `partial`-Dateien (47 davon Binding, Welle 18d).
+
+### F.0 Entscheidungen des Owners (Phase 19, 2026-10-20)
+
+| Nr. | Frage | Empfehlung | Entscheidung |
+| --- | --- | --- | --- |
+| 19.1 | Wellenschnitt | Zwei Wellen (19a OTA, 19b der Rest) | **Eine Welle.** Brief BR, ein PR, `v0.8.9`; `v0.9.0` schließt Meilenstein 3 danach. |
+| 19.2 | ICD, WebRTC, Thread-Diagnose im Register | ICD → M5, WebRTC + Thread `excluded` | **Wie empfohlen.** `IcdManagementServerTest.ts` (60) und `IcdModeTest.ts` (14) `until: M5 phase 23` (Roadmap Phase 23); `WebRtcTransportRequestorServerTest.ts` (28) und `ThreadNetworkDiagnosticsProvisionalTest.ts` (2) `excluded` (Kamera- und Thread-Entscheidung, `docs/matterjs-comparison.md`). |
+| 19.3 | 23 Laufzeit-Testdateien (277 Fälle) ohne `until` | nach Inhalt klassifizieren | **Wie empfohlen.** Gerätebeobachtbar → Phase 19: `CommissioningWindowTest.ts` 8, `RemoteDescriptorTest.ts` 14, `FabricLabelReconciliationTest.ts` 2, `ConnectionStateTest.ts` 11, `SessionsBehaviorTest.ts` 3, `EventsBehaviorTest.ts` 2 (40). Validierung, Zustands- und Endpoint-Modell → `until: M4`: `ClusterBehaviorFeaturesTest.ts` 15, `MarkChangedTest.ts` 10, `ValuePatcherTest.ts` 8, `conformanceTest.ts` 16, `EndpointNumberConflictTest.ts` 20, `ProtocolServiceTest.ts` 13, `SemanticNamespaceTest.ts` 3, `ConstructionValidationTest.ts` 28, `RuntimeValidationTest.ts` 65, `StandardDeviceTypeCorpusTest.ts` 4, `LargeBridgeTest.ts` 2 (184). Discovery → `until: M5 phase 25`: `CommissioningIdentityTest.ts` 7, `ContinuousDiscoveryTest.ts` 1, `DiscoveryCancelTest.ts` 23, `DiscoveryErrorTest.ts` 13, `DiscoveryTransportsTest.ts` 9 (53). `DclBehaviorTest.ts` 21 → `until: M6 phase 27`. |
+| 19.4 | Was „Register bei 100 % für `packages/node/test/behaviors`" heißt | kein `planned` mehr, jedes `missing` begründet | **Wie empfohlen.** Jede Datei dort ist `ported` oder `partial`; jedes `missing` trägt seinen Grund: js-runtime-only (Transaktionen, Observer-Handles), ein `by_design`-Eintrag, oder `until: M4/M5` mit Findings-Eintrag. Die Roadmap-Zeile ist so präzisiert. |
+
+Die Register-Tags aus 19.2 und 19.3 setzt der Release-Schnitt `v0.8.8`
+(nach Welle 18d, damit das Register nicht zwei Zweige gleichzeitig bewegt).
+
+### F.1 Befund
+
+**OTA.** `packages/node/test/behaviors/ota/OtaTest.ts` (2 819 Zeilen, 50
+Fälle in zwei `describe`, dazu `ota-utils.ts`) prüft beide Seiten auf einer
+`MockSite`: einen Knoten mit `OtaSoftwareUpdateProviderServer` (30,7 kB)
+und dem `SoftwareUpdateManager` (64,9 kB: Consent-Warteschlange, Token- und
+Versionsregeln, Apply-Delay, Stillstands- und Reboot-Erkennung, BDX-Fortschritt,
+`suppressNextStartUp`, Aufräumen von Testimages) und einen Knoten mit
+`OtaSoftwareUpdateRequestorServer` (62,8 kB: Anfrage, Download, Apply,
+Neustart, Busy-Wiederholungen, Disable). Go hat beide Server
+(`cluster/core/ota_software_update_requestor.go`, `ota_provider.go`,
+`node/ota_provider.go`, `bdx/`) mit 26 + 11 eigenen Tests; das Register
+führt die Datei `planned` ohne `go`. Die OTA-Reboot-Fälle (`:706-1049`)
+beobachten den Requestor-Knoten über eine Subscription des
+Provider-Knotens (`subscribedPeer`): sie brauchen den Client-Stack eines
+fabrictest-Geräts, den Welle 18d für Binding zuerst benutzt.
+
+**Die kleinen Server.** Acht `planned`-Dateien mit 19 Fällen:
+commodity-tariff 3, energy-evse-mode 3, fan-control 2, measurement 3,
+occupancy-sensing 3, power-source 1, rvc-operational-state 2,
+time-format-localization 2 — alle Server in Go vorhanden (generiert oder
+`cluster/<gruppe>/`). Dazu die offenen `missing`-Fälle der Phasen 17 und
+18 außer Binding (37): boolean-state 1, concentration-measurement 2,
+hepa-filter-monitoring 2, ColorControl 2, Identify 4, RemainingTime 2,
+die beiden Kopplungen 2, GeneralDiagnostics-Betriebsstunden 1,
+GroupKeyManagement 1, OperationalCredentials 2 (Fabric-Ereignis für
+Label/VID, Findings BO), AccessControl 3 (verzögerte ACL-Übernahme; der
+Extension-Hook und der untypisierte Eintrag sind M4 bzw. `by_design`),
+AtomicWriteHandler 6, Presets 6, DoorLock 1 (monotone Uhr, M4),
+ConfigurationVersion 1 und Groupcast 1 (`by_design`).
+
+**Laufzeit-Dateien (19.3).** 40 Fälle in sechs Dateien, alle
+gerätebeobachtbar: das Kommissionierfenster und der Remote-Descriptor
+(`behavior/system/commissioning`), der Fabric-Label-Abgleich, der
+Verbindungszustand, Sessions und Events.
+
+Phase 19 umfasst damit rund 146 Fälle: 50 OTA, 19 kleine Server, 37
+offene Teilfälle, 40 Laufzeit-Fälle.
+
+### F.2 Was ein Port hier ist
+
+A.2 und E.2 gelten. Dazu:
+
+- **OTA auf fabrictest mit zwei Geräten:** das Provider-Gerät trägt den
+  OtaProvider-Endpunkt (`node.Config.OTAProvider`), das Requestor-Gerät den
+  Requestor; BDX läuft über das Site-Netz; die `subscribedPeer`-Fälle
+  über den Client-Stack des Provider-Geräts (18d zeigt, ob er auf der Site
+  läuft; sonst `missing` mit Grund und Register-Kandidat).
+- **Offene Teilfälle:** gerätebeobachtbar → portieren oder Fix nach Regel 4;
+  Transaktion oder Observer-Handle → `missing` „js-runtime-only" mit Satz;
+  fehlende Node-Option → `until: M4` mit Findings-Eintrag. Kein Fall wird
+  stillschweigend `excluded`.
+- **Die Laufzeit-Dateien** laufen auf fabrictest wie BO's Commissioning-Tests.
+
+### F.3 Der Posten
+
+| Welle | Inhalt | Fälle offen | Pfade | Modell |
+| --- | --- | ---: | --- | --- |
+| 19 | OTA (50), die kleinen Server (19), die offenen Teilfälle (37), die Laufzeit-Dateien (40) | ≈ 146 | `cluster/core/ota_*.go`, `node/ota_provider.go`, `bdx/`, `cluster/{fan,measurement,modebase,opstate,…}/`, `cluster/core/`, `cluster/thermostat/`, `node/`, `fabrictest/` | Opus; Fable liest die zitierten Fix-Zeilen des OTA-Requestors und -Providers (Image-Prüfung, Consent) gegen den Pin |
+
+Brief BR, geschrieben nach dem Merge von 18d mit dessen Befund.
+
+### F.4 chip-tool
+
+SU (OTA) läuft in `core-su` jedes PRs; die übrigen Familien bleiben die
+Probe (E.4).
+
+### F.5 Versionen
+
+Welle 19 ein Patch (`v0.8.9`); `v0.9.0` schließt Meilenstein 3 mit dem
+Register nach 19.4 und dem Roadmap-Status (A.6).
+
+### F.6 Risiken
+
+- **OTA-Reboot-Fälle** hängen am Client-Stack auf der Site (F.2); ohne
+  ihn bleiben vier Fälle `missing`.
+- **SoftwareUpdateManager-Umfang.** 65 kB matter.js gegen den Go-Provider:
+  jede Lücke wird Fix oder Findings-Eintrag nach Regel, kein Nachbau auf
+  Verdacht; ein Fix an Consent oder Image-Prüfung ist eine Fix-Zeile, die
+  der Owner liest.
+- **Umfang.** 146 Fälle in einer Welle (19.1): Tranchenregel wie Teil D,
+  Report pro Datei.
