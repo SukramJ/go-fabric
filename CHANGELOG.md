@@ -29,6 +29,7 @@ pseudo-version of `main`.
 ### Removed
 
 - `bridge`: the `GOFABRIC_DUMP_SUBSCRIBE` (and the deprecated `OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE`) debug dump, which wrote `/tmp/subscribe-init-sub…bin` and ran a strict TLV validation of each Subscribe-initial chunk; a byte dump belongs in a test, not in the library.
+- The `reference-controller` binary at the repository root, committed by mistake since #144; `/reference-controller` joins `/reference-bridge` in `.gitignore`.
 
 ## [0.9.1] — 2026-10-20
 
