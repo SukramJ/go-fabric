@@ -586,8 +586,15 @@ Line numbers at `862ad75f`.
   (`AccessControlServer.ts:545-560` `#handleInteractionBegin`/`End`,
   `:598-602` `#applyDelayedAclUpdateFor`); a chunked Go write is in force
   per entry, so a concurrent request can meet a partly written list. One
-  `AccessControlAuxiliaryTest.ts` case is `missing` for this. (Milestone 3,
-  phase 19; security path, the owner's read.)
+  `AccessControlAuxiliaryTest.ts` case is `missing` for this. The change
+  is the write path's, not `cluster/core/access_control.go`'s alone: the
+  bridge's write dispatch would collect a CASE session's ACL list items per
+  fabric for the interaction (matter.js `#prepareAclUpdateFor` at
+  interaction begin, `#delayAclUpdateFor` per write), the access check
+  keep reading the list in force, and the interaction's end store the
+  collected list as one replacement (`#applyDelayedAclUpdateFor`) —
+  more than a few dozen lines in `im/`, `bridge/` and the ACL server,
+  so brief BR left it. (Milestone 4; security path, the owner's read.)
 - **No extension access-check hook.** `extensionEntryAccessCheck`
   (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
   has none. (Milestone 4, with `AccessControlCustomExtensionTest.ts`.)
@@ -634,6 +641,13 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   `missing` for this. (Milestone 4, a host option: a feature selection
   changes the FeatureMap a controller sees, and the event needs the
   bridge's change observation `booleanStateEvents` has for BooleanState.)
+- **The thermostat serves no Schedules.** MatterScheduleConfiguration's
+  Schedules is the second atomic attribute a CommitWrite of more than one
+  attribute needs (`AtomicWriteHandlerTest.ts:392-516` stages it beside
+  Presets through the behavior); the Go thermostat serves Presets alone,
+  as matter.js's ThermostatServer does not implement the feature
+  (`ThermostatServer.ts:126-128`). Five `AtomicWriteHandlerTest.ts` cases
+  are `missing` for this. (Milestone 4, with a Schedules implementation.)
 - **The Groupcast server has no Listener-only configuration.** The module
   builds Groupcast with Listener, Sender and PerGroup
   (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
