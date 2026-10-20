@@ -277,15 +277,6 @@ func (s *Server) Value(attrID uint32) (any, bool) {
 	return v, ok
 }
 
-// Values returns a copy of every stored value, by attribute id, taken at
-// one instant: what [Server.Value] answers for each, without a change
-// landing between two of them.
-func (s *Server) Values() map[uint32]any {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return maps.Clone(s.values)
-}
-
 // SetBeforeWrite installs fn as the write veto ([ServerConfig.BeforeWrite]),
 // replacing the one before; nil removes it.
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {

@@ -113,11 +113,13 @@ func TestTypedBeforeWrite(t *testing.T) {
 	var seen []hepaState
 	var attrs []uint32
 	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
-	srv.SetBeforeWrite(spec.BeforeWriteOf(srv, func(_ context.Context, next hepaState, attrID uint32) error {
+	if err := spec.OnWriteOf(srv, func(_ context.Context, next hepaState, attrID uint32) error {
 		seen = append(seen, next)
 		attrs = append(attrs, attrID)
 		return veto
-	}))
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	veto = refusal
 	err := srv.MatterWrite(ctx, hepa.AttrLastChangedTime, uint64(1000))
@@ -149,13 +151,12 @@ func TestTypedBeforeWrite(t *testing.T) {
 		t.Errorf("an accepted write: %v, sink %v", v, sk.writes)
 	}
 
-	srv.SetBeforeWrite(nil)
+	if err := spec.OnWriteOf[hepaState](srv, nil); err != nil {
+		t.Fatal(err)
+	}
 	veto = refusal
 	if err := srv.MatterWrite(ctx, hepa.AttrLastChangedTime, uint64(6)); err != nil {
 		t.Errorf("a removed veto still refuses: %v", err)
-	}
-	if spec.BeforeWriteOf[hepaState](srv, nil) != nil {
-		t.Error("BeforeWriteOf(nil) is not nil")
 	}
 
 	// The veto set at construction.
@@ -208,28 +209,164 @@ func TestTypedHandler(t *testing.T) {
 	}
 }
 
-// typedHull is the shape of a generated typed server.
-type typedHull struct{ *spec.Server }
+// bare is a server with none of the optional interfaces.
+type bare struct{ values map[uint32]any }
 
-func TestTypedServerRegistry(t *testing.T) {
+func (b bare) MatterClusterID() uint32 { return 0xFFF1FC7E }
+
+func (b bare) MatterRead(attrID uint32) (any, bool) { v, ok := b.values[attrID]; return v, ok }
+
+func (bare) MatterWrite(context.Context, uint32, any) error { return nil }
+
+func (bare) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+
+func (bare) MatterReportable() []uint32 { return []uint32{0, 2} }
+
+// valueNotifier reports its changes through contract.ChangeNotifier only.
+type valueNotifier struct {
+	bare
+	cb func()
+}
+
+func (n *valueNotifier) OnMatterValueChanged(cb func()) func() {
+	n.cb = cb
+	return func() { n.cb = nil }
+}
+
+// full implements every optional interface the hull forwards, each
+// answering a value of its own.
+type full struct {
+	bare
+	quiesced bool
+	emitter  contract.EventEmitter
+	attrCB   func([]uint32)
+}
+
+func (*full) MatterDataVersion() uint32                              { return 7 }
+func (*full) MatterAttributes() []uint32                             { return []uint32{1} }
+func (*full) MatterAcceptedCommands() []uint32                       { return []uint32{2} }
+func (*full) MatterGeneratedCommands() []uint32                      { return []uint32{3} }
+func (*full) MatterEvents() []uint32                                 { return []uint32{4} }
+func (*full) MinReadPrivilege(uint32) uint8                          { return 3 }
+func (*full) MinWritePrivilege(uint32) uint8                         { return 4 }
+func (*full) MinInvokePrivilege(uint32) uint8                        { return 5 }
+func (*full) IsTimedCommand(uint32) bool                             { return true }
+func (*full) MatterReadFiltered(context.Context, uint32) (any, bool) { return "filtered", true }
+func (*full) MatterSelfReportedAttributes() []uint32                 { return []uint32{6} }
+func (f *full) MatterQuiesce()                                       { f.quiesced = true }
+func (f *full) SetMatterEventEmitter(e contract.EventEmitter)        { f.emitter = e }
+func (f *full) OnMatterAttributesChanged(cb func([]uint32)) func()   { f.attrCB = cb; return func() {} }
+
+type nopEmitter struct{}
+
+func (nopEmitter) MatterEmitEvent(uint16, uint32, uint32, any, contract.EventPriority) {}
+
+// TestHullForwards holds spec.Hull to every interface of its forwarding
+// list: over a server implementing it, the server's answer; over one
+// without it, the dispatcher's value for an absent interface.
+func TestHullForwards(t *testing.T) {
 	t.Parallel()
-	def := &spec.Cluster{ID: 0xFFF1FC7E, Name: "TypedTest", Revision: 1}
-	srv, err := spec.NewServer(def, spec.Options{}, spec.ServerConfig{})
-	if err != nil {
+	ctx := context.Background()
+	f := &full{bare: bare{values: map[uint32]any{0: uint8(1)}}}
+	h := spec.NewHull(f)
+	if h.Underlying() != contract.ClusterServer(f) || h.MatterClusterID() != 0xFFF1FC7E {
+		t.Fatal("the hull does not hold its server")
+	}
+	if v, ok := h.MatterRead(0); !ok || v != uint8(1) {
+		t.Errorf("MatterRead %v %v", v, ok)
+	}
+	if err := h.MatterWrite(ctx, 0, nil); err != nil {
+		t.Error(err)
+	}
+	if _, err := h.MatterInvoke(ctx, 0, nil); err != nil {
+		t.Error(err)
+	}
+	var calls int
+	h.OnMatterAttributesChanged(func([]uint32) { calls++ })()
+	h.OnMatterValueChanged(func() { calls++ })()
+	f.attrCB(nil)
+	h.MatterQuiesce()
+	h.SetMatterEventEmitter(nopEmitter{})
+	if v, ok := h.MatterReadFiltered(ctx, 0); v != "filtered" || !ok {
+		t.Errorf("MatterReadFiltered %v", v)
+	}
+	if h.MatterDataVersion() != 7 || !slices.Equal(h.MatterAttributes(), []uint32{1}) || !slices.Equal(h.MatterAcceptedCommands(), []uint32{2}) ||
+		!slices.Equal(h.MatterGeneratedCommands(), []uint32{3}) || !slices.Equal(h.MatterEvents(), []uint32{4}) ||
+		h.MinReadPrivilege(0) != 3 || h.MinWritePrivilege(0) != 4 || h.MinInvokePrivilege(0) != 5 || !h.IsTimedCommand(0) ||
+		!slices.Equal(h.MatterSelfReportedAttributes(), []uint32{6}) || !slices.Equal(h.MatterReportable(), []uint32{0, 2}) ||
+		!f.quiesced || f.emitter == nil || calls != 1 {
+		t.Errorf("forwarding over a full server: %+v, %d calls", f, calls)
+	}
+
+	b := spec.NewHull(bare{values: map[uint32]any{0: uint8(9)}})
+	if v, _ := b.MatterReadFiltered(ctx, 0); v != uint8(9) {
+		t.Errorf("the unfiltered read: %v", v)
+	}
+	b.OnMatterAttributesChanged(func([]uint32) {})()
+	b.OnMatterValueChanged(func() {})()
+	b.MatterQuiesce()
+	b.SetMatterEventEmitter(nopEmitter{})
+	if b.MatterDataVersion() != 0 || !slices.Equal(b.MatterAttributes(), []uint32{0, 2}) || len(b.MatterAcceptedCommands()) != 0 ||
+		len(b.MatterGeneratedCommands()) != 0 || len(b.MatterEvents()) != 0 || b.MinReadPrivilege(0) != 1 ||
+		b.MinWritePrivilege(0) != 0 || b.MinInvokePrivilege(0) != 0 || b.IsTimedCommand(0) || b.MatterSelfReportedAttributes() != nil {
+		t.Error("the absent-interface values")
+	}
+
+	// A ChangeNotifier-only server reports through both notifiers.
+	vn := &valueNotifier{}
+	var ids [][]uint32
+	unsubscribe := spec.NewHull(vn).OnMatterAttributesChanged(func(a []uint32) { ids = append(ids, a) })
+	vn.cb()
+	unsubscribe()
+	spec.NewHull(vn).OnMatterValueChanged(func() { ids = append(ids, nil) })
+	vn.cb()
+	if len(ids) != 2 || !slices.Equal(ids[0], []uint32{0, 2}) {
+		t.Errorf("ChangeNotifier adapted: %v", ids)
+	}
+}
+
+// TestTypedOverAServerWithoutInterfaces: the typed helpers over a server
+// that is no AttributeSetter, CommandRegistrar, EventEmitting or
+// BeforeWriteSetter refuse with their error; Get and OnChanged read and
+// subscribe through MatterRead and the ChangeNotifier.
+func TestTypedOverAServerWithoutInterfaces(t *testing.T) {
+	t.Parallel()
+	vn := &valueNotifier{bare: bare{values: map[uint32]any{hepa.AttrCondition: uint64(30), hepa.AttrChangeIndication: uint8(2)}}}
+	if err := spec.SetPatch(vn, hepaPatch{Condition: ptr(uint8(1))}); !errors.Is(err, spec.ErrNotSettable) {
+		t.Errorf("SetPatch: %v", err)
+	}
+	if err := spec.HandleOn(vn, 0, func(context.Context, hepa.ResetConditionRequest) (struct{}, error) { return struct{}{}, nil }); !errors.Is(err, spec.ErrNoHandlers) {
+		t.Errorf("HandleOn: %v", err)
+	}
+	if err := spec.EmitOn(vn, 1, 0, nil); !errors.Is(err, spec.ErrNoEvents) {
+		t.Errorf("EmitOn: %v", err)
+	}
+	if err := spec.OnWriteOf[hepaState](vn, nil); !errors.Is(err, spec.ErrNoWriteVeto) {
+		t.Errorf("OnWriteOf: %v", err)
+	}
+	if st := spec.StateOf[hepaState](vn); st.Condition != 30 || st.ChangeIndication != hepa.ChangeIndicationCritical {
+		t.Errorf("StateOf over MatterRead: %+v", st)
+	}
+	var got [][]uint32
+	unsubscribe := spec.OnChangedOf(vn, func(st hepaState, changed []uint32) { got = append(got, changed) })
+	vn.cb()
+	unsubscribe()
+	if len(got) != 1 || !slices.Equal(got[0], []uint32{0, 2}) {
+		t.Errorf("OnChangedOf over the ChangeNotifier: %v", got)
+	}
+	spec.OnChangedOf(bare{}, func(hepaState, []uint32) { t.Error("a silent server reported") })()
+}
+
+func TestTypedEmitAndHandleOn(t *testing.T) {
+	t.Parallel()
+	srv := hepaServer(t, spec.ServerConfig{})
+	if err := spec.HandleOn(srv, hepa.CmdResetCondition, func(context.Context, hepa.ResetConditionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
 		t.Fatal(err)
 	}
-	if got := spec.TypedServer(srv); got != contract.ClusterServer(srv) {
-		t.Errorf("unregistered: %T", got)
+	if resp, err := srv.MatterInvoke(context.Background(), hepa.CmdResetCondition, hepa.ResetConditionRequest{}); resp != nil || err != nil {
+		t.Errorf("HandleOn: %v %v", resp, err)
 	}
-	spec.RegisterTyped(def.ID, func(s *spec.Server) *typedHull { return &typedHull{s} })
-	if got, ok := spec.TypedServer(srv).(*typedHull); !ok || got.Server != srv {
-		t.Errorf("registered: %#v", spec.TypedServer(srv))
-	}
-	if spec.TypedServer(nil) != nil {
-		t.Error("TypedServer(nil) is not nil")
-	}
-	zero := new(spec.Server)
-	if got := spec.TypedServer(zero); got != contract.ClusterServer(zero) {
-		t.Errorf("a server without a definition: %T", got)
+	if err := spec.EmitOn(srv, 1, 0x7F, nil); !errors.Is(err, spec.ErrNotEmitted) {
+		t.Errorf("EmitOn of an event outside EventList: %v", err)
 	}
 }

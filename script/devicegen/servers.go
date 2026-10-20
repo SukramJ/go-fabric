@@ -10,29 +10,16 @@ type serverType struct {
 	Type string
 	// Import is the declaring package's import path.
 	Import string
-	// Alias is the import's name in the generated file; empty for the
-	// path's last element.
+	// Alias is the import's name in the generated file.
 	Alias string
 }
 
 // typedServer is the typed server script/clustergen generates beside the
-// definition of the cluster pkg (cluster/spec/<pkg>/server_gen.go: the
-// <pkg>def.Server that embeds spec.Server), the default for every cluster
-// with a committed definition that servers does not name (ADR 0018,
-// decisions of wave 6, 2 and 3; brief BT). device.New mounts the generated
-// server in it, so the accessor finds it.
+// definition of the cluster pkg (cluster/spec/<pkg>/server_gen.go), the
+// type of every accessor (ADR 0018, decisions of wave 6, 2 and 3; brief BT
+// and its addendum): <pkg>def.Wrap wraps whichever server the device
+// mounts, the generated spec.Server or a self-held one (onoff.Server,
+// core.Binding, core.EcosystemInformation).
 func typedServer(pkg string) serverType {
 	return serverType{Type: "*" + pkg + "def.Server", Import: "github.com/SukramJ/go-fabric/cluster/spec/" + pkg, Alias: pkg + "def"}
 }
-
-// servers is the hand-maintained table of the clusters whose default
-// server is one of the module's self-held servers rather than the
-// generated one: cluster name → Go type and import. Keep it in step with
-// device/device.go defaultFactories, which builds them.
-var servers = map[string]serverType{
-	"OnOff":                {Type: "*onoff.Server", Import: "github.com/SukramJ/go-fabric/cluster/onoff"},
-	"Binding":              {Type: "*core.Binding", Import: coreImport},
-	"EcosystemInformation": {Type: "*core.EcosystemInformation", Import: coreImport},
-}
-
-const coreImport = "github.com/SukramJ/go-fabric/cluster/core"

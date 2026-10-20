@@ -16,15 +16,54 @@ import (
 )
 
 // The typed layer: script/clustergen generates, beside each cluster
-// definition, a typed server (<cluster>def.Server, server_gen.go) that
-// embeds [*Server] and adds a typed State, a Patch and per-command
-// handlers. The helpers below are what that generated code calls; they
-// add no semantics — every value still passes [Server.SetAttributes],
-// [Server.MatterWrite] and [Server.MatterInvoke] as it does untyped.
+// definition, a typed server (<cluster>def.Server, server_gen.go) over any
+// contract.ClusterServer of the cluster — the generated [Server] or a
+// self-held one — with a typed State, a Patch, typed command handlers and
+// typed events. The helpers below are what that generated code calls; they
+// add no semantics: a value still passes the server's own SetAttributes,
+// MatterWrite, MatterInvoke and Emit as it does untyped.
 //
 // A generated State or Patch names the attribute of each field in its
 // `matter` tag (the attribute id, "0x0000"); a Patch states the nullable
 // attributes it sets to null in a []uint32 field named Null.
+
+// The optional interfaces a typed server reaches the server's own methods
+// through. [*Server] implements all four.
+type (
+	// AttributeSetter is a server the host sets attributes of, all or
+	// nothing ([Server.SetAttributes]).
+	AttributeSetter interface {
+		SetAttributes(values map[uint32]any) error
+	}
+	// CommandRegistrar is a server that takes command handlers
+	// ([Server.Handle]).
+	CommandRegistrar interface {
+		Handle(cmdID uint32, fn CommandHandler)
+	}
+	// EventEmitting is a server that emits its cluster's events
+	// ([Server.Emit]).
+	EventEmitting interface {
+		Emit(endpoint uint16, eventID uint32, data any) error
+	}
+	// BeforeWriteSetter is a server that takes a write veto
+	// ([Server.SetBeforeWrite]).
+	BeforeWriteSetter interface {
+		SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error)
+	}
+)
+
+// The typed server's refusals for a server without the optional interface
+// an operation needs.
+var (
+	// ErrNotSettable: the server is no [AttributeSetter].
+	ErrNotSettable = errors.New("spec: the server does not set attributes (no SetAttributes)")
+	// ErrNoHandlers: the server is no [CommandRegistrar].
+	ErrNoHandlers = errors.New("spec: the server takes no command handlers (no Handle)")
+	// ErrNoEvents: the server is no [EventEmitting].
+	ErrNoEvents = errors.New("spec: the server emits no events (no Emit)")
+	// ErrNoWriteVeto: the server is no [BeforeWriteSetter].
+	ErrNoWriteVeto = errors.New("spec: the server takes no write veto (no SetBeforeWrite)")
+)
 
 // typedField is one attribute field of a generated State or Patch.
 type typedField struct {
@@ -81,23 +120,38 @@ func PatchValues(patch any) map[uint32]any {
 	return out
 }
 
-// StateOf returns the generated State S of s: each field the stored value
-// of its attribute ([Server.Values], one instant), converted to the
-// field's type. An attribute without a stored value, or with one the
-// field's type cannot hold, leaves the field at its zero value.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func StateOf[S any](s *Server) S {
-	return stateFrom[S](s.Values())
+// SetPatch sets the attributes a generated Patch sets ([PatchValues]) on
+// srv, all or nothing as its SetAttributes sets them; [ErrNotSettable] for
+// a server that is no [AttributeSetter].
+func SetPatch(srv contract.ClusterServer, patch any) error {
+	setter, ok := srv.(AttributeSetter)
+	if !ok {
+		return fmt.Errorf("%w: %T", ErrNotSettable, srv)
+	}
+	return setter.SetAttributes(PatchValues(patch))
 }
 
-func stateFrom[S any](values map[uint32]any) S {
+// StateOf returns the generated State S of srv: each field the value srv
+// reads for its attribute (MatterRead), converted to the field's type. An
+// attribute srv does not answer, or answers with a value the field's type
+// cannot hold, leaves the field at its zero value.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
+func StateOf[S any](srv contract.ClusterServer) S {
+	return stateOf[S](srv, 0, nil, false)
+}
+
+// stateOf reads S from srv, with value in place of attrID's when with.
+func stateOf[S any](srv contract.ClusterServer, attrID uint32, value any, with bool) S {
 	var st S
 	rv := reflect.ValueOf(&st).Elem()
 	if rv.Kind() != reflect.Struct {
 		return st
 	}
 	for _, f := range fieldsOf(rv.Type()) {
-		v, ok := values[f.attr]
+		v, ok := value, with && f.attr == attrID
+		if !ok {
+			v, ok = srv.MatterRead(f.attr)
+		}
 		if !ok {
 			continue
 		}
@@ -108,30 +162,68 @@ func stateFrom[S any](values map[uint32]any) S {
 	return st
 }
 
-// OnChangedOf calls fn with the State S of s and the changed attribute
-// ids after every change s reports ([contract.AttributeChangeNotifier]);
-// it returns the unsubscribe function.
+// OnChangedOf calls fn with the State S of srv and the changed attribute
+// ids after every change srv reports: through its
+// [contract.AttributeChangeNotifier], or through its
+// [contract.ChangeNotifier] with every attribute it reports — the switch
+// of device.Device.OnChanged. It returns the unsubscribe function; a
+// server that notifies nothing never calls fn.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func OnChangedOf[S any](s *Server, fn func(state S, changed []uint32)) (unsubscribe func()) {
+func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, changed []uint32)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}
 	}
-	return s.OnMatterAttributesChanged(func(ids []uint32) { fn(StateOf[S](s), ids) })
+	switch n := srv.(type) {
+	case contract.AttributeChangeNotifier:
+		return n.OnMatterAttributesChanged(func(ids []uint32) { fn(StateOf[S](srv), ids) })
+	case contract.ChangeNotifier:
+		return n.OnMatterValueChanged(func() { fn(StateOf[S](srv), srv.MatterReportable()) })
+	default:
+		return func() {}
+	}
 }
 
-// BeforeWriteOf adapts a typed write veto to [ServerConfig.BeforeWrite]:
-// fn receives the State S of s with the written value in place of the
-// attribute's stored one, and the attribute id. nil adapts to nil.
+// OnWriteOf installs a typed write veto on srv ([ServerConfig.BeforeWrite]):
+// fn receives the State S of srv with the written value in place of the
+// attribute's, and the attribute id; nil removes the veto.
+// [ErrNoWriteVeto] for a server that is no [BeforeWriteSetter].
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func BeforeWriteOf[S any](s *Server, fn func(ctx context.Context, next S, attrID uint32) error) func(ctx context.Context, attrID uint32, value any) error {
+func OnWriteOf[S any](srv contract.ClusterServer, fn func(ctx context.Context, next S, attrID uint32) error) error {
+	setter, ok := srv.(BeforeWriteSetter)
+	if !ok {
+		return fmt.Errorf("%w: %T", ErrNoWriteVeto, srv)
+	}
 	if fn == nil {
+		setter.SetBeforeWrite(nil)
 		return nil
 	}
-	return func(ctx context.Context, attrID uint32, value any) error {
-		values := s.Values()
-		values[attrID] = value
-		return fn(ctx, stateFrom[S](values), attrID)
+	setter.SetBeforeWrite(func(ctx context.Context, attrID uint32, value any) error {
+		return fn(ctx, stateOf[S](srv, attrID, value, true), attrID)
+	})
+	return nil
+}
+
+// HandleOn registers a typed handler for the request command cmdID on srv
+// ([HandlerOf]); nil removes the handler. [ErrNoHandlers] for a server
+// that is no [CommandRegistrar].
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
+func HandleOn[Req, Resp any](srv contract.ClusterServer, cmdID uint32, fn func(ctx context.Context, req Req) (Resp, error)) error {
+	reg, ok := srv.(CommandRegistrar)
+	if !ok {
+		return fmt.Errorf("%w: %T", ErrNoHandlers, srv)
 	}
+	reg.Handle(cmdID, HandlerOf(fn))
+	return nil
+}
+
+// EmitOn emits the event eventID with data on endpoint through srv's own
+// Emit; [ErrNoEvents] for a server that is no [EventEmitting].
+func EmitOn(srv contract.ClusterServer, endpoint uint16, eventID uint32, data any) error {
+	em, ok := srv.(EventEmitting)
+	if !ok {
+		return fmt.Errorf("%w: %T", ErrNoEvents, srv)
+	}
+	return em.Emit(endpoint, eventID, data)
 }
 
 // HandlerOf adapts a typed command handler to [CommandHandler]: the
@@ -167,35 +259,6 @@ func HandlerOf[Req, Resp any](fn func(ctx context.Context, req Req) (Resp, error
 }
 
 func emptyStruct(t reflect.Type) bool { return t.Kind() == reflect.Struct && t.NumField() == 0 }
-
-// typedServers holds each cluster's typed-server constructor, by cluster id.
-var typedServers sync.Map // uint32 → func(*Server) contract.ClusterServer
-
-// RegisterTyped registers wrap as the typed server of clusterID; every
-// generated server_gen.go registers its Wrap from init.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func RegisterTyped[H contract.ClusterServer](clusterID uint32, wrap func(*Server) H) {
-	typedServers.Store(clusterID, func(s *Server) contract.ClusterServer { return wrap(s) })
-}
-
-// TypedServer returns s in the typed server registered for its cluster
-// ([RegisterTyped]), or s itself when none is registered. The typed
-// server embeds s: it is the same server to a dispatcher, by every
-// interface s implements. nil stays nil.
-func TypedServer(s *Server) contract.ClusterServer {
-	if s == nil {
-		return nil
-	}
-	if s.Instance == nil {
-		return s
-	}
-	if v, ok := typedServers.Load(s.def.ID); ok {
-		if wrap, ok := v.(func(*Server) contract.ClusterServer); ok {
-			return wrap(s)
-		}
-	}
-	return s
-}
 
 // vetoError is a [ServerConfig.BeforeWrite] refusal that carries no IM
 // status of its own: it answers FAILURE and unwraps to the refusal.

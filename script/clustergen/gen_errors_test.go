@@ -116,6 +116,7 @@ func TestGenerateShapes(t *testing.T) {
 	for _, want := range []string{
 		"spectest.RoundTripAttribute(t, Definition, AttrRec", "spectest.RoundTripEvent", "[]byte{1, 1, 1, 1}",
 		"func TestTypedServer(t *testing.T)", "s.HandleAsk(func(context.Context, AskRequest) (PairResponseCommand, error)",
+		"_ = s.EmitEv(0, EvEvent{})",
 	} {
 		if !strings.Contains(string(o.Test), want) {
 			t.Errorf("test lacks %q", want)
@@ -124,16 +125,17 @@ func TestGenerateShapes(t *testing.T) {
 	// The typed server: a nullable attribute a pointer in State and in
 	// Patch with Null, a list a slice, a struct its type, a fabric-scoped
 	// and an untyped attribute left out and named, a command with a
-	// response and one answered by status.
+	// response and one answered by status, an event.
 	hull := strings.Join(strings.Fields(string(o.Server)), " ") // gofmt's column alignment aside
 	for _, want := range []string{
 		"Level *uint8 `matter:\"0x0005\"`", "Anon []AnonEntry `matter:\"0x0000\"`", "Rec Pair `matter:\"0x0002\"`",
 		"Anon *[]AnonEntry `matter:\"0x0000\"`", "Null []uint32",
 		"// - Untyped (0x0003): its type is one the generator maps to any.",
 		"// - Scoped (0x0006): fabric-scoped: spec.NewServer refuses to serve it.",
-		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error))",
-		"func (s *Server) HandleAsk(fn func(ctx context.Context, req AskRequest) (PairResponseCommand, error))",
-		"func init() { spec.RegisterTyped(ClusterID, Wrap) }",
+		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error)) error",
+		"func (s *Server) HandleAsk(fn func(ctx context.Context, req AskRequest) (PairResponseCommand, error)) error",
+		"func (s *Server) EmitEv(endpoint uint16, data EvEvent) error { return spec.EmitOn(s.Underlying(), endpoint, EventEv, data) }",
+		"type Server struct{ spec.Hull }", "func Wrap(srv contract.ClusterServer) *Server",
 	} {
 		if !strings.Contains(hull, want) {
 			t.Errorf("server lacks %q", want)

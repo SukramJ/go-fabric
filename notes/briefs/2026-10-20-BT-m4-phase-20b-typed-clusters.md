@@ -151,3 +151,48 @@ daemon rewrite, the docs page (BU); the facade (BS); apidiff and the
 `until: M4` test ports (BV); the self-held servers (`cluster/onoff`,
 `levelcontrol`, `light`, `thermo`, `lock`, …) and `contract/`; the
 behaviour of any cluster — the hull adds no semantics.
+
+## Addendum (owner, 2026-10-20, after the wave started)
+
+Two extensions of the scope, decided after the review of the concept;
+they replace the narrower statements above where they conflict.
+
+1. **The hull wraps every `contract.ClusterServer`, not only
+   `*spec.Server`.** `type Server struct { srv contract.ClusterServer }`
+   with `Wrap(srv contract.ClusterServer) *Server` and
+   `Underlying() contract.ClusterServer`; `Get` reads through
+   `contract.ClusterServer.MatterRead` (typed per attribute, as before);
+   `OnChanged` through `contract.AttributeChangeNotifier` or
+   `contract.ChangeNotifier` (exactly `device.Device.OnChanged`'s switch);
+   `Set` through an optional interface `spec.AttributeSetter`
+   (`SetAttributes(map[uint32]any) error`, which `*spec.Server` implements
+   today) and returns `spec.ErrNotSettable` (new, exported) for a server
+   without it; `Handle<Command>` through an optional interface
+   `spec.CommandRegistrar` (`Handle(cmdID uint32, fn CommandHandler)`,
+   which `*spec.Server` implements) and returns `spec.ErrNoHandlers`
+   otherwise. The hull implements `contract.ClusterServer` and every
+   optional interface of the dispatcher by forwarding to `srv` (list them
+   from `endpoint/dispatcher.go` and `endpoint/materialize.go`; a
+   forwarding test asserts each one on a hull over a fake that implements
+   it). Consequence for devicegen: **every** accessor returns the hull,
+   the three mapped servers included (`OnOff() *onoffdef.Server`;
+   `onoffdef.Server.Underlying()` gives the `*onoff.Server` back for a
+   host that needs its own API). This is a `### Changed` for those three
+   accessors too. The self-held servers' `Set` stays theirs (they do not
+   implement `AttributeSetter` unless they already have a generic setter —
+   do not add one in this wave; the report lists which self-held servers
+   the hull can `Set` and which not).
+2. **Typed events.** For every event of the definition the hull gets
+   `Emit<Event>(endpoint uint16, data <Event>Event) error` over the
+   server's event emitter path: `*spec.Server.Emit` (`server.go:488`) for
+   spec servers; for another server through an optional interface
+   `spec.EventEmitting` (`Emit(endpoint uint16, eventID uint32, data any) error`)
+   — check whether the self-held servers expose such a method already
+   (grep `func (s \*Server) Emit`); if not, `spec.ErrNoEvents`. The event
+   data structs exist in the definition packages (the `<Name>Event`
+   structs with codecs — verify the naming in one package and use what
+   the generator emits).
+
+The report's **Decisions** section names the hull's forwarding list and
+the accessor break for the three mapped servers; the hand-written test
+on levelcontrol gains an event case; `TestGenerateShapes` gains an event.
