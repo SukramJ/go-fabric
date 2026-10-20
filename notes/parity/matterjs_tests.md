@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 73 |
-| partial | 112 |
-| planned | 52 |
+| partial | 113 |
+| planned | 51 |
 | excluded | 87 |
 | total | 324 |
 
@@ -42,7 +42,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/binding](#nodetestbehaviorsbinding) | 3 | 2 | 1 | 0 | 0 |
 | [node/test/behaviors/boolean-state](#nodetestbehaviorsboolean-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/color-control](#nodetestbehaviorscolor-control) | 3 | 2 | 1 | 0 | 0 |
-| [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/commodity-tariff](#nodetestbehaviorscommodity-tariff) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/concentration-measurement](#nodetestbehaviorsconcentration-measurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/descriptor](#nodetestbehaviorsdescriptor) | 2 | 2 | 0 | 0 | 0 |
 | [node/test/behaviors/door-lock](#nodetestbehaviorsdoor-lock) | 1 | 0 | 1 | 0 | 0 |
@@ -296,7 +296,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| CommodityTariffServerTest.ts | 87 | planned | ‚Äî | Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it. |
+| CommodityTariffServerTest.ts | 87 | partial | `cluster/energy:TestCommodityTariffServerParityMatterJS` | The day entry without its randomization fields under Pricing is stored as written, in the smallest tariff chip's update accepts (UpdateTariff carries a whole tariff; cluster/energy/commoditytariff_parity_matterjs_test.go). Missing, by_design BD-chip-Commodity-ServerChoices (an extension the report proposes): the Go server's write is chip's tariff update, which refuses a TariffInfo without Currency under PRICE and a day entry without RandomizationOffset and RandomizationType under RNDM (cluster/energy/commoditytariff.go validateTariffInfo, validateDayEntries), where matter.js's managed state fills Currency in as null and stores the entry as written (matter.js #4386). Missing: ‚Äúreads a member the active features make mandatory as null when a write omits it‚Äù; ‚Äústores a day entry that omits the randomization fields with Randomization supported‚Äù. |
 
 ## node/test/behaviors/concentration-measurement
 
@@ -960,10 +960,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/access-control
 
 - `AccessControlCustomExtensionTest.ts` ‚Äî A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.
-
-### node/test/behaviors/commodity-tariff
-
-- `CommodityTariffServerTest.ts` ‚Äî Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it.
 
 ### node/test/behaviors/energy-evse-mode
 

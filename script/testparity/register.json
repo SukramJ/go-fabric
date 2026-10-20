@@ -718,8 +718,15 @@
     },
     {
       "path": "packages/node/test/behaviors/commodity-tariff/CommodityTariffServerTest.ts",
-      "status": "planned",
-      "reason": "Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it.",
+      "status": "partial",
+      "go": [
+        "cluster/energy:TestCommodityTariffServerParityMatterJS"
+      ],
+      "missing": [
+        "reads a member the active features make mandatory as null when a write omits it",
+        "stores a day entry that omits the randomization fields with Randomization supported"
+      ],
+      "reason": "The day entry without its randomization fields under Pricing is stored as written, in the smallest tariff chip's update accepts (UpdateTariff carries a whole tariff; cluster/energy/commoditytariff_parity_matterjs_test.go). Missing, by_design BD-chip-Commodity-ServerChoices (an extension the report proposes): the Go server's write is chip's tariff update, which refuses a TariffInfo without Currency under PRICE and a day entry without RandomizationOffset and RandomizationType under RNDM (cluster/energy/commoditytariff.go validateTariffInfo, validateDayEntries), where matter.js's managed state fills Currency in as null and stores the entry as written (matter.js #4386).",
       "snapshotSha": "5bc23fc9d4794934a8b0d74db7aa0fe5c7f1610c"
     },
     {
