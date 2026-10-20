@@ -85,6 +85,7 @@ func PatchValues(patch any) map[uint32]any {
 // of its attribute ([Server.Values], one instant), converted to the
 // field's type. An attribute without a stored value, or with one the
 // field's type cannot hold, leaves the field at its zero value.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func StateOf[S any](s *Server) S {
 	return stateFrom[S](s.Values())
 }
@@ -110,6 +111,7 @@ func stateFrom[S any](values map[uint32]any) S {
 // OnChangedOf calls fn with the State S of s and the changed attribute
 // ids after every change s reports ([contract.AttributeChangeNotifier]);
 // it returns the unsubscribe function.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnChangedOf[S any](s *Server, fn func(state S, changed []uint32)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}
@@ -120,6 +122,7 @@ func OnChangedOf[S any](s *Server, fn func(state S, changed []uint32)) (unsubscr
 // BeforeWriteOf adapts a typed write veto to [ServerConfig.BeforeWrite]:
 // fn receives the State S of s with the written value in place of the
 // attribute's stored one, and the attribute id. nil adapts to nil.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func BeforeWriteOf[S any](s *Server, fn func(ctx context.Context, next S, attrID uint32) error) func(ctx context.Context, attrID uint32, value any) error {
 	if fn == nil {
 		return nil
@@ -135,6 +138,7 @@ func BeforeWriteOf[S any](s *Server, fn func(ctx context.Context, next S, attrID
 // decoded request payload is asserted to Req (a payload of another type is
 // INVALID_COMMAND), and a response of type struct{} — a status-only
 // command — answers no payload. nil adapts to nil.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func HandlerOf[Req, Resp any](fn func(ctx context.Context, req Req) (Resp, error)) CommandHandler {
 	if fn == nil {
 		return nil
@@ -169,6 +173,7 @@ var typedServers sync.Map // uint32 → func(*Server) contract.ClusterServer
 
 // RegisterTyped registers wrap as the typed server of clusterID; every
 // generated server_gen.go registers its Wrap from init.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func RegisterTyped[H contract.ClusterServer](clusterID uint32, wrap func(*Server) H) {
 	typedServers.Store(clusterID, func(s *Server) contract.ClusterServer { return wrap(s) })
 }
