@@ -13,7 +13,7 @@ import (
 // beside each definition declares State, Patch and Server, a typed view of
 // any contract.ClusterServer of the cluster (brief BT and its addendum) that
 // adds no behavior, with Emit<Event> per event. The runtime half is
-// cluster/spec/typed.go and cluster/spec/hull.go.
+// cluster/spec/typed.go and cluster/spec/wrapper.go.
 //
 // Server.Set takes a Patch: the fields set, the others left. Mirrors
 // matter.js packages/node/src/endpoint/Endpoint.ts:256-262 (`set`, a
@@ -193,20 +193,17 @@ func (g *generator) server() ([]byte, error) {
 	w.p("// generated spec.Server or a self-held one (Underlying) — with a typed")
 	w.p("// state, typed change reports, a write veto, typed command handlers and")
 	w.p("// typed events. It adds no behavior: each method reaches the server's")
-	w.p("// own (spec.Hull forwards contract.ClusterServer and the dispatcher's")
-	w.p("// optional interfaces). Mount the underlying server, not this one.")
-	w.p("type Server struct{ spec.Hull }")
+	w.p("// own. It is not a contract.ClusterServer: mount the underlying server,")
+	w.p("// not this one.")
+	w.p("type Server struct{ spec.Wrapper }")
 	w.p("")
-	w.p("// Wrap returns srv as the typed server: nil for nil, a typed server as")
-	w.p("// it is.")
+	w.p("// Wrap returns srv as the typed server; nil for nil. A typed server is")
+	w.p("// no contract.ClusterServer, so it is never wrapped twice.")
 	w.p("func Wrap(srv contract.ClusterServer) *Server {")
-	w.p("\tswitch s := srv.(type) {")
-	w.p("\tcase nil:")
+	w.p("\tif srv == nil {")
 	w.p("\t\treturn nil")
-	w.p("\tcase *Server:")
-	w.p("\t\treturn s")
 	w.p("\t}")
-	w.p("\treturn &Server{spec.NewHull(srv)}")
+	w.p("\treturn &Server{spec.NewWrapper(srv)}")
 	w.p("}")
 	w.p("")
 	w.p("// Set applies p through the server's SetAttributes: every value is")
@@ -275,8 +272,8 @@ func (g *generator) serverTest(w *writer) {
 	w.p("\t\tt.Fatal(err)")
 	w.p("\t}")
 	w.p("\ts := Wrap(srv)")
-	w.p("\tif Wrap(s) != s || s.Underlying() != srv {")
-	w.p("\t\tt.Error(\"Wrap does not hold the server once\")")
+	w.p("\tif s.Underlying() != srv {")
+	w.p("\t\tt.Error(\"the typed server does not hold its server\")")
 	w.p("\t}")
 	w.p("\tif err := s.Set(Patch{}); err != nil {")
 	w.p("\t\tt.Error(err)")

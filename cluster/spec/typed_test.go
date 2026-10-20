@@ -233,95 +233,19 @@ func (n *valueNotifier) OnMatterValueChanged(cb func()) func() {
 	return func() { n.cb = nil }
 }
 
-// full implements every optional interface the hull forwards, each
-// answering a value of its own.
-type full struct {
-	bare
-	quiesced bool
-	emitter  contract.EventEmitter
-	attrCB   func([]uint32)
-}
-
-func (*full) MatterDataVersion() uint32                              { return 7 }
-func (*full) MatterAttributes() []uint32                             { return []uint32{1} }
-func (*full) MatterAcceptedCommands() []uint32                       { return []uint32{2} }
-func (*full) MatterGeneratedCommands() []uint32                      { return []uint32{3} }
-func (*full) MatterEvents() []uint32                                 { return []uint32{4} }
-func (*full) MinReadPrivilege(uint32) uint8                          { return 3 }
-func (*full) MinWritePrivilege(uint32) uint8                         { return 4 }
-func (*full) MinInvokePrivilege(uint32) uint8                        { return 5 }
-func (*full) IsTimedCommand(uint32) bool                             { return true }
-func (*full) MatterReadFiltered(context.Context, uint32) (any, bool) { return "filtered", true }
-func (*full) MatterSelfReportedAttributes() []uint32                 { return []uint32{6} }
-func (f *full) MatterQuiesce()                                       { f.quiesced = true }
-func (f *full) SetMatterEventEmitter(e contract.EventEmitter)        { f.emitter = e }
-func (f *full) OnMatterAttributesChanged(cb func([]uint32)) func()   { f.attrCB = cb; return func() {} }
-
-type nopEmitter struct{}
-
-func (nopEmitter) MatterEmitEvent(uint16, uint32, uint32, any, contract.EventPriority) {}
-
-// TestHullForwards holds spec.Hull to every interface of its forwarding
-// list: over a server implementing it, the server's answer; over one
-// without it, the dispatcher's value for an absent interface.
-func TestHullForwards(t *testing.T) {
+// TestWrapper: the wrapper holds its server and is no
+// contract.ClusterServer, so a typed server cannot be mounted.
+func TestWrapper(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	f := &full{bare: bare{values: map[uint32]any{0: uint8(1)}}}
-	h := spec.NewHull(f)
-	if h.Underlying() != contract.ClusterServer(f) || h.MatterClusterID() != 0xFFF1FC7E {
-		t.Fatal("the hull does not hold its server")
+	b := &bare{}
+	if spec.NewWrapper(b).Underlying() != contract.ClusterServer(b) {
+		t.Error("the wrapper does not hold its server")
 	}
-	if v, ok := h.MatterRead(0); !ok || v != uint8(1) {
-		t.Errorf("MatterRead %v %v", v, ok)
-	}
-	if err := h.MatterWrite(ctx, 0, nil); err != nil {
-		t.Error(err)
-	}
-	if _, err := h.MatterInvoke(ctx, 0, nil); err != nil {
-		t.Error(err)
-	}
-	var calls int
-	h.OnMatterAttributesChanged(func([]uint32) { calls++ })()
-	h.OnMatterValueChanged(func() { calls++ })()
-	f.attrCB(nil)
-	h.MatterQuiesce()
-	h.SetMatterEventEmitter(nopEmitter{})
-	if v, ok := h.MatterReadFiltered(ctx, 0); v != "filtered" || !ok {
-		t.Errorf("MatterReadFiltered %v", v)
-	}
-	if h.MatterDataVersion() != 7 || !slices.Equal(h.MatterAttributes(), []uint32{1}) || !slices.Equal(h.MatterAcceptedCommands(), []uint32{2}) ||
-		!slices.Equal(h.MatterGeneratedCommands(), []uint32{3}) || !slices.Equal(h.MatterEvents(), []uint32{4}) ||
-		h.MinReadPrivilege(0) != 3 || h.MinWritePrivilege(0) != 4 || h.MinInvokePrivilege(0) != 5 || !h.IsTimedCommand(0) ||
-		!slices.Equal(h.MatterSelfReportedAttributes(), []uint32{6}) || !slices.Equal(h.MatterReportable(), []uint32{0, 2}) ||
-		!f.quiesced || f.emitter == nil || calls != 1 {
-		t.Errorf("forwarding over a full server: %+v, %d calls", f, calls)
-	}
-
-	b := spec.NewHull(bare{values: map[uint32]any{0: uint8(9)}})
-	if v, _ := b.MatterReadFiltered(ctx, 0); v != uint8(9) {
-		t.Errorf("the unfiltered read: %v", v)
-	}
-	b.OnMatterAttributesChanged(func([]uint32) {})()
-	b.OnMatterValueChanged(func() {})()
-	b.MatterQuiesce()
-	b.SetMatterEventEmitter(nopEmitter{})
-	if b.MatterDataVersion() != 0 || !slices.Equal(b.MatterAttributes(), []uint32{0, 2}) || len(b.MatterAcceptedCommands()) != 0 ||
-		len(b.MatterGeneratedCommands()) != 0 || len(b.MatterEvents()) != 0 || b.MinReadPrivilege(0) != 1 ||
-		b.MinWritePrivilege(0) != 0 || b.MinInvokePrivilege(0) != 0 || b.IsTimedCommand(0) || b.MatterSelfReportedAttributes() != nil {
-		t.Error("the absent-interface values")
-	}
-
-	// A ChangeNotifier-only server reports through both notifiers.
-	vn := &valueNotifier{}
-	var ids [][]uint32
-	unsubscribe := spec.NewHull(vn).OnMatterAttributesChanged(func(a []uint32) { ids = append(ids, a) })
-	vn.cb()
-	unsubscribe()
-	spec.NewHull(vn).OnMatterValueChanged(func() { ids = append(ids, nil) })
-	vn.cb()
-	if len(ids) != 2 || !slices.Equal(ids[0], []uint32{0, 2}) {
-		t.Errorf("ChangeNotifier adapted: %v", ids)
+	server := reflect.TypeFor[contract.ClusterServer]()
+	for _, typ := range []reflect.Type{reflect.TypeFor[spec.Wrapper](), reflect.TypeFor[*spec.Wrapper]()} {
+		if typ.Implements(server) {
+			t.Errorf("%v implements contract.ClusterServer", typ)
+		}
 	}
 }
 

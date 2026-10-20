@@ -135,7 +135,7 @@ func TestGenerateShapes(t *testing.T) {
 		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error)) error",
 		"func (s *Server) HandleAsk(fn func(ctx context.Context, req AskRequest) (PairResponseCommand, error)) error",
 		"func (s *Server) EmitEv(endpoint uint16, data EvEvent) error { return spec.EmitOn(s.Underlying(), endpoint, EventEv, data) }",
-		"type Server struct{ spec.Hull }", "func Wrap(srv contract.ClusterServer) *Server",
+		"type Server struct{ spec.Wrapper }", "func Wrap(srv contract.ClusterServer) *Server",
 	} {
 		if !strings.Contains(hull, want) {
 			t.Errorf("server lacks %q", want)
