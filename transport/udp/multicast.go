@@ -38,12 +38,12 @@ var multicastInterfaces = func() []net.Interface {
 // in through internal/udpseam. [Listener.JoinGroup],
 // [Listener.LeaveGroup] and [Listener.SendMulticast] delegate to it
 // before they demand a *net.UDPConn, so the socket's own model decides
-// which groups it holds and who receives what it sends to one (matter.js
-// MockUdpSocket.addMembership / dropMembership, which hand the membership
-// to the host's MockNetwork, and MockUdpSocket.send, which hands a
-// datagram to the network's router for every host that takes its
-// destination — packages/general/src/net/mock/MockUdpSocket.ts:87-97,
-// MockNetwork.ts:79-81 at 862ad75f).
+// which groups it holds and who receives what it sends to one, as matter.js
+// MockUdpSocket hands the membership to the host's MockNetwork. A datagram
+// to a group goes to the network's router for every host that takes its
+// destination: MockUdpSocket.send
+// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at 862ad75f) with
+// MockNetwork.shouldReceive (MockNetwork.ts:79-81).
 type multicastMember interface {
 	JoinGroup(group net.IP) error
 	LeaveGroup(group net.IP) error
