@@ -9,6 +9,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -130,6 +131,28 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	}
 	if qr3 != wantQR || manual3 != wantManual {
 		t.Fatalf("PairingCodesFor = %q %q, want %q %q", qr3, manual3, wantQR, wantManual)
+	}
+
+	// A fresh window secret opens a basic window as it is.
+	fresh, err := node.NewCommissioningCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := fresh.WindowCredentials(time.Minute)
+	if w.Passcode != fresh.Passcode || w.Discriminator != fresh.Discriminator || w.Iterations != uint32(fresh.PBKDFIterations) ||
+		!bytes.Equal(w.Salt, fresh.Salt) || w.Timeout != time.Minute {
+		t.Fatalf("WindowCredentials = %+v from %+v", w, fresh)
+	}
+	ctx := context.Background()
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.OpenBasicWindow(ctx, w); err != nil {
+		t.Fatalf("OpenBasicWindow with fresh credentials: %v", err)
+	}
+	bad := node.Commissioning{Passcode: fresh.Passcode, PBKDFIterations: -1, Salt: fresh.Salt}
+	if err := n.OpenBasicWindow(ctx, bad.WindowCredentials(0)); !errors.Is(err, node.ErrInvalidWindowCredentials) {
+		t.Fatalf("negative iterations: %v, want ErrInvalidWindowCredentials", err)
 	}
 }
 

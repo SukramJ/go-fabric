@@ -59,7 +59,8 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
 - `VendorID`, `ProductID` and `NodeLabel` are set;
 - a store is given (see below), and not both `Store.Path` and `Store.DB`;
-- `Attestation.Files` is not combined with `Chain` or the CD;
+- `Attestation.Files` is not combined with `Chain` or the CD, and
+  `BlockCommissioningOnError` comes with `Files`;
 - `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
@@ -81,7 +82,7 @@ Defaults worth knowing:
 | `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Disabled` makes it `mdns.NewNoop()`, and nothing can discover the node |
 | `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Disabled` publishes nothing, `HostName` sets the SRV target |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
-| `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain) |
+| `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | no probe; `Interval` (0 is 30 s) or `OnSample` runs it from `Start` to `Stop`, `Node.Health` returns the last verdict |
 | `BootID.RotateUniqueIDs` | stable UniqueIDs; set, every UniqueID rotates per process (development only, process-wide) |
 | `DeviceTypeValidation` | matter.js's warn mode |
@@ -237,7 +238,7 @@ of which is something a product would also decide:
   parameters, label and log level. Each flag is checked before the node is
   built.
 - **A vendor attestation chain** read from a directory instead of the test
-  chain (`node.LoadAttestation`).
+  chain (`Attestation.Files`).
 - **The OTA requestor** with an applier that validates and keeps the image.
   This is the host's `OtaApplier`.
 - **An Actions server** on the Aggregator, root FixedLabels and two

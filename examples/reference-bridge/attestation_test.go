@@ -4,23 +4,25 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 )
 
-// TestLoadAttestation: an empty flag keeps the test chain, a directory
-// with the four files serves the vendor chain, a directory missing one
-// is an error (no silent fall-back to the test vendor).
-func TestLoadAttestation(t *testing.T) {
+// TestAttestationConfig: an empty flag keeps the test chain, a directory
+// with the four files builds a node on the vendor chain, a directory
+// missing one fails node.New (no silent fall-back to the test vendor).
+func TestAttestationConfig(t *testing.T) {
 	t.Parallel()
-	if att, err := loadAttestation(""); err != nil || att.Chain != nil || att.CertificationDeclaration != nil {
-		t.Fatalf("empty flag: %+v, %v", att, err)
+	if att := attestationConfig(""); att.Files != nil || att.Chain != nil || att.CertificationDeclaration != nil {
+		t.Fatalf("empty flag: %+v", att)
 	}
 	chain, err := attestation.BuildTestChain(0xFFF1, 0x8002)
 	if err != nil {
@@ -45,17 +47,27 @@ func TestLoadAttestation(t *testing.T) {
 	write("pai.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.PAI}))
 	write("cd.der", cd)
 
-	att, err := loadAttestation(dir)
-	if err != nil {
-		t.Fatalf("loadAttestation: %v", err)
+	build := func(name string) error {
+		cfg := nodeConfig(flags{
+			dbPath: filepath.Join(t.TempDir(), name), listen: "127.0.0.1:0", label: "attestation-test",
+			salt: "go-fabric-ref-salt", iterations: 1000,
+		},
+			20202021, 3840, node.TCPConfig{}, &otaApplier{dir: t.TempDir()}, nil, slog.New(slog.DiscardHandler))
+		cfg.OTA, cfg.AggregatorServers = nil, nil
+		cfg.Attestation = attestationConfig(dir)
+		n, err := node.New(cfg)
+		if err == nil {
+			_ = n.Stop(context.Background())
+		}
+		return err
 	}
-	if att.Chain == nil || !bytes.Equal(att.Chain.DAC, chain.DAC) || !bytes.Equal(att.CertificationDeclaration, cd) {
-		t.Fatal("the loaded chain is not the one written")
+	if err := build("good.db"); err != nil {
+		t.Fatalf("the vendor chain: %v", err)
 	}
 	if err := os.Remove(filepath.Join(dir, "pai.pem")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadAttestation(dir); err == nil {
-		t.Fatal("a directory missing the PAI loaded")
+	if err := build("broken.db"); err == nil {
+		t.Fatal("a directory missing the PAI built a node")
 	}
 }

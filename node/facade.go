@@ -99,19 +99,22 @@ const (
 	RegulatoryIndoorOutdoor = mattercore.RegulatoryIndoorOutdoor
 )
 
-// SoftwareVersionFromString maps a version string to the
-// BasicInformation SoftwareVersion number
-// ([mattercore.SoftwareVersionFromString]), for
-// [BasicInformation].SoftwareVersion.
-var SoftwareVersionFromString = mattercore.SoftwareVersionFromString
+// SoftwareVersionFromString maps a version string such as "1.4.2" to the
+// BasicInformation SoftwareVersion number, for
+// [BasicInformation].SoftwareVersion
+// ([mattercore.SoftwareVersionFromString]: the major, minor and patch
+// components packed, floored at 1).
+func SoftwareVersionFromString(version string) uint32 {
+	return mattercore.SoftwareVersionFromString(version)
+}
 
 // ValidateSetupPIN reports whether pin is a usable setup passcode: within
 // 1..99999998 and not on the trivially-guessable list
 // ([setup.IsValidSetupPIN]) — the check [Config.Validate] applies to
 // [Commissioning].Passcode. The error wraps [ErrInvalidConfig].
 func ValidateSetupPIN(pin uint32) error {
-	if pin > setupPasscodeMax || !setup.IsValidSetupPIN(pin) {
-		return fmt.Errorf("%w: passcode %d is invalid or on the trivially-guessable list", ErrInvalidConfig, pin)
+	if !validSetupPIN(pin) {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, errSetupPIN(pin))
 	}
 	return nil
 }

@@ -10,57 +10,39 @@ import (
 	"github.com/SukramJ/go-fabric/secure/attestation"
 )
 
-// AttestationFiles names a vendor attestation chain on disk — the fields
-// of attestation.ChainFiles: the Device Attestation Certificate, its
+// AttestationFiles names a vendor attestation chain on disk
+// ([attestation.ChainFiles]): the Device Attestation Certificate, its
 // private key, the Product Attestation Intermediate and the Certification
 // Declaration. Each file may be PEM or DER, the key PKCS#8 or SEC1.
-type AttestationFiles struct {
-	DACPath    string
-	DACKeyPath string
-	PAIPath    string
-	CDPath     string
-}
+type AttestationFiles = attestation.ChainFiles
 
-// ErrNoChainConfigured is [LoadAttestation]'s answer when every path is
-// empty (attestation.ErrNoChainConfigured, the same value).
-var ErrNoChainConfigured = attestation.ErrNoChainConfigured
-
-// LoadAttestation reads the chain f names (attestation.LoadChainFiles)
-// into the [Attestation] a node serves. With every path empty it returns
-// [ErrNoChainConfigured]; a file that is missing or does not parse, a key
-// that is not the DAC's and a certificate too large to serve are errors.
-// [Attestation].Files has [New] call it; a host that keeps running on a
-// chain that does not load — blocking commissioning
-// ([Node.SetCommissioningBlocked]) instead of failing — calls it itself
-// and passes the zero Attestation on an error.
-func LoadAttestation(f AttestationFiles) (Attestation, error) {
-	chain, cd, err := attestation.LoadChainFiles(attestation.ChainFiles{
-		DACPath: f.DACPath, DACKeyPath: f.DACKeyPath, PAIPath: f.PAIPath, CDPath: f.CDPath,
-	})
-	if err != nil {
-		return Attestation{}, err
+// resolveAttestation loads Attestation.Files (attestation.LoadChainFiles)
+// into Chain and CertificationDeclaration; files that name nothing keep
+// the CSA test chain. A chain that does not load fails New — a node told
+// to serve a vendor identity must not pair as the test vendor — unless
+// BlockCommissioningOnError is set: then the test chain stays, which no
+// commissioner reaches, and blocked is the load error New blocks
+// commissioning with.
+func (c *Config) resolveAttestation() (blocked, err error) {
+	a := &c.Attestation
+	if a.Files == nil {
+		return nil, nil
 	}
-	return Attestation{Chain: chain, CertificationDeclaration: cd}, nil
-}
-
-// loadAttestationFiles resolves Attestation.Files: the loaded chain and
-// CD, or the zero value — the CSA test chain — when the files name
-// nothing. A chain that does not load fails New: a node told to serve a
-// vendor identity must not pair as the test vendor.
-func (c *Config) loadAttestationFiles() error {
-	f := c.Attestation.Files
-	if f == nil {
-		return nil
-	}
-	a, err := LoadAttestation(*f)
+	chain, cd, err := attestation.LoadChainFiles(*a.Files)
 	switch {
-	case errors.Is(err, ErrNoChainConfigured):
-		c.Attestation = Attestation{Files: f}
-		return nil
+	case errors.Is(err, attestation.ErrNoChainConfigured):
+		return nil, nil
+	case err != nil && a.BlockCommissioningOnError:
+		return fmt.Errorf("node: attestation files: %w", err), nil
 	case err != nil:
-		return fmt.Errorf("node: attestation files: %w", err)
+		return nil, fmt.Errorf("node: attestation files: %w", err)
 	}
-	a.Files = f
-	c.Attestation = a
-	return nil
+	a.Chain, a.CertificationDeclaration = chain, cd
+	return nil, nil
 }
+
+// AttestationError is the load error of [Attestation].Files under
+// [Attestation].BlockCommissioningOnError: the node runs on the test chain
+// and refuses every commissioning until the files are fixed and a new
+// node is built. nil when the files loaded, named nothing, or are unset.
+func (n *Node) AttestationError() error { return n.attestationErr }

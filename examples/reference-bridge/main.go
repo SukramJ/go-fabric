@@ -23,7 +23,7 @@
 // (control.go), the OTA applier (ota.go) and the operator's banner. The
 // node opens its SQLite file (node.Store.Path), builds its DNS-SD
 // advertiser (a nil node.Config.Advertiser, shaped by Network.MDNS),
-// loads a vendor attestation chain (node.LoadAttestation) and runs the
+// loads a vendor attestation chain (node.Attestation.Files) and runs the
 // health probe (node.Config.Health); the daemon names none of bridge,
 // mdns, secure/* or store for them.
 //
@@ -191,9 +191,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
-	if cfg.Attestation, err = loadAttestation(f.attestationDir); err != nil {
-		return err
-	}
+	cfg.Attestation = attestationConfig(f.attestationDir)
 	// The listener's verdict, logged when it fails (node.Config.Health).
 	cfg.Health.OnSample = func(s node.HealthSample) {
 		if !s.Healthy {

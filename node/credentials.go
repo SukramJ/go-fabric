@@ -5,6 +5,8 @@ package node
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -40,6 +42,23 @@ func NewCommissioningCredentials() (Commissioning, error) {
 		PBKDFIterations: PBKDFIterationsMin,
 		Salt:            salt,
 	}, nil
+}
+
+// WindowCredentials are c's secret as the credentials of one
+// [Node.OpenBasicWindow] window that stays open for timeout (0 is the
+// node's own window default) — a fresh window secret is
+// NewCommissioningCredentials().WindowCredentials(timeout).
+func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredentials {
+	// Clamped to uint32's range; OpenBasicWindow refuses what lies
+	// outside [PBKDFIterationsMin, PBKDFIterationsMax].
+	iterations := uint32(min(max(c.PBKDFIterations, 0), math.MaxUint32)) //nolint:gosec // clamped to uint32's range
+	return WindowCredentials{
+		Discriminator: c.Discriminator,
+		Passcode:      c.Passcode,
+		Iterations:    iterations,
+		Salt:          append([]byte(nil), c.Salt...),
+		Timeout:       timeout,
+	}
 }
 
 // PairingCodesFor returns the QR code payload and the manual pairing code

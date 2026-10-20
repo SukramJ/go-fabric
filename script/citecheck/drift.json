@@ -2086,7 +2086,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 32,
+    "line": 31,
     "citation": "packages/node/src/node/ServerNode.ts:107-127",
     "resolved": "packages/node/src/node/ServerNode.ts",
     "identifier": "commissioning",
@@ -2095,7 +2095,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 36,
+    "line": 35,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2104,7 +2104,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 174,
+    "line": 199,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2113,7 +2113,7 @@
   },
   {
     "file": "node/observers.go",
-    "line": 46,
+    "line": 47,
     "citation": "FabricManager.ts:253",
     "resolved": "packages/protocol/src/fabric/FabricManager.ts",
     "identifier": "deleted",

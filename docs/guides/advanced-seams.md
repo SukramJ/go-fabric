@@ -21,12 +21,12 @@ A host names none of the packages below for these:
 | --- | --- |
 | The store | `Config.Store.Path` (the node opens and closes the SQLite file), or `Store.DB` for the host's own handle |
 | DNS-SD | a nil `Config.Advertiser`: Zeroconf with the subtype responder, shaped by `Network.MDNS` (`Disabled`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS` |
-| Attestation | `Config.Attestation.Files`, or `node.LoadAttestation` for a host that blocks commissioning on a broken chain |
-| Credentials | `node.NewCommissioningCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodes`, `Node.PairingCodesFor` |
+| Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
+| Credentials | `node.NewCommissioningCredentials`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodes`, `Node.PairingCodesFor` |
 | Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers` |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
-| Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`; `device.SourceKey`, `device.AvailabilityProbe` |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
 An alias is the type of the lower package under a second name, not a new

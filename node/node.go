@@ -66,6 +66,9 @@ type Node struct {
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
+	// attestationErr is the load error of Attestation.Files under
+	// BlockCommissioningOnError (attestation.go).
+	attestationErr error
 	// stopReannounce ends the re-announce loop Start began; nil when none
 	// runs (reannounce.go).
 	stopReannounce func()
@@ -125,7 +128,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	if err := cfg.loadAttestationFiles(); err != nil {
+	attestationErr, err := cfg.resolveAttestation()
+	if err != nil {
 		return nil, err
 	}
 	// Before anything derives a UniqueID (persist.go uniqueID, the
@@ -138,7 +142,10 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
-	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot}
+	n := &Node{
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot,
+		attestationErr: attestationErr,
+	}
 	n.life, n.cancel = context.WithCancel(ctx)
 	ok := false
 	defer func() {
@@ -165,7 +172,6 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if n.endpoints == nil {
 		n.endpoints = n.persisted
 	}
-	var err error
 	// The host's group manager when it supplies one (its assembler mounts
 	// the Groups servers over it), else the facade's own.
 	n.groups = cfg.Groups
@@ -335,8 +341,20 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		}
 		return nil, err
 	}
+	n.blockOnAttestationError(ctx)
 	ok = true
 	return n, nil
+}
+
+// blockOnAttestationError refuses commissioning while the configured
+// chain did not load (Attestation.BlockCommissioningOnError).
+func (n *Node) blockOnAttestationError(ctx context.Context) {
+	if n.attestationErr == nil {
+		return
+	}
+	n.logger.Error("attestation.files", slog.String("err", n.attestationErr.Error()),
+		slog.String("hint", "new commissioning is refused until the files load; paired controllers keep working"))
+	n.SetCommissioningBlocked(ctx, n.attestationErr)
 }
 
 // openStores resolves cfg.Store: the overrides, or the two stores on DB

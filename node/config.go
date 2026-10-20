@@ -21,7 +21,6 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -375,11 +374,18 @@ type Store struct {
 
 // Attestation is the device attestation material.
 type Attestation struct {
-	// Files names a vendor chain on disk; [New] loads it
-	// ([LoadAttestation]) into Chain and CertificationDeclaration, which
-	// it excludes. Files that name nothing keep the CSA test chain; a
-	// chain that does not load fails New.
+	// Files names a vendor chain on disk; [New] loads it into Chain and
+	// CertificationDeclaration, which it excludes. Files that name
+	// nothing keep the CSA test chain; a chain that does not load fails
+	// New.
 	Files *AttestationFiles
+	// BlockCommissioningOnError keeps a node whose Files do not load
+	// running: it serves the test chain, refuses every commissioning
+	// ([Node.SetCommissioningBlocked] with the load error) and reports the
+	// error in [Node.AttestationError]. Controllers already paired keep
+	// working — attestation is checked only while a controller
+	// commissions. It needs Files.
+	BlockCommissioningOnError bool
 	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
 	// host with a chain of its own (an HSM-held key, say) sets it here.
 	Chain *attestation.Chain
@@ -420,6 +426,35 @@ const (
 // enforces too.
 const maxUniqueIDBytes = 32
 
+// validSetupPIN is the one passcode check: the Matter §5.1.1.6 range and
+// the trivially-guessable list.
+func validSetupPIN(pin uint32) bool { return pin <= setupPasscodeMax && setup.IsValidSetupPIN(pin) }
+
+// errSetupPIN is the failure every passcode check reports.
+func errSetupPIN(pin uint32) error {
+	return fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", pin)
+}
+
+// The checks [Config.Validate] and [Node.OpenBasicWindow] share, against
+// the bounds above.
+func checkDiscriminator(d uint16) error {
+	if d > MaxDiscriminator {
+		return fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
+	}
+	return nil
+}
+
+func checkPBKDF(iterations int64, saltLen int) []error {
+	var errs []error
+	if iterations < PBKDFIterationsMin || iterations > PBKDFIterationsMax {
+		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
+	}
+	if saltLen < PBKDFSaltMin || saltLen > PBKDFSaltMax {
+		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
+	}
+	return errs
+}
+
 // Validate holds the checks the daemon applies to its flags
 // (main.go:113-131): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
@@ -432,18 +467,13 @@ const maxUniqueIDBytes = 32
 func (c *Config) Validate() error {
 	var errs []error
 	cm := c.Commissioning
-	if cm.Discriminator > setup.MaxDiscriminator {
-		errs = append(errs, fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", cm.Discriminator, setup.MaxDiscriminator))
+	if err := checkDiscriminator(cm.Discriminator); err != nil {
+		errs = append(errs, err)
 	}
-	if cm.Passcode > setupPasscodeMax || !setup.IsValidSetupPIN(cm.Passcode) {
-		errs = append(errs, fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", cm.Passcode))
+	if !validSetupPIN(cm.Passcode) {
+		errs = append(errs, errSetupPIN(cm.Passcode))
 	}
-	if cm.PBKDFIterations < spake2.IterationsMin || cm.PBKDFIterations > spake2.IterationsMax {
-		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", cm.PBKDFIterations, spake2.IterationsMin, spake2.IterationsMax))
-	}
-	if len(cm.Salt) < spake2.PBKDFMinSaltSize || len(cm.Salt) > spake2.PBKDFMaxSaltSize {
-		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", len(cm.Salt), spake2.PBKDFMinSaltSize, spake2.PBKDFMaxSaltSize))
-	}
+	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("ProductDescription.VendorID and ProductID must be non-zero"))
 	}
@@ -465,8 +495,10 @@ func (c *Config) Validate() error {
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
-	if c.Attestation.Files != nil && (c.Attestation.Chain != nil || c.Attestation.CertificationDeclaration != nil) {
+	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("Attestation.Files excludes Chain and CertificationDeclaration"))
+	} else if at.Files == nil && at.BlockCommissioningOnError {
+		errs = append(errs, errors.New("Attestation.BlockCommissioningOnError needs Files"))
 	}
 	if c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
