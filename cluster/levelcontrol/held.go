@@ -85,7 +85,8 @@ func New(cfg HeldConfig) (*Server, error) {
 	return s, nil
 }
 
-// ErrFeatures: a [HeldConfig] feature selection the server does not serve.
+// ErrFeatures is the refusal of a [HeldConfig] feature selection the
+// server does not serve.
 var ErrFeatures = errors.New("levelcontrol: feature selection not served")
 
 // heldLevel is the [LevelSource] a held server keeps its state in: the

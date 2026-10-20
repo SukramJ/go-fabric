@@ -439,13 +439,6 @@ func (d *Device) MatterDeviceType() uint16 { return d.typ.ID }
 // servers, without the ones the assembler mounts.
 func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Servers() }
 
-// serverAs returns the device's server for clusterID as T, or T's zero
-// value when it mounts none or the host's server is of another type.
-func serverAs[T contract.ClusterServer](d *Device, clusterID uint32) T {
-	v, _ := d.Server(clusterID).(T)
-	return v
-}
-
 // AddPart makes p a part of the device — matter.js's `endpoint.parts.add`
 // (packages/node/src/endpoint/properties/Parts.ts:37-73). matter.js
 // validates an insertion for endpoint-number identity only
