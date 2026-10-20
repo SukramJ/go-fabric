@@ -24,11 +24,14 @@ with its test; the two security-path commits (`7de40666` the reaper,
 | `bridge/bdx_responder.go` per-exchange responder | `Bridge` (`goResponder`: counter + `sync.Cond` on `bdx.mu`) | `Bridge.Stop`, bounded by its context | `TestStopWaitsForTheBDXResponder` |
 | `ble/bluez/central_linux.go` `dispatch` | `central` (`dispatched` channel) | `Close` waits (every call) | `TestCloseWaitsForTheSignalLoop` |
 | `bridge/securechannel.go` `clock.After` in `closeSecureSessionsForShutdown` | `Bridge.Stop` | the budget timer is stopped on either branch | (with the re-announce commit) |
+| `bridge/commissioning_window.go` expiry timer (own or administrator window; 48 h for an uncommissioned node) | `Bridge` | `Bridge.Stop` calls `CommissioningWindow.stopTimer` after the quiesce: timer stopped, window state kept, no hooks fired; the next start replaces the window (review, efb4ab4f) | `TestStopLeavesNoTimerArmed` (nothing armed on the fake clock after `Node.Stop`) |
 
 The waits that can meet host code are bounded where the owner has a
-context (exchange `Shutdown`, TCP `WaitIdle`, the BDX responders);
-`MatterQuiesce` and `Identify.Close` have none and wait unbounded — the
-contract gives them no context (Questions).
+context (exchange `Shutdown`, TCP `WaitIdle`, the BDX responders).
+`MatterQuiesce` keeps its signature (owner, review: a context on the
+`contract` interface would be a break); its wait is bounded by the work it
+cancels, which DoorLock's and DiagnosticLogs' doc comments now say
+("returns once the cancelled timer action / transfer has returned").
 
 ## The restart flake (G1-15)
 
@@ -93,7 +96,9 @@ readers take:
   `transport/tcp/conn.go:98` (`writeMu` serialises the frame writes),
   `bridge/group_messaging.go:232`, `:237` (`groupNetMu`, the group
   networking's own setsockopt calls), `node/node.go:755` (`n.mu` is the
-  lifecycle lock of `Start`/`Stop`; see Questions),
+  lifecycle lock of `Start`/`Stop`; after the review it is taken by
+  nothing else — `SetCommissioningBlocked` reads an atomic `started`,
+  169ee06e, `TestSetCommissioningBlockedDuringStart`),
   `controller/client/reactions.go:134` (`r.op`, the registry's operation
   queue; see Questions).
 - *Timers and clocks*: `bridge/commissioning_window.go:421`,
@@ -202,13 +207,15 @@ nothing; `Stop` now waits for what it started).
    brief's "a store call that does SQLite I/O is not harmless".
 6. **Two timers found by a Stop-leaves-nothing-armed probe**: the bridge's
    session-close budget (`clock.After`, fixed) and the commissioning
-   window's 48 h own-window timer (left, Questions). The probe itself was
-   not kept as a test: `n.cancel()` ends the session reaper quickly
-   enough that it cannot tell a waiting Stop from one that does not.
+   window's 48 h own-window timer (fixed in review, efb4ab4f; the probe
+   is now `TestStopLeavesNoTimerArmed`). It does not prove the reaper's
+   wait — `n.cancel()` ends the reaper quickly enough either way — which
+   `TestStopReaperWaitsForTheReaper` does.
 
 ## Decisions
 
-- **Command queues stay across host calls.** `op`-style locks that only
+- **Command queues stay across host calls** (accepted in review; the
+  owner amends ADR 0026 and the by_design entry after the merge). `op`-style locks that only
   the server's own commands take (WindowCovering, Microwave, OnOff,
   Transition, and now DEM and media) are the by_design shape
   `BD-Matter-HostPort-OutsideTheSetterLock`: commands serialised as a
@@ -235,30 +242,26 @@ nothing; `Stop` now waits for what it started).
 - `cluster/energy/evse.go`: the other "documented exception" of
   `BD-Matter-HostPort-OutsideTheSetterLock` (hooks under the state lock)
   — not in the brief's rows and not flagged by §3c; left.
-- The commissioning window's own-window timer (48 h) stays armed after
-  `Node.Stop`.
-- `node.Node.mu` (lifecycle) and `controller/client` `Registry.op` hold
-  host callbacks (`Start`'s Snapshotter, the `Decommissioned` hook);
-  judged as queues, not changed.
+- `controller/client` `Registry.op` holds a host callback (the
+  `Decommissioned` hook); judged as a queue, not changed.
 - The 149 uncommented mutexes outside the touched files (BX3).
 
-## Questions
+## Questions (answered in review, 2026-10-21)
 
-1. `contract.ClusterQuiescer.MatterQuiesce` has no context, so
-   DoorLock's and DiagnosticLogs' waits (host hardware, a host log
-   collector) are unbounded inside `Bridge.Stop`. Give it a context, or
-   keep host code that ignores its context the host's problem?
-2. Should `Bridge.Stop` stop the commissioning window's timer (and with
-   it close the window without firing its hooks), or is an armed window
-   timer after Stop accepted because the node is not restarted in place?
-3. `Node.mu` serialises `Start` and `Stop` across host callbacks; a host
-   Snapshotter that calls `SetCommissioningBlocked` during `Start` would
-   deadlock. Make `SetCommissioningBlocked` lock-free (an atomic `started`)?
-4. Is the reading of P6 above (command queues allowed) the owner's?
+1. `MatterQuiesce` keeps its signature; the doc of each implementation
+   names what bounds its wait — done (DoorLock, DiagnosticLogs).
+2. `Bridge.Stop` stops the window's timer — done (efb4ab4f).
+3. `SetCommissioningBlocked` without the lifecycle lock — done (169ee06e).
+4. The P6 reading is accepted; the owner amends ADR 0026 and
+   `BD-Matter-HostPort-OutsideTheSetterLock`.
+
+Also from the review: `matter.rx.sc.status_report`
+(`bridge/securechannel.go`) no longer logs the payload as hex (G1-17,
+a96ff772; CHANGELOG Removed).
 
 ## by_design candidates
 
 - `BD-Matter-HostPort-OutsideTheSetterLock`: DeviceEnergyManagement and
   the media servers now have the two-lock shape (op, mu); the entry's
   closing sentence still names DEM as the documented exception, with
-  EVSE. One sentence to update (Fable's, not written here).
+  EVSE — the owner updates it after the merge.
