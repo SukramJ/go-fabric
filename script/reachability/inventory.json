@@ -227,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13907,
-    "reachable": 9710,
-    "whitelisted": 4192,
+    "total_exported": 13923,
+    "reachable": 9711,
+    "whitelisted": 4207,
     "unreachable": 5
   },
   "by_package": [
@@ -5508,7 +5508,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 676
+      "line": 677
     },
     {
       "package": "cluster/alarm",
@@ -5669,7 +5669,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 553
+      "line": 554
     },
     {
       "package": "cluster/core",
@@ -5683,21 +5683,21 @@
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 569
+      "line": 576
     },
     {
       "package": "cluster/core",
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 688
+      "line": 689
     },
     {
       "package": "cluster/core",
       "identifier": "ReachableChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/bridged_device_basic_information.go",
-      "line": 130
+      "line": 134
     },
     {
       "package": "cluster/core",
@@ -5711,14 +5711,14 @@
       "identifier": "ShutDownEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 566
+      "line": 573
     },
     {
       "package": "cluster/core",
       "identifier": "StartUpEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
-      "line": 561
+      "line": 568
     },
     {
       "package": "cluster/core",
@@ -5893,7 +5893,7 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 722
+      "line": 723
     },
     {
       "package": "cluster/core",
@@ -6894,7 +6894,7 @@
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 71
+      "line": 72
     },
     {
       "package": "cluster/lock",
@@ -19641,7 +19641,7 @@
       "identifier": "MemoryResumptionStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/peer/store.go",
-      "line": 92
+      "line": 93
     },
     {
       "package": "controller/peer",
@@ -19655,7 +19655,7 @@
       "identifier": "ResumptionStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/peer/store.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "controller/peer",
@@ -25084,6 +25084,13 @@
     },
     {
       "package": "node",
+      "identifier": "AttestationChain",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 171
+    },
+    {
+      "package": "node",
       "identifier": "AttestationFiles",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/attestation.go",
@@ -25091,17 +25098,45 @@
     },
     {
       "package": "node",
+      "identifier": "CapabilityMinimaStruct",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 159
+    },
+    {
+      "package": "node",
+      "identifier": "CommissioningApprover",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 153
+    },
+    {
+      "package": "node",
       "identifier": "CommissioningWindow",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 41
+      "line": 43
+    },
+    {
+      "package": "node",
+      "identifier": "DeviceTypeValidationMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 165
     },
     {
       "package": "node",
       "identifier": "DiagnosticEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 55
+      "line": 57
+    },
+    {
+      "package": "node",
+      "identifier": "GeneralDiagnosticsFeatures",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 162
     },
     {
       "package": "node",
@@ -25126,6 +25161,55 @@
     },
     {
       "package": "node",
+      "identifier": "OTAApplyPolicy",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 138
+    },
+    {
+      "package": "node",
+      "identifier": "OTAConsent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 132
+    },
+    {
+      "package": "node",
+      "identifier": "OTAConsentState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 135
+    },
+    {
+      "package": "node",
+      "identifier": "OTAImageSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 129
+    },
+    {
+      "package": "node",
+      "identifier": "OTAPeer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 141
+    },
+    {
+      "package": "node",
+      "identifier": "OTAUpdateStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 144
+    },
+    {
+      "package": "node",
+      "identifier": "OtaApplier",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 147
+    },
+    {
+      "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
@@ -25133,31 +25217,38 @@
     },
     {
       "package": "node",
+      "identifier": "ReverseCommissioner",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 156
+    },
+    {
+      "package": "node",
       "identifier": "SessionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "node",
       "identifier": "Snapshotter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "node",
       "identifier": "SubscriptionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "node",
       "identifier": "TCPConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "node",
@@ -25262,7 +25353,21 @@
       "identifier": "Topology",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 33
+      "line": 35
+    },
+    {
+      "package": "node",
+      "identifier": "WiFiReporter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 150
+    },
+    {
+      "package": "node",
+      "identifier": "WindowStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 168
     },
     {
       "package": "schema",
