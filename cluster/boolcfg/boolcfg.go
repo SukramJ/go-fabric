@@ -147,6 +147,9 @@ var ErrInvalidConfig = errors.New("boolcfg: configuration outside the cluster's 
 // BooleanStateConfigurationCluster.h:128-132).
 type Server struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (typed.go).
+	spec.SelfHeld
 
 	srv       *spec.Server
 	delegate  Delegate
@@ -228,7 +231,7 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("boolcfg: %w", err)
 	}
-	s.srv, s.Instance = srv, srv.Instance
+	s.srv, s.Instance, s.SelfHeld = srv, srv.Instance, spec.NewSelfHeld(srv)
 	initial := s.served(map[uint32]any{
 		def.AttrCurrentSensitivityLevel:    s.current,
 		def.AttrSupportedSensitivityLevels: s.supported,
@@ -285,7 +288,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // and EnableDisableAlarm without VIS or AUD, as chip's AcceptedCommands
 // (.cpp:119-134) and SuppressAlarms (.cpp:405-407) answer them.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields) // a host's handler first ([spec.SelfHeld.Handle])
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].

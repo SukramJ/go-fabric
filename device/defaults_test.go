@@ -9,14 +9,22 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/alarmbase"
+	"github.com/SukramJ/go-fabric/cluster/appliance"
+	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/energy"
+	"github.com/SukramJ/go-fabric/cluster/filter"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
+	lwcdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -54,6 +62,24 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x0201, func() (*Device, error) {
 			return New(&ThermostatType, testOptions("th"), WithFeatures(0x0201, thermo.ThermostatFeatureHEAT))
 		}, (*thermo.ThermostatServer)(nil)},
+		{0x0053, func() (*Device, error) {
+			return New(&LaundryWasherType, testOptions("lw"), WithOptional(0x0053), WithFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
+		}, (*appliance.WasherServer)(nil)},
+		{0x0057, optIn(&RefrigeratorType, 0x0057), (*alarmbase.Server)(nil)},
+		{0x005D, optIn(&DishwasherType, 0x005D), (*alarmbase.Server)(nil)},
+		{0x0071, optIn(&AirPurifierType, 0x0071), (*filter.Server)(nil)},
+		{0x0072, optIn(&AirPurifierType, 0x0072), (*filter.Server)(nil)},
+		{0x0080, optIn(&ContactSensorType, 0x0080), (*boolcfg.Server)(nil)},
+		{0x0095, optIn(&ElectricalEnergyTariffType, 0x0095), (*energy.CommodityPriceServer)(nil)},
+		{0x0099, func() (*Device, error) { return New(&EnergyEvseType, testOptions("evse")) }, (*energy.EvseServer)(nil)},
+		{0x00A0, optIn(&ElectricalEnergyTariffType, 0x00A0), (*energy.GridConditionsServer)(nil)},
+		{0x0204, func() (*Device, error) {
+			return New(&ThermostatType, testOptions("tui"), WithFeatures(0x0201, thermo.ThermostatFeatureHEAT), WithOptional(0x0204))
+		}, (*thermo.ThermostatUIServer)(nil)},
+		{0x0B07, func() (*Device, error) {
+			return New(&ElectricalMeterType, testOptions("meter"), WithOptional(0x0B07), WithFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
+				WithFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
+		}, (*energy.CommodityMeteringServer)(nil)},
 	}
 	covered := map[uint32]bool{}
 	for _, tc := range cases {
@@ -150,4 +176,9 @@ func TestDimmableLightCouplesItsServers(t *testing.T) {
 // at once.
 func levelcontrolMoveWithOnOff(level uint8) levelcontroldef.MoveToLevelWithOnOffRequest {
 	return levelcontroldef.MoveToLevelWithOnOffRequest{Level: level, TransitionTime: spec.NullOf[uint16]()}
+}
+
+// optIn builds a device of type t with the optional cluster id opted in.
+func optIn(t *Type, id uint32) func() (*Device, error) {
+	return func() (*Device, error) { return New(t, testOptions("opt"), WithOptional(id)) }
 }

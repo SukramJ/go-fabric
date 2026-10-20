@@ -51,6 +51,9 @@ type GridConditionsConfig struct {
 // chip's.
 type GridConditionsServer struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (typed.go).
+	spec.SelfHeld
 
 	srv *spec.Server
 
@@ -89,7 +92,7 @@ func NewElectricalGridConditions(cfg GridConditionsConfig) (*GridConditionsServe
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	return &GridConditionsServer{Instance: srv.Instance, srv: srv}, nil
+	return &GridConditionsServer{Instance: srv.Instance, SelfHeld: spec.NewSelfHeld(srv), srv: srv}, nil
 }
 
 // SetLocalGenerationAvailable records LocalGenerationAvailable; nil is
@@ -184,5 +187,5 @@ func (s *GridConditionsServer) MatterWrite(ctx context.Context, attrID uint32, v
 
 // MatterInvoke answers every command: the cluster has none.
 func (s *GridConditionsServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields) // a host's handler first ([spec.SelfHeld.Handle])
 }

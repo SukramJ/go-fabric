@@ -10,8 +10,10 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/cluster/alarmbase"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/filter"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/lock"
@@ -85,6 +87,20 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	0x0201: newThermostatServer,           // Thermostat: cluster/thermo, matter.js ThermostatServer.ts.
 	0x0300: newColorControlServer,         // ColorControl: cluster/light, matter.js ColorControlServer.ts.
 	0x0750: newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+
+	// The appliance, sensor-configuration and energy servers
+	// (defaults_appliance.go).
+	0x0053: newLaundryWasherControlsServer,                          // LaundryWasherControls: cluster/appliance.
+	0x0057: alarmServer(alarmbase.NewRefrigeratorAlarm),             // RefrigeratorAlarm: cluster/alarmbase.
+	0x005D: alarmServer(alarmbase.NewDishwasherAlarm),               // DishwasherAlarm: cluster/alarmbase.
+	0x0071: filterServer(filter.NewHepaFilterMonitoring),            // HepaFilterMonitoring: cluster/filter.
+	0x0072: filterServer(filter.NewActivatedCarbonFilterMonitoring), // ActivatedCarbonFilterMonitoring: cluster/filter.
+	0x0080: newBooleanStateConfigurationServer,                      // BooleanStateConfiguration: cluster/boolcfg.
+	0x0095: newCommodityPriceServer,                                 // CommodityPrice: cluster/energy.
+	0x0099: newEnergyEvseServer,                                     // EnergyEvse: cluster/energy.
+	0x00A0: newGridConditionsServer,                                 // ElectricalGridConditions: cluster/energy.
+	0x0204: newThermostatUIServer,                                   // ThermostatUserInterfaceConfiguration: cluster/thermo.
+	0x0B07: newCommodityMeteringServer,                              // CommodityMetering: cluster/energy.
 }
 
 // coupledLast are the defaults built after the device's other servers,

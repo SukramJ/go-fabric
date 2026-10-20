@@ -138,9 +138,10 @@ func (w *WriteVeto) Check(ctx context.Context, attrID uint32, value any) error {
 // handler over the server's own logic ([HostHandlers]), Emit emits
 // through the store's emitter, and SetBeforeWrite vetoes the writes the
 // store takes. The server embeds it, routes MatterInvoke through
-// [SelfHeld.Invoke], forwards its emitter with [SelfHeld.SetMatterEventEmitter]
+// [InvokeHeld], forwards its emitter with [SelfHeld.SetMatterEventEmitter]
 // unless it keeps its own, and overrides SetAttributes where its own state
-// sits beside the store.
+// sits beside the store. Every method it promotes is one of those the
+// server answers anyway.
 type SelfHeld struct {
 	srv  *Server
 	host HostHandlers
@@ -175,9 +176,11 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	h.srv.SetMatterEventEmitter(emitter)
 }
 
-// Invoke runs the host's handler of cmdID when one is registered and
-// the store's — the server's own logic — otherwise.
-func (h *SelfHeld) Invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+// InvokeHeld is a self-held server's MatterInvoke: the host's handler of
+// cmdID when one is registered ([SelfHeld.Handle]), the store's — the
+// server's own logic — otherwise. It is a function rather than a method so
+// that embedding [SelfHeld] promotes no second invoke onto the server.
+func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := h.host.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}

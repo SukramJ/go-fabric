@@ -91,12 +91,12 @@ func (s *CommodityMeteringServer) SetMaximumMeteredQuantities(maximum *uint16) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if maximum == nil {
-		return s.Set(commtr.AttrMaximumMeteredQuantities, nil)
+		return s.Server.Set(commtr.AttrMaximumMeteredQuantities, nil)
 	}
 	if *maximum < meteringMaxMeteredQuantitiesMin {
 		return ErrMeteringMaximum
 	}
-	return s.Set(commtr.AttrMaximumMeteredQuantities, *maximum)
+	return s.Server.Set(commtr.AttrMaximumMeteredQuantities, *maximum)
 }
 
 // SetMeteredQuantity records MeteredQuantity
@@ -113,7 +113,7 @@ func (s *CommodityMeteringServer) SetMeteredQuantity(quantities []MeteredQuantit
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if quantities == nil {
-		return s.Set(commtr.AttrMeteredQuantity, nil)
+		return s.Server.Set(commtr.AttrMeteredQuantity, nil)
 	}
 	v, _ := s.Value(commtr.AttrMaximumMeteredQuantities)
 	maximum, ok := v.(uint16)
@@ -134,28 +134,28 @@ func (s *CommodityMeteringServer) SetMeteredQuantity(quantities []MeteredQuantit
 	if old, _ := s.Value(commtr.AttrMeteredQuantity); reflect.DeepEqual(old, out) {
 		return nil
 	}
-	return s.Set(commtr.AttrMeteredQuantity, out)
+	return s.Server.Set(commtr.AttrMeteredQuantity, out)
 }
 
 // SetMeteredQuantityTimestamp records MeteredQuantityTimestamp, in Matter
 // epoch seconds; nil is null (commodity-metering-server.cpp:241-262).
 func (s *CommodityMeteringServer) SetMeteredQuantityTimestamp(epochS *uint32) error {
 	if epochS == nil {
-		return s.Set(commtr.AttrMeteredQuantityTimestamp, nil)
+		return s.Server.Set(commtr.AttrMeteredQuantityTimestamp, nil)
 	}
-	return s.Set(commtr.AttrMeteredQuantityTimestamp, *epochS)
+	return s.Server.Set(commtr.AttrMeteredQuantityTimestamp, *epochS)
 }
 
 // SetTariffUnit records TariffUnit; nil is null, a value outside the
 // enum CONSTRAINT_ERROR (commodity-metering-server.cpp:264-288).
 func (s *CommodityMeteringServer) SetTariffUnit(unit *MeteringTariffUnit) error {
 	if unit == nil {
-		return s.Set(commtr.AttrTariffUnit, nil)
+		return s.Server.Set(commtr.AttrTariffUnit, nil)
 	}
 	if *unit > commtr.TariffUnitKVAh {
 		return statusError{im.StatusConstraintError, "energy: CommodityMetering: TariffUnit outside the enum"}
 	}
-	return s.Set(commtr.AttrTariffUnit, *unit)
+	return s.Server.Set(commtr.AttrTariffUnit, *unit)
 }
 
 // MaximumMeteredQuantities returns MaximumMeteredQuantities; nil while
