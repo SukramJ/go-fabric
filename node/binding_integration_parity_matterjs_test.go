@@ -435,7 +435,8 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 			Updated: func(r *interaction.Report) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
-				for _, a := range r.Attributes {
+				for i := range r.Attributes {
+					a := &r.Attributes[i]
 					s.paths = append(s.paths, a.Path)
 					if a.Path.Attribute == onoff.AttrOnOff {
 						s.reports = append(s.reports, a.Value.El.Bool)

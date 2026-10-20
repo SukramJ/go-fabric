@@ -656,8 +656,9 @@ func TestOtaBusyParityMatterJS(t *testing.T) {
 	t.Run("waits in DelayedOnQuery while the retry is armed, and queries again when it is due", func(t *testing.T) {
 		s, busy := newBusySite(t)
 		s.eventually(t, "the second DelayedOnQuery", into(s, otadef.UpdateStateDelayedOnQuery, 2))
-		var states []otadef.UpdateStateEnum
-		for _, e := range s.transitions() {
+		transitions := s.transitions()
+		states := make([]otadef.UpdateStateEnum, 0, len(transitions))
+		for _, e := range transitions {
 			states = append(states, e.NewState)
 		}
 		want := []otadef.UpdateStateEnum{otadef.UpdateStateQuerying, otadef.UpdateStateDelayedOnQuery, otadef.UpdateStateQuerying, otadef.UpdateStateDelayedOnQuery}
