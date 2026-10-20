@@ -206,6 +206,62 @@ func TestCacheBuffered(t *testing.T) {
 	}
 }
 
+// blockingStore holds its first Save until release is closed.
+type blockingStore struct {
+	MemoryStore
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *blockingStore) Save(nodeID string, ep uint16, cluster uint32, values map[uint32][]byte, version *uint32) error {
+	s.once.Do(func() { close(s.entered) })
+	<-s.release
+	return s.MemoryStore.Save(nodeID, ep, cluster, values, version)
+}
+
+// TestPersisterStopWaitsForTheRunningFlush: a flush the timer started
+// finishes before stop returns, so the erase that follows a stop cannot be
+// overwritten by it — ClientCacheBuffer.close awaits the timer loop and
+// drains the mutex the flushes run through (ClientCacheBuffer.ts:94-101,
+// :159-173). The flush writes outside the node's lock, which is where
+// TestRegistryDecommission saw the erased node stored again.
+func TestPersisterStopWaitsForTheRunningFlush(t *testing.T) {
+	t.Parallel()
+	st := &blockingStore{entered: make(chan struct{}), release: make(chan struct{})}
+	clock := newManualClock()
+	p, image := newTestPersister(st, 5*time.Second, clock)
+	image.Lock()
+	c := newCache(p, 1, 6, nil, nil)
+	c.externalSet(map[uint32]*spec.Node{0: ptr(boolNode(true))}, nil)
+	image.Unlock()
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		clock.Advance(5 * time.Second) // the timer's flush, held in Save
+	}()
+	<-st.entered
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		p.stop()
+	}()
+	select {
+	case <-stopped:
+		t.Fatal("stop returned while the timer's flush was still writing")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(st.release)
+	<-stopped
+	<-advanced
+	if _, _, ok := stored(t, st, 1, 6); !ok {
+		t.Fatal("the flush did not write")
+	}
+	if clock.armed() != 0 {
+		t.Fatal("a timer stayed armed after stop")
+	}
+}
+
 // TestMemoryStore: Load returns copies in order; the erase paths.
 func TestMemoryStore(t *testing.T) {
 	t.Parallel()

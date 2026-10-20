@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5859,
+  "entry_points": 5860,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13244,
+    "total_exported": 13245,
     "reachable": 9201,
-    "whitelisted": 4038,
+    "whitelisted": 4039,
     "unreachable": 5
   },
   "by_package": [
@@ -16476,14 +16476,14 @@
       "identifier": "TestMemoryStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 210
+      "line": 266
     },
     {
       "package": "controller/client",
       "identifier": "TestMemoryStoreConcurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 253
+      "line": 309
     },
     {
       "package": "controller/client",
@@ -16526,6 +16526,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/peer_descriptor_parity_matterjs_internal_test.go",
       "line": 35
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestPersisterStopWaitsForTheRunningFlush",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 229
     },
     {
       "package": "controller/client",
@@ -16658,7 +16665,7 @@
       "identifier": "TestSettingsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 277
+      "line": 333
     },
     {
       "package": "controller/client",

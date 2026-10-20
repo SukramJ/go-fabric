@@ -52,7 +52,8 @@
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts",
       "status": "planned",
-      "reason": "Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match.",
+      "until": "M4",
+      "reason": "Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "223fcd05a368c9a8fb7ebe3079ffa671276528da"
     },
     {
@@ -152,7 +153,8 @@
     {
       "path": "packages/node/test/behavior/internal/MarkChangedTest.ts",
       "status": "planned",
-      "reason": "markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules.",
+      "until": "M4",
+      "reason": "markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "1fb1c1b8e88dee014ba4d22ce015172f6b81706e"
     },
     {
@@ -224,7 +226,8 @@
     {
       "path": "packages/node/test/behavior/state/managed/values/ValuePatcherTest.ts",
       "status": "planned",
-      "reason": "Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with.",
+      "until": "M4",
+      "reason": "Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "8d16b9842415d25a12a7a5dbb46d7ab8b3db411b"
     },
     {
@@ -282,7 +285,8 @@
     {
       "path": "packages/node/test/behavior/state/validation/conformanceTest.ts",
       "status": "planned",
-      "reason": "Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers.",
+      "until": "M4",
+      "reason": "Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "6d5d6808f5881ec2dc21fc9ce2a86a816027c9d9"
     },
     {
@@ -382,31 +386,36 @@
     {
       "path": "packages/node/test/behavior/system/controller/discovery/CommissioningIdentityTest.ts",
       "status": "planned",
-      "reason": "The commissioner's vendor/product identity check of an advertised device against the onboarding payload.",
+      "until": "M5 phase 25",
+      "reason": "The commissioner's vendor/product identity check of an advertised device against the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
       "snapshotSha": "a5d21a5f6705a7679a5040c96a9daaa727a4a730"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/ContinuousDiscoveryTest.ts",
       "status": "planned",
-      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report.",
+      "until": "M5 phase 25",
+      "reason": "Continuous discovery creating one node for a device that concurrent discoveries report. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
       "snapshotSha": "c0adf3e65a382f5be567ed488776e7d38d6f490c"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
       "status": "planned",
-      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling.",
+      "until": "M5 phase 25",
+      "reason": "Cancellation and abort of a commissioning discovery before and after the PASE win, cancel reasons and settling. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
       "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
       "status": "planned",
-      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device).",
+      "until": "M5 phase 25",
+      "reason": "The error kinds a commissioning discovery reports (not discovered, incomplete, aggregate, no transport, unusable device). Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
       "snapshotSha": "9b754259f919ad36968baa4bbcd6411c032123a5"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryTransportsTest.ts",
       "status": "planned",
-      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload.",
+      "until": "M5 phase 25",
+      "reason": "Selection and reporting of the discovery transports (IP network, BLE) from the onboarding payload. Controller discovery: milestone 5 phase 25 (concept v5 F.0 19.3).",
       "snapshotSha": "4d32c07967e95dbb8ba1fad22a962328a051280b"
     },
     {
@@ -427,7 +436,8 @@
     {
       "path": "packages/node/test/behavior/system/dcl/DclBehaviorTest.ts",
       "status": "planned",
-      "reason": "The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services.",
+      "until": "M6 phase 27",
+      "reason": "The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).",
       "snapshotSha": "3aa10da7c5cb2c5748e34ea35de431b1c1d9698f"
     },
     {
@@ -912,12 +922,14 @@
     {
       "path": "packages/node/test/behaviors/icd-management/IcdManagementServerTest.ts",
       "status": "planned",
+      "until": "M5 phase 23",
       "reason": "The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.",
       "snapshotSha": "f168fd993e7a6406e0233a3d47dea95842515a2b"
     },
     {
       "path": "packages/node/test/behaviors/icd-management/IcdModeTest.ts",
       "status": "planned",
+      "until": "M5 phase 23",
       "reason": "The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.",
       "snapshotSha": "7b99feb752196c8cda93148580223886a42c2b95"
     },
@@ -1168,7 +1180,8 @@
     {
       "path": "packages/node/test/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsProvisionalTest.ts",
       "status": "planned",
-      "reason": "Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied.",
+      "until": "M6 phase 26",
+      "reason": "Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).",
       "snapshotSha": "b7c1de35767659dbb9969e8df122c54dc799b4f3"
     },
     {
@@ -1189,6 +1202,7 @@
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
       "status": "planned",
+      "until": "M6 phase 26",
       "reason": "The WebRTC transport requestor server, which milestone 6 phase 26 builds.",
       "snapshotSha": "b2f3d0d4396de6304fc14b4663892bacfa4c8f3c"
     },
@@ -1242,7 +1256,8 @@
     {
       "path": "packages/node/test/endpoint/EndpointNumberConflictTest.ts",
       "status": "planned",
-      "reason": "Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it.",
+      "until": "M4",
+      "reason": "Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "cdf30f5cc5585c8ac49ee6a4f72e1fd52ba4bd61"
     },
     {
@@ -1366,7 +1381,8 @@
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
       "status": "planned",
-      "reason": "The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation.",
+      "until": "M4",
+      "reason": "The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
@@ -1437,13 +1453,15 @@
     {
       "path": "packages/node/test/endpoint/type/SemanticNamespaceTest.ts",
       "status": "planned",
-      "reason": "The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint.",
+      "until": "M4",
+      "reason": "The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "bf9c7994abef9eb3e7b6cd8775458ff982bdd910"
     },
     {
       "path": "packages/node/test/endpoint/validation/ConstructionValidationTest.ts",
       "status": "planned",
-      "reason": "Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints.",
+      "until": "M4",
+      "reason": "Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "945b895c82bab2343b9c27d8ea03b9f8bc2b1b59"
     },
     {
@@ -1584,7 +1602,8 @@
     {
       "path": "packages/node/test/endpoint/validation/RuntimeValidationTest.ts",
       "status": "planned",
-      "reason": "Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset.",
+      "until": "M4",
+      "reason": "Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "7dceb4c71f56ffe843b5c70f4448f6c89ce701e8"
     },
     {
@@ -1611,7 +1630,8 @@
     {
       "path": "packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts",
       "status": "planned",
-      "reason": "Every standard device type judged as built, and the Closure TagList requirement.",
+      "until": "M4",
+      "reason": "Every standard device type judged as built, and the Closure TagList requirement. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "bdfc8d3f028840052f223b3e3b1fb0f15f088d93"
     },
     {
@@ -1658,7 +1678,8 @@
     {
       "path": "packages/node/test/endpoints/LargeBridgeTest.ts",
       "status": "planned",
-      "reason": "Instantiating, reading and destroying a bridge with many bridged devices in bounded time.",
+      "until": "M4",
+      "reason": "Instantiating, reading and destroying a bridge with many bridged devices in bounded time. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
       "snapshotSha": "7ef34cc123970d48c24eeb14568a339bec5c977f"
     },
     {

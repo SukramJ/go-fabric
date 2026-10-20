@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.8.8] — 2026-10-20
+
+Milestone 3, phase 18d, brief BQ: the behaviour-test port of Binding against matter.js at `862ad75f` — 41 of 47 open cases, group sends on the `fabrictest` multicast model, two fixes the port found. Phase 18 is complete. The test register carries the phase-19 tags of concept v5 Teil F (decisions 19.2 and 19.3): ICD, WebRTC and Thread diagnostics, the validation and endpoint-model files, discovery and DCL each `until` their milestone.
+
 ### Added
 
 - `fabrictest`: group sends on the multicast model. `transport/udp`'s `Listener.SendMulticast` hands the datagram to a socket that carries its own multicast model, as `JoinGroup` and `LeaveGroup` hand the membership; the in-memory socket puts it on the network from the host's address, through `Network.Filter` and the delivery options, to every host holding the group (matter.js `MockUdpSocket.send`, `MockNetwork.shouldReceive`). A device's node sends its group messages through its bridge's socket on the network (`Node.Groups().SetTransport` after start), as matter.js sends them from the operational socket.
@@ -17,6 +21,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `controller/client`: a node's persister waits for a flush its timer already started before it stops, as matter.js's `ClientCacheBuffer.close` awaits the timer loop and drains the flush mutex (`ClientCacheBuffer.ts:94-101`). The flush wrote outside the node's lock, so a decommission's erase could be followed by that write and the erased node was back in the store (`TestRegistryDecommission`, seen once in CI).
 - `groups`: a group invoke logs at info as it leaves (`matter.groups.invoke`), naming the group, the multicast address it goes to, the cluster and the command, as matter.js logs every invoke and adds the group and destination for a group session (`ClientInteraction.ts:86-95`, `:495-508`). A command sent through a group binding left no trace in the log.
 - `binding`: a group entry unregistered while it resolves is not established. The manager records a group entry as registered when `Register` is called and forgets it when `Unregister` or `Detach` is called, not when the worker gets to it, so a resolution under way — the group sender's lookup reads the store — sees the unregister and stops (`BindingManager.ts:119-141`, `:191-195`, `:528-532`). The host used to see established and then removed for an entry that was gone before it resolved.
 
@@ -4377,7 +4382,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...HEAD
+[0.8.8]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/SukramJ/go-fabric/compare/v0.8.4...v0.8.5
