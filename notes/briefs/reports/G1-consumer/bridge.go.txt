@@ -1,0 +1,217 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+// Command G1-consumer is a two-device Matter bridge written from the public
+// documentation only (gate 1 consumer test): a dimmable light whose level a
+// simulated wall switch moves every second, and a contact sensor that flips
+// every five seconds.
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/node"
+)
+
+// Stable keys of the two bridged devices.
+const (
+	LightKey  = "light:1"
+	SensorKey = "contact:1"
+)
+
+// ControllerEvent is one change a controller made to the light.
+type ControllerEvent struct {
+	// Attribute is onoffdef.AttrOnOff or levelcontroldef.AttrCurrentLevel.
+	Attribute uint32
+	On        bool
+	Level     uint8
+}
+
+// Devices is the host side of the bridge: the two devices and the program's
+// own view of them.
+type Devices struct {
+	Light  *device.DimmableLight
+	Sensor *device.ContactSensor
+
+	onControl func(ControllerEvent)
+	hostLevel atomic.Int32 // the level the wall switch set last; -1 none
+
+	mu      sync.Mutex
+	level   uint8 // the wall switch's next level
+	contact bool
+}
+
+// NewDevices builds the light and the sensor on clk (nil is the system
+// clock) and wires onControl to the controller's changes of the light.
+func NewDevices(clk clock.Clock, onControl func(ControllerEvent)) (*Devices, error) {
+	d := &Devices{onControl: onControl, level: 1}
+	d.hostLevel.Store(-1)
+	var err error
+	d.Light, err = device.NewDimmableLight(device.Options{
+		StableKey: endpoint.StringKey(LightKey), Name: "Kitchen light", Vendor: "G1", Clock: clk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("light: %w", err)
+	}
+	d.Sensor, err = device.NewContactSensor(device.Options{
+		StableKey: endpoint.StringKey(SensorKey), Name: "Front door", Vendor: "G1", Clock: clk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sensor: %w", err)
+	}
+	// Controller -> device. The wall switch never touches OnOff, so every
+	// OnOff change is the controller's (or a countdown's).
+	d.Light.OnChanged(onoffdef.ClusterID, func(attrs []uint32) {
+		if contains(attrs, onoffdef.AttrOnOff) {
+			d.onControl(ControllerEvent{Attribute: onoffdef.AttrOnOff, On: d.Light.OnOff().Get().OnOff})
+		}
+	})
+	// The level is changed by both sides; a change to the value the wall
+	// switch just set is taken as the wall switch's own.
+	d.Light.OnChanged(levelcontroldef.ClusterID, func(attrs []uint32) {
+		if !contains(attrs, levelcontroldef.AttrCurrentLevel) {
+			return
+		}
+		cur := d.Light.LevelControl().Get().CurrentLevel
+		if cur == nil || int32(*cur) == d.hostLevel.Load() {
+			return
+		}
+		d.onControl(ControllerEvent{Attribute: levelcontroldef.AttrCurrentLevel, Level: *cur})
+	})
+	if err := d.TickLight(); err != nil {
+		return nil, err
+	}
+	if err := d.FlipSensor(); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+// Endpoints are the devices for the node's Aggregator.
+func (d *Devices) Endpoints() []node.Endpoint { return []node.Endpoint{d.Light, d.Sensor} }
+
+// TickLight is one wall-switch step: the next level, reported to Matter.
+func (d *Devices) TickLight() error {
+	d.mu.Lock()
+	lvl := d.level
+	d.level = d.level%254 + 1
+	d.mu.Unlock()
+	d.hostLevel.Store(int32(lvl))
+	return d.Light.LevelControl().Set(levelcontroldef.Patch{CurrentLevel: &lvl})
+}
+
+// FlipSensor toggles the contact and reports it.
+func (d *Devices) FlipSensor() error {
+	d.mu.Lock()
+	d.contact = !d.contact
+	v := d.contact
+	d.mu.Unlock()
+	return d.Sensor.BooleanState().Set(booleanstatedef.Patch{StateValue: &v})
+}
+
+// Run moves the light every second and the sensor every five seconds on clk
+// (nil is the system clock) until ctx ends.
+func (d *Devices) Run(ctx context.Context, clk clock.Clock, log *slog.Logger) {
+	clk = clock.Or(clk)
+	light, sensor := clk.NewTicker(time.Second), clk.NewTicker(5*time.Second)
+	defer light.Stop()
+	defer sensor.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-light.C():
+			if err := d.TickLight(); err != nil {
+				log.Warn("wall switch", "err", err)
+			}
+		case <-sensor.C():
+			if err := d.FlipSensor(); err != nil {
+				log.Warn("contact sensor", "err", err)
+			}
+		}
+	}
+}
+
+func contains(ids []uint32, id uint32) bool {
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+func main() {
+	if err := run(); err != nil {
+		slog.Error("bridge", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	log := slog.Default()
+	devs, err := NewDevices(nil, func(ev ControllerEvent) {
+		if ev.Attribute == onoffdef.AttrOnOff {
+			log.Info("controller switched the light", "on", ev.On)
+		} else {
+			log.Info("controller set the level", "level", ev.Level)
+		}
+	})
+	if err != nil {
+		return err
+	}
+
+	cfg := node.Config{
+		Commissioning: node.Commissioning{
+			Passcode:        20202021,
+			Discriminator:   3840,
+			PBKDFIterations: node.PBKDFIterationsMin,
+			Salt:            []byte("G1 consumer salt"), // 16 bytes
+		},
+		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8000},
+		BasicInformation: node.BasicInformation{
+			VendorName: "G1", ProductName: "G1 bridge", NodeLabel: "G1 bridge",
+			SoftwareVersion: 1, SoftwareVersionString: "1.0.0",
+		},
+		Store:  node.Store{Path: "g1-bridge.db"},
+		Logger: log,
+	}
+	n, err := node.New(cfg)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	for _, ep := range devs.Endpoints() {
+		if err := n.Aggregator().Add(ctx, ep); err != nil {
+			return errors.Join(err, n.Stop(context.Background()))
+		}
+	}
+	n.Aggregator().MarkComplete()
+	if qr, manual, err := n.PairingCodes(); err == nil {
+		log.Info("pair with", "qr", qr, "manual", manual)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { defer wg.Done(); devs.Run(ctx, nil, log) }()
+	err = n.Run(ctx) // starts, waits for Ctrl-C, stops with a 5 s budget
+	stop()
+	wg.Wait()
+	return err
+}
