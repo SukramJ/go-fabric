@@ -8,9 +8,9 @@ package node_test
 // a device.NewContactSensor built with nothing but their options — the
 // gate's consumer experiment — and toggles the light, dims it, and reads
 // the sensor, as a matter.js DimmableLightDevice and ContactSensorDevice
-// answer (packages/node/src/devices/dimmable-light.ts:103-116,
-// contact-sensor.ts:68 mount OnOffServer, LevelControlServer and
-// BooleanStateServer as their defaults).
+// answer: packages/node/src/devices/dimmable-light.ts:103-116 and
+// packages/node/src/devices/contact-sensor.ts:68 mount OnOffServer,
+// LevelControlServer and BooleanStateServer as their defaults.
 
 import (
 	"context"
