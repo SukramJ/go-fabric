@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 74 |
-| partial | 117 |
-| planned | 46 |
+| partial | 118 |
+| planned | 45 |
 | excluded | 87 |
 | total | 324 |
 
@@ -62,7 +62,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 1 | 0 | 0 |
-| [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/scenes-management](#nodetestbehaviorsscenes-management) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/service-area](#nodetestbehaviorsservice-area) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/switch](#nodetestbehaviorsswitch) | 1 | 1 | 0 | 0 | 0 |
@@ -422,7 +422,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| RvcOperationalStateServerTest.ts | 73 | planned | ‚Äî | The RVC operational state server's base commands. |
+| RvcOperationalStateServerTest.ts | 73 | partial | `cluster/opstate:TestRvcOperationalStateServerParityMatterJS` | The base command a device does not implement runs on the RVC server built with createNode's state (Pause outside the AcceptedCommandList, UNSUPPORTED_COMMAND for matter.js's NotImplementedError; cluster/opstate/rvc_opstate_server_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding pause, checked with satisfies; no runtime). Missing: ‚Äúknows methods are methods‚Äù. |
 
 ## node/test/behaviors/scenes-management
 
@@ -969,10 +969,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/ota
 
 - `OtaTest.ts` ‚Äî The OTA requestor flow (query, Busy retries, apply, reboot, consent), which milestone 3 phase 19 ports.
-
-### node/test/behaviors/rvc-operational-state
-
-- `RvcOperationalStateServerTest.ts` ‚Äî The RVC operational state server's base commands.
 
 ### node/test/behaviors/thread-network-diagnostics
 

@@ -1089,8 +1089,14 @@
     },
     {
       "path": "packages/node/test/behaviors/rvc-operational-state/RvcOperationalStateServerTest.ts",
-      "status": "planned",
-      "reason": "The RVC operational state server's base commands.",
+      "status": "partial",
+      "go": [
+        "cluster/opstate:TestRvcOperationalStateServerParityMatterJS"
+      ],
+      "missing": [
+        "knows methods are methods"
+      ],
+      "reason": "The base command a device does not implement runs on the RVC server built with createNode's state (Pause outside the AcceptedCommandList, UNSUPPORTED_COMMAND for matter.js's NotImplementedError; cluster/opstate/rvc_opstate_server_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding pause, checked with satisfies; no runtime).",
       "snapshotSha": "7809ff0ed93ee0cecad53cda3a4e17581f94a91a"
     },
     {
