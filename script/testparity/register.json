@@ -1229,8 +1229,11 @@
     },
     {
       "path": "packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts",
-      "status": "planned",
-      "reason": "Accepted and rejected date formats of TimeFormatLocalizationServer.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestTimeFormatLocalizationServerParityMatterJS"
+      ],
+      "reason": "The accepted and the refused ActiveCalendarType run on the server built as createEndpoint builds it, the refusal as CONSTRAINT_ERROR of the \"in supportedCalendarTypes\" constraint (cluster/core/time_format_localization_server_parity_matterjs_test.go).",
       "snapshotSha": "d6a83ceaff7255a92378d54d9231513fb29972f6"
     },
     {

@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 74 |
+| ported | 75 |
 | partial | 118 |
-| planned | 45 |
+| planned | 44 |
 | excluded | 87 |
 | total | 324 |
 
@@ -69,7 +69,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [node/test/behaviors/thermostat](#nodetestbehaviorsthermostat) | 6 | 2 | 4 | 0 | 0 |
 | [node/test/behaviors/thermostat-user-interface-configuration](#nodetestbehaviorsthermostat-user-interface-configuration) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/thread-network-diagnostics](#nodetestbehaviorsthread-network-diagnostics) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behaviors/time-format-localization](#nodetestbehaviorstime-format-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/unit-localization](#nodetestbehaviorsunit-localization) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 1 | 0 | 0 | 0 |
@@ -469,7 +469,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| TimeFormatLocalizationServerTest.ts | 48 | planned | â€” | Accepted and rejected date formats of TimeFormatLocalizationServer. |
+| TimeFormatLocalizationServerTest.ts | 48 | ported | `cluster/core:TestTimeFormatLocalizationServerParityMatterJS` | The accepted and the refused ActiveCalendarType run on the server built as createEndpoint builds it, the refusal as CONSTRAINT_ERROR of the "in supportedCalendarTypes" constraint (cluster/core/time_format_localization_server_parity_matterjs_test.go). |
 
 ## node/test/behaviors/unit-localization
 
@@ -973,10 +973,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 ### node/test/behaviors/thread-network-diagnostics
 
 - `ThreadNetworkDiagnosticsProvisionalTest.ts` â€” Provisional ThreadNetworkDiagnostics attributes absent by default and present once supplied. Thread network diagnostics are milestone 6 phase 26 work (concept v5 F.0 19.2).
-
-### node/test/behaviors/time-format-localization
-
-- `TimeFormatLocalizationServerTest.ts` â€” Accepted and rejected date formats of TimeFormatLocalizationServer.
 
 ### node/test/behaviors/web-rtc-transport-requestor
 
