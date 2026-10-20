@@ -649,7 +649,7 @@
       "missing": [
         "throws when increasing a bridged node's ConfigurationVersion that is not enabled"
       ],
-      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and through the node facade's Aggregator.IncreaseConfigurationVersions (persisted once, kept across a restart), and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
+      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and through the node facade's Aggregator.IncreaseConfigurationVersions (persisted once, kept across a restart), and the standalone bridged bump are ported on a fabrictest device. Missing, by_design BD-Matter-BridgedDevice-ConfigurationVersionAlwaysServed: a bridged endpoint always serves ConfigurationVersion (Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
       "snapshotSha": "b255a8bb62d2df742a723bc6c3c231b13ac323aa"
     },
     {
