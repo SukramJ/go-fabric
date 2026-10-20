@@ -379,8 +379,12 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/RemoteDescriptorTest.ts",
-      "status": "planned",
-      "reason": "The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters).",
+      "status": "ported",
+      "go": [
+        "controller/client:TestRemoteDescriptorRoundtripParityMatterJS",
+        "controller/client:TestRemoteDescriptorSessionIntervalsParityMatterJS"
+      ],
+      "reason": "The long form is controller/client's Record: toLongForm over a commissionable device is Record.applyDevice, over bare discovery data Record.applyTXT, fromLongForm Record.device and Record.txt (controller/client/remote_descriptor_parity_matterjs_internal_test.go); the intervals DNS-SD can advertise are kept both ways (fix: SessionIntervals.advertisable, SessionIntervals.ts:99-118).",
       "snapshotSha": "64d0b890a223fb1fc667c650d3146458aa626cf7"
     },
     {

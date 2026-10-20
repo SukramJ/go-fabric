@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 75 |
+| ported | 76 |
 | partial | 120 |
-| planned | 42 |
+| planned | 41 |
 | excluded | 87 |
 | total | 324 |
 
@@ -28,7 +28,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 0 | 1 | 1 | 1 |
 | [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 1 | 2 | 2 | 1 |
+| [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 2 | 2 | 1 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 1 | 0 | 0 |
@@ -193,7 +193,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | CommissioningWindowTest.ts | 209 | planned | ‚Äî | The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case. |
 | FabricBeforeStartTest.ts | 172 | partial | `node:TestFabricBeforeStart` | A node started on a store holding a fabric (commissioned, stopped, started again: a Go node creates no fabric of its own) counts as commissioned, advertises the fabric operationally once and only when no commissionable record is out, logs no error and raises no fabric event (node/fabric_before_start_parity_matterjs_test.go). matter.js's lifecycle.commissioned count has no Go counterpart at start (BD-Matter-Node-CommissioningCompletePerCommand), and its gated fabric write has none either (the Go store writes before the command answers). Missing, js-runtime-only: the commissioning-state transaction lock (FabricChangeLockTest.ts). Missing: ‚Äúwaits for another transaction that holds the commissioning state‚Äù. |
 | FabricChangeLockTest.ts | 95 | excluded | `js-runtime-only` | The commissioned-state update waiting for another transaction to release matter.js's commissioning-state lock. |
-| RemoteDescriptorTest.ts | 229 | planned | ‚Äî | The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters). |
+| RemoteDescriptorTest.ts | 229 | ported | `controller/client:TestRemoteDescriptorRoundtripParityMatterJS`<br>`controller/client:TestRemoteDescriptorSessionIntervalsParityMatterJS` | The long form is controller/client's Record: toLongForm over a commissionable device is Record.applyDevice, over bare discovery data Record.applyTXT, fromLongForm Record.device and Record.txt (controller/client/remote_descriptor_parity_matterjs_internal_test.go); the intervals DNS-SD can advertise are kept both ways (fix: SessionIntervals.advertisable, SessionIntervals.ts:99-118). |
 
 ## node/test/behavior/system/controller/discovery
 
@@ -930,7 +930,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behavior/system/commissioning
 
 - `CommissioningWindowTest.ts` ‚Äî The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case.
-- `RemoteDescriptorTest.ts` ‚Äî The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters).
 
 ### node/test/behavior/system/controller/discovery
 
