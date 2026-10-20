@@ -140,7 +140,7 @@ landed leaves any mutex that now has a comment alone.
 ## 4 Facade aliases (G1-6) — 15 aliases, 30 references
 
 `node/facade.go` gains `OTAImageSource`, `OTAConsent`, `OTAConsentState` (the consent interface's result type, added so a host
-can implement `OTAConsent` from `node` alone), `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OtaApplier`, `WiFiReporter`,
+can implement `OTAConsent` from `node` alone), `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`,
 `CommissioningApprover`, `ReverseCommissioner`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`, `DeviceTypeValidationMode`,
 `WindowStatus` (for `wire.WindowStatusSnapshot`) and `AttestationChain` (for `attestation.Chain`). 30 references in `node/*.go`
 (`Config`, `OTAProviderConfig`, `OtaConfig`, `WiFi`, `CommissionerControlConfig`, `Attestation`, `WindowSnapshot`)

@@ -402,7 +402,7 @@ type OtaConfig struct {
 	Harness bool
 	// Applier carries out an update; nil is the daemon's applier, which
 	// validates the image and keeps it under Dir/applied.
-	Applier OtaApplier
+	Applier OTAApplier
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.

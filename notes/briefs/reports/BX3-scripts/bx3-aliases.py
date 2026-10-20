@@ -18,7 +18,7 @@ ALIASES = [
     ("OTAApplyPolicy", "mattercore.OTAApplyPolicy", "is the type of [OTAProviderConfig].ApplyPolicy: when a requestor may apply a downloaded image"),
     ("OTAPeer", "mattercore.OTAPeer", "names the requestor an [OTAProviderConfig] callback is about"),
     ("OTAUpdateStatus", "mattercore.OTAUpdateStatus", "is the status [OTAProviderConfig].OnStatusChange reports for a requestor"),
-    ("OtaApplier", "mattercore.OtaApplier", "is the type of [OtaConfig].Applier: the requestor's consent and apply hooks"),
+    ("OTAApplier", "mattercore.OtaApplier", "is the type of [OtaConfig].Applier: the requestor's consent and apply hooks"),
     ("WiFiReporter", "mattercore.WiFiReporter", "is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports"),
     ("CommissioningApprover", "mattercore.CommissioningApprover", "is the type of [CommissionerControlConfig].Approver: the host's decision on a commissioning request"),
     ("ReverseCommissioner", "mattercore.ReverseCommissioner", "is the type of [CommissionerControlConfig].Commissioner: the host's commissioner of the requesting node"),
@@ -45,8 +45,10 @@ if BEGIN not in src:
     print("facade.go: %d aliases" % len(ALIASES))
 
 changed = []
-mc = "|".join(n for n, o, _ in ALIASES if o.startswith("mattercore."))
+# the alias spells OTA one way; the original type keeps its name
+mc = "|".join(n for n, o, _ in ALIASES if o.startswith("mattercore.") and n != "OTAApplier")
 rules = [
+    (re.compile(r"\bmattercore\.OtaApplier\b"), "OTAApplier"),
     (re.compile(r"\bmattercore\.(" + mc + r")\b"), r"\1"),
     (re.compile(r"\battestation\.Chain\b"), "AttestationChain"),
     (re.compile(r"\bwire\.WindowStatusSnapshot\b"), "WindowStatus"),

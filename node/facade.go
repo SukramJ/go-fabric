@@ -143,8 +143,8 @@ type OTAPeer = mattercore.OTAPeer
 // OTAUpdateStatus is the status [OTAProviderConfig].OnStatusChange reports for a requestor ([mattercore.OTAUpdateStatus]).
 type OTAUpdateStatus = mattercore.OTAUpdateStatus
 
-// OtaApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
-type OtaApplier = mattercore.OtaApplier
+// OTAApplier is the type of [OtaConfig].Applier: the requestor's consent and apply hooks ([mattercore.OtaApplier]).
+type OTAApplier = mattercore.OtaApplier
 
 // WiFiReporter is the type of [WiFi].Reporter: the live Wi-Fi diagnostics the host reports ([mattercore.WiFiReporter]).
 type WiFiReporter = mattercore.WiFiReporter

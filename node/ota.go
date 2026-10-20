@@ -19,7 +19,7 @@ import (
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
-// otaApplier is the default [OtaApplier], the reference daemon's
+// otaApplier is the default [OTAApplier], the reference daemon's
 // (examples/reference-bridge/ota.go:36-214).
 //
 // A product applies an image by installing it and restarting into it; the
@@ -49,9 +49,9 @@ type otaApplier struct {
 	clock               clock.Clock
 }
 
-var _ OtaApplier = (*otaApplier)(nil)
+var _ OTAApplier = (*otaApplier)(nil)
 
-// RequestUserConsent implements [OtaApplier]. The node has no
+// RequestUserConsent implements [OTAApplier]. The node has no
 // user to ask; it declares CanConsent only in harness mode, where it
 // consents as the matter.js cert requestor does
 // (OtaRequestorTestInstance.ts:166-168).
@@ -59,7 +59,7 @@ func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, 
 	return a.harness, nil
 }
 
-// ApplyUpdate implements [OtaApplier]: the image's payload digest
+// ApplyUpdate implements [OTAApplier]: the image's payload digest
 // and total size hold, its version is the one the provider offered, it
 // carries a payload, and its vendor and product are this node's (a zero
 // field applies to every vendor or product, OtaImageHeader.ts:26-41) —
