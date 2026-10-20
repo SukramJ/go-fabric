@@ -16,6 +16,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `groups`: a group invoke logs at info as it leaves (`matter.groups.invoke`), naming the group, the multicast address it goes to, the cluster and the command, as matter.js logs every invoke and adds the group and destination for a group session (`ClientInteraction.ts:86-95`, `:495-508`). A command sent through a group binding left no trace in the log.
 - `binding`: a group entry unregistered while it resolves is not established. The manager records a group entry as registered when `Register` is called and forgets it when `Unregister` or `Detach` is called, not when the worker gets to it, so a resolution under way — the group sender's lookup reads the store — sees the unregister and stops (`BindingManager.ts:119-141`, `:191-195`, `:528-532`). The host used to see established and then removed for an entry that was gone before it resolved.
 
 ## [0.8.7] — 2026-10-20

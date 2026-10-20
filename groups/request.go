@@ -6,9 +6,11 @@ package groups
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -61,7 +63,25 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 	if err != nil {
 		return fmt.Errorf("groups: encode InvokeRequest: %w", err)
 	}
+	s.logInvoke(path)
 	return s.Send(ctx, payload, im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
+}
+
+// logInvoke logs a group invoke as it leaves, naming the group and the
+// multicast address it goes to. Mirrors matter.js packages/protocol/src/
+// action/client/ClientInteraction.ts:495-508 at 862ad75f, which logs every
+// invoke at info, and peerAddressDiagnostic (:86-95), which adds the group
+// and the destination for a group session; the path has no endpoint
+// (matter.js prints "*.onOff.on") and suppressResponse is set.
+func (s *Sender) logInvoke(path im.ConcreteCommandPath) {
+	cluster, ok := schema.ClusterName(path.Cluster)
+	if !ok {
+		cluster = fmt.Sprintf("0x%x", path.Cluster)
+	}
+	s.m.logger.Info("matter.groups.invoke",
+		slog.Int("group", int(s.groupID)), slog.String("dest", s.address.String()),
+		slog.Int("fabric_index", int(s.fabricIndex)), slog.String("cluster", cluster),
+		slog.String("command", fmt.Sprintf("0x%02x", path.Command)), slog.Bool("suppress_response", true))
 }
 
 // Write writes one attribute on the group. The path names the cluster and
