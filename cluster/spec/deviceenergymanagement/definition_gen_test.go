@@ -6,6 +6,7 @@
 package deviceenergymanagement
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -44,4 +45,56 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventPowerAdjustEnd, PowerAdjustEndEvent{Cause: CauseEnum(0), Duration: uint32(1), EnergyUse: int64(1)})
 	spectest.RoundTripEvent(t, Definition, EventPaused, PausedEvent{})
 	spectest.RoundTripEvent(t, Definition, EventResumed, ResumedEvent{Cause: CauseEnum(0)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePowerAdjustRequest(func(context.Context, PowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCancelPowerAdjustRequest(func(context.Context, CancelPowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartTimeAdjustRequest(func(context.Context, StartTimeAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePauseRequest(func(context.Context, PauseRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResumeRequest(func(context.Context, ResumeRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleModifyForecastRequest(func(context.Context, ModifyForecastRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRequestConstraintBasedForecast(func(context.Context, RequestConstraintBasedForecastRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCancelRequest(func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitPowerAdjustStart(0, PowerAdjustStartEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitPowerAdjustEnd(0, PowerAdjustEndEvent{})     // not in the empty definition's EventList: refused
+	_ = s.EmitPaused(0, PausedEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitResumed(0, ResumedEvent{})                   // not in the empty definition's EventList: refused
 }

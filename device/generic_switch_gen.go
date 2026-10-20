@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	"github.com/SukramJ/go-fabric/schema"
@@ -50,5 +49,9 @@ func NewGenericSwitch(opts Options, with ...Option) (*GenericSwitch, error) {
 	return &GenericSwitch{d}, nil
 }
 
-// Switch returns the Switch server (mandatory), or nil when the host supplied one of another type.
-func (d *GenericSwitch) Switch() *spec.Server { return serverAs[*spec.Server](d.Device, 0x003B) }
+// Switch returns the typed Switch server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *GenericSwitch) Switch() *switchclusterdef.Server {
+	return switchclusterdef.Wrap(d.Server(0x003B))
+}

@@ -6,6 +6,7 @@
 package closurecontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -34,4 +35,41 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventMovementCompleted, MovementCompletedEvent{})
 	spectest.RoundTripEvent(t, Definition, EventEngageStateChanged, EngageStateChangedEvent{EngageValue: true})
 	spectest.RoundTripEvent(t, Definition, EventSecureStateChanged, SecureStateChangedEvent{SecureValue: true})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveTo(func(context.Context, MoveToRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCalibrate(func(context.Context, CalibrateRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitOperationalError(0, OperationalErrorEvent{})     // not in the empty definition's EventList: refused
+	_ = s.EmitMovementCompleted(0, MovementCompletedEvent{})   // not in the empty definition's EventList: refused
+	_ = s.EmitEngageStateChanged(0, EngageStateChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitSecureStateChanged(0, SecureStateChangedEvent{}) // not in the empty definition's EventList: refused
 }

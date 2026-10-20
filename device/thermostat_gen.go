@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	energypreferencedef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -82,13 +81,23 @@ func NewThermostat(opts Options, with ...Option) (*Thermostat, error) {
 	return &Thermostat{d}, nil
 }
 
-// Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *Thermostat) Thermostat() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0201) }
+// Thermostat returns the typed Thermostat server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Thermostat) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }
 
-// EnergyPreference returns the EnergyPreference server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Thermostat) EnergyPreference() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009B) }
+// EnergyPreference returns the typed EnergyPreference server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
+	return energypreferencedef.Wrap(d.Server(0x009B))
+}
 
-// ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Thermostat) ThermostatUserInterfaceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0204)
+// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
+	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
 }

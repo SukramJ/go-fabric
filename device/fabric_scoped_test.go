@@ -24,7 +24,7 @@ func TestFabricScopedDefaults(t *testing.T) {
 	if bell.Binding() == nil {
 		t.Error("Doorbell mounts no default Binding")
 	}
-	if v, ok := bell.Binding().MatterRead(0x0000); !ok || v == nil {
+	if v, ok := bell.Binding().Underlying().MatterRead(0x0000); !ok || v == nil {
 		t.Errorf("Binding list %v, %v", v, ok)
 	}
 
@@ -37,7 +37,7 @@ func TestFabricScopedDefaults(t *testing.T) {
 		t.Fatal("BridgedNode mounts no EcosystemInformation when opted in")
 	}
 	for _, attr := range []uint32{ecodef.AttrDeviceDirectory, ecodef.AttrLocationDirectory} {
-		v, ok := eco.MatterRead(attr)
+		v, ok := eco.Underlying().MatterRead(attr)
 		list, isList := v.(spec.List[spec.Encodable])
 		if !ok || !isList || len(list) != 0 {
 			t.Errorf("attribute 0x%04X = %v (%T), want an empty list", attr, v, v)

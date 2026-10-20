@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
@@ -58,12 +57,17 @@ func NewTemperatureSensor(opts Options, with ...Option) (*TemperatureSensor, err
 	return &TemperatureSensor{d}, nil
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *TemperatureSensor) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0204)
+// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
+	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
 }

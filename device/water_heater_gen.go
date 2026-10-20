@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	waterheatermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
@@ -62,13 +61,21 @@ func NewWaterHeater(opts Options, with ...Option) (*WaterHeater, error) {
 	return &WaterHeater{d}, nil
 }
 
-// WaterHeaterManagement returns the WaterHeaterManagement server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) WaterHeaterManagement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0094)
+// WaterHeaterManagement returns the typed WaterHeaterManagement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
+	return waterheatermanagementdef.Wrap(d.Server(0x0094))
 }
 
-// WaterHeaterMode returns the WaterHeaterMode server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) WaterHeaterMode() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009E) }
+// WaterHeaterMode returns the typed WaterHeaterMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
+	return waterheatermodedef.Wrap(d.Server(0x009E))
+}
 
-// Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) Thermostat() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0201) }
+// Thermostat returns the typed Thermostat server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *WaterHeater) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }

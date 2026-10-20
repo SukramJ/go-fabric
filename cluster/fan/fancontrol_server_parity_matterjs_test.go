@@ -49,7 +49,7 @@ func TestFanControlServerParityMatterJS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		srv := purifier.OnOff()
+		srv, _ := purifier.OnOff().Underlying().(*onoff.Server)
 		if srv == nil {
 			t.Fatal("the air purifier mounted no OnOff")
 		}

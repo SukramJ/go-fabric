@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/schema"
@@ -50,5 +49,7 @@ func NewDoorLock(opts Options, with ...Option) (*DoorLock, error) {
 	return &DoorLock{d}, nil
 }
 
-// DoorLock returns the DoorLock server (mandatory), or nil when the host supplied one of another type.
-func (d *DoorLock) DoorLock() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0101) }
+// DoorLock returns the typed DoorLock server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *DoorLock) DoorLock() *doorlockdef.Server { return doorlockdef.Wrap(d.Server(0x0101)) }

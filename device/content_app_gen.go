@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	accountlogindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	applicationbasicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
 	applicationlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
@@ -87,28 +86,61 @@ func NewContentApp(opts Options, with ...Option) (*ContentApp, error) {
 	return &ContentApp{d}, nil
 }
 
-// KeypadInput returns the KeypadInput server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) KeypadInput() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0509) }
-
-// ApplicationLauncher returns the ApplicationLauncher server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) ApplicationLauncher() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050C)
+// KeypadInput returns the typed KeypadInput server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
+	return keypadinputdef.Wrap(d.Server(0x0509))
 }
 
-// ApplicationBasic returns the ApplicationBasic server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) ApplicationBasic() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050D) }
+// ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
+	return applicationlauncherdef.Wrap(d.Server(0x050C))
+}
 
-// Channel returns the Channel server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) Channel() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0504) }
+// ApplicationBasic returns the typed ApplicationBasic server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
+	return applicationbasicdef.Wrap(d.Server(0x050D))
+}
 
-// TargetNavigator returns the TargetNavigator server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) TargetNavigator() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0505) }
+// Channel returns the typed Channel server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) Channel() *channeldef.Server { return channeldef.Wrap(d.Server(0x0504)) }
 
-// MediaPlayback returns the MediaPlayback server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) MediaPlayback() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0506) }
+// TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
+	return targetnavigatordef.Wrap(d.Server(0x0505))
+}
 
-// ContentLauncher returns the ContentLauncher server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) ContentLauncher() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050A) }
+// MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
+	return mediaplaybackdef.Wrap(d.Server(0x0506))
+}
 
-// AccountLogin returns the AccountLogin server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) AccountLogin() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050E) }
+// ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
+	return contentlauncherdef.Wrap(d.Server(0x050A))
+}
+
+// AccountLogin returns the typed AccountLogin server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContentApp) AccountLogin() *accountlogindef.Server {
+	return accountlogindef.Wrap(d.Server(0x050E))
+}

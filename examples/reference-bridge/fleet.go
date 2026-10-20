@@ -117,7 +117,7 @@ func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv := dev.OnOff()
+	srv, _ := dev.OnOff().Underlying().(*onoff.Server)
 	d.mu.Lock()
 	d.srv = srv
 	d.mu.Unlock()

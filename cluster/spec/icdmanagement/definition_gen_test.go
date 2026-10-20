@@ -6,6 +6,7 @@
 package icdmanagement
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -32,4 +33,41 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStayActiveRequest, spec.Request, StayActiveRequestRequest{StayActiveDuration: uint32(1)})
 	spectest.RoundTripCommand(t, Definition, CmdStayActiveResponse, spec.Response, StayActiveResponse{PromisedActiveDuration: uint32(1)})
 	spectest.RoundTripAttribute(t, Definition, AttrRegisteredClients, spec.List[MonitoringRegistrationStruct]([]MonitoringRegistrationStruct{MonitoringRegistrationStruct{CheckInNodeId: uint64(1), MonitoredSubject: uint64(1), Key: spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), ClientType: ClientTypeEnum(0), FabricIndex: uint8(1)}}))
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRegisterClient(func(context.Context, RegisterClientRequest) (RegisterClientResponse, error) {
+		return RegisterClientResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnregisterClient(func(context.Context, UnregisterClientRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStayActiveRequest(func(context.Context, StayActiveRequestRequest) (StayActiveResponse, error) {
+		return StayActiveResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
 }

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -55,10 +54,17 @@ func NewContactSensor(opts Options, with ...Option) (*ContactSensor, error) {
 	return &ContactSensor{d}, nil
 }
 
-// BooleanState returns the BooleanState server (mandatory), or nil when the host supplied one of another type.
-func (d *ContactSensor) BooleanState() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0045) }
+// BooleanState returns the typed BooleanState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ContactSensor) BooleanState() *booleanstatedef.Server {
+	return booleanstatedef.Wrap(d.Server(0x0045))
+}
 
-// BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContactSensor) BooleanStateConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0080)
+// BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ContactSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
+	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
 }

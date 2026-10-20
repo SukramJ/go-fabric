@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/onoff"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -61,7 +63,7 @@ func TestFeatureSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.OnOff().MatterRead(spec.AttrFeatureMap); v != uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior) {
+	if v, _ := d.OnOff().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior) {
 		t.Errorf("FeatureMap %v", v)
 	}
 	// The mandated features alone, by default.
@@ -69,7 +71,7 @@ func TestFeatureSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.LevelControl().MatterRead(spec.AttrFeatureMap); v != uint32(levelcontroldef.FeatureOnOff|levelcontroldef.FeatureLighting) {
+	if v, _ := d.LevelControl().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(levelcontroldef.FeatureOnOff|levelcontroldef.FeatureLighting) {
 		t.Errorf("LevelControl FeatureMap %v", v)
 	}
 	// A mandatory-with-extension cluster takes the host's selection.
@@ -87,7 +89,7 @@ func TestWithServerReplacesTheDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Server(onoffdef.ClusterID) != own || d.OnOff() != nil {
+	if d.Server(onoffdef.ClusterID) != own || d.OnOff().Underlying() != own {
 		t.Error("the host's OnOff server is not mounted in place of the default")
 	}
 	if d.LevelControl() == nil {
@@ -166,7 +168,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		levelcontroldef.AttrCurrentLevel: uint8(42),
 		spec.AttrFeatureMap:              uint32(levelcontroldef.FeatureOnOff | levelcontroldef.FeatureLighting),
 	} {
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -178,10 +180,10 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		levelcontroldef.AttrMinLevel: uint8(1),
 		levelcontroldef.AttrMaxLevel: uint8(254),
 	} {
-		if !lc.Serves(attr) {
+		if !lc.Underlying().(*spec.Server).Serves(attr) {
 			t.Errorf("attribute 0x%04X not served", attr)
 		}
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -203,7 +205,7 @@ func TestDimmableLightServesMinAndMaxLevel(t *testing.T) {
 		levelcontroldef.AttrMinLevel: uint8(1),
 		levelcontroldef.AttrMaxLevel: uint8(254),
 	} {
-		if v, _ := lc.MatterRead(attr); v != want {
+		if v, _ := lc.Underlying().MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
@@ -254,12 +256,12 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 	}
 	var got [][]uint32
 	stop := d.OnChanged(onoffdef.ClusterID, func(ids []uint32) { got = append(got, ids) })
-	d.OnOff().Set(true)
+	d.OnOff().Underlying().(*onoff.Server).Set(true)
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{onoffdef.AttrOnOff}) {
 		t.Errorf("notified %v", got)
 	}
 	stop()
-	d.OnOff().Set(false)
+	d.OnOff().Underlying().(*onoff.Server).Set(false)
 	if len(got) != 1 {
 		t.Error("notified after unsubscribe")
 	}
@@ -500,7 +502,7 @@ func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := d.EnergyEvse().MatterRead(spec.AttrFeatureMap); v != uint32(evsedef.FeatureChargingPreferences) {
+	if v, _ := d.EnergyEvse().Underlying().MatterRead(spec.AttrFeatureMap); v != uint32(evsedef.FeatureChargingPreferences) {
 		t.Errorf("EnergyEvse FeatureMap %v", v)
 	}
 }
@@ -517,7 +519,7 @@ func TestWithElements(t *testing.T) {
 		t.Fatal(err)
 	}
 	epm := d.ElectricalPowerMeasurement()
-	if !epm.Serves(epmdef.AttrVoltage) || !epm.Serves(epmdef.AttrActiveCurrent) {
+	if s := epm.Underlying().(*spec.Server); !s.Serves(epmdef.AttrVoltage) || !s.Serves(epmdef.AttrActiveCurrent) {
 		t.Error("the elements opted in are not served")
 	}
 	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),

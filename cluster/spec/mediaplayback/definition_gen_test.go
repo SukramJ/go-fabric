@@ -6,6 +6,7 @@
 package mediaplayback
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -44,4 +45,71 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdActivateTextTrack, spec.Request, ActivateTextTrackRequest{TrackId: "x"})
 	spectest.RoundTripCommand(t, Definition, CmdDeactivateTextTrack, spec.Request, DeactivateTextTrackRequest{})
 	spectest.RoundTripEvent(t, Definition, EventStateChanged, StateChangedEvent{CurrentState: PlaybackStateEnum(0), StartTime: spectest.Ptr(uint64(1)), Duration: spectest.Ptr(uint64(1)), SampledPosition: spectest.Ptr(PlaybackPositionStruct{UpdatedAt: uint64(1), Position: spec.ValueOf(uint64(1))}), PlaybackSpeed: spectest.Ptr(float32(1.5)), SeekRangeEnd: spectest.Ptr(uint64(1)), SeekRangeStart: spectest.Ptr(uint64(1)), Data: spectest.Ptr([]byte{1}), AudioAdvanceUnmuted: spectest.Ptr(true)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePlay(func(context.Context, PlayRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePause(func(context.Context, PauseRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStop(func(context.Context, StopRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartOver(func(context.Context, StartOverRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePrevious(func(context.Context, PreviousRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleNext(func(context.Context, NextRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRewind(func(context.Context, RewindRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleFastForward(func(context.Context, FastForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSkipForward(func(context.Context, SkipForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSkipBackward(func(context.Context, SkipBackwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSeek(func(context.Context, SeekRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleActivateAudioTrack(func(context.Context, ActivateAudioTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleActivateTextTrack(func(context.Context, ActivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDeactivateTextTrack(func(context.Context, DeactivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
 }

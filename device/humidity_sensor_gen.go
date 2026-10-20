@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
 	"github.com/SukramJ/go-fabric/schema"
@@ -50,7 +49,9 @@ func NewHumiditySensor(opts Options, with ...Option) (*HumiditySensor, error) {
 	return &HumiditySensor{d}, nil
 }
 
-// RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *HumiditySensor) RelativeHumidityMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0405)
+// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *HumiditySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
+	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
 }

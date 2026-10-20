@@ -173,7 +173,8 @@ func testLight(t *testing.T, name string) (*demoLight, *onoff.Server) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return light, dev.OnOff()
+	srv, _ := dev.OnOff().Underlying().(*onoff.Server)
+	return light, srv
 }
 
 // TestOnWithTimedOffCountsDownAndTurnsTheLightOff drives the one LT command

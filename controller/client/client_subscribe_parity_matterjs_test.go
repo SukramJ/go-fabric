@@ -379,7 +379,7 @@ func TestClientSubscribeCacheFabricFilterParity(t *testing.T) {
 		if v := onOffOf(); v != false {
 			t.Fatalf("OnOff %v before the change, want false", v)
 		}
-		cp.light.OnOff().Set(true)
+		cp.light.OnOff().Underlying().(*onoff.Server).Set(true)
 		cp.eventually(t, "the report of OnOff true", func() bool {
 			select {
 			case <-reported:

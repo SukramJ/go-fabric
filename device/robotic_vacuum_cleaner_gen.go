@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	rvccleanmodedef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
 	rvcoperationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
@@ -69,22 +68,32 @@ func NewRoboticVacuumCleaner(opts Options, with ...Option) (*RoboticVacuumCleane
 	return &RoboticVacuumCleaner{d}, nil
 }
 
-// RvcRunMode returns the RvcRunMode server (mandatory), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcRunMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0054)
+// RvcRunMode returns the typed RvcRunMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
+	return rvcrunmodedef.Wrap(d.Server(0x0054))
 }
 
-// RvcOperationalState returns the RvcOperationalState server (mandatory), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcOperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0061)
+// RvcOperationalState returns the typed RvcOperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
+	return rvcoperationalstatedef.Wrap(d.Server(0x0061))
 }
 
-// RvcCleanMode returns the RvcCleanMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcCleanMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0055)
+// RvcCleanMode returns the typed RvcCleanMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
+	return rvccleanmodedef.Wrap(d.Server(0x0055))
 }
 
-// ServiceArea returns the ServiceArea server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) ServiceArea() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0150)
+// ServiceArea returns the typed ServiceArea server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
+	return serviceareadef.Wrap(d.Server(0x0150))
 }

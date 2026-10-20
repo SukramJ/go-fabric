@@ -364,8 +364,9 @@ type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerCon
 // defaultFactories is the device layer's default table: the clusters whose
 // default server is one of the module's self-held servers rather than the
 // generated [spec.Server] every other cluster gets (ADR 0018, decisions of
-// wave 6, 2). Keep it in step with script/devicegen/servers.go, which
-// types the generated accessors.
+// wave 6, 2). The generated accessors return the cluster's typed server
+// (<cluster>def.Server) over whichever server this table or the host
+// mounts, so the table types nothing there.
 //
 // The fabric-scoped clusters, whose generated server [spec.NewServer]
 // refuses ([spec.ErrFabricScoped]), take the core server here where it holds

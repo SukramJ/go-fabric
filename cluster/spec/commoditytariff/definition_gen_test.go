@@ -6,6 +6,7 @@
 package commoditytariff
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,4 +43,38 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdGetTariffComponentResponse, spec.Response, GetTariffComponentResponse{Label: spec.ValueOf("x"), DayEntryIds: []uint32{uint32(1)}, TariffComponent: TariffComponentStruct{TariffComponentId: uint32(1), Price: spectest.Ptr(spec.ValueOf(TariffPriceStruct{PriceType: TariffPriceTypeEnum(0), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1))})), FriendlyCredit: spectest.Ptr(true), AuxiliaryLoad: spectest.Ptr(AuxiliaryLoadSwitchSettingsStruct{Number: uint8(1), RequiredState: AuxiliaryLoadSettingEnum(0)}), PeakPeriod: spectest.Ptr(PeakPeriodStruct{Severity: PeakPeriodSeverityEnum(0), PeakPeriod: uint16(1)}), PowerThreshold: spectest.Ptr(PowerThresholdStruct{PowerThreshold: spectest.Ptr(int64(1)), ApparentPowerThreshold: spectest.Ptr(int64(1)), PowerThresholdSource: spec.ValueOf(PowerThresholdSourceEnum(0))}), Threshold: spec.ValueOf(int64(1)), Label: spectest.Ptr(spec.ValueOf("x")), Predicted: spectest.Ptr(true)}})
 	spectest.RoundTripCommand(t, Definition, CmdGetDayEntry, spec.Request, GetDayEntryRequest{DayEntryId: uint32(1)})
 	spectest.RoundTripCommand(t, Definition, CmdGetDayEntryResponse, spec.Response, GetDayEntryResponse{DayEntry: DayEntryStruct{DayEntryId: uint32(1), StartTime: uint16(1), Duration: spectest.Ptr(uint16(1)), RandomizationOffset: spectest.Ptr(int16(1)), RandomizationType: spectest.Ptr(DayEntryRandomizationTypeEnum(0))}})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetTariffComponent(func(context.Context, GetTariffComponentRequest) (GetTariffComponentResponse, error) {
+		return GetTariffComponentResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetDayEntry(func(context.Context, GetDayEntryRequest) (GetDayEntryResponse, error) {
+		return GetDayEntryResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
 }

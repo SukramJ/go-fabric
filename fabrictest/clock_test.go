@@ -45,11 +45,11 @@ func TestDeviceTimersOnTheSiteClock(t *testing.T) {
 		onoffdef.OnWithTimedOffRequest{OnTime: 30}); err != nil {
 		t.Fatalf("OnWithTimedOff: %v", err)
 	}
-	if v, _ := light.OnOff().MatterRead(onoff.AttrOnOff); v != true {
+	if v, _ := light.OnOff().Underlying().MatterRead(onoff.AttrOnOff); v != true {
 		t.Fatalf("OnOff %v after OnWithTimedOff", v)
 	}
 	fake.Advance(3500 * time.Millisecond)
-	if v, _ := light.OnOff().MatterRead(onoff.AttrOnOff); v != false {
+	if v, _ := light.OnOff().Underlying().MatterRead(onoff.AttrOnOff); v != false {
 		t.Fatalf("OnOff %v after the fake clock passed the OnTime", v)
 	}
 

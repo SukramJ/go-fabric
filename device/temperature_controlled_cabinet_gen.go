@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	ovencavityoperationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
 	ovenmodedef "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
 	refrigeratorandtemperaturecontrolledcabinetmodedef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
@@ -74,32 +73,49 @@ func NewTemperatureControlledCabinet(opts Options, with ...Option) (*Temperature
 	return &TemperatureControlledCabinet{d}, nil
 }
 
-// TemperatureControl returns the TemperatureControl server (mandatory), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) TemperatureControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0056)
+// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontroldef.Server {
+	return temperaturecontroldef.Wrap(d.Server(0x0056))
 }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the RefrigeratorAndTemperatureControlledCabinetMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0052)
+// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
 }
 
-// OvenMode returns the OvenMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) OvenMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0049)
+// OvenMode returns the typed OvenMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
+	return ovenmodedef.Wrap(d.Server(0x0049))
 }
 
-// OvenCavityOperationalState returns the OvenCavityOperationalState server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0048)
+// OvenCavityOperationalState returns the typed OvenCavityOperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityoperationalstatedef.Server {
+	return ovencavityoperationalstatedef.Wrap(d.Server(0x0048))
 }
 
-// TemperatureAlarm returns the TemperatureAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureControlledCabinet) TemperatureAlarm() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0064)
+// TemperatureAlarm returns the typed TemperatureAlarm server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *TemperatureControlledCabinet) TemperatureAlarm() *temperaturealarmdef.Server {
+	return temperaturealarmdef.Wrap(d.Server(0x0064))
 }

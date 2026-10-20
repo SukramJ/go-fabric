@@ -6,8 +6,6 @@
 package device
 
 import (
-	core "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
@@ -65,8 +63,12 @@ func NewDoorbell(opts Options, with ...Option) (*Doorbell, error) {
 	return &Doorbell{d}, nil
 }
 
-// Switch returns the Switch server (mandatory), or nil when the host supplied one of another type.
-func (d *Doorbell) Switch() *spec.Server { return serverAs[*spec.Server](d.Device, 0x003B) }
+// Switch returns the typed Switch server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Doorbell) Switch() *switchclusterdef.Server { return switchclusterdef.Wrap(d.Server(0x003B)) }
 
-// Binding returns the Binding server (mandatory), or nil when the host supplied one of another type.
-func (d *Doorbell) Binding() *core.Binding { return serverAs[*core.Binding](d.Device, 0x001E) }
+// Binding returns the typed Binding server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Doorbell) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }

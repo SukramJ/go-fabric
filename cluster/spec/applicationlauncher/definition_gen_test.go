@@ -6,6 +6,7 @@
 package applicationlauncher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -31,4 +32,37 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStopApp, spec.Request, StopAppRequest{Application: spectest.Ptr(ApplicationStruct{CatalogVendorId: uint16(1), ApplicationId: "x"})})
 	spectest.RoundTripCommand(t, Definition, CmdHideApp, spec.Request, HideAppRequest{Application: spectest.Ptr(ApplicationStruct{CatalogVendorId: uint16(1), ApplicationId: "x"})})
 	spectest.RoundTripCommand(t, Definition, CmdLauncherResponse, spec.Response, LauncherResponse{Status: StatusEnum(0), Data: spectest.Ptr([]byte{1})})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

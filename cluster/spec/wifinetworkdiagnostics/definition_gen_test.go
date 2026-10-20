@@ -6,6 +6,7 @@
 package wifinetworkdiagnostics
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -29,4 +30,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventDisconnection, DisconnectionEvent{ReasonCode: uint16(1)})
 	spectest.RoundTripEvent(t, Definition, EventAssociationFailure, AssociationFailureEvent{AssociationFailureCause: AssociationFailureCauseEnum(0), Status: uint16(1)})
 	spectest.RoundTripEvent(t, Definition, EventConnectionStatus, ConnectionStatusEvent{ConnectionStatus: ConnectionStatusEnum(0)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitDisconnection(0, DisconnectionEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitAssociationFailure(0, AssociationFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitConnectionStatus(0, ConnectionStatusEvent{})     // not in the empty definition's EventList: refused
 }

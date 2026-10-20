@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	energyevsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	energyevsemodedef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -60,13 +59,22 @@ func NewEnergyEvse(opts Options, with ...Option) (*EnergyEvse, error) {
 	return &EnergyEvse{d}, nil
 }
 
-// EnergyEvse returns the EnergyEvse server (mandatory), or nil when the host supplied one of another type.
-func (d *EnergyEvse) EnergyEvse() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0099) }
+// EnergyEvse returns the typed EnergyEvse server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server { return energyevsedef.Wrap(d.Server(0x0099)) }
 
-// EnergyEvseMode returns the EnergyEvseMode server (mandatory), or nil when the host supplied one of another type.
-func (d *EnergyEvse) EnergyEvseMode() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009D) }
+// EnergyEvseMode returns the typed EnergyEvseMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
+	return energyevsemodedef.Wrap(d.Server(0x009D))
+}
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *EnergyEvse) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
 }

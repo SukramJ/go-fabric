@@ -6,6 +6,7 @@
 package switchcluster
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -32,4 +33,35 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventLongRelease, LongReleaseEvent{PreviousPosition: uint8(1)})
 	spectest.RoundTripEvent(t, Definition, EventMultiPressOngoing, MultiPressOngoingEvent{NewPosition: uint8(1), CurrentNumberOfPressesCounted: uint8(2)})
 	spectest.RoundTripEvent(t, Definition, EventMultiPressComplete, MultiPressCompleteEvent{PreviousPosition: uint8(1), TotalNumberOfPressesCounted: uint8(1)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitSwitchLatched(0, SwitchLatchedEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitInitialPress(0, InitialPressEvent{})             // not in the empty definition's EventList: refused
+	_ = s.EmitLongPress(0, LongPressEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.EmitShortRelease(0, ShortReleaseEvent{})             // not in the empty definition's EventList: refused
+	_ = s.EmitLongRelease(0, LongReleaseEvent{})               // not in the empty definition's EventList: refused
+	_ = s.EmitMultiPressOngoing(0, MultiPressOngoingEvent{})   // not in the empty definition's EventList: refused
+	_ = s.EmitMultiPressComplete(0, MultiPressCompleteEvent{}) // not in the empty definition's EventList: refused
 }

@@ -6,6 +6,7 @@
 package ecosysteminformation
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -31,4 +32,28 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTrip(t, Locationdesc{LocationName: "x", FloorNumber: spec.ValueOf(int16(1)), AreaType: spec.ValueOf(uint8(1))}, spec.DecodeStruct[Locationdesc])
 	spectest.RoundTripAttribute(t, Definition, AttrDeviceDirectory, spec.List[EcosystemDeviceStruct]([]EcosystemDeviceStruct{EcosystemDeviceStruct{DeviceName: spectest.Ptr("x"), DeviceNameLastEdit: spectest.Ptr(uint64(1)), BridgedEndpoint: spectest.Ptr(uint16(1)), OriginalEndpoint: spectest.Ptr(uint16(1)), DeviceTypes: []DeviceTypeStruct{DeviceTypeStruct{DeviceType: uint32(1), Revision: uint16(1)}}, UniqueLocationIds: []string{"x"}, UniqueLocationIdsLastEdit: uint64(1), FabricIndex: uint8(1)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrLocationDirectory, spec.List[EcosystemLocationStruct]([]EcosystemLocationStruct{EcosystemLocationStruct{UniqueLocationId: "x", LocationDescriptor: Locationdesc{LocationName: "x", FloorNumber: spec.ValueOf(int16(1)), AreaType: spec.ValueOf(uint8(1))}, LocationDescriptorLastEdit: uint64(1), FabricIndex: uint8(1)}}))
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
 }

@@ -6,8 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -71,18 +69,29 @@ func NewAirPurifier(opts Options, with ...Option) (*AirPurifier, error) {
 	return &AirPurifier{d}, nil
 }
 
-// FanControl returns the FanControl server (mandatory), or nil when the host supplied one of another type.
-func (d *AirPurifier) FanControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0202) }
+// FanControl returns the typed FanControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *AirPurifier) FanControl() *fancontroldef.Server { return fancontroldef.Wrap(d.Server(0x0202)) }
 
-// OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirPurifier) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *AirPurifier) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirPurifier) HepaFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0071)
+// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
+	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }

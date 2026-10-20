@@ -94,7 +94,7 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 	if err == nil {
 		light.OnChanged(onoff.ClusterID, func(attrs []uint32) {
 			if slices.Contains(attrs, onoff.AttrOnOff) {
-				slog.Info("light", slog.Bool("on", light.OnOff().OnOff())) // drive the real lamp here
+				slog.Info("light", slog.Bool("on", light.OnOff().Get().OnOff)) // drive the real lamp here
 			}
 		})
 		err = n.Aggregator().Add(ctx, light)

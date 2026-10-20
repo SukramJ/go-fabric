@@ -6,6 +6,7 @@
 package rvcoperationalstate
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -37,4 +38,55 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventOperationCompletion, OperationCompletionEvent{CompletionErrorCode: uint8(1), TotalOperationalTime: spectest.Ptr(spec.ValueOf(uint32(1))), PausedTime: spectest.Ptr(spec.ValueOf(uint32(1)))})
 	spectest.RoundTripAttribute(t, Definition, AttrOperationalStateList, spec.List[OperationalStateStruct]([]OperationalStateStruct{OperationalStateStruct{OperationalStateId: OperationalStateEnum(0), OperationalStateLabel: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrOperationalError, ErrorStateStruct{ErrorStateId: ErrorStateEnum(0), ErrorStateLabel: spectest.Ptr("x"), ErrorStateDetails: spectest.Ptr("x")})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePause(func(context.Context, PauseRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStop(func(context.Context, StopRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStart(func(context.Context, StartRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResume(func(context.Context, ResumeRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGoHome(func(context.Context, GoHomeRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitOperationalError(0, OperationalErrorEvent{})       // not in the empty definition's EventList: refused
+	_ = s.EmitOperationCompletion(0, OperationCompletionEvent{}) // not in the empty definition's EventList: refused
 }

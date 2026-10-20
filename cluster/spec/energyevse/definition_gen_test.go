@@ -6,6 +6,7 @@
 package energyevse
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -41,4 +42,55 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventEnergyTransferStopped, EnergyTransferStoppedEvent{SessionId: uint32(1), State: StateEnum(0), Reason: EnergyTransferStoppedReasonEnum(0), EnergyTransferred: int64(1), EnergyDischarged: spectest.Ptr(int64(1))})
 	spectest.RoundTripEvent(t, Definition, EventFault, FaultEvent{SessionId: spec.ValueOf(uint32(1)), State: StateEnum(0), FaultStatePreviousState: FaultStateEnum(0), FaultStateCurrentState: FaultStateEnum(0)})
 	spectest.RoundTripEvent(t, Definition, EventRfid, RfidEvent{Uid: []byte{1}})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitEvConnected(0, EvConnectedEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitEvNotDetected(0, EvNotDetectedEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitEnergyTransferStarted(0, EnergyTransferStartedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitEnergyTransferStopped(0, EnergyTransferStoppedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitFault(0, FaultEvent{})                                 // not in the empty definition's EventList: refused
+	_ = s.EmitRfid(0, RfidEvent{})                                   // not in the empty definition's EventList: refused
 }

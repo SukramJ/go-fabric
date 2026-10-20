@@ -446,7 +446,7 @@ func buildEndpoints(t *testing.T, site *fabrictest.Site, specs []endpointSpec) (
 			lights[s.key] = s.onOff.Load()
 		default:
 			if l, ok := ep.(*device.OnOffLight); ok {
-				lights[s.key] = l.OnOff()
+				lights[s.key], _ = l.OnOff().Underlying().(*onoff.Server)
 			}
 		}
 		eps = append(eps, ep)

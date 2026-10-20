@@ -6,6 +6,7 @@
 package contentappobserver
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -27,4 +28,33 @@ func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTripCommand(t, Definition, CmdContentAppMessage, spec.Request, ContentAppMessageRequest{Data: "x", EncodingHint: spectest.Ptr("x")})
 	spectest.RoundTripCommand(t, Definition, CmdContentAppMessageResponse, spec.Response, ContentAppMessageResponse{Status: StatusEnum(0), Data: spectest.Ptr("x"), EncodingHint: spectest.Ptr("x")})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleContentAppMessage(func(context.Context, ContentAppMessageRequest) (ContentAppMessageResponse, error) {
+		return ContentAppMessageResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
 }

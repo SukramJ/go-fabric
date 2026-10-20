@@ -6,8 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	colorcontroldef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -98,15 +96,21 @@ func NewExtendedColorLight(opts Options, with ...Option) (*ExtendedColorLight, e
 	return &ExtendedColorLight{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *ExtendedColorLight) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ExtendedColorLight) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
-func (d *ExtendedColorLight) LevelControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0008)
+// LevelControl returns the typed LevelControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ExtendedColorLight) LevelControl() *levelcontroldef.Server {
+	return levelcontroldef.Wrap(d.Server(0x0008))
 }
 
-// ColorControl returns the ColorControl server (mandatory), or nil when the host supplied one of another type.
-func (d *ExtendedColorLight) ColorControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0300)
+// ColorControl returns the typed ColorControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ExtendedColorLight) ColorControl() *colorcontroldef.Server {
+	return colorcontroldef.Wrap(d.Server(0x0300))
 }

@@ -6,6 +6,7 @@
 package smokecoalarm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -37,4 +38,42 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventInterconnectSmokeAlarm, InterconnectSmokeAlarmEvent{AlarmSeverityLevel: AlarmStateEnum(0)})
 	spectest.RoundTripEvent(t, Definition, EventInterconnectCoAlarm, InterconnectCoAlarmEvent{AlarmSeverityLevel: AlarmStateEnum(0)})
 	spectest.RoundTripEvent(t, Definition, EventAllClear, AllClearEvent{})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSelfTestRequest(func(context.Context, SelfTestRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitSmokeAlarm(0, SmokeAlarmEvent{})                         // not in the empty definition's EventList: refused
+	_ = s.EmitCoAlarm(0, CoAlarmEvent{})                               // not in the empty definition's EventList: refused
+	_ = s.EmitLowBattery(0, LowBatteryEvent{})                         // not in the empty definition's EventList: refused
+	_ = s.EmitHardwareFault(0, HardwareFaultEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.EmitEndOfService(0, EndOfServiceEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitSelfTestComplete(0, SelfTestCompleteEvent{})             // not in the empty definition's EventList: refused
+	_ = s.EmitAlarmMuted(0, AlarmMutedEvent{})                         // not in the empty definition's EventList: refused
+	_ = s.EmitMuteEnded(0, MuteEndedEvent{})                           // not in the empty definition's EventList: refused
+	_ = s.EmitInterconnectSmokeAlarm(0, InterconnectSmokeAlarmEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitInterconnectCoAlarm(0, InterconnectCoAlarmEvent{})       // not in the empty definition's EventList: refused
+	_ = s.EmitAllClear(0, AllClearEvent{})                             // not in the empty definition's EventList: refused
 }

@@ -6,6 +6,7 @@
 package commissionercontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -29,4 +30,37 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdCommissionNode, spec.Request, CommissionNodeRequest{RequestId: uint64(1), ResponseTimeoutSeconds: uint16(30)})
 	spectest.RoundTripCommand(t, Definition, CmdReverseOpenCommissioningWindow, spec.Response, ReverseOpenCommissioningWindowResponse{CommissioningTimeout: uint16(1), PakePasscodeVerifier: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, Discriminator: uint16(1), Iterations: uint32(1000), Salt: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}})
 	spectest.RoundTripEvent(t, Definition, EventCommissioningRequestResult, CommissioningRequestResultEvent{RequestId: uint64(1), ClientNodeId: uint64(1), StatusCode: Status(0), FabricIndex: uint8(1)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRequestCommissioningApproval(func(context.Context, RequestCommissioningApprovalRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleCommissionNode(func(context.Context, CommissionNodeRequest) (ReverseOpenCommissioningWindowResponse, error) {
+		return ReverseOpenCommissioningWindowResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitCommissioningRequestResult(0, CommissioningRequestResultEvent{}) // not in the empty definition's EventList: refused
 }

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	commoditypricedef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	commoditytariffdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
@@ -61,17 +60,26 @@ func NewElectricalEnergyTariff(opts Options, with ...Option) (*ElectricalEnergyT
 	return &ElectricalEnergyTariff{d}, nil
 }
 
-// CommodityPrice returns the CommodityPrice server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) CommodityPrice() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0095)
+// CommodityPrice returns the typed CommodityPrice server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
+	return commoditypricedef.Wrap(d.Server(0x0095))
 }
 
-// ElectricalGridConditions returns the ElectricalGridConditions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) ElectricalGridConditions() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x00A0)
+// ElectricalGridConditions returns the typed ElectricalGridConditions server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
+	return electricalgridconditionsdef.Wrap(d.Server(0x00A0))
 }
 
-// CommodityTariff returns the CommodityTariff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) CommodityTariff() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0700)
+// CommodityTariff returns the typed CommodityTariff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
+	return commoditytariffdef.Wrap(d.Server(0x0700))
 }

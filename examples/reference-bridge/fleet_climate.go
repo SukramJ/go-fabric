@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/onoff"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -347,7 +349,8 @@ func (p *demoPump) device(opts device.Options) (*device.Pump, error) {
 	if err != nil {
 		return nil, err
 	}
-	followOnOff(dev.Device, dev.OnOff(), func(on bool) {
+	srv, _ := dev.OnOff().Underlying().(*onoff.Server)
+	followOnOff(dev.Device, srv, func(on bool) {
 		p.setOn(on)
 		slog.Info("pump.set", slog.String("device", p.name), slog.Bool("on", on))
 	})

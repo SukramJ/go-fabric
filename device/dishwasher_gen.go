@@ -6,8 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	dishwasheralarmdef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
 	dishwashermodedef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -74,19 +72,39 @@ func NewDishwasher(opts Options, with ...Option) (*Dishwasher, error) {
 	return &Dishwasher{d}, nil
 }
 
-// OperationalState returns the OperationalState server (mandatory), or nil when the host supplied one of another type.
-func (d *Dishwasher) OperationalState() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0060) }
-
-// OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Dishwasher) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
-
-// TemperatureControl returns the TemperatureControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Dishwasher) TemperatureControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0056)
+// OperationalState returns the typed OperationalState server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Dishwasher) OperationalState() *operationalstatedef.Server {
+	return operationalstatedef.Wrap(d.Server(0x0060))
 }
 
-// DishwasherMode returns the DishwasherMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Dishwasher) DishwasherMode() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0059) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Dishwasher) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// DishwasherAlarm returns the DishwasherAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Dishwasher) DishwasherAlarm() *spec.Server { return serverAs[*spec.Server](d.Device, 0x005D) }
+// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Dishwasher) TemperatureControl() *temperaturecontroldef.Server {
+	return temperaturecontroldef.Wrap(d.Server(0x0056))
+}
+
+// DishwasherMode returns the typed DishwasherMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Dishwasher) DishwasherMode() *dishwashermodedef.Server {
+	return dishwashermodedef.Wrap(d.Server(0x0059))
+}
+
+// DishwasherAlarm returns the typed DishwasherAlarm server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Dishwasher) DishwasherAlarm() *dishwasheralarmdef.Server {
+	return dishwasheralarmdef.Wrap(d.Server(0x005D))
+}

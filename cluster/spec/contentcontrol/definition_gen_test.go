@@ -6,6 +6,7 @@
 package contentcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -54,4 +55,80 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrBlockChannelList, spec.List[BlockChannelStruct]([]BlockChannelStruct{BlockChannelStruct{BlockChannelIndex: spec.ValueOf(uint16(1)), MajorNumber: uint16(1), MinorNumber: uint16(1), Identifier: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrBlockApplicationList, spec.List[AppInfoStruct]([]AppInfoStruct{AppInfoStruct{CatalogVendorId: uint16(1), ApplicationId: "x"}}))
 	spectest.RoundTripAttribute(t, Definition, AttrBlockContentTimeWindow, spec.List[TimeWindowStruct]([]TimeWindowStruct{TimeWindowStruct{TimeWindowIndex: spec.ValueOf(uint16(1)), DayOfWeek: DayOfWeekBitmap(1 << 0), TimePeriod: []TimePeriodStruct{TimePeriodStruct{StartHour: uint8(1), StartMinute: uint8(1), EndHour: uint8(1), EndMinute: uint8(1)}}}}))
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUpdatePin(func(context.Context, UpdatePinRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResetPin(func(context.Context, ResetPinRequest) (ResetPinResponse, error) { return ResetPinResponse{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnable(func(context.Context, EnableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddBonusTime(func(context.Context, AddBonusTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetScreenDailyTime(func(context.Context, SetScreenDailyTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleBlockUnratedContent(func(context.Context, BlockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleUnblockUnratedContent(func(context.Context, UnblockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetOnDemandRatingThreshold(func(context.Context, SetOnDemandRatingThresholdRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetScheduledContentRatingThreshold(func(context.Context, SetScheduledContentRatingThresholdRequest) (struct{}, error) {
+		return struct{}{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddBlockChannels(func(context.Context, AddBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveBlockChannels(func(context.Context, RemoveBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddBlockApplications(func(context.Context, AddBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveBlockApplications(func(context.Context, RemoveBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetBlockContentTimeWindow(func(context.Context, SetBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleRemoveBlockContentTimeWindow(func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitRemainingScreenTimeExpired(0, RemainingScreenTimeExpiredEvent{})         // not in the empty definition's EventList: refused
+	_ = s.EmitEnteringBlockContentTimeWindow(0, EnteringBlockContentTimeWindowEvent{}) // not in the empty definition's EventList: refused
 }

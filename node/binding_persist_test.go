@@ -38,7 +38,8 @@ func TestNodeBindingPersisted(t *testing.T) {
 		if err := n.Start(ctx); err != nil {
 			t.Fatal(err)
 		}
-		return n, sw.Binding()
+		b, _ := sw.Binding().Underlying().(*mattercore.Binding)
+		return n, b
 	}
 
 	n, b := boot()

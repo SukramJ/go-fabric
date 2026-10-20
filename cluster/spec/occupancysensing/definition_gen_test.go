@@ -6,6 +6,7 @@
 package occupancysensing
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -28,4 +29,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTrip(t, HoldTimeLimitsStruct{HoldTimeMin: uint16(1), HoldTimeMax: uint16(1), HoldTimeDefault: uint16(1)}, spec.DecodeStruct[HoldTimeLimitsStruct])
 	spectest.RoundTripEvent(t, Definition, EventOccupancyChanged, OccupancyChangedEvent{Occupancy: OccupancyBitmap(1 << 0)})
 	spectest.RoundTripAttribute(t, Definition, AttrHoldTimeLimits, HoldTimeLimitsStruct{HoldTimeMin: uint16(1), HoldTimeMax: uint16(1), HoldTimeDefault: uint16(1)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitOccupancyChanged(0, OccupancyChangedEvent{}) // not in the empty definition's EventList: refused
 }

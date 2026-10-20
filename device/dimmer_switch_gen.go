@@ -6,7 +6,6 @@
 package device
 
 import (
-	core "github.com/SukramJ/go-fabric/cluster/core"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/schema"
@@ -72,5 +71,7 @@ func NewDimmerSwitch(opts Options, with ...Option) (*DimmerSwitch, error) {
 	return &DimmerSwitch{d}, nil
 }
 
-// Binding returns the Binding server (mandatory), or nil when the host supplied one of another type.
-func (d *DimmerSwitch) Binding() *core.Binding { return serverAs[*core.Binding](d.Device, 0x001E) }
+// Binding returns the typed Binding server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *DimmerSwitch) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }

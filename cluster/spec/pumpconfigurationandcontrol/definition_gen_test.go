@@ -6,6 +6,7 @@
 package pumpconfigurationandcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,4 +43,45 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventLeakage, LeakageEvent{})
 	spectest.RoundTripEvent(t, Definition, EventAirDetection, AirDetectionEvent{})
 	spectest.RoundTripEvent(t, Definition, EventTurbineOperation, TurbineOperationEvent{})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitSupplyVoltageLow(0, SupplyVoltageLowEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.EmitSupplyVoltageHigh(0, SupplyVoltageHighEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitPowerMissingPhase(0, PowerMissingPhaseEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitSystemPressureLow(0, SystemPressureLowEvent{})                 // not in the empty definition's EventList: refused
+	_ = s.EmitSystemPressureHigh(0, SystemPressureHighEvent{})               // not in the empty definition's EventList: refused
+	_ = s.EmitDryRunning(0, DryRunningEvent{})                               // not in the empty definition's EventList: refused
+	_ = s.EmitMotorTemperatureHigh(0, MotorTemperatureHighEvent{})           // not in the empty definition's EventList: refused
+	_ = s.EmitPumpMotorFatalFailure(0, PumpMotorFatalFailureEvent{})         // not in the empty definition's EventList: refused
+	_ = s.EmitElectronicTemperatureHigh(0, ElectronicTemperatureHighEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitPumpBlocked(0, PumpBlockedEvent{})                             // not in the empty definition's EventList: refused
+	_ = s.EmitSensorFailure(0, SensorFailureEvent{})                         // not in the empty definition's EventList: refused
+	_ = s.EmitElectronicNonFatalFailure(0, ElectronicNonFatalFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitElectronicFatalFailure(0, ElectronicFatalFailureEvent{})       // not in the empty definition's EventList: refused
+	_ = s.EmitGeneralFault(0, GeneralFaultEvent{})                           // not in the empty definition's EventList: refused
+	_ = s.EmitLeakage(0, LeakageEvent{})                                     // not in the empty definition's EventList: refused
+	_ = s.EmitAirDetection(0, AirDetectionEvent{})                           // not in the empty definition's EventList: refused
+	_ = s.EmitTurbineOperation(0, TurbineOperationEvent{})                   // not in the empty definition's EventList: refused
 }

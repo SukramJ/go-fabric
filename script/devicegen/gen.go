@@ -441,40 +441,34 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		if !ok {
 			continue
 		}
-		if acc.Import == specImport {
-			imports[specImport] = ""
-		} else {
-			// A self-held server's package, aliased by its last path
-			// element; the definition import carries the "def" suffix.
-			imports[acc.Import] = acc.Import[strings.LastIndex(acc.Import, "/")+1:]
-		}
+		// The typed server's package: the definition's, "def" alias.
+		imports[acc.Import] = acc.Alias
 		method := exportName(cr.def.Name)
 		if deviceMethods[method] {
 			return nil, fmt.Errorf("%s: accessor %s shadows a Device method", dt.Name, method)
 		}
-		state := "mandatory"
+		state := "// The device type mandates the cluster.\n"
 		if !cr.mandatory {
-			state = "optional: nil until WithOptional, WithFeatures or WithServer mounts it"
+			state = "// It is nil until WithOptional, WithFeatures or WithServer mounts\n// the optional cluster.\n"
 		}
-		fmt.Fprintf(&w, "\n// %s returns the %s server (%s), or nil when the host supplied one of another type.\n", method, cr.def.Name, state)
-		fmt.Fprintf(&w, "func (d *%s) %s() %s { return serverAs[%s](d.Device, 0x%04X) }\n", n, method, acc.Type, acc.Type, cr.def.ID)
+		fmt.Fprintf(&w, "\n// %s returns the typed %s server over the one the device mounts,\n", method, cr.def.Name)
+		w.WriteString("// whatever its type (Underlying returns it).\n" + state)
+		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.Wrap(d.Server(0x%04X)) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
 	}
 	return w.Bytes(), nil
 }
 
 // accessor returns the Go type of a server cluster's typed accessor, when
 // the generated type gets one: not for a cluster the assembler mounts, and
-// only where the default server's type is known — the servers table, or
-// the generated server for a cluster with a committed definition.
+// only for a cluster with a committed definition, whose typed server
+// (<pkg>def.Server) wraps any server of the cluster — the generated one or
+// a self-held one (brief BT, addendum).
 func (g *generator) accessor(cr *clusterReq) (serverType, bool) {
 	if assemblerMounted[cr.def.Name] {
 		return serverType{}, false
 	}
-	if t, ok := servers[cr.def.Name]; ok {
-		return t, true
-	}
-	if g.defs[packageName(cr.def.Name)] {
-		return specServer, true
+	if pkg := packageName(cr.def.Name); g.defs[pkg] {
+		return typedServer(pkg), true
 	}
 	return serverType{}, false
 }
@@ -628,9 +622,9 @@ func (g *generator) generateTest(names []string) (*output, error) {
 			}
 			method := exportName(cr.def.Name)
 			if cr.mandatory {
-				fmt.Fprintf(&w, "\t\tif s := d.%s(); d.Server(0x%04X) == nil || s != nil && d.Server(0x%04X) != s {\n\t\t\tt.Error(\"%s: mandatory %s not mounted\")\n\t\t}\n", method, cr.def.ID, cr.def.ID, name, cr.def.Name)
+				fmt.Fprintf(&w, "\t\tif s := d.%s(); s == nil || s.Underlying() != d.Server(0x%04X) {\n\t\t\tt.Error(\"%s: mandatory %s not mounted\")\n\t\t}\n", method, cr.def.ID, name, cr.def.Name)
 			} else {
-				fmt.Fprintf(&w, "\t\tif s := d.%s(); s != nil && d.Server(0x%04X) != s {\n\t\t\tt.Error(\"%s: optional %s is not the device's server\")\n\t\t}\n", method, cr.def.ID, name, cr.def.Name)
+				fmt.Fprintf(&w, "\t\tif s, srv := d.%s(), d.Server(0x%04X); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {\n\t\t\tt.Error(\"%s: optional %s is not the device's server\")\n\t\t}\n", method, cr.def.ID, name, cr.def.Name)
 			}
 		}
 		fmt.Fprintf(&w, "\t} else if !refusesFixture(%q) {\n\t\tt.Errorf(\"%s: %%v\", err)\n\t}\n", name, name)

@@ -6,6 +6,7 @@
 package actions
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -43,4 +44,66 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventActionFailed, ActionFailedEvent{ActionId: uint16(1), InvokeId: uint32(1), NewState: ActionStateEnum(0), Error: ActionErrorEnum(0)})
 	spectest.RoundTripAttribute(t, Definition, AttrActionList, spec.List[ActionStruct]([]ActionStruct{ActionStruct{ActionId: uint16(1), Name: "x", Type: ActionTypeEnum(0), EndpointListId: uint16(1), SupportedCommands: CommandBits(1 << 0), State: ActionStateEnum(0)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrEndpointLists, spec.List[EndpointListStruct]([]EndpointListStruct{EndpointListStruct{EndpointListId: uint16(1), Name: "x", Type: EndpointListTypeEnum(0), Endpoints: []uint16{uint16(1)}}}))
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.EmitActionFailed(0, ActionFailedEvent{}) // not in the empty definition's EventList: refused
 }

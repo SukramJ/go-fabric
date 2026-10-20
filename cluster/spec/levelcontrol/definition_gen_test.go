@@ -6,6 +6,7 @@
 package levelcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -34,4 +35,55 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStepWithOnOff, spec.Request, StepWithOnOffRequest{StepMode: StepModeEnum(0), StepSize: uint8(1), TransitionTime: spec.ValueOf(uint16(1)), OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdStopWithOnOff, spec.Request, StopWithOnOffRequest{OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdMoveToClosestFrequency, spec.Request, MoveToClosestFrequencyRequest{Frequency: uint16(1)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

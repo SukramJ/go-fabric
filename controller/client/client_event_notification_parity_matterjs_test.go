@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -105,7 +107,7 @@ func newSwitchPair(t *testing.T, multi bool) *switchPair {
 // emit emits a switch event on the device.
 func (sp *switchPair) emit(t *testing.T, event uint32, payload any) {
 	t.Helper()
-	if err := sp.sw.Switch().Emit(sp.ep, event, payload); err != nil {
+	if err := sp.sw.Switch().Underlying().(*spec.Server).Emit(sp.ep, event, payload); err != nil {
 		t.Fatal(err)
 	}
 }

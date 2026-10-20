@@ -6,8 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -101,22 +99,44 @@ func NewPump(opts Options, with ...Option) (*Pump, error) {
 	return &Pump{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *Pump) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// PumpConfigurationAndControl returns the PumpConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
-func (d *Pump) PumpConfigurationAndControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0200)
+// PumpConfigurationAndControl returns the typed PumpConfigurationAndControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
+	return pumpconfigurationandcontroldef.Wrap(d.Server(0x0200))
 }
 
-// LevelControl returns the LevelControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) LevelControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0008) }
+// LevelControl returns the typed LevelControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Pump) LevelControl() *levelcontroldef.Server { return levelcontroldef.Wrap(d.Server(0x0008)) }
 
-// TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) TemperatureMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0402) }
+// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+}
 
-// PressureMeasurement returns the PressureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) PressureMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0403) }
+// PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
+	return pressuremeasurementdef.Wrap(d.Server(0x0403))
+}
 
-// FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) FlowMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0404) }
+// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
+	return flowmeasurementdef.Wrap(d.Server(0x0404))
+}

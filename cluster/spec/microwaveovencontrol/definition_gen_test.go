@@ -6,6 +6,7 @@
 package microwaveovencontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -27,4 +28,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTripCommand(t, Definition, CmdSetCookingParameters, spec.Request, SetCookingParametersRequest{CookMode: spectest.Ptr(uint8(1)), CookTime: spectest.Ptr(uint32(1)), PowerSetting: spectest.Ptr(uint8(1)), WattSettingIndex: spectest.Ptr(uint8(1)), StartAfterSetting: spectest.Ptr(true)})
 	spectest.RoundTripCommand(t, Definition, CmdAddMoreTime, spec.Request, AddMoreTimeRequest{TimeToAdd: uint32(1)})
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetCookingParameters(func(context.Context, SetCookingParametersRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleAddMoreTime(func(context.Context, AddMoreTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
 }

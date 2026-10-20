@@ -70,7 +70,7 @@ func TestClientStructureOffloadParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		ep, _ := p.Device.EndpointOf("switch:1")
-		if err := sw.Switch().Emit(ep, swdef.EventInitialPress, swdef.InitialPressEvent{NewPosition: 1}); err != nil {
+		if err := sw.Switch().EmitInitialPress(ep, swdef.InitialPressEvent{NewPosition: 1}); err != nil {
 			t.Fatal(err)
 		}
 		if err := site.Eventually(parityCtx(t), "the InitialPress event", func() bool {

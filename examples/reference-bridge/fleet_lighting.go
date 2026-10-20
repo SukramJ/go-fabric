@@ -219,7 +219,7 @@ func (d *nativeDimmer) device(opts device.Options) (*device.Device, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv := l.OnOff()
+	srv, _ := l.OnOff().Underlying().(*onoff.Server)
 	if srv == nil {
 		return nil, fmt.Errorf("%s: no default OnOff server", d.name)
 	}

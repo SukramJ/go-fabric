@@ -50,7 +50,7 @@ func TestGolden(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		for suffix, got := range map[string][]byte{".go.golden": o.Source, "_test.go.golden": o.Test} {
+		for suffix, got := range map[string][]byte{".go.golden": o.Source, "_server.go.golden": o.Server, "_test.go.golden": o.Test} {
 			path := filepath.Join("testdata", o.Package+suffix)
 			if *update {
 				if err := os.WriteFile(path, got, 0o644); err != nil { //nolint:gosec // a golden file
@@ -85,7 +85,7 @@ func TestCommittedPackagesAreCurrent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		for file, want := range map[string][]byte{"definition_gen.go": o.Source, "definition_gen_test.go": o.Test} {
+		for file, want := range map[string][]byte{"definition_gen.go": o.Source, "server_gen.go": o.Server, "definition_gen_test.go": o.Test} {
 			path := filepath.Join(root, outDir, o.Package, file)
 			got, err := os.ReadFile(path)
 			if err != nil || !bytes.Equal(got, want) {

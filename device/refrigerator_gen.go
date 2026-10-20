@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	refrigeratoralarmdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
@@ -58,17 +57,26 @@ func NewRefrigerator(opts Options, with ...Option) (*Refrigerator, error) {
 	return &Refrigerator{d}, nil
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the RefrigeratorAndTemperatureControlledCabinetMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0052)
+// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
 }
 
-// RefrigeratorAlarm returns the RefrigeratorAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) RefrigeratorAlarm() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0057)
+// RefrigeratorAlarm returns the typed RefrigeratorAlarm server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
+	return refrigeratoralarmdef.Wrap(d.Server(0x0057))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }

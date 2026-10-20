@@ -2146,6 +2146,30 @@ does the same since wave 7: `Instance` resolves `Rev >= vN` against
 (`LevelControlServer.ts:113-121`), and `CheckFeatures` still reports such
 a node as conditional. Owner decision 2026-10-12 (report T, question 1).
 
+### BD-Matter-TypedServer-WriteVeto — the typed server's write veto fires on controller writes only, and a plain veto error answers the attribute with FAILURE
+
+matter.js fires `<field>$Changing` in a transaction's pre-commit for every
+field that changed since the last pre-commit cycle, whoever changed it —
+a controller's write and the host's own `endpoint.set` alike — and a
+throw from an observer rolls the transaction back
+(`packages/node/src/behavior/state/managed/Datasource.ts:1172-1195` at
+`862ad75f`, `packages/general/src/transaction/Participant.ts:16-23`). A
+thrown error that is no `StatusResponseError` leaves the write response
+(`packages/protocol/src/action/server/AttributeWriteResponse.ts:452-460`
+rolls back and rethrows) and the messenger answers the whole request with
+a StatusResponse of FAILURE (`packages/protocol/src/interaction/InteractionMessenger.ts:431-459`).
+The Go typed server's `OnWrite` (`spec.ServerConfig.BeforeWrite`,
+`cluster/spec/server.go` `MatterWrite`) runs for a controller's write
+only — after the definition's checks, before the `Sink` and the store —
+and never for the host's own `Set`; an error carrying an IM status
+answers the attribute with it, any other error answers that attribute
+with FAILURE and leaves the request's other writes to their own result
+(`cluster/spec/typed.go` `vetoed`). Reasoning: the host's own `Set` is
+the host's decision and needs no veto by the host, and a per-attribute
+status is the write response's own unit, where matter.js's message-level
+FAILURE is the fall-through of an uncaught error, not a choice (phase 20b,
+brief BT).
+
 ### BD-Matter-Device-MeasuredClusterIsTheAssemblers — with `WithMeasurement` the measured cluster belongs to the assembler, and the typed accessor answers nil
 
 `device.WithMeasurement(src)` fills `endpoint.Spec.Measurement`; the

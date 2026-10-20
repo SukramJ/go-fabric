@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	ethernetnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
@@ -57,17 +56,25 @@ func NewSecondaryNetworkInterface(opts Options, with ...Option) (*SecondaryNetwo
 	return &SecondaryNetworkInterface{d}, nil
 }
 
-// NetworkCommissioning returns the NetworkCommissioning server (mandatory), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) NetworkCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0031)
+// NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
+	return networkcommissioningdef.Wrap(d.Server(0x0031))
 }
 
-// WiFiNetworkDiagnostics returns the WiFiNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0036)
+// WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
+	return wifinetworkdiagnosticsdef.Wrap(d.Server(0x0036))
 }
 
-// EthernetNetworkDiagnostics returns the EthernetNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0037)
+// EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
+	return ethernetnetworkdiagnosticsdef.Wrap(d.Server(0x0037))
 }

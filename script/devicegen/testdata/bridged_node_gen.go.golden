@@ -6,8 +6,6 @@
 package device
 
 import (
-	core "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	administratorcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	bridgeddevicebasicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	ecosysteminformationdef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
@@ -66,20 +64,34 @@ func NewBridgedNode(opts Options, with ...Option) (*BridgedNode, error) {
 	return &BridgedNode{d}, nil
 }
 
-// PowerSourceConfiguration returns the PowerSourceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *BridgedNode) PowerSourceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x002E)
+// PowerSourceConfiguration returns the typed PowerSourceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *BridgedNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
+	return powersourceconfigurationdef.Wrap(d.Server(0x002E))
 }
 
-// PowerSource returns the PowerSource server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *BridgedNode) PowerSource() *spec.Server { return serverAs[*spec.Server](d.Device, 0x002F) }
-
-// AdministratorCommissioning returns the AdministratorCommissioning server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *BridgedNode) AdministratorCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x003C)
+// PowerSource returns the typed PowerSource server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *BridgedNode) PowerSource() *powersourcedef.Server {
+	return powersourcedef.Wrap(d.Server(0x002F))
 }
 
-// EcosystemInformation returns the EcosystemInformation server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *BridgedNode) EcosystemInformation() *core.EcosystemInformation {
-	return serverAs[*core.EcosystemInformation](d.Device, 0x0750)
+// AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *BridgedNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
+	return administratorcommissioningdef.Wrap(d.Server(0x003C))
+}
+
+// EcosystemInformation returns the typed EcosystemInformation server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *BridgedNode) EcosystemInformation() *ecosysteminformationdef.Server {
+	return ecosysteminformationdef.Wrap(d.Server(0x0750))
 }

@@ -6,8 +6,6 @@
 package device
 
 import (
-	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -88,12 +86,14 @@ func NewMountedDimmableLoadControl(opts Options, with ...Option) (*MountedDimmab
 	return &MountedDimmableLoadControl{d}, nil
 }
 
-// OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *MountedDimmableLoadControl) OnOff() *onoff.Server {
-	return serverAs[*onoff.Server](d.Device, 0x0006)
-}
+// OnOff returns the typed OnOff server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *MountedDimmableLoadControl) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
 
-// LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
-func (d *MountedDimmableLoadControl) LevelControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0008)
+// LevelControl returns the typed LevelControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *MountedDimmableLoadControl) LevelControl() *levelcontroldef.Server {
+	return levelcontroldef.Wrap(d.Server(0x0008))
 }

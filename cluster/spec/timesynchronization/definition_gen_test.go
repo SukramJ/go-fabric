@@ -6,6 +6,7 @@
 package timesynchronization
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,4 +43,50 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventMissingTrustedTimeSource, MissingTrustedTimeSourceEvent{})
 	spectest.RoundTripAttribute(t, Definition, AttrTimeZone, spec.List[TimeZoneStruct]([]TimeZoneStruct{TimeZoneStruct{Offset: int32(1), ValidAt: uint64(1), Name: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrDstOffset, spec.List[DSTOffsetStruct]([]DSTOffsetStruct{DSTOffsetStruct{Offset: int32(1), ValidStarting: uint64(1), ValidUntil: spec.ValueOf(uint64(1))}}))
+}
+
+// TestTypedServer drives every method of the typed server once.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Wrap(srv)
+	if s.Underlying() != srv {
+		t.Error("the typed server does not hold its server")
+	}
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetTimeZone(func(context.Context, SetTimeZoneRequest) (SetTimeZoneResponse, error) {
+		return SetTimeZoneResponse{}, nil
+	}); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	if err := s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Error(err)
+	}
+	_ = s.EmitDstTableEmpty(0, DstTableEmptyEvent{})                       // not in the empty definition's EventList: refused
+	_ = s.EmitDstStatus(0, DstStatusEvent{})                               // not in the empty definition's EventList: refused
+	_ = s.EmitTimeZoneStatus(0, TimeZoneStatusEvent{})                     // not in the empty definition's EventList: refused
+	_ = s.EmitTimeFailure(0, TimeFailureEvent{})                           // not in the empty definition's EventList: refused
+	_ = s.EmitMissingTrustedTimeSource(0, MissingTrustedTimeSourceEvent{}) // not in the empty definition's EventList: refused
 }

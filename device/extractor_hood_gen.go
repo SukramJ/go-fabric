@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	hepafiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
@@ -59,15 +58,25 @@ func NewExtractorHood(opts Options, with ...Option) (*ExtractorHood, error) {
 	return &ExtractorHood{d}, nil
 }
 
-// FanControl returns the FanControl server (mandatory), or nil when the host supplied one of another type.
-func (d *ExtractorHood) FanControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0202) }
-
-// HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ExtractorHood) HepaFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0071)
+// FanControl returns the typed FanControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ExtractorHood) FanControl() *fancontroldef.Server {
+	return fancontroldef.Wrap(d.Server(0x0202))
 }
 
-// ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
+	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
+}
+
+// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
 }

@@ -68,6 +68,15 @@ type ServerConfig struct {
 	Source Source
 	// Sink is optionally told about controller writes.
 	Sink Sink
+	// BeforeWrite optionally vetoes a controller write: called by
+	// [Server.MatterWrite] after the definition's checks and before the
+	// Sink and the store, with the value in its stored form. An error
+	// refuses the write and nothing is stored; the error answers the write
+	// with the IM status it carries, FAILURE when it carries none. It is
+	// the hook the generated typed server exposes as OnWrite (matter.js's
+	// pre-commit `$Changing` veto, cited in script/clustergen). Also set
+	// after construction with [Server.SetBeforeWrite].
+	BeforeWrite func(ctx context.Context, attrID uint32, value any) error
 	// Initial holds the values the server starts with, checked as
 	// [Server.Set] checks a value.
 	Initial map[uint32]any
@@ -115,9 +124,10 @@ type Server struct {
 	source   Source
 	sink     Sink
 
-	mu       sync.Mutex
-	values   map[uint32]any
-	handlers map[uint32]CommandHandler
+	mu          sync.Mutex
+	beforeWrite func(ctx context.Context, attrID uint32, value any) error
+	values      map[uint32]any
+	handlers    map[uint32]CommandHandler
 	// stubs are the accepted commands construction found unimplemented
 	// ([ServerConfig.Unimplemented]); one is listed once it has a handler.
 	stubs   []uint32
@@ -161,6 +171,8 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		sink:     cfg.Sink,
 		values:   map[uint32]any{},
 		handlers: map[uint32]CommandHandler{},
+
+		beforeWrite: cfg.BeforeWrite,
 	}
 	// A command the conformance requires is fatal at construction when it
 	// has no implementation. Mirrors matter.js
@@ -265,20 +277,36 @@ func (s *Server) Value(attrID uint32) (any, bool) {
 	return v, ok
 }
 
+// SetBeforeWrite installs fn as the write veto ([ServerConfig.BeforeWrite]),
+// replacing the one before; nil removes it.
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.mu.Lock()
+	s.beforeWrite = fn
+	s.mu.Unlock()
+}
+
 // peers resolves a sibling attribute a constraint names.
 func (s *Server) peers(attrID uint32) (any, bool) { return s.MatterRead(attrID) }
 
 // MatterWrite implements [contract.ClusterServer]: [Instance.ValidateWrite]
-// answers the status of a write the definition refuses; the Sink, when
-// set, may refuse it as well and is handed the value in its stored form;
-// then the value is stored, and a change bumps the data version and is
-// notified.
+// answers the status of a write the definition refuses; the
+// [ServerConfig.BeforeWrite] veto, when set, may refuse it next, then the
+// Sink, each handed the value in its stored form; then the value is
+// stored, and a change bumps the data version and is notified.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	v, err := s.ValidateWrite(attrID, value, s.peers)
 	if err != nil {
 		return err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
+	s.mu.Lock()
+	veto := s.beforeWrite
+	s.mu.Unlock()
+	if veto != nil {
+		if err := veto(ctx, attrID, v); err != nil {
+			return vetoed(err)
+		}
+	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
 			return err

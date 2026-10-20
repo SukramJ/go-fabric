@@ -95,7 +95,7 @@ func write(dir string, o *output) (changed bool, err error) {
 	if err := os.MkdirAll(pkgDir, 0o750); err != nil {
 		return false, err
 	}
-	for name, content := range map[string][]byte{"definition_gen.go": o.Source, "definition_gen_test.go": o.Test} {
+	for name, content := range map[string][]byte{"definition_gen.go": o.Source, "server_gen.go": o.Server, "definition_gen_test.go": o.Test} {
 		path := filepath.Join(pkgDir, name)
 		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, content) { //nolint:gosec // a path below the output directory this tool writes
 

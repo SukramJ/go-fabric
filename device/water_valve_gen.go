@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	valveconfigurationandcontroldef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -60,10 +59,17 @@ func NewWaterValve(opts Options, with ...Option) (*WaterValve, error) {
 	return &WaterValve{d}, nil
 }
 
-// ValveConfigurationAndControl returns the ValveConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterValve) ValveConfigurationAndControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0081)
+// ValveConfigurationAndControl returns the typed ValveConfigurationAndControl server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
+	return valveconfigurationandcontroldef.Wrap(d.Server(0x0081))
 }
 
-// FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *WaterValve) FlowMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0404) }
+// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
+	return flowmeasurementdef.Wrap(d.Server(0x0404))
+}

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	commoditymeteringdef "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
 	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
@@ -56,17 +55,24 @@ func NewElectricalMeter(opts Options, with ...Option) (*ElectricalMeter, error) 
 	return &ElectricalMeter{d}, nil
 }
 
-// ElectricalPowerMeasurement returns the ElectricalPowerMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) ElectricalPowerMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0090)
+// ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
+	return electricalpowermeasurementdef.Wrap(d.Server(0x0090))
 }
 
-// ElectricalEnergyMeasurement returns the ElectricalEnergyMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) ElectricalEnergyMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0091)
+// ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
+	return electricalenergymeasurementdef.Wrap(d.Server(0x0091))
 }
 
-// CommodityMetering returns the CommodityMetering server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) CommodityMetering() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0B07)
+// CommodityMetering returns the typed CommodityMetering server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *ElectricalMeter) CommodityMetering() *commoditymeteringdef.Server {
+	return commoditymeteringdef.Wrap(d.Server(0x0B07))
 }

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 )
 
@@ -23,7 +25,7 @@ func TestDefaultServerCommandsUnimplementedUntilHandled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lc := d.LevelControl()
+	lc, _ := d.LevelControl().Underlying().(*spec.Server)
 	if got := lc.MatterAcceptedCommands(); len(got) != 0 {
 		t.Fatalf("AcceptedCommandList %v before any handler", got)
 	}

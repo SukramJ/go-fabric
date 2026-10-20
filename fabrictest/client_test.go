@@ -68,7 +68,7 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("device A's Toggle on device B: %v", err)
 	}
-	if v, _ := light.OnOff().MatterRead(onoff.AttrOnOff); v != true {
+	if v, _ := light.OnOff().Underlying().MatterRead(onoff.AttrOnOff); v != true {
 		t.Fatalf("B's light OnOff %v after A's Toggle", v)
 	}
 }

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	administratorcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	basicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	diagnosticlogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
@@ -149,70 +148,124 @@ func NewRootNode(opts Options, with ...Option) (*RootNode, error) {
 	return &RootNode{d}, nil
 }
 
-// BasicInformation returns the BasicInformation server (mandatory), or nil when the host supplied one of another type.
-func (d *RootNode) BasicInformation() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0028) }
-
-// GeneralCommissioning returns the GeneralCommissioning server (mandatory), or nil when the host supplied one of another type.
-func (d *RootNode) GeneralCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0030)
+// BasicInformation returns the typed BasicInformation server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RootNode) BasicInformation() *basicinformationdef.Server {
+	return basicinformationdef.Wrap(d.Server(0x0028))
 }
 
-// GeneralDiagnostics returns the GeneralDiagnostics server (mandatory), or nil when the host supplied one of another type.
-func (d *RootNode) GeneralDiagnostics() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0033) }
-
-// AdministratorCommissioning returns the AdministratorCommissioning server (mandatory), or nil when the host supplied one of another type.
-func (d *RootNode) AdministratorCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x003C)
+// GeneralCommissioning returns the typed GeneralCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RootNode) GeneralCommissioning() *generalcommissioningdef.Server {
+	return generalcommissioningdef.Wrap(d.Server(0x0030))
 }
 
-// LocalizationConfiguration returns the LocalizationConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) LocalizationConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x002B)
+// GeneralDiagnostics returns the typed GeneralDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RootNode) GeneralDiagnostics() *generaldiagnosticsdef.Server {
+	return generaldiagnosticsdef.Wrap(d.Server(0x0033))
 }
 
-// TimeFormatLocalization returns the TimeFormatLocalization server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) TimeFormatLocalization() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x002C)
+// AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// The device type mandates the cluster.
+func (d *RootNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
+	return administratorcommissioningdef.Wrap(d.Server(0x003C))
 }
 
-// UnitLocalization returns the UnitLocalization server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) UnitLocalization() *spec.Server { return serverAs[*spec.Server](d.Device, 0x002D) }
-
-// PowerSourceConfiguration returns the PowerSourceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) PowerSourceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x002E)
+// LocalizationConfiguration returns the typed LocalizationConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) LocalizationConfiguration() *localizationconfigurationdef.Server {
+	return localizationconfigurationdef.Wrap(d.Server(0x002B))
 }
 
-// NetworkCommissioning returns the NetworkCommissioning server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) NetworkCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0031)
+// TimeFormatLocalization returns the typed TimeFormatLocalization server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) TimeFormatLocalization() *timeformatlocalizationdef.Server {
+	return timeformatlocalizationdef.Wrap(d.Server(0x002C))
 }
 
-// DiagnosticLogs returns the DiagnosticLogs server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) DiagnosticLogs() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0032) }
-
-// SoftwareDiagnostics returns the SoftwareDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) SoftwareDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0034)
+// UnitLocalization returns the typed UnitLocalization server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) UnitLocalization() *unitlocalizationdef.Server {
+	return unitlocalizationdef.Wrap(d.Server(0x002D))
 }
 
-// WiFiNetworkDiagnostics returns the WiFiNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) WiFiNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0036)
+// PowerSourceConfiguration returns the typed PowerSourceConfiguration server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
+	return powersourceconfigurationdef.Wrap(d.Server(0x002E))
 }
 
-// EthernetNetworkDiagnostics returns the EthernetNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) EthernetNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0037)
+// NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) NetworkCommissioning() *networkcommissioningdef.Server {
+	return networkcommissioningdef.Wrap(d.Server(0x0031))
 }
 
-// TimeSynchronization returns the TimeSynchronization server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) TimeSynchronization() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0038)
+// DiagnosticLogs returns the typed DiagnosticLogs server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) DiagnosticLogs() *diagnosticlogsdef.Server {
+	return diagnosticlogsdef.Wrap(d.Server(0x0032))
 }
 
-// IcdManagement returns the IcdManagement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) IcdManagement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0046) }
+// SoftwareDiagnostics returns the typed SoftwareDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) SoftwareDiagnostics() *softwarediagnosticsdef.Server {
+	return softwarediagnosticsdef.Wrap(d.Server(0x0034))
+}
 
-// Groupcast returns the Groupcast server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RootNode) Groupcast() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0065) }
+// WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
+	return wifinetworkdiagnosticsdef.Wrap(d.Server(0x0036))
+}
+
+// EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
+	return ethernetnetworkdiagnosticsdef.Wrap(d.Server(0x0037))
+}
+
+// TimeSynchronization returns the typed TimeSynchronization server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) TimeSynchronization() *timesynchronizationdef.Server {
+	return timesynchronizationdef.Wrap(d.Server(0x0038))
+}
+
+// IcdManagement returns the typed IcdManagement server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) IcdManagement() *icdmanagementdef.Server {
+	return icdmanagementdef.Wrap(d.Server(0x0046))
+}
+
+// Groupcast returns the typed Groupcast server over the one the device mounts,
+// whatever its type (Underlying returns it).
+// It is nil until WithOptional, WithFeatures or WithServer mounts
+// the optional cluster.
+func (d *RootNode) Groupcast() *groupcastdef.Server { return groupcastdef.Wrap(d.Server(0x0065)) }
