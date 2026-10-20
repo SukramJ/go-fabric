@@ -618,6 +618,17 @@ Line numbers at `862ad75f`.
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`.
 
+- **No controller-side SoftwareUpdateManager.** matter.js's controller
+  keeps a manager beside its OTA provider: the reboot detection
+  (RebootResubscribeArmer, handlePeerShutdown, closeForPeer,
+  suppressNextStartUp, the failed-apply detection on startUp), the consent
+  queue (addUpdateConsent, removeConsent, queuedUpdates), the BDX transfer
+  options per consent, the stalled detection by BDX progress, the update
+  check of the controller's nodes and the DCL store cleanup
+  (`SoftwareUpdateManager.ts`). The Go provider is a node's and carries
+  the consent of an offered image and the in-progress entries only; 29
+  `OtaTest.ts` cases are `missing` for this. (Register candidate; the
+  milestone is the owner's.)
 - **OccupancySensing has no feature selection.** The Go server serves
   PassiveInfrared alone (`cluster/measurement/definitions.go`
   `occupancyInst`), so neither another detector type nor the
@@ -648,6 +659,11 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   LevelIndication feature and its LevelValue cannot be served; two
   `ConcentrationMeasurementServerTest.ts` cases are `missing` for this.
   (Milestone 4, a host option and a level source in `contract/`.)
+- **The controller chooses no TCP session.** `PeerExchangeProvider`'s
+  selection of a TCP session among a peer's sessions (skipping closing
+  ones) has no Go counterpart: `controller/peer` opens UDP sessions. Four
+  `TcpSessionBindingTest.ts` cases are `missing` for this. (Register
+  candidate, with a controller TCP transport.)
 - **The node's session intervals are not configurable.** matter.js takes
   `sessions.intervals` (idle and active interval, active threshold) into
   the SessionManager's parameters (`SessionsBehaviorTest.ts:15-25`); the
