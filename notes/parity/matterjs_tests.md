@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | status | files |
 | --- | ---: |
 | ported | 75 |
-| partial | 119 |
-| planned | 43 |
+| partial | 120 |
+| planned | 42 |
 | excluded | 87 |
 | total | 324 |
 
@@ -31,7 +31,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 1 | 2 | 2 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 0 | 1 | 5 | 0 |
 | [node/test/behavior/system/dcl](#nodetestbehaviorsystemdcl) | 1 | 0 | 0 | 1 | 0 |
-| [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 0 | 1 | 0 |
+| [node/test/behavior/system/events](#nodetestbehaviorsystemevents) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behavior/system/icd](#nodetestbehaviorsystemicd) | 5 | 0 | 0 | 0 | 5 |
 | [node/test/behavior/system/network](#nodetestbehaviorsystemnetwork) | 2 | 0 | 0 | 2 | 0 |
 | [node/test/behavior/system/remote](#nodetestbehaviorsystemremote) | 3 | 0 | 0 | 0 | 3 |
@@ -216,7 +216,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| EventsBehaviorTest.ts | 55 | planned | ‚Äî | Events of a former run dropped after stop/start unless the event store is non-volatile. |
+| EventsBehaviorTest.ts | 55 | partial | `node:TestEventsBehaviorParityMatterJS` | The volatile event store across a restart runs on a fabrictest device restarted on its store, the root's BasicInformation StartUp and ShutDown read from the node's event log (node/events_parity_matterjs_test.go). Missing, M4: findings entry "The event store is volatile only" (node.Config has no nonvolatile events option). Missing: ‚Äúkeeps the events of the former run after stop() and start() if nonvolatile‚Äù. |
 
 ## node/test/behavior/system/icd
 
@@ -943,10 +943,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behavior/system/dcl
 
 - `DclBehaviorTest.ts` ‚Äî The DCL configuration defaults (production/test URLs, certificate sources) and the offline switch of the DCL services. Milestone 6 phase 27 with the DCL services (concept v5 F.0 19.3).
-
-### node/test/behavior/system/events
-
-- `EventsBehaviorTest.ts` ‚Äî Events of a former run dropped after stop/start unless the event store is non-volatile.
 
 ### node/test/behavior/system/network
 

@@ -442,8 +442,14 @@
     },
     {
       "path": "packages/node/test/behavior/system/events/EventsBehaviorTest.ts",
-      "status": "planned",
-      "reason": "Events of a former run dropped after stop/start unless the event store is non-volatile.",
+      "status": "partial",
+      "go": [
+        "node:TestEventsBehaviorParityMatterJS"
+      ],
+      "missing": [
+        "keeps the events of the former run after stop() and start() if nonvolatile"
+      ],
+      "reason": "The volatile event store across a restart runs on a fabrictest device restarted on its store, the root's BasicInformation StartUp and ShutDown read from the node's event log (node/events_parity_matterjs_test.go). Missing, M4: findings entry \"The event store is volatile only\" (node.Config has no nonvolatile events option).",
       "snapshotSha": "3b11a62ead829c0a11720dd1012c52695a1637d9"
     },
     {
