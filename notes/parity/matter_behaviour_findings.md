@@ -627,8 +627,10 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   check of the controller's nodes and the DCL store cleanup
   (`SoftwareUpdateManager.ts`). The Go provider is a node's and carries
   the consent of an offered image and the in-progress entries only; 29
-  `OtaTest.ts` cases are `missing` for this. (Register candidate; the
-  milestone is the owner's.)
+  `OtaTest.ts` cases are `missing` for this. (Register candidate,
+  milestone 5 phase 25 with the rest of OTA push from the controller,
+  the RebootResubscribeArmer phase 24; `docs/roadmap.md`. Decided in
+  the BR review, 2026-10-20.)
 - **OccupancySensing has no feature selection.** The Go server serves
   PassiveInfrared alone (`cluster/measurement/definitions.go`
   `occupancyInst`), so neither another detector type nor the

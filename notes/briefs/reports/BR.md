@@ -213,3 +213,42 @@ chiptool-families` rerun once at a03fbad: exit 0, 950 s, SU/2.2, 2.4 and
 - **BD-Matter-Measurement-StatedRange**: matter.js's measurement servers leave MinMeasuredValue and MaxMeasuredValue null by default and refuse a state outside a stated range or a maximum not above the minimum (`MeasurementServersTest.ts:33`, `:44`, `:53`; the generated behaviors' constraints). The Go servers project a host reading and serve the range of the attribute's encoding (`cluster/measurement/measurement.go` MatterRead of TemperatureMeasurement -27315..32766, RelativeHumidity 0..10000, Illuminance 1..0xFFFE, Pressure 0..32766, `flow.go` Flow's constants; L01-D06, L01-D07), saturating a reading into it (`TestTemperatureServerSaturatesHigh/Low`). Reasoning: no host states a range, so there is nothing to refuse, and the served bounds keep every reported value inside a stated range.
 - **BD-Matter-PowerSource-DeviceTypeOnPart**: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint (`PowerSourceServer.ts:23`, `DescriptorServer.addDeviceTypes` `DescriptorServer.ts:91-111`). The Go endpoint layer lists one device type per endpoint (`endpoint/helpers.go` `listedDeviceTypes`), serves a bridged device's battery as BridgedNode's optional PowerSource cluster (`endpoint/types.go` `Endpoint.PowerSource`) and the PowerSource device type as a part endpoint (`endpoint:TestSpecPartsComposeAChildEndpoint`). Reasoning: the bridged composition is Apple's and the order of an appended device type after BridgedNode is matter.js's behavior-initialization order, which the Go assembler does not have.
 - **BD-chip-Commodity-ServerChoices** (an extension): the CommodityTariff update, transcribed from chip, refuses a TariffInfo without Currency under PRICE and a day entry without RandomizationOffset/RandomizationType under RNDM (`cluster/energy/commoditytariff.go` `validateTariffInfo`, `validateDayEntries`, citing chip's `DataMgmt.cpp:689-703`, `:428-441`), where matter.js's state fills Currency in as null and stores the entry as written (`CommodityTariffServerTest.ts:50`, `:69`; matter.js #4386). Reasoning: matter.js's server is empty and the SETRF family certifies chip's update rules.
+
+## Decided in review (2026-10-20)
+
+- Every cited fix line read against the pin: fix 1 `NetworkClient.ts:168-210`
+  (`packages/node/src/behavior/system/network/`, the sustained default
+  subscription); fix 2 `SessionIntervals.ts:57`, `:63`, `:99-118`,
+  `RemoteDescriptor.ts:119`, `:223-227`; fix 3 `Fabric.ts:193-201`,
+  `:208-243`, `FabricManager.ts:236-246` (the emit is `:247`),
+  `OperationalCredentialsServer.ts:404`, `:522`, `:579-582`
+  (`reactTo(replaced)` is `:597`), `CommissioningServer.ts:118-141`; the
+  hook fires outside `o.mu` in both handlers; fix 4
+  `OtaSoftwareUpdateProviderServer.ts:417-430`, `:444-464` exact; fix 5
+  `OtaSoftwareUpdateRequestorServer.ts:376-420`, `:423-442`, `:568-582`,
+  `OtaTest.ts:533`. The by_design candidates' citations verified
+  (`MeasurementServersTest.ts:33`, `:44`, `:53`; `PowerSourceServer.ts:23`,
+  `DescriptorServer.ts:91-111`; `CommodityTariffServerTest.ts:50`, `:69`;
+  `PhysicalDeviceProperties.ts:24`).
+- Question 1: the three by_design entries as proposed —
+  `BD-Matter-Measurement-StatedRange`, `BD-Matter-PowerSource-DeviceTypeOnPart`,
+  the CommodityTariff bullet of `BD-chip-Commodity-ServerChoices`. The
+  measurement ranges stay as L01-D06/D07 settled them: null ranges would
+  change the value of every bridged sensor for no host that states a range.
+- Question 2: one observer. matter.js has one `fabricsChanged` for the
+  "updated" fabric, and the host reads the fabric as the store holds it
+  either way. The fail-safe difference (matter.js defers a change of the
+  fail-safe's own fabric, `CommissioningServer.ts:118-127`; the Go hook
+  fires at once) is the facade's standing shape — `OnFabricAdded` fires at
+  AddNOC and the rollback is an `OnFabricRemoved` — and needs no entry.
+- Question 3: the controller-side SoftwareUpdateManager is milestone 5
+  phase 25 ("the rest of OTA push from the controller", `docs/roadmap.md`),
+  the RebootResubscribeArmer phase 24; the findings entry names it.
+- Question 4: SU/2.2's one failure is a one-off (the rerun passed, the
+  CASE initiator and the resolver did not move); no findings entry.
+- The requestor's answered-at-once announcement is a divergence and has
+  its entry: `BD-Matter-OTARequestor-AnnouncementAnsweredAtOnce`.
+- The other decisions stand (queryImage Case B and Sessions :27 counted
+  ported on their device half; CommissioningWindow on the reference
+  controller's helpers; Measurement and PowerSource `partial` on their
+  by_design tests; "controller-side" as a reason class).
