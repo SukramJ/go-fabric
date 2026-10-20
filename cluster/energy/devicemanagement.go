@@ -121,8 +121,14 @@ const (
 // [NopDemManager] for the same. A hook's error fails the command as the
 // delegate fails it (FAILURE).
 //
-// The hooks are called with the server's state lock held, as chip calls
-// them from within the delegate: they must not call the server.
+// The hooks are called with the server's command queue held and its state
+// lock released (ADR 0026 P6): a hook may call the state setters
+// (SetEsaState, SetForecast, SetAbsMinPower, SetAbsMaxPower,
+// SetPowerAdjustmentCapability) and the reads, but not SetOptOutState or
+// a command, which wait for the queue. A state the hook sets is then
+// overwritten by what the command itself records after it: the command
+// wins the overlap, as for the other servers with a host port (by_design
+// BD-Matter-HostPort-OutsideTheSetterLock).
 type DemManager interface {
 	// ApproxEnergyDuringSession is the PowerAdjustEnd event's EnergyUse,
 	// in mWh (DelegateImpl.cpp:322-329).
@@ -229,8 +235,13 @@ type DeviceEnergyManagementServer struct {
 	now     func() time.Time
 	clock   clock.Clock // the timers' clock
 
-	// mu serialises the delegate state, as chip's single-threaded stack
-	// does; it is held across the manager hooks (see [DemManager]).
+	// op is the command queue: the commands, the two timers' expiries,
+	// SetOptOutState and Close take it first, so they run one at a time as
+	// on chip's single-threaded stack, and it is held across the manager
+	// hooks. The host never takes it.
+	op sync.Mutex
+	// mu guards the delegate state below; it is released across every
+	// manager hook (hook), so the hook may call the state setters.
 	mu                    sync.Mutex
 	endpoint              uint16
 	powerAdjustInProgress bool
@@ -406,6 +417,8 @@ func (s *DeviceEnergyManagementServer) SetForecast(f *Forecast) error {
 // cause UserOptOut; a forecast adjusted for an opted-out cause returns to
 // InternalOptimization.
 func (s *DeviceEnergyManagementServer) SetOptOutState(state OptOutState) error {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	old := s.OptOutState()
@@ -576,6 +589,8 @@ func (s *DeviceEnergyManagementServer) powerAdjustRequest(ctx context.Context, f
 	if err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkOptOut(r.Cause); err != nil { // :332
@@ -610,7 +625,7 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 		generateEvent = true
 		s.powerAdjustStartUtc = s.nowEpoch()
 	}
-	if err := s.manager.PowerAdjust(ctx, r.Power, r.Duration, r.Cause); err != nil { // :125-132
+	if err := s.hook(func() error { return s.manager.PowerAdjust(ctx, r.Power, r.Duration, r.Cause) }); err != nil { // :125-132
 		return demFailure("PowerAdjustRequest: %v", err)
 	}
 	if err := s.setLocked(dem.AttrEsaState, EsaStatePowerAdjustActive); err != nil { // :134
@@ -650,6 +665,8 @@ func (s *DeviceEnergyManagementServer) stopPauseTimerLocked() {
 // powerAdjustExpired is HandlePowerAdjustTimerExpiry (DelegateImpl.cpp:
 // 222-241).
 func (s *DeviceEnergyManagementServer) powerAdjustExpired() {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.powerAdjustInProgress {
@@ -660,16 +677,18 @@ func (s *DeviceEnergyManagementServer) powerAdjustExpired() {
 	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
 	_ = s.setCapabilityCauseLocked(dem.PowerAdjustReasonNoAdjustment)
 	_ = s.powerAdjustEndLocked(dem.CauseNormalCompletion)
-	_ = s.manager.PowerAdjustCompleted()
+	_ = s.hook(s.manager.PowerAdjustCompleted)
 }
 
 // powerAdjustEndLocked is GeneratePowerAdjustEndEvent (DelegateImpl.cpp:
 // 304-339).
 func (s *DeviceEnergyManagementServer) powerAdjustEndLocked(cause DemCause) error {
+	var energy int64
+	_ = s.hook(func() error { energy = s.manager.ApproxEnergyDuringSession(); return nil })
 	return s.emitLocked(dem.EventPowerAdjustEnd, dem.PowerAdjustEndEvent{
 		Cause:     cause,
 		Duration:  s.nowEpoch() - s.powerAdjustStartUtc,
-		EnergyUse: s.manager.ApproxEnergyDuringSession(),
+		EnergyUse: energy,
 	})
 }
 
@@ -681,12 +700,14 @@ func (s *DeviceEnergyManagementServer) cancelPowerAdjustLocked(cause DemCause) e
 	s.powerAdjustInProgress = false
 	_ = s.setCapabilityCauseLocked(dem.PowerAdjustReasonNoAdjustment)
 	_ = s.powerAdjustEndLocked(cause) // :287; its error is overwritten by the hook's (:294)
-	return s.manager.CancelPowerAdjust(cause)
+	return s.hook(func() error { return s.manager.CancelPowerAdjust(cause) })
 }
 
 // cancelPowerAdjustRequest is HandleCancelPowerAdjustRequest (Cluster.cpp:
 // 381-414) over CancelPowerAdjustRequest (DelegateImpl.cpp:255-266).
 func (s *DeviceEnergyManagementServer) cancelPowerAdjustRequest(_ context.Context, _ any) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if st := s.EsaState(); st != EsaStatePowerAdjustActive { // :390
@@ -708,6 +729,8 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkOptOut(r.Cause); err != nil { // :424
@@ -739,8 +762,8 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	f.ForecastUpdateReason = reason
 	f.ForecastId++ // :373
 	savedStart, savedEnd := f.StartTime, f.EndTime
-	f.StartTime, f.EndTime = r.RequestedStartTime, r.RequestedStartTime+duration            // :383-384
-	if herr := s.manager.StartTimeAdjust(ctx, r.RequestedStartTime, r.Cause); herr != nil { // :386-400
+	f.StartTime, f.EndTime = r.RequestedStartTime, r.RequestedStartTime+duration                                            // :383-384
+	if herr := s.hook(func() error { return s.manager.StartTimeAdjust(ctx, r.RequestedStartTime, r.Cause) }); herr != nil { // :386-400
 		// chip restores the times and resets the reason to
 		// InternalOptimization; the incremented ForecastID stays.
 		f.ForecastUpdateReason = dem.ForecastUpdateReasonInternalOptimization
@@ -768,6 +791,8 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 	if err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkOptOut(r.Cause); err != nil { // :530
@@ -805,8 +830,8 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 		generateEvent = true
 		s.pauseInProgress = true
 	}
-	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired) // :443
-	if herr := s.manager.Pause(ctx, r.Duration, r.Cause); herr != nil {                     // :451-460
+	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired)             // :443
+	if herr := s.hook(func() error { return s.manager.Pause(ctx, r.Duration, r.Cause) }); herr != nil { // :451-460
 		s.pauseFailureLocked()
 		return nil, demFailure("PauseRequest: %v", herr)
 	}
@@ -836,6 +861,8 @@ func (s *DeviceEnergyManagementServer) pauseFailureLocked() {
 
 // pauseExpired is HandlePauseRequestTimerExpiry (DelegateImpl.cpp:531-546).
 func (s *DeviceEnergyManagementServer) pauseExpired() {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.pauseInProgress {
@@ -845,7 +872,7 @@ func (s *DeviceEnergyManagementServer) pauseExpired() {
 	s.pauseInProgress = false
 	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
 	_ = s.emitLocked(dem.EventResumed, dem.ResumedEvent{Cause: dem.CauseNormalCompletion})
-	_ = s.manager.PauseCompleted()
+	_ = s.hook(s.manager.PauseCompleted)
 }
 
 // cancelPauseLocked is CancelPauseRequestAndGenerateEvent
@@ -856,7 +883,7 @@ func (s *DeviceEnergyManagementServer) cancelPauseLocked(cause DemCause) error {
 	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
 	s.stopPauseTimerLocked()
 	err := s.emitLocked(dem.EventResumed, dem.ResumedEvent{Cause: cause})
-	if herr := s.manager.CancelPause(cause); herr != nil {
+	if herr := s.hook(func() error { return s.manager.CancelPause(cause) }); herr != nil {
 		return herr
 	}
 	return err
@@ -865,6 +892,8 @@ func (s *DeviceEnergyManagementServer) cancelPauseLocked(cause DemCause) error {
 // resumeRequest is HandleResumeRequest (Cluster.cpp:596-616) over
 // ResumeRequest (DelegateImpl.cpp:622-646).
 func (s *DeviceEnergyManagementServer) resumeRequest(_ context.Context, _ any) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if st := s.EsaState(); st != EsaStatePaused { // :604
@@ -903,6 +932,8 @@ func (s *DeviceEnergyManagementServer) modifyForecastRequest(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkOptOut(r.Cause); err != nil { // :626
@@ -935,7 +966,7 @@ func (s *DeviceEnergyManagementServer) modifyForecastRequest(ctx context.Context
 	if f.ForecastId != r.ForecastId { // :672-675
 		return nil, demFailure("ForecastID %d, current %d", r.ForecastId, f.ForecastId)
 	}
-	if herr := s.manager.ModifyForecast(ctx, r.ForecastId, r.SlotAdjustments, r.Cause); herr != nil { // :676-684
+	if herr := s.hook(func() error { return s.manager.ModifyForecast(ctx, r.ForecastId, r.SlotAdjustments, r.Cause) }); herr != nil { // :676-684
 		return nil, demFailure("ModifyForecastRequest: %v", herr)
 	}
 	return nil, s.adjustForecastLocked(f, r.Cause)
@@ -962,6 +993,8 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 	if err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.checkOptOut(r.Cause); err != nil { // :695
@@ -1005,7 +1038,7 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 	if f == nil { // :726-729
 		return nil, demFailure("Forecast is null")
 	}
-	if herr := s.manager.RequestConstraintBasedForecast(ctx, r.Constraints, r.Cause); herr != nil { // :730-738
+	if herr := s.hook(func() error { return s.manager.RequestConstraintBasedForecast(ctx, r.Constraints, r.Cause) }); herr != nil { // :730-738
 		return nil, demFailure("RequestConstraintBasedForecast: %v", herr)
 	}
 	return nil, s.adjustForecastLocked(f, r.Cause)
@@ -1014,6 +1047,8 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 // cancelRequest is HandleCancelRequest (Cluster.cpp:798-826) over
 // CancelRequest (DelegateImpl.cpp:776-798).
 func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f := s.Forecast()
@@ -1027,7 +1062,7 @@ func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any)
 	if err := s.setForecastLocked(f); err != nil {
 		return nil, err
 	}
-	if herr := s.manager.CancelRequest(ctx); herr != nil { // :788-795, Cluster.cpp:820
+	if herr := s.hook(func() error { return s.manager.CancelRequest(ctx) }); herr != nil { // :788-795, Cluster.cpp:820
 		return nil, demFailure("CancelRequest: %v", herr)
 	}
 	return nil, nil
@@ -1046,10 +1081,20 @@ func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
 // Close stops the adjustment and pause timers (chip's destructor,
 // DelegateImpl.cpp:45-53).
 func (s *DeviceEnergyManagementServer) Close() {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopPowerAdjustTimerLocked()
 	s.stopPauseTimerLocked()
+}
+
+// hook calls a manager hook with mu released: the caller holds op and mu,
+// and holds both again when hook returns.
+func (s *DeviceEnergyManagementServer) hook(fn func() error) error {
+	s.mu.Unlock()
+	defer s.mu.Lock()
+	return fn()
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
