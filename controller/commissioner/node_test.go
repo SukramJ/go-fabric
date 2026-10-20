@@ -243,7 +243,7 @@ func TestCommissionTheNode(t *testing.T) {
 	if res.Address != c.fabric.AddressOf(commissionedNode) || res.FabricIndexOnPeer == 0 {
 		t.Fatalf("result %+v", res)
 	}
-	fabrics, err := n.Fabrics(ctx)
+	fabrics, err := n.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("node fabrics %+v (%v)", fabrics, err)
 	}

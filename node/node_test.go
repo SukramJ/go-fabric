@@ -42,7 +42,6 @@ func openDB(t *testing.T, path string) *sql.DB {
 // minimalConfig is the smallest configuration New accepts.
 func minimalConfig(db *sql.DB) node.Config {
 	return node.Config{
-		Network:       node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
 		Commissioning: node.Commissioning{Passcode: testPasscode, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
 		ProductDescription: node.ProductDescription{
 			VendorID: 0xFFF1, ProductID: 0x8001,
@@ -53,6 +52,8 @@ func minimalConfig(db *sql.DB) node.Config {
 		},
 		Store:  node.Store{DB: db},
 		Logger: slog.New(slog.DiscardHandler),
+		// A unit test publishes nothing on the network.
+		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
 	}
 }
 
@@ -448,7 +449,7 @@ func TestPairingCodes(t *testing.T) {
 	if len(qr) < 4 || qr[:3] != "MT:" || len(manual) != 11 {
 		t.Errorf("qr %q manual %q", qr, manual)
 	}
-	if fabrics, err := n.Fabrics(context.Background()); err != nil || len(fabrics) != 0 {
+	if fabrics, err := n.FabricInfos(context.Background()); err != nil || len(fabrics) != 0 {
 		t.Errorf("fabrics %v %v", fabrics, err)
 	}
 	if n.Root().BasicInformation == nil || len(n.Root().Servers()) == 0 {

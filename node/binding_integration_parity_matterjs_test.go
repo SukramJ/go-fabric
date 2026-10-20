@@ -380,7 +380,7 @@ func boundLight(t *testing.T) *boundLightSite {
 	if s.lightEp, ok = s.lightDev.EndpointOf("light:1"); !ok {
 		t.Fatal("the light has no endpoint")
 	}
-	fabrics, err := s.lightDev.Node().Fabrics(parityCtx(t))
+	fabrics, err := s.lightDev.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("light fabrics %v, %v", fabrics, err)
 	}

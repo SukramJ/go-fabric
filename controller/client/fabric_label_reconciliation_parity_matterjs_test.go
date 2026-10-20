@@ -23,7 +23,7 @@ import (
 // deviceFabricLabel is the device's label of its one fabric.
 func (cp *clientPair) deviceFabricLabel(t *testing.T) string {
 	t.Helper()
-	fabrics, err := cp.pair.Device.Node().Fabrics(parityCtx(t))
+	fabrics, err := cp.pair.Device.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("device fabrics %+v, %v", fabrics, err)
 	}

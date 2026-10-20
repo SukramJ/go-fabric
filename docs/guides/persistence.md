@@ -20,11 +20,15 @@ db, err := sql.Open("sqlite", "file:node.db?_pragma=foreign_keys(1)&_pragma=busy
 - Both pragmas go in the DSN. A pragma set with a statement applies to
   one pooled connection only.
 
+`Config.Store.Path` has the node open a file with exactly this DSN
+(modernc.org/sqlite) and close it on `Stop`; `Config.Store.DB` takes a
+handle you opened.
+
 `node.New` applies the device schemas (`store.Apply` and
-`sqlitestore.Apply`) to `Config.Store.DB` on every boot. Both scripts are
+`sqlitestore.Apply`) to the database on every boot. Both scripts are
 idempotent.
 
-*Source: `examples/reference-bridge/persist.go:24-60`, `store/doc.go:8-36`, `node/node.go:300-317`.*
+*Source: `node/store_path.go`, `store/doc.go:8-36`, `node/node.go` (`openStores`).*
 
 ## The device database
 

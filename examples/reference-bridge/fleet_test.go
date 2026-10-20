@@ -226,11 +226,6 @@ func testNode(t *testing.T, f *fleet, path string) *node.Node {
 func testNodeWith(t *testing.T, f *fleet, path string, edit func(*node.Config)) *node.Node {
 	t.Helper()
 	logger := slog.New(slog.DiscardHandler)
-	db, err := openDB(context.Background(), path)
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
 	applier := &otaApplier{
 		vendorID: testVendorID, productID: testProductID,
 		dir: filepath.Join(filepath.Dir(path), "ota"), logger: logger,
@@ -239,8 +234,9 @@ func testNodeWith(t *testing.T, f *fleet, path string, edit func(*node.Config)) 
 	if err != nil {
 		t.Fatalf("NewActions: %v", err)
 	}
-	cfg := nodeConfig(flags{listen: "127.0.0.1:0", label: "fleet-test", salt: "go-fabric-ref-salt", iterations: 1000},
-		20202021, 3840, matterbridge.TCPConfig{}, db, nil, applier, actions, logger)
+	// advertise is false: the node publishes nothing (Network.MDNS.Disabled).
+	cfg := nodeConfig(flags{dbPath: path, listen: "127.0.0.1:0", label: "fleet-test", salt: "go-fabric-ref-salt", iterations: 1000},
+		20202021, 3840, node.TCPConfig{}, applier, actions, logger)
 	if edit != nil {
 		edit(&cfg)
 	}

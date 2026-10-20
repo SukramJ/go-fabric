@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
@@ -22,7 +21,6 @@ import (
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -48,8 +46,10 @@ type Config struct {
 	// Store is where the node keeps its fabrics, credentials, ACL, groups,
 	// subscriptions, settings and endpoint numbers.
 	Store Store
-	// Advertiser publishes the node over DNS-SD; nil is mdns.NewNoop(),
-	// as bridge.New treats a nil advertiser. [Node.Stop] closes it.
+	// Advertiser publishes the node over DNS-SD. nil is the node's own:
+	// mdns.Zeroconf with the subtype responder, configured by
+	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
+	// closes it, the host's as the node's.
 	Advertiser mdns.Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
@@ -91,6 +91,8 @@ type Config struct {
 	// write (GroupsServer.ts). The facade loads it (groups.Manager.Load)
 	// and attaches it; nil builds one over the credential store, which
 	// [Node.Groups] returns for a host that binds its assembler after New.
+	// An advanced seam (docs/guides/advanced-seams.md): a host with the
+	// facade's own assembler leaves it nil.
 	Groups *groups.Manager
 	// Topology, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
@@ -101,7 +103,7 @@ type Config struct {
 	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
-	Topology bridge.Snapshotter
+	Topology Snapshotter
 	// EndpointPersistence, when set, replaces the facade's own scene and
 	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
 	// node's store) in the facade's assembler and [Aggregator], for a host
@@ -153,6 +155,12 @@ type Config struct {
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
 	Client Client
+	// BootID selects the development rotation of UniqueIDs ([BootID]); the
+	// zero value keeps every UniqueID stable across restarts.
+	BootID BootID
+	// Health runs the node's health probe ([Health], [Node.Health]); the
+	// zero value runs none.
+	Health Health
 	// Observers are the host's callbacks on fabric and commissioning
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.
@@ -170,6 +178,22 @@ type Config struct {
 	Clock clock.Clock
 }
 
+// BootID is the per-boot UniqueID rotation of package bootid, a
+// development aid: with RotateUniqueIDs every UniqueID the module derives
+// — the root's BasicInformation UniqueID and every bridged endpoint's —
+// mixes in a salt drawn once per process, so a controller sees a new
+// bridge on every start (bootid.EnableRotation). Rotation is process-wide
+// and stays on for the life of the process, for every node in it; a boot
+// under rotation pins nothing in the store, so the next boot without it
+// serves the UniqueID pinned before. Never set it in production: Apple
+// Home and Google Home recognise a bridge's accessories by their
+// UniqueIDs across restarts.
+type BootID struct {
+	// RotateUniqueIDs enables the rotation; [New] enables it before it
+	// derives the root's UniqueID.
+	RotateUniqueIDs bool
+}
+
 // Network is matter.js `network` for the keys the daemon uses
 // (NetworkServer.ts:202-222: port and listening address, ipv4, tcp).
 type Network struct {
@@ -183,7 +207,7 @@ type Network struct {
 	// Incoming, tcpClient for Outgoing), so a peer learns it during the
 	// handshake and may open TCP to us — matter.js
 	// ServerNetworkRuntime.ts:355-363.
-	TCP bridge.TCPConfig
+	TCP TCPConfig
 	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
 	// Wi-Fi; the zero value (no Reporter) mounts none. NetworkCommissioning
 	// stays Ethernet-only either way (concept v2 §B.4): the node states the
@@ -209,6 +233,10 @@ type Network struct {
 	// DisableReannounce keeps the re-announce loop off; [Node.TriggerReannounce]
 	// still re-publishes on demand.
 	DisableReannounce bool
+	// MDNS configures the advertiser the node builds when
+	// [Config].Advertiser is nil; the zero value advertises (Zeroconf with
+	// the subtype responder).
+	MDNS MDNS
 }
 
 // DefaultReannounceInterval is the re-announce cadence a zero
@@ -331,9 +359,14 @@ type BasicInformation struct {
 // Store names the node's persistence. With DB the node applies both
 // schemas (store.Apply, sqlitestore.Apply) and opens the two stores on it,
 // as the daemon's openDB does (persist.go:45-60); the caller picks the
-// SQLite driver and owns the handle. Credentials and Endpoints override
-// the stores built from DB, or stand in for it when DB is nil.
+// SQLite driver and owns the handle. With Path the node opens that SQLite
+// file itself and treats it as DB. Credentials and Endpoints override the
+// stores built from DB or Path, or stand in for them when both are unset.
 type Store struct {
+	// Path is a SQLite file the node opens (creating it on first use)
+	// with the pure-Go driver modernc.org/sqlite, foreign keys on and a
+	// 5 s busy timeout; [Node.Stop] closes it. It excludes DB.
+	Path        string
 	DB          *sql.DB
 	Credentials *store.Store
 	Endpoints   endpoint.Store
@@ -341,7 +374,20 @@ type Store struct {
 
 // Attestation is the device attestation material.
 type Attestation struct {
-	// Chain is the DAC, its key and the PAI; nil is the CSA test chain.
+	// Files names a vendor chain on disk; [New] loads it into Chain and
+	// CertificationDeclaration, which it excludes. Files that name
+	// nothing keep the CSA test chain; a chain that does not load fails
+	// New.
+	Files *AttestationFiles
+	// BlockCommissioningOnError keeps a node whose Files do not load
+	// running: it serves the test chain, refuses every commissioning
+	// ([Node.SetCommissioningBlocked] with the load error) and reports the
+	// error in [Node.AttestationError]. Controllers already paired keep
+	// working — attestation is checked only while a controller
+	// commissions. It needs Files.
+	BlockCommissioningOnError bool
+	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
+	// host with a chain of its own (an HSM-held key, say) sets it here.
 	Chain *attestation.Chain
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
@@ -380,34 +426,65 @@ const (
 // enforces too.
 const maxUniqueIDBytes = 32
 
+// validSetupPIN is the one passcode check: the Matter §5.1.1.6 range and
+// the trivially-guessable list.
+func validSetupPIN(pin uint32) bool { return pin <= setupPasscodeMax && setup.IsValidSetupPIN(pin) }
+
+// errSetupPIN is the failure every passcode check reports.
+func errSetupPIN(pin uint32) error {
+	return fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", pin)
+}
+
+// The checks [Config.Validate] and [Node.OpenBasicWindow] share, against
+// the bounds above.
+func checkDiscriminator(d uint16) error {
+	if d > MaxDiscriminator {
+		return fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
+	}
+	return nil
+}
+
+func checkPBKDF(iterations int64, saltLen int) []error {
+	var errs []error
+	if iterations < PBKDFIterationsMin || iterations > PBKDFIterationsMax {
+		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
+	}
+	if saltLen < PBKDFSaltMin || saltLen > PBKDFSaltMax {
+		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
+	}
+	return errs
+}
+
 // Validate holds the checks the daemon applies to its flags
 // (main.go:113-131): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
 // length the SPAKE2+ verifier needs, and the identity the bridge and the
-// assembler refuse to start without.
+// assembler refuse to start without. The bounds are this package's
+// [MaxDiscriminator], [PBKDFIterationsMin], [PBKDFIterationsMax],
+// [PBKDFSaltMin] and [PBKDFSaltMax]; the passcode check is
+// [ValidateSetupPIN] — a host checks its own configuration against them
+// before New.
 func (c *Config) Validate() error {
 	var errs []error
 	cm := c.Commissioning
-	if cm.Discriminator > setup.MaxDiscriminator {
-		errs = append(errs, fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", cm.Discriminator, setup.MaxDiscriminator))
+	if err := checkDiscriminator(cm.Discriminator); err != nil {
+		errs = append(errs, err)
 	}
-	if cm.Passcode > setupPasscodeMax || !setup.IsValidSetupPIN(cm.Passcode) {
-		errs = append(errs, fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", cm.Passcode))
+	if !validSetupPIN(cm.Passcode) {
+		errs = append(errs, errSetupPIN(cm.Passcode))
 	}
-	if cm.PBKDFIterations < spake2.IterationsMin || cm.PBKDFIterations > spake2.IterationsMax {
-		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", cm.PBKDFIterations, spake2.IterationsMin, spake2.IterationsMax))
-	}
-	if len(cm.Salt) < spake2.PBKDFMinSaltSize || len(cm.Salt) > spake2.PBKDFMaxSaltSize {
-		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", len(cm.Salt), spake2.PBKDFMinSaltSize, spake2.PBKDFMaxSaltSize))
-	}
+	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("ProductDescription.VendorID and ProductID must be non-zero"))
 	}
 	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
 		errs = append(errs, errors.New("BasicInformation.NodeLabel must be non-empty"))
 	}
-	if c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil) {
-		errs = append(errs, errors.New("Store needs DB, or both Credentials and Endpoints"))
+	switch {
+	case c.Store.Path != "" && c.Store.DB != nil:
+		errs = append(errs, errors.New("Store takes Path or DB, not both"))
+	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
+		errs = append(errs, errors.New("Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
@@ -417,6 +494,14 @@ func (c *Config) Validate() error {
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	}
+	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
+		errs = append(errs, errors.New("Attestation.Files excludes Chain and CertificationDeclaration"))
+	} else if at.Files == nil && at.BlockCommissioningOnError {
+		errs = append(errs, errors.New("Attestation.BlockCommissioningOnError needs Files"))
+	}
+	if c.Health.Interval < 0 {
+		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
 	}
 	if c.Network.ReannounceInterval < 0 {
 		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))

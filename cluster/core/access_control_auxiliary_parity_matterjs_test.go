@@ -220,7 +220,7 @@ func auxDevice(t *testing.T) *fabrictest.Pair {
 // auxFabric is the device's one fabric index.
 func auxFabric(t *testing.T, p *fabrictest.Pair) uint8 {
 	t.Helper()
-	fabrics, err := p.Device.Node().Fabrics(context.Background())
+	fabrics, err := p.Device.Node().FabricInfos(context.Background())
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %v, %v", fabrics, err)
 	}

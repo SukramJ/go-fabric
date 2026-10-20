@@ -74,9 +74,9 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 }
 
 // onlyFabric is the device's one fabric.
-func onlyFabric(ctx context.Context, t *testing.T, d *fabrictest.Device) store.FabricRecord {
+func onlyFabric(ctx context.Context, t *testing.T, d *fabrictest.Device) node.FabricInfo {
 	t.Helper()
-	fabrics, err := d.Node().Fabrics(ctx)
+	fabrics, err := d.Node().FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("device %d fabrics %+v, %v", d.Index(), fabrics, err)
 	}

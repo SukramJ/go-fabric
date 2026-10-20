@@ -97,7 +97,7 @@ func TestOpenBasicWindowPairsWithItsCredentials(t *testing.T) {
 	if _, err := c.Commission(context.Background()); err != nil {
 		t.Fatalf("Commission with the window's credentials: %v", err)
 	}
-	fabrics, err := n.Fabrics(context.Background())
+	fabrics, err := n.FabricInfos(context.Background())
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("Fabrics() = %+v, %v; want the commissioner's", fabrics, err)
 	}

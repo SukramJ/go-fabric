@@ -15,7 +15,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -403,18 +402,13 @@ var ErrInvalidWindowCredentials = errors.New("node: invalid window credentials")
 // configured commissioning secret.
 func (c *WindowCredentials) validate() error {
 	var errs []error
-	if c.Discriminator > setup.MaxDiscriminator {
-		errs = append(errs, fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", c.Discriminator, setup.MaxDiscriminator))
+	if err := checkDiscriminator(c.Discriminator); err != nil {
+		errs = append(errs, err)
 	}
-	if c.Passcode > setupPasscodeMax || !setup.IsValidSetupPIN(c.Passcode) {
-		errs = append(errs, fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", c.Passcode))
+	if !validSetupPIN(c.Passcode) {
+		errs = append(errs, errSetupPIN(c.Passcode))
 	}
-	if c.Iterations < spake2.IterationsMin || c.Iterations > spake2.IterationsMax {
-		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", c.Iterations, spake2.IterationsMin, spake2.IterationsMax))
-	}
-	if len(c.Salt) < spake2.PBKDFMinSaltSize || len(c.Salt) > spake2.PBKDFMaxSaltSize {
-		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", len(c.Salt), spake2.PBKDFMinSaltSize, spake2.PBKDFMaxSaltSize))
-	}
+	errs = append(errs, checkPBKDF(int64(c.Iterations), len(c.Salt))...)
 	if c.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("timeout %s is negative", c.Timeout))
 	}

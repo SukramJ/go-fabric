@@ -111,6 +111,14 @@ mechanical and guarded by tests that fail on drift.
 
 Everything outside `internal/` is public API under the
 [deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability).
+The facade (`node/`, `device/`, `contract/`, the typed cluster packages,
+`controller/`) is built and reviewed to the principles of
+[ADR 0025](adr/0025-facade-design-principles.md); what stays public below
+it is an advanced seam, documented as such. Every layer behind it is held to
+[ADR 0026](adr/0026-architecture-principles.md).
+
+The layers and their allowed direction are held by `script/archcheck`
+([ADR 0026](adr/0026-architecture-principles.md)).
 
 ## Boundaries that are decisions
 
@@ -121,6 +129,15 @@ Everything outside `internal/` is public API under the
 | Joint Fabric | no matter.js behaviour to mirror at the pin | [ADR 0020](adr/0020-commissioner-and-controller-role.md) |
 | Camera and WebRTC clusters | need a media path in the host | [matter.js comparison](matterjs-comparison.md) |
 | CSA certification | not pursued; certifiability is the goal | [ADR 0011](adr/0011-certifiability-is-a-goal.md) |
+
+The facade is the host's boundary too: a host configures and observes a
+node through `node/` and builds on `device/`, `contract/`, `schema/`,
+`eligibility/` and the `cluster/…` servers. What stays public below it —
+`bridge`, `endpoint`, `store`, `mdns`, `secure/…`, `groups`,
+`im/subscription`, `diagevent` — and what going around the facade costs is
+on [Advanced seams](guides/advanced-seams.md);
+[Migrating to the facade](guides/migrating-to-the-facade.md) maps each
+symbol a host reaches today to its route.
 
 ## How parity is held
 

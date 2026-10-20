@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,10 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -49,9 +47,12 @@ const stopTimeout = 5 * time.Second
 // Node is a Matter node: the bridge, its root and Aggregator endpoints and
 // every port [bridge] documents, wired in the documented order.
 type Node struct {
-	cfg        Config
-	logger     *slog.Logger
-	st         *store.Store
+	cfg    Config
+	logger *slog.Logger
+	st     *store.Store
+	// ownedDB is the handle opened for Config.Store.Path, closed by Stop;
+	// nil for a host's own.
+	ownedDB    *sql.DB
 	groups     *groups.Manager
 	assembler  *endpoint.Assembler
 	br         *bridge.Bridge
@@ -62,11 +63,21 @@ type Node struct {
 	window     *commissioningHost
 	diagRing   *diagevent.Ring
 	advertiser mdns.Advertiser
+	// ownsAdvertiser is set when New built the advertiser (a nil
+	// Config.Advertiser), so a failed New closes it.
+	ownsAdvertiser bool
+	// attestationErr is the load error of Attestation.Files under
+	// BlockCommissioningOnError (attestation.go).
+	attestationErr error
 	// stopReannounce ends the re-announce loop Start began; nil when none
 	// runs (reannounce.go).
 	stopReannounce func()
-	bootReason     uint8
-	persisted      persisted
+	// health is the probe Start began (Config.Health); nil when none runs
+	// (health.go).
+	healthMu   sync.Mutex
+	health     *healthProbe
+	bootReason uint8
+	persisted  persisted
 	// endpoints is the endpoint-level persistence the facade's assembler
 	// and Aggregator use: Config.EndpointPersistence, else persisted.
 	endpoints EndpointPersistence
@@ -103,7 +114,8 @@ type Node struct {
 // port of bridge/bridge.go's package doc attached in its documented order.
 //
 // Nothing is left as a noop except what the configuration omits on
-// purpose: a nil Advertiser publishes nothing (mdns.NewNoop), a nil OTA
+// purpose: a nil Advertiser is the node's own (Zeroconf with the subtype
+// responder, or Noop under Network.MDNS.Disabled), a nil OTA
 // mounts no OTA requestor. The TestEventTrigger enable key is not armed
 // (Root().GeneralDiagnostics.EnableTestEventTriggers is the host's), and
 // SetOnReassembled / SetOnFabricAdded stay the bridge's nil-safe hooks for
@@ -116,22 +128,33 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	attestationErr, err := cfg.resolveAttestation()
+	if err != nil {
+		return nil, err
+	}
+	// Before anything derives a UniqueID (persist.go uniqueID, the
+	// assembler's bridged endpoints).
+	if cfg.BootID.RotateUniqueIDs {
+		enableBootIDRotation()
+	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	if cfg.Advertiser == nil {
-		cfg.Advertiser = mdns.NewNoop()
-	}
 	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
-	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot}
+	n := &Node{
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot,
+		attestationErr: attestationErr,
+	}
 	n.life, n.cancel = context.WithCancel(ctx)
 	ok := false
 	defer func() {
 		if !ok {
-			n.cancel()
+			n.abandon()
 		}
 	}()
+	// A nil advertiser is the node's own (mdns.go).
+	n.resolveAdvertiser()
 
 	// An advertiser that paces its own timers (mdns.Zeroconf) runs them on
 	// the node's clock.
@@ -149,7 +172,6 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if n.endpoints == nil {
 		n.endpoints = n.persisted
 	}
-	var err error
 	// The host's group manager when it supplies one (its assembler mounts
 	// the Groups servers over it), else the facade's own.
 	n.groups = cfg.Groups
@@ -319,13 +341,33 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		}
 		return nil, err
 	}
+	n.blockOnAttestationError(ctx)
 	ok = true
 	return n, nil
+}
+
+// blockOnAttestationError refuses commissioning while the configured
+// chain did not load (Attestation.BlockCommissioningOnError).
+func (n *Node) blockOnAttestationError(ctx context.Context) {
+	if n.attestationErr == nil {
+		return
+	}
+	n.logger.Error("attestation.files", slog.String("err", n.attestationErr.Error()),
+		slog.String("hint", "new commissioning is refused until the files load; paired controllers keep working"))
+	n.SetCommissioningBlocked(ctx, n.attestationErr)
 }
 
 // openStores resolves cfg.Store: the overrides, or the two stores on DB
 // with their schemas applied (persist.go:45-60).
 func (n *Node) openStores(ctx context.Context) error {
+	if path := n.cfg.Store.Path; path != "" {
+		db, err := openStorePath(path)
+		if err != nil {
+			return err
+		}
+		n.ownedDB = db
+		n.cfg.Store.DB = db
+	}
 	sc := n.cfg.Store
 	n.st = sc.Credentials
 	if sc.DB != nil {
@@ -343,6 +385,27 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// abandon releases what a New that failed had begun: the node's
+// lifetime, the advertiser it built and the store file it opened.
+func (n *Node) abandon() {
+	n.cancel()
+	if n.ownsAdvertiser {
+		_ = n.advertiser.Close()
+	}
+	n.closeOwnedDB()
+}
+
+// closeOwnedDB closes the handle the node opened for Store.Path; a no-op
+// for a host's own handle.
+func (n *Node) closeOwnedDB() {
+	if n.ownedDB == nil {
+		return
+	}
+	if err := n.ownedDB.Close(); err != nil {
+		n.logger.Warn("node.store.close", slog.String("err", err.Error()))
+	}
 }
 
 // advertisement is the commissionable record of the node's own window
@@ -577,6 +640,7 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 	n.startGroupSender()
 	n.startReannounce()
+	n.startHealthProbe()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -648,8 +712,9 @@ func (n *Node) Start(ctx context.Context) error {
 // the daemon's shutdown order (main.go:430-450): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the
-// subscription engine, the re-announce loop, the bridge and the
-// advertiser. Stop is idempotent
+// subscription engine, the re-announce loop, the health probe, the
+// bridge, the advertiser and the store the node opened for Store.Path.
+// Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
@@ -685,10 +750,12 @@ func (n *Node) Stop(ctx context.Context) error {
 		n.commissionerControl.Close()
 	}
 	n.stopReannounceLoop()
+	n.stopHealthProbe()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()
+	n.closeOwnedDB()
 	if err != nil {
 		return fmt.Errorf("node: bridge stop: %w", err)
 	}
@@ -711,6 +778,11 @@ func (n *Node) Run(ctx context.Context) error {
 // not cover (ADR 0018 decision 5).
 func (n *Node) Bridge() *bridge.Bridge { return n.br }
 
+// LocalAddr returns the bound `host:port` of the node's operational UDP
+// listener — empty before [Node.Start] and after [Node.Stop]
+// (bridge.Bridge.LocalAddr). It is what the health probe checks.
+func (n *Node) LocalAddr() string { return n.br.LocalAddr() }
+
 // Root returns the root endpoint's servers.
 func (n *Node) Root() *RootClusters { return n.root }
 
@@ -723,13 +795,13 @@ func (n *Node) Aggregator() *Aggregator { return n.agg }
 // CASE session, on which fabric, and when each was last active. The
 // facade owns its lifecycle; a host reads it and leaves closing to the
 // node.
-func (n *Node) Sessions() *operational.Manager { return n.sec.sessions }
+func (n *Node) Sessions() *SessionManager { return n.sec.sessions }
 
 // Subscriptions returns the subscription manager, for a host's
 // diagnostics (subscription.Manager.CountBySession, Active): the
 // subscriptions riding on each session. The facade owns its lifecycle;
 // a host reads it and leaves closing to the node.
-func (n *Node) Subscriptions() *subscription.Manager { return n.sec.subs }
+func (n *Node) Subscriptions() *SubscriptionManager { return n.sec.subs }
 
 // RemoveFabric removes a fabric without a commissioner — a host's revoke
 // or factory reset — exactly as the RemoveFabric command does: the
@@ -745,7 +817,7 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 }
 
 // CommissioningWindow returns the commissioning window.
-func (n *Node) CommissioningWindow() *bridge.CommissioningWindow { return n.br.CommissioningWindow() }
+func (n *Node) CommissioningWindow() *CommissioningWindow { return n.br.CommissioningWindow() }
 
 // SetCommissioningBlocked refuses every new commissioning while err is
 // non-nil — the node's own window (at Start and after the last fabric is
@@ -770,10 +842,34 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 	}
 }
 
-// Fabrics returns the installed fabrics.
+// Fabrics returns the installed fabrics as the store keeps them.
+//
+// Deprecated: use [Node.FabricInfos], which returns the same fabrics as
+// [FabricInfo] without the store's type. Fabrics is removable in v0.11.0.
 func (n *Node) Fabrics(ctx context.Context) ([]store.FabricRecord, error) {
 	return n.st.ListFabrics(ctx)
 }
+
+// FabricInfos returns the installed fabrics in the store's order (by
+// fabric index): index, fabric and node id, root public key, compressed
+// fabric id, vendor and label.
+func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
+	recs, err := n.st.ListFabrics(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FabricInfo, 0, len(recs))
+	for _, rec := range recs {
+		out = append(out, fabricInfoOf(rec))
+	}
+	return out, nil
+}
+
+// UniqueID returns the BasicInformation UniqueID the node serves: the
+// host's [BasicInformation].UniqueID, else the value the node pinned in
+// its store at the first boot (or, with [BootID].RotateUniqueIDs, this
+// boot's value).
+func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built
 // with — the value [Node.Start]'s EmitBootReason reports. The device layer
@@ -802,22 +898,8 @@ func (n *Node) Groups() *groups.Manager { return n.groups }
 // `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
 // daemon prints them (main.go:504-518).
 func (n *Node) PairingCodes() (qr, manual string, err error) {
-	cm, pd := n.cfg.Commissioning, n.cfg.ProductDescription
-	qr, err = setup.QRCode(setup.Payload{
-		VendorID:      pd.VendorID,
-		ProductID:     pd.ProductID,
-		Discriminator: cm.Discriminator,
-		Passcode:      cm.Passcode,
-		DiscoveryCaps: setup.DiscoveryOnIP,
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("node: qr payload: %w", err)
-	}
-	manual, err = setup.ManualCode(cm.Discriminator, cm.Passcode)
-	if err != nil {
-		return "", "", fmt.Errorf("node: manual code: %w", err)
-	}
-	return qr, manual, nil
+	cm := n.cfg.Commissioning
+	return pairingCodes(n.cfg.ProductDescription, cm.Discriminator, cm.Passcode)
 }
 
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic

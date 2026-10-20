@@ -100,7 +100,7 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	n, err := node.New(node.Config{
-		Network:       node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
+		Network:       node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Disabled: true}},
 		Commissioning: node.Commissioning{Passcode: 20202021, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
 		ProductDescription: node.ProductDescription{
 			VendorID: 0xFFF1, ProductID: 0x8001,

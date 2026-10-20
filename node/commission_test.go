@@ -83,15 +83,15 @@ func TestAddNOCCommissionsFreshNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
 	}
-	fabrics, err := n.Fabrics(context.Background())
+	fabrics, err := n.FabricInfos(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(fabrics) != 1 || fabrics[0].FabricID != testFabricID || fabrics[0].NodeID != testNodeID || fabrics[0].FabricIndex != c.FabricIndex() {
 		t.Fatalf("Fabrics() = %+v, want fabric 0x%X node 0x%X index %d", fabrics, testFabricID, testNodeID, c.FabricIndex())
 	}
-	if fabrics[0].CompressedID != c.CompressedFabricID() {
-		t.Errorf("compressed fabric id %X, commissioner derived %X", fabrics[0].CompressedID, c.CompressedFabricID())
+	if fabrics[0].CompressedFabricID != c.CompressedFabricID() {
+		t.Errorf("compressed fabric id %X, commissioner derived %X", fabrics[0].CompressedFabricID, c.CompressedFabricID())
 	}
 	if n.CommissioningWindow().IsOpen() {
 		t.Error("the commissioning window is still open after CommissioningComplete")
@@ -278,7 +278,7 @@ func TestRemoveFabricDropsSession(t *testing.T) {
 	if err != nil || status != 0 {
 		t.Fatalf("RemoveFabric = %d, %v; want NOCResponse OK", status, err)
 	}
-	fabrics, err := n.Fabrics(ctx)
+	fabrics, err := n.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 0 {
 		t.Fatalf("Fabrics() after RemoveFabric = %+v, %v", fabrics, err)
 	}
@@ -337,7 +337,7 @@ func TestRemoveFabricClosesSessionsWithCloseSession(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("read on the invoking session after RemoveFabric = %v, want no answer and no CloseSession", err)
 	}
-	fabrics, err := n.Fabrics(ctx)
+	fabrics, err := n.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 0 {
 		t.Fatalf("Fabrics() after RemoveFabric = %+v, %v", fabrics, err)
 	}

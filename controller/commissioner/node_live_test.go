@@ -49,7 +49,7 @@ func TestCommissionLiveThroughMulticast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
 	}
-	fabrics, err := n.Fabrics(cctx)
+	fabrics, err := n.FabricInfos(cctx)
 	if err != nil || len(fabrics) != 1 || fabrics[0].NodeID != res.Address.NodeID {
 		t.Fatalf("node fabrics %+v (%v)", fabrics, err)
 	}

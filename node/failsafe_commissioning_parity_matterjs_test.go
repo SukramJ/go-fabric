@@ -93,7 +93,7 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 	armed := func(u *fabrictest.Pair) bool { return u.Device.Node().Root().GeneralCommissioning.FailSafeArmed() }
 	fabrics := func(t *testing.T, u *fabrictest.Pair) int {
 		t.Helper()
-		f, err := u.Device.Node().Fabrics(parityCtx(t))
+		f, err := u.Device.Node().FabricInfos(parityCtx(t))
 		if err != nil {
 			t.Fatal(err)
 		}

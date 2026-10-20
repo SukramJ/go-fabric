@@ -256,7 +256,7 @@ func TestRemoveFabricFromHost(t *testing.T) {
 	if err := n.RemoveFabric(ctx, c.FabricIndex()); err != nil {
 		t.Fatalf("RemoveFabric: %v", err)
 	}
-	fabrics, err := n.Fabrics(ctx)
+	fabrics, err := n.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 0 {
 		t.Errorf("fabrics after removal %v (%v), want none", fabrics, err)
 	}
