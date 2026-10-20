@@ -634,6 +634,13 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   `missing` for this. (Milestone 4, a host option: a feature selection
   changes the FeatureMap a controller sees, and the event needs the
   bridge's change observation `booleanStateEvents` has for BooleanState.)
+- **The concentration servers serve NumericMeasurement only.** Every
+  `cluster/measurement` concentration server is bound to the MEA
+  selection (`concentration.go` `concOptions`), and its host port
+  carries a number (`contract.FloatMeasurementSource`), so the
+  LevelIndication feature and its LevelValue cannot be served; two
+  `ConcentrationMeasurementServerTest.ts` cases are `missing` for this.
+  (Milestone 4, a host option and a level source in `contract/`.)
 - **The node's session intervals are not configurable.** matter.js takes
   `sessions.intervals` (idle and active interval, active threshold) into
   the SessionManager's parameters (`SessionsBehaviorTest.ts:15-25`); the

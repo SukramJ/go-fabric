@@ -771,7 +771,7 @@
         "supports level indication mode",
         "supports one value mode with sibling with different value mode"
       ],
-      "reason": "The numeric measurement mode is covered; level indication and mixed value modes on sibling clusters are not.",
+      "reason": "The numeric measurement mode is covered. Missing, M4: findings entry \"The concentration servers serve NumericMeasurement only\": the level indication mode and a sibling in another value mode need the LevelIndication feature, which the Go servers cannot select (cluster/measurement/concentration.go concOptions) and whose LevelValue no host source carries (contract.FloatMeasurementSource).",
       "snapshotSha": "e582be7cccdceef704f23a8cd64ae0d0dcaa1585"
     },
     {

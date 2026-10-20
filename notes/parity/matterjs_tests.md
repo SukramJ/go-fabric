@@ -302,7 +302,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| ConcentrationMeasurementServerTest.ts | 97 | partial | `cluster/measurement:TestCO2ConcentrationServerHappyPath`<br>`cluster/measurement:TestFurtherConcentrationServers` | The numeric measurement mode is covered; level indication and mixed value modes on sibling clusters are not. Missing: “supports level indication mode”; “supports one value mode with sibling with different value mode”. |
+| ConcentrationMeasurementServerTest.ts | 97 | partial | `cluster/measurement:TestCO2ConcentrationServerHappyPath`<br>`cluster/measurement:TestFurtherConcentrationServers` | The numeric measurement mode is covered. Missing, M4: findings entry "The concentration servers serve NumericMeasurement only": the level indication mode and a sibling in another value mode need the LevelIndication feature, which the Go servers cannot select (cluster/measurement/concentration.go concOptions) and whose LevelValue no host source carries (contract.FloatMeasurementSource). Missing: “supports level indication mode”; “supports one value mode with sibling with different value mode”. |
 
 ## node/test/behaviors/descriptor
 
