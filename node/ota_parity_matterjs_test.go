@@ -600,3 +600,121 @@ func TestOtaParityMatterJS(t *testing.T) {
 		}
 	})
 }
+
+// otaBusyConsent is BusyOtaProviderServer (OtaTest.ts:583-598): every
+// query answered Busy with a delayedActionTime of 60 s, the time of each
+// answer recorded. The Go provider answers Busy with the consent port's
+// delay while it obtains a consent the requestor cannot give (OP:269-273),
+// so the port that is always obtaining is its Go form.
+type otaBusyConsent struct {
+	clk interface{ Now() time.Time }
+	mu  sync.Mutex
+	at  []time.Time
+}
+
+func (b *otaBusyConsent) RequestConsent(context.Context, mattercore.OTAPeer, provdef.QueryImageRequest, mattercore.OTAImage) (mattercore.OTAConsentState, time.Duration, error) {
+	b.mu.Lock()
+	b.at = append(b.at, b.clk.Now())
+	b.mu.Unlock()
+	return mattercore.OTAConsentObtaining, 60 * time.Second, nil
+}
+
+func (b *otaBusyConsent) answeredAt() []time.Time {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.at)
+}
+
+// TestOtaBusyParityMatterJS ports the describe "with a provider that
+// answers Busy" (OtaTest.ts:581-705). The first query is the requestor's
+// own, 30 s after its commissioning (#scheduleInitialQuery), as in
+// matter.js.
+func TestOtaBusyParityMatterJS(t *testing.T) {
+	holdSite(t)
+	newBusySite := func(t *testing.T) (*otaSite, *otaBusyConsent) {
+		t.Helper()
+		busy := &otaBusyConsent{clk: clockNow{}}
+		s := newOTASite(t, otaSiteOptions{consent: busy})
+		busy.mu.Lock()
+		busy.clk = s.site.Clock()
+		busy.mu.Unlock()
+		return s, busy
+	}
+	into := func(s *otaSite, state otadef.UpdateStateEnum, count int) func() bool {
+		return func() bool {
+			n := 0
+			for _, e := range s.transitions() {
+				if e.NewState == state {
+					n++
+				}
+			}
+			return n >= count
+		}
+	}
+
+	// :635-660.
+	t.Run("waits in DelayedOnQuery while the retry is armed, and queries again when it is due", func(t *testing.T) {
+		s, busy := newBusySite(t)
+		s.eventually(t, "the second DelayedOnQuery", into(s, otadef.UpdateStateDelayedOnQuery, 2))
+		var states []otadef.UpdateStateEnum
+		for _, e := range s.transitions() {
+			states = append(states, e.NewState)
+		}
+		want := []otadef.UpdateStateEnum{otadef.UpdateStateQuerying, otadef.UpdateStateDelayedOnQuery, otadef.UpdateStateQuerying, otadef.UpdateStateDelayedOnQuery}
+		if !slices.Equal(states, want) {
+			t.Fatalf("transitions %v, want %v", states, want)
+		}
+		at := busy.answeredAt()
+		if len(at) != 2 {
+			t.Fatalf("%d answers, want 2", len(at))
+		}
+		// The provider asked for 60 s; the minimum query interval of 120 s
+		// is longer.
+		if gap := at[1].Sub(at[0]); gap < 120*time.Second || gap > 130*time.Second {
+			t.Errorf("the second query %v after the first, want 120-130 s", gap)
+		}
+	})
+
+	// :662-679.
+	t.Run("gives up on the provider after three Busy retries", func(t *testing.T) {
+		s, busy := newBusySite(t)
+		s.eventually(t, "Idle", into(s, otadef.UpdateStateIdle, 1))
+		if got := len(busy.answeredAt()); got != 4 {
+			t.Fatalf("%d answers, want 4", got)
+		}
+		transitions := len(s.transitions())
+		s.advance(t, 10*time.Minute)
+		if got := len(s.transitions()); got != transitions {
+			t.Errorf("%d transitions after ten more minutes, want %d", got, transitions)
+		}
+		if got := len(busy.answeredAt()); got != 4 {
+			t.Errorf("%d answers after ten more minutes, want 4", got)
+		}
+	})
+
+	// :681-704. updatePossible = false is the requestor's SetUpdatePossible.
+	t.Run("returns to Idle when updates are disabled while it waits", func(t *testing.T) {
+		s, busy := newBusySite(t)
+		s.eventually(t, "DelayedOnQuery", into(s, otadef.UpdateStateDelayedOnQuery, 1))
+		s.requestor().SetUpdatePossible(false)
+		if err := s.site.Settle(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if got := s.updateState(); got != otadef.UpdateStateIdle {
+			t.Fatalf("UpdateState %d, want Idle", got)
+		}
+		transitions := len(s.transitions())
+		s.advance(t, 10*time.Minute)
+		if got := len(s.transitions()); got != transitions {
+			t.Errorf("%d transitions after ten minutes, want %d", got, transitions)
+		}
+		if got := len(busy.answeredAt()); got != 1 {
+			t.Errorf("%d answers, want 1", got)
+		}
+	})
+}
+
+// clockNow is the wall clock, the busy port's until the site's is known.
+type clockNow struct{}
+
+func (clockNow) Now() time.Time { return time.Now() }

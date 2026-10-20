@@ -307,3 +307,29 @@ func TestParityMatterJS_OTAProviderQueryInProgress(t *testing.T) {
 		<-done
 	})
 }
+
+// TestParityMatterJS_OTAProviderDoneClearsConsent ports OtaTest.ts
+// :1403-1435. matter.js adds a consent to the SoftwareUpdateManager and
+// reports Done to it (onOtaStatusChange); the Go provider holds the
+// consent its query recorded (consents, SoftwareUpdateManager.hasConsent)
+// and reaches Done through the NotifyUpdateApplied that reports it.
+func TestParityMatterJS_OTAProviderDoneClearsConsent(t *testing.T) {
+	t.Parallel()
+	t.Run("Done status clears the consent for the completed version", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		if !f.p.hasUpdateConsent(otaTestPeer, 2) {
+			t.Fatal("no consent for the offered version")
+		}
+		if _, err := f.p.MatterInvoke(otaCtx(7), provdef.CmdNotifyUpdateApplied, provdef.NotifyUpdateAppliedRequest{UpdateToken: *r.UpdateToken, SoftwareVersion: 2}); err != nil {
+			t.Fatal(err)
+		}
+		if f.p.hasUpdateConsent(otaTestPeer, 2) {
+			t.Error("the consent outlived Done")
+		}
+		if d := f.p.detailsForPeer(otaTestPeer, nil); d != nil {
+			t.Errorf("an update stayed in progress: %+v", d)
+		}
+	})
+}
