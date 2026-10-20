@@ -47,8 +47,10 @@ type Config struct {
 	// Store is where the node keeps its fabrics, credentials, ACL, groups,
 	// subscriptions, settings and endpoint numbers.
 	Store Store
-	// Advertiser publishes the node over DNS-SD; nil is mdns.NewNoop(),
-	// as bridge.New treats a nil advertiser. [Node.Stop] closes it.
+	// Advertiser publishes the node over DNS-SD. nil is the node's own:
+	// mdns.Zeroconf with the subtype responder, configured by
+	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
+	// closes it, the host's as the node's.
 	Advertiser mdns.Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
@@ -211,6 +213,10 @@ type Network struct {
 	// DisableReannounce keeps the re-announce loop off; [Node.TriggerReannounce]
 	// still re-publishes on demand.
 	DisableReannounce bool
+	// MDNS configures the advertiser the node builds when
+	// [Config].Advertiser is nil; the zero value advertises (Zeroconf with
+	// the subtype responder).
+	MDNS MDNS
 }
 
 // DefaultReannounceInterval is the re-announce cadence a zero

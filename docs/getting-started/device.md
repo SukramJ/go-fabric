@@ -76,7 +76,7 @@ Defaults worth knowing:
 | Field | Zero value means |
 | --- | --- |
 | `Network.Listen` | `:5540` |
-| `Advertiser` | `mdns.NewNoop()`: nothing is published, so nothing can discover the node |
+| `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Disabled` makes it `mdns.NewNoop()`, and nothing can discover the node |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |

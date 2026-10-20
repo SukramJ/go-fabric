@@ -63,6 +63,9 @@ type Node struct {
 	window     *commissioningHost
 	diagRing   *diagevent.Ring
 	advertiser mdns.Advertiser
+	// ownsAdvertiser is set when New built the advertiser (a nil
+	// Config.Advertiser), so a failed New closes it.
+	ownsAdvertiser bool
 	// stopReannounce ends the re-announce loop Start began; nil when none
 	// runs (reannounce.go).
 	stopReannounce func()
@@ -108,7 +111,8 @@ type Node struct {
 // port of bridge/bridge.go's package doc attached in its documented order.
 //
 // Nothing is left as a noop except what the configuration omits on
-// purpose: a nil Advertiser publishes nothing (mdns.NewNoop), a nil OTA
+// purpose: a nil Advertiser is the node's own (Zeroconf with the subtype
+// responder, or Noop under Network.MDNS.Disabled), a nil OTA
 // mounts no OTA requestor. The TestEventTrigger enable key is not armed
 // (Root().GeneralDiagnostics.EnableTestEventTriggers is the host's), and
 // SetOnReassembled / SetOnFabricAdded stay the bridge's nil-safe hooks for
@@ -127,9 +131,6 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	if cfg.Advertiser == nil {
-		cfg.Advertiser = mdns.NewNoop()
-	}
 	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot}
@@ -137,10 +138,11 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	ok := false
 	defer func() {
 		if !ok {
-			n.cancel()
-			n.closeOwnedDB()
+			n.abandon()
 		}
 	}()
+	// A nil advertiser is the node's own (mdns.go).
+	n.resolveAdvertiser()
 
 	// An advertiser that paces its own timers (mdns.Zeroconf) runs them on
 	// the node's clock.
@@ -360,6 +362,16 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// abandon releases what a New that failed had begun: the node's
+// lifetime, the advertiser it built and the store file it opened.
+func (n *Node) abandon() {
+	n.cancel()
+	if n.ownsAdvertiser {
+		_ = n.advertiser.Close()
+	}
+	n.closeOwnedDB()
 }
 
 // closeOwnedDB closes the handle the node opened for Store.Path; a no-op

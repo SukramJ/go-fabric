@@ -64,7 +64,7 @@ these interfaces does not drag the host's dependencies into the module.
 | Field | What it does | When nil or zero |
 | --- | --- | --- |
 | `Store` | `DB`, or both `Credentials` and `Endpoints` | `New` refuses the configuration |
-| `Advertiser` | publishes the node over DNS-SD | `mdns.NewNoop()`. Nothing is discoverable; the bridge logs `matter.mdns.commissioning_not_advertised` |
+| `Advertiser` | publishes the node over DNS-SD | the node's own `mdns.Zeroconf` with the subtype responder, shaped by `Network.MDNS`; with `Network.MDNS.Disabled` it is `mdns.NewNoop()`: nothing is discoverable, and the bridge logs `matter.mdns.commissioning_not_advertised` |
 | `Attestation` | DAC, PAI and Certification Declaration | the CSA test chain and test CD: pairable everywhere, not shippable |
 | `OTA` (`OtaConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied` |
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |

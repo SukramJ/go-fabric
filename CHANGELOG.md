@@ -20,7 +20,13 @@ Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the 
 - `node`: `Config.Store.Path` — the node opens the SQLite file itself (the pure-Go `modernc.org/sqlite` driver, foreign keys on, a 5 s busy timeout), applies both schemas as for `Store.DB`, and closes it on `Stop`. `Path` and `DB` exclude each other.
 - `node`: `Node.FabricInfos` returns the installed fabrics as `FabricInfo`, which gains `VendorID` and `Label` (from the store's record; the observers' `FabricInfo` carries them too). `Node.UniqueID` returns the BasicInformation UniqueID the node serves.
 - `node`: `Config.Attestation.Files` (`AttestationFiles`: the DAC, its key, the PAI and the CD on disk) — `New` loads the chain with `attestation.LoadChainFiles` into `Chain` and `CertificationDeclaration`; files naming nothing keep the CSA test chain, a chain that does not load fails `New`. `LoadAttestation` is the same load for a host that blocks commissioning on a failure instead; `ErrNoChainConfigured` is the attestation package's value.
+- `node`: `Network.MDNS{Disabled, HostName}` configures the advertiser the node builds for a nil `Config.Advertiser`; `Node.MDNSEnabled`, `Node.MDNSServices` and `Node.DiagnoseMDNS` (`mdns.IsEnabled`, `Active`, `Diagnose` over the node's advertiser; `MDNSService` and `MDNSFinding` alias `mdns.Service` and `mdns.Finding`).
 - `node`: `NewCommissioningCredentials` draws a commissioning secret `Config.Validate` accepts — a random passcode from the valid set, a random discriminator, a random 16-byte salt (`bridge.RandomPasscode`, `RandomDiscriminator`, `RandomSalt`) and the minimum 1000 PBKDF iterations; `Node.PairingCodesFor` returns the QR payload and manual code of a window opened with the host's own `WindowCredentials`.
+
+
+### Changed
+
+- `node`: a nil `Config.Advertiser` advertises: the node builds `mdns.Zeroconf` with the subtype responder (what the reference daemon wired by hand), as a matter.js ServerNode advertises on the IP network unless configured otherwise (`NetworkServer.ts:207-209`, `ServerEnvironment.ts:155`). It used to be `mdns.NewNoop()`, which published nothing; a host that wants that sets `Network.MDNS.Disabled`. Every in-repo `node.Config` already states its advertiser or sets `Disabled` (`fabrictest` sets its own).
 
 ### Deprecated
 

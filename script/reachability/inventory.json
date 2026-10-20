@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5895,
+  "entry_points": 5896,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13285,
-    "reachable": 9222,
-    "whitelisted": 4058,
+    "total_exported": 13289,
+    "reachable": 9223,
+    "whitelisted": 4061,
     "unreachable": 5
   },
   "by_package": [
@@ -24208,6 +24208,20 @@
     },
     {
       "package": "node",
+      "identifier": "MDNSFinding",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/mdns.go",
+      "line": 25
+    },
+    {
+      "package": "node",
+      "identifier": "MDNSService",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/mdns.go",
+      "line": 29
+    },
+    {
+      "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
@@ -24275,6 +24289,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 41
+    },
+    {
+      "package": "node",
+      "identifier": "TestDefaultAdvertiser",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/mdns_internal_test.go",
+      "line": 42
     },
     {
       "package": "node",
