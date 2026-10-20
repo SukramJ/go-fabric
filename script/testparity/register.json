@@ -724,7 +724,7 @@
         "accepts a primary a light supplies without stating the number of primaries",
         "clears the end time the application states on StopMoveStep"
       ],
-      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case (the Go ColorControl server serves no Primary1X … Primary6Intensity attributes, so a light cannot supply one) and the application end time (the Go server keeps no application-stated transitionEndTime, by_design BD-Matter-LevelControl-NativeRamp).",
+      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case, M4: findings entry \"ColorControl serves no primaries\" (no Primary1X … Primary6Intensity attribute, so a light cannot supply one); the application end time, by_design BD-Matter-LevelControl-NativeRamp (the Go server keeps no application-stated transitionEndTime).",
       "snapshotSha": "23c14586e80efe7f245301082deb9ee284a84a97"
     },
     {
@@ -830,7 +830,7 @@
       "missing": [
         "measures the lockout on the monotonic clock"
       ],
-      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {
@@ -881,7 +881,7 @@
       "missing": [
         "keeps the operational time counted across a backward wall-clock step"
       ],
-      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
+      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device. Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the operational time across a wall-clock-only step; clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
       "snapshotSha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330"
     },
     {
@@ -937,7 +937,7 @@
       "missing": [
         "removes a group a wildcard request empties without the Sender feature"
       ],
-      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing: \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it) and has no Listener-only configuration to run it on.",
+      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing, M4: findings entry \"The Groupcast server has no Listener-only configuration\": \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it).",
       "snapshotSha": "dfc099700a300680d98b261fe6752cc1cb8ac073"
     },
     {
@@ -998,7 +998,7 @@
       "missing": [
         "leaves the color temperature where a later command in the transaction overrides the coupling off"
       ],
-      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits.",
+      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing, js-runtime-only: a transaction of several commands committed with its last command's options (matter.js couples once, on the commit; a Go command couples when it commits).",
       "snapshotSha": "69c2d9e69eb27dae9b1d66804e70de1ea276fce6"
     },
     {
@@ -1024,7 +1024,7 @@
       "missing": [
         "lifts the on/off coupling block when its transaction rolls back"
       ],
-      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns.",
+      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). Missing, js-runtime-only: a transaction the caller abandons after the command (rollback); a Go command commits when it returns.",
       "snapshotSha": "189a9755de998ba24ad323fcb6a783e2597842da"
     },
     {
@@ -1038,7 +1038,7 @@
         "reads zero after a stop, although the application stated a remaining time",
         "reads zero after a stop, although the application stated a later end time"
       ],
-      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup.",
+      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. Missing, by_design BD-Matter-LevelControl-NativeRamp: the Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path), so the two cases whose precondition is a remaining time the application states have no Go setup.",
       "snapshotSha": "57ecfbd7a1732693bd794dd7a6003c760ee98384"
     },
     {
@@ -1208,7 +1208,7 @@
       "missing": [
         "refuses a commit whose settled presets an observer stripped the handle from"
       ],
-      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged; the observer case is missing: it rewrites the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have (the host refuses through its PresetStore).",
+      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Missing, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
       "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
     },
     {
@@ -1220,7 +1220,7 @@
       "missing": [
         "seeds from configuration, not from presets a device stored before the accessor existed"
       ],
-      "reason": "The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. The seed case is missing: it plants a value under the attribute's pre-accessor storage key, and the Go server never stored presets anywhere but its PresetStore.",
+      "reason": "The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. Missing, js-runtime-only: a value planted under the attribute's pre-accessor key of matter.js's behavior storage; the Go server never stored presets anywhere but its PresetStore.",
       "snapshotSha": "e95224b86692e0d1e33d3f2b69063b6dd3c87f46"
     },
     {
@@ -1235,7 +1235,7 @@
         "refuses a preset an observer marks built-in after the thermostat issued its handle",
         "validates a change an observer makes after the thermostat normalized"
       ],
-      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's; the four missing cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
+      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Missing, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
       "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
     },
     {

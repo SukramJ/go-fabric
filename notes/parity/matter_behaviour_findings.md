@@ -634,6 +634,12 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   `missing` for this. (Milestone 4, a host option: a feature selection
   changes the FeatureMap a controller sees, and the event needs the
   bridge's change observation `booleanStateEvents` has for BooleanState.)
+- **The Groupcast server has no Listener-only configuration.** The module
+  builds Groupcast with Listener, Sender and PerGroup
+  (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
+  the Sender feature (`ListenerOnlyRootEndpoint`) cannot be configured, so
+  one `GroupcastServerTest.ts` loop case is `missing`. (Milestone 4, a
+  node option.)
 - **The concentration servers serve NumericMeasurement only.** Every
   `cluster/measurement` concentration server is bound to the MEA
   selection (`concentration.go` `concOptions`), and its host port
@@ -781,7 +787,8 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   NumberOfPrimaries are absent from `cluster/light`, so a light cannot
   supply one (ColorControlServerTest "accepts a primary a light supplies
   without stating the number of primaries"). Optional attributes; low.
-  (Milestone 3, when a consumer asks.)
+  (Milestone 4, when a consumer asks; moved from milestone 3 by brief BR,
+  decision 19.4.)
 - **ColorControl `MatterQuiesce` leaves the quieter's pending-report
   timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
   only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held
