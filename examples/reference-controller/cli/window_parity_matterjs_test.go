@@ -86,7 +86,7 @@ func (wp *windowPair) adminFabric() (uint8, bool) {
 // on the device is nodeID.
 func (wp *windowPair) deviceFabric(t *testing.T, nodeID uint64) uint8 {
 	t.Helper()
-	fabrics, err := wp.pair.Device.Node().Fabrics(windowCtx(t))
+	fabrics, err := wp.pair.Device.Node().FabricInfos(windowCtx(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 			return wp.pair.Controller.Registry().Decommission(ctx, wp.node)
 		})
 		if err := wp.site.Eventually(windowCtx(t), "the admin fabric removed", func() bool {
-			fabrics, err := wp.pair.Device.Node().Fabrics(windowCtx(t))
+			fabrics, err := wp.pair.Device.Node().FabricInfos(windowCtx(t))
 			return err == nil && len(fabrics) == 0
 		}); err != nil {
 			t.Fatal(err)
@@ -241,7 +241,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 		otherFabric := wp.deviceFabric(t, op.Address.NodeID)
 		_, _ = fabrictest.Invoke(windowCtx(t), op, im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x003E, Command: 0x0A}, removeFabric(otherFabric))
 		if err := wp.site.Eventually(windowCtx(t), "the other fabric removed", func() bool {
-			fabrics, err := wp.pair.Device.Node().Fabrics(windowCtx(t))
+			fabrics, err := wp.pair.Device.Node().FabricInfos(windowCtx(t))
 			return err == nil && len(fabrics) == 1
 		}); err != nil {
 			t.Fatal(err)

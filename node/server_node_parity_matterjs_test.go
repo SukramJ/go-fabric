@@ -71,7 +71,7 @@ const (
 // fabricIndexOf is the device's index of the pair's fabric.
 func fabricIndexOf(t *testing.T, p *fabrictest.Pair) uint8 {
 	t.Helper()
-	fabrics, err := p.Device.Node().Fabrics(parityCtx(t))
+	fabrics, err := p.Device.Node().FabricInfos(parityCtx(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestServerNodeParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		fabrics := func() int {
-			f, err := u.Device.Node().Fabrics(ctx)
+			f, err := u.Device.Node().FabricInfos(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -179,7 +179,7 @@ func TestServerNodeParity(t *testing.T) {
 			t.Logf("RemoveFabric answered %v (the session goes with the fabric)", err)
 		}
 		if err := site.Eventually(ctx, "the node decommissioned", func() bool {
-			f, err := p.Device.Node().Fabrics(ctx)
+			f, err := p.Device.Node().FabricInfos(ctx)
 			return err == nil && len(f) == 0
 		}); err != nil {
 			t.Fatal(err)
@@ -206,7 +206,7 @@ func TestServerNodeParity(t *testing.T) {
 		p := site.CommissionedPair(fabrictest.PairOptions{})
 		p2 := secondFabric(t, site, p)
 		ctx := parityCtx(t)
-		f, err := p.Device.Node().Fabrics(ctx)
+		f, err := p.Device.Node().FabricInfos(ctx)
 		if err != nil || len(f) != 2 {
 			t.Fatalf("fabrics %+v, %v, want 2", f, err)
 		}
@@ -258,7 +258,7 @@ func TestServerNodeParity(t *testing.T) {
 			t.Logf("RemoveFabric answered %v", err)
 		}
 		if err := site.Eventually(ctx, "the first fabric removed", func() bool {
-			f, err := n.Fabrics(ctx)
+			f, err := n.FabricInfos(ctx)
 			return err == nil && len(f) == 1 && f[0].FabricIndex == second
 		}); err != nil {
 			t.Fatal(err)
@@ -289,7 +289,7 @@ func TestServerNodeParity(t *testing.T) {
 				t.Logf("RemoveFabric answered %v", err)
 			}
 			if err := site.Eventually(ctx, "the first fabric removed", func() bool {
-				f, err := p.Device.Node().Fabrics(ctx)
+				f, err := p.Device.Node().FabricInfos(ctx)
 				return err == nil && len(f) == 1
 			}); err != nil {
 				t.Fatal(err)

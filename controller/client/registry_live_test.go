@@ -323,7 +323,7 @@ func TestLiveRegistry(t *testing.T) {
 	if got := ownFabricLabel(ctx, t, n); got != "renamed" {
 		t.Fatalf("the device's label after the reconciliation %q", got)
 	}
-	fabrics, err := lv.node.Fabrics(ctx)
+	fabrics, err := lv.node.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 || fabrics[0].Label != "renamed" {
 		t.Fatalf("the device's store: %+v %v", fabrics, err)
 	}
@@ -381,7 +381,7 @@ func TestLiveRegistry(t *testing.T) {
 	if err := r2.Decommission(ctx, n2); err != nil {
 		t.Fatalf("Decommission: %v", err)
 	}
-	if fabrics, err := lv.node.Fabrics(ctx); err != nil || len(fabrics) != 0 {
+	if fabrics, err := lv.node.FabricInfos(ctx); err != nil || len(fabrics) != 0 {
 		t.Fatalf("the device's fabrics after the decommission %+v %v", fabrics, err)
 	}
 	if len(r2.Commissioned()) != 0 || r2.Size() != 0 || lr.set.Get(addr) != nil {

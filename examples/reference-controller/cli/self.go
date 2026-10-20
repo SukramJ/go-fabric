@@ -169,7 +169,7 @@ func (s *stack) ensureSelf(ctx context.Context) (*selfNode, error) {
 
 // fabricIndex is the index of our fabric in the own node's fabric table.
 func (sn *selfNode) fabricIndex(ctx context.Context, s *stack) (index uint8, ok bool, err error) {
-	fabrics, err := sn.n.Fabrics(ctx)
+	fabrics, err := sn.n.FabricInfos(ctx)
 	if err != nil {
 		return 0, false, err
 	}

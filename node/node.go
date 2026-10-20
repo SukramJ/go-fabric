@@ -804,10 +804,34 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 	}
 }
 
-// Fabrics returns the installed fabrics.
+// Fabrics returns the installed fabrics as the store keeps them.
+//
+// Deprecated: use [Node.FabricInfos], which returns the same fabrics as
+// [FabricInfo] without the store's type. Fabrics is removable in v0.11.0.
 func (n *Node) Fabrics(ctx context.Context) ([]store.FabricRecord, error) {
 	return n.st.ListFabrics(ctx)
 }
+
+// FabricInfos returns the installed fabrics in the store's order (by
+// fabric index): index, fabric and node id, root public key, compressed
+// fabric id, vendor and label.
+func (n *Node) FabricInfos(ctx context.Context) ([]FabricInfo, error) {
+	recs, err := n.st.ListFabrics(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FabricInfo, 0, len(recs))
+	for _, rec := range recs {
+		out = append(out, fabricInfoOf(rec))
+	}
+	return out, nil
+}
+
+// UniqueID returns the BasicInformation UniqueID the node serves: the
+// host's [BasicInformation].UniqueID, else the value the node pinned in
+// its store at the first boot (or, with [BootID].RotateUniqueIDs, this
+// boot's value).
+func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 
 // BootReason returns the GeneralDiagnostics BootReason the node was built
 // with — the value [Node.Start]'s EmitBootReason reports. The device layer

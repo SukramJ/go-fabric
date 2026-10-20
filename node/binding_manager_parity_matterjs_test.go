@@ -232,7 +232,7 @@ func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 		}
 		b.eps = append(b.eps, ep)
 	}
-	fabrics, err := b.dev.Node().Fabrics(parityCtx(t))
+	fabrics, err := b.dev.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %v, %v", fabrics, err)
 	}

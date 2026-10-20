@@ -209,7 +209,7 @@ func TestClientNodeParity(t *testing.T) {
 	t.Run("commissions and initializes endpoints after commissioning and restart", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})
-		fabrics, err := cp.pair.Device.Node().Fabrics(parityCtx(t))
+		fabrics, err := cp.pair.Device.Node().FabricInfos(parityCtx(t))
 		if err != nil || len(fabrics) != 1 {
 			t.Fatalf("device fabrics %v, %v", fabrics, err)
 		}
@@ -338,7 +338,7 @@ func TestClientNodeParity(t *testing.T) {
 		if !errors.Is(err, commissioner.ErrNodeIDConflict) {
 			t.Fatalf("commission with a used node id: %v, want ErrNodeIDConflict", err)
 		}
-		if fabrics, _ := second.Node().Fabrics(parityCtx(t)); len(fabrics) != 0 {
+		if fabrics, _ := second.Node().FabricInfos(parityCtx(t)); len(fabrics) != 0 {
 			t.Fatal("the second device was commissioned")
 		}
 	})
@@ -378,7 +378,7 @@ func TestClientNodeParity(t *testing.T) {
 		if !errors.Is(err, commissioner.ErrNodeIDConflict) {
 			t.Fatalf("commission with a used node id and a wrong passcode: %v, want ErrNodeIDConflict before PASE", err)
 		}
-		if fabrics, _ := second.Node().Fabrics(parityCtx(t)); len(fabrics) != 0 {
+		if fabrics, _ := second.Node().FabricInfos(parityCtx(t)); len(fabrics) != 0 {
 			t.Fatal("the second device was commissioned")
 		}
 	})
@@ -399,10 +399,10 @@ func TestClientNodeParity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f, _ := wrong.Node().Fabrics(parityCtx(t)); len(f) != 0 {
+		if f, _ := wrong.Node().FabricInfos(parityCtx(t)); len(f) != 0 {
 			t.Fatal("the wrong-passcode device was commissioned")
 		}
-		if f, _ := matching.Node().Fabrics(parityCtx(t)); len(f) != 1 {
+		if f, _ := matching.Node().FabricInfos(parityCtx(t)); len(f) != 1 {
 			t.Fatal("the matching device was not commissioned")
 		}
 	})
@@ -464,7 +464,7 @@ func TestClientNodeParity(t *testing.T) {
 		if reg.Size() != 0 {
 			t.Fatalf("registry size %d after the decommission", reg.Size())
 		}
-		if f, _ := cp.pair.Device.Node().Fabrics(parityCtx(t)); len(f) != 0 {
+		if f, _ := cp.pair.Device.Node().FabricInfos(parityCtx(t)); len(f) != 0 {
 			t.Fatal("the device is still commissioned")
 		}
 		if cp.pair.Controller.Peers().Get(addr) != nil {

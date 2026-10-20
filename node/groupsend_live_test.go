@@ -297,7 +297,7 @@ func TestLiveGroupSend(t *testing.T) {
 		t.Fatalf("sender JoinGroup (sender-only): %v", err)
 	}
 
-	fabrics, err := sender.Fabrics(ctx)
+	fabrics, err := sender.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("sender fabrics: %v, %v", fabrics, err)
 	}

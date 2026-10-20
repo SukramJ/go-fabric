@@ -340,7 +340,7 @@ func TestLiveCommissionerControl(t *testing.T) {
 	if rc.Discriminator != win.Discriminator || rc.Request.RequestID != ccRequestID || rc.ResponseTimeout != time.Minute {
 		t.Fatalf("commissioner asked %+v", rc)
 	}
-	fabrics, err := nodeB.Fabrics(ctx)
+	fabrics, err := nodeB.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 2 {
 		t.Fatalf("B's fabrics %+v (%v)", fabrics, err)
 	}

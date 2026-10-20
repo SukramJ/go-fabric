@@ -448,7 +448,7 @@ func TestPairingCodes(t *testing.T) {
 	if len(qr) < 4 || qr[:3] != "MT:" || len(manual) != 11 {
 		t.Errorf("qr %q manual %q", qr, manual)
 	}
-	if fabrics, err := n.Fabrics(context.Background()); err != nil || len(fabrics) != 0 {
+	if fabrics, err := n.FabricInfos(context.Background()); err != nil || len(fabrics) != 0 {
 		t.Errorf("fabrics %v %v", fabrics, err)
 	}
 	if n.Root().BasicInformation == nil || len(n.Root().Servers()) == 0 {

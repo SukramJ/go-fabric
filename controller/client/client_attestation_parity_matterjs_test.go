@@ -112,7 +112,7 @@ func (r *attestationRun) expectCommissioned(t *testing.T) {
 	if r.err != nil {
 		t.Fatalf("commission: %v", r.err)
 	}
-	f, err := r.device.Node().Fabrics(parityCtx(t))
+	f, err := r.device.Node().FabricInfos(parityCtx(t))
 	if err != nil || len(f) != 1 || r.size != 1 {
 		t.Fatalf("device fabrics %d (%v), commissioned peers %d; want 1 and 1", len(f), err, r.size)
 	}

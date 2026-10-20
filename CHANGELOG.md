@@ -18,7 +18,12 @@ Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the 
 - `device`: the aliases `SourceKey` and `AvailabilityProbe`, the types of `Options.StableKey` and `Options.Reachable` (`endpoint.SourceKey`, `endpoint.AvailabilityProbe`).
 - `node`: the health probe — `Config.Health{Interval, OnSample}` runs `bridge.StartHealthProbeWithClock` on the node's clock from `Start` to `Stop` (0 is `DefaultProbeInterval`, 30 s; the zero value runs none), `Node.Health` returns the last `HealthSample` (an alias of `bridge.HealthSample`). `Node.LocalAddr` returns the operational listener's address.
 - `node`: `Config.Store.Path` — the node opens the SQLite file itself (the pure-Go `modernc.org/sqlite` driver, foreign keys on, a 5 s busy timeout), applies both schemas as for `Store.DB`, and closes it on `Stop`. `Path` and `DB` exclude each other.
+- `node`: `Node.FabricInfos` returns the installed fabrics as `FabricInfo`, which gains `VendorID` and `Label` (from the store's record; the observers' `FabricInfo` carries them too). `Node.UniqueID` returns the BasicInformation UniqueID the node serves.
 - `node`: `NewCommissioningCredentials` draws a commissioning secret `Config.Validate` accepts — a random passcode from the valid set, a random discriminator, a random 16-byte salt (`bridge.RandomPasscode`, `RandomDiscriminator`, `RandomSalt`) and the minimum 1000 PBKDF iterations; `Node.PairingCodesFor` returns the QR payload and manual code of a window opened with the host's own `WindowCredentials`.
+
+### Deprecated
+
+- `node`: `Node.Fabrics`, which returns `[]store.FabricRecord`. Use `Node.FabricInfos`. Removable in `v0.11.0`.
 
 ## [0.9.0] — 2026-10-20
 

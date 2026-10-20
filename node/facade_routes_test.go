@@ -4,6 +4,8 @@
 package node_test
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -18,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // The facade's re-exported errors are the bridge's own values.
@@ -127,6 +130,38 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 	}
 	if qr3 != wantQR || manual3 != wantManual {
 		t.Fatalf("PairingCodesFor = %q %q, want %q %q", qr3, manual3, wantQR, wantManual)
+	}
+}
+
+// FabricInfos carries the store record's fields, Label and VendorID
+// included; UniqueID is the value the node pinned in its store.
+func TestFacadeFabricInfosAndUniqueID(t *testing.T) {
+	ctx := context.Background()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "n.db"))))
+	rec := store.FabricRecord{
+		FabricID: 0xFAB, NodeID: 0x1234, RootPublicKey: []byte{4, 1, 2, 3},
+		VendorID: 0xFFF1, Label: "home", CompressedID: [8]byte{1, 2, 3, 4, 5, 6, 7, 8},
+	}
+	idx, err := n.Store().AddFabric(ctx, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	infos, err := n.FabricInfos(ctx)
+	if err != nil || len(infos) != 1 {
+		t.Fatalf("FabricInfos = %+v, %v", infos, err)
+	}
+	want := node.FabricInfo{
+		FabricIndex: idx, FabricID: rec.FabricID, NodeID: rec.NodeID, RootPublicKey: rec.RootPublicKey,
+		CompressedFabricID: rec.CompressedID, VendorID: rec.VendorID, Label: rec.Label,
+	}
+	if got := infos[0]; got.FabricIndex != want.FabricIndex || got.FabricID != want.FabricID || got.NodeID != want.NodeID ||
+		!bytes.Equal(got.RootPublicKey, want.RootPublicKey) || got.CompressedFabricID != want.CompressedFabricID ||
+		got.VendorID != want.VendorID || got.Label != want.Label {
+		t.Fatalf("FabricInfos()[0] = %+v, want %+v", got, want)
+	}
+	stored, found, err := n.Store().GetSetting(ctx, store.SettingUniqueID)
+	if err != nil || !found || stored == "" || n.UniqueID() != stored {
+		t.Fatalf("UniqueID %q, stored %q %v %v", n.UniqueID(), stored, found, err)
 	}
 }
 

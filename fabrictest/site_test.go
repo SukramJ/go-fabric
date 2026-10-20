@@ -93,7 +93,7 @@ func TestCommissionedPair(t *testing.T) {
 	if !p.Commissioned() || !p.Peer.HasSession() {
 		t.Fatal("no CASE session after commissioning")
 	}
-	fabrics, err := p.Device.Node().Fabrics(ctx)
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 || fabrics[0].NodeID != p.Address.NodeID {
 		t.Fatalf("device fabrics %+v, %v", fabrics, err)
 	}

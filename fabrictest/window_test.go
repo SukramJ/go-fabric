@@ -23,7 +23,7 @@ func TestDeviceOpenWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fabrics, err := p.Device.Node().Fabrics(ctx)
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
 	if err != nil || len(fabrics) != 2 {
 		t.Fatalf("fabrics %+v, %v", fabrics, err)
 	}

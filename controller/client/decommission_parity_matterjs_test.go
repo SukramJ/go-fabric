@@ -55,7 +55,7 @@ func (cp *clientPair) decommission(t *testing.T) error {
 // deviceCommissioned is matter.js device.lifecycle.isCommissioned.
 func (cp *clientPair) deviceCommissioned(t *testing.T) bool {
 	t.Helper()
-	f, err := cp.pair.Device.Node().Fabrics(parityCtx(t))
+	f, err := cp.pair.Device.Node().FabricInfos(parityCtx(t))
 	if err != nil {
 		t.Fatal(err)
 	}

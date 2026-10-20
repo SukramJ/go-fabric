@@ -414,12 +414,12 @@ func (d *Device) answers(ctx context.Context, compressedFabricID [8]byte, nodeID
 	if !running || n == nil {
 		return false
 	}
-	fabrics, err := n.Fabrics(ctx)
+	fabrics, err := n.FabricInfos(ctx)
 	if err != nil {
 		return false
 	}
 	for _, f := range fabrics {
-		if f.CompressedID == compressedFabricID && f.NodeID == nodeID {
+		if f.CompressedFabricID == compressedFabricID && f.NodeID == nodeID {
 			return true
 		}
 	}

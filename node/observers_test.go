@@ -143,7 +143,7 @@ func TestObserverOnFabricRemoved(t *testing.T) {
 	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) error {
 		n := ref.Load()
 		ctx := context.Background()
-		fabrics, _ := n.Fabrics(ctx)
+		fabrics, _ := n.FabricInfos(ctx)
 		acl, _ := n.Store().ListACL(ctx, info.FabricIndex)
 		removed <- seen{info: info, fabrics: len(fabrics), acl: len(acl), record: hasOperationalRecord(adv)}
 		return nil

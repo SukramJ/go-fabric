@@ -37,7 +37,7 @@ func TestDeviceMulticastGroups(t *testing.T) {
 		changes = append(changes, c.String())
 	})
 	defer stop()
-	fabrics, err := p.Device.Node().Fabrics(ctx)
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %v, %v", fabrics, err)
 	}
@@ -86,7 +86,7 @@ func TestDeviceGroupSend(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	ctx := testContext(t)
 	p := site.CommissionedPair(fabrictest.PairOptions{})
-	fabrics, err := p.Device.Node().Fabrics(ctx)
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 {
 		t.Fatalf("fabrics %v, %v", fabrics, err)
 	}

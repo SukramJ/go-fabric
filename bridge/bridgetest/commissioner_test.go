@@ -213,7 +213,7 @@ func TestCommissionerSessions(t *testing.T) {
 	if status, err := c.RemoveFabric(ctx, s); err != nil || status != 0 {
 		t.Fatalf("RemoveFabric = %d, %v", status, err)
 	}
-	if fabrics, _ := n.Fabrics(ctx); len(fabrics) != 0 {
+	if fabrics, _ := n.FabricInfos(ctx); len(fabrics) != 0 {
 		t.Errorf("fabrics after RemoveFabric: %+v", fabrics)
 	}
 }

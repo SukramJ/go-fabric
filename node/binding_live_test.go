@@ -414,7 +414,7 @@ func TestLiveBinding(t *testing.T) {
 		}
 		commissioned[id] = cn
 	}
-	fabrics, err := dut.n.Fabrics(ctx)
+	fabrics, err := dut.n.FabricInfos(ctx)
 	if err != nil || len(fabrics) != 1 || fabrics[0].NodeID != bindDUT {
 		t.Fatalf("the DUT's fabrics %+v %v", fabrics, err)
 	}
