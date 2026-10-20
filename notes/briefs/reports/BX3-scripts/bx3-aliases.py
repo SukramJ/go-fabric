@@ -60,6 +60,10 @@ for path in sorted(glob.glob("node/*.go")):
     s = open(path).read()
     t = s
     for rx, rep in rules:
+        # node/root.go keeps *attestation.Chain in the unexported
+        # attestationMaterial: gocritic's unnamedResult flags the alias there
+        if path == "node/root.go" and rep == "AttestationChain":
+            continue
         t = rx.sub(rep, t)
     if t != s:
         cnt = sum(len(rx.findall(s)) for rx, _ in rules)

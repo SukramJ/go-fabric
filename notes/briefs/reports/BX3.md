@@ -72,7 +72,7 @@ names are dotted lower case at run time. `node/commissioning.go:237` (`h.logger.
 ### 2b loggers — 29 of 44 calls, 8 config fields (commit `loggers`)
 
 Each type below stores `log` (resolved at construction with `cmp.Or(cfg.Logger, slog.Default())`) and reads it through a nil-safe
-`logger()` accessor, so a value built without its constructor still logs. One additive field per config, nil is `slog.Default()`:
+`logger()` accessor, so a value built without its constructor still logs (`BridgedDeviceBasicInformation` has none: only its validator logs, from the constructor). One additive field per config, nil is `slog.Default()`:
 
 | Config field | Type | Calls |
 | --- | --- | --- |
@@ -137,14 +137,15 @@ BX2's files are skipped (`cluster/core/messages.go`, `cluster/cover/windowcoveri
 `node/ota.go`, `cluster/core/diagnostic_logs.go`, `bridge/bdx_responder.go`, `fabrictest/*`); the script run on a tree where BX2 has
 landed leaves any mutex that now has a comment alone.
 
-## 4 Facade aliases (G1-6) — 15 aliases, 31 references
+## 4 Facade aliases (G1-6) — 15 aliases, 30 references
 
 `node/facade.go` gains `OTAImageSource`, `OTAConsent`, `OTAConsentState` (the consent interface's result type, added so a host
 can implement `OTAConsent` from `node` alone), `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OtaApplier`, `WiFiReporter`,
 `CommissioningApprover`, `ReverseCommissioner`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`, `DeviceTypeValidationMode`,
-`WindowStatus` (for `wire.WindowStatusSnapshot`) and `AttestationChain` (for `attestation.Chain`). 31 references in `node/*.go`
-(`Config`, `OTAProviderConfig`, `OtaConfig`, `WiFi`, `CommissionerControlConfig`, `Attestation`, `WindowSnapshot`, `root.go`)
-spell the alias; `Aggregator.Remove`, `IncreaseConfigurationVersion(s)` and `EndpointPersistence` spell `device.SourceKey`.
+`WindowStatus` (for `wire.WindowStatusSnapshot`) and `AttestationChain` (for `attestation.Chain`). 30 references in `node/*.go`
+(`Config`, `OTAProviderConfig`, `OtaConfig`, `WiFi`, `CommissionerControlConfig`, `Attestation`, `WindowSnapshot`)
+spell the alias; `attestationMaterial` (unexported) keeps `*attestation.Chain`: gocritic's unnamedResult flags the alias there.
+`Aggregator.Remove`, `IncreaseConfigurationVersion(s)` and `EndpointPersistence` spell `device.SourceKey`.
 `go doc ./node` shows the aliases in those declarations; what still names `cluster/core` there is the seams (`Node.Bridge`,
 `Store`, `Peers`, `Bindings`, `RootClusters`, `CommissionerControl()`, `OTAProvider()`), as the brief says. `docs/guides/advanced-seams.md`:
 two rows (`Peers`, `Bindings`) and the new alias names.

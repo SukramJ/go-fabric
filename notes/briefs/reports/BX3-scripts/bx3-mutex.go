@@ -20,11 +20,11 @@ package main
 
 import (
 	"flag"
-	"go/types"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,7 +97,7 @@ func doFile(path string, apply bool) int {
 		return 0
 	}
 	lines := strings.Split(string(src), "\n")
-	muxes := map[string][]*mu{}        // type -> mutexes without a comment
+	muxes := map[string][]*mu{}              // type -> mutexes without a comment
 	fieldsOf := map[string]map[string]bool{} // type -> field names
 	fieldType = map[string]map[string]string{}
 	for _, d := range file.Decls {

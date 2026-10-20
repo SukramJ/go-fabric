@@ -563,12 +563,3 @@ func (b *BridgedDeviceBasicInformation) SetEndpoint(endpoint uint16) {
 // as GenericSwitch, so the bridge's SetMatterEventEmitter loop in
 // bridge.go (the topology-assembly walk) auto-injects the emitter.
 var _ contract.EventReceiver = (*BridgedDeviceBasicInformation)(nil)
-
-// logger is the BridgedDeviceBasicInformation's logger; a value built without its constructor
-// logs through slog.Default().
-func (b *BridgedDeviceBasicInformation) logger() *slog.Logger {
-	if b.log != nil {
-		return b.log
-	}
-	return slog.Default()
-}

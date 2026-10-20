@@ -135,7 +135,7 @@ struct_append(p, "type BridgedConfig struct {", CFG_DOC % "cluster")
 struct_prepend(p, "type BridgedDeviceBasicInformation struct {\n", FIELD_DOC % ("cluster", "BridgedConfig"))
 ctor(p, "\tb := &BridgedDeviceBasicInformation{\n")
 add_import(p, "cmp")
-append_accessor(p, "b", "BridgedDeviceBasicInformation", "b.log")
+# (no accessor: the validator takes b.log, set by the constructor)
 
 # ---- cluster/thermo ThermostatServer -----------------------------------
 for p in ("cluster/thermo/thermostat_server.go", "cluster/thermo/presets.go"):
