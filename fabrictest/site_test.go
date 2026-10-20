@@ -184,8 +184,14 @@ func TestEventsAndSubscribe(t *testing.T) {
 // controller's retransmissions — stepped on the fake clock — run out; with
 // a delay and duplicates it succeeds; a filter drops one chosen datagram
 // and MRP recovers it.
+//
+// Not parallel (a named flake of gate 1): the full-loss read runs MRP to
+// its last retransmission on the fake clock, one step at a time, and the
+// site moves its clock only while the whole process is quiet (Site.Run),
+// so beside the package's parallel sites under -race every step waits for
+// all of them, against testContext's wall-clock minute. Run before them,
+// it has the process to itself.
 func TestNetworkLossAndDelay(t *testing.T) {
-	t.Parallel()
 	site, p, _, _ := pairWithPlug(t, fabrictest.Options{})
 	ctx := testContext(t)
 	label := rootAttr(basicinfo.ClusterID, basicinfo.AttrNodeLabel)
