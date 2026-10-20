@@ -58,7 +58,9 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
 - `VendorID`, `ProductID` and `NodeLabel` are set;
-- a store is given (see below);
+- a store is given (see below), and not both `Store.Path` and `Store.DB`;
+- `Attestation.Files` is not combined with `Chain` or the CD;
+- `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location;
@@ -77,6 +79,11 @@ Defaults worth knowing:
 | --- | --- |
 | `Network.Listen` | `:5540` |
 | `Advertiser` | the node's own `mdns.Zeroconf` with the subtype responder; `Network.MDNS.Disabled` makes it `mdns.NewNoop()`, and nothing can discover the node |
+| `Network.MDNS` | Zeroconf with the subtype responder, SRV target from the interface's MAC; `Disabled` publishes nothing, `HostName` sets the SRV target |
+| `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
+| `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain) |
+| `Health` | no probe; `Interval` (0 is 30 s) or `OnSample` runs it from `Start` to `Stop`, `Node.Health` returns the last verdict |
+| `BootID.RotateUniqueIDs` | stable UniqueIDs; set, every UniqueID rotates per process (development only, process-wide) |
 | `DeviceTypeValidation` | matter.js's warn mode |
 | `SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `ProductDescription.Name` | `BasicInformation.NodeLabel` |
@@ -177,13 +184,15 @@ its configured attestation chain.
 
 ## Persistence
 
-`Config.Store.DB` is a `*sql.DB` that you open; no library package imports
-a SQLite driver. The quickstart uses `modernc.org/sqlite`, the pure-Go driver the
-module already depends on. `node.New` applies both schemas (fabrics,
+`Config.Store.Path` names a SQLite file the node opens itself with
+`modernc.org/sqlite`, the pure-Go driver the module already depends on, and
+closes on `Stop` — what the reference daemon does. `Config.Store.DB` is a
+`*sql.DB` that you open instead, with a driver of your choice; the store
+packages import none. `node.New` applies both schemas (fabrics,
 credentials, ACL, groups, subscriptions, settings, and endpoint numbers) to
-that handle on every boot; both scripts are idempotent.
+the database on every boot; both scripts are idempotent.
 
-Open the database with `_pragma=foreign_keys(1)` in the DSN. The fabric
+Opening a handle yourself, put `_pragma=foreign_keys(1)` in the DSN. The fabric
 tables cascade-delete through foreign keys, and SQLite ignores those
 silently with the pragma off. The pragma must be in the DSN, not in a
 statement, so that every pooled connection gets it.
@@ -191,7 +200,7 @@ statement, so that every pooled connection gets it.
 The [persistence guide](../guides/persistence.md) lists every table and
 settings key.
 
-*Source: `node/config.go:281-290`, `node/node.go:300-317`, `examples/reference-bridge/persist.go:24-34`.*
+*Source: `node/config.go` (`Store`), `node/store_path.go`, `node/node.go` (`openStores`, `closeOwnedDB`).*
 
 ## Stopping
 
@@ -202,11 +211,12 @@ settings key.
 2. the operational time is stored and the ShutDown event is emitted;
 3. the bindings and client stack close;
 4. PASE, the commissioning window and the CASE reaper stop;
-5. the subscription engine, the group sender, BDX and the re-announce
-   loop stop;
+5. the subscription engine, the group sender, BDX, the re-announce
+   loop and the health probe stop;
 6. the bridge stops (sessions are closed with a CloseSession to each
    peer, then the socket closes and the mDNS records are withdrawn);
-7. the advertiser closes.
+7. the advertiser closes, and the store the node opened for
+   `Store.Path`.
 
 `Stop` is idempotent and safe without `Start`. A stopped node does not
 restart: `Start` after `Stop` returns `node.ErrStopped`. To restart, build a
@@ -227,7 +237,7 @@ of which is something a product would also decide:
   parameters, label and log level. Each flag is checked before the node is
   built.
 - **A vendor attestation chain** read from a directory instead of the test
-  chain.
+  chain (`node.LoadAttestation`).
 - **The OTA requestor** with an applier that validates and keeps the image.
   This is the host's `OtaApplier`.
 - **An Actions server** on the Aggregator, root FixedLabels and two
@@ -239,4 +249,4 @@ of which is something a product would also decide:
   simulated Wi-Fi link and the media devices. None of these belongs in a
   product.
 
-*Source: `examples/reference-bridge/main.go:4-24`, `examples/reference-bridge/main.go:96-145`, `examples/reference-bridge/main.go:147-299`, `examples/reference-bridge/main.go:306-391`, `examples/reference-bridge/persist.go:68-86`.*
+*Source: `examples/reference-bridge/main.go` (`parseFlags`, `checkFlags`, `run`, `nodeConfig`), `examples/reference-bridge/attestation.go`, `examples/reference-bridge/persist.go`.*

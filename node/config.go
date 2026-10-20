@@ -92,6 +92,8 @@ type Config struct {
 	// write (GroupsServer.ts). The facade loads it (groups.Manager.Load)
 	// and attaches it; nil builds one over the credential store, which
 	// [Node.Groups] returns for a host that binds its assembler after New.
+	// An advanced seam (docs/guides/advanced-seams.md): a host with the
+	// facade's own assembler leaves it nil.
 	Groups *groups.Manager
 	// Topology, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
