@@ -128,6 +128,11 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if err := cfg.loadAttestationFiles(); err != nil {
 		return nil, err
 	}
+	// Before anything derives a UniqueID (persist.go uniqueID, the
+	// assembler's bridged endpoints).
+	if cfg.BootID.RotateUniqueIDs {
+		enableBootIDRotation()
+	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}

@@ -154,6 +154,9 @@ type Config struct {
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
 	Client Client
+	// BootID selects the development rotation of UniqueIDs ([BootID]); the
+	// zero value keeps every UniqueID stable across restarts.
+	BootID BootID
 	// Health runs the node's health probe ([Health], [Node.Health]); the
 	// zero value runs none.
 	Health Health
@@ -172,6 +175,22 @@ type Config struct {
 	// servers, OTA, the store's persist loop and the reopen poll. A test
 	// passes a [github.com/SukramJ/go-fabric/clock/clocktest.Fake].
 	Clock clock.Clock
+}
+
+// BootID is the per-boot UniqueID rotation of package bootid, a
+// development aid: with RotateUniqueIDs every UniqueID the module derives
+// — the root's BasicInformation UniqueID and every bridged endpoint's —
+// mixes in a salt drawn once per process, so a controller sees a new
+// bridge on every start (bootid.EnableRotation). Rotation is process-wide
+// and stays on for the life of the process, for every node in it; a boot
+// under rotation pins nothing in the store, so the next boot without it
+// serves the UniqueID pinned before. Never set it in production: Apple
+// Home and Google Home recognise a bridge's accessories by their
+// UniqueIDs across restarts.
+type BootID struct {
+	// RotateUniqueIDs enables the rotation; [New] enables it before it
+	// derives the root's UniqueID.
+	RotateUniqueIDs bool
 }
 
 // Network is matter.js `network` for the keys the daemon uses

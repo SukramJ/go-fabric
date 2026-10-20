@@ -219,6 +219,11 @@ func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 // stored value a host's own pinning flagged "1" (written salted, under
 // rotation) is stale to a boot without rotation, which re-derives, pins
 // and clears the flag — the behaviour before #122 for that case.
+// enableBootIDRotation is bootid.EnableRotation, a variable so a test of
+// Config.BootID observes the call without turning rotation on for its
+// whole process.
+var enableBootIDRotation = bootid.EnableRotation
+
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
 	salt := p.salt
 	if salt == nil {
