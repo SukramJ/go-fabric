@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 79 |
-| partial | 120 |
+| ported | 80 |
+| partial | 119 |
 | planned | 38 |
 | excluded | 87 |
 | total | 324 |
@@ -59,7 +59,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/occupancy-sensing](#nodetestbehaviorsoccupancy-sensing) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/on-off](#nodetestbehaviorson-off) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 0 | 1 | 0 | 0 |
+| [node/test/behaviors/operational-credentials](#nodetestbehaviorsoperational-credentials) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/ota](#nodetestbehaviorsota) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/power-source](#nodetestbehaviorspower-source) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/rvc-operational-state](#nodetestbehaviorsrvc-operational-state) | 1 | 0 | 1 | 0 | 0 |
@@ -404,7 +404,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| OperationalCredentialsServerTest.ts | 360 | partial | `node:TestOperationalCredentialsAddNOCAdminVendor`<br>`node:TestOperationalCredentialsAddNOCCertificateChecks`<br>`node:TestOperationalCredentialsSetVIDVerificationStatementVendor`<br>`node:TestOperationalCredentialsUpdateNOC` | The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry and the refused NOC of another fabric are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). Missing: the two final-fabric-change cases assert the fabricsChanged event "1 updated" (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582), and the Go node raises no fabric event for a label or vendor ID change (Observers.OnFabricUpdated follows UpdateNOC). Missing: ‚Äútreats UpdateFabricLabel as a final fabric change‚Äù; ‚Äútreats SetVIDVerificationStatement as a final fabric change‚Äù. |
+| OperationalCredentialsServerTest.ts | 360 | ported | `node:TestOperationalCredentialsAddNOCAdminVendor`<br>`node:TestOperationalCredentialsAddNOCCertificateChecks`<br>`node:TestOperationalCredentialsSetVIDVerificationStatementVendor`<br>`node:TestOperationalCredentialsUpdateNOC`<br>`node:TestOperationalCredentialsFinalFabricChange` | The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry, the refused NOC of another fabric, and UpdateFabricLabel and SetVIDVerificationStatement under a bare fail-safe reporting the fabric "updated" at once (fix: Observers.OnFabricUpdated after either, FabricManager.ts:236-246, CommissioningServer.ts:118-141) are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). |
 
 ## node/test/behaviors/ota
 

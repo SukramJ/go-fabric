@@ -1083,18 +1083,15 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "node:TestOperationalCredentialsAddNOCAdminVendor",
         "node:TestOperationalCredentialsAddNOCCertificateChecks",
         "node:TestOperationalCredentialsSetVIDVerificationStatementVendor",
-        "node:TestOperationalCredentialsUpdateNOC"
+        "node:TestOperationalCredentialsUpdateNOC",
+        "node:TestOperationalCredentialsFinalFabricChange"
       ],
-      "missing": [
-        "treats UpdateFabricLabel as a final fabric change",
-        "treats SetVIDVerificationStatement as a final fabric change"
-      ],
-      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry and the refused NOC of another fabric are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). Missing: the two final-fabric-change cases assert the fabricsChanged event \"1 updated\" (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582), and the Go node raises no fabric event for a label or vendor ID change (Observers.OnFabricUpdated follows UpdateNOC).",
+      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry, the refused NOC of another fabric, and UpdateFabricLabel and SetVIDVerificationStatement under a bare fail-safe reporting the fabric \"updated\" at once (fix: Observers.OnFabricUpdated after either, FabricManager.ts:236-246, CommissioningServer.ts:118-141) are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go).",
       "snapshotSha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b"
     },
     {
