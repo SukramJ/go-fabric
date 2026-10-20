@@ -6,8 +6,8 @@ package device
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -23,7 +23,7 @@ func TestTypedAccessors(t *testing.T) {
 		t.Fatal(err)
 	}
 	lc := d.LevelControl()
-	if _, generated := lc.Underlying().(*spec.Server); !generated || lc.Underlying() != d.Server(levelcontroldef.ClusterID) {
+	if _, selfHeld := lc.Underlying().(*levelcontrol.Server); !selfHeld || lc.Underlying() != d.Server(levelcontroldef.ClusterID) {
 		t.Errorf("LevelControl over %T", lc.Underlying())
 	}
 	if _, selfHeld := d.OnOff().Underlying().(*onoff.Server); !selfHeld {

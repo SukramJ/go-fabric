@@ -16,6 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -146,7 +147,7 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 		path   im.ConcreteAttributePath
 		change func()
 	}{
-		"onoff.Server Set": {onOffPath, func() { lamp.OnOff().Underlying().(*onoff.Server).Set(true) }},
+		"onoff.Server Set": {onOffPath, func() { _ = lamp.OnOff().Set(onoffdef.Patch{OnOff: new(true)}) }},
 		"host server":      {knobPath, func() { knob.turn(5) }},
 	} {
 		spy := &reportSpy{}

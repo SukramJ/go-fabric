@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
@@ -91,7 +92,7 @@ type demoLight struct {
 	name string
 
 	mu  sync.Mutex
-	srv *onoff.Server
+	srv *onoffdef.Server
 }
 
 func newDemoLight(name string) *demoLight { return &demoLight{name: name} }
@@ -117,7 +118,7 @@ func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, _ := dev.OnOff().Underlying().(*onoff.Server)
+	srv := dev.OnOff()
 	d.mu.Lock()
 	d.srv = srv
 	d.mu.Unlock()
@@ -128,7 +129,7 @@ func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
 }
 
 // server returns the light's OnOff server; nil before [demoLight.device].
-func (d *demoLight) server() *onoff.Server {
+func (d *demoLight) server() *onoffdef.Server {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.srv
@@ -139,26 +140,26 @@ func (d *demoLight) server() *onoff.Server {
 // behavior state.
 func (d *demoLight) setOn(on bool) {
 	if srv := d.server(); srv != nil {
-		srv.Set(on)
+		_ = srv.Set(onoffdef.Patch{OnOff: new(on)})
 	}
 }
 
 // isOn reads the light's OnOff state.
 func (d *demoLight) isOn() bool {
 	srv := d.server()
-	return srv != nil && srv.OnOff()
+	return srv != nil && srv.Get().OnOff
 }
 
 // followOnOff calls changed with the new value whenever the OnOff
 // attribute of srv changes — a command, a countdown that ends, a host
-// [onoff.Server.Set] — through the device's OnChanged hook (matter.js
+// Set — through the device's OnChanged hook (matter.js
 // `events.onOff.onOff$Changed`). The hook runs while the server holds its
 // operation lock: changed may read any server of the endpoint, but must
 // not invoke or Set the OnOff server itself.
-func followOnOff(dev *device.Device, srv *onoff.Server, changed func(on bool)) {
+func followOnOff(dev *device.Device, srv *onoffdef.Server, changed func(on bool)) {
 	dev.OnChanged(onoff.ClusterID, func(attrIDs []uint32) {
 		if slices.Contains(attrIDs, onoff.AttrOnOff) {
-			changed(srv.OnOff())
+			changed(srv.Get().OnOff)
 		}
 	})
 }
@@ -669,7 +670,7 @@ type dimmer struct {
 	// turns it on; nil is the spec's "OnLevel has no effect".
 	onLevel *uint8
 	// onOff is the device's OnOff server; nil before [dimmer.device].
-	onOff *onoff.Server
+	onOff *onoffdef.Server
 }
 
 // Compile-time assertions.
@@ -735,8 +736,8 @@ func (s *dimmer) device(opts device.Options) (*device.Device, error) {
 		}
 		d = sp.Device
 	}
-	srv, ok := d.Server(onoff.ClusterID).(*onoff.Server)
-	if !ok {
+	srv := onoffdef.Wrap(d.Server(onoff.ClusterID))
+	if srv == nil {
 		return nil, fmt.Errorf("%s: no default OnOff server", s.name)
 	}
 	s.mu.Lock()
@@ -758,8 +759,8 @@ func (s *dimmer) publishOnOff(on bool) {
 	s.mu.Lock()
 	srv := s.onOff
 	s.mu.Unlock()
-	if srv != nil && srv.OnOff() != on {
-		srv.Set(on)
+	if srv != nil && srv.Get().OnOff != on {
+		_ = srv.Set(onoffdef.Patch{OnOff: new(on)})
 	}
 }
 

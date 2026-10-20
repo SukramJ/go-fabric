@@ -367,7 +367,9 @@ type Config struct {
 type Server struct {
 	src      LevelSource
 	lighting bool
-	inst     *spec.Instance
+	// featureBits is the advertised FeatureMap: OO, and LT with lighting.
+	featureBits uint32
+	inst        *spec.Instance
 
 	// held is the server's own state when [New] built it; nil over a
 	// host's [LevelSource].
@@ -428,17 +430,27 @@ var (
 
 // NewServer constructs a LevelControl server over the host port in cfg.
 func NewServer(cfg Config) *Server {
-	s := &Server{src: cfg.Source, ext: cfg.DataVersion, lighting: cfg.Lighting}
-	// MinLevel and MaxLevel are "Rev >= v7, O": served at the revision
-	// advertised. OO and OO | LT are conformant selections, so New has
-	// nothing to refuse.
-	s.inst, _ = spec.New(lvldef.Definition, spec.Options{
-		Features:   s.features(),
-		Attributes: []uint32{AttrMinLevel, AttrMaxLevel},
-	})
+	features := featureMap
+	if cfg.Lighting {
+		features |= FeatureLighting
+	}
+	s := newServer(cfg.Source, cfg.DataVersion, features)
 	if cfg.Transitions != nil {
 		s.initEngine(*cfg.Transitions, true)
 	}
+	return s
+}
+
+// newServer is a server over src advertising features — OO and LT, each
+// optional: every subset is a conformant selection, so the instance has
+// nothing to refuse. MinLevel and MaxLevel are "Rev >= v7, O": served at
+// the revision advertised.
+func newServer(src LevelSource, dv *cluster.DataVersionTracker, features uint32) *Server {
+	s := &Server{src: src, ext: dv, lighting: features&FeatureLighting != 0, featureBits: features}
+	s.inst, _ = spec.New(lvldef.Definition, spec.Options{
+		Features:   features,
+		Attributes: []uint32{AttrMinLevel, AttrMaxLevel},
+	})
 	return s
 }
 
@@ -466,12 +478,7 @@ func (s *Server) optionsMask() uint8 {
 }
 
 // features is the advertised FeatureMap.
-func (s *Server) features() uint32 {
-	if s.lighting {
-		return featureMap | FeatureLighting
-	}
-	return featureMap
-}
+func (s *Server) features() uint32 { return s.featureBits }
 
 // tracker returns the active DataVersion counter — the host's when it
 // supplied one, the embedded one otherwise.

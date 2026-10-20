@@ -49,11 +49,14 @@ func (o *typedOnOff) OnMatterAttributesChanged(cb func([]uint32)) func() {
 
 func heldServer(t *testing.T, onOff *typedOnOff) (typed *lvldef.Server, srv *levelcontrol.Server) {
 	t.Helper()
-	cfg := levelcontrol.HeldConfig{Lighting: true, Clock: clocktest.New(time.Unix(0, 0))}
+	cfg := levelcontrol.HeldConfig{Features: levelcontrol.FeatureOnOff | levelcontrol.FeatureLighting, Clock: clocktest.New(time.Unix(0, 0))}
 	if onOff != nil {
 		cfg.OnOff = onOff
 	}
-	srv = levelcontrol.New(cfg)
+	srv, err := levelcontrol.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return lvldef.Wrap(srv), srv
 }
 

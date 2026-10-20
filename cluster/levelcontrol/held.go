@@ -5,6 +5,8 @@ package levelcontrol
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,8 +21,11 @@ import (
 // (packages/node/src/behaviors/level-control/LevelControlServer.ts:772-799,
 // State). It is the device layer's default for LevelControl.
 type HeldConfig struct {
-	// Lighting advertises the LT feature, as [Config.Lighting].
-	Lighting bool
+	// Features is the FeatureMap: [FeatureOnOff] and [FeatureLighting],
+	// each optional (matter.js's LevelControlServer without features is a
+	// device type's LevelControl that couples to no OnOff, a speaker's
+	// volume); [FeatureFrequency] is not served ([ErrFeatures]).
+	Features uint32
 	// CurrentLevel, OnLevel and Options are the values the server starts
 	// with; a nil level is null (matter.js's default for both).
 	CurrentLevel, OnLevel *uint8
@@ -37,7 +42,9 @@ type HeldConfig struct {
 	// [transition.DefaultStepInterval].
 	StepInterval time.Duration
 	// OnOff is the On/Off cluster on the same endpoint, as
-	// [Transitions.OnOff]. When it also reports its changes
+	// [Transitions.OnOff]; without [FeatureOnOff] the server couples to
+	// none (matter.js `this.features.onOff`, LevelControlServer.ts:141,
+	// :558, :729-735). When it also reports its changes
 	// ([contract.AttributeChangeNotifier]), the server follows it: OnOff
 	// turning on moves CurrentLevel to a non-null OnLevel (matter.js
 	// initializeOnOff and handleOnOffChange, :253-255, :658-670).
@@ -55,21 +62,31 @@ type HeldConfig struct {
 // state, as matter.js's LevelControlServer runs them against its own
 // (LevelControlServer.ts:113-147 initialize). A host that owns the level
 // in its device builds the server over its port with [NewServer] instead.
-func New(cfg HeldConfig) *Server {
+func New(cfg HeldConfig) (*Server, error) {
+	if extra := cfg.Features &^ (FeatureOnOff | FeatureLighting); extra != 0 {
+		return nil, fmt.Errorf("%w: 0x%X", ErrFeatures, extra)
+	}
 	h := &heldLevel{options: cfg.Options}
 	h.level, h.levelKnown = levelOf(cfg.CurrentLevel)
 	h.onLevel = clonePtr(cfg.OnLevel)
-	s := NewServer(Config{Source: h, DataVersion: cfg.DataVersion, Lighting: cfg.Lighting})
+	s := newServer(h, cfg.DataVersion, cfg.Features)
 	s.held = h
+	onOff := cfg.OnOff
+	if cfg.Features&FeatureOnOff == 0 {
+		onOff = nil
+	}
 	s.initEngine(Transitions{
-		OnOff: cfg.OnOff, ColorTemperature: cfg.ColorTemperature,
+		OnOff: onOff, ColorTemperature: cfg.ColorTemperature,
 		StepInterval: cfg.StepInterval, Clock: clock.Or(cfg.Clock),
 	}, cfg.ManageTransitions)
-	if n, ok := cfg.OnOff.(contract.AttributeChangeNotifier); ok && n != nil {
+	if n, ok := onOff.(contract.AttributeChangeNotifier); ok && n != nil {
 		s.followOnOff(n)
 	}
-	return s
+	return s, nil
 }
+
+// ErrFeatures: a [HeldConfig] feature selection the server does not serve.
+var ErrFeatures = errors.New("levelcontrol: feature selection not served")
 
 // heldLevel is the [LevelSource] a held server keeps its state in: the
 // level the engine applies and the two writable attributes; the server

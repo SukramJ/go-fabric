@@ -13,7 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 )
@@ -184,7 +184,7 @@ type nativeDimmer struct {
 	// replaced does nothing.
 	ramp uint64
 	// onOff is the light's OnOff server; nil before [nativeDimmer.device].
-	onOff *onoff.Server
+	onOff *onoffdef.Server
 }
 
 // nativeRampStep is the step of the simulated ramp.
@@ -219,7 +219,7 @@ func (d *nativeDimmer) device(opts device.Options) (*device.Device, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, _ := l.OnOff().Underlying().(*onoff.Server)
+	srv := l.OnOff()
 	if srv == nil {
 		return nil, fmt.Errorf("%s: no default OnOff server", d.name)
 	}
@@ -293,8 +293,8 @@ func (d *nativeDimmer) SetOnOff(_ context.Context, on bool) error {
 	d.mu.Lock()
 	srv := d.onOff
 	d.mu.Unlock()
-	if srv != nil && srv.OnOff() != on {
-		srv.Set(on)
+	if srv != nil && srv.Get().OnOff != on {
+		_ = srv.Set(onoffdef.Patch{OnOff: new(on)})
 	}
 	return nil
 }

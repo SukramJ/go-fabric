@@ -36,6 +36,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
@@ -379,7 +380,7 @@ func TestClientSubscribeCacheFabricFilterParity(t *testing.T) {
 		if v := onOffOf(); v != false {
 			t.Fatalf("OnOff %v before the change, want false", v)
 		}
-		cp.light.OnOff().Underlying().(*onoff.Server).Set(true)
+		_ = cp.light.OnOff().Set(onoffdef.Patch{OnOff: new(true)})
 		cp.eventually(t, "the report of OnOff true", func() bool {
 			select {
 			case <-reported:

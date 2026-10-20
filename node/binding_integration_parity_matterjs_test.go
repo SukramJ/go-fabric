@@ -50,6 +50,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	specgroups "github.com/SukramJ/go-fabric/cluster/spec/groups"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -463,7 +464,7 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 // bound endpoint's subscription reports the new value.
 func (s *boundLightSite) switchLight(t *testing.T, on bool) {
 	t.Helper()
-	if err := s.lightDev.Act(func(*node.Node) error { s.light.OnOff().Underlying().(*onoff.Server).Set(on); return nil }); err != nil {
+	if err := s.lightDev.Act(func(*node.Node) error { _ = s.light.OnOff().Set(onoffdef.Patch{OnOff: new(on)}); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	s.sw.eventually(t, "the subscription reports the light", func() bool {
