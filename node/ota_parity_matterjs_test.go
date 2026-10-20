@@ -56,7 +56,7 @@ const otaTestFile = "fff1-8001-v1.ota"
 
 // otaSource is the provider's image catalogue: the test image for a
 // requestor below its version (checkUpdateAvailable, ota-utils.ts
-// :430-452), or none.
+// :483-497, which defers to the provider's default check), or none.
 type otaSource struct {
 	mu      sync.Mutex
 	img     mattercore.OTAImage

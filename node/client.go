@@ -95,9 +95,9 @@ func (n *Node) newClientStack() (*clientStack, error) {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
 	}
 	// The subscriptions a bound peer's interaction opens: matter.js's
-	// ClientNode of a ServerNode's peers subscribes through its interaction
-	// (NetworkClient.ts:168-210, the sustained default subscription), whose
-	// reports reach the environment's ClientSubscriptions.
+	// client node of a server node's peers subscribes through its
+	// interaction (NetworkClient.ts:168-210, the sustained default
+	// subscription); the reports reach the environment's subscriptions.
 	cs.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: n.cfg.Clock, Logger: n.logger})
 	cs.subs.Register(cs.exchanges)
 	if cs.names == nil {

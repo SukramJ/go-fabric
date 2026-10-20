@@ -427,7 +427,7 @@ func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscriptio
 				Endpoint: s.lightEp, Cluster: onoff.ClusterID, Attribute: onoff.AttrOnOff, HasEndpoint: true, HasCluster: true, HasAttribute: true,
 			}},
 			Sustain: true,
-			// The bounds the bound ClientNode asks of a WiFi node: floor 0,
+			// The bounds the bound client node asks by default: floor 0,
 			// ceiling one minute (PhysicalDeviceProperties.ts:13, :24,
 			// :117-129); the Go interaction applies none of its own.
 			MinIntervalFloor:   &floor,

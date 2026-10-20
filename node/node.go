@@ -518,8 +518,9 @@ func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // or SetVIDVerificationStatement changed a fabric under the same
 // operational identity: the facade has nothing to move (no CASE identity,
 // no operational record, no session), the host sees the fabric as the
-// store now holds it. matter.js emits fabricsChanged(index, "updated") for
-// these as for an UpdateNOC (FabricManager.ts:236-246 → CommissioningServer.ts:118-141).
+// store now holds it. matter.js reports these as an "updated" fabric, the
+// fabric's persist emitting its replaced event (FabricManager.ts:236-246),
+// which the node hands on as fabricsChanged (CommissioningServer.ts:118-141).
 func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
 		info, _ := n.fabricInfo(ctx, fabricIndex)

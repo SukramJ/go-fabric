@@ -574,7 +574,7 @@ const ocUpdateFabricLabel uint32 = 0x09
 
 // TestOperationalCredentialsFinalFabricChange ports the describe "while a
 // fail-safe without AddNOC or UpdateNOC is armed"
-// (OperationalCredentialsServerTest.ts:319-366). matter.js's
+// (OperationalCredentialsServerTest.ts:320-359). matter.js's
 // fabricsChanged(index, "updated") is the host's Observers.OnFabricUpdated
 // (fix: a label or vendor ID change reports the fabric,
 // FabricManager.ts:236-246); its captureLog of errors is the node's records

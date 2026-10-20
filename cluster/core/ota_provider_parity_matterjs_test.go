@@ -202,8 +202,8 @@ func TestParityMatterJS_OTAProviderApplyConsentAndToken(t *testing.T) {
 }
 
 // TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
-// :1639-1658: the DelayedActionTime of a Proceed under the provider's apply
-// delay (matter.js State.applyDelay, the ApplyPolicy's delay here). The
+// :1639-1658: what a Proceed sends under the provider's apply delay. The
+// delay is matter.js's State.applyDelay, the ApplyPolicy's here; the
 // RebootResubscribeArmer half is SoftwareUpdateManager's (the register
 // names it).
 func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
