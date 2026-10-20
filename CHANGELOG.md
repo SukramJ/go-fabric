@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `fabrictest`: a device's node runs its client stack on the site. With `node.Client.Enabled` its socket is the device's host address of the in-memory network (port `udp.MatterPort`+1, through the module-internal `internal/nodeseam`) and its DNS-SD cache asks the site, so two devices of one fabric reach each other over CASE; `Device.Peers` is the node's peer set. The client stack's exchanges and peers now run on `node.Config.Clock`.
+
+### Fixed
+
+- `node`: a bound peer's interaction can subscribe. The client stack keeps a subscription registry on its exchanges and hands it, with the node's clock, to the binding manager's interactions, as matter.js's ClientNode of a server node's peers subscribes through its interaction (`NetworkClient.ts:168-210`, the sustained default subscription). `Resolution.Interaction.Subscribe` answered `ErrNoSubscriptions`.
+
 ## [0.8.8] — 2026-10-20
 
 Milestone 3, phase 18d, brief BQ: the behaviour-test port of Binding against matter.js at `862ad75f` — 41 of 47 open cases, group sends on the `fabrictest` multicast model, two fixes the port found. Phase 18 is complete. The test register carries the phase-19 tags of concept v5 Teil F (decisions 19.2 and 19.3): ICD, WebRTC and Thread diagnostics, the validation and endpoint-model files, discovery and DCL each `until` their milestone.

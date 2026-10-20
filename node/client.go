@@ -57,8 +57,11 @@ type clientStack struct {
 	names     *discovery.Names
 	ownNames  bool
 	peers     *peer.Set
-	stop      context.CancelFunc
-	served    chan struct{}
+	// subs is the registry of the subscriptions the node holds on its
+	// peers: a bound peer's interaction subscribes through it.
+	subs   *interaction.Subscriptions
+	stop   context.CancelFunc
+	served chan struct{}
 }
 
 // newClientStack opens the client socket, its exchange manager and the
@@ -91,6 +94,12 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	if err != nil {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
 	}
+	// The subscriptions a bound peer's interaction opens: matter.js's
+	// ClientNode of a ServerNode's peers subscribes through its interaction
+	// (NetworkClient.ts:168-210, the sustained default subscription), whose
+	// reports reach the environment's ClientSubscriptions.
+	cs.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: n.cfg.Clock, Logger: n.logger})
+	cs.subs.Register(cs.exchanges)
 	if cs.names == nil {
 		if cs.names, err = discovery.Open(n.logger); err != nil {
 			return fail(fmt.Errorf("node: client discovery: %w", err))
@@ -119,6 +128,9 @@ func (n *Node) newClientStack() (*clientStack, error) {
 // close releases the client stack: the peers, the exchanges, the socket
 // and a DNS-SD cache the node opened.
 func (cs *clientStack) close(ctx context.Context) {
+	if cs.subs != nil {
+		_ = cs.subs.Close(ctx)
+	}
 	if cs.peers != nil {
 		cs.peers.Close(ctx)
 	}
@@ -172,7 +184,7 @@ func (n *Node) Bindings() *binding.Manager { return n.bindings }
 
 // newBindings builds the binding manager over the node.
 func (n *Node) newBindings() (*binding.Manager, error) {
-	cfg := binding.Config{Topology: nodeTopology{n}, Logger: n.logger, Interaction: interaction.Config{Logger: n.logger}}
+	cfg := binding.Config{Topology: nodeTopology{n}, Logger: n.logger, Interaction: interaction.Config{Logger: n.logger, Clock: n.cfg.Clock}}
 	// A group entry resolves through the node's group sender (brief AN):
 	// the target invokes without an endpoint, suppressResponse forced.
 	cfg.Groups = binding.GroupSenderFunc(func(ctx context.Context, fabricIndex uint8, groupID uint16) (binding.GroupTarget, error) {
@@ -184,6 +196,7 @@ func (n *Node) newBindings() (*binding.Manager, error) {
 	})
 	if n.client != nil {
 		cfg.Peers = n.client.peers
+		cfg.Interaction.Subscriptions = n.client.subs
 	}
 	m, err := binding.New(cfg)
 	if err != nil {
