@@ -199,3 +199,17 @@ if os.path.exists(GOFUMPT):
         "cluster/cover/windowcovering_server.go", "cluster/light/colorcontrol_set.go",
         "cluster/light/colorcontrol_server.go", "transport/udp/listener.go", "mdns/service.go"])
 print("loggers: done")
+
+# the udp test swapped slog.Default() after building the listener; the listener
+# now keeps the logger it was built with, so the test hands it one
+p = "transport/udp/listener_test.go"
+old = '''	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&lockedWriter{mu: &logMu, w: &logBuf}, &slog.HandlerOptions{Level: slog.LevelError})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+'''
+new = '''	// The listener logs through the logger it was built with (Config.Logger,
+	// slog.Default() at construction), so the test hands it one.
+	a.log = slog.New(slog.NewTextHandler(&lockedWriter{mu: &logMu, w: &logBuf}, &slog.HandlerOptions{Level: slog.LevelError}))
+'''
+if old in rd(p):
+    wr(p, rd(p).replace(old, new))
