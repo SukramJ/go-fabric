@@ -1465,9 +1465,47 @@ its first `OnEstablished` handler (manager-wide), and a `Resolution`
 names the target endpoint and the declared client cluster ids beside the
 peer's `*interaction.Interaction` — there is no client node image on
 the device side (ADR 0020 decision 6). Report AO.
+Since brief BQ the manager's set of registered group entries is
+call-time state, as matter.js's `ServerRecord.groups`
+(`BindingManager.ts:119-141` at `862ad75f`): `Register` and `Unregister`
+change it when they are called, the worker only reads it
+(`#isRegisteredGroup`, `:528-532`).
 
 By design. The same order of effects per entry; a host sends through the
 interaction it is handed.
+
+### BD-Matter-BindingManager-CloseEmitsRemoved — `Manager.Close` disposes every server and emits removed
+
+matter.js `BindingManager.close()` clears its queue, its pending and
+dormant maps and its group registrations without emitting anything
+(`BindingManager.ts:663-686` at `862ad75f`); `removed` fires for a live
+binding only through `disposeServer` (`:191-228`), which each
+`BindingServer` calls from its own `[Symbol.asyncDispose]`
+(`BindingServer.ts:160-163`). `binding.Manager.Close` is the node's
+shutdown: it disposes every attached server, emitting removed, and then
+stops the worker; `node.Stop` has no separate per-server disposal. The
+case "close clears queue, pending subscriptions, and maps without
+emitting" stays `missing`. Report BQ.
+
+By design. A host observes the same removals at shutdown as under
+matter.js's node close, where the servers dispose before the manager
+closes; the manager has no life apart from the node.
+
+### BD-Matter-GroupTarget-InvokeOnly — the binding's group target invokes only
+
+matter.js resolves a group binding to a `ClientGroupInteraction`
+(`packages/node/src/node/client/ClientGroupInteraction.ts:33-82` at
+`862ad75f`), which refuses read and subscribe, writes with
+`suppressResponse` forced and refuses a timed or concrete request on the
+way in. `binding.GroupTarget` offers `Invoke(ctx, path, fields)` without
+options and without a response; the refusals (a timed request, an
+endpoint in the path) and the write live on `groups.Sender`
+(`groups/request.go` `Invoke`, `Write`), which the host reaches through
+the node's groups manager. Report BQ.
+
+By design. The target is the group sender narrowed to what a binding
+sends, and a group answers nothing; a host that writes through a group
+uses the sender.
 
 ### BD-Matter-ClientView-RemoteConformance — the client image is judged against the generated device types
 

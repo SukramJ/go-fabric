@@ -130,3 +130,29 @@ BIND 2.1, 2.2 and 2.3 are skipped by the harness as manual cases ("the CHIP test
 - **BD-Matter-BindingManager-CloseEmitsRemoved**: matter.js `BindingManager.close()` clears its maps without emitting (`BindingManager.ts:663-686`). `removed` fires for live bindings only when a server is disposed (`disposeServer` :191-228, called by `BindingServer[Symbol.asyncDispose]` `BindingServer.ts:160-163`). `binding.Manager.Close` does both, disposing every server and then stopping. It is the node's shutdown, and `node.Stop` has no separate per-server disposal. Reasoning: the host observes the same removals at shutdown, and the manager has no life apart from the node.
 - **BD-Matter-BindingManager-Worker** (existing entry, an update): matter.js keeps `ServerRecord.groups` at call time (`BindingManager.ts:119-141`). With fix 8c9d145, the Go manager does the same in `Manager.registered`, while resolutions stay on the worker. The entry's claim that the worker serializes everything should name this one call-time state.
 - **BD-Matter-GroupTarget-InvokeOnly**: matter.js `ClientGroupInteraction` (`ClientGroupInteraction.ts:33-82`) takes timed requests (and refuses them) and also writes. `binding.GroupTarget` offers `Invoke(ctx, path, fields)` only, without options or a response, and the refusals live on `groups.Sender` (`groups/request.go`). Reasoning: the target is the group sender narrowed to what a binding sends, and a group answers nothing.
+
+## Decided in review (2026-10-20)
+
+- Every cited fix line read against the pin: fix 1 `BindingManager.ts:34-44`,
+  `:119-141`, `:191-195`, `:528-532` (the call-time `groups` map,
+  `#isRegisteredGroup`); fix 2 `ClientInteraction.ts:86-95`, `:495-508`
+  (`peerAddressDiagnostic`, the info line of every invoke); the model's
+  `MockUdpSocket.ts:87-97`, `MockNetwork.ts:79-81`; the close case
+  `BindingManager.ts:663-686`, `BindingServer.ts:160-163`;
+  `ClientGroupInteraction.ts:33-82`. All hold.
+- Question 1: the superseded-fabric case stays ported. What Go can show is
+  the observable — a key that reaches the fabric index after the
+  replacement resolves the binding, here over CASE where the sibling
+  provisions locally; the identity of the Fabric object is matter.js
+  runtime. The test's comment says so; no register change.
+- Question 2: yes. The fabrictest node client stack is brief BR's first
+  harness commit (as the multicast model was BP's) and the three
+  default-subscription cases go with it; a findings entry records the gap.
+- The other decisions stand as made: UpdateNOC committed in both
+  replacement cases; "records no cache fabric filter" as no peer, no
+  interaction, no warn line; the shared ClientGroup on two switches; the
+  log record's attributes.
+- by_design: `BD-Matter-BindingManager-CloseEmitsRemoved`,
+  `BD-Matter-GroupTarget-InvokeOnly`; one sentence added to
+  `BD-Matter-BindingManager-Worker`. Findings: the fabrictest client
+  stack, the group write log line.

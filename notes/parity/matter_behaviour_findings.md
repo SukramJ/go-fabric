@@ -621,6 +621,23 @@ Line numbers at `862ad75f`.
   check matter.js has not. (Milestone 3, phase 19; decide together with the
   SetRegulatoryConfig CountryCode item below.)
 
+Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
+Line numbers at `862ad75f`.
+
+- **fabrictest carries no node client stack.** `node/client.go:62-110`
+  opens a kernel socket and its own DNS-SD cache, so two nodes on a site
+  cannot reach each other over CASE; a bound client's default
+  subscription (`BindingIntegrationTest.ts:180-219`, set on the ClientNode
+  by the test; Go: `Resolution.Interaction.Subscribe` with `Sustain`) has
+  no in-process test. Three `BindingIntegrationTest.ts` cases are
+  `missing` for this. (Milestone 3, phase 19: a node seam for the client
+  listener and its names, the fabrictest wiring, then the cases — brief
+  BR's first harness commit, which `TcpSessionBindingTest.ts` needs too.)
+- **A group write leaves no log line.** matter.js logs every write at
+  info (`ClientInteraction.ts:317`); `groups.Sender.Write` logs nothing,
+  where `Invoke` does since BQ (`matter.groups.invoke`). No case asks for
+  it. (Milestone 3, phase 19, with the next `groups/` fix.)
+
 Found by the phase-18a system-set port (brief BN, PR #182, 2026-10-19).
 Line numbers at `862ad75f`.
 
