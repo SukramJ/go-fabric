@@ -6,7 +6,6 @@ package appliance
 import (
 	"fmt"
 	"maps"
-	"reflect"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,7 +41,7 @@ func (s *WasherServer) SetAttributes(values map[uint32]any) error {
 		}
 		switch id {
 		case lwc.AttrSpinSpeeds, lwc.AttrSupportedRinses:
-			if fixed, _ := s.srv.Value(id); !reflect.DeepEqual(v, fixed) {
+			if !s.isConfigured(id, v) {
 				return fmt.Errorf("%w: laundrywashercontrols: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
 			}
 		case lwc.AttrSpinSpeedCurrent:
@@ -76,7 +75,7 @@ func (s *DryerServer) SetAttributes(values map[uint32]any) error {
 		}
 		switch id {
 		case ldc.AttrSupportedDrynessLevels:
-			if fixed, _ := s.srv.Value(id); !reflect.DeepEqual(v, fixed) {
+			if !s.isConfigured(id, v) {
 				return fmt.Errorf("%w: laundrydryercontrols: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
 			}
 		case ldc.AttrSelectedDrynessLevel:
@@ -91,4 +90,36 @@ func (s *DryerServer) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	return s.srv.SetAttributes(values)
+}
+
+// isConfigured reports whether v, a value [spec.Instance.CheckSet]
+// returned for SpinSpeeds or SupportedRinses, is the configured list:
+// compared entry by entry, whether it arrives as the plain slice or in the
+// list form the server stores.
+func (s *WasherServer) isConfigured(id uint32, v any) bool {
+	if id == lwc.AttrSpinSpeeds {
+		got, ok := v.([]string)
+		return ok && slices.Equal(got, s.speeds)
+	}
+	got, ok := listOf[NumberOfRinses](v)
+	return ok && slices.Equal(got, s.rinses)
+}
+
+// isConfigured is [WasherServer.isConfigured] for SupportedDrynessLevels.
+func (s *DryerServer) isConfigured(_ uint32, v any) bool {
+	got, ok := listOf[DrynessLevel](v)
+	return ok && slices.Equal(got, s.levels)
+}
+
+// listOf is a list of T as a host gives it ([]T) or as the server stores
+// it (uintList[T]).
+func listOf[T spec.Unsigned](v any) ([]T, bool) {
+	switch l := v.(type) {
+	case []T:
+		return l, true
+	case uintList[T]:
+		return []T(l), true
+	default:
+		return nil, false
+	}
 }

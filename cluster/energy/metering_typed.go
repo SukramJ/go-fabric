@@ -26,11 +26,12 @@ func (s *CommodityMeteringServer) Set(attrID uint32, value any) error {
 }
 
 // SetAttributes implements [spec.AttributeSetter]: the host's own change,
-// all or nothing, with the rules of [CommodityMeteringServer.SetMaximumMeteredQuantities]
-// (at least 1), [CommodityMeteringServer.SetMeteredQuantity] (no longer
-// than MaximumMeteredQuantities, which it needs; tariff component ids
-// capped at 128) and [CommodityMeteringServer.SetTariffUnit] (inside the
-// enum), on top of the definition's checks.
+// all or nothing, with the rule of [CommodityMeteringServer.SetMeteredQuantity]
+// (no longer than MaximumMeteredQuantities, which it needs) and
+// [CommodityMeteringServer.SetTariffUnit] (inside the enum) on top of the
+// definition's checks, which already refuse a MaximumMeteredQuantities
+// below 1 and more than 128 tariff component ids (constraints "min 1",
+// "max 128").
 func (s *CommodityMeteringServer) SetAttributes(values map[uint32]any) error {
 	ids, checked, err := checkedSet(s.Instance, values)
 	if err != nil {
@@ -41,9 +42,6 @@ func (s *CommodityMeteringServer) SetAttributes(values map[uint32]any) error {
 	maximum, hasMaximum := s.Value(commtr.AttrMaximumMeteredQuantities)
 	if v, set := checked[commtr.AttrMaximumMeteredQuantities]; set {
 		maximum, hasMaximum = v, true
-		if n, ok := v.(uint16); ok && n < meteringMaxMeteredQuantitiesMin {
-			return ErrMeteringMaximum
-		}
 	}
 	for _, id := range ids {
 		v := checked[id]
@@ -65,11 +63,7 @@ func (s *CommodityMeteringServer) SetAttributes(values map[uint32]any) error {
 			}
 			out := make([]MeteredQuantity, len(quantities))
 			for i, q := range quantities {
-				cids := q.TariffComponentIds
-				if len(cids) > meteringMaxTariffComponentIDs {
-					cids = cids[:meteringMaxTariffComponentIDs]
-				}
-				out[i] = MeteredQuantity{TariffComponentIds: append([]uint32{}, cids...), Quantity: q.Quantity}
+				out[i] = MeteredQuantity{TariffComponentIds: append([]uint32{}, q.TariffComponentIds...), Quantity: q.Quantity}
 			}
 			checked[id] = out
 		case commtr.AttrTariffUnit:
