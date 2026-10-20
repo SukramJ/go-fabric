@@ -97,7 +97,8 @@ type inflightLookup struct {
 // identifier: a value is reused while used within the hour, one fill runs
 // per key, a failed fill is not cached.
 type revocationCache struct {
-	s        *CertificateStore
+	s *CertificateStore
+	// mu guards inflight and values.
 	mu       sync.Mutex
 	values   map[string]*cachedLookup
 	inflight map[string]*inflightLookup

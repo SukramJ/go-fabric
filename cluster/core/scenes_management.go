@@ -109,6 +109,7 @@ type SceneInfoStruct struct {
 // the table after every change (the host stores it); LoadScenesState
 // restores one.
 type ScenesState struct {
+	// mu guards info, monitor and table.
 	mu        sync.Mutex
 	table     []SceneEntry
 	info      map[uint8]*SceneInfoStruct

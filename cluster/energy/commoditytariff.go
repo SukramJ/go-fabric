@@ -212,6 +212,7 @@ type CommodityTariffServer struct {
 	srv *spec.Server
 	now func() time.Time
 
+	// mu guards active, assigned and pending.
 	mu sync.Mutex
 	// active is a tariff the current attributes are derived from —
 	// mServerTariffAttrsCtx.mTariffProvider != nullptr (Server.cpp:896-904).

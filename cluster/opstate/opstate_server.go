@@ -440,6 +440,7 @@ type Server struct {
 	countOn  bool
 	quiet    *cluster.Quieter
 
+	// mu guards countdown, currentPhase, emitter, endpoint, opError, phases and state.
 	mu           sync.Mutex
 	state        State
 	opError      ErrorState

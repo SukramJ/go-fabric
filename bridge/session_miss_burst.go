@@ -23,6 +23,7 @@ import (
 // per cooldown thereafter. The receive path emits a single
 // `matter.rx.session_miss.burst` INFO at that point.
 type sessionMissBurst struct {
+	// mu guards entries and lastSweepAt.
 	mu      sync.Mutex
 	entries map[uint16]*sessionMissEntry
 	// lastSweepAt gates [sessionMissBurst.maybeSweepLocked] to at most

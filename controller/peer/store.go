@@ -27,6 +27,7 @@ type Store interface {
 // MemoryStore is a [Store] in memory. The zero value is ready to use; it
 // is safe for concurrent use.
 type MemoryStore struct {
+	// mu guards peers and saves.
 	mu    sync.Mutex
 	peers map[handshake.PeerAddress]Descriptor
 	saves int

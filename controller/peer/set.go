@@ -86,6 +86,7 @@ type Set struct {
 	clock exchange.Clock
 	rand  func() float64
 
+	// mu guards disconnected, handleError, peers and timing.
 	mu           sync.Mutex
 	peers        []*Peer
 	timing       Timing

@@ -390,6 +390,7 @@ type DeviceTypeVerdict struct {
 // persists, and is reported again after it went away and came back. Safe
 // for concurrent use.
 type DeviceTypeValidator struct {
+	// mu guards recorded and reported.
 	mu       sync.Mutex
 	mode     DeviceTypeValidationMode
 	reported map[uint16]map[string]bool

@@ -63,6 +63,7 @@ type caseFabric struct {
 // which Apple Home does within seconds of a pair, and which then signs
 // Sigma2 under the wrong fabric's NOC for every reconnect of the first.
 type caseIdentities struct {
+	// mu guards byIdx and latest.
 	mu     sync.RWMutex
 	byIdx  map[uint8]*caseFabric
 	latest *caseFabric

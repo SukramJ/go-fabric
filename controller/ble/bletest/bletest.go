@@ -27,6 +27,7 @@ var ErrUnknownPeripheral = errors.New("bletest: unknown peripheral")
 
 // Central is an in-memory ble.Central.
 type Central struct {
+	// mu guards callback, order, peripherals, scanning, starts and stops.
 	mu          sync.Mutex
 	callback    func(ble.Peripheral, []byte)
 	peripherals map[string]*Peripheral
@@ -190,6 +191,7 @@ func (p *pipe) send(b []byte) bool {
 type connection struct {
 	p *Peripheral
 
+	// mu guards closedHook, handle, messages, onC2, request, session and started.
 	mu         sync.Mutex
 	onC2       func([]byte)
 	request    []byte

@@ -83,6 +83,7 @@ func listHostNameIfaces() ([]hostNameIface, error) {
 // querier that hears the node on several interfaces must see one host, so
 // the name may not follow interface order.
 type hostNameChooser struct {
+	// mu guards current.
 	mu      sync.Mutex
 	current string
 }

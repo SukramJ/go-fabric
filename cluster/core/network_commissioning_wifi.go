@@ -35,6 +35,7 @@ import (
 // the commands, and src/platform/Linux/NetworkCommissioningWiFiDriver.cpp
 // for the network list, generalized from its one network to MaxNetworks.
 type WiFiNetworkCommissioning struct {
+	// mu guards busy, committed, interfaceEnabled, lastConnectErr, lastNetworkID, lastStatus and networks.
 	mu          sync.Mutex
 	dataVersion cluster.DataVersionTracker
 

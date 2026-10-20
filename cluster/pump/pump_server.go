@@ -286,6 +286,7 @@ type Server struct {
 	cfg      Config
 	inst     *spec.Instance
 
+	// mu guards emitter and endpoint.
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16

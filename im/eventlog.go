@@ -122,6 +122,7 @@ func (c bufferConfig) normalized() bufferConfig {
 //
 // Mirrors matter.js packages/protocol/src/interaction/EventHandler.ts.
 type EventLog struct {
+	// mu guards clock, next, occurrences, persistCeiling, persistEpoch and persistFn.
 	mu   sync.RWMutex
 	next uint64 // next event number; incremented before use so first event is 1
 	// occurrences holds every buffered record across all priorities, in

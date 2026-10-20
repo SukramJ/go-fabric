@@ -32,6 +32,7 @@ import (
 //     the node is on its Ethernet network from boot; LastConnectErrorValue
 //     stays null.
 type NetworkCommissioning struct {
+	// mu guards interfaceEnabled.
 	mu sync.RWMutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter

@@ -90,6 +90,7 @@ type githubDir struct {
 	g   *githubClient
 	url string
 
+	// mu guards contents.
 	mu       sync.Mutex
 	contents map[string]githubEntry
 }

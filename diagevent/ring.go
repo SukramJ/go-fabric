@@ -73,6 +73,7 @@ type Event struct {
 // receive path, taken for every packet, and a diagnostic that can panic
 // there is worse than no diagnostic.
 type Ring struct {
+	// mu guards clock, events, full and next.
 	mu     sync.RWMutex
 	events []Event
 	next   int

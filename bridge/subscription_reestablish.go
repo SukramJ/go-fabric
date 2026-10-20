@@ -27,6 +27,7 @@ type peerKey struct {
 // because the peer already began a normal subscribe, or because reaching
 // it failed.
 type peerBlockList struct {
+	// mu guards peers.
 	mu    sync.Mutex
 	peers map[peerKey]struct{}
 }

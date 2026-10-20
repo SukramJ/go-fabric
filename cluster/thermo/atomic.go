@@ -53,6 +53,7 @@ type atomicWriteState struct {
 	timeout  time.Duration
 	deadline time.Time
 
+	// mu guards closed, deadline, onClosed, pending and timer.
 	mu       sync.Mutex
 	pending  map[uint32]any
 	timer    clock.Timer
@@ -139,6 +140,7 @@ func (a *atomicWriteState) holds(attrID uint32) bool { return slices.Contains(a.
 // atomicWrites is the set of a server's atomic writes in progress —
 // matter.js AtomicWriteHandler's #pendingWrites (AtomicWriteHandler.ts:72).
 type atomicWrites struct {
+	// mu guards states.
 	mu     sync.Mutex
 	states []*atomicWriteState
 }

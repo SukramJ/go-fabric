@@ -54,6 +54,7 @@ type GridConditionsServer struct {
 
 	srv *spec.Server
 
+	// mu guards endpoint.
 	mu       sync.Mutex
 	endpoint uint16
 }

@@ -171,6 +171,7 @@ type OpenWindowParams struct {
 
 // AdministratorCommissioning is the cluster server.
 type AdministratorCommissioning struct {
+	// mu guards controller, fabricCounter, isFailSafeArmed and vendorResolver.
 	mu             sync.RWMutex
 	controller     WindowController
 	vendorResolver VendorIDResolver
@@ -183,6 +184,7 @@ type AdministratorCommissioning struct {
 	// VerifyOrExit(IsFailSafeFullyDisarmed, ...).
 	isFailSafeArmed func() bool
 
+	// versionMu guards lastSnapshot.
 	versionMu    sync.Mutex
 	version      contract.DataVersionTracker
 	lastSnapshot string

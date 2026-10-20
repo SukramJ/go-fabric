@@ -49,14 +49,17 @@ type commissioningHost struct {
 	// (security.go responderSessionParams).
 	responderParams *sessionparams.Parameters
 	advert          bridge.CommissioningAdvertisement
-	installMu       sync.Mutex
-	active          *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	// installMu guards active.
+	installMu sync.Mutex
+	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
 	// observer is the host's OnWindowTransition (nil: none).
 	observer func(WindowSnapshot) error
 
+	// basicMu guards basic.
 	basicMu sync.Mutex
 	basic   *basicWindow // the open OpenBasicWindow window, nil without one
 
+	// announcedMu guards announcedDiscriminator and announcedMode.
 	announcedMu            sync.Mutex
 	announcedMode          uint8  // CM of the published commissionable record; 0 none
 	announcedDiscriminator uint16 // its discriminator

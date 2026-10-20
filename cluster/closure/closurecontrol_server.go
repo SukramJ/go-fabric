@@ -124,6 +124,7 @@ type ControlServer struct {
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
 
+	// mu guards currentPosition, errorList, mainState, secureState and targetPosition.
 	mu sync.RWMutex
 
 	inst *spec.Instance

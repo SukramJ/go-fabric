@@ -55,6 +55,7 @@ var (
 type Aggregator struct {
 	n *Node
 
+	// mu guards complete, eps and started.
 	mu       sync.Mutex
 	eps      []Endpoint
 	started  bool

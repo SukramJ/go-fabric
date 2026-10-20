@@ -153,6 +153,7 @@ type Server struct {
 	supported uint8 // SupportedSensitivityLevels after the clamp
 	alarmsSup AlarmMode
 
+	// mu guards active, current, enabled, endpoint, fault and suppressed.
 	mu         sync.Mutex
 	endpoint   uint16
 	current    uint8

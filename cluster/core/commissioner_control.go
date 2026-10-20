@@ -183,6 +183,7 @@ type CommissionerControl struct {
 	rand io.Reader
 	now  func() time.Time
 
+	// mu guards approvedAt, closed, endpoint, request, step and wg.
 	mu         sync.Mutex
 	endpoint   uint16
 	step       ccStep

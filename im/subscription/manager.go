@@ -93,6 +93,7 @@ type Manager struct {
 	reporter      Reporter
 	eventReporter EventReporter
 
+	// mu guards byID, eventReporter, nextID, onClosed, onTerminated and perFabric.
 	mu        sync.RWMutex
 	byID      map[uint32]*Subscription
 	perFabric map[uint8]int

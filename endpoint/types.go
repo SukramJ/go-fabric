@@ -320,6 +320,7 @@ func (e *Endpoint) identifyServer() *mattercore.Identify {
 // topology still serving in-flight reads and the incoming one — may
 // reference it concurrently, hence the internal mutex.
 type endpointState struct {
+	// mu guards configVersion, identify, nodeLabel and trackers.
 	mu       sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
 	identify *mattercore.Identify
@@ -451,6 +452,7 @@ func (s *endpointState) close() {
 // memory only; a full daemon restart re-randomizes, which matches
 // matter.js re-seeding the Datasource version on reboot.
 type endpointStateRegistry struct {
+	// mu guards states.
 	mu     sync.Mutex
 	states map[SourceKey]*endpointState
 	// clock is the assembler's (Config.Clock), handed to every state.

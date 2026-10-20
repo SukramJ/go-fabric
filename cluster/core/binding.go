@@ -34,11 +34,13 @@ type Binding struct {
 	// writeMu serialises the list's changes with their persistence, so the
 	// saves land in the order the changes commit; mu guards the list for
 	// readers, which a save never blocks.
-	writeMu  sync.Mutex
+	writeMu sync.Mutex
+	// mu guards bindings.
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
 
+	// obsMu guards observers.
 	obsMu     sync.Mutex
 	observers []*bindingObserver
 }

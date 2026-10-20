@@ -555,6 +555,7 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 // resumptionId + initiatorResumeMic triggers a one-round-trip resume
 // instead of Full Sigma.
 type CaseAdapter struct {
+	// mu guards established, establishedSessionID, lastSigma2 and responder.
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished

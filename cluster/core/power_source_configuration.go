@@ -35,6 +35,7 @@ const PowerSourceConfigurationMaxSources = 6
 type PowerSourceConfiguration struct {
 	*spec.Server
 
+	// mu guards provider.
 	mu       sync.RWMutex
 	provider func() []uint16
 }

@@ -152,6 +152,7 @@ type Server struct {
 	srv *spec.Server
 	cfg Config
 
+	// mu guards last.
 	mu sync.Mutex
 	// last is the state the host set last; it answers State for the
 	// fields whose attribute the server does not serve.

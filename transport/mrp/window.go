@@ -44,6 +44,7 @@ const maxCounter32 = int64(0xFFFFFFFF)
 // Concurrency: Window is safe for concurrent use; lookups and updates
 // are serialised through an internal mutex.
 type Window struct {
+	// mu guards bitmap, max and primed.
 	mu sync.Mutex
 	// initialBitmap seeds bitmap when the window anchors on its first
 	// counter. Mirrors matter.js MessageReceptionState.ts

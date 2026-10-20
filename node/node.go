@@ -104,6 +104,7 @@ type Node struct {
 	cancel        context.CancelFunc
 	keeperWG      sync.WaitGroup
 
+	// mu guards cfg, keeperWG, ownedDB, st, started and stopped.
 	mu      sync.Mutex
 	started bool
 	stopped bool

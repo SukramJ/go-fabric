@@ -180,6 +180,7 @@ type DimensionServer struct {
 	ext      *cluster.DataVersionTracker
 	cfg      DimensionConfig
 
+	// mu guards current, lastPosDirt, limit, target and unitRange.
 	mu          sync.Mutex
 	current     *DimensionState
 	target      *DimensionState

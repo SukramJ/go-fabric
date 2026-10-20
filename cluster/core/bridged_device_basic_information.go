@@ -37,7 +37,8 @@ type BridgedDeviceBasicInformation struct {
 	// this instance serves (see instanceOptions).
 	def           *spec.Instance
 	configVersion uint32
-	mu            sync.RWMutex
+	// mu guards emitter, endpoint, nodeLabel and reachable.
+	mu sync.RWMutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful state mutation (Reachable

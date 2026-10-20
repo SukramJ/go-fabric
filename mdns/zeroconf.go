@@ -62,7 +62,8 @@ import (
 // decided here, by [Zeroconf.InterfaceFilter].
 type Zeroconf struct {
 	// clock paces the subtype re-announcement and the re-announce loop.
-	clock   clockvar.Var
+	clock clockvar.Var
+	// mu guards closed, items, loopTrigger, published, responder, servers and subFQDNs.
 	mu      sync.RWMutex
 	servers map[string]*zeroconf.Server
 	items   map[string]Service

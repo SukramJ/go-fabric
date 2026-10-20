@@ -99,6 +99,7 @@ type Listener struct {
 	// that share an order key in arrival order (ordered.go).
 	order *orderedDispatch
 
+	// mu guards closed.
 	mu     sync.Mutex
 	closed bool
 }

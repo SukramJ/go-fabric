@@ -74,6 +74,7 @@ type SubtypeResponder struct {
 	lifecycleMu sync.Mutex
 	closed      bool
 
+	// mu guards mappings.
 	mu sync.RWMutex
 	// mappings is a lower-cased qname (`_l3840._sub._matterc._udp.local.`)
 	// → primary instance FQDN

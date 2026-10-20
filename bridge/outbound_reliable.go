@@ -49,6 +49,7 @@ type outboundKey struct {
 }
 
 type outboundReliableTracker struct {
+	// mu guards pending and waiters.
 	mu      sync.Mutex
 	pending map[outboundKey]*outboundEntry
 	// waiters lets callers block on Ack via [WaitForAck] — used by the

@@ -101,6 +101,7 @@ type NativeSource struct {
 	// are the ones that take effect in that order.
 	wmu sync.Mutex
 
+	// mu guards off, onLevel and options.
 	mu      sync.Mutex
 	options uint8
 	onLevel *uint8

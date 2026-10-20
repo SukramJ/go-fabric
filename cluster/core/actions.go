@@ -109,6 +109,7 @@ type Actions struct {
 	host ActionsHost
 	dv   cluster.DataVersionTracker
 
+	// mu guards endpoint.
 	mu       sync.Mutex
 	endpoint uint16
 }

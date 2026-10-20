@@ -126,6 +126,7 @@ type TemperatureControlServer struct {
 	ext      *cluster.DataVersionTracker
 	cfg      TemperatureControlConfig
 
+	// mu guards level and setpoint.
 	mu       sync.Mutex
 	setpoint int16
 	level    uint8
