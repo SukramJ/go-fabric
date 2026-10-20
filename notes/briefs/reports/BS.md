@@ -133,7 +133,7 @@ HEAD after dc4401d9 18:50:01
 ## Decisions the owner should check
 
 - `node` links modernc.org/sqlite (registers the driver name `sqlite`): a host that registers another driver under that name panics at init. `Store.DB` stays for such a host.
-- `NewCommissioningCredentials` draws a 16-byte salt (`bridge.RandomSalt`, as the brief says); matter.js draws 32 for its basic window (`DeviceCommissioner.ts:132-134` at 862ad75f) and its enhanced window (`CommissioningClient.ts:522-525`). Both are inside the 16..32 bounds.
+- The salt follows matter.js (owner's review of #197): `bridge.RandomSalt` draws 32 bytes (`DeviceCommissioner.ts:134`, `CommissioningClient.ts:524` at 862ad75f), and `NewCommissioningCredentials` keeps using it — one function. `### Changed` in the CHANGELOG; the two bridge tests that asserted 16 now assert 32.
 - The node's own advertiser is built in `New`, so the subtype responder's sockets open at `New`, as the daemon opened them before `New`.
 - `DiagnoseMDNS` returns nil for a Noop advertiser (loom's reporter skips the diagnosis then) rather than the `no_services` finding.
 - `Fabrics` removable in v0.11.0 (marked in v0.9.1; the concept said v0.10.0, which the README's "second minor after" rule does not allow).
@@ -146,9 +146,12 @@ HEAD after dc4401d9 18:50:01
 
 ## Questions
 
-- Should `NewCommissioningCredentials` follow matter.js's 32-byte salt? (a one-line change, `bridge.RandomSalt` itself unchanged)
-- `node` under `-race` is close to the 10-minute package timeout on a loaded machine (689 s alone at load 11). Should `make race` raise the timeout, or should the slowest `node` parity files move behind a shorter clock?
-- Is `Node.Bridge().Topology()` worth a facade accessor in phase 21, since loom reads it in three places (`daemon_matter.go:1315`, `matter_status_adapter.go:49`, `matter_window_adapter.go:98`)?
+Answered in the review of #197:
+
+- `node` under `-race` near the 10-minute package timeout on a loaded machine (689 s alone at load 11): the timeout stays; test runtime under load is a gate-1 audit item.
+- `Node.Topology` (loom reads `Bridge().Topology()` at `daemon_matter.go:1315`, `matter_status_adapter.go:49`, `matter_window_adapter.go:98`): goes to brief BU.
+- `Config.DeviceTypeValidation`, `Node.Peers`, `Node.Bindings` exposing lower types: gate-1 findings, not this wave.
+- The salt: follows matter.js, 32 bytes (Decisions).
 
 ## by_design candidates
 

@@ -15,7 +15,7 @@ import (
 // NewCommissioningCredentials draws a fresh commissioning secret: a random
 // passcode from the valid set (bridge.RandomPasscode, never on the
 // trivially-guessable list), a random 12-bit discriminator
-// (bridge.RandomDiscriminator), a random salt of [PBKDFSaltMin] bytes
+// (bridge.RandomDiscriminator), a random salt of [PBKDFSaltMax] bytes
 // (bridge.RandomSalt) and [PBKDFIterationsMin] PBKDF iterations — values
 // [Config.Validate] accepts. LocationCapability is left at its zero value
 // ([RegulatoryIndoor]). A host that has no configured secret uses it for

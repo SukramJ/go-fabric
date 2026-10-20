@@ -94,7 +94,7 @@ func TestFacadeCommissioningCredentials(t *testing.T) {
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("credentials %+v: %v", cm, err)
 		}
-		if cm.PBKDFIterations != node.PBKDFIterationsMin || len(cm.Salt) != node.PBKDFSaltMin {
+		if cm.PBKDFIterations != node.PBKDFIterationsMin || len(cm.Salt) != node.PBKDFSaltMax {
 			t.Fatalf("iterations %d, salt %d bytes", cm.PBKDFIterations, len(cm.Salt))
 		}
 		seen[cm.Passcode] = true
