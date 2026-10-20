@@ -201,7 +201,7 @@ func TestLayering(t *testing.T) {
 
 func TestSpecificity(t *testing.T) {
 	r := rules{Layers: []layerDef{
-		{Name: "low", Packages: []string{"cluster/spec/...", "clock/clocktest"}},
+		{Name: "low", Packages: []string{"cluster", "cluster/spec/...", "clock/clocktest"}},
 		{Name: "mid", Packages: []string{"cluster/...", "clock"}},
 	}}
 	m := matcher{r}
@@ -210,7 +210,7 @@ func TestSpecificity(t *testing.T) {
 		"cluster/spec/gen":     0,
 		"cluster/specx":        1,
 		"cluster/onoff":        1,
-		"cluster":              1,
+		"cluster":              0, // exact beats cluster/... of the same base
 		"clock":                1,
 		"clock/clocktest":      0,
 		"clock/clocktest/deep": -1,

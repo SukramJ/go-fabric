@@ -30,7 +30,8 @@
 // the most specific pattern that matches it (the longest base path, an exact
 // name before a "/..." pattern of the same base; the module root is "."), whatever the order of the
 // file, so "cluster/spec/..." in model-and-protocol beats "cluster/..." in
-// servers. Patterns that match nothing are not an error: a layer may name a
+// servers, and the exact "cluster" (shared machinery, model-and-protocol)
+// beats the "cluster/..." pattern of the servers layer. Patterns that match nothing are not an error: a layer may name a
 // package that lives in another module (ble/bluez) or that is yet to come.
 //
 // # Changing the rules
