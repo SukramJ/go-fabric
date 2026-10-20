@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
@@ -27,7 +28,7 @@ func (m *Manager) record(source uint16) *record {
 	if rec == nil {
 		rec = &record{
 			pending: map[string]*pendingEntry{}, established: map[string]Resolution{},
-			groups: map[string]*item{}, dormant: map[string]*item{},
+			dormant: map[string]*item{},
 		}
 		m.records[source] = rec
 	}
@@ -264,36 +265,47 @@ func (m *Manager) resolveGroup(it *item) (GroupTarget, bool) {
 }
 
 // isRegisteredGroup reports whether it is its server's registered group
-// entry and not yet established (#isRegisteredGroup, :543-548).
+// entry and not yet established — matter.js #isRegisteredGroup
+// (BindingManager.ts:528-532). The registration is the one of the time of
+// the call, so an unregister or a disposal that came in while the entry
+// resolved makes it false.
 func (m *Manager) isRegisteredGroup(it *item) bool {
-	m.stateMu.Lock()
-	defer m.stateMu.Unlock()
-	rec := m.records[it.source]
-	if rec == nil || rec.groups[it.key] != it {
+	m.mu.Lock()
+	registered := m.registered[regKey{source: it.source, key: it.key}] == it
+	m.mu.Unlock()
+	if !registered {
 		return false
 	}
-	_, est := rec.established[it.key]
-	return !est
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	if rec := m.records[it.source]; rec != nil {
+		if _, est := rec.established[it.key]; est {
+			return false
+		}
+	}
+	return true
 }
 
 // recheckGroups resolves the registered group entries of a fabric whose
 // group now holds a key; an established one stays — matter.js
 // #recheckGroups (BindingManager.ts:522-541).
 func (m *Manager) recheckGroups(fabricIndex uint8) {
-	m.stateMu.Lock()
+	m.mu.Lock()
 	var items []*item
-	for _, ep := range sortedKeys(m.records) {
-		rec := m.records[ep]
-		for _, k := range sortedKeys(rec.groups) {
-			it := rec.groups[k]
-			if _, est := rec.established[k]; it.entry.FabricIndex == fabricIndex && !est {
-				items = append(items, it)
-			}
+	for _, it := range m.registered {
+		if it.entry.FabricIndex == fabricIndex {
+			items = append(items, it)
 		}
 	}
-	m.stateMu.Unlock()
+	m.mu.Unlock()
+	slices.SortFunc(items, func(a, b *item) int {
+		if a.source != b.source {
+			return int(a.source) - int(b.source)
+		}
+		return strings.Compare(a.key, b.key)
+	})
 	for _, it := range items {
-		if m.cfg.Topology.HasGroupKey(fabricIndex, it.entry.Group) {
+		if m.isRegisteredGroup(it) && m.cfg.Topology.HasGroupKey(fabricIndex, it.entry.Group) {
 			m.resolveAndEmit(it)
 		}
 	}

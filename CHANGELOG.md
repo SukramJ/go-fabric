@@ -14,6 +14,10 @@ pseudo-version of `main`.
 
 - `fabrictest`: group sends on the multicast model. `transport/udp`'s `Listener.SendMulticast` hands the datagram to a socket that carries its own multicast model, as `JoinGroup` and `LeaveGroup` hand the membership; the in-memory socket puts it on the network from the host's address, through `Network.Filter` and the delivery options, to every host holding the group (matter.js `MockUdpSocket.send`, `MockNetwork.shouldReceive`). A device's node sends its group messages through its bridge's socket on the network (`Node.Groups().SetTransport` after start), as matter.js sends them from the operational socket.
 
+### Fixed
+
+- `binding`: a group entry unregistered while it resolves is not established. The manager records a group entry as registered when `Register` is called and forgets it when `Unregister` or `Detach` is called, not when the worker gets to it, so a resolution under way — the group sender's lookup reads the store — sees the unregister and stops (`BindingManager.ts:119-141`, `:191-195`, `:528-532`). The host used to see established and then removed for an entry that was gone before it resolved.
+
 ## [0.8.7] — 2026-10-20
 
 Milestone 3, phase 18c, brief BP: the behaviour-test port of Groupcast against matter.js at `862ad75f` — 49 of 50 open cases on a multicast model for `fabrictest`, two fixes the port found, the Identity Protection Key set (key set 0) in the groups manager so a rotated IPK reaches CASE.
