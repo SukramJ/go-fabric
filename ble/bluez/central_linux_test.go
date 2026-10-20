@@ -402,3 +402,24 @@ func TestDevicePathAndAddress(t *testing.T) {
 		t.Fatalf("wrap %v", e)
 	}
 }
+
+// TestCloseWaitsForTheSignalLoop pins the central as the owner of its
+// signal loop (G1-14, ADR 0026 P5): Close returns after the loop did,
+// a second Close too.
+func TestCloseWaitsForTheSignalLoop(t *testing.T) {
+	c, err := newCentral(newFakeBus(), testAdapter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-c.dispatched:
+	default:
+		t.Fatal("Close returned while the signal loop still ran")
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
