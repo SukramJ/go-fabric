@@ -35,6 +35,8 @@ pseudo-version of `main`.
 - Host code no longer runs under a server's state lock: Messages' presenter, SoilMeasurement's source, the media servers' ports (which may now call `SetState`), DeviceEnergyManagement's hooks (see Changed), and `controller/ca` signing through a `RootSigner` and saving through its store. `controller/client.Node.Erase` erases the store with the node's lock released (G1-16).
 - Store and network I/O no longer runs under a lock that readers take: the `groups` manager reads and writes its store under a store queue of its own, so the group receive path and the IPK lookups never wait for SQLite; the event log persists its counter ceiling outside its lock; the reliable-send tracker retransmits outside its lock and does not resend an entry acknowledged meanwhile; `bdx.FileSink.Written` no longer waits for a write (G1-16).
 - Tests that bounded event-driven waits with wall time a loaded machine could outrun (`TestStartReaper_*` now on a fake clock, `TestDiagLogsBDX_Transfer`, `TestRegistryDecommission`, `TestLiveSustainedSurvivesRestart`, `TestNetworkLossAndDelay`) (G1-19).
+- `node.Node.SetCommissioningBlocked` no longer takes the node's lifecycle lock: called from a host callback that runs inside `Start` or `Stop` (the host's `Config.Topology` Snapshotter) it deadlocked (G1-16).
+- `Bridge.Stop` stops the commissioning window's expiry timer: an uncommissioned node's own window left a 48-hour timer armed on the node's clock after `Node.Stop` (G1-14).
 
 ### Removed
 

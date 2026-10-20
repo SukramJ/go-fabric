@@ -104,8 +104,12 @@ type Node struct {
 	cancel        context.CancelFunc
 	keeperWG      sync.WaitGroup
 
+	// mu serialises Start and Stop, the lifecycle; it is held across
+	// them, host callbacks included (the host's Snapshotter), and
+	// taken by nothing else. started is atomic so a host's call during
+	// either (SetCommissioningBlocked) never waits for it (ADR 0026 P6).
 	mu      sync.Mutex
-	started bool
+	started atomic.Bool
 	stopped bool
 }
 
@@ -615,7 +619,7 @@ func (n *Node) Start(ctx context.Context) error {
 	switch {
 	case n.stopped:
 		return ErrStopped
-	case n.started:
+	case n.started.Load():
 		return nil
 	}
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
@@ -634,7 +638,7 @@ func (n *Node) Start(ctx context.Context) error {
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
-	n.started = true
+	n.started.Store(true)
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
@@ -729,7 +733,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	if n.root.otaApplier != nil {
 		n.root.otaApplier.close()
 	}
-	if n.started {
+	if n.started.Load() {
 		if err := storeOperationalTime(ctx, n.st, n.root.GeneralDiagnostics); err != nil {
 			n.logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 		}
@@ -838,10 +842,9 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 	if err != nil {
 		return
 	}
-	n.mu.Lock()
-	started := n.started
-	n.mu.Unlock()
-	if started && n.window != nil && n.st != nil {
+	// Lock-free: a host may call this from a callback that runs inside
+	// Start or Stop, which hold n.mu (a Snapshotter, say).
+	if n.started.Load() && n.window != nil && n.st != nil {
 		n.window.reopenIfDecommissioned(ctx, n.st)
 	}
 }
