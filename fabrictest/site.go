@@ -66,6 +66,12 @@ type Site struct {
 	net  *Network
 	log  *slog.Logger
 
+	// inSyscall is the number of goroutines in a system call when the
+	// site was built: the process's standing ones (os/signal's loop, once
+	// a test of the binary called signal.Notify), which never leave it
+	// and are no work of the site.
+	inSyscall uint64
+
 	mu          sync.Mutex
 	nextIndex   int
 	devices     []*Device
@@ -94,8 +100,20 @@ func NewSite(tb testing.TB, opts Options) *Site {
 		s.net = newNetwork(s.clk, opts.Net)
 	}
 	s.dir = tb.TempDir()
+	s.inSyscall = goroutinesInSyscall()
 	tb.Cleanup(s.Close)
 	return s
+}
+
+// goroutinesInSyscall is the process's count of goroutines in a system
+// call.
+func goroutinesInSyscall() uint64 {
+	sample := []metrics.Sample{{Name: "/sched/goroutines/not-in-go:goroutines"}}
+	metrics.Read(sample)
+	if sample[0].Value.Kind() != metrics.KindUint64 {
+		return 0
+	}
+	return sample[0].Value.Uint64()
 }
 
 // Clock is the site's clock.
@@ -194,7 +212,7 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}) error {
 			return ctx.Err()
 		default:
 		}
-		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples) {
+		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples, s.inSyscall) {
 			lastSent, since = sent, wall.Now()
 		} else if clock.Since(wall, since) >= s.opts.Settle {
 			return nil
@@ -214,8 +232,10 @@ var busyMetrics = []string{
 // running or in a system call: a host still working on a message, a
 // handshake's cryptography, a store write. It is the Go reading of
 // MockTime's "the task queue is empty" — the process-wide count, so the
-// work of a parallel test in the same binary delays the step too.
-func busy(samples []metrics.Sample) bool {
+// work of a parallel test in the same binary delays the step too. The
+// standing goroutines in a system call (standing, counted when the site
+// was built) are not work.
+func busy(samples []metrics.Sample, standing uint64) bool {
 	metrics.Read(samples)
 	var n uint64
 	for i := range samples {
@@ -223,7 +243,7 @@ func busy(samples []metrics.Sample) bool {
 			n += samples[i].Value.Uint64()
 		}
 	}
-	return n > 1
+	return n > 1+standing
 }
 
 func (s *Site) sent() uint64 {
