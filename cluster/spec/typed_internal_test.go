@@ -4,7 +4,6 @@
 package spec
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -101,17 +100,3 @@ func TestTypedFieldsOf(t *testing.T) {
 		A uint8 `matter:"one"`
 	}]())
 }
-
-func TestTypedVetoError(t *testing.T) {
-	t.Parallel()
-	e := &vetoError{err: errFlash}
-	if e.Error() != "flash" || !errors.Is(e.Unwrap(), errFlash) {
-		t.Errorf("veto error %v", e)
-	}
-}
-
-var errFlash = errorString("flash")
-
-type errorString string
-
-func (e errorString) Error() string { return string(e) }

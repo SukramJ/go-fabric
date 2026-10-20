@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
@@ -448,7 +449,7 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 // fabric.
 func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
-		return fmt.Errorf("matter: GroupKeyManagement attribute 0x%04X is read-only", attrID)
+		return spec.Errorf(im.StatusUnsupportedWrite, "matter: GroupKeyManagement attribute 0x%04X is read-only", attrID)
 	}
 	list, ok := value.([]GroupKeyMapStruct)
 	if !ok {
@@ -711,9 +712,8 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
 	// GroupKeyManagementServer.ts:280-352. Five validation classes,
-	// every failure is reported as InvalidCommand (sentinel substring
-	// "invalid command argument" → StatusInvalidCommand via
-	// dispatcher.invokeErrorStatus):
+	// every failure is reported as InvalidCommand (a typed
+	// spec.Errorf(im.StatusInvalidCommand, …)):
 	//
 	//   1. MAX_64BIT_TIME on EpochStartTimeN disables the slot —
 	//      treat (start, key) as null.
@@ -746,41 +746,41 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// Status::ConstraintError (substring "constraint" triggers that path).
 	const epochKeyLen = 16
 	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
-		return nil, fmt.Errorf("matter: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
+		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
 	}
 	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
-		return nil, fmt.Errorf("matter: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
+		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
 	}
 	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
-		return nil, fmt.Errorf("matter: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
+		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
 	}
 
 	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
 	}
 	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
 	}
 
 	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
 	}
 	if len(gks.EpochKey1) == 0 && gks.EpochStartTime1 != 0 {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
 	}
 
 	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
 	}
 	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
 	}
 	if len(gks.EpochKey2) == 0 && gks.EpochStartTime2 != 0 {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
 	}
 
 	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
-		return nil, errors.New("matter: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
 	}
 	// GroupKeyMulticastPolicy (field 8) is accepted whatever its value and
 	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check
@@ -878,10 +878,9 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	// (Identity Protection Key) that the bridge needs for CASE; the
 	// spec forbids deleting it via KeySetRemove. matter.js throws a
 	// StatusResponseError with InvalidCommand; we surface the same
-	// status by emitting a sentinel substring picked up by
-	// `invokeErrorStatus` in dispatcher.go.
+	// status as a typed spec.Errorf.
 	if req.GroupKeySetID == 0 {
-		return nil, errors.New("matter: KeySetRemove: invalid command argument: GroupKeySet 0 (IPK) cannot be removed")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetRemove: invalid command argument: GroupKeySet 0 (IPK) cannot be removed")
 	}
 	// Removing a non-existent key set must return NotFound, not silent
 	// success. matter.js GroupKeyManagementServer.ts throws Status.NotFound

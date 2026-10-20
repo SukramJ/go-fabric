@@ -300,6 +300,12 @@ func TestAccessControl_ACLWriteValidation(t *testing.T) {
 						t.Errorf("error %q does not contain %q", err.Error(), sub)
 					}
 				}
+				// The status is carried by type (the dispatcher reads no
+				// status from the text).
+				want := map[string]im.StatusCode{"resource exhausted": im.StatusResourceExhausted, "constraint error": im.StatusConstraintError}[tc.errContains[0]]
+				if sce, ok := errors.AsType[im.StatusCodeError](err); want != 0 && (!ok || sce.MatterStatusCode() != want) {
+					t.Errorf("error %q: status not %v by type", err, want)
+				}
 			} else if err != nil {
 				t.Fatalf("MatterWrite: unexpected error: %v", err)
 			}

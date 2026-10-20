@@ -304,7 +304,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	s.mu.Unlock()
 	if veto != nil {
 		if err := veto(ctx, attrID, v); err != nil {
-			return vetoed(err)
+			// As given: its IM status when it carries one, FAILURE
+			// otherwise (the dispatcher reads no status from the text).
+			return err
 		}
 	}
 	if s.sink != nil {

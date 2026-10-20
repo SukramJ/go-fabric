@@ -559,7 +559,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		}
 		return command{tilt: &pct}, nil
 	default:
-		return command{}, fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
+		return command{}, im.UnsupportedCommandf("windowcovering: unknown command 0x%02X", cmdID)
 	}
 }
 

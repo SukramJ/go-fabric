@@ -297,7 +297,7 @@ func (s *ControlServer) MatterInvoke(
 			"closurecontrol: Calibrate requires the Calibration feature, which this server does not advertise",
 		}
 	default:
-		return nil, fmt.Errorf("closurecontrol: unknown command 0x%02X", cmdID)
+		return nil, im.UnsupportedCommandf("closurecontrol: unknown command 0x%02X", cmdID)
 	}
 }
 

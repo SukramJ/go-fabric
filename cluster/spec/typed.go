@@ -260,25 +260,6 @@ func HandlerOf[Req, Resp any](fn func(ctx context.Context, req Req) (Resp, error
 
 func emptyStruct(t reflect.Type) bool { return t.Kind() == reflect.Struct && t.NumField() == 0 }
 
-// vetoError is a [ServerConfig.BeforeWrite] refusal that carries no IM
-// status of its own: it answers FAILURE and unwraps to the refusal.
-type vetoError struct{ err error }
-
-func (e *vetoError) Error() string                   { return e.err.Error() }
-func (e *vetoError) Unwrap() error                   { return e.err }
-func (e *vetoError) MatterStatusCode() im.StatusCode { return im.StatusFailure }
-
-// vetoed returns a write veto's error as the write's answer: as given
-// when it carries an IM status, FAILURE otherwise — the dispatcher reads
-// a plain error's text for a status (endpoint/dispatcher.go
-// writeErrorStatus), and a host's message is not a status.
-func vetoed(err error) error {
-	if _, ok := errors.AsType[im.StatusCodeError](err); ok {
-		return err
-	}
-	return &vetoError{err: err}
-}
-
 // nullableType is the interface every [Nullable] implements.
 var nullableType = reflect.TypeFor[nullable]()
 

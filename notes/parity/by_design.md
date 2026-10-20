@@ -2164,7 +2164,7 @@ only — after the definition's checks, before the `Sink` and the store —
 and never for the host's own `Set`; an error carrying an IM status
 answers the attribute with it, any other error answers that attribute
 with FAILURE and leaves the request's other writes to their own result
-(`cluster/spec/typed.go` `vetoed`). Reasoning: the host's own `Set` is
+(`endpoint/dispatcher.go` `classifyError`). Reasoning: the host's own `Set` is
 the host's decision and needs no veto by the host, and a per-attribute
 status is the write response's own unit, where matter.js's message-level
 FAILURE is the fall-through of an uncaught error, not a choice (phase 20b,

@@ -181,7 +181,7 @@ const (
 
 // errBasicInfoUnknown is returned when a write hits an unwritable or
 // unknown attribute.
-var errBasicInfoUnknown = errors.New("matter: BasicInformation unknown / read-only attribute")
+var errBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "matter: BasicInformation unknown / read-only attribute")
 
 // Config carries the bridge's static identity. The fields map 1:1 to
 // the Matter BasicInformation attributes; non-empty values pass

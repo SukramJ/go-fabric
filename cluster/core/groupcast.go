@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
@@ -428,7 +429,7 @@ func usedMcastAddrCount(ms []groups.GroupcastMembership) uint16 {
 // MatterWrite implements [contract.ClusterServer]: Groupcast has no
 // writable attribute.
 func (g *Groupcast) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: Groupcast attribute 0x%04X is read-only", attrID)
+	return spec.Errorf(im.StatusUnsupportedWrite, "matter: Groupcast attribute 0x%04X is read-only", attrID)
 }
 
 // MatterReportable implements [contract.ClusterServer].

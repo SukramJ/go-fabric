@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -1065,7 +1066,7 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 
 // MatterWrite always rejects — every state change goes through commands.
 func (o *OperationalCredentials) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: OperationalCredentials is read-only via attributes (got 0x%04X)", attrID)
+	return spec.Errorf(im.StatusUnsupportedWrite, "matter: OperationalCredentials is read-only via attributes (got 0x%04X)", attrID)
 }
 
 // Request / response payload structs.
@@ -1437,7 +1438,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// is the bootstrap channel and only AddNOC is valid over it.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	if req.IsForUpdateNOC && sessFabric == 0 {
-		return nil, errors.New("matter: CSRRequest: invalid command argument: IsForUpdateNOC requires CASE session (got PASE)")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: CSRRequest: invalid command argument: IsForUpdateNOC requires CASE session (got PASE)")
 	}
 	// A CSRRequest requires an armed FailSafe window — the generated CSR is a
 	// FailSafe-scoped ephemeral, so issuing one outside the window leaves
@@ -2290,10 +2291,10 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
 	if dupRoot {
-		return nil, errors.New("matter: AddTrustedRootCertificate: constraint error: root already set for this FailSafe window")
+		return nil, spec.Errorf(im.StatusConstraintError, "matter: AddTrustedRootCertificate: constraint error: root already set for this FailSafe window")
 	}
 	if nocInvoked {
-		return nil, errors.New("matter: AddTrustedRootCertificate: constraint error: NOC command already invoked in this FailSafe window")
+		return nil, spec.Errorf(im.StatusConstraintError, "matter: AddTrustedRootCertificate: constraint error: NOC command already invoked in this FailSafe window")
 	}
 
 	root, err := mattercert.Decode(req.RootCACertificate)

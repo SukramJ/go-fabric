@@ -108,7 +108,7 @@ func TestTypedBeforeWrite(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	sk := &sink{}
-	refusal := errors.New("the relay says constraint") // text the dispatcher's heuristic would read as CONSTRAINT_ERROR
+	refusal := errors.New("the relay says constraint") // wording is no status: the dispatcher answers FAILURE
 	var veto error
 	var seen []hepaState
 	var attrs []uint32
@@ -123,7 +123,9 @@ func TestTypedBeforeWrite(t *testing.T) {
 
 	veto = refusal
 	err := srv.MatterWrite(ctx, hepa.AttrLastChangedTime, uint64(1000))
-	if !errors.Is(err, refusal) || statusOf(err) != im.StatusFailure || err.Error() != refusal.Error() {
+	// The refusal comes back as given, without a status of its own: the
+	// dispatcher answers an untyped error with FAILURE (classifyError).
+	if !errors.Is(err, refusal) || statusOf(err) != im.StatusSuccess || err.Error() != refusal.Error() {
 		t.Errorf("plain refusal: %v (status %v)", err, statusOf(err))
 	}
 	if len(seen) != 1 || seen[0].LastChangedTime == nil || *seen[0].LastChangedTime != 1000 || seen[0].Condition != 40 || attrs[0] != hepa.AttrLastChangedTime {

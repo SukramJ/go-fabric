@@ -6,11 +6,12 @@ package wire
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // ScenesManagement is a minimal stub for the Matter ScenesManagement
@@ -68,19 +69,16 @@ func (ScenesManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterWrite rejects every write.
 func (ScenesManagement) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("%w: attrID 0x%04X", errScenesStub, attrID)
+	return spec.Errorf(im.StatusUnsupportedWrite, "%w: attrID 0x%04X", errScenesStub, attrID)
 }
 
-// MatterInvoke rejects every command. The bridge dispatcher maps errors
-// whose message contains "no commands" to IM StatusCode UnsupportedCommand
-// (0x81). Returning errScenesStub alone would fall through to StatusFailure
-// (0x01); wrapping with the "no commands" sentinel ensures the controller
-// receives the correct Matter status code.
+// MatterInvoke rejects every command with a typed UnsupportedCommand
+// (0x81); errScenesStub alone would answer StatusFailure (0x01).
 // matter.js `packages/node/src/behaviors/scenes-management/` + chip
 // `src/app/clusters/scenes-server/ScenesServer.cpp` both require a valid
 // status-code response for unsupported commands.
 func (ScenesManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, fmt.Errorf("%w: no commands supported (HM has no scene management), cmdID 0x%02X", errScenesStub, cmdID)
+	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: no commands supported (HM has no scene management), cmdID 0x%02X", errScenesStub, cmdID)
 }
 
 // MatterReportable returns nil — no subscribe-able attributes.
