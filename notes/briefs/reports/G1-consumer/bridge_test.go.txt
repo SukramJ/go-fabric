@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package main
+
+import (
+	"context"
+	"sync"
+	"testing"
+
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
+)
+
+func attr(ep uint16, cluster, id uint32) im.ConcreteAttributePath {
+	return im.ConcreteAttributePath{
+		Endpoint: ep, Cluster: cluster, Attribute: id,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+}
+
+func TestBridgeOverTheWire(t *testing.T) {
+	ctx := context.Background()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+
+	var mu sync.Mutex
+	var seen []ControllerEvent
+	devs, err := NewDevices(site.Clock(), func(ev ControllerEvent) {
+		mu.Lock()
+		seen = append(seen, ev)
+		mu.Unlock()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair := site.CommissionedPair(fabrictest.PairOptions{
+		Device: fabrictest.Topology{Bridged: devs.Endpoints()},
+	})
+	lightEP, ok := pair.Device.EndpointOf(LightKey)
+	if !ok {
+		t.Fatal("no endpoint for the light")
+	}
+	sensorEP, ok := pair.Device.EndpointOf(SensorKey)
+	if !ok {
+		t.Fatal("no endpoint for the sensor")
+	}
+
+	// The state NewDevices set: off, level 1, contact true.
+	got, err := fabrictest.Read(ctx, pair, attr(lightEP, onoffdef.ClusterID, onoffdef.AttrOnOff))
+	if err != nil || got.Value.El.Bool {
+		t.Fatalf("OnOff = %+v, %v; want false", got.Value.El, err)
+	}
+	got, err = fabrictest.Read(ctx, pair, attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel))
+	if err != nil || got.Value.El.Uint != 1 {
+		t.Fatalf("CurrentLevel = %+v, %v; want 1", got.Value.El, err)
+	}
+	got, err = fabrictest.Read(ctx, pair, attr(sensorEP, booleanstatedef.ClusterID, booleanstatedef.AttrStateValue))
+	if err != nil || !got.Value.El.Bool {
+		t.Fatalf("StateValue = %+v, %v; want true", got.Value.El, err)
+	}
+
+	// The wall switch and the sensor move on the device side; the
+	// controller reads the new values.
+	if err := pair.Device.Act(func(*node.Node) error {
+		if err := devs.TickLight(); err != nil {
+			return err
+		}
+		return devs.FlipSensor()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = fabrictest.Read(ctx, pair, attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel))
+	if err != nil || got.Value.El.Uint != 2 {
+		t.Fatalf("CurrentLevel after the wall switch = %+v, %v; want 2", got.Value.El, err)
+	}
+	got, err = fabrictest.Read(ctx, pair, attr(sensorEP, booleanstatedef.ClusterID, booleanstatedef.AttrStateValue))
+	if err != nil || got.Value.El.Bool {
+		t.Fatalf("StateValue after the flip = %+v, %v; want false", got.Value.El, err)
+	}
+	mu.Lock()
+	if len(seen) != 0 {
+		t.Errorf("the wall switch's own change reached the controller handler: %+v", seen)
+	}
+	mu.Unlock()
+
+	// The controller toggles the light; the program's handler sees it.
+	toggle := im.ConcreteCommandPath{Endpoint: lightEP, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
+	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := site.Eventually(ctx, "the handler saw the toggle", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, ev := range seen {
+			if ev.Attribute == onoffdef.AttrOnOff && ev.On {
+				return true
+			}
+		}
+		return false
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = fabrictest.Read(ctx, pair, attr(lightEP, onoffdef.ClusterID, onoffdef.AttrOnOff))
+	if err != nil || !got.Value.El.Bool {
+		t.Fatalf("OnOff after Toggle = %+v, %v; want true", got.Value.El, err)
+	}
+}
