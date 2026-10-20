@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
@@ -101,7 +100,7 @@ type Config struct {
 	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
-	Topology bridge.Snapshotter
+	Topology Snapshotter
 	// EndpointPersistence, when set, replaces the facade's own scene and
 	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
 	// node's store) in the facade's assembler and [Aggregator], for a host
@@ -183,7 +182,7 @@ type Network struct {
 	// Incoming, tcpClient for Outgoing), so a peer learns it during the
 	// handshake and may open TCP to us — matter.js
 	// ServerNetworkRuntime.ts:355-363.
-	TCP bridge.TCPConfig
+	TCP TCPConfig
 	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
 	// Wi-Fi; the zero value (no Reporter) mounts none. NetworkCommissioning
 	// stays Ethernet-only either way (concept v2 §B.4): the node states the
@@ -384,7 +383,11 @@ const maxUniqueIDBytes = 32
 // (main.go:113-131): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
 // length the SPAKE2+ verifier needs, and the identity the bridge and the
-// assembler refuse to start without.
+// assembler refuse to start without. The bounds are this package's
+// [MaxDiscriminator], [PBKDFIterationsMin], [PBKDFIterationsMax],
+// [PBKDFSaltMin] and [PBKDFSaltMax]; the passcode check is
+// [ValidateSetupPIN] — a host checks its own configuration against them
+// before New.
 func (c *Config) Validate() error {
 	var errs []error
 	cm := c.Commissioning

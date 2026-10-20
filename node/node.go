@@ -26,9 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -723,13 +721,13 @@ func (n *Node) Aggregator() *Aggregator { return n.agg }
 // CASE session, on which fabric, and when each was last active. The
 // facade owns its lifecycle; a host reads it and leaves closing to the
 // node.
-func (n *Node) Sessions() *operational.Manager { return n.sec.sessions }
+func (n *Node) Sessions() *SessionManager { return n.sec.sessions }
 
 // Subscriptions returns the subscription manager, for a host's
 // diagnostics (subscription.Manager.CountBySession, Active): the
 // subscriptions riding on each session. The facade owns its lifecycle;
 // a host reads it and leaves closing to the node.
-func (n *Node) Subscriptions() *subscription.Manager { return n.sec.subs }
+func (n *Node) Subscriptions() *SubscriptionManager { return n.sec.subs }
 
 // RemoveFabric removes a fabric without a commissioner — a host's revoke
 // or factory reset — exactly as the RemoveFabric command does: the
@@ -745,7 +743,7 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 }
 
 // CommissioningWindow returns the commissioning window.
-func (n *Node) CommissioningWindow() *bridge.CommissioningWindow { return n.br.CommissioningWindow() }
+func (n *Node) CommissioningWindow() *CommissioningWindow { return n.br.CommissioningWindow() }
 
 // SetCommissioningBlocked refuses every new commissioning while err is
 // non-nil — the node's own window (at Start and after the last fabric is

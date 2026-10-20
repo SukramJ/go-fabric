@@ -10,6 +10,13 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the reference consumer reaches below `node/` has a facade route or is a documented advanced seam (`docs/guides/advanced-seams.md`).
+
+### Added
+
+- `node`: the names a host configures and observes a node with, without importing the lower packages — the type aliases `Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager` and `DiagnosticEvent` (the same types as `bridge.Snapshotter`, `endpoint.Topology`, `bridge.TCPConfig`, `bridge.CommissioningWindow`, `operational.Manager`, `subscription.Manager` and `diagevent.Event`); the bridge's window errors `ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen` and `ErrCommissioningWindowNotConfigured` (the same values, for `errors.Is`); the commissioning bounds `MaxDiscriminator`, `PBKDFIterationsMin`/`Max` and `PBKDFSaltMin`/`Max` (from `secure/setup` and `secure/spake2`), `ValidateSetupPIN`, the regulatory locations `RegulatoryIndoor`, `RegulatoryOutdoor`, `RegulatoryIndoorOutdoor` and `SoftwareVersionFromString` (cluster/core's). `Config.Topology`, `Network.TCP`, `Node.Sessions`, `Node.Subscriptions` and `Node.CommissioningWindow` are declared through the aliases; their types do not change.
+- `device`: the aliases `SourceKey` and `AvailabilityProbe`, the types of `Options.StableKey` and `Options.Reachable` (`endpoint.SourceKey`, `endpoint.AvailabilityProbe`).
+
 ## [0.9.0] — 2026-10-20
 
 Closes milestone 3 (behaviour depth) of the [roadmap](./docs/roadmap.md). Milestone 3, phase 19, brief BR: the behaviour-test port of OTA (`OtaTest.ts` on two `fabrictest` devices of one site), the small generated servers, the open partial cases and the runtime files against matter.js at `862ad75f` — 75 of 159 open cases, the other 84 `missing` with a class in their reason, the planned ratchet from 52 to 37; a node client stack on `fabrictest`, five fixes the ports found (a bound peer's subscription, the DNS-SD interval bounds of a node record, the fabric event of UpdateFabricLabel and SetVIDVerificationStatement, the OTA provider's update-token rules, the OTA requestor's announcement during a query) and four `by_design` entries. The milestone's last wave carries the minor version, as `v0.8.0` did for milestone 2; the `v0.8.9` concept v5 F.5 named is folded into it.

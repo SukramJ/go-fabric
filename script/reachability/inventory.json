@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5885,
+  "entry_points": 5888,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13254,
-    "reachable": 9202,
-    "whitelisted": 4047,
+    "total_exported": 13277,
+    "reachable": 9216,
+    "whitelisted": 4056,
     "unreachable": 5
   },
   "by_package": [
@@ -19245,6 +19245,20 @@
     },
     {
       "package": "device",
+      "identifier": "AvailabilityProbe",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 58
+    },
+    {
+      "package": "device",
+      "identifier": "SourceKey",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 54
+    },
+    {
+      "package": "device",
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
@@ -24173,10 +24187,52 @@
     },
     {
       "package": "node",
+      "identifier": "CommissioningWindow",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 41
+    },
+    {
+      "package": "node",
+      "identifier": "DiagnosticEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 55
+    },
+    {
+      "package": "node",
       "identifier": "RemoveFabricBindings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
       "line": 8
+    },
+    {
+      "package": "node",
+      "identifier": "SessionManager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 46
+    },
+    {
+      "package": "node",
+      "identifier": "Snapshotter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 29
+    },
+    {
+      "package": "node",
+      "identifier": "SubscriptionManager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 51
+    },
+    {
+      "package": "node",
+      "identifier": "TCPConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 37
     },
     {
       "package": "node",
@@ -24247,6 +24303,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 167
+    },
+    {
+      "package": "node",
+      "identifier": "Topology",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/facade.go",
+      "line": 33
     },
     {
       "package": "schema",
