@@ -2,7 +2,8 @@
 
 Brief `notes/briefs/2026-10-20-BX3-sweeps.md`; branch `m4/bx3` off `main` at `ab4303fd`. Strings, comments, aliases, one
 field per config and one dump removal; no behaviour changed except where named below. `make race` not run: nothing here
-adds a goroutine, a lock or a shared write (the one new package variable, `tlv.Logger`, is documented as set once before use).
+adds a goroutine, a lock or a shared write beyond construction: the one new package variable, `tlv.Logger`, is documented as set once
+before use, and the two `SetLogger` methods store into an `atomic.Pointer`, so they may be called at any time.
 
 ## Scripts
 
@@ -12,18 +13,20 @@ All in `notes/briefs/reports/BX3-scripts/` (and the scratchpad), idempotent, run
 | --- | --- |
 | 1 error prefixes | `bx3-prefixes.py` (prints one line per changed message) |
 | 2a log names | `bx3-logs.py` |
-| 2b loggers | `bx3-loggers.py` |
+| 2b loggers | `bx3-loggers.py`; `bx3-setlogger.py` (`SetLogger` for `GeneralDiagnostics` and `Zeroconf`, the `CaseAdapter` dump removal); `bx3-wire-logger.py` (`node.Config.Logger` and the bridge's logger into the components) |
 | 3 mutex comments | `bx3-mutex.sh` (wraps `bx3-mutex.go`, a go/ast pass; dry run by default, `-apply` writes) |
 | 4 facade aliases | `bx3-aliases.py` |
 | 5 the dump | `bx3-dump.py` |
 
-After BX1/BX2 merge, re-run in this order: `bx3-dump.py`, `bx3-prefixes.py`, `bx3-logs.py`, `bx3-loggers.py`,
-`bx3-aliases.py`, `bx3-mutex.sh -apply`, then `gofumpt -l .`, `go build ./...`, `go test ./...`. A script that finds its anchor gone
-asserts and says which; a rewritten region is a manual merge. The test edit `node/system_set_wiring_test.go` is part of `bx3-logs.py`.
+After BX1/BX2 merge, re-run in this order: `bx3-dump.py`, `bx3-prefixes.py`, `bx3-logs.py`, `bx3-loggers.py`, `bx3-setlogger.py`,
+`bx3-wire-logger.py`, `bx3-aliases.py`, `bx3-mutex.sh -apply`, then `gofumpt -l .`, `go build ./...`, `go test ./...`. A script that finds its anchor gone
+asserts and says which; a rewritten region is a manual merge. The test edits `node/system_set_wiring_test.go` (in `bx3-logs.py`), `transport/udp/listener_test.go` (in `bx3-loggers.py`) and
+`bridge/securechannel_noop_test.go` (the `peekBytes` tests, in `bx3-setlogger.py`) are part of the scripts; `node/logger_wiring_test.go` is new.
+`bx3-aliases.py` spells the alias `OTAApplier` for `mattercore.OtaApplier`.
 
-## 1 Error prefixes (G1-9) — 485 messages
+## 1 Error prefixes (G1-9) — 631 messages
 
-Commit `error prefixes`. 417 `errors.New`/`fmt.Errorf` literals plus 68 further string literals of the old `matter:` prefix
+Commit `error prefixes`, first pass 485 messages: 417 `errors.New`/`fmt.Errorf` literals plus 68 further string literals of the old `matter:` prefix
 (typed errors, `im.UnsupportedCommandf`, `im.ErrUnsupportedCommand`). By package: `cluster/core` 208, `store` 131 (`matter store:`
 to `store:`, most are `fmt.Errorf` wraps), `bridge` 19, `controller/commissioner` 14, `controller/attestation` 14,
 `cluster/thermo` 13, `cluster/cover` 13, `cluster/lock` 11, `node` 10, `cluster/closure` 10, `controller/dcl` 9,
@@ -35,21 +38,20 @@ Three prefixes were kept behind the package name rather than replaced, because t
 No test asserted a changed message (the full suite passed with no test edit); `docs/` had no occurrence;
 `internal/chiptool` reads no `DebugText` (grep), so nothing there changed.
 
+Second pass (review decisions 1 and 2, commit `error prefixes, second pass`): 146 more string literals. The four `matter:` panics of
+`contract/` are `contract:`; the status texts that `spec.Errorf` and the typed errors build, and the `im.UnsupportedCommandf` texts of
+the cluster servers, take the package name instead of the cluster name: `cluster/thermo` 46, `cluster/lock` 42, `cluster/closure` 23,
+`cluster/appliance` 16, `cluster/light` 8, `cluster/cover` 7 (`lock:`, `closure:`, `thermo:`, `cover:`, `appliance:`, `light:`). No test,
+`docs/` page or `internal/chiptool` expectation named an old text (the one `errors.New("doorlock: invoke failed")` is a test-local
+sentinel). The `matter` pass of `bx3-prefixes.py` now handles every sub-prefix of a directory, not only `matter`.
+
 Left as it is, with the reason:
 
-- `contract/` panics `matter: …` (`dataversion.go:59`, `matter.go:412,467,470`): `contract` is not one of the 23 directories and
-  is the stdlib-only boundary; the brief names no prefix for it. A decision: `contract:`?
-- `spec.Errorf(im.Status…, "doorlock: …")`, `thermostat: …`, `windowcovering: …`, `closuredimension: …`, `microwaveovencontrol: …`,
-  `colorcontrol: …`, `temperaturecontrol: …`, `closurecontrol: …` (about 200 literals in `cluster/lock`, `thermo`, `cover`, `closure`,
-  `appliance`, `light`): these are status-carrying messages and typed-error texts that the dispatcher maps by status (G1-8), not
-  sentinels, and the cluster name is the more useful prefix there. They are the sub-package prefixes the brief lists, but the brief
-  scopes the rule to `errors.New`/`fmt.Errorf` sentinels. Where the same prefix started an `errors.New`/`fmt.Errorf` literal it was
-  replaced. If the owner wants these too, `bx3-prefixes.py` takes the extra literals in its `matter` pass; say so.
 - `fmt.Errorf` literals without a known sub-package prefix (they wrap) were not given one.
 - `endpoint/dispatcher_test.go:1478-1479` keep `matter: …` strings: fixtures for the legacy wording heuristic (G1-8), not messages.
 - Wire payload: `operational_credentials.go` puts `err.Error()` into `NOCResponse.DebugText` at about a dozen sites; the errors come from
   `store` (shorter now) and `mattercert` (untouched). No chip-tool case reads it.
-- Security paths got prefix text only: 92 literals across `cluster/core/{operational_credentials,group_key_management,access_control*,general_commissioning}.go`
+- Security paths got prefix text only: 92 literals (first pass) across `cluster/core/{operational_credentials,group_key_management,access_control*,general_commissioning}.go`
   and `secure/{attestation,sigma,spake2}`.
 
 ## 2 Log names and loggers (G1-18)
@@ -69,7 +71,7 @@ names are dotted lower case at run time. `node/commissioning.go:237` (`h.logger.
 (`m.log.Info(msg, …)`) take their names from callers' literals; not inspected further. `cluster/cover/windowcovering_server.go:721`
 (`clampMsg`) is a constant passed by two callers; unchanged.
 
-### 2b loggers — 29 of 44 calls, 8 config fields (commit `loggers`)
+### 2b loggers — 32 of 44 calls through a logger, 2 removed, 8 config fields and 2 `SetLogger`
 
 Each type below stores `log` (resolved at construction with `cmp.Or(cfg.Logger, slog.Default())`) and reads it through a nil-safe
 `logger()` accessor, so a value built without its constructor still logs (`BridgedDeviceBasicInformation` has none: only its validator logs, from the constructor). One additive field per config, nil is `slog.Default()`:
@@ -83,27 +85,36 @@ Each type below stores `log` (resolved at construction with `cmp.Or(cfg.Logger, 
 | `light.ColorControlServerConfig.Logger` | `ColorControlServer` | 1 |
 | `udp.Config.Logger` | `Listener` | 1 |
 | `mdns.OperationalServiceConfig.Logger`, `mdns.CommissionableServiceConfig.Logger` | `capAdvertisedIntervals` takes the logger | 1 |
+| `GeneralDiagnostics.SetLogger` (no config struct) | `GeneralDiagnostics`, `EmitBootReason` | 2 |
+| `Zeroconf.SetLogger` (no config struct) | `Zeroconf.StartReannounceLoop` | 1 |
+
+`SetLogger` follows `DiagnosticLogs.SetLogger` (nil is `slog.Default()`) but stores into an `atomic.Pointer[slog.Logger]` read through the
+nil-safe `logger()` accessor, so it needs no lock and cannot race with a log call. Commit `SetLogger for GeneralDiagnostics and Zeroconf`.
 
 One test edit comes with this: `transport/udp/listener_test.go` swapped `slog.Default()` after the listener was built; the
 listener now keeps the logger it was built with, so the test sets `a.log` instead. (A host that calls `slog.SetDefault` after
 building a component of this table keeps the old default in it — the same as the existing constructors that resolve `slog.Default()`
 at construction.)
 
-`node.Config` does not yet pass its logger into these configs; that is wiring (not a string) and is listed for a follow-up, so today
-nothing changes for a host that sets no `Logger`.
+Wiring (review decision 4, commit `node.Config.Logger and the bridge's logger reach the components`, `bx3-wire-logger.py`):
+`node.Config.Logger` (`n.logger`) reaches `core.Config.Logger` and `GeneralDiagnostics.SetLogger` (`node/root.go`, through `rootDeps.logger`),
+`Zeroconf.SetLogger` (`node/mdns.go`) and the two node-built `udp.Config`s (`node/client.go`, `node/groupsend.go`); the bridge's `b.logger`
+reaches its `udp.Config` (`bridge/tcp_listen.go`) and the three `mdns` service configs (`bridge/bridge.go`). New test
+`node/logger_wiring_test.go`: a node built with a logger over a recorder sees the `BasicInformation` validator line (an empty VendorName;
+the validator logs at debug, not warn) and the GeneralDiagnostics BootReason line there. Not wired: `core.BridgedConfig.Logger`
+(`endpoint.ClusterServers` is a free function with no logger in reach), and the thermostat, window-covering and colour-control servers
+(`thermo`, `cover`, `light` configs), which only the host builds (`examples/reference-bridge` here) — the host sets their `Logger`.
+`bridge/bridgetest` still builds a bare `udp.Config` and `mdns.OperationalServiceConfig` (test support).
 
-Left, 15 calls, because the type has no config struct to carry the field or the file is a security path:
+Removed (review decision 3): the two debug lines of `bridge/handlers.go` (`matter.tx.sigma2resume.wire`, `matter.tx.sigma2.wire`, the first
+128 Sigma2 bytes in hex), the helper `peekBytes` and its three tests (`bridge/securechannel_noop_test.go`); CHANGELOG `### Removed`.
+Seen, not touched: `bridge/securechannel.go:1089` logs a payload as hex (BX2's file) — the same kind of line.
 
-- `cluster/core/general_diagnostics.go:919,923` (`NewGeneralDiagnostics(bootReason)` and `…With(bootReason, features)` are positional;
-  the features struct is not a logger home);
-- `mdns/zeroconf.go:637` (`NewZeroconf()` takes nothing; `SubtypeResponder` already takes a logger, `Zeroconf` does not);
-- `bridge/handlers.go:746,793` (`CaseAdapter` is built as a bare `&CaseAdapter{}`; the lines log the first 128 bytes of Sigma2 in hex at
-  debug, which may deserve a look of its own);
-- security paths, strings only: `cluster/core/operational_credentials.go` 6, `general_commissioning.go` 3, `access_control_auxiliary.go:102`
-  (its `AccessControl` is in the `access_control.go` path, built with a positional store).
+Left, 10 calls, the owner's after the merge: the three security-path servers, `cluster/core/operational_credentials.go` 6,
+`general_commissioning.go` 3 and `access_control_auxiliary.go:102` (its `AccessControl` is in the `access_control.go` path, built with a
+positional store).
 
-For these a decision is needed: a `SetLogger` like `DiagnosticLogs.SetLogger`, or a config struct. The one print in
-`ble/bluez/cmd/reference-controller/main.go:21` stays: `fmt.Fprintln(os.Stderr, …)` in a `main` package is the CLI's own output.
+The one print in `ble/bluez/cmd/reference-controller/main.go:21` stays: `fmt.Fprintln(os.Stderr, …)` in a `main` package is the CLI's own output.
 
 ## 3 Mutex comments (G1-16) — 104 comments
 
@@ -161,21 +172,39 @@ still imports `cluster/core` for them. `discovery.Names` (`Client.Names`) and `e
 (`chunk_strict_violation`, a log line only) went with the gate: nothing else reads it; it was off outside diagnose mode.
 Unused imports `os` and `tlv` removed from that file.
 
+## Stray artefact
+
+`reference-controller` at the repository root was a committed 34 MB binary (since #144). `git rm` and `/reference-controller` in
+`.gitignore` next to `/reference-bridge`, one commit `remove the committed reference-controller binary`; CHANGELOG `### Removed`.
+
 ## CHANGELOG
 
-`[Unreleased]` `### Changed` (prefixes, log events, `tlv.Logger`, the eight logger fields, the aliases with the signatures that now
-spell `node.X`, the mutex comments) and `### Removed` (the dump).
+`[Unreleased]` `### Changed` (prefixes incl. status texts and `contract`, log events, `tlv.Logger`, the eight logger fields, the two
+`SetLogger` and the wiring, the aliases with the signatures that now spell `node.X`, the mutex comments) and `### Removed` (the dump,
+the Sigma2 wire dumps, the binary).
 
 ## Guards
 
 The exit lines with HEAD are in the PR description. `make reachability` and `make cite-check` were regenerated and committed: the
 unreached count stays at its ratchet 5 (the new exported names are whitelisted), the citation drift keeps its 28 entries and only
-their line numbers moved. `make race` was not run (strings, comments, aliases, one write-once variable).
+their line numbers moved. `make race` was not run: no shared write beyond construction was added (`SetLogger` is an atomic pointer store).
 
-## Questions
+## Decisions (owner answers to the review of #202)
 
-1. `contract/` panics still say `matter:`; `contract:`?
-2. The ~200 `spec.Errorf`/typed-error status texts with cluster-name prefixes: leave (cluster name is the useful prefix) or rename to the package?
-3. The five types without a config (`GeneralDiagnostics`, `Zeroconf`, `CaseAdapter`, `OperationalCredentials`/`GeneralCommissioning`/`AccessControl`):
-   `SetLogger` or a config struct?
-4. `node.Config.Logger` into the eight new fields: a follow-up.
+1. `contract/` panics: `contract:` (done, second pass).
+2. Status texts and typed errors take the package name, not the cluster name (done, second pass; P8 allows one style).
+3. `GeneralDiagnostics` and `Zeroconf` get `SetLogger`; the `CaseAdapter` wire dumps are removed; the three security-path servers stay
+   (below).
+4. `node.Config.Logger` is wired in now (done, with a test), where `node/` and `bridge/` build the configs.
+5. The alias is `OTAApplier`; `mattercore.OtaApplier` keeps its name (done; CHANGELOG, advanced-seams table and `bx3-aliases.py`).
+6. The committed `reference-controller` binary is removed (done).
+7. This report, counts and re-run order updated.
+
+## Left out (the owner's)
+
+- `cluster/core/operational_credentials.go` (6 inline `slog.Default()` calls), `general_commissioning.go` (3) and
+  `access_control_auxiliary.go:102` (1): the owner does them after the merge.
+- The mutexes of the security paths (`access_control.go`, `operational_credentials.go`, `group_key_management.go`,
+  `general_commissioning.go`, `secure/sigma/initiator.go`) and the 22 others listed in section 3 (more than seven guarded fields, irregular or missing Lock sites).
+- `core.BridgedConfig.Logger` has no caller that sets it from the node (no logger in reach in `endpoint.ClusterServers`).
+- The `OTA*` and `DeviceTypeValidation*` constants next to the new aliases are not re-exported.
