@@ -498,8 +498,14 @@
     },
     {
       "path": "packages/node/test/behavior/system/network/ConnectionStateTest.ts",
-      "status": "planned",
-      "reason": "The controller's per-peer connection state (Connected, Reconnecting, WaitingForDeviceDiscovery, Disconnected) and its transitions.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestConnectionStateParityMatterJS"
+      ],
+      "missing": [
+        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in"
+      ],
+      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate.",
       "snapshotSha": "ee5c84e8287b20be0454c11fbaa692f35dfeb8dd"
     },
     {
