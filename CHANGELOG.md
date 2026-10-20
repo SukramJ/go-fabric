@@ -10,7 +10,9 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the reference consumer reaches below `node/` has a facade route or is a documented advanced seam (`docs/guides/advanced-seams.md`).
+## [0.9.1] — 2026-10-20
+
+Milestone 4, phase 20a, brief BS: the node facade complete — every symbol the reference consumer reaches below `node/` has a facade route or is a documented advanced seam (`docs/guides/advanced-seams.md`). With it the archcheck guard (brief BW, pull request 196: the layers of ADR 0026 and their direction as a test in `make ci`) and the two architecture decision records of 2026-10-20, [ADR 0025](./docs/adr/0025-facade-design-principles.md) (the facade's design principles) and [ADR 0026](./docs/adr/0026-architecture-principles.md) (the module's architecture principles).
 
 ### Added
 
@@ -4426,7 +4428,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/SukramJ/go-fabric/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...v0.9.0
 [0.8.8]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...v0.8.7

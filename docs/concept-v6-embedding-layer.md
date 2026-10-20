@@ -369,3 +369,8 @@ Meilenstein 4 mit Phase 22.
   BU — Report mit einem Abschnitt je Prinzip, ein unvoreingenommener
   Leser als Konsument; Befunde als eigene Welle vor BU; das zweite Tor
   vor `v0.10.0` über die ganze Facade einschließlich `controller/`.
+- **Versionen (Owner, 2026-10-20):** BS `v0.9.1`; BT und BU zusammen
+  `v0.10.0` (der Accessor-Bruch verlangt eine Minor, README §Pre-1.0);
+  Meilenstein 4 schließt mit `v0.11.0`; M5–M7 rücken in der
+  Roadmap-Tabelle je eine Minor. Teil D oben nennt noch die alten
+  Patch-Nummern.

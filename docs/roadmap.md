@@ -97,10 +97,10 @@ one none uses, and both come before completeness for its own sake.
 | 1 | [The commissioner in the field](#milestone-1-the-commissioner-in-the-field) | `v0.7.0` | 11–13 | a boxed Wi-Fi or Thread product is commissioned by this module and handed on to Apple Home |
 | 2 | [The test foundation](#milestone-2-the-test-foundation) | `v0.8.0` | 14–16 | every later milestone is proved against matter.js's own tests; consumers test their bridge without hardware |
 | 3 | [Behaviour depth](#milestone-3-behaviour-depth) | `v0.9.0` | 17–19 | the 25 matter.js servers with logic are ported line for line — remotes, thermostats, locks behave as the ecosystems expect |
-| 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.10.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
-| 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.11.0` | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
-| 6 | [Completeness](#milestone-6-completeness) | `v0.12.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
-| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.13.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+| 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.11.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
+| 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
+| 6 | [Completeness](#milestone-6-completeness) | `v0.13.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
+| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.14.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 
 Milestones 2 and 3 are the owner's order of 2026-10-17: the test
 foundation first, because milestones 3–7 are proved on it; the behaviour
@@ -211,7 +211,7 @@ exceptions stay matter.js's. Consumers: every one; the HA bridge and the
 no ◐ left except the behaviour-layer idiom row; loom and one 2mqtt daemon
 build on the facade alone.
 
-**Status 2026-10-20.** Phase 20 planned: concept v6 Teil A — a facade route or a documented advanced seam for every symbol loom reaches below `node/` today, the generated typed cluster layer (`State`, `Patch`, typed `OnChanged` and command handlers per cluster) and the declaration form of the device kit, the reference bridge rewritten on it, the apidiff guard on `golang.org/x/exp/cmd/apidiff` against the last tag; four waves (BS ∥ BT, then BU, BV) as `v0.9.1`–`v0.9.4`, the twelve `until: M4` test files ported where their subject exists.
+**Status 2026-10-20.** Phase 20 planned: concept v6 Teil A — a facade route or a documented advanced seam for every symbol loom reaches below `node/` today, the generated typed cluster layer (`State`, `Patch`, typed `OnChanged` and command handlers per cluster) and the declaration form of the device kit, the reference bridge rewritten on it, the apidiff guard on `golang.org/x/exp/cmd/apidiff` against the last tag; four waves (BS ∥ BT, then BU, BV) as `v0.9.1`–`v0.9.4`, the twelve `until: M4` test files ported where their subject exists. Phase 20a (brief BS, pull request 197) released as `v0.9.1`: a facade route or a documented advanced seam (`docs/guides/advanced-seams.md`) for every symbol loom reaches below `node/`, the migration guide (`docs/guides/migrating-to-the-facade.md`), the reference daemon on the routes; with it the archcheck guard (brief BW, pull request 196) and ADR 0025 / ADR 0026. Versions (owner, 2026-10-20): phase 20b (the typed cluster layer, an accessor break) and 20c land together as `v0.10.0`, milestone 4 closes with `v0.11.0`, and the later milestones shift by one minor in the table above.
 
 ### Milestone 5: ICD and the controller remainder
 
