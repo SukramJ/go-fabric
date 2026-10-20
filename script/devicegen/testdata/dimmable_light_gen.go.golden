@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -92,4 +91,6 @@ func NewDimmableLight(opts Options, with ...Option) (*DimmableLight, error) {
 func (d *DimmableLight) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
-func (d *DimmableLight) LevelControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0008) }
+func (d *DimmableLight) LevelControl() *levelcontroldef.Server {
+	return serverAs[*levelcontroldef.Server](d.Device, 0x0008)
+}

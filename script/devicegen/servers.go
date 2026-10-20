@@ -10,14 +10,20 @@ type serverType struct {
 	Type string
 	// Import is the declaring package's import path.
 	Import string
+	// Alias is the import's name in the generated file; empty for the
+	// path's last element.
+	Alias string
 }
 
-const specImport = "github.com/SukramJ/go-fabric/cluster/spec"
-
-// specServer is the generated server ([spec.Server]), the default for every
-// cluster with a committed definition under cluster/spec that servers does
-// not name (ADR 0018, decisions of wave 6, 2 and 3).
-var specServer = serverType{Type: "*spec.Server", Import: specImport}
+// typedServer is the typed server script/clustergen generates beside the
+// definition of the cluster pkg (cluster/spec/<pkg>/server_gen.go: the
+// <pkg>def.Server that embeds spec.Server), the default for every cluster
+// with a committed definition that servers does not name (ADR 0018,
+// decisions of wave 6, 2 and 3; brief BT). device.New mounts the generated
+// server in it, so the accessor finds it.
+func typedServer(pkg string) serverType {
+	return serverType{Type: "*" + pkg + "def.Server", Import: "github.com/SukramJ/go-fabric/cluster/spec/" + pkg, Alias: pkg + "def"}
+}
 
 // servers is the hand-maintained table of the clusters whose default
 // server is one of the module's self-held servers rather than the

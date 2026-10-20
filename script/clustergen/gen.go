@@ -33,6 +33,7 @@ const header = `// SPDX-License-Identifier: Apache-2.0
 type output struct {
 	Package string
 	Source  []byte // definition_gen.go
+	Server  []byte // server_gen.go, the typed server (hull.go)
 	Test    []byte // definition_gen_test.go
 }
 
@@ -117,7 +118,7 @@ func generate(snap *snapshot, name string) (*output, error) {
 		snap: snap, c: c, pkg: packageName(c.Name),
 		used: map[string]string{}, data: map[string]*dataInfo{}, attrType: map[uint32]typeInfo{},
 	}
-	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature"} {
+	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap"} {
 		g.used[id] = "package identifier"
 	}
 	if err := g.collect(); err != nil {
@@ -127,11 +128,15 @@ func generate(snap *snapshot, name string) (*output, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
+	srv, err := g.server()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", c.Name, err)
+	}
 	test, err := g.test()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
-	return &output{Package: g.pkg, Source: src, Test: test}, nil
+	return &output{Package: g.pkg, Source: src, Server: srv, Test: test}, nil
 }
 
 func (g *generator) claim(id, what string) error {
@@ -1582,6 +1587,7 @@ func (g *generator) test() ([]byte, error) {
 	w.p("package %s", g.pkg)
 	w.p("")
 	w.p("import (")
+	w.p("\t\"context\"")
 	w.p("\t\"testing\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
@@ -1633,6 +1639,7 @@ func (g *generator) test() ([]byte, error) {
 		w.p("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample)
 	}
 	w.p("}")
+	g.serverTest(w)
 	out, err := format.Source(w.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())

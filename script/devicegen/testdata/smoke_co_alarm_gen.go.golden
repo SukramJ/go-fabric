@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	carbonmonoxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -71,19 +70,21 @@ func NewSmokeCoAlarm(opts Options, with ...Option) (*SmokeCoAlarm, error) {
 }
 
 // SmokeCoAlarm returns the SmokeCoAlarm server (mandatory), or nil when the host supplied one of another type.
-func (d *SmokeCoAlarm) SmokeCoAlarm() *spec.Server { return serverAs[*spec.Server](d.Device, 0x005C) }
+func (d *SmokeCoAlarm) SmokeCoAlarm() *smokecoalarmdef.Server {
+	return serverAs[*smokecoalarmdef.Server](d.Device, 0x005C)
+}
 
 // RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SmokeCoAlarm) RelativeHumidityMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0405)
+func (d *SmokeCoAlarm) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
+	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
 }
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SmokeCoAlarm) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *SmokeCoAlarm) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }
 
 // CarbonMonoxideConcentrationMeasurement returns the CarbonMonoxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SmokeCoAlarm) CarbonMonoxideConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x040C)
+func (d *SmokeCoAlarm) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
+	return serverAs[*carbonmonoxideconcentrationmeasurementdef.Server](d.Device, 0x040C)
 }

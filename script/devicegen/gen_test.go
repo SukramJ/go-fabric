@@ -404,7 +404,7 @@ func TestSyntheticElements(t *testing.T) {
 		`Conditions: []string{"K"}`,
 		`ID: 0x001D, Name: "Descriptor"`,
 		`Definition: cdef.Definition`,
-		`func (d *T) C() *spec.Server`,
+		`func (d *T) C() *cdef.Server { return serverAs[*cdef.Server](d.Device, 0x0002) }`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("generated source lacks %q:\n%s", want, src)

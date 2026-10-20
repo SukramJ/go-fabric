@@ -112,9 +112,11 @@ func TestMatterJSFixtures(t *testing.T) {
 
 // TestEveryClusterGeneratesAndCompiles generates every cluster of the
 // snapshot into a scratch module that replaces this one, vets it — which
-// compiles every package and its generated test — and runs the generated
-// tests of the clusters matter.js wire fixtures exist for, together with a
-// test that round-trips each fixture through the generated codecs.
+// compiles every package, its typed server and its generated test — and
+// runs the generated tests of the clusters matter.js wire fixtures exist
+// for, together with a test that round-trips each fixture through the
+// generated codecs. (The committed packages run their generated tests,
+// TestTypedServer among them, in the module's own suite.)
 func TestEveryClusterGeneratesAndCompiles(t *testing.T) {
 	if testing.Short() {
 		t.Skip("compiles every cluster; skipped in -short")
@@ -135,6 +137,11 @@ func TestEveryClusterGeneratesAndCompiles(t *testing.T) {
 	}
 	if len(entries) != len(snap.Clusters) {
 		t.Fatalf("%d packages for %d clusters", len(entries), len(snap.Clusters))
+	}
+	for _, e := range entries {
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), "server_gen.go")); err != nil {
+			t.Errorf("%s has no typed server: %v", e.Name(), err)
+		}
 	}
 	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.2\n\nrequire github.com/SukramJ/go-fabric v0.0.0\n\nreplace github.com/SukramJ/go-fabric => %s\n", root)
 	sum, err := os.ReadFile(filepath.Join(root, "go.sum"))

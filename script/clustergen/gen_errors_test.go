@@ -72,11 +72,14 @@ func TestGenerateShapes(t *testing.T) {
 			{"id":2,"name":"Rec","effective":{"type":"Pair","metatype":"object","primitive":"struct"}},
 			{"id":3,"name":"Untyped","effective":{"conformance":{"text":"X","ast":{"type":"X"}}}},
 			{"id":4,"name":"Inline","effective":{"type":"struct","metatype":"object","fields":[{"id":0,"name":"G","type":"bool","metatype":"boolean",`+m+`}]}},
+			{"id":5,"name":"Level","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","quality":{"nullable":true}}},
+			{"id":6,"name":"Scoped","effective":{"type":"list","metatype":"array","access":{"fabric":"F"},"entry":{"type":"Pair","metatype":"object"}}},
 			{"id":65532,"name":"FeatureMap","effective":{"type":"FeatureMap","metatype":"bitmap","primitive":"uint32"}}
 		],
 		"commands":[
 			{"id":0,"name":"Ping","effective":{"direction":"request","response":"status","fields":[{"id":0,"name":"Text","type":"string","metatype":"string","primitive":"string","constraint":{"text":"max 8","max":8}},{"id":1,"name":"Ignored"}]}},
-			{"id":1,"name":"Pair","effective":{"direction":"response","fields":[]}}
+			{"id":1,"name":"Pair","effective":{"direction":"response","fields":[]}},
+			{"id":2,"name":"Ask","effective":{"direction":"request","response":"Pair","fields":[]}}
 		],
 		"events":[{"id":0,"name":"Ev","effective":{"priority":"debug","fields":[{"id":0,"name":"Rec","type":"Pair","metatype":"object","primitive":"struct","quality":{"nullable":true}}]}}],
 		"datatypes":[
@@ -110,9 +113,48 @@ func TestGenerateShapes(t *testing.T) {
 	if strings.Contains(src, "AttrFeatureMap") {
 		t.Error("a global attribute was generated")
 	}
-	for _, want := range []string{"spectest.RoundTripAttribute(t, Definition, AttrRec", "spectest.RoundTripEvent", "[]byte{1, 1, 1, 1}"} {
+	for _, want := range []string{
+		"spectest.RoundTripAttribute(t, Definition, AttrRec", "spectest.RoundTripEvent", "[]byte{1, 1, 1, 1}",
+		"func TestTypedServer(t *testing.T)", "s.HandleAsk(func(context.Context, AskRequest) (PairResponseCommand, error)",
+	} {
 		if !strings.Contains(string(o.Test), want) {
 			t.Errorf("test lacks %q", want)
+		}
+	}
+	// The typed server: a nullable attribute a pointer in State and in
+	// Patch with Null, a list a slice, a struct its type, a fabric-scoped
+	// and an untyped attribute left out and named, a command with a
+	// response and one answered by status.
+	hull := strings.Join(strings.Fields(string(o.Server)), " ") // gofmt's column alignment aside
+	for _, want := range []string{
+		"Level *uint8 `matter:\"0x0005\"`", "Anon []AnonEntry `matter:\"0x0000\"`", "Rec Pair `matter:\"0x0002\"`",
+		"Anon *[]AnonEntry `matter:\"0x0000\"`", "Null []uint32",
+		"// - Untyped (0x0003): its type is one the generator maps to any.",
+		"// - Scoped (0x0006): fabric-scoped: spec.NewServer refuses to serve it.",
+		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error))",
+		"func (s *Server) HandleAsk(fn func(ctx context.Context, req AskRequest) (PairResponseCommand, error))",
+		"func init() { spec.RegisterTyped(ClusterID, Wrap) }",
+	} {
+		if !strings.Contains(hull, want) {
+			t.Errorf("server lacks %q", want)
+		}
+	}
+	for _, unwanted := range []string{"HandlePair", "Untyped any", "Scoped []Pair"} {
+		if strings.Contains(hull, unwanted) {
+			t.Errorf("server has %q", unwanted)
+		}
+	}
+}
+
+// TestGenerateHullRejects covers the typed server's own collisions.
+func TestGenerateHullRejects(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, cluster, want string }{
+		{"attribute named Null", `{"id":1,"name":"A","attributes":[{"id":0,"name":"Null","effective":{"type":"bool","metatype":"boolean"}}],"commands":[],"events":[]}`, "Patch.Null"},
+		{"datatype named State", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"State","type":"enum8","metatype":"enum","primitive":"uint8","fields":[]}]}`, "collides"},
+	} {
+		if _, err := generate(synthetic(t, tc.cluster), "A"); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want %q", tc.name, err, tc.want)
 		}
 	}
 }

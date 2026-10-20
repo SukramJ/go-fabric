@@ -441,8 +441,9 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		if !ok {
 			continue
 		}
-		if acc.Import == specImport {
-			imports[specImport] = ""
+		if acc.Alias != "" {
+			// The typed server's package: the definition's, "def" alias.
+			imports[acc.Import] = acc.Alias
 		} else {
 			// A self-held server's package, aliased by its last path
 			// element; the definition import carries the "def" suffix.
@@ -465,7 +466,8 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 // accessor returns the Go type of a server cluster's typed accessor, when
 // the generated type gets one: not for a cluster the assembler mounts, and
 // only where the default server's type is known — the servers table, or
-// the generated server for a cluster with a committed definition.
+// the typed server (<pkg>def.Server) for a cluster with a committed
+// definition.
 func (g *generator) accessor(cr *clusterReq) (serverType, bool) {
 	if assemblerMounted[cr.def.Name] {
 		return serverType{}, false
@@ -473,8 +475,8 @@ func (g *generator) accessor(cr *clusterReq) (serverType, bool) {
 	if t, ok := servers[cr.def.Name]; ok {
 		return t, true
 	}
-	if g.defs[packageName(cr.def.Name)] {
-		return specServer, true
+	if pkg := packageName(cr.def.Name); g.defs[pkg] {
+		return typedServer(pkg), true
 	}
 	return serverType{}, false
 }
