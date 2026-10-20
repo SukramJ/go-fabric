@@ -22,7 +22,7 @@ validation:
 # German working paper. Neither is published.
 exclude_docs: |
   history/
-  concept-v5-*.md
+  concept-v6-*.md
   requirements.txt
 
 theme:

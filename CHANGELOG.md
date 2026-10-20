@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-20
+
+Closes milestone 3 (behaviour depth) of the [roadmap](./docs/roadmap.md). Milestone 3, phase 19, brief BR: the behaviour-test port of OTA (`OtaTest.ts` on two `fabrictest` devices of one site), the small generated servers, the open partial cases and the runtime files against matter.js at `862ad75f` — 75 of 159 open cases, the other 84 `missing` with a class in their reason, the planned ratchet from 52 to 37; a node client stack on `fabrictest`, five fixes the ports found (a bound peer's subscription, the DNS-SD interval bounds of a node record, the fabric event of UpdateFabricLabel and SetVIDVerificationStatement, the OTA provider's update-token rules, the OTA requestor's announcement during a query) and four `by_design` entries. The milestone's last wave carries the minor version, as `v0.8.0` did for milestone 2; the `v0.8.9` concept v5 F.5 named is folded into it.
+
 ### Added
 
 - `fabrictest`: a device's node runs its client stack on the site. With `node.Client.Enabled` its socket is the device's host address of the in-memory network (port `udp.MatterPort`+1, through the module-internal `internal/nodeseam`) and its DNS-SD cache asks the site, so two devices of one fabric reach each other over CASE; `Device.Peers` is the node's peer set. The client stack's exchanges and peers now run on `node.Config.Clock`.
@@ -4396,7 +4400,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...v0.9.0
 [0.8.8]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/SukramJ/go-fabric/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/SukramJ/go-fabric/compare/v0.8.5...v0.8.6
