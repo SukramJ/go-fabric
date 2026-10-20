@@ -4,10 +4,12 @@
 package core
 
 import (
+	"bytes"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
@@ -101,4 +103,233 @@ func TestParityMatterJS_OTAProviderResponseFields(t *testing.T) {
 	if err != nil || ab.Action != provdef.ApplyUpdateActionDiscontinue || ab.DelayedActionTime != 120 {
 		t.Fatalf("ApplyUpdateResponse %+v %v", ab, err)
 	}
+}
+
+// The provider's answers of matter.js packages/node/test/behaviors/ota/OtaTest.ts
+// at 862ad75f. matter.js drives a requestor to the provider on a MockSite
+// pair and rewrites its requests (applyRewritten :1488-1539, applyWithDelay
+// :1584-1637, the queryImage cases :2288-2591); the provider's answer is
+// the observable, so these run on the provider (otaFixture), its requests
+// as the requestor sends them. SoftwareUpdateManager's consent
+// bookkeeping is the provider's: the consent a QueryImage records for an
+// image the source offers without asking (consents), none for an image
+// whose consent the requestor obtains itself (UserConsentNeeded).
+
+// otaNeedsRequestorConsent offers an image whose consent the requestor
+// obtains: the provider holds none.
+func otaNeedsRequestorConsent(c *OTAProviderConfig) {
+	src := c.ImageSource.(*otaTestSource)
+	src.img.ConsentRequired = true
+}
+
+func canConsentQuery() provdef.QueryImageRequest {
+	q := bdxQuery()
+	yes := true
+	q.RequestorCanConsent = &yes
+	return q
+}
+
+// TestParityMatterJS_OTAProviderApplyConsentAndToken ports the apply
+// answers of OtaTest.ts :1437-1582.
+func TestParityMatterJS_OTAProviderApplyConsentAndToken(t *testing.T) {
+	t.Parallel()
+
+	// :1437-1486. DelayedActionTime is seconds on the wire.
+	t.Run("refuses an apply it holds no consent for, naming the wait in seconds", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, otaNeedsRequestorConsent)
+		r := f.query(t, 7, canConsentQuery())
+		a := f.apply(t, *r.UpdateToken, 2)
+		if a.Action != provdef.ApplyUpdateActionDiscontinue || a.DelayedActionTime != 120 {
+			t.Fatalf("ApplyUpdateResponse %+v, want Discontinue 120", a)
+		}
+	})
+
+	// applyRewritten: the query of the update, then its apply as the
+	// rewritten request; the image is version 2.
+	applyRewritten := func(t *testing.T, consent func(f *otaFixture), token []byte, version uint32) provdef.ApplyUpdateActionEnum {
+		t.Helper()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		if consent != nil {
+			consent(f)
+		}
+		if token == nil {
+			token = *r.UpdateToken
+		}
+		return f.apply(t, token, version).Action
+	}
+	unknownToken := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+	withdrawn := func(f *otaFixture) {
+		f.p.mu.Lock()
+		delete(f.p.consents, otaTestPeer)
+		f.p.mu.Unlock()
+	}
+	// addUpdateConsent for the next version replaces the one the query
+	// recorded (the provider keeps one consent per peer).
+	movedToNext := func(f *otaFixture) {
+		f.p.mu.Lock()
+		f.p.consents[otaTestPeer] = 3
+		f.p.mu.Unlock()
+	}
+	for _, tc := range []struct {
+		name    string
+		consent func(*otaFixture)
+		token   []byte
+		version uint32
+		want    provdef.ApplyUpdateActionEnum
+	}{
+		// :1541.
+		{"applies the version of a known update token when the requestor asks for version 0", nil, nil, 0, provdef.ApplyUpdateActionProceed},
+		// :1547.
+		{"refuses a version other than 0 that differs from its update token", nil, nil, 3, provdef.ApplyUpdateActionDiscontinue},
+		// :1553.
+		{"refuses a version other than 0 that differs from its update token, even with consent for it", movedToNext, nil, 3, provdef.ApplyUpdateActionDiscontinue},
+		// :1561.
+		{"applies a consented version under an update token it does not know, as after a restart", nil, unknownToken, 2, provdef.ApplyUpdateActionProceed},
+		// :1567.
+		{"refuses version 0 for an update token it does not know", nil, unknownToken, 0, provdef.ApplyUpdateActionDiscontinue},
+		// :1577.
+		{"refuses version 0 for a known update token once its consent is gone", withdrawn, nil, 0, provdef.ApplyUpdateActionDiscontinue},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := applyRewritten(t, tc.consent, tc.token, tc.version); got != tc.want {
+				t.Errorf("action %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
+// :1639-1658: what a Proceed sends under the provider's apply delay. The
+// delay is matter.js's State.applyDelay, the ApplyPolicy's here; the
+// RebootResubscribeArmer half is SoftwareUpdateManager's (the register
+// names it).
+func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		delay time.Duration
+		want  uint32
+	}{
+		{"expects the device's return only after the delay it was allowed to apply with", 180 * time.Second, 180},
+		{"rounds an apply delay up to whole seconds, since it is a minimum wait", 1500 * time.Millisecond, 2},
+		{"sends at most a day of apply delay, which a requestor may treat a longer one as", 48 * time.Hour, 86_400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyPolicy = fixedPolicy{provdef.ApplyUpdateActionProceed, tc.delay} })
+			r := f.query(t, 7, bdxQuery())
+			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed || a.DelayedActionTime != tc.want {
+				t.Errorf("ApplyUpdateResponse %+v, want Proceed %d", a, tc.want)
+			}
+		})
+	}
+}
+
+// TestParityMatterJS_OTAProviderQueryInProgress ports the queryImage cases
+// of OtaTest.ts :2288-2591 on the provider's in-progress entries
+// (internal.inProgressDetails, the Go inProgress map) and its BDX
+// responder's sessions (BdxProtocol.sessionFor).
+func TestParityMatterJS_OTAProviderQueryInProgress(t *testing.T) {
+	t.Parallel()
+	stale := bytes.Repeat([]byte{0xaa}, otaUpdateTokenLength)
+	has := func(f *otaFixture, token []byte) bool {
+		f.p.mu.Lock()
+		defer f.p.mu.Unlock()
+		return f.p.inProgress[otaKey(otaTestPeer, token)] != nil
+	}
+	size := func(f *otaFixture) int {
+		f.p.mu.Lock()
+		defer f.p.mu.Unlock()
+		return len(f.p.inProgress)
+	}
+
+	// :2288-2393. A Downloading entry, fresh, without a BDX session.
+	t.Run("queryImage Case A: stale in-progress entry with no BDX session → cleared, fresh queryImage proceeds", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, nil)
+		f.p.mu.Lock()
+		f.p.inProgress[otaKey(otaTestPeer, stale)] = &otaInProgress{peer: otaTestPeer, lastState: OTAUpdateDownloading, timestamp: f.clock.Now().Add(time.Hour)}
+		f.p.mu.Unlock()
+		r := f.query(t, 7, bdxQuery())
+		if r.Status != provdef.StatusUpdateAvailable {
+			t.Fatalf("response %+v", r)
+		}
+		if has(f, stale) {
+			t.Error("the stale aa entry stayed")
+		}
+		if size(f) == 0 {
+			t.Error("no fresh entry")
+		}
+	})
+
+	// :2395-2522. The transfer of the update runs on another session, its
+	// last activity before the query's: the requestor rebooted. The
+	// SoftwareUpdateManager's suppressNextStartUp record is the manager's
+	// (the report names it); the provider's half is the cancelled
+	// transfer, the removed entry and the UpdateAvailable answer.
+	t.Run("queryImage Case B: reboot detected (different session, older BDX timestamp) → BDX cancelled, entry cleared, startUp suppressed, UpdateAvailable", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		_, done := f.startDownload(t, 7, *r.ImageUri)
+		f.clock.Advance(time.Second)
+		r2 := f.query(t, 0xDEAD, bdxQuery())
+		if r2.Status != provdef.StatusUpdateAvailable {
+			t.Fatalf("response %+v, want UpdateAvailable (not Busy)", r2)
+		}
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("the old transfer was not cancelled")
+		}
+		if has(f, *r.UpdateToken) {
+			t.Error("the old entry stayed")
+		}
+	})
+
+	// :2524-2591. The transfer runs on the query's own session: the update
+	// in progress is kept, the query is Busy.
+	t.Run("queryImage Case C: in-progress with active BDX session → in-progress state preserved when BDX active", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		_, done := f.startDownload(t, 7, *r.ImageUri)
+		if busy := f.query(t, 7, bdxQuery()); busy.Status != provdef.StatusBusy {
+			t.Fatalf("response %+v, want Busy", busy)
+		}
+		if !has(f, *r.UpdateToken) || size(f) != 1 {
+			t.Errorf("entries %d, the update's kept %v", size(f), has(f, *r.UpdateToken))
+		}
+		_ = f.bdx.DisablePeerForScope(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, otaScope, true)
+		<-done
+	})
+}
+
+// TestParityMatterJS_OTAProviderDoneClearsConsent ports OtaTest.ts
+// :1403-1435. matter.js adds a consent to the SoftwareUpdateManager and
+// reports Done to it (onOtaStatusChange); the Go provider holds the
+// consent its query recorded (consents, SoftwareUpdateManager.hasConsent)
+// and reaches Done through the NotifyUpdateApplied that reports it.
+func TestParityMatterJS_OTAProviderDoneClearsConsent(t *testing.T) {
+	t.Parallel()
+	t.Run("Done status clears the consent for the completed version", func(t *testing.T) {
+		t.Parallel()
+		f := newOTAFixture(t, nil)
+		r := f.query(t, 7, bdxQuery())
+		if !f.p.hasUpdateConsent(otaTestPeer, 2) {
+			t.Fatal("no consent for the offered version")
+		}
+		if _, err := f.p.MatterInvoke(otaCtx(7), provdef.CmdNotifyUpdateApplied, provdef.NotifyUpdateAppliedRequest{UpdateToken: *r.UpdateToken, SoftwareVersion: 2}); err != nil {
+			t.Fatal(err)
+		}
+		if f.p.hasUpdateConsent(otaTestPeer, 2) {
+			t.Error("the consent outlived Done")
+		}
+		if d := f.p.detailsForPeer(otaTestPeer, nil); d != nil {
+			t.Errorf("an update stayed in progress: %+v", d)
+		}
+	})
 }

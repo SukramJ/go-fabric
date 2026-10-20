@@ -1792,6 +1792,26 @@ answers the last reading inside the limits, null until there was one; a
 float reading is rounded to whole percent. matter.js's server is empty.
 Family SOIL passes (#47).
 
+### BD-Matter-Measurement-StatedRange — the measurement servers state the range of the attribute's encoding, matter.js's leave it null
+
+matter.js's generated measurement servers (Temperature, RelativeHumidity,
+Illuminance, Pressure and Flow) leave `MinMeasuredValue` and
+`MaxMeasuredValue` null by default and refuse a measurement outside a
+stated range or a maximum that does not exceed the minimum
+(`packages/node/test/behaviors/measurement/MeasurementServersTest.ts:33`,
+`:44`, `:53` at `862ad75f`; the constraints of the generated behaviors).
+The Go servers project a host reading and state the range the
+attribute's encoding can carry — Temperature -27315..32766,
+RelativeHumidity 0..10000, Illuminance 1..0xFFFE, Pressure 0..32766
+(`cluster/measurement/measurement.go` MatterRead), Flow 0..65534
+(`cluster/measurement/flow.go`) — and saturate a reading into it
+(`cluster/measurement:TestTemperatureServerSaturatesHigh`,
+`TestTemperatureServerSaturatesLow`; L01-D06, L01-D07 above). Reasoning:
+no host states a range, so there is nothing to refuse, and the served
+bounds keep every reported value inside a stated range. The seven range
+cases of `MeasurementServersTest.ts` are `missing` under this entry
+(phase 19, brief BR).
+
 ### BD-chip-PowerSourceConfiguration-HostOrder — Sources is the host's ordered list, not a read-time sort by PowerSource.Order
 
 connectedhomeip builds Sources at read time from the first six enabled
@@ -1813,6 +1833,25 @@ every read, so an entry those rules would refuse is left out of the read,
 and the second of two locations with the same key is ignored; the rules
 themselves are chip's. matter.js's server is empty. The ECOINFO cases need
 a fabric-sync admin+bridge app and are class (c) in the harness (#47).
+
+### BD-Matter-PowerSource-DeviceTypeOnPart — the PowerSource device type is a part endpoint, not appended to the battery's endpoint
+
+matter.js's `PowerSourceServer` adds the PowerSource device type to the
+endpoint it is mounted on
+(`packages/node/src/behaviors/power-source/PowerSourceServer.ts:23` at
+`862ad75f`, through `DescriptorServer.addDeviceTypes`,
+`DescriptorServer.ts:91-111`), so a bridged device's DeviceTypeList gains
+a second entry after BridgedNode's in behavior-initialization order. The
+Go endpoint layer lists one device type per endpoint
+(`endpoint/helpers.go` `listedDeviceTypes`), serves a bridged device's
+battery as BridgedNode's optional PowerSource cluster (`endpoint/types.go`
+`Endpoint.PowerSource`) and the PowerSource device type as a part endpoint
+of its own (`endpoint:TestSpecPartsComposeAChildEndpoint`). Reasoning:
+the bridged composition keeps BridgedNode as the endpoint's one device
+type, and the order of an appended device type is matter.js's
+behavior-initialization order, which the Go assembler does not have.
+"successfully augments descriptor" (`PowerSourceServerTest.ts`) is
+`missing` under this entry (phase 19, brief BR).
 
 ### BD-chip-Commodity-ServerChoices — where connectedhomeip's commodity servers are undefined or incidental, the module's choice is recorded
 
@@ -1842,6 +1881,16 @@ differences, each a deliberate choice:
   empty set (chip would dereference null); ClearTariff drops a pending
   delayed update; the tariff test clock is scoped to the server (chip's
   mock clock replaces the whole app's clock).
+- CommodityTariff: the update refuses a TariffInfo without Currency
+  under PRICE and a day entry without RandomizationOffset or
+  RandomizationType under RNDM (`validateTariffInfo`,
+  `validateDayEntries` in `cluster/energy/commoditytariff.go`; chip's
+  `CommodityTariffAttrsDataMgmt.cpp:689-703`, `:428-441`), where matter.js's managed state fills Currency in as
+  null and stores the day entry as written
+  (`CommodityTariffServerTest.ts:50`, `:69` at `862ad75f`; matter.js
+  #4386). matter.js's server is empty, and the SETRF family certifies
+  chip's update rules; the two cases are `missing` under this entry
+  (phase 19, brief BR).
 
 Families SETRF and COMMTR pass (#47). Retire an item when chip defines it.
 
@@ -1878,6 +1927,26 @@ host directory for its blob store — and the absence of HTTPS downloads,
 which matter.js's default `transferProtocolsSupported` (:139, :839) does
 not announce either. Retire the `spec.Instance` half when `spec.Server`
 learns fabric-scoped attributes.
+
+### BD-Matter-OTARequestor-AnnouncementAnsweredAtOnce — an AnnounceOTAProvider that arrives during a query is answered at once and handled when the query ends
+
+matter.js's `announceOtaProvider` writes the requestor's state
+(`#addActiveOtaProvider`,
+`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:376-420`,
+`:423-442` at `862ad75f`), so an announcement that arrives while a query
+runs waits for the transaction the query holds and is answered when the
+query ends (`#performUpdateQuery` `:568-582`; `OtaTest.ts:533` "handles an
+announcement only after a running query, so no second query overlaps
+it"). The Go requestor answers the command at once and queues the
+announcement (`announcedDuringQuery`,
+`cluster/core/ota_software_update_requestor.go` MatterInvoke), which the
+end of `runUpdateQuery` handles, so the announced query replaces the one
+the ended query scheduled (fix b49310e,
+`cluster/core:TestOTARequestor_AnnouncementDuringQuery`). Reasoning: a
+query waits out provider delays of up to a day, and an invoke answer held
+that long is a timed-out exchange at the controller, while the outcome —
+one query, the announced provider first — is the same (phase 19, brief
+BR).
 
 ### BD-Daemon-OTA-HarnessAppliesInPlace — the reference daemon's `--ota-harness` applies an image in place, after a 2 s Applying hold, with the requestor on the root
 

@@ -557,6 +557,23 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 		return provdef.ApplyUpdateResponse{}, err
 	}
 	details := p.detailsForPeer(peer, req.UpdateToken)
+	// A known token names the version offered under it, so only that
+	// version is applied under it; an offered version is above the
+	// requestor's current one, so 0 names no image provided and stands for
+	// the token's. Mirrors matter.js
+	// packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:417-430
+	// at 862ad75f (tokenVersion, the adjustment of newVersion 0).
+	var tokenVersion *uint32
+	if details != nil && details.versionToApply != nil {
+		v := *details.versionToApply
+		tokenVersion = &v
+	}
+	newVersion := req.NewVersion
+	if newVersion == 0 && tokenVersion != nil {
+		p.logger.Info("ota.provider.apply_version_adjusted", slog.Uint64("peer", peer.NodeID),
+			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("version", uint64(*tokenVersion)))
+		newVersion = *tokenVersion
+	}
 	if p.cfg.BDX != nil {
 		// OP:418-428: the transfer is closed — forced when it is not known
 		// to have completed.
@@ -565,12 +582,25 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 			p.logger.Info("ota.provider.bdx_close_failed", slog.String("err", err.Error()))
 		}
 	}
-	newVersion := req.NewVersion
-	if !p.hasUpdateConsent(peer, newVersion) {
-		// OP:430-437.
-		p.updateInProgress(peer, req.UpdateToken, OTAUpdateCancelled, &newVersion, false)
+	// A version other than the token's is refused, consent or not, and so
+	// is one without consent; the cancelled update keeps the token's
+	// version (OtaSoftwareUpdateProviderServer.ts:444-464).
+	matchesToken := tokenVersion == nil || newVersion == *tokenVersion
+	if !matchesToken {
+		p.logger.Info("ota.provider.apply_version_mismatch", slog.Uint64("peer", peer.NodeID),
+			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("requested", uint64(newVersion)),
+			slog.Uint64("token_version", uint64(*tokenVersion)))
+	}
+	if !matchesToken || !p.hasUpdateConsent(peer, newVersion) {
+		cancelled := newVersion
+		if tokenVersion != nil {
+			cancelled = *tokenVersion
+		}
+		p.updateInProgress(peer, req.UpdateToken, OTAUpdateCancelled, &cancelled, false)
 		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue, DelayedActionTime: *seconds(otaBusyRetry)}, nil
 	}
+	// The policy decides the version the provider allows.
+	req.NewVersion = newVersion
 	action, delay := provdef.ApplyUpdateActionProceed, time.Duration(0)
 	if p.cfg.ApplyPolicy != nil {
 		if action, delay, err = p.cfg.ApplyPolicy.ApplyUpdate(ctx, peer, req); err != nil {

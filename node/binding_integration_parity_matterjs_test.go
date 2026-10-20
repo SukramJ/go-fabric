@@ -5,8 +5,22 @@
 // at 862ad75f: the group kind of "Binding integration" and the describe
 // "Binding integration, group sends". The client kind written by an
 // administrator and the self-binding are node:TestLiveBinding and
-// binding:TestDormantThenWoken; the describe "kind=client with a default
-// subscription of one attribute" is not ported (the register names why).
+// binding:TestDormantThenWoken.
+//
+// The describe "kind=client with a default subscription of one attribute"
+// (:352-474) commissions a switch (OnOffLightSwitchDevice on a root with
+// ControllerBehavior) and a light onto one controller, grants any CASE
+// subject of the fabric Operate on the light, binds the switch's endpoint
+// to the light's and sets a sustained default subscription of the light's
+// onOff on the bound ClientNode (boundLight :62-174, subscribeToOnOff
+// :180-219). The port does the same on fabrictest: the switch is a
+// bqSwitch whose node runs its client stack on the site (node.Client), the
+// light a second device commissioned by the switch's controller, and the
+// default subscription is what NetworkClient builds (NetworkClient.ts:168-210):
+// a sustained subscription through the resolution's interaction. The
+// switch's onOff$Changed is the subscription's reports; matter.js's
+// isolation (router.intercept) is Network.Filter dropping every datagram
+// from or to the light's address.
 //
 // matter.js runs these on one MockServerNode with an OnOffLightSwitch (the
 // group sends with GroupsClient declared too) and an added fabric, writes
@@ -22,20 +36,28 @@
 package node_test
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/binding"
+	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	specgroups "github.com/SukramJ/go-fabric/cluster/spec/groups"
+	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -316,6 +338,243 @@ func TestBindingIntegrationGroupSendsParityMatterJS(t *testing.T) {
 		}
 		if got := sent.all(); len(got) != 0 {
 			t.Errorf("%d datagrams sent for a refused invoke", len(got))
+		}
+	})
+}
+
+// boundLightSite is boundLight's result.
+type boundLightSite struct {
+	sw       *bqSwitch
+	light    *device.OnOffLight
+	lightDev *fabrictest.Device
+	lightEp  uint16
+	res      binding.Resolution
+	// isolated drops every datagram from or to the light while set.
+	isolated bool
+	mu       sync.Mutex
+	// reports are the onOff values the subscription delivered.
+	reports []bool
+	// paths are every attribute path a report carried.
+	paths []im.ConcreteAttributePath
+	// statuses are the subscription's activity changes.
+	statuses []bool
+}
+
+// boundLight is matter.js boundLight (:62-174): a switch and a light on one
+// controller's fabric, the light granting any CASE subject Operate, and
+// the switch's endpoint bound to the light's.
+func boundLight(t *testing.T) *boundLightSite {
+	t.Helper()
+	b := newBQSwitch(t, bqOptions{client: true})
+	h := observeBindings(b.dev.Node().Bindings())
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light", Clock: b.site.Clock()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &boundLightSite{sw: b, light: light}
+	s.lightDev = b.site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{light}})
+	if _, err := b.pair.Controller.Commission(parityCtx(t), s.lightDev, fabrictest.CommissionOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	var ok bool
+	if s.lightEp, ok = s.lightDev.EndpointOf("light:1"); !ok {
+		t.Fatal("the light has no endpoint")
+	}
+	fabrics, err := s.lightDev.Node().Fabrics(parityCtx(t))
+	if err != nil || len(fabrics) != 1 {
+		t.Fatalf("light fabrics %v, %v", fabrics, err)
+	}
+	lf := fabrics[0]
+	// "grant-operate": any CASE subject of the fabric operates the light.
+	if err := s.lightDev.Store().ReplaceACL(parityCtx(t), lf.FabricIndex, []store.ACLEntry{
+		{FabricIndex: lf.FabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE, Subjects: []uint64{bridgetest.DefaultControllerNodeID}},
+		{FabricIndex: lf.FabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	lightAddr := s.lightDev.Addr().IP
+	b.site.Net().Filter(func(d fabrictest.Datagram) bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return !s.isolated || (!d.From.IP.Equal(lightAddr) && !d.To.IP.Equal(lightAddr))
+	})
+	t.Cleanup(func() { b.site.Net().Filter(nil) })
+	b.writeBinding(t, 0, core.TargetStruct{Node: lf.NodeID, Endpoint: s.lightEp, EndpointPresent: true})
+	b.eventually(t, "the client binding resolved", func() bool { return len(h.takeEstablished()) > 0 })
+	s.res = h.takeEstablished()[0]
+	if s.res.Kind != binding.KindClient || s.res.Interaction == nil {
+		t.Fatalf("expected a client resolution, got %+v", s.res)
+	}
+	return s
+}
+
+func (s *boundLightSite) isolate(on bool) {
+	s.mu.Lock()
+	s.isolated = on
+	s.mu.Unlock()
+}
+
+// subscribeToOnOff is subscribeToOnOff (:180-219): the sustained default
+// subscription of the light's onOff, returned once it is active.
+func (s *boundLightSite) subscribeToOnOff(t *testing.T) *interaction.Subscription {
+	t.Helper()
+	var sub *interaction.Subscription
+	floor, ceiling := time.Duration(0), time.Minute
+	err := s.sw.site.Run(parityCtx(t), func(ctx context.Context) error {
+		var err error
+		sub, err = s.res.Interaction.Subscribe(ctx, interaction.SubscribeRequest{
+			Attributes: []im.ConcreteAttributePath{{
+				Endpoint: s.lightEp, Cluster: onoff.ClusterID, Attribute: onoff.AttrOnOff, HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			}},
+			Sustain: true,
+			// The bounds the bound client node asks by default: floor 0,
+			// ceiling one minute (PhysicalDeviceProperties.ts:13, :24,
+			// :117-129); the Go interaction applies none of its own.
+			MinIntervalFloor:   &floor,
+			MaxIntervalCeiling: &ceiling,
+			Updated: func(r *interaction.Report) {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				for i := range r.Attributes {
+					a := &r.Attributes[i]
+					s.paths = append(s.paths, a.Path)
+					if a.Path.Attribute == onoff.AttrOnOff {
+						s.reports = append(s.reports, a.Value.El.Bool)
+					}
+				}
+			},
+			ActiveChanged: func(active bool) {
+				s.mu.Lock()
+				s.statuses = append(s.statuses, active)
+				s.mu.Unlock()
+			},
+		})
+		return err
+	})
+	if err != nil {
+		t.Fatalf("the default subscription: %v", err)
+	}
+	t.Cleanup(sub.Close)
+	s.sw.eventually(t, "the default subscription active", sub.Active)
+	return sub
+}
+
+// switchLight is switchLight (:222-241): the light switches locally and the
+// bound endpoint's subscription reports the new value.
+func (s *boundLightSite) switchLight(t *testing.T, on bool) {
+	t.Helper()
+	if err := s.lightDev.Act(func(*node.Node) error { s.light.OnOff().Set(on); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	s.sw.eventually(t, "the subscription reports the light", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return len(s.reports) > 0 && s.reports[len(s.reports)-1] == on
+	})
+}
+
+func (s *boundLightSite) takeStatuses() []bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.statuses)
+}
+
+// TestBindingDefaultSubscriptionParityMatterJS ports the describe
+// "kind=client with a default subscription of one attribute"
+// (BindingIntegrationTest.ts:352-474).
+func TestBindingDefaultSubscriptionParityMatterJS(t *testing.T) {
+	holdSite(t)
+
+	// :409-427. matter.js asserts the bound ClientNode installed no
+	// BasicInformation, Descriptor or OperationalCredentials client (no read
+	// of the root endpoint) and reads Connected; the Go resolution holds no
+	// client node, so the observable is the wire: every attribute the
+	// subscription carried is the light's onOff on its endpoint, nothing of
+	// endpoint 0, the peer holds its session, the switch knows one peer and
+	// nothing logs at warn level.
+	t.Run("receives reports without data of the peer's root endpoint", func(t *testing.T) {
+		s := boundLight(t)
+		mark := s.sw.log.mark()
+		s.subscribeToOnOff(t)
+		s.switchLight(t, true)
+		s.switchLight(t, false)
+		s.mu.Lock()
+		paths := slices.Clone(s.paths)
+		s.mu.Unlock()
+		for _, p := range paths {
+			if p.Endpoint != s.lightEp || p.Cluster != onoff.ClusterID || p.Attribute != onoff.AttrOnOff {
+				t.Errorf("a report carried %+v, not the light's onOff", p)
+			}
+		}
+		if !s.res.Peer.HasSession() {
+			t.Error("the bound peer holds no session")
+		}
+		if n := s.sw.dev.Peers().Size(); n != 1 {
+			t.Errorf("the switch knows %d peers, want 1", n)
+		}
+		if p := s.sw.log.problemsSince(mark); len(p) != 0 {
+			t.Errorf("problems %q", p)
+		}
+	})
+
+	// :429-452.
+	t.Run("detects a lost peer by the subscription timeout and resubscribes once it is back", func(t *testing.T) {
+		s := boundLight(t)
+		sub := s.subscribeToOnOff(t)
+		maxInterval := sub.MaxInterval()
+		before := len(s.takeStatuses())
+		mark := s.sw.log.mark()
+		s.switchLight(t, true)
+		s.isolate(true)
+		lostAt := s.sw.site.Clock().Now()
+		s.sw.eventually(t, "the subscription inactive", func() bool { return !sub.Active() })
+		if elapsed := s.sw.site.Clock().Now().Sub(lostAt); elapsed < maxInterval {
+			t.Errorf("the loss was detected after %v, before the max interval %v", elapsed, maxInterval)
+		}
+		if got := s.takeStatuses()[before:]; !slices.Equal(got, []bool{false}) {
+			t.Errorf("statuses %v after the loss, want [false]", got)
+		}
+		s.isolate(false)
+		s.sw.eventually(t, "the subscription active again", sub.Active)
+		if got := s.takeStatuses()[before:]; !slices.Equal(got, []bool{false, true}) {
+			t.Errorf("statuses %v after the return, want [false true]", got)
+		}
+		s.switchLight(t, false)
+		if n := s.sw.dev.Peers().Size(); n != 1 {
+			t.Errorf("the switch knows %d peers, want 1", n)
+		}
+		if p := s.sw.log.problemsSince(mark); len(p) != 0 {
+			t.Errorf("problems %q", p)
+		}
+	})
+
+	// :454-473.
+	t.Run("detects a restarting peer by the subscription timeout and resubscribes after its restart", func(t *testing.T) {
+		s := boundLight(t)
+		sub := s.subscribeToOnOff(t)
+		mark := s.sw.log.mark()
+		s.switchLight(t, true)
+		// A power loss: the light goes away without a word to the switch.
+		s.isolate(true)
+		stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.sw.site.Run(stopCtx, s.lightDev.Stop); err != nil {
+			t.Fatal(err)
+		}
+		s.sw.eventually(t, "the subscription inactive", func() bool { return !sub.Active() })
+		s.isolate(false)
+		// MockTime.resolve(lightNode.start()): the light re-establishes the
+		// switch's former subscription while it starts, on the site's clock.
+		if err := s.sw.site.Run(stopCtx, s.lightDev.Start); err != nil {
+			t.Fatal(err)
+		}
+		s.sw.eventually(t, "the subscription active again", sub.Active)
+		s.switchLight(t, false)
+		if n := s.sw.dev.Peers().Size(); n != 1 {
+			t.Errorf("the switch knows %d peers, want 1", n)
+		}
+		if p := s.sw.log.problemsSince(mark); len(p) != 0 {
+			t.Errorf("problems %q", p)
 		}
 	})
 }

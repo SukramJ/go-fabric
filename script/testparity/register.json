@@ -354,8 +354,15 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/CommissioningWindowTest.ts",
-      "status": "planned",
-      "reason": "The controller-side window helpers (openEnhanced/openBasicCommissioningWindow with the pre-emptive revoke, AdminFabricIndex on fabric removal); the reference controller opens windows, without a ported case.",
+      "status": "partial",
+      "go": [
+        "examples/reference-controller/cli:TestCommissioningWindowParityMatterJS"
+      ],
+      "missing": [
+        "invokes openBasicCommissioningWindow when the peer supports the basic feature",
+        "tolerates a WindowNotOpen error on the pre-emptive revoke"
+      ],
+      "reason": "The window helpers are the reference controller's openEnhancedWindow and openBasicWindow (examples/reference-controller/cli/window.go, mirroring CommissioningClient's) over the registry's client.Node of a commissioned fabrictest device; the request matter.js spies on is observed as the device's window (open, its advertised discriminator, a supplied verifier, the requested duration) and as a second administrator commissioning with the returned passcode, the admin-fabric cases as the device window's AdminFabricIndex after the administrator decommissions itself and after another administrator removes its own fabric (examples/reference-controller/cli/window_parity_matterjs_test.go). Missing: the two Basic cases (the second is the \"tolerates …\" of the describe openBasicCommissioningWindow, :167), M4: findings entry \"No Basic commissioning window (BC)\" (a node cannot serve the Basic feature).",
       "snapshotSha": "2f362119b40600a132651fbdfe3a07bd98c5b612"
     },
     {
@@ -379,8 +386,12 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/RemoteDescriptorTest.ts",
-      "status": "planned",
-      "reason": "The controller's long-form record of a discovered device (addresses, hostname, D/VP fields, advertised SII/SAI/SAT kept apart from session parameters).",
+      "status": "ported",
+      "go": [
+        "controller/client:TestRemoteDescriptorRoundtripParityMatterJS",
+        "controller/client:TestRemoteDescriptorSessionIntervalsParityMatterJS"
+      ],
+      "reason": "The long form is controller/client's Record: toLongForm over a commissionable device is Record.applyDevice, over bare discovery data Record.applyTXT, fromLongForm Record.device and Record.txt (controller/client/remote_descriptor_parity_matterjs_internal_test.go); the intervals DNS-SD can advertise are kept both ways (fix: SessionIntervals.advertisable, SessionIntervals.ts:99-118).",
       "snapshotSha": "64d0b890a223fb1fc667c650d3146458aa626cf7"
     },
     {
@@ -442,8 +453,14 @@
     },
     {
       "path": "packages/node/test/behavior/system/events/EventsBehaviorTest.ts",
-      "status": "planned",
-      "reason": "Events of a former run dropped after stop/start unless the event store is non-volatile.",
+      "status": "partial",
+      "go": [
+        "node:TestEventsBehaviorParityMatterJS"
+      ],
+      "missing": [
+        "keeps the events of the former run after stop() and start() if nonvolatile"
+      ],
+      "reason": "The volatile event store across a restart runs on a fabrictest device restarted on its store, the root's BasicInformation StartUp and ShutDown read from the node's event log (node/events_parity_matterjs_test.go). Missing, M4: findings entry \"The event store is volatile only\" (node.Config has no nonvolatile events option).",
       "snapshotSha": "3b11a62ead829c0a11720dd1012c52695a1637d9"
     },
     {
@@ -488,14 +505,23 @@
     },
     {
       "path": "packages/node/test/behavior/system/network/ConnectionStateTest.ts",
-      "status": "planned",
-      "reason": "The controller's per-peer connection state (Connected, Reconnecting, WaitingForDeviceDiscovery, Disconnected) and its transitions.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestConnectionStateParityMatterJS"
+      ],
+      "missing": [
+        "transitions to WaitingForDeviceDiscovery when a registered ICD misses its check-in"
+      ],
+      "reason": "Ten cases run on the registry's client.Node of a commissioned fabrictest device: Node.ConnectionState and the ConnectionStateChanged hook every node of the registry gets; the establishment-unresponsive signal fires as in the field, the stopped device leaving the sustained subscription's CASE re-establishment unanswered (the Go peer's signal is not emitted from outside), the session loss is Peer.Disconnect with a cause (controller/client/connection_state_parity_matterjs_test.go). Missing, controller-side: the IcdClient's checkInMissed (ClientNode's ICD client, with the ICD files of milestone 5 phase 23); Register candidate.",
       "snapshotSha": "ee5c84e8287b20be0454c11fbaa692f35dfeb8dd"
     },
     {
       "path": "packages/node/test/behavior/system/network/FabricLabelReconciliationTest.ts",
-      "status": "planned",
-      "reason": "The controller pushing a drifted fabric label to a peer on start.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestFabricLabelReconciliationParityMatterJS"
+      ],
+      "reason": "Both cases run on the registry's client.Node of a commissioned fabrictest device: the once-per-start reconciliation (Registry.reconcileLabel on the first SubscriptionAlive) re-run by a new start of the node, the controller's label the commissioner fabric's Label (set between a controller restart and the start, as it has no setter), the device's the label its store holds (controller/client/fabric_label_reconciliation_parity_matterjs_test.go).",
       "snapshotSha": "ed8f3865361e256da5b9dcd220144d9fc9cf68cb"
     },
     {
@@ -521,8 +547,15 @@
     },
     {
       "path": "packages/node/test/behavior/system/sessions/SessionsBehaviorTest.ts",
-      "status": "planned",
-      "reason": "Configured session intervals reaching the session manager, defaults kept for the unset ones, and reported session activity.",
+      "status": "partial",
+      "go": [
+        "node:TestSessionsBehaviorParityMatterJS"
+      ],
+      "missing": [
+        "applies configured intervals to the SessionManager",
+        "reports session activity on the wall clock"
+      ],
+      "reason": "The defaults of the intervals left unset run on a commissioned fabrictest pair, the node's session parameters being what its CASE responder states and the controller's peer reports (node/sessions_parity_matterjs_test.go). Missing: \"applies configured intervals …\", M4: findings entry \"The node's session intervals are not configurable\" (node.Config has no sessions.intervals); \"reports session activity on the wall clock\", M4: findings entry \"clock.Clock has no monotonic reading\" (MockTime.stepWallClock has no clocktest.Fake form).",
       "snapshotSha": "3acabc55adce8bd9b19cb1ccbfc9d7bf6a62fa90"
     },
     {
@@ -565,7 +598,7 @@
         "keeps the applied real entries when auxiliary entries change during a controller ACL write",
         "applies an overridden extension access check to a fabric commissioned after startup"
       ],
-      "reason": "Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: an untyped provider entry cannot exist (AuxiliaryACLSource yields store.ACLEntry, served as Groupcast); the Go ACL write lands in the store at once where matter.js delays the effective list to the interaction's end (AccessControlServer.ts:545-605); the Go AccessControl has no overridable extensionEntryAccessCheck (:441-450).",
+      "reason": "Provider entries next to the real ones, after a restart, across local and controller ACL writes, the refused AuxiliaryType on both, AuxiliaryAccessUpdated per changed fabric, the per-entry split and the feature gate are ported (cluster/core/access_control_auxiliary_parity_matterjs_test.go on fabrictest, the installed list asserted as the device's access check). Missing: \"ignores provider entries without AuxiliaryType\", js-runtime-only: a provider entry is a TypeScript object that may lack the field, where the Go AuxiliaryACLSource yields store.ACLEntry, served as Groupcast; \"keeps the applied real entries when auxiliary entries change during a controller ACL write\", M4: findings entry \"The effective ACL is applied entry by entry\" (matter.js delays the written list to the interaction's end, AccessControlServer.ts:545-602; the Go write lands in the store at once); \"applies an overridden extension access check to a fabric commissioned after startup\", M4: findings entry \"No extension access-check hook\" (:441-450).",
       "snapshotSha": "9ccf261c72c458d1aa3728439f626ea3b892e21e"
     },
     {
@@ -616,24 +649,20 @@
       "missing": [
         "throws when increasing a bridged node's ConfigurationVersion that is not enabled"
       ],
-      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and through the node facade's Aggregator.IncreaseConfigurationVersions (persisted once, kept across a restart), and the standalone bridged bump are ported on a fabrictest device; a bridged endpoint always serves ConfigurationVersion (bridged_device_basic_information.go: Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
+      "reason": "The change before the increment, the refused decrease (the Go server has no setter that lowers the version), the grouped bump through Bridge.IncreaseNodeConfigurationVersionWith and through the node facade's Aggregator.IncreaseConfigurationVersions (persisted once, kept across a restart), and the standalone bridged bump are ported on a fabrictest device. Missing, by_design BD-Matter-BridgedDevice-ConfigurationVersionAlwaysServed: a bridged endpoint always serves ConfigurationVersion (Apple iOS 18.4+ probes it), so there is no endpoint without it to refuse.",
       "snapshotSha": "b255a8bb62d2df742a723bc6c3c231b13ac323aa"
     },
     {
       "path": "packages/node/test/behaviors/binding/BindingIntegrationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "node:TestLiveBinding",
         "binding:TestDormantThenWoken",
         "node:TestBindingIntegrationParityMatterJS",
-        "node:TestBindingIntegrationGroupSendsParityMatterJS"
+        "node:TestBindingIntegrationGroupSendsParityMatterJS",
+        "node:TestBindingDefaultSubscriptionParityMatterJS"
       ],
-      "missing": [
-        "receives reports without data of the peer's root endpoint",
-        "detects a lost peer by the subscription timeout and resubscribes once it is back",
-        "detects a restarting peer by the subscription timeout and resubscribes after its restart"
-      ],
-      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). Missing: the default subscription of a bound client (a Register candidate): the subscription the host sets on the bound ClientNode (NetworkClient defaultSubscription, autoSubscribe) has its Go counterpart in Resolution.Interaction.Subscribe with Sustain (controller/interaction/sustained.go), but fabrictest carries no node client stack — node/client.go opens a kernel socket and its own DNS-SD cache — so two nodes cannot reach each other over CASE on a site.",
+      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). The default subscription of a bound client runs on two fabrictest devices of one fabric, the switch's node client stack on the site: the subscription NetworkClient sets on the bound ClientNode (defaultSubscription, autoSubscribe, a SustainedSubscription) is Resolution.Interaction.Subscribe with Sustain at the WiFi ceiling the ClientNode asks (PhysicalDeviceProperties.ts:24); the isolation is Network.Filter, the restart Device.Stop and Start.",
       "snapshotSha": "12d2db88432bfd7bab871aae408d06551a7cfa24"
     },
     {
@@ -674,14 +703,12 @@
     },
     {
       "path": "packages/node/test/behaviors/boolean-state/BooleanStateServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "bridge:TestBooleanStateChangeEvent"
+        "bridge:TestBooleanStateChangeEvent",
+        "cluster/measurement:TestBooleanStateServerParityMatterJS"
       ],
-      "missing": [
-        "enables the ChangeEvent feature by default"
-      ],
-      "reason": "The StateChange event is covered; the event being enabled by default is not asserted.",
+      "reason": "The StateChange event the bridge emits on a StateValue change (bridge:TestBooleanStateChangeEvent) and the ChangeEvent feature the server advertises by default, FeatureMap and EventList (cluster/measurement/boolean_state_server_parity_matterjs_test.go).",
       "snapshotSha": "0bc76387536350609742f8941b03d974fa375694"
     },
     {
@@ -697,7 +724,7 @@
         "accepts a primary a light supplies without stating the number of primaries",
         "clears the end time the application states on StopMoveStep"
       ],
-      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case (the Go ColorControl server serves no Primary1X … Primary6Intensity attributes, so a light cannot supply one) and the application end time (the Go server keeps no application-stated transitionEndTime, by_design BD-Matter-LevelControl-NativeRamp).",
+      "reason": "The cyclic hue transition and the stop cases are ported locally, StopMoveStep leaving a running colour loop alone on a fabrictest extended colour light. Missing: the primaries case, M4: findings entry \"ColorControl serves no primaries\" (no Primary1X … Primary6Intensity attribute, so a light cannot supply one); the application end time, by_design BD-Matter-LevelControl-NativeRamp (the Go server keeps no application-stated transitionEndTime).",
       "snapshotSha": "23c14586e80efe7f245301082deb9ee284a84a97"
     },
     {
@@ -722,8 +749,15 @@
     },
     {
       "path": "packages/node/test/behaviors/commodity-tariff/CommodityTariffServerTest.ts",
-      "status": "planned",
-      "reason": "Day entries without the randomization fields and a feature-mandatory member read as null when a write omits it.",
+      "status": "partial",
+      "go": [
+        "cluster/energy:TestCommodityTariffServerParityMatterJS"
+      ],
+      "missing": [
+        "reads a member the active features make mandatory as null when a write omits it",
+        "stores a day entry that omits the randomization fields with Randomization supported"
+      ],
+      "reason": "The day entry without its randomization fields under Pricing is stored as written, in the smallest tariff chip's update accepts (UpdateTariff carries a whole tariff; cluster/energy/commoditytariff_parity_matterjs_test.go). Missing, by_design BD-chip-Commodity-ServerChoices: the Go server's write is chip's tariff update, which refuses a TariffInfo without Currency under PRICE and a day entry without RandomizationOffset and RandomizationType under RNDM (cluster/energy/commoditytariff.go validateTariffInfo, validateDayEntries), where matter.js's managed state fills Currency in as null and stores the entry as written (matter.js #4386).",
       "snapshotSha": "5bc23fc9d4794934a8b0d74db7aa0fe5c7f1610c"
     },
     {
@@ -737,7 +771,7 @@
         "supports level indication mode",
         "supports one value mode with sibling with different value mode"
       ],
-      "reason": "The numeric measurement mode is covered; level indication and mixed value modes on sibling clusters are not.",
+      "reason": "The numeric measurement mode is covered. Missing, M4: findings entry \"The concentration servers serve NumericMeasurement only\": the level indication mode and a sibling in another value mode need the LevelIndication feature, which the Go servers cannot select (cluster/measurement/concentration.go concOptions) and whose LevelValue no host source carries (contract.FloatMeasurementSource).",
       "snapshotSha": "e582be7cccdceef704f23a8cd64ae0d0dcaa1585"
     },
     {
@@ -796,19 +830,28 @@
       "missing": [
         "measures the lockout on the monotonic clock"
       ],
-      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
+      "reason": "67 of 68 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System).",
       "snapshotSha": "b56582b0263eb069b28554616645021a9e18d060"
     },
     {
       "path": "packages/node/test/behaviors/energy-evse-mode/EnergyEvsModeServerTest.ts",
-      "status": "planned",
-      "reason": "Local mode tags and the inherited mode-base commands of EnergyEvseModeServer.",
+      "status": "partial",
+      "go": [
+        "cluster/modebase:TestEnergyEvseModeServerParityMatterJS"
+      ],
+      "missing": [
+        "supports extension of inherited commands"
+      ],
+      "reason": "The local mode tags and the inherited ChangeToMode run on the EnergyEvseMode server built with createNode's modes (cluster/modebase/energyevsemode_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding changeToMode, checked with satisfies; no runtime).",
       "snapshotSha": "3b632e519b04ab3c06d51d697b8c3c35549ff080"
     },
     {
       "path": "packages/node/test/behaviors/fan-control/FanControlTest.ts",
-      "status": "planned",
-      "reason": "Local mode tags and the not-off-only command set of FanControlServer by default.",
+      "status": "ported",
+      "go": [
+        "cluster/fan:TestFanControlServerParityMatterJS"
+      ],
+      "reason": "The server built over a host fan in FanMode On on OffLowMedHigh, and On on the OnOff an air purifier mounts with its default (not OffOnly) features (cluster/fan/fancontrol_server_parity_matterjs_test.go).",
       "snapshotSha": "1a06e54ae96892bf2537a0b7a52b6ac5856382cb"
     },
     {
@@ -838,7 +881,7 @@
       "missing": [
         "keeps the operational time counted across a backward wall-clock step"
       ],
-      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device; the operational time across a wall-clock-only step is not: clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
+      "reason": "UpTime across forward and backward steps, its high-water reset across a restart, the non-negative counters and the clean offline transition on a backward step and the integer persisted counter are ported on a fabrictest device. Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the operational time across a wall-clock-only step; clocktest.Fake has one reading, so its Set is MockTime.atTime (both clocks, and the timers' reference), and MockTime.stepWallClock has no Fake form.",
       "snapshotSha": "ec3cd7f6d6f84ad51a3928e4bd2e02fca1618330"
     },
     {
@@ -894,7 +937,7 @@
       "missing": [
         "removes a group a wildcard request empties without the Sender feature"
       ],
-      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing: \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it) and has no Listener-only configuration to run it on.",
+      "reason": "The server cases run in cluster/core/groupcast_parity_matterjs_test.go, one test per describe: JoinGroup, LeaveGroup with the wildcard, UpdateGroupKey, ConfigureAuxiliaryAcl, the GKM and endpoint mirrors, the legacy removal prune, the per-fabric quota, MaxMcastAddrCount (on GroupcastConfig.MaxMcastAddrCount 4), the testing duration on a fake clock, the testing events and the derived Membership. The cases on a commissioned node run on fabrictest in node/groupcast_server_parity_matterjs_test.go: the multicast policy ordering (fix: the policy before the endpoints, GroupcastServer.ts:253-258), the rebind after a restart, the shutdown cleanup, the IANA address shared across fabrics and the join failures (fix: one info line per failure streak, ServerGroupNetworking.ts:136-140, 159-176) on fabrictest's multicast model, the fabric removal, the reload cases on Device.Restart and the AuxiliaryAccessUpdated admin over CASE. Missing, M4: findings entry \"The Groupcast server has no Listener-only configuration\": \"removes a group a wildcard request empties without the Sender feature\" (the second title of the loop at GroupcastServerTest.ts:358-405, ListenerOnlyRootEndpoint) — the module builds the Groupcast server with Listener, Sender and PerGroup only (GroupcastServer.ts:81-83 as RootEndpoint installs it).",
       "snapshotSha": "dfc099700a300680d98b261fe6752cc1cb8ac073"
     },
     {
@@ -908,15 +951,12 @@
     },
     {
       "path": "packages/node/test/behaviors/hepa-filter-monitoring/HepaFilterMonitoringServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/filter:TestParityMatterJS_FilterServers"
+        "cluster/filter:TestParityMatterJS_FilterServers",
+        "cluster/filter:TestHepaFilterMonitoringServerParityMatterJS"
       ],
-      "missing": [
-        "properly types state",
-        "rejects a condition above 100 percent"
-      ],
-      "reason": "The server with and without its features is covered; the refused condition above 100 percent is not.",
+      "reason": "The server with and without its features (cluster/filter:TestParityMatterJS_FilterServers), the condition set on the Condition feature and the refused condition above 100 percent, ErrInvalidValue at construction for matter.js's ConstraintError at the node's start (cluster/filter/hepa_filter_monitoring_server_parity_matterjs_test.go).",
       "snapshotSha": "5b00298f3b031f67d820e6a0e3f98d47edacbb63"
     },
     {
@@ -945,7 +985,7 @@
         "remains locally invocable when withdrawn",
         "is supported when explicitly implemented"
       ],
-      "reason": "The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify), which accepts TriggerEffect on every device type and exposes no effectTriggered event, so the withdrawal on a device type that does not require the command (IdentifyServer.ts:78-90) and the effect observations (:133-135) are missing: the device-type requirement must reach the endpoint's Identify, a change of the endpoint layer outside this wave.",
+      "reason": "The supported cases run over the wire on fabrictest (AcceptedCommandList and the TriggerEffect status); two of them assert the support only. A bridged endpoint's Identify belongs to the endpoint layer (endpoint/materialize.go, core.Identify). Missing: \"is unsupported on a device type that does not require it\" and \"remains locally invocable when withdrawn\", by_design BD-Matter-Identify-TriggerEffectEverywhere (the endpoint's Identify accepts TriggerEffect on every device type, as Apple Home's HAP rebuild invokes it; the wire shows it in every AcceptedCommandList); \"is supported on a device type that requires it\" and \"is supported when explicitly implemented\", M4: findings entry \"TriggerEffect has no host hook\" (their AcceptedCommandList and Success hold on the Go endpoint; the effectTriggered observation has no Go form).",
       "snapshotSha": "3d6054c75fafade0dc04aa4ffded539afe04fee5"
     },
     {
@@ -958,7 +998,7 @@
       "missing": [
         "leaves the color temperature where a later command in the transaction overrides the coupling off"
       ],
-      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing is the case where a later command of one transaction clears the coupling: matter.js couples once, on the transaction's commit with its last command's options, a Go command couples when it commits.",
+      "reason": "Twelve cases run on a fabrictest colour temperature light with matter.js's state (CoupleColorTempToLevelMinMireds 200): the Options attribute and per-command overrides, MoveToLevel, Step and Move, every step of a managed transition, two commands in a row, and a coupling waiting for a ColorControl command in flight (the Go form of a transaction holding the colour temperature). Missing, js-runtime-only: a transaction of several commands committed with its last command's options (matter.js couples once, on the commit; a Go command couples when it commits).",
       "snapshotSha": "69c2d9e69eb27dae9b1d66804e70de1ea276fce6"
     },
     {
@@ -984,7 +1024,7 @@
       "missing": [
         "lifts the on/off coupling block when its transaction rolls back"
       ],
-      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). The rollback case is missing: a transaction the caller abandons after the command has no Go form, a Go command commits when it returns.",
+      "reason": "The four switching cases are ported locally and the committed-level-change case on a fabrictest light (the switch-on is the host's OnOff.SetOnOff, which applies OnLevel; the command's transition starts from there). Missing, js-runtime-only: a transaction the caller abandons after the command (rollback); a Go command commits when it returns.",
       "snapshotSha": "189a9755de998ba24ad323fcb6a783e2597842da"
     },
     {
@@ -998,19 +1038,38 @@
         "reads zero after a stop, although the application stated a remaining time",
         "reads zero after a stop, although the application stated a later end time"
       ],
-      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. The Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path: by_design BD-Matter-LevelControl-NativeRamp), so the two cases whose precondition is a remaining time the application states have no Go setup.",
+      "reason": "The two stop cases are ported locally, the managed-transition cases on a fabrictest light. Missing, by_design BD-Matter-LevelControl-NativeRamp: the Go LevelControl server keeps no application-stated RemainingTime or transitionEndTime (the engine's RemainingTime, or 0 on the hand-off path), so the two cases whose precondition is a remaining time the application states have no Go setup.",
       "snapshotSha": "57ecfbd7a1732693bd794dd7a6003c760ee98384"
     },
     {
       "path": "packages/node/test/behaviors/measurement/MeasurementServersTest.ts",
-      "status": "planned",
-      "reason": "The measurement servers' unavailable default range and the TemperatureMeasurement bound checks.",
+      "status": "partial",
+      "go": [
+        "cluster/measurement:TestTemperatureServerSaturatesHigh",
+        "cluster/measurement:TestTemperatureServerSaturatesLow"
+      ],
+      "missing": [
+        "TemperatureMeasurementServer reports an unavailable measurement range by default",
+        "IlluminanceMeasurementServer reports an unavailable measurement range by default",
+        "PressureMeasurementServer reports an unavailable measurement range by default",
+        "FlowMeasurementServer reports an unavailable measurement range by default",
+        "RelativeHumidityMeasurementServer reports an unavailable measurement range by default",
+        "refuses a maximum that does not exceed the minimum",
+        "refuses a measurement outside a stated range"
+      ],
+      "reason": "Missing, by_design BD-Matter-Measurement-StatedRange: the Go measurement servers project a host reading and state the range of the attribute's encoding (TemperatureMeasurement -27315 to 32766, RelativeHumidity 0 to 10000, Illuminance 1 to 0xFFFE, Pressure 0 to 32766, Flow its constants; L01-D06, L01-D07) where matter.js leaves MinMeasuredValue and MaxMeasuredValue null; no host states a range, so there is no bound to refuse, and a reading beyond the stated range is saturated into it (the two Go tests named), where matter.js refuses the state change.",
       "snapshotSha": "770e0af190627889e1c3c04ef28d1b188d40d530"
     },
     {
       "path": "packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts",
-      "status": "planned",
-      "reason": "OccupancySensing defaults and the OccupancyChanged event under the OccupancyEvent feature.",
+      "status": "partial",
+      "go": [
+        "cluster/measurement:TestOccupancySensingServerParityMatterJS"
+      ],
+      "missing": [
+        "emits OccupancyChanged when occupancy changes and the OccupancyEvent feature is enabled"
+      ],
+      "reason": "The construction and the absent HoldTime dependents run on the Go server, PassiveInfrared its one feature selection (cluster/measurement/occupancy_sensing_parity_matterjs_test.go). Missing, M4: findings entry \"OccupancySensing has no feature selection\": the server serves PIR alone, without the OccupancyEvent feature and so without the OccupancyChanged event matter.js emits on occupancy$Changed (OccupancySensingServer.ts initialize).",
       "snapshotSha": "51868775f7d7a9ae1566f27af0fd4a3615801269"
     },
     {
@@ -1024,36 +1083,85 @@
     },
     {
       "path": "packages/node/test/behaviors/operational-credentials/OperationalCredentialsServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "node:TestOperationalCredentialsAddNOCAdminVendor",
         "node:TestOperationalCredentialsAddNOCCertificateChecks",
         "node:TestOperationalCredentialsSetVIDVerificationStatementVendor",
-        "node:TestOperationalCredentialsUpdateNOC"
+        "node:TestOperationalCredentialsUpdateNOC",
+        "node:TestOperationalCredentialsFinalFabricChange"
       ],
-      "missing": [
-        "treats UpdateFabricLabel as a final fabric change",
-        "treats SetVIDVerificationStatement as a final fabric change"
-      ],
-      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry and the refused NOC of another fabric are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go). Missing: the two final-fabric-change cases assert the fabricsChanged event \"1 updated\" (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582), and the Go node raises no fabric event for a label or vendor ID change (Observers.OnFabricUpdated follows UpdateNOC).",
+      "reason": "The AddNOC admin vendor refusals and fail-safe check, the certificate checks (InvalidNodeOpId, InvalidAdminSubject, Ok) with the site CA's certificates over PASE, SetVIDVerificationStatement refusing vendor 0 (fix: VendorId.isOperational, OperationalCredentialsServer.ts:516-518), UpdateNOC keeping group keys, endpoints, multicast policy, group ACL and the socket's multicast memberships (fabrictest's multicast model, Network.WatchMemberships and Device.MulticastGroups), UpdateNOC keeping the group state across a fail-safe expiry, the refused NOC of another fabric, and UpdateFabricLabel and SetVIDVerificationStatement under a bare fail-safe reporting the fabric \"updated\" at once (fix: Observers.OnFabricUpdated after either, FabricManager.ts:236-246, CommissioningServer.ts:118-141) are ported on fabrictest (node/operational_credentials_server_parity_matterjs_test.go).",
       "snapshotSha": "7f12f9c5dad85f77a7f0874a4c4e156941d0d25b"
     },
     {
       "path": "packages/node/test/behaviors/ota/OtaTest.ts",
-      "status": "planned",
-      "reason": "The OTA requestor flow (query, Busy retries, apply, reboot, consent), which milestone 3 phase 19 ports.",
+      "status": "partial",
+      "go": [
+        "node:TestOtaParityMatterJS",
+        "node:TestOtaBusyParityMatterJS",
+        "cluster/core:TestParityMatterJS_OTAProviderApplyConsentAndToken",
+        "cluster/core:TestParityMatterJS_OTAProviderApplyDelay",
+        "cluster/core:TestParityMatterJS_OTAProviderQueryInProgress",
+        "cluster/core:TestParityMatterJS_OTAProviderDoneClearsConsent",
+        "cluster/core:TestOTARequestor_AnnouncementDuringQuery"
+      ],
+      "missing": [
+        "OTA reboot: closes older sessions and does not re-subscribe a device that feeds its subscription",
+        "OTA reboot: force re-subscribes (Mechanism B) when the subscription is not fed within the grace window",
+        "a real inbound subscription report announces the session it arrived over",
+        "OTA reboot: the failed-apply detection path does not disarm the peer",
+        "Cancel a software update before download by removing consent",
+        "resolves transfer options from the consent, then from state",
+        "lets a later consent change and clear the options of a queued update",
+        "rejects invalid transfer options before touching any state",
+        "Queue processes a single update via addUpdateConsent",
+        "Does not report updates for nodes without OTA requestor",
+        "Cancelled status resets queue entry for retry",
+        "does not count an update as stalled while the device waits out its apply delay",
+        "Apply failure detected when startUp fires after Applying state",
+        "fails an applied update when the node resubscribes with its previous version (apply delay none)",
+        "fails an applied update when the node resubscribes with its previous version (apply delay 2 min)",
+        "keeps an applied update when the node resubscribes at or above the target version",
+        "keeps an applied update while the controller resubscribes before its restart deadline",
+        "keeps an applied update while the controller resubscribes during its apply delay",
+        "keeps an applied update when the node goes away as the restart deadline passes",
+        "keeps an update that waits for its apply when the controller resubscribes",
+        "triggerUpdateOnNode skips announcement when BDX session is active",
+        "A running BDX transfer keeps a long download out of the stalled state",
+        "A retried BDX transfer counts as progress although its byte counter restarts",
+        "A running BDX transfer keeps its in-progress entry alive, including a session opened for a retry",
+        "An open BDX session that never transfers a block does not count as progress",
+        "A BDX transfer that stops moving data is reset for retry",
+        "suppressNextStartUp: suppresses startUp on matching session ID",
+        "suppressNextStartUp: different session ID does NOT suppress startUp",
+        "Cleanup purges stored test-mode OTA when allowTestOtaImages is disabled, preserves prod/local"
+      ],
+      "reason": "The requestor's cases run on two fabrictest devices of one site, the Go provider being a node's (node/ota_parity_matterjs_test.go): the update through download, apply and NotifyUpdateApplied after the restart into the new version, the restart from storage into the new and the previous version, the failed apply, no query while applying, the announcement during a running query (fix: handled once the query ended, OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582) and the Busy describe (the provider's Busy is its consent port obtaining). The provider's answers run on the provider (cluster/core/ota_provider_parity_matterjs_test.go): the apply without consent, the update-token rules (fix: OtaSoftwareUpdateProviderServer.ts:417-430, :444-464), the apply delay on the wire, queryImage cases A, B (the provider's half) and C, and Done clearing the consent. Missing, controller-side SoftwareUpdateManager (a Register candidate; no Go manager in this wave): its reboot detection (RebootResubscribeArmer, handlePeerShutdown, closeForPeer, the reportStarted signal it reads, the failed-apply detection on startUp, suppressNextStartUp), its consent queue (removeConsent, addUpdateConsent, queuedUpdates, the Cancelled reset), its transfer options (bdxTransferOptionsFor), its update check of nodes without a requestor, its stalled detection by BDX progress and by the apply delay, its outcome after the resubscription (updateFailed, updateDone), triggerUpdateOnNode's skip of a running transfer and the DCL store cleanup of test images; the queryImage Case B record of the suppressed startUp is the manager's too.",
       "snapshotSha": "a6e773f32ed4c1c3eb3a3c00ca1d8b474cd448ae"
     },
     {
       "path": "packages/node/test/behaviors/power-source/PowerSourceServerTest.ts",
-      "status": "planned",
-      "reason": "PowerSourceServer augmenting the descriptor of its endpoint.",
+      "status": "partial",
+      "go": [
+        "endpoint:TestSpecPartsComposeAChildEndpoint"
+      ],
+      "missing": [
+        "successfully augments descriptor"
+      ],
+      "reason": "Missing, by_design BD-Matter-PowerSource-DeviceTypeOnPart: matter.js's PowerSourceServer adds the PowerSource device type to its own endpoint's DeviceTypeList (PowerSourceServer.ts:23, DescriptorServer.addDeviceTypes); the Go endpoint layer lists one device type per endpoint, serves a bridged device's battery as BridgedNode's optional PowerSource cluster (endpoint/types.go Endpoint.PowerSource) and the PowerSource device type as a part endpoint of its own (the Go test named).",
       "snapshotSha": "10432eff46484005a9b53521644582b2b4aa7a2a"
     },
     {
       "path": "packages/node/test/behaviors/rvc-operational-state/RvcOperationalStateServerTest.ts",
-      "status": "planned",
-      "reason": "The RVC operational state server's base commands.",
+      "status": "partial",
+      "go": [
+        "cluster/opstate:TestRvcOperationalStateServerParityMatterJS"
+      ],
+      "missing": [
+        "knows methods are methods"
+      ],
+      "reason": "The base command a device does not implement runs on the RVC server built with createNode's state (Pause outside the AcceptedCommandList, UNSUPPORTED_COMMAND for matter.js's NotImplementedError; cluster/opstate/rvc_opstate_server_parity_matterjs_test.go). Missing, js-runtime-only: a TypeScript type assertion (a subclass overriding pause, checked with satisfies; no runtime).",
       "snapshotSha": "7809ff0ed93ee0cecad53cda3a4e17581f94a91a"
     },
     {
@@ -1116,7 +1224,7 @@
         "discards a valid Schedules write when the Presets write fails",
         "discards a valid Presets write when the Schedules write fails"
       ],
-      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session); the inherited-quality case is a TypeScript schema extension of a behavior class with no Go counterpart (the atomic quality is the generated definition's), and the five CommitWrite cases stage Schedules, MatterScheduleConfiguration, which the server does not serve (matter.js does not implement it either, ThermostatServer.ts:126-128).",
+      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's); the five CommitWrite cases, M4: findings entry \"The thermostat serves no Schedules\": they stage Schedules (MatterScheduleConfiguration) beside Presets, the Go thermostat's only other atomic attribute, which the server does not serve (matter.js's ThermostatServer does not implement it either, ThermostatServer.ts:126-128; its test stages the value through the behavior).",
       "snapshotSha": "169b7cc8fea0d7a2db31d147679b19a13463772d"
     },
     {
@@ -1137,7 +1245,7 @@
       "missing": [
         "refuses a commit whose settled presets an observer stripped the handle from"
       ],
-      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged; the observer case is missing: it rewrites the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have (the host refuses through its PresetStore).",
+      "reason": "BeginWrite, the chunked Presets write, CommitWrite and RollbackWrite run over the wire on a commissioned fabrictest pair, the controller's cache being its Presets subscription and the device's announcements the server's OnMatterAttributesChanged. Missing, js-runtime-only: an application observer on persistedPresets$Changing rewriting the presets in flight, a seam the Go server does not have (the host refuses through its PresetStore).",
       "snapshotSha": "23cae0af7ec40de910fa411bb37f0157a4906c63"
     },
     {
@@ -1149,7 +1257,7 @@
       "missing": [
         "seeds from configuration, not from presets a device stored before the accessor existed"
       ],
-      "reason": "The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. The seed case is missing: it plants a value under the attribute's pre-accessor storage key, and the Go server never stored presets anywhere but its PresetStore.",
+      "reason": "The remote case runs over the wire on a commissioned fabrictest pair, the local ones on a fabrictest device with SetPresets inside Device.Act; a behavior type's defaults and an endpoint's options are one ThermostatConfig.Presets in Go. Missing, js-runtime-only: a value planted under the attribute's pre-accessor key of matter.js's behavior storage; the Go server never stored presets anywhere but its PresetStore.",
       "snapshotSha": "e95224b86692e0d1e33d3f2b69063b6dd3c87f46"
     },
     {
@@ -1164,7 +1272,7 @@
         "refuses a preset an observer marks built-in after the thermostat issued its handle",
         "validates a change an observer makes after the thermostat normalized"
       ],
-      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's; the four missing cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
+      "reason": "The local writes run on a fabrictest device with SetPresets inside Device.Act (the one local write, for Presets and persistedPresets alike), the restart on the node's own store (Aggregator.Add, Device.Restart), an application's refusal being its PresetStore's. Missing, js-runtime-only: the four cases rewrite the presets in flight from an application observer on persistedPresets$Changing, a seam the Go server does not have.",
       "snapshotSha": "7f2a9f8b2dfe56e3524b64f0a79664116d4bfeb4"
     },
     {
@@ -1186,8 +1294,11 @@
     },
     {
       "path": "packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts",
-      "status": "planned",
-      "reason": "Accepted and rejected date formats of TimeFormatLocalizationServer.",
+      "status": "ported",
+      "go": [
+        "cluster/core:TestTimeFormatLocalizationServerParityMatterJS"
+      ],
+      "reason": "The accepted and the refused ActiveCalendarType run on the server built as createEndpoint builds it, the refusal as CONSTRAINT_ERROR of the \"in supportedCalendarTypes\" constraint (cluster/core/time_format_localization_server_parity_matterjs_test.go).",
       "snapshotSha": "d6a83ceaff7255a92378d54d9231513fb29972f6"
     },
     {
@@ -4341,7 +4452,7 @@
         "skips closing TCP sessions",
         "returns undefined when all TCP sessions are closing"
       ],
-      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp; the device bridge's exchanges hold no awaitable with an error cause, the listener's onClose is a Serve argument with no handle to remove nor a duck-typed probe, and the TCP session selection is PeerExchangeProvider's controller-side logic with no device-side counterpart.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp. Missing: \"gives the closed exchange a cause that claims nothing about the peer\", js-runtime-only: the error cause of the rejected promise a closed exchange holds (the device bridge's exchanges hold no awaitable); \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object; the four TCP session selection cases (\"finds a TCP session among mixed sessions\", \"returns undefined when no TCP session exists\", \"skips closing TCP sessions\", \"returns undefined when all TCP sessions are closing\"), controller-side: PeerExchangeProvider's choice of a TCP session among a peer's sessions, which the module's controller does not make (controller/peer opens UDP sessions); Register candidate.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {

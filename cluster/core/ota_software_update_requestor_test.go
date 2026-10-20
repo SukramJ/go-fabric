@@ -1244,3 +1244,40 @@ func TestOtaRequestorBdxBlockSizeByChannel(t *testing.T) {
 		}
 	}
 }
+
+// TestOTARequestor_AnnouncementDuringQuery: an AnnounceOTAProvider that
+// arrives while a query runs is answered and handled once the query ended
+// — the query it schedules replaces the one the ended query scheduled —
+// rather than scheduling a query the running one would skip. matter.js
+// handles it after the query, whose transaction its state change waits for
+// (OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582; OtaTest.ts
+// "handles an announcement only after a running query, so no second query
+// overlaps it").
+func TestOTARequestor_AnnouncementDuringQuery(t *testing.T) {
+	t.Parallel()
+	quick := 250 * time.Millisecond
+	h := newOtaHarness(t, func(c *OTARequestorConfig) { c.AnnouncedUpdateQueryDelay = &quick })
+	h.provider.answer = func(int) (provdef.QueryImageResponse, error) {
+		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
+	}
+	h.r.mu.Lock()
+	h.r.queryRunning = true
+	h.r.mu.Unlock()
+	req := otadef.AnnounceOtaProviderRequest{ProviderNodeId: testProvider, VendorId: 0xFFF1, AnnouncementReason: otadef.AnnouncementReasonUpdateAvailable}
+	if _, err := h.r.MatterInvoke(fabricCtx(1), otadef.CmdAnnounceOtaProvider, req); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.clock.pending(); len(got) != 0 {
+		t.Fatalf("the announcement scheduled %v while the query ran", got)
+	}
+	h.r.mu.Lock()
+	h.r.queryRunning = false
+	h.r.mu.Unlock()
+	h.r.performUpdateQuery(context.Background())
+	if got := h.clock.pending(); len(got) != 1 || got[0] != quick {
+		t.Fatalf("pending %v after the query, want the announced %v", got, quick)
+	}
+	if h.r.selected == nil || h.r.selected.ProviderNodeId != testProvider {
+		t.Fatalf("selected %+v, want the announced provider", h.r.selected)
+	}
+}

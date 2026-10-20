@@ -16,8 +16,11 @@ import (
 	_ "modernc.org/sqlite" // the device's SQLite stores (node.Store.DB)
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
+	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
@@ -88,7 +91,17 @@ type Device struct {
 	addr    *net.UDPAddr
 	cfg     node.Config
 	running bool
+	// names is the client stack's DNS-SD cache, answered by the site;
+	// built at the first start with node.Client.Enabled, kept across
+	// restarts and closed with the site.
+	names *discovery.Names
 }
+
+// clientPort is the port of a device's client socket on its host address
+// of the in-memory network: the node's client stack initiates from a
+// socket of its own (node/client.go), apart from the server socket on
+// udp.MatterPort.
+const clientPort = udp.MatterPort + 1
 
 // AddDevice builds a device serving topo, starts it and returns it. The
 // device is uncommissioned, its commissioning window open; it stops when
@@ -212,8 +225,44 @@ func (d *Device) config() node.Config {
 	if cfg.Advertiser == nil {
 		cfg.Advertiser = mdns.NewNoop()
 	}
+	if cfg.Client.Enabled {
+		d.siteClient(&cfg)
+	}
 	return cfg
 }
+
+// siteClient puts the node's client stack onto the site: its DNS-SD
+// cache asks the site (as a Controller's does, mdns.go), and on the
+// in-memory network its socket is the device's host address on
+// clientPort (on loopback a real socket on [::1]). A Names the topology
+// set stays the topology's.
+func (d *Device) siteClient(cfg *node.Config) {
+	if cfg.Client.Names == nil {
+		d.mu.Lock()
+		if d.names == nil {
+			d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
+			names := d.names
+			d.site.onClose(func() { _ = names.Close() })
+		}
+		cfg.Client.Names = d.names
+		d.mu.Unlock()
+	}
+	nw := d.site.net
+	if nw == nil {
+		if cfg.Client.Listen == "" {
+			cfg.Client.Listen = "[::1]:0"
+		}
+		return
+	}
+	addr := hostAddr(d.index)
+	addr.Port = clientPort
+	nodeseam.UseClientListener(cfg, func() (*udp.Listener, error) { return nw.listen(addr) })
+}
+
+// Peers is the node's client stack ([node.Node.Peers]): the nodes of its
+// fabrics it reaches as a client, on the site. Nil unless the topology's
+// Configure set node.Client.Enabled.
+func (d *Device) Peers() *peer.Set { return d.Node().Peers() }
 
 // Stop stops the node; its store and address stay the device's. A
 // stopped device is not an error.
@@ -339,11 +388,40 @@ func (d *Device) advertised() (mdns.Advertiser, net.IP, string) {
 // when it re-establishes a subscription (bridge.OperationalResolver).
 type siteResolver struct{ s *Site }
 
-func (r siteResolver) ResolveOperational(_ context.Context, compressedFabricID [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
+func (r siteResolver) ResolveOperational(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
 	for _, c := range r.s.Controllers() {
 		if c.answers(compressedFabricID, nodeID) {
 			return []*net.UDPAddr{c.Addr()}, nil
 		}
 	}
-	return nil, fmt.Errorf("fabrictest: no controller %016X-%016X on the site", compressedFabricID, nodeID)
+	// A device of the site, as its operational record names it: a node's
+	// initiator (an OTA requestor reaching its provider) resolves another
+	// node of its fabric.
+	for _, d := range r.s.Devices() {
+		if d.answers(ctx, compressedFabricID, nodeID) {
+			return []*net.UDPAddr{d.Addr()}, nil
+		}
+	}
+	return nil, fmt.Errorf("fabrictest: no node %016X-%016X on the site", compressedFabricID, nodeID)
+}
+
+// answers reports whether the running device is node nodeID of the fabric
+// with compressedFabricID.
+func (d *Device) answers(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) bool {
+	d.mu.Lock()
+	n, running := d.n, d.running
+	d.mu.Unlock()
+	if !running || n == nil {
+		return false
+	}
+	fabrics, err := n.Fabrics(ctx)
+	if err != nil {
+		return false
+	}
+	for _, f := range fabrics {
+		if f.CompressedID == compressedFabricID && f.NodeID == nodeID {
+			return true
+		}
+	}
+	return false
 }

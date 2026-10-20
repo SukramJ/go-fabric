@@ -295,6 +295,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// The host's observers run after each (observers.go).
 	n.root.OperationalCredentials.SetOnFabricRemoved(n.observedFabricRemoved)
 	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
+	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
 	// Event numbers continue across a reboot (main.go:416-426).
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
@@ -507,6 +508,20 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 // OnFabricUpdated with the fabric as the store now holds it.
 func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 	n.fabricUpdated(ctx, fabricIndex)
+	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
+		info, _ := n.fabricInfo(ctx, fabricIndex)
+		observe(n.logger, "fabric_updated", func() error { return fn(info) })
+	}
+}
+
+// observedFabricChanged is the host's OnFabricUpdated after UpdateFabricLabel
+// or SetVIDVerificationStatement changed a fabric under the same
+// operational identity: the facade has nothing to move (no CASE identity,
+// no operational record, no session), the host sees the fabric as the
+// store now holds it. matter.js reports these as an "updated" fabric, the
+// fabric's persist emitting its replaced event (FabricManager.ts:236-246),
+// which the node hands on as fabricsChanged (CommissioningServer.ts:118-141).
+func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
 		info, _ := n.fabricInfo(ctx, fabricIndex)
 		observe(n.logger, "fabric_updated", func() error { return fn(info) })

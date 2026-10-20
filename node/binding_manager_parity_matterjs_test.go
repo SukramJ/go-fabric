@@ -188,11 +188,20 @@ type bqOptions struct {
 	clients []uint32
 	// prepare, when set, runs with the node before every start.
 	prepare func(n *node.Node)
+	// client runs the node's client stack on the site (node.Client).
+	client bool
 }
 
 func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 	t.Helper()
-	b := &bqSwitch{site: quietSite(t), log: &bqLog{}}
+	b := &bqSwitch{log: &bqLog{}}
+	if o.client {
+		// Two nodes keep sub-second timers running for minutes of fake time;
+		// a short settle steps them in seconds of wall time.
+		b.site = steppedSite(t)
+	} else {
+		b.site = quietSite(t)
+	}
 	if o.switches == 0 {
 		o.switches = 1
 	}
@@ -208,9 +217,12 @@ func newBQSwitch(t *testing.T, o bqOptions) *bqSwitch {
 		bridged = append(bridged, sw)
 	}
 	b.pair = b.site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
-		Bridged:   bridged,
-		Configure: func(cfg *node.Config) { cfg.Logger = slog.New(&bqHandler{log: b.log}) },
-		Prepare:   o.prepare,
+		Bridged: bridged,
+		Configure: func(cfg *node.Config) {
+			cfg.Logger = slog.New(&bqHandler{log: b.log})
+			cfg.Client.Enabled = o.client
+		},
+		Prepare: o.prepare,
 	}})
 	b.dev = b.pair.Device
 	for i := range o.switches {

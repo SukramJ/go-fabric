@@ -25,10 +25,10 @@
 // the group state legs run here. "treats UpdateFabricLabel as a final
 // fabric change" and "treats SetVIDVerificationStatement as a final fabric
 // change" assert the node's fabricsChanged event "1 updated"
-// (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582).
-// matter.js raises it on every persist of a fabric (FabricManager.ts:236-247,
-// persistCallback). The Go node raises no fabric event for a label or
-// vendor ID change: Observers.OnFabricUpdated follows UpdateNOC.
+// (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582),
+// which matter.js raises on every persist of a fabric (FabricManager.ts:236-246,
+// persistCallback); the Go node's is Observers.OnFabricUpdated
+// (TestOperationalCredentialsFinalFabricChange).
 package node_test
 
 import (
@@ -38,6 +38,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
+	"log/slog"
 	"slices"
 	"sync"
 	"testing"
@@ -566,4 +567,79 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 func sameFabric(a, b store.FabricRecord) bool {
 	return a.FabricIndex == b.FabricIndex && a.FabricID == b.FabricID && a.NodeID == b.NodeID &&
 		bytes.Equal(a.RootPublicKey, b.RootPublicKey) && a.CompressedID == b.CompressedID
+}
+
+// ocUpdateFabricLabel is UpdateFabricLabel's command id.
+const ocUpdateFabricLabel uint32 = 0x09
+
+// TestOperationalCredentialsFinalFabricChange ports the describe "while a
+// fail-safe without AddNOC or UpdateNOC is armed"
+// (OperationalCredentialsServerTest.ts:320-359). matter.js's
+// fabricsChanged(index, "updated") is the host's Observers.OnFabricUpdated
+// (fix: a label or vendor ID change reports the fabric,
+// FabricManager.ts:236-246); its captureLog of errors is the node's records
+// at error level; CommissioningServer's commissioned is the node holding
+// its one fabric.
+func TestOperationalCredentialsFinalFabricChange(t *testing.T) {
+	holdSite(t)
+	changeFabric := func(t *testing.T, cmd uint32, fields spec.Encodable) store.FabricRecord {
+		t.Helper()
+		var mu sync.Mutex
+		var changes []uint8
+		errLog := &bqLog{}
+		p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Configure: func(cfg *node.Config) {
+			cfg.Logger = slog.New(&bqHandler{log: errLog})
+			cfg.Observers.OnFabricUpdated = func(f node.FabricInfo) error {
+				mu.Lock()
+				changes = append(changes, f.FabricIndex)
+				mu.Unlock()
+				return nil
+			}
+		}}})
+		armFailSafe(t, p)
+		mark := errLog.mark()
+		mu.Lock()
+		before := len(changes)
+		mu.Unlock()
+		res, err := invokeOC(t, p, cmd, fields)
+		if cmd == ocUpdateFabricLabel {
+			if got := nocStatus(t, res, err); got != 0 {
+				t.Fatalf("UpdateFabricLabel: NOCResponse status %d", got)
+			}
+		} else if err != nil {
+			t.Fatalf("SetVIDVerificationStatement: %v", err)
+		}
+		for _, r := range errLog.records()[mark:] {
+			if r.level >= slog.LevelError {
+				t.Errorf("error logged: %s %v", r.msg, r.attrs)
+			}
+		}
+		fabrics, err := p.Device.Node().Fabrics(parityCtx(t))
+		if err != nil || len(fabrics) != 1 {
+			t.Fatalf("fabrics %+v, %v: the node is not commissioned", fabrics, err)
+		}
+		mu.Lock()
+		got := slices.Clone(changes[before:])
+		mu.Unlock()
+		if !slices.Equal(got, []uint8{fabrics[0].FabricIndex}) {
+			t.Errorf("fabric changes %v, want [%d updated]", got, fabrics[0].FabricIndex)
+		}
+		return fabrics[0]
+	}
+
+	// :346-350.
+	t.Run("treats UpdateFabricLabel as a final fabric change", func(t *testing.T) {
+		f := changeFabric(t, ocUpdateFabricLabel, tlvFields(func(enc *tlv.Encoder) { enc.PutUTF8(tlv.ContextTag(0), "renamed") }))
+		if f.Label != "renamed" {
+			t.Errorf("label %q, want renamed", f.Label)
+		}
+	})
+
+	// :352-358.
+	t.Run("treats SetVIDVerificationStatement as a final fabric change", func(t *testing.T) {
+		f := changeFabric(t, ocSetVIDStmt, tlvFields(func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(0), 0xFFF2) }))
+		if f.VendorID != 0xFFF2 {
+			t.Errorf("vendor ID 0x%04X, want 0xFFF2", f.VendorID)
+		}
+	})
 }

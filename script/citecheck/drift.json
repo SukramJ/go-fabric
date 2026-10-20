@@ -685,7 +685,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 241,
+    "line": 253,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -694,7 +694,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 337,
+    "line": 349,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -703,7 +703,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1315,
+    "line": 1346,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -712,7 +712,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1859,
+    "line": 1890,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -721,7 +721,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1899,
+    "line": 1930,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -730,7 +730,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2023,
+    "line": 2054,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -739,7 +739,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2204,
+    "line": 2245,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",
@@ -766,7 +766,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 594,
+    "line": 624,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
@@ -1399,7 +1399,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 489,
+    "line": 486,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -1408,7 +1408,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 657,
+    "line": 691,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",

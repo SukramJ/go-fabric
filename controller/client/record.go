@@ -468,10 +468,7 @@ func (r *Record) applyTXT(t discovery.TXTData) {
 		vendor, product, _ := strings.Cut(*t.VP, "+")
 		r.VendorID, r.ProductID = nonZeroID(vendor), nonZeroID(product)
 	}
-	r.AdvertisedIntervals = nil
-	if t.SII != nil || t.SAI != nil || t.SAT != nil {
-		r.AdvertisedIntervals = &AdvertisedIntervals{IdleInterval: clonePtr(t.SII), ActiveInterval: clonePtr(t.SAI), ActiveThreshold: clonePtr(t.SAT)}
-	}
+	r.AdvertisedIntervals = advertisable(AdvertisedIntervals{IdleInterval: t.SII, ActiveInterval: t.SAI, ActiveThreshold: t.SAT})
 	r.DeviceType = clonePtr(t.DT)
 	r.DeviceName = deref(t.DN)
 	r.RotatingIdentifier = deref(t.RI)
@@ -503,8 +500,10 @@ func (r Record) txt() discovery.TXTData {
 		t.PH = clonePtr(r.PairingHint)
 		t.PI = strPtr(r.PairingInstructions)
 	}
-	if ai := r.AdvertisedIntervals; ai != nil {
-		t.SII, t.SAI, t.SAT = clonePtr(ai.IdleInterval), clonePtr(ai.ActiveInterval), clonePtr(ai.ActiveThreshold)
+	if r.AdvertisedIntervals != nil {
+		if ai := advertisable(*r.AdvertisedIntervals); ai != nil {
+			t.SII, t.SAI, t.SAT = ai.IdleInterval, ai.ActiveInterval, ai.ActiveThreshold
+		}
 	}
 	t.T = clonePtr(r.TCPSupport)
 	if r.LongIdleTimeOperatingMode != nil {
@@ -515,6 +514,41 @@ func (r Record) txt() discovery.TXTData {
 		t.ICD = &icd
 	}
 	return t
+}
+
+// The bounds of an interval DNS-SD advertises (Core § 4.3.4): matter.js
+// SessionIntervals.maxAdvertisedInterval (one hour) for SII and SAI,
+// maxActiveThreshold (65535 ms) for SAT (SessionIntervals.ts:57, :63).
+const (
+	maxAdvertisedInterval = time.Hour
+	maxActiveThreshold    = 65535 * time.Millisecond
+)
+
+// advertisable keeps the intervals a DNS-SD advertisement can carry and
+// drops the others, nil when none remains. Mirrors matter.js
+// SessionIntervals.advertisable (packages/protocol/src/session/
+// SessionIntervals.ts:99-118 at 862ad75f): SII and SAI whole milliseconds
+// from 0 to an hour, SAT whole milliseconds from 1 to 65535 ("DiscoveryData
+// treats an SAT of 0 as absent, so a stored 0 must not apply either"),
+// which RemoteDescriptor applies both into the long form and out of it
+// (RemoteDescriptor.ts:119, :223-227).
+func advertisable(ai AdvertisedIntervals) *AdvertisedIntervals {
+	keep := func(v *time.Duration, lowest, highest time.Duration) *time.Duration {
+		if v == nil || *v%time.Millisecond != 0 || *v < lowest || *v > highest {
+			return nil
+		}
+		c := *v
+		return &c
+	}
+	out := AdvertisedIntervals{
+		IdleInterval:    keep(ai.IdleInterval, 0, maxAdvertisedInterval),
+		ActiveInterval:  keep(ai.ActiveInterval, 0, maxAdvertisedInterval),
+		ActiveThreshold: keep(ai.ActiveThreshold, time.Millisecond, maxActiveThreshold),
+	}
+	if out.IdleInterval == nil && out.ActiveInterval == nil && out.ActiveThreshold == nil {
+		return nil
+	}
+	return &out
 }
 
 // device is the record as the commissioner's discovery data —

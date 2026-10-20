@@ -383,13 +383,7 @@ Device side:
   marks them `assertedAtRoot`, never refuses, logs at debug
   (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
   (With the previous item.)
-- **OTA provider applies the requestor's `NewVersion` unchecked against the
-  token.** `cluster/core/ota_provider.go:558-563` checks consent on the raw
-  value; matter.js #4736 rewrites `NewVersion 0` under a known token to the
-  token's `versionToApply` and refuses (Cancelled) a version that differs
-  from the token's (`OtaSoftwareUpdateProviderServer.ts:419-458`; OtaTest
-  "applies the version of a known update token when the requestor asks for
-  version 0"). (Milestone 3, OTA.)
+
 
 Controller side:
 
@@ -586,19 +580,19 @@ Line numbers at `862ad75f`.
   (`AccessControlServer.ts:545-560` `#handleInteractionBegin`/`End`,
   `:598-602` `#applyDelayedAclUpdateFor`); a chunked Go write is in force
   per entry, so a concurrent request can meet a partly written list. One
-  `AccessControlAuxiliaryTest.ts` case is `missing` for this. (Milestone 3,
-  phase 19; security path, the owner's read.)
+  `AccessControlAuxiliaryTest.ts` case is `missing` for this. The change
+  is the write path's, not `cluster/core/access_control.go`'s alone: the
+  bridge's write dispatch would collect a CASE session's ACL list items per
+  fabric for the interaction (matter.js `#prepareAclUpdateFor` at
+  interaction begin, `#delayAclUpdateFor` per write), the access check
+  keep reading the list in force, and the interaction's end store the
+  collected list as one replacement (`#applyDelayedAclUpdateFor`) —
+  more than a few dozen lines in `im/`, `bridge/` and the ACL server,
+  so brief BR left it. (Milestone 4; security path, the owner's read.)
 - **No extension access-check hook.** `extensionEntryAccessCheck`
   (`AccessControlServer.ts:441-450`) is an overridable check per entry; Go
   has none. (Milestone 4, with `AccessControlCustomExtensionTest.ts`.)
-- **A fabric label or vendor-ID change raises no fabric event.** matter.js
-  emits `fabricsChanged(index, "updated")` for every updated fabric
-  (`OperationalCredentialsServer.ts:579-582` →
-  `CommissioningServer.ts:118-141`); the Go `Observers.OnFabricUpdated`
-  follows UpdateNOC only and its facade handler closes sessions, so
-  UpdateFabricLabel and SetVIDVerificationStatement notify nothing. The two
-  "final fabric change" cases of `OperationalCredentialsServerTest.ts` are
-  `missing` for this. (Milestone 3, phase 19.)
+
 - **AdministratorCommissioning checks in another order.** matter.js: an open
   window → Busy, a timeout outside 180–900 s → InvalidCommand, an armed
   fail-safe → Busy (`AdministratorCommissioningServer.ts:191-212`), then a
@@ -621,18 +615,75 @@ Line numbers at `862ad75f`.
   check matter.js has not. (Milestone 3, phase 19; decide together with the
   SetRegulatoryConfig CountryCode item below.)
 
+Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
+`862ad75f`.
+
+- **No controller-side SoftwareUpdateManager.** matter.js's controller
+  keeps a manager beside its OTA provider: the reboot detection
+  (RebootResubscribeArmer, handlePeerShutdown, closeForPeer,
+  suppressNextStartUp, the failed-apply detection on startUp), the consent
+  queue (addUpdateConsent, removeConsent, queuedUpdates), the BDX transfer
+  options per consent, the stalled detection by BDX progress, the update
+  check of the controller's nodes and the DCL store cleanup
+  (`SoftwareUpdateManager.ts`). The Go provider is a node's and carries
+  the consent of an offered image and the in-progress entries only; 29
+  `OtaTest.ts` cases are `missing` for this. (Register candidate,
+  milestone 5 phase 25 with the rest of OTA push from the controller,
+  the RebootResubscribeArmer phase 24; `docs/roadmap.md`. Decided in
+  the BR review, 2026-10-20.)
+- **OccupancySensing has no feature selection.** The Go server serves
+  PassiveInfrared alone (`cluster/measurement/definitions.go`
+  `occupancyInst`), so neither another detector type nor the
+  OccupancyEvent feature can be chosen, and no OccupancyChanged event is
+  emitted, where matter.js emits it on `occupancy$Changed` with the
+  feature (`OccupancySensingServer.ts` `initialize`,
+  `#emitOccupancyChanged`). One `OccupancySensingServerTest.ts` case is
+  `missing` for this. (Milestone 4, a host option: a feature selection
+  changes the FeatureMap a controller sees, and the event needs the
+  bridge's change observation `booleanStateEvents` has for BooleanState.)
+- **The thermostat serves no Schedules.** MatterScheduleConfiguration's
+  Schedules is the second atomic attribute a CommitWrite of more than one
+  attribute needs (`AtomicWriteHandlerTest.ts:392-516` stages it beside
+  Presets through the behavior); the Go thermostat serves Presets alone,
+  as matter.js's ThermostatServer does not implement the feature
+  (`ThermostatServer.ts:126-128`). Five `AtomicWriteHandlerTest.ts` cases
+  are `missing` for this. (Milestone 4, with a Schedules implementation.)
+- **The Groupcast server has no Listener-only configuration.** The module
+  builds Groupcast with Listener, Sender and PerGroup
+  (`GroupcastServer.ts:81-83` as RootEndpoint installs it); a node without
+  the Sender feature (`ListenerOnlyRootEndpoint`) cannot be configured, so
+  one `GroupcastServerTest.ts` loop case is `missing`. (Milestone 4, a
+  node option.)
+- **The concentration servers serve NumericMeasurement only.** Every
+  `cluster/measurement` concentration server is bound to the MEA
+  selection (`concentration.go` `concOptions`), and its host port
+  carries a number (`contract.FloatMeasurementSource`), so the
+  LevelIndication feature and its LevelValue cannot be served; two
+  `ConcentrationMeasurementServerTest.ts` cases are `missing` for this.
+  (Milestone 4, a host option and a level source in `contract/`.)
+- **The controller chooses no TCP session.** `PeerExchangeProvider`'s
+  selection of a TCP session among a peer's sessions (skipping closing
+  ones) has no Go counterpart: `controller/peer` opens UDP sessions. Four
+  `TcpSessionBindingTest.ts` cases are `missing` for this. (Register
+  candidate, with a controller TCP transport.)
+- **The node's session intervals are not configurable.** matter.js takes
+  `sessions.intervals` (idle and active interval, active threshold) into
+  the SessionManager's parameters (`SessionsBehaviorTest.ts:15-25`); the
+  Go node states `bridge.DefaultSessionParameters` in Sigma2
+  (`node/security.go` `responderSessionParams`) and `node.Config` has no
+  field for them. One `SessionsBehaviorTest.ts` case is `missing` for
+  this; its sibling of the wall clock waits on the monotonic reading
+  below. (Milestone 4, a node option.)
+- **The event store is volatile only.** matter.js keeps the events of a
+  former run with `events: { nonvolatile: true }`
+  (`EventsBehaviorTest.ts:45-54`); the Go node's event log lives in
+  memory and persists only the event-number ceiling. One
+  `EventsBehaviorTest.ts` case is `missing` for this. (Milestone 4, a
+  node option over the store.)
+
 Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
 Line numbers at `862ad75f`.
 
-- **fabrictest carries no node client stack.** `node/client.go:62-110`
-  opens a kernel socket and its own DNS-SD cache, so two nodes on a site
-  cannot reach each other over CASE; a bound client's default
-  subscription (`BindingIntegrationTest.ts:180-219`, set on the ClientNode
-  by the test; Go: `Resolution.Interaction.Subscribe` with `Sustain`) has
-  no in-process test. Three `BindingIntegrationTest.ts` cases are
-  `missing` for this. (Milestone 3, phase 19: a node seam for the client
-  listener and its names, the fabrictest wiring, then the cases — brief
-  BR's first harness commit, which `TcpSessionBindingTest.ts` needs too.)
 - **A group write leaves no log line.** matter.js logs every write at
   info (`ClientInteraction.ts:317`); `groups.Sender.Write` logs nothing,
   where `Invoke` does since BQ (`matter.groups.invoke`). No case asks for
@@ -755,7 +806,8 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
   NumberOfPrimaries are absent from `cluster/light`, so a light cannot
   supply one (ColorControlServerTest "accepts a primary a light supplies
   without stating the number of primaries"). Optional attributes; low.
-  (Milestone 3, when a consumer asks.)
+  (Milestone 4, when a consumer asks; moved from milestone 3 by brief BR,
+  decision 19.4.)
 - **ColorControl `MatterQuiesce` leaves the quieter's pending-report
   timers.** `cluster/light/colorcontrol_transitions.go` stops the engine
   only; the LevelControl fix of PR #170 (`MatterQuiesce` drops the held

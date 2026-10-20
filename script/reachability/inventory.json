@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5860,
+  "entry_points": 5885,
   "entry_packages": [
     ".",
     "bdx",
@@ -226,9 +226,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13245,
-    "reachable": 9201,
-    "whitelisted": 4039,
+    "total_exported": 13254,
+    "reachable": 9202,
+    "whitelisted": 4047,
     "unreachable": 5
   },
   "by_package": [
@@ -6015,6 +6015,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestOTARequestor_AnnouncementDuringQuery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1256
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestOTARequestor_ApplyActions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
@@ -6267,24 +6274,52 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderApplyConsentAndToken",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderApplyDelay",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 209
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestParityMatterJS_OTAProviderConstants",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_parity_matterjs_test.go",
-      "line": 55
+      "line": 57
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_OTAProviderDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_parity_matterjs_test.go",
-      "line": 24
+      "line": 26
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderDoneClearsConsent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 316
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderQueryInProgress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 235
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_OTAProviderResponseFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_parity_matterjs_test.go",
-      "line": 80
+      "line": 82
     },
     {
       "package": "cluster/core",
@@ -16648,6 +16683,20 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestRemoteDescriptorRoundtripParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/remote_descriptor_parity_matterjs_internal_test.go",
+      "line": 61
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRemoteDescriptorSessionIntervalsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/remote_descriptor_parity_matterjs_internal_test.go",
+      "line": 162
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestRemovalConfirmedByFabricRemoved",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_follow_internal_test.go",
@@ -21055,6 +21104,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/args_test.go",
       "line": 19
+    },
+    {
+      "package": "examples/reference-controller/cli",
+      "identifier": "TestCommissioningWindowParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/cli/window_parity_matterjs_test.go",
+      "line": 114
     },
     {
       "package": "examples/reference-controller/cli",
