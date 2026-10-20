@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6038,
+  "entry_points": 6062,
   "entry_packages": [
     ".",
     "bdx",
@@ -227,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13907,
+    "total_exported": 13924,
     "reachable": 9710,
-    "whitelisted": 4192,
+    "whitelisted": 4209,
     "unreachable": 5
   },
   "by_package": [
@@ -302,6 +302,13 @@
     }
   ],
   "whitelisted": [
+    {
+      "package": "bdx",
+      "identifier": "TestFileSinkWrittenDoesNotWaitForTheDisk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bdx/sink_lock_internal_test.go",
+      "line": 14
+    },
     {
       "package": "binding",
       "identifier": "Entry",
@@ -3902,6 +3909,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOutboundReliable_TickSendsWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/outbound_reliable_lock_test.go",
+      "line": 16
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOutboundReliable_TrackAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
@@ -5116,6 +5130,20 @@
       "identifier": "TestStatusResponseWithErrorStatusEndsTheOngoingSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/status_response_decode_test.go",
+      "line": 33
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStopWaitsForTheBDXResponder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_responder_owner_test.go",
+      "line": 33
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStopWaitsForTheSessionReannounce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reannounce_owner_test.go",
       "line": 33
     },
     {
@@ -7063,6 +7091,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/soil_test.go",
       "line": 137
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilSourceReadWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_lock_test.go",
+      "line": 31
     },
     {
       "package": "cluster/modeselect",
@@ -17370,6 +17405,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestEraseCallsTheStoreWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/erase_lock_internal_test.go",
+      "line": 29
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
@@ -19165,14 +19207,14 @@
       "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 106
+      "line": 108
     },
     {
       "package": "controller/exchange",
       "identifier": "TestHandlerTakesPeerOpenedIMExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "controller/exchange",
@@ -19291,7 +19333,7 @@
       "identifier": "TestPBKDFParamRequestIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 242
+      "line": 244
     },
     {
       "package": "controller/exchange",
@@ -19354,7 +19396,7 @@
       "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 269
+      "line": 271
     },
     {
       "package": "controller/exchange",
@@ -19449,17 +19491,24 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestShutdownWaitsForTheHandlers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 302
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestSigma1ReachesHandlerOnInboundSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 170
+      "line": 172
     },
     {
       "package": "controller/exchange",
       "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 224
+      "line": 226
     },
     {
       "package": "controller/exchange",
@@ -22109,6 +22158,13 @@
     },
     {
       "package": "fabrictest",
+      "identifier": "TestControllerFailedStartReleasesItsAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "fabrictest",
       "identifier": "TestMulticastModelDelivery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/multicast_internal_test.go",
@@ -22120,6 +22176,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/multicast_internal_test.go",
       "line": 115
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestSettleMeasuresOnTheInjectedWallClock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/wall_internal_test.go",
+      "line": 30
     },
     {
       "package": "groups",
@@ -22294,21 +22357,21 @@
       "identifier": "TestGroupsCurrentKeyForID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groups_parity_matterjs_test.go",
-      "line": 217
+      "line": 216
     },
     {
       "package": "groups",
       "identifier": "TestGroupsIDMap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groups_parity_matterjs_test.go",
-      "line": 75
+      "line": 74
     },
     {
       "package": "groups",
       "identifier": "TestGroupsMulticastAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groups_parity_matterjs_test.go",
-      "line": 42
+      "line": 41
     },
     {
       "package": "groups",
@@ -22319,10 +22382,17 @@
     },
     {
       "package": "groups",
+      "identifier": "TestGroupsStoreWriteWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/store_lock_test.go",
+      "line": 39
+    },
+    {
+      "package": "groups",
       "identifier": "TestGroupsSubjectForGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groups_parity_matterjs_test.go",
-      "line": 137
+      "line": 136
     },
     {
       "package": "groups",
@@ -22771,6 +22841,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/eventlog_test.go",
       "line": 268
+    },
+    {
+      "package": "im",
+      "identifier": "TestEventLog_PersistRunsWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/eventlog_lock_test.go",
+      "line": 17
     },
     {
       "package": "im",
@@ -25224,6 +25301,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestOtaApplierCloseWaitsForTheRestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/ota_owner_internal_test.go",
+      "line": 18
+    },
+    {
+      "package": "node",
       "identifier": "TestPersistedKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
@@ -26186,21 +26270,28 @@
       "identifier": "TestStartReaper_ActiveSessionSurvivesSweeps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
-      "line": 74
+      "line": 115
     },
     {
       "package": "secure/operational",
       "identifier": "TestStartReaper_EvictsIdleSessionGracefully",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
-      "line": 25
+      "line": 85
     },
     {
       "package": "secure/operational",
       "identifier": "TestStartReaper_NeverMarkedSessionIsNotReaped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
-      "line": 119
+      "line": 147
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestStopReaperWaitsForTheReaper",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_idle_reaper_test.go",
+      "line": 167
     },
     {
       "package": "secure/setup",
@@ -29319,6 +29410,13 @@
     },
     {
       "package": "transport/tcp",
+      "identifier": "TestDialedConnWait",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/tcp/owner_test.go",
+      "line": 59
+    },
+    {
+      "package": "transport/tcp",
       "identifier": "TestDialerRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
@@ -29417,6 +29515,13 @@
     },
     {
       "package": "transport/tcp",
+      "identifier": "TestListenerWaitIdleWaitsForTheHandlers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/tcp/owner_test.go",
+      "line": 19
+    },
+    {
+      "package": "transport/tcp",
       "identifier": "TestTcpChannelAsyncIteration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/conn_parity_matterjs_test.go",
@@ -29505,6 +29610,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 167
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestCloseReturnsTheSocketErrorOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/close_test.go",
+      "line": 85
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestCloseWaitsForTheClosingCall",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/close_test.go",
+      "line": 55
     },
     {
       "package": "transport/udp",
