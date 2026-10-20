@@ -744,7 +744,10 @@ func (s *DoorLockServer) SetEndpoint(endpoint uint16) {
 // (DoorLockServer.ts:182-189). A later lock command arms auto-relock
 // again; an ExpiringUser's deadline stays stored and is checked on its
 // next use. A timer action already running (an auto-relock moving the
-// hardware) finishes first: MatterQuiesce returns after it did.
+// hardware) finishes first: MatterQuiesce returns once the cancelled timer
+// action has returned. The wait has no bound of its own — the interface
+// carries no context — and is bounded by the action, whose hardware call
+// the host keeps short.
 func (s *DoorLockServer) MatterQuiesce() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

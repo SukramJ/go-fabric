@@ -516,8 +516,11 @@ func (d *DiagnosticLogs) done() {
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: a BDX log transfer
 // still running is cancelled — its blocks go to a peer the node no longer
-// serves — and MatterQuiesce returns after it ended, so no transfer
-// goroutine or collector call outlives the bridge's Stop. A later
+// serves — and MatterQuiesce returns once the cancelled transfer has
+// returned, so no transfer goroutine or collector call outlives the
+// bridge's Stop. The wait has no bound of its own — the interface carries
+// no context — and is bounded by the transfer, whose context is cancelled
+// and whose collector the host keeps responsive to it. A later
 // RetrieveLogsRequest starts a new transfer.
 func (d *DiagnosticLogs) MatterQuiesce() {
 	d.mu.Lock()
