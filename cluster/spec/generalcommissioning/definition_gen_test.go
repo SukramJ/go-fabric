@@ -6,6 +6,7 @@
 package generalcommissioning
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -35,4 +36,39 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdSetTcAcknowledgements, spec.Request, SetTcAcknowledgementsRequest{TcVersion: uint16(1), TcUserResponse: uint16(1)})
 	spectest.RoundTripCommand(t, Definition, CmdSetTcAcknowledgementsResponse, spec.Response, SetTcAcknowledgementsResponse{ErrorCode: CommissioningErrorEnum(0)})
 	spectest.RoundTripAttribute(t, Definition, AttrBasicCommissioningInfo, BasicCommissioningInfo{FailSafeExpiryLengthSeconds: uint16(1), MaxCumulativeFailsafeSeconds: uint16(1)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleArmFailSafe(func(context.Context, ArmFailSafeRequest) (ArmFailSafeResponse, error) {
+		return ArmFailSafeResponse{}, nil
+	})
+	s.HandleSetRegulatoryConfig(func(context.Context, SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error) {
+		return SetRegulatoryConfigResponse{}, nil
+	})
+	s.HandleCommissioningComplete(func(context.Context, CommissioningCompleteRequest) (CommissioningCompleteResponse, error) {
+		return CommissioningCompleteResponse{}, nil
+	})
+	s.HandleSetTcAcknowledgements(func(context.Context, SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error) {
+		return SetTcAcknowledgementsResponse{}, nil
+	})
 }

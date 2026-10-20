@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	closuredimensiondef "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/schema"
@@ -52,6 +51,6 @@ func NewClosurePanel(opts Options, with ...Option) (*ClosurePanel, error) {
 }
 
 // ClosureDimension returns the ClosureDimension server (mandatory), or nil when the host supplied one of another type.
-func (d *ClosurePanel) ClosureDimension() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0105)
+func (d *ClosurePanel) ClosureDimension() *closuredimensiondef.Server {
+	return serverAs[*closuredimensiondef.Server](d.Device, 0x0105)
 }

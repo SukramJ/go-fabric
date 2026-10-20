@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -105,18 +104,26 @@ func NewPump(opts Options, with ...Option) (*Pump, error) {
 func (d *Pump) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // PumpConfigurationAndControl returns the PumpConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
-func (d *Pump) PumpConfigurationAndControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0200)
+func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
+	return serverAs[*pumpconfigurationandcontroldef.Server](d.Device, 0x0200)
 }
 
 // LevelControl returns the LevelControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) LevelControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0008) }
+func (d *Pump) LevelControl() *levelcontroldef.Server {
+	return serverAs[*levelcontroldef.Server](d.Device, 0x0008)
+}
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) TemperatureMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0402) }
+func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
+}
 
 // PressureMeasurement returns the PressureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) PressureMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0403) }
+func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
+	return serverAs[*pressuremeasurementdef.Server](d.Device, 0x0403)
+}
 
 // FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Pump) FlowMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0404) }
+func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
+	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+}

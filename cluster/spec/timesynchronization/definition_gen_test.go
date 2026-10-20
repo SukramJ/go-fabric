@@ -6,6 +6,7 @@
 package timesynchronization
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,4 +43,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventMissingTrustedTimeSource, MissingTrustedTimeSourceEvent{})
 	spectest.RoundTripAttribute(t, Definition, AttrTimeZone, spec.List[TimeZoneStruct]([]TimeZoneStruct{TimeZoneStruct{Offset: int32(1), ValidAt: uint64(1), Name: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrDstOffset, spec.List[DSTOffsetStruct]([]DSTOffsetStruct{DSTOffsetStruct{Offset: int32(1), ValidStarting: uint64(1), ValidUntil: spec.ValueOf(uint64(1))}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleSetUtcTime(func(context.Context, SetUtcTimeRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetTrustedTimeSource(func(context.Context, SetTrustedTimeSourceRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetTimeZone(func(context.Context, SetTimeZoneRequest) (SetTimeZoneResponse, error) {
+		return SetTimeZoneResponse{}, nil
+	})
+	s.HandleSetDstOffset(func(context.Context, SetDstOffsetRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetDefaultNtp(func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil })
 }

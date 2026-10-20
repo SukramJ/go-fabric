@@ -6,6 +6,7 @@
 package applicationlauncher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -31,4 +32,30 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStopApp, spec.Request, StopAppRequest{Application: spectest.Ptr(ApplicationStruct{CatalogVendorId: uint16(1), ApplicationId: "x"})})
 	spectest.RoundTripCommand(t, Definition, CmdHideApp, spec.Request, HideAppRequest{Application: spectest.Ptr(ApplicationStruct{CatalogVendorId: uint16(1), ApplicationId: "x"})})
 	spectest.RoundTripCommand(t, Definition, CmdLauncherResponse, spec.Response, LauncherResponse{Status: StatusEnum(0), Data: spectest.Ptr([]byte{1})})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
+	s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
+	s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
 }

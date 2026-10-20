@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -60,11 +59,11 @@ func NewWaterLeakDetector(opts Options, with ...Option) (*WaterLeakDetector, err
 }
 
 // BooleanState returns the BooleanState server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterLeakDetector) BooleanState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0045)
+func (d *WaterLeakDetector) BooleanState() *booleanstatedef.Server {
+	return serverAs[*booleanstatedef.Server](d.Device, 0x0045)
 }
 
 // BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *WaterLeakDetector) BooleanStateConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0080)
+func (d *WaterLeakDetector) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
+	return serverAs[*booleanstateconfigurationdef.Server](d.Device, 0x0080)
 }

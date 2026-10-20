@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	laundrydryercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
 	laundrywashermodedef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
@@ -75,24 +74,24 @@ func NewLaundryDryer(opts Options, with ...Option) (*LaundryDryer, error) {
 }
 
 // OperationalState returns the OperationalState server (mandatory), or nil when the host supplied one of another type.
-func (d *LaundryDryer) OperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0060)
+func (d *LaundryDryer) OperationalState() *operationalstatedef.Server {
+	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
 }
 
 // LaundryWasherMode returns the LaundryWasherMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *LaundryDryer) LaundryWasherMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0051)
+func (d *LaundryDryer) LaundryWasherMode() *laundrywashermodedef.Server {
+	return serverAs[*laundrywashermodedef.Server](d.Device, 0x0051)
 }
 
 // OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *LaundryDryer) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // LaundryDryerControls returns the LaundryDryerControls server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *LaundryDryer) LaundryDryerControls() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x004A)
+func (d *LaundryDryer) LaundryDryerControls() *laundrydryercontrolsdef.Server {
+	return serverAs[*laundrydryercontrolsdef.Server](d.Device, 0x004A)
 }
 
 // TemperatureControl returns the TemperatureControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *LaundryDryer) TemperatureControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0056)
+func (d *LaundryDryer) TemperatureControl() *temperaturecontroldef.Server {
+	return serverAs[*temperaturecontroldef.Server](d.Device, 0x0056)
 }

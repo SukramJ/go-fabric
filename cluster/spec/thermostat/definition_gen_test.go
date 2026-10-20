@@ -6,6 +6,7 @@
 package thermostat
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -54,4 +55,35 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrPresets, spec.List[PresetStruct]([]PresetStruct{PresetStruct{PresetHandle: spec.ValueOf([]byte{1}), PresetScenario: PresetScenarioEnum(1), Name: spectest.Ptr(spec.ValueOf("x")), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1)), BuiltIn: spec.ValueOf(true)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrSchedules, spec.List[ScheduleStruct]([]ScheduleStruct{ScheduleStruct{ScheduleHandle: spec.ValueOf([]byte{1}), SystemMode: SystemModeEnum(0), Name: spectest.Ptr("x"), PresetHandle: spectest.Ptr([]byte{1}), Transitions: []ScheduleTransitionStruct{ScheduleTransitionStruct{DayOfWeek: ScheduleDayOfWeekBitmap(1 << 0), TransitionTime: uint16(1), PresetHandle: spectest.Ptr([]byte{1}), SystemMode: spectest.Ptr(SystemModeEnum(0)), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1))}}, BuiltIn: spec.ValueOf(true)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrThermostatSuggestions, spec.List[ThermostatSuggestionStruct]([]ThermostatSuggestionStruct{ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleSetpointRaiseLower(func(context.Context, SetpointRaiseLowerRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetActiveScheduleRequest(func(context.Context, SetActiveScheduleRequestRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetActivePresetRequest(func(context.Context, SetActivePresetRequestRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleAddThermostatSuggestion(func(context.Context, AddThermostatSuggestionRequest) (AddThermostatSuggestionResponse, error) {
+		return AddThermostatSuggestionResponse{}, nil
+	})
+	s.HandleRemoveThermostatSuggestion(func(context.Context, RemoveThermostatSuggestionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil })
 }

@@ -6,6 +6,7 @@
 package descriptor
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -29,4 +30,27 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTrip(t, Semtag{MfgCode: spec.ValueOf(uint16(1)), NamespaceId: Namespace(1), Tag: uint8(1), Label: spectest.Ptr(spec.ValueOf("x"))}, spec.DecodeStruct[Semtag])
 	spectest.RoundTripAttribute(t, Definition, AttrDeviceTypeList, spec.List[DeviceTypeStruct]([]DeviceTypeStruct{DeviceTypeStruct{DeviceType: uint32(1), Revision: uint16(1)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrTagList, spec.List[Semtag]([]Semtag{Semtag{MfgCode: spec.ValueOf(uint16(1)), NamespaceId: Namespace(1), Tag: uint8(1), Label: spectest.Ptr(spec.ValueOf("x"))}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
 }

@@ -6,6 +6,7 @@
 package generaldiagnostics
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -38,4 +39,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventBootReason, BootReasonEvent{BootReason: BootReasonEnum(0)})
 	spectest.RoundTripAttribute(t, Definition, AttrNetworkInterfaces, spec.List[NetworkInterface]([]NetworkInterface{NetworkInterface{Name: "x", IsOperational: true, OffPremiseServicesReachableIPv4: spec.ValueOf(true), OffPremiseServicesReachableIPv6: spec.ValueOf(true), HardwareAddress: []byte{1}, IPv4Addresses: [][]byte{[]byte{1, 1, 1, 1}}, IPv6Addresses: [][]byte{[]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}, Type: InterfaceTypeEnum(0)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrDeviceLoadStatus, DeviceLoadStruct{CurrentSubscriptions: uint16(1), CurrentSubscriptionsForFabric: uint16(1), TotalSubscriptionsEstablished: uint32(1), TotalInteractionModelMessagesSent: uint32(1), TotalInteractionModelMessagesReceived: uint32(1)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleTestEventTrigger(func(context.Context, TestEventTriggerRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleTimeSnapshot(func(context.Context, TimeSnapshotRequest) (TimeSnapshotResponse, error) {
+		return TimeSnapshotResponse{}, nil
+	})
+	s.HandlePayloadTestRequest(func(context.Context, PayloadTestRequestRequest) (PayloadTestResponse, error) {
+		return PayloadTestResponse{}, nil
+	})
 }

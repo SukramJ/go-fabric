@@ -6,6 +6,7 @@
 package temperaturealarm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -29,4 +30,30 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdModifyEnabledAlarms, spec.Request, ModifyEnabledAlarmsRequest{Mask: AlarmBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdSetTemperatureAlarmThresholds, spec.Request, SetTemperatureAlarmThresholdsRequest{CriticalOverTemperatureThreshold: spectest.Ptr(int16(1)), MajorOverTemperatureThreshold: spectest.Ptr(int16(1)), MinorOverTemperatureThreshold: spectest.Ptr(int16(1)), MinorUnderTemperatureThreshold: spectest.Ptr(int16(1)), MajorUnderTemperatureThreshold: spectest.Ptr(int16(1)), CriticalUnderTemperatureThreshold: spectest.Ptr(int16(1))})
 	spectest.RoundTripEvent(t, Definition, EventNotify, NotifyEvent{Active: AlarmBitmap(1 << 0), Inactive: AlarmBitmap(1 << 0), State: AlarmBitmap(1 << 0), Mask: AlarmBitmap(1 << 0)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleReset(func(context.Context, ResetRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleModifyEnabledAlarms(func(context.Context, ModifyEnabledAlarmsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetTemperatureAlarmThresholds(func(context.Context, SetTemperatureAlarmThresholdsRequest) (struct{}, error) { return struct{}{}, nil })
 }

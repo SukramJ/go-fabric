@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	commoditymeteringdef "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
 	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
@@ -57,16 +56,16 @@ func NewElectricalMeter(opts Options, with ...Option) (*ElectricalMeter, error) 
 }
 
 // ElectricalPowerMeasurement returns the ElectricalPowerMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) ElectricalPowerMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0090)
+func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
+	return serverAs[*electricalpowermeasurementdef.Server](d.Device, 0x0090)
 }
 
 // ElectricalEnergyMeasurement returns the ElectricalEnergyMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) ElectricalEnergyMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0091)
+func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
+	return serverAs[*electricalenergymeasurementdef.Server](d.Device, 0x0091)
 }
 
 // CommodityMetering returns the CommodityMetering server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalMeter) CommodityMetering() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0B07)
+func (d *ElectricalMeter) CommodityMetering() *commoditymeteringdef.Server {
+	return serverAs[*commoditymeteringdef.Server](d.Device, 0x0B07)
 }

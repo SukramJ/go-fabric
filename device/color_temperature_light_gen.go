@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	colorcontroldef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -104,11 +103,11 @@ func (d *ColorTemperatureLight) OnOff() *onoff.Server {
 }
 
 // LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
-func (d *ColorTemperatureLight) LevelControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0008)
+func (d *ColorTemperatureLight) LevelControl() *levelcontroldef.Server {
+	return serverAs[*levelcontroldef.Server](d.Device, 0x0008)
 }
 
 // ColorControl returns the ColorControl server (mandatory), or nil when the host supplied one of another type.
-func (d *ColorTemperatureLight) ColorControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0300)
+func (d *ColorTemperatureLight) ColorControl() *colorcontroldef.Server {
+	return serverAs[*colorcontroldef.Server](d.Device, 0x0300)
 }

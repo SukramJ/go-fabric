@@ -6,6 +6,7 @@
 package groupcast
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -34,4 +35,32 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdGroupcastTesting, spec.Request, GroupcastTestingRequest{TestOperation: GroupcastTestingEnum(0), DurationSeconds: spectest.Ptr(uint16(10))})
 	spectest.RoundTripEvent(t, Definition, EventGroupcastTesting, GroupcastTestingEvent{SourceIpAddress: spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), DestinationIpAddress: spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), GroupId: spectest.Ptr(uint16(1)), EndpointId: spectest.Ptr(uint16(1)), ClusterId: spectest.Ptr(uint32(1)), ElementId: spectest.Ptr(uint32(1)), AccessAllowed: spectest.Ptr(true), GroupcastTestResult: GroupcastTestResultEnum(0), FabricIndex: uint8(1)})
 	spectest.RoundTripAttribute(t, Definition, AttrMembership, spec.List[MembershipStruct]([]MembershipStruct{MembershipStruct{GroupId: uint16(1), Endpoints: spectest.Ptr([]uint16{uint16(1)}), KeySetId: uint16(1), HasAuxiliaryAcl: spectest.Ptr(true), McastAddrPolicy: MulticastAddrPolicyEnum(0), FabricIndex: uint8(1)}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleJoinGroup(func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleLeaveGroup(func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil })
+	s.HandleUpdateGroupKey(func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleConfigureAuxiliaryAcl(func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil })
 }

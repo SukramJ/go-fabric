@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
@@ -59,11 +58,11 @@ func NewTemperatureSensor(opts Options, with ...Option) (*TemperatureSensor, err
 }
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *TemperatureSensor) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }
 
 // ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0204)
+func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
+	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
 }

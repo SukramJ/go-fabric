@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -58,4 +57,6 @@ func NewClosure(opts Options, with ...Option) (*Closure, error) {
 }
 
 // ClosureControl returns the ClosureControl server (mandatory), or nil when the host supplied one of another type.
-func (d *Closure) ClosureControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0104) }
+func (d *Closure) ClosureControl() *closurecontroldef.Server {
+	return serverAs[*closurecontroldef.Server](d.Device, 0x0104)
+}

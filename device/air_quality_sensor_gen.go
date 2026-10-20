@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	airqualitydef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
 	carbondioxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
 	carbonmonoxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
@@ -111,64 +110,66 @@ func NewAirQualitySensor(opts Options, with ...Option) (*AirQualitySensor, error
 }
 
 // AirQuality returns the AirQuality server (mandatory), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) AirQuality() *spec.Server { return serverAs[*spec.Server](d.Device, 0x005B) }
+func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
+	return serverAs[*airqualitydef.Server](d.Device, 0x005B)
+}
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }
 
 // RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) RelativeHumidityMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0405)
+func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
+	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
 }
 
 // CarbonMonoxideConcentrationMeasurement returns the CarbonMonoxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x040C)
+func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
+	return serverAs[*carbonmonoxideconcentrationmeasurementdef.Server](d.Device, 0x040C)
 }
 
 // CarbonDioxideConcentrationMeasurement returns the CarbonDioxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x040D)
+func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxideconcentrationmeasurementdef.Server {
+	return serverAs[*carbondioxideconcentrationmeasurementdef.Server](d.Device, 0x040D)
 }
 
 // NitrogenDioxideConcentrationMeasurement returns the NitrogenDioxideConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0413)
+func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendioxideconcentrationmeasurementdef.Server {
+	return serverAs[*nitrogendioxideconcentrationmeasurementdef.Server](d.Device, 0x0413)
 }
 
 // OzoneConcentrationMeasurement returns the OzoneConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) OzoneConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0415)
+func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationmeasurementdef.Server {
+	return serverAs[*ozoneconcentrationmeasurementdef.Server](d.Device, 0x0415)
 }
 
 // Pm25ConcentrationMeasurement returns the Pm25ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042A)
+func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeasurementdef.Server {
+	return serverAs[*pm25concentrationmeasurementdef.Server](d.Device, 0x042A)
 }
 
 // FormaldehydeConcentrationMeasurement returns the FormaldehydeConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042B)
+func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydeconcentrationmeasurementdef.Server {
+	return serverAs[*formaldehydeconcentrationmeasurementdef.Server](d.Device, 0x042B)
 }
 
 // Pm1ConcentrationMeasurement returns the Pm1ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042C)
+func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasurementdef.Server {
+	return serverAs[*pm1concentrationmeasurementdef.Server](d.Device, 0x042C)
 }
 
 // Pm10ConcentrationMeasurement returns the Pm10ConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042D)
+func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeasurementdef.Server {
+	return serverAs[*pm10concentrationmeasurementdef.Server](d.Device, 0x042D)
 }
 
 // TotalVolatileOrganicCompoundsConcentrationMeasurement returns the TotalVolatileOrganicCompoundsConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042E)
+func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *totalvolatileorganiccompoundsconcentrationmeasurementdef.Server {
+	return serverAs[*totalvolatileorganiccompoundsconcentrationmeasurementdef.Server](d.Device, 0x042E)
 }
 
 // RadonConcentrationMeasurement returns the RadonConcentrationMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirQualitySensor) RadonConcentrationMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x042F)
+func (d *AirQualitySensor) RadonConcentrationMeasurement() *radonconcentrationmeasurementdef.Server {
+	return serverAs[*radonconcentrationmeasurementdef.Server](d.Device, 0x042F)
 }

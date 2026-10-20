@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	deviceenergymanagementdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	deviceenergymanagementmodedef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
 	"github.com/SukramJ/go-fabric/schema"
@@ -56,11 +55,11 @@ func NewDeviceEnergyManagement(opts Options, with ...Option) (*DeviceEnergyManag
 }
 
 // DeviceEnergyManagement returns the DeviceEnergyManagement server (mandatory), or nil when the host supplied one of another type.
-func (d *DeviceEnergyManagement) DeviceEnergyManagement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0098)
+func (d *DeviceEnergyManagement) DeviceEnergyManagement() *deviceenergymanagementdef.Server {
+	return serverAs[*deviceenergymanagementdef.Server](d.Device, 0x0098)
 }
 
 // DeviceEnergyManagementMode returns the DeviceEnergyManagementMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *DeviceEnergyManagement) DeviceEnergyManagementMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x009F)
+func (d *DeviceEnergyManagement) DeviceEnergyManagementMode() *deviceenergymanagementmodedef.Server {
+	return serverAs[*deviceenergymanagementmodedef.Server](d.Device, 0x009F)
 }

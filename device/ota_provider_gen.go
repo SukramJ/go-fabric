@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	otasoftwareupdateproviderdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -50,6 +49,6 @@ func NewOtaProvider(opts Options, with ...Option) (*OtaProvider, error) {
 }
 
 // OtaSoftwareUpdateProvider returns the OtaSoftwareUpdateProvider server (mandatory), or nil when the host supplied one of another type.
-func (d *OtaProvider) OtaSoftwareUpdateProvider() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0029)
+func (d *OtaProvider) OtaSoftwareUpdateProvider() *otasoftwareupdateproviderdef.Server {
+	return serverAs[*otasoftwareupdateproviderdef.Server](d.Device, 0x0029)
 }

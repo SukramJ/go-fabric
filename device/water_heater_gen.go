@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	waterheatermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
@@ -63,12 +62,16 @@ func NewWaterHeater(opts Options, with ...Option) (*WaterHeater, error) {
 }
 
 // WaterHeaterManagement returns the WaterHeaterManagement server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) WaterHeaterManagement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0094)
+func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
+	return serverAs[*waterheatermanagementdef.Server](d.Device, 0x0094)
 }
 
 // WaterHeaterMode returns the WaterHeaterMode server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) WaterHeaterMode() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009E) }
+func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
+	return serverAs[*waterheatermodedef.Server](d.Device, 0x009E)
+}
 
 // Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterHeater) Thermostat() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0201) }
+func (d *WaterHeater) Thermostat() *thermostatdef.Server {
+	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
+}

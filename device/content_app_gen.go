@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	accountlogindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	applicationbasicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
 	applicationlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
@@ -88,27 +87,41 @@ func NewContentApp(opts Options, with ...Option) (*ContentApp, error) {
 }
 
 // KeypadInput returns the KeypadInput server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) KeypadInput() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0509) }
+func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
+	return serverAs[*keypadinputdef.Server](d.Device, 0x0509)
+}
 
 // ApplicationLauncher returns the ApplicationLauncher server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) ApplicationLauncher() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050C)
+func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
+	return serverAs[*applicationlauncherdef.Server](d.Device, 0x050C)
 }
 
 // ApplicationBasic returns the ApplicationBasic server (mandatory), or nil when the host supplied one of another type.
-func (d *ContentApp) ApplicationBasic() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050D) }
+func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
+	return serverAs[*applicationbasicdef.Server](d.Device, 0x050D)
+}
 
 // Channel returns the Channel server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) Channel() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0504) }
+func (d *ContentApp) Channel() *channeldef.Server {
+	return serverAs[*channeldef.Server](d.Device, 0x0504)
+}
 
 // TargetNavigator returns the TargetNavigator server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) TargetNavigator() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0505) }
+func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
+	return serverAs[*targetnavigatordef.Server](d.Device, 0x0505)
+}
 
 // MediaPlayback returns the MediaPlayback server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) MediaPlayback() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0506) }
+func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
+	return serverAs[*mediaplaybackdef.Server](d.Device, 0x0506)
+}
 
 // ContentLauncher returns the ContentLauncher server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) ContentLauncher() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050A) }
+func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
+	return serverAs[*contentlauncherdef.Server](d.Device, 0x050A)
+}
 
 // AccountLogin returns the AccountLogin server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ContentApp) AccountLogin() *spec.Server { return serverAs[*spec.Server](d.Device, 0x050E) }
+func (d *ContentApp) AccountLogin() *accountlogindef.Server {
+	return serverAs[*accountlogindef.Server](d.Device, 0x050E)
+}

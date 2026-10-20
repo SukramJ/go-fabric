@@ -6,6 +6,7 @@
 package actions
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -43,4 +44,39 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventActionFailed, ActionFailedEvent{ActionId: uint16(1), InvokeId: uint32(1), NewState: ActionStateEnum(0), Error: ActionErrorEnum(0)})
 	spectest.RoundTripAttribute(t, Definition, AttrActionList, spec.List[ActionStruct]([]ActionStruct{ActionStruct{ActionId: uint16(1), Name: "x", Type: ActionTypeEnum(0), EndpointListId: uint16(1), SupportedCommands: CommandBits(1 << 0), State: ActionStateEnum(0)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrEndpointLists, spec.List[EndpointListStruct]([]EndpointListStruct{EndpointListStruct{EndpointListId: uint16(1), Name: "x", Type: EndpointListTypeEnum(0), Endpoints: []uint16{uint16(1)}}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleInstantAction(func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleInstantActionWithTransition(func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStartAction(func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStartActionWithDuration(func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStopAction(func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandlePauseAction(func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandlePauseActionWithDuration(func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleResumeAction(func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnableAction(func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnableActionWithDuration(func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleDisableAction(func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil })
 }

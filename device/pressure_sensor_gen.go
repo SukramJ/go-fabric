@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	pressuremeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
 	"github.com/SukramJ/go-fabric/schema"
@@ -51,6 +50,6 @@ func NewPressureSensor(opts Options, with ...Option) (*PressureSensor, error) {
 }
 
 // PressureMeasurement returns the PressureMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *PressureSensor) PressureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0403)
+func (d *PressureSensor) PressureMeasurement() *pressuremeasurementdef.Server {
+	return serverAs[*pressuremeasurementdef.Server](d.Device, 0x0403)
 }

@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	accountlogindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	applicationlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	audiooutputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
@@ -119,60 +118,66 @@ func NewCastingVideoPlayer(opts Options, with ...Option) (*CastingVideoPlayer, e
 func (d *CastingVideoPlayer) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // MediaPlayback returns the MediaPlayback server (mandatory), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) MediaPlayback() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0506)
+func (d *CastingVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
+	return serverAs[*mediaplaybackdef.Server](d.Device, 0x0506)
 }
 
 // KeypadInput returns the KeypadInput server (mandatory), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) KeypadInput() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0509)
+func (d *CastingVideoPlayer) KeypadInput() *keypadinputdef.Server {
+	return serverAs[*keypadinputdef.Server](d.Device, 0x0509)
 }
 
 // ContentLauncher returns the ContentLauncher server (mandatory), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) ContentLauncher() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050A)
+func (d *CastingVideoPlayer) ContentLauncher() *contentlauncherdef.Server {
+	return serverAs[*contentlauncherdef.Server](d.Device, 0x050A)
 }
 
 // Messages returns the Messages server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) Messages() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0097) }
+func (d *CastingVideoPlayer) Messages() *messagesdef.Server {
+	return serverAs[*messagesdef.Server](d.Device, 0x0097)
+}
 
 // WakeOnLan returns the WakeOnLan server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) WakeOnLan() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0503)
+func (d *CastingVideoPlayer) WakeOnLan() *wakeonlandef.Server {
+	return serverAs[*wakeonlandef.Server](d.Device, 0x0503)
 }
 
 // Channel returns the Channel server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) Channel() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0504) }
+func (d *CastingVideoPlayer) Channel() *channeldef.Server {
+	return serverAs[*channeldef.Server](d.Device, 0x0504)
+}
 
 // TargetNavigator returns the TargetNavigator server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) TargetNavigator() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0505)
+func (d *CastingVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
+	return serverAs[*targetnavigatordef.Server](d.Device, 0x0505)
 }
 
 // MediaInput returns the MediaInput server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) MediaInput() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0507)
+func (d *CastingVideoPlayer) MediaInput() *mediainputdef.Server {
+	return serverAs[*mediainputdef.Server](d.Device, 0x0507)
 }
 
 // LowPower returns the LowPower server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) LowPower() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0508) }
+func (d *CastingVideoPlayer) LowPower() *lowpowerdef.Server {
+	return serverAs[*lowpowerdef.Server](d.Device, 0x0508)
+}
 
 // AudioOutput returns the AudioOutput server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) AudioOutput() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050B)
+func (d *CastingVideoPlayer) AudioOutput() *audiooutputdef.Server {
+	return serverAs[*audiooutputdef.Server](d.Device, 0x050B)
 }
 
 // ApplicationLauncher returns the ApplicationLauncher server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) ApplicationLauncher() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050C)
+func (d *CastingVideoPlayer) ApplicationLauncher() *applicationlauncherdef.Server {
+	return serverAs[*applicationlauncherdef.Server](d.Device, 0x050C)
 }
 
 // AccountLogin returns the AccountLogin server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) AccountLogin() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050E)
+func (d *CastingVideoPlayer) AccountLogin() *accountlogindef.Server {
+	return serverAs[*accountlogindef.Server](d.Device, 0x050E)
 }
 
 // ContentControl returns the ContentControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CastingVideoPlayer) ContentControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x050F)
+func (d *CastingVideoPlayer) ContentControl() *contentcontroldef.Server {
+	return serverAs[*contentcontroldef.Server](d.Device, 0x050F)
 }

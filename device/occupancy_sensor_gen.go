@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	occupancysensingdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
@@ -56,11 +55,11 @@ func NewOccupancySensor(opts Options, with ...Option) (*OccupancySensor, error) 
 }
 
 // OccupancySensing returns the OccupancySensing server (mandatory), or nil when the host supplied one of another type.
-func (d *OccupancySensor) OccupancySensing() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0406)
+func (d *OccupancySensor) OccupancySensing() *occupancysensingdef.Server {
+	return serverAs[*occupancysensingdef.Server](d.Device, 0x0406)
 }
 
 // BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *OccupancySensor) BooleanStateConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0080)
+func (d *OccupancySensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
+	return serverAs[*booleanstateconfigurationdef.Server](d.Device, 0x0080)
 }

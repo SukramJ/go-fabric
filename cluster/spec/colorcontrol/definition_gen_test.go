@@ -6,6 +6,7 @@
 package colorcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -44,4 +45,46 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStopMoveStep, spec.Request, StopMoveStepRequest{OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdMoveColorTemperature, spec.Request, MoveColorTemperatureRequest{MoveMode: MoveModeEnum(0), Rate: uint16(1), ColorTemperatureMinimumMireds: uint16(1), ColorTemperatureMaximumMireds: uint16(1), OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdStepColorTemperature, spec.Request, StepColorTemperatureRequest{StepMode: StepModeEnum(1), StepSize: uint16(1), TransitionTime: uint16(1), ColorTemperatureMinimumMireds: uint16(1), ColorTemperatureMaximumMireds: uint16(1), OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleMoveToHue(func(context.Context, MoveToHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveHue(func(context.Context, MoveHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStepHue(func(context.Context, StepHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToSaturation(func(context.Context, MoveToSaturationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveSaturation(func(context.Context, MoveSaturationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStepSaturation(func(context.Context, StepSaturationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToHueAndSaturation(func(context.Context, MoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToColor(func(context.Context, MoveToColorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveColor(func(context.Context, MoveColorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStepColor(func(context.Context, StepColorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToColorTemperature(func(context.Context, MoveToColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnhancedMoveToHue(func(context.Context, EnhancedMoveToHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnhancedMoveHue(func(context.Context, EnhancedMoveHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnhancedStepHue(func(context.Context, EnhancedStepHueRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnhancedMoveToHueAndSaturation(func(context.Context, EnhancedMoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleColorLoopSet(func(context.Context, ColorLoopSetRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStopMoveStep(func(context.Context, StopMoveStepRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveColorTemperature(func(context.Context, MoveColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStepColorTemperature(func(context.Context, StepColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil })
 }

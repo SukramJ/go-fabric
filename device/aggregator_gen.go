@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
 	commissionercontroldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -55,9 +54,11 @@ func NewAggregator(opts Options, with ...Option) (*Aggregator, error) {
 }
 
 // Actions returns the Actions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Aggregator) Actions() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0025) }
+func (d *Aggregator) Actions() *actionsdef.Server {
+	return serverAs[*actionsdef.Server](d.Device, 0x0025)
+}
 
 // CommissionerControl returns the CommissionerControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Aggregator) CommissionerControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0751)
+func (d *Aggregator) CommissionerControl() *commissionercontroldef.Server {
+	return serverAs[*commissionercontroldef.Server](d.Device, 0x0751)
 }

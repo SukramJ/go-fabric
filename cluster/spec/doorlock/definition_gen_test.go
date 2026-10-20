@@ -6,6 +6,7 @@
 package doorlock
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -59,4 +60,59 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventLockOperation, LockOperationEvent{LockOperationType: LockOperationTypeEnum(0), OperationSource: OperationSourceEnum(0), UserIndex: spec.ValueOf(uint16(1)), FabricIndex: spec.ValueOf(uint8(1)), SourceNode: spec.ValueOf(uint64(1)), Credentials: spectest.Ptr(spec.ValueOf([]CredentialStruct{CredentialStruct{CredentialType: CredentialTypeEnum(0), CredentialIndex: uint16(1)}}))})
 	spectest.RoundTripEvent(t, Definition, EventLockOperationError, LockOperationErrorEvent{LockOperationType: LockOperationTypeEnum(0), OperationSource: OperationSourceEnum(0), OperationError: OperationErrorEnum(0), UserIndex: spec.ValueOf(uint16(1)), FabricIndex: spec.ValueOf(uint8(1)), SourceNode: spec.ValueOf(uint64(1)), Credentials: spectest.Ptr(spec.ValueOf([]CredentialStruct{CredentialStruct{CredentialType: CredentialTypeEnum(0), CredentialIndex: uint16(1)}}))})
 	spectest.RoundTripEvent(t, Definition, EventLockUserChange, LockUserChangeEvent{LockDataType: LockDataTypeEnum(0), DataOperationType: DataOperationTypeEnum(0), OperationSource: OperationSourceEnum(0), UserIndex: spec.ValueOf(uint16(1)), FabricIndex: spec.ValueOf(uint8(1)), SourceNode: spec.ValueOf(uint64(1)), DataIndex: spec.ValueOf(uint16(1))})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleLockDoor(func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleUnlockDoor(func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleUnlockWithTimeout(func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetWeekDaySchedule(func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGetWeekDaySchedule(func(context.Context, GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error) {
+		return GetWeekDayScheduleResponse{}, nil
+	})
+	s.HandleClearWeekDaySchedule(func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetYearDaySchedule(func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGetYearDaySchedule(func(context.Context, GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error) {
+		return GetYearDayScheduleResponse{}, nil
+	})
+	s.HandleClearYearDaySchedule(func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetHolidaySchedule(func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGetHolidaySchedule(func(context.Context, GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error) {
+		return GetHolidayScheduleResponse{}, nil
+	})
+	s.HandleClearHolidaySchedule(func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetUser(func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGetUser(func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil })
+	s.HandleClearUser(func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetCredential(func(context.Context, SetCredentialRequest) (SetCredentialResponse, error) {
+		return SetCredentialResponse{}, nil
+	})
+	s.HandleGetCredentialStatus(func(context.Context, GetCredentialStatusRequest) (GetCredentialStatusResponse, error) {
+		return GetCredentialStatusResponse{}, nil
+	})
+	s.HandleClearCredential(func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleUnboltDoor(func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetAliroReaderConfig(func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil })
 }

@@ -6,6 +6,7 @@
 package groups
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -35,4 +36,37 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdRemoveGroupResponse, spec.Response, RemoveGroupResponse{Status: Status(0), GroupId: uint16(1)})
 	spectest.RoundTripCommand(t, Definition, CmdRemoveAllGroups, spec.Request, RemoveAllGroupsRequest{})
 	spectest.RoundTripCommand(t, Definition, CmdAddGroupIfIdentifying, spec.Request, AddGroupIfIdentifyingRequest{GroupId: uint16(1), GroupName: "x"})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleAddGroup(func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil })
+	s.HandleViewGroup(func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil })
+	s.HandleGetGroupMembership(func(context.Context, GetGroupMembershipRequest) (GetGroupMembershipResponse, error) {
+		return GetGroupMembershipResponse{}, nil
+	})
+	s.HandleRemoveGroup(func(context.Context, RemoveGroupRequest) (RemoveGroupResponse, error) {
+		return RemoveGroupResponse{}, nil
+	})
+	s.HandleRemoveAllGroups(func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleAddGroupIfIdentifying(func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil })
 }

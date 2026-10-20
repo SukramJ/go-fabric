@@ -6,6 +6,7 @@
 package networkcommissioning
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -38,4 +39,45 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdConnectNetworkResponse, spec.Response, ConnectNetworkResponse{NetworkingStatus: NetworkCommissioningStatusEnum(0), DebugText: spectest.Ptr("x"), ErrorValue: spec.ValueOf(int32(1))})
 	spectest.RoundTripCommand(t, Definition, CmdReorderNetwork, spec.Request, ReorderNetworkRequest{NetworkId: []byte{1}, NetworkIndex: uint8(1), Breadcrumb: spectest.Ptr(uint64(1))})
 	spectest.RoundTripAttribute(t, Definition, AttrNetworks, spec.List[NetworkInfoStruct]([]NetworkInfoStruct{NetworkInfoStruct{NetworkId: []byte{1}, Connected: true}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleScanNetworks(func(context.Context, ScanNetworksRequest) (ScanNetworksResponse, error) {
+		return ScanNetworksResponse{}, nil
+	})
+	s.HandleAddOrUpdateWiFiNetwork(func(context.Context, AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error) {
+		return NetworkConfigResponse{}, nil
+	})
+	s.HandleAddOrUpdateThreadNetwork(func(context.Context, AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error) {
+		return NetworkConfigResponse{}, nil
+	})
+	s.HandleRemoveNetwork(func(context.Context, RemoveNetworkRequest) (NetworkConfigResponse, error) {
+		return NetworkConfigResponse{}, nil
+	})
+	s.HandleConnectNetwork(func(context.Context, ConnectNetworkRequest) (ConnectNetworkResponse, error) {
+		return ConnectNetworkResponse{}, nil
+	})
+	s.HandleReorderNetwork(func(context.Context, ReorderNetworkRequest) (NetworkConfigResponse, error) {
+		return NetworkConfigResponse{}, nil
+	})
 }

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	ethernetnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
@@ -58,16 +57,16 @@ func NewSecondaryNetworkInterface(opts Options, with ...Option) (*SecondaryNetwo
 }
 
 // NetworkCommissioning returns the NetworkCommissioning server (mandatory), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) NetworkCommissioning() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0031)
+func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
+	return serverAs[*networkcommissioningdef.Server](d.Device, 0x0031)
 }
 
 // WiFiNetworkDiagnostics returns the WiFiNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0036)
+func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
+	return serverAs[*wifinetworkdiagnosticsdef.Server](d.Device, 0x0036)
 }
 
 // EthernetNetworkDiagnostics returns the EthernetNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0037)
+func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
+	return serverAs[*ethernetnetworkdiagnosticsdef.Server](d.Device, 0x0037)
 }

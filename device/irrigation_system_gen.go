@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	operationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
@@ -59,11 +58,11 @@ func NewIrrigationSystem(opts Options, with ...Option) (*IrrigationSystem, error
 }
 
 // OperationalState returns the OperationalState server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *IrrigationSystem) OperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0060)
+func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
+	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
 }
 
 // FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *IrrigationSystem) FlowMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0404)
+func (d *IrrigationSystem) FlowMeasurement() *flowmeasurementdef.Server {
+	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
 }

@@ -6,6 +6,7 @@
 package levelcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -34,4 +35,36 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdStepWithOnOff, spec.Request, StepWithOnOffRequest{StepMode: StepModeEnum(0), StepSize: uint8(1), TransitionTime: spec.ValueOf(uint16(1)), OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdStopWithOnOff, spec.Request, StopWithOnOffRequest{OptionsMask: OptionsBitmap(1 << 0), OptionsOverride: OptionsBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdMoveToClosestFrequency, spec.Request, MoveToClosestFrequencyRequest{Frequency: uint16(1)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleMoveToLevel(func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMove(func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToLevelWithOnOff(func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveWithOnOff(func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStepWithOnOff(func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStopWithOnOff(func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil })
 }

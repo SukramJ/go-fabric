@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	otasoftwareupdaterequestordef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -51,6 +50,6 @@ func NewOtaRequestor(opts Options, with ...Option) (*OtaRequestor, error) {
 }
 
 // OtaSoftwareUpdateRequestor returns the OtaSoftwareUpdateRequestor server (mandatory), or nil when the host supplied one of another type.
-func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x002A)
+func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *otasoftwareupdaterequestordef.Server {
+	return serverAs[*otasoftwareupdaterequestordef.Server](d.Device, 0x002A)
 }

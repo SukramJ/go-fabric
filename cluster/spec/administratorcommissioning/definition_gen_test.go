@@ -6,6 +6,7 @@
 package administratorcommissioning
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -28,4 +29,30 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdOpenCommissioningWindow, spec.Request, OpenCommissioningWindowRequest{CommissioningTimeout: uint16(1), PakePasscodeVerifier: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, Discriminator: uint16(1), Iterations: uint32(1000), Salt: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}})
 	spectest.RoundTripCommand(t, Definition, CmdOpenBasicCommissioningWindow, spec.Request, OpenBasicCommissioningWindowRequest{CommissioningTimeout: uint16(1)})
 	spectest.RoundTripCommand(t, Definition, CmdRevokeCommissioning, spec.Request, RevokeCommissioningRequest{})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleOpenCommissioningWindow(func(context.Context, OpenCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleOpenBasicCommissioningWindow(func(context.Context, OpenBasicCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRevokeCommissioning(func(context.Context, RevokeCommissioningRequest) (struct{}, error) { return struct{}{}, nil })
 }

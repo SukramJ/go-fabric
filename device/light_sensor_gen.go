@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	illuminancemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
 	"github.com/SukramJ/go-fabric/schema"
@@ -51,6 +50,6 @@ func NewLightSensor(opts Options, with ...Option) (*LightSensor, error) {
 }
 
 // IlluminanceMeasurement returns the IlluminanceMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *LightSensor) IlluminanceMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0400)
+func (d *LightSensor) IlluminanceMeasurement() *illuminancemeasurementdef.Server {
+	return serverAs[*illuminancemeasurementdef.Server](d.Device, 0x0400)
 }

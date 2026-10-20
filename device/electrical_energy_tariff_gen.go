@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	commoditypricedef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	commoditytariffdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
@@ -62,16 +61,16 @@ func NewElectricalEnergyTariff(opts Options, with ...Option) (*ElectricalEnergyT
 }
 
 // CommodityPrice returns the CommodityPrice server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) CommodityPrice() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0095)
+func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
+	return serverAs[*commoditypricedef.Server](d.Device, 0x0095)
 }
 
 // ElectricalGridConditions returns the ElectricalGridConditions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) ElectricalGridConditions() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x00A0)
+func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
+	return serverAs[*electricalgridconditionsdef.Server](d.Device, 0x00A0)
 }
 
 // CommodityTariff returns the CommodityTariff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalEnergyTariff) CommodityTariff() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0700)
+func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
+	return serverAs[*commoditytariffdef.Server](d.Device, 0x0700)
 }

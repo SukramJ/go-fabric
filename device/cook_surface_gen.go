@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	temperaturecontroldef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
 	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
@@ -60,11 +59,11 @@ func NewCookSurface(opts Options, with ...Option) (*CookSurface, error) {
 func (d *CookSurface) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // TemperatureControl returns the TemperatureControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CookSurface) TemperatureControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0056)
+func (d *CookSurface) TemperatureControl() *temperaturecontroldef.Server {
+	return serverAs[*temperaturecontroldef.Server](d.Device, 0x0056)
 }
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *CookSurface) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *CookSurface) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }

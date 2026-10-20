@@ -6,6 +6,7 @@
 package contentlauncher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -36,4 +37,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdLaunchContent, spec.Request, LaunchContentRequest{Search: ContentSearchStruct{ParameterList: []ParameterStruct{ParameterStruct{Type: ParameterEnum(0), Value: "x", ExternalIdList: spectest.Ptr([]AdditionalInfoStruct{AdditionalInfoStruct{Name: "x", Value: "x"}})}}}, AutoPlay: true, Data: spectest.Ptr("x"), PlaybackPreferences: spectest.Ptr(PlaybackPreferencesStruct{PlaybackPosition: spectest.Ptr(spec.ValueOf(uint64(1))), TextTrack: spectest.Ptr(spec.ValueOf(TrackPreferenceStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]uint8{uint8(1)})), AudioOutputIndex: spectest.Ptr(spec.ValueOf(uint8(1)))})), AudioTracks: spectest.Ptr(spec.ValueOf([]TrackPreferenceStruct{TrackPreferenceStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]uint8{uint8(1)})), AudioOutputIndex: spectest.Ptr(spec.ValueOf(uint8(1)))}}))}), UseCurrentContext: spectest.Ptr(true)})
 	spectest.RoundTripCommand(t, Definition, CmdLaunchUrl, spec.Request, LaunchUrlRequest{ContentUrl: "x", DisplayString: spectest.Ptr("x"), BrandingInformation: spectest.Ptr(BrandingInformationStruct{ProviderName: "x", Background: spectest.Ptr(StyleInformationStruct{ImageUrl: spectest.Ptr("x"), Color: spectest.Ptr("x"), Size: spectest.Ptr(DimensionStruct{Width: float64(1.5), Height: float64(1.5), Metric: MetricTypeEnum(0)})}), Logo: spectest.Ptr(StyleInformationStruct{ImageUrl: spectest.Ptr("x"), Color: spectest.Ptr("x"), Size: spectest.Ptr(DimensionStruct{Width: float64(1.5), Height: float64(1.5), Metric: MetricTypeEnum(0)})}), ProgressBar: spectest.Ptr(StyleInformationStruct{ImageUrl: spectest.Ptr("x"), Color: spectest.Ptr("x"), Size: spectest.Ptr(DimensionStruct{Width: float64(1.5), Height: float64(1.5), Metric: MetricTypeEnum(0)})}), Splash: spectest.Ptr(StyleInformationStruct{ImageUrl: spectest.Ptr("x"), Color: spectest.Ptr("x"), Size: spectest.Ptr(DimensionStruct{Width: float64(1.5), Height: float64(1.5), Metric: MetricTypeEnum(0)})}), Watermark: spectest.Ptr(StyleInformationStruct{ImageUrl: spectest.Ptr("x"), Color: spectest.Ptr("x"), Size: spectest.Ptr(DimensionStruct{Width: float64(1.5), Height: float64(1.5), Metric: MetricTypeEnum(0)})})}), PlaybackPreferences: spectest.Ptr(PlaybackPreferencesStruct{PlaybackPosition: spectest.Ptr(spec.ValueOf(uint64(1))), TextTrack: spectest.Ptr(spec.ValueOf(TrackPreferenceStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]uint8{uint8(1)})), AudioOutputIndex: spectest.Ptr(spec.ValueOf(uint8(1)))})), AudioTracks: spectest.Ptr(spec.ValueOf([]TrackPreferenceStruct{TrackPreferenceStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]uint8{uint8(1)})), AudioOutputIndex: spectest.Ptr(spec.ValueOf(uint8(1)))}}))})})
 	spectest.RoundTripCommand(t, Definition, CmdLauncherResponse, spec.Response, LauncherResponse{Status: StatusEnum(0), Data: spectest.Ptr("x")})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleLaunchContent(func(context.Context, LaunchContentRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
+	s.HandleLaunchUrl(func(context.Context, LaunchUrlRequest) (LauncherResponse, error) { return LauncherResponse{}, nil })
 }

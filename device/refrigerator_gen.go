@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	refrigeratoralarmdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
@@ -59,16 +58,16 @@ func NewRefrigerator(opts Options, with ...Option) (*Refrigerator, error) {
 }
 
 // RefrigeratorAndTemperatureControlledCabinetMode returns the RefrigeratorAndTemperatureControlledCabinetMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0052)
+func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
+	return serverAs[*refrigeratorandtemperaturecontrolledcabinetmodedef.Server](d.Device, 0x0052)
 }
 
 // RefrigeratorAlarm returns the RefrigeratorAlarm server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) RefrigeratorAlarm() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0057)
+func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
+	return serverAs[*refrigeratoralarmdef.Server](d.Device, 0x0057)
 }
 
 // ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
 }

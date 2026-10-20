@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	energypreferencedef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -83,12 +82,16 @@ func NewThermostat(opts Options, with ...Option) (*Thermostat, error) {
 }
 
 // Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *Thermostat) Thermostat() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0201) }
+func (d *Thermostat) Thermostat() *thermostatdef.Server {
+	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
+}
 
 // EnergyPreference returns the EnergyPreference server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Thermostat) EnergyPreference() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009B) }
+func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
+	return serverAs[*energypreferencedef.Server](d.Device, 0x009B)
+}
 
 // ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Thermostat) ThermostatUserInterfaceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0204)
+func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
+	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
 }

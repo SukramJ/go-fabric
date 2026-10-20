@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	meteridentificationdef "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -46,6 +45,6 @@ func NewElectricalUtilityMeter(opts Options, with ...Option) (*ElectricalUtility
 }
 
 // MeterIdentification returns the MeterIdentification server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalUtilityMeter) MeterIdentification() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0B06)
+func (d *ElectricalUtilityMeter) MeterIdentification() *meteridentificationdef.Server {
+	return serverAs[*meteridentificationdef.Server](d.Device, 0x0B06)
 }

@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	microwaveovencontroldef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
@@ -71,19 +70,21 @@ func NewMicrowaveOven(opts Options, with ...Option) (*MicrowaveOven, error) {
 }
 
 // OperationalState returns the OperationalState server (mandatory), or nil when the host supplied one of another type.
-func (d *MicrowaveOven) OperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0060)
+func (d *MicrowaveOven) OperationalState() *operationalstatedef.Server {
+	return serverAs[*operationalstatedef.Server](d.Device, 0x0060)
 }
 
 // MicrowaveOvenMode returns the MicrowaveOvenMode server (mandatory), or nil when the host supplied one of another type.
-func (d *MicrowaveOven) MicrowaveOvenMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x005E)
+func (d *MicrowaveOven) MicrowaveOvenMode() *microwaveovenmodedef.Server {
+	return serverAs[*microwaveovenmodedef.Server](d.Device, 0x005E)
 }
 
 // MicrowaveOvenControl returns the MicrowaveOvenControl server (mandatory), or nil when the host supplied one of another type.
-func (d *MicrowaveOven) MicrowaveOvenControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x005F)
+func (d *MicrowaveOven) MicrowaveOvenControl() *microwaveovencontroldef.Server {
+	return serverAs[*microwaveovencontroldef.Server](d.Device, 0x005F)
 }
 
 // FanControl returns the FanControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *MicrowaveOven) FanControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0202) }
+func (d *MicrowaveOven) FanControl() *fancontroldef.Server {
+	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
+}

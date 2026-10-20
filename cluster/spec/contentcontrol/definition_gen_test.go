@@ -6,6 +6,7 @@
 package contentcontrol
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -54,4 +55,45 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrBlockChannelList, spec.List[BlockChannelStruct]([]BlockChannelStruct{BlockChannelStruct{BlockChannelIndex: spec.ValueOf(uint16(1)), MajorNumber: uint16(1), MinorNumber: uint16(1), Identifier: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrBlockApplicationList, spec.List[AppInfoStruct]([]AppInfoStruct{AppInfoStruct{CatalogVendorId: uint16(1), ApplicationId: "x"}}))
 	spectest.RoundTripAttribute(t, Definition, AttrBlockContentTimeWindow, spec.List[TimeWindowStruct]([]TimeWindowStruct{TimeWindowStruct{TimeWindowIndex: spec.ValueOf(uint16(1)), DayOfWeek: DayOfWeekBitmap(1 << 0), TimePeriod: []TimePeriodStruct{TimePeriodStruct{StartHour: uint8(1), StartMinute: uint8(1), EndHour: uint8(1), EndMinute: uint8(1)}}}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleUpdatePin(func(context.Context, UpdatePinRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleResetPin(func(context.Context, ResetPinRequest) (ResetPinResponse, error) { return ResetPinResponse{}, nil })
+	s.HandleEnable(func(context.Context, EnableRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleAddBonusTime(func(context.Context, AddBonusTimeRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetScreenDailyTime(func(context.Context, SetScreenDailyTimeRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleBlockUnratedContent(func(context.Context, BlockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleUnblockUnratedContent(func(context.Context, UnblockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetOnDemandRatingThreshold(func(context.Context, SetOnDemandRatingThresholdRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetScheduledContentRatingThreshold(func(context.Context, SetScheduledContentRatingThresholdRequest) (struct{}, error) {
+		return struct{}{}, nil
+	})
+	s.HandleAddBlockChannels(func(context.Context, AddBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRemoveBlockChannels(func(context.Context, RemoveBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleAddBlockApplications(func(context.Context, AddBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRemoveBlockApplications(func(context.Context, RemoveBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetBlockContentTimeWindow(func(context.Context, SetBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRemoveBlockContentTimeWindow(func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil })
 }

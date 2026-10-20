@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -72,17 +71,19 @@ func NewAirPurifier(opts Options, with ...Option) (*AirPurifier, error) {
 }
 
 // FanControl returns the FanControl server (mandatory), or nil when the host supplied one of another type.
-func (d *AirPurifier) FanControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0202) }
+func (d *AirPurifier) FanControl() *fancontroldef.Server {
+	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
+}
 
 // OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *AirPurifier) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirPurifier) HepaFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0071)
+func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
+	return serverAs[*hepafiltermonitoringdef.Server](d.Device, 0x0071)
 }
 
 // ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
 }

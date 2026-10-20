@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	energyevsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	energyevsemodedef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -61,12 +60,16 @@ func NewEnergyEvse(opts Options, with ...Option) (*EnergyEvse, error) {
 }
 
 // EnergyEvse returns the EnergyEvse server (mandatory), or nil when the host supplied one of another type.
-func (d *EnergyEvse) EnergyEvse() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0099) }
+func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
+	return serverAs[*energyevsedef.Server](d.Device, 0x0099)
+}
 
 // EnergyEvseMode returns the EnergyEvseMode server (mandatory), or nil when the host supplied one of another type.
-func (d *EnergyEvse) EnergyEvseMode() *spec.Server { return serverAs[*spec.Server](d.Device, 0x009D) }
+func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
+	return serverAs[*energyevsemodedef.Server](d.Device, 0x009D)
+}
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *EnergyEvse) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }

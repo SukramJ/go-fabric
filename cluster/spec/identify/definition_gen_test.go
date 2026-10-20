@@ -6,6 +6,7 @@
 package identify
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -27,4 +28,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTripCommand(t, Definition, CmdIdentify, spec.Request, IdentifyRequest{IdentifyTime: uint16(1)})
 	spectest.RoundTripCommand(t, Definition, CmdTriggerEffect, spec.Request, TriggerEffectRequest{EffectIdentifier: EffectIdentifierEnum(0), EffectVariant: EffectVariantEnum(0)})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleIdentify(func(context.Context, IdentifyRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleTriggerEffect(func(context.Context, TriggerEffectRequest) (struct{}, error) { return struct{}{}, nil })
 }

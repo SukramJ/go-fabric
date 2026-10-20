@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -60,9 +59,11 @@ func NewRainSensor(opts Options, with ...Option) (*RainSensor, error) {
 }
 
 // BooleanState returns the BooleanState server (mandatory), or nil when the host supplied one of another type.
-func (d *RainSensor) BooleanState() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0045) }
+func (d *RainSensor) BooleanState() *booleanstatedef.Server {
+	return serverAs[*booleanstatedef.Server](d.Device, 0x0045)
+}
 
 // BooleanStateConfiguration returns the BooleanStateConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RainSensor) BooleanStateConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0080)
+func (d *RainSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
+	return serverAs[*booleanstateconfigurationdef.Server](d.Device, 0x0080)
 }

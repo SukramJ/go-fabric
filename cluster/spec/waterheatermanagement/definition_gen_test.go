@@ -6,6 +6,7 @@
 package waterheatermanagement
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -30,4 +31,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdCancelBoost, spec.Request, CancelBoostRequest{})
 	spectest.RoundTripEvent(t, Definition, EventBoostStarted, BoostStartedEvent{BoostInfo: WaterHeaterBoostInfoStruct{Duration: uint32(1), OneShot: spectest.Ptr(true), EmergencyBoost: spectest.Ptr(true), TemporarySetpoint: spectest.Ptr(int16(1)), TargetPercentage: spectest.Ptr(uint8(1)), TargetReheat: spectest.Ptr(uint8(1))}})
 	spectest.RoundTripEvent(t, Definition, EventBoostEnded, BoostEndedEvent{})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleBoost(func(context.Context, BoostRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleCancelBoost(func(context.Context, CancelBoostRequest) (struct{}, error) { return struct{}{}, nil })
 }

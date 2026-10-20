@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -45,4 +44,6 @@ func NewModeSelect(opts Options, with ...Option) (*ModeSelect, error) {
 }
 
 // ModeSelect returns the ModeSelect server (mandatory), or nil when the host supplied one of another type.
-func (d *ModeSelect) ModeSelect() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0050) }
+func (d *ModeSelect) ModeSelect() *modeselectdef.Server {
+	return serverAs[*modeselectdef.Server](d.Device, 0x0050)
+}

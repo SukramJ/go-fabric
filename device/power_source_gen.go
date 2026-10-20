@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -45,4 +44,6 @@ func NewPowerSource(opts Options, with ...Option) (*PowerSource, error) {
 }
 
 // PowerSource returns the PowerSource server (mandatory), or nil when the host supplied one of another type.
-func (d *PowerSource) PowerSource() *spec.Server { return serverAs[*spec.Server](d.Device, 0x002F) }
+func (d *PowerSource) PowerSource() *powersourcedef.Server {
+	return serverAs[*powersourcedef.Server](d.Device, 0x002F)
+}

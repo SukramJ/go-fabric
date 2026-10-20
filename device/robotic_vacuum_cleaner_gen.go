@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	rvccleanmodedef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
 	rvcoperationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
@@ -70,21 +69,21 @@ func NewRoboticVacuumCleaner(opts Options, with ...Option) (*RoboticVacuumCleane
 }
 
 // RvcRunMode returns the RvcRunMode server (mandatory), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcRunMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0054)
+func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
+	return serverAs[*rvcrunmodedef.Server](d.Device, 0x0054)
 }
 
 // RvcOperationalState returns the RvcOperationalState server (mandatory), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcOperationalState() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0061)
+func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
+	return serverAs[*rvcoperationalstatedef.Server](d.Device, 0x0061)
 }
 
 // RvcCleanMode returns the RvcCleanMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) RvcCleanMode() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0055)
+func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
+	return serverAs[*rvccleanmodedef.Server](d.Device, 0x0055)
 }
 
 // ServiceArea returns the ServiceArea server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoboticVacuumCleaner) ServiceArea() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0150)
+func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
+	return serverAs[*serviceareadef.Server](d.Device, 0x0150)
 }

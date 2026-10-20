@@ -6,6 +6,7 @@
 package mediainput
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -31,4 +32,31 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdHideInputStatus, spec.Request, HideInputStatusRequest{})
 	spectest.RoundTripCommand(t, Definition, CmdRenameInput, spec.Request, RenameInputRequest{Index: uint8(1), Name: "x"})
 	spectest.RoundTripAttribute(t, Definition, AttrInputList, spec.List[InputInfoStruct]([]InputInfoStruct{InputInfoStruct{Index: uint8(1), InputType: InputTypeEnum(0), Name: "x", Description: "x"}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleSelectInput(func(context.Context, SelectInputRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleShowInputStatus(func(context.Context, ShowInputStatusRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleHideInputStatus(func(context.Context, HideInputStatusRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRenameInput(func(context.Context, RenameInputRequest) (struct{}, error) { return struct{}{}, nil })
 }

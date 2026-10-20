@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/schema"
@@ -51,4 +50,6 @@ func NewFlowSensor(opts Options, with ...Option) (*FlowSensor, error) {
 }
 
 // FlowMeasurement returns the FlowMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *FlowSensor) FlowMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0404) }
+func (d *FlowSensor) FlowMeasurement() *flowmeasurementdef.Server {
+	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+}

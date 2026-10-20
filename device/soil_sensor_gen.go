@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	soilmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
 	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
@@ -56,9 +55,11 @@ func NewSoilSensor(opts Options, with ...Option) (*SoilSensor, error) {
 }
 
 // SoilMeasurement returns the SoilMeasurement server (mandatory), or nil when the host supplied one of another type.
-func (d *SoilSensor) SoilMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0430) }
+func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
+	return serverAs[*soilmeasurementdef.Server](d.Device, 0x0430)
+}
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *SoilSensor) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *SoilSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }

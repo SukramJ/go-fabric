@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	windowcoveringdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -56,6 +55,6 @@ func NewWindowCovering(opts Options, with ...Option) (*WindowCovering, error) {
 }
 
 // WindowCovering returns the WindowCovering server (mandatory), or nil when the host supplied one of another type.
-func (d *WindowCovering) WindowCovering() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0102)
+func (d *WindowCovering) WindowCovering() *windowcoveringdef.Server {
+	return serverAs[*windowcoveringdef.Server](d.Device, 0x0102)
 }

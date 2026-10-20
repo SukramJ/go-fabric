@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	powertopologydef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
@@ -55,16 +54,16 @@ func NewElectricalSensor(opts Options, with ...Option) (*ElectricalSensor, error
 }
 
 // PowerTopology returns the PowerTopology server (mandatory), or nil when the host supplied one of another type.
-func (d *ElectricalSensor) PowerTopology() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x009C)
+func (d *ElectricalSensor) PowerTopology() *powertopologydef.Server {
+	return serverAs[*powertopologydef.Server](d.Device, 0x009C)
 }
 
 // ElectricalPowerMeasurement returns the ElectricalPowerMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalSensor) ElectricalPowerMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0090)
+func (d *ElectricalSensor) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
+	return serverAs[*electricalpowermeasurementdef.Server](d.Device, 0x0090)
 }
 
 // ElectricalEnergyMeasurement returns the ElectricalEnergyMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *ElectricalSensor) ElectricalEnergyMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0091)
+func (d *ElectricalSensor) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
+	return serverAs[*electricalenergymeasurementdef.Server](d.Device, 0x0091)
 }

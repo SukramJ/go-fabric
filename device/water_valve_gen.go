@@ -6,7 +6,6 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	valveconfigurationandcontroldef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -61,9 +60,11 @@ func NewWaterValve(opts Options, with ...Option) (*WaterValve, error) {
 }
 
 // ValveConfigurationAndControl returns the ValveConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
-func (d *WaterValve) ValveConfigurationAndControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0081)
+func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
+	return serverAs[*valveconfigurationandcontroldef.Server](d.Device, 0x0081)
 }
 
 // FlowMeasurement returns the FlowMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *WaterValve) FlowMeasurement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0404) }
+func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
+	return serverAs[*flowmeasurementdef.Server](d.Device, 0x0404)
+}

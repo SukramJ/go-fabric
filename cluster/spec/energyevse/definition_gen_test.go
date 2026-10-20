@@ -6,6 +6,7 @@
 package energyevse
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -41,4 +42,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventEnergyTransferStopped, EnergyTransferStoppedEvent{SessionId: uint32(1), State: StateEnum(0), Reason: EnergyTransferStoppedReasonEnum(0), EnergyTransferred: int64(1), EnergyDischarged: spectest.Ptr(int64(1))})
 	spectest.RoundTripEvent(t, Definition, EventFault, FaultEvent{SessionId: spec.ValueOf(uint32(1)), State: StateEnum(0), FaultStatePreviousState: FaultStateEnum(0), FaultStateCurrentState: FaultStateEnum(0)})
 	spectest.RoundTripEvent(t, Definition, EventRfid, RfidEvent{Uid: []byte{1}})
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil })
+	s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil })
 }

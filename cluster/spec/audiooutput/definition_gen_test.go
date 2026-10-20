@@ -6,6 +6,7 @@
 package audiooutput
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -29,4 +30,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdSelectOutput, spec.Request, SelectOutputRequest{Index: uint8(1)})
 	spectest.RoundTripCommand(t, Definition, CmdRenameOutput, spec.Request, RenameOutputRequest{Index: uint8(1), Name: "x"})
 	spectest.RoundTripAttribute(t, Definition, AttrOutputList, spec.List[OutputInfoStruct]([]OutputInfoStruct{OutputInfoStruct{Index: uint8(1), OutputType: OutputTypeEnum(0), Name: "x"}}))
+}
+
+// TestTypedServer drives every method of the typed server once, and
+// finds it registered for the cluster.
+func TestTypedServer(t *testing.T) {
+	t.Parallel()
+	if Wrap(nil) != nil {
+		t.Error("Wrap(nil) is not nil")
+	}
+	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := spec.TypedServer(srv).(*Server); !ok {
+		t.Errorf("spec.TypedServer: %T", spec.TypedServer(srv))
+	}
+	s := Wrap(srv)
+	if err := s.Set(Patch{}); err != nil {
+		t.Error(err)
+	}
+	_ = s.Get()
+	s.OnChanged(func(State, []uint32) {})()
+	s.OnWrite(func(context.Context, State, uint32) error { return nil })
+	s.HandleSelectOutput(func(context.Context, SelectOutputRequest) (struct{}, error) { return struct{}{}, nil })
+	s.HandleRenameOutput(func(context.Context, RenameOutputRequest) (struct{}, error) { return struct{}{}, nil })
 }

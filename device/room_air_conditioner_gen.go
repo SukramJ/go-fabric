@@ -7,7 +7,6 @@ package device
 
 import (
 	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -105,36 +104,36 @@ func NewRoomAirConditioner(opts Options, with ...Option) (*RoomAirConditioner, e
 func (d *RoomAirConditioner) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) Thermostat() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0201)
+func (d *RoomAirConditioner) Thermostat() *thermostatdef.Server {
+	return serverAs[*thermostatdef.Server](d.Device, 0x0201)
 }
 
 // HepaFilterMonitoring returns the HepaFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) HepaFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0071)
+func (d *RoomAirConditioner) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
+	return serverAs[*hepafiltermonitoringdef.Server](d.Device, 0x0071)
 }
 
 // ActivatedCarbonFilterMonitoring returns the ActivatedCarbonFilterMonitoring server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0072)
+func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
+	return serverAs[*activatedcarbonfiltermonitoringdef.Server](d.Device, 0x0072)
 }
 
 // FanControl returns the FanControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) FanControl() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0202)
+func (d *RoomAirConditioner) FanControl() *fancontroldef.Server {
+	return serverAs[*fancontroldef.Server](d.Device, 0x0202)
 }
 
 // ThermostatUserInterfaceConfiguration returns the ThermostatUserInterfaceConfiguration server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0204)
+func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
+	return serverAs[*thermostatuserinterfaceconfigurationdef.Server](d.Device, 0x0204)
 }
 
 // TemperatureMeasurement returns the TemperatureMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) TemperatureMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0402)
+func (d *RoomAirConditioner) TemperatureMeasurement() *temperaturemeasurementdef.Server {
+	return serverAs[*temperaturemeasurementdef.Server](d.Device, 0x0402)
 }
 
 // RelativeHumidityMeasurement returns the RelativeHumidityMeasurement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) RelativeHumidityMeasurement() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0405)
+func (d *RoomAirConditioner) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
+	return serverAs[*relativehumiditymeasurementdef.Server](d.Device, 0x0405)
 }
