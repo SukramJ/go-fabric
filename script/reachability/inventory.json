@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6082,
+  "entry_points": 6137,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,6 +184,7 @@
     "endpoint",
     "endpoint/endpointtest",
     "endpoint/sqlitestore",
+    "examples/host-view",
     "examples/quickstart-controller",
     "examples/quickstart-device",
     "examples/reference-bridge",
@@ -227,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14181,
-    "reachable": 9945,
-    "whitelisted": 4231,
+    "total_exported": 14244,
+    "reachable": 9943,
+    "whitelisted": 4296,
     "unreachable": 5
   },
   "by_package": [
@@ -276,7 +277,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 133,
+      "line": 132,
       "kind": "func"
     },
     {
@@ -493,6 +494,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAPlainGeneratedListEncodesAsItsList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_values_list_test.go",
+      "line": 19
+    },
+    {
+      "package": "bridge",
       "identifier": "TestAccessControlUnfilteredReadsRedactOtherFabrics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/acl_unfiltered_read_test.go",
@@ -657,7 +665,7 @@
       "identifier": "TestApplicationValueWriterEncodesEventPayloads",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
-      "line": 267
+      "line": 270
     },
     {
       "package": "bridge",
@@ -3261,14 +3269,14 @@
       "identifier": "TestFanControlOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
-      "line": 325
+      "line": 328
     },
     {
       "package": "bridge",
       "identifier": "TestFanStepDecoderRejectsMalformedFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
-      "line": 407
+      "line": 410
     },
     {
       "package": "bridge",
@@ -4416,7 +4424,7 @@
       "identifier": "TestPumpOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
-      "line": 489
+      "line": 492
     },
     {
       "package": "bridge",
@@ -5067,7 +5075,7 @@
       "identifier": "TestSmokeCoAlarmOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
-      "line": 188
+      "line": 191
     },
     {
       "package": "bridge",
@@ -6950,7 +6958,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 677
+      "line": 765
     },
     {
       "package": "cluster/alarm",
@@ -6996,10 +7004,31 @@
     },
     {
       "package": "cluster/alarm",
+      "identifier": "SelfTester",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 290
+    },
+    {
+      "package": "cluster/alarm",
       "identifier": "Sensitivity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
       "line": 128
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "SensitivitySetter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 294
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "StateSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 282
     },
     {
       "package": "cluster/appliance",
@@ -7016,11 +7045,32 @@
       "line": 34
     },
     {
+      "package": "cluster/appliance",
+      "identifier": "Oven",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/appliance/microwave.go",
+      "line": 67
+    },
+    {
+      "package": "cluster/appliance",
+      "identifier": "TestListOfTakesBothListForms",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/appliance/typed_coverage_internal_test.go",
+      "line": 13
+    },
+    {
       "package": "cluster/boolcfg",
       "identifier": "AlarmMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/boolcfg/boolcfg.go",
       "line": 43
+    },
+    {
+      "package": "cluster/boolcfg",
+      "identifier": "Delegate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/boolcfg/boolcfg.go",
+      "line": 97
     },
     {
       "package": "cluster/boolcfg",
@@ -7041,14 +7091,21 @@
       "identifier": "DimensionFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 78
+      "line": 79
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "DimensionHandler",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 118
     },
     {
       "package": "cluster/closure",
       "identifier": "DimensionState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 81
+      "line": 82
     },
     {
       "package": "cluster/closure",
@@ -7062,14 +7119,14 @@
       "identifier": "LatchControlModes",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 91
+      "line": 92
     },
     {
       "package": "cluster/closure",
       "identifier": "LimitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 85
+      "line": 86
     },
     {
       "package": "cluster/closure",
@@ -7077,6 +7134,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closurecontrol_events.go",
       "line": 44
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "Mover",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closurecontrol_server.go",
+      "line": 93
     },
     {
       "package": "cluster/closure",
@@ -7090,21 +7154,21 @@
       "identifier": "StepDirection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 89
+      "line": 90
     },
     {
       "package": "cluster/closure",
       "identifier": "ThreeLevelAuto",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 87
+      "line": 88
     },
     {
       "package": "cluster/closure",
       "identifier": "UnitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 83
+      "line": 84
     },
     {
       "package": "cluster/core",
@@ -7881,7 +7945,7 @@
       "identifier": "AdjustmentCause",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 65
+      "line": 68
     },
     {
       "package": "cluster/energy",
@@ -7903,6 +7967,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/waterheater.go",
       "line": 30
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "Booster",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/waterheater.go",
+      "line": 69
     },
     {
       "package": "cluster/energy",
@@ -7958,28 +8029,35 @@
       "identifier": "DemCause",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 67
+      "line": 70
     },
     {
       "package": "cluster/energy",
       "identifier": "DemFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 57
+      "line": 60
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "DemManager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/devicemanagement.go",
+      "line": 135
     },
     {
       "package": "cluster/energy",
       "identifier": "EsaState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 61
+      "line": 64
     },
     {
       "package": "cluster/energy",
       "identifier": "EsaType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 59
+      "line": 62
     },
     {
       "package": "cluster/energy",
@@ -8007,28 +8085,28 @@
       "identifier": "Forecast",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 76
+      "line": 79
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastConstraint",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 83
+      "line": 86
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastSlot",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 78
+      "line": 81
     },
     {
       "package": "cluster/energy",
       "identifier": "ForecastUpdateReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 85
+      "line": 88
     },
     {
       "package": "cluster/energy",
@@ -8077,28 +8155,28 @@
       "identifier": "OptOutState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 63
+      "line": 66
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustCapability",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 69
+      "line": 72
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 72
+      "line": 75
     },
     {
       "package": "cluster/energy",
       "identifier": "PowerAdjustReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 74
+      "line": 77
     },
     {
       "package": "cluster/energy",
@@ -8133,7 +8211,7 @@
       "identifier": "SlotAdjustment",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/devicemanagement.go",
-      "line": 80
+      "line": 83
     },
     {
       "package": "cluster/energy",
@@ -8270,10 +8348,17 @@
     },
     {
       "package": "cluster/fan",
+      "identifier": "StateSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 220
+    },
+    {
+      "package": "cluster/fan",
       "identifier": "Stepper",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 244
+      "line": 251
     },
     {
       "package": "cluster/fan",
@@ -8326,10 +8411,45 @@
     },
     {
       "package": "cluster/light",
+      "identifier": "Color",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/light/colorcontrol_server.go",
+      "line": 197
+    },
+    {
+      "package": "cluster/light",
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
       "line": 73
+    },
+    {
+      "package": "cluster/light",
+      "identifier": "ColorMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/light/colorcontrol_server.go",
+      "line": 88
+    },
+    {
+      "package": "cluster/light",
+      "identifier": "ColorTemperatureWriter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/light/colorcontrol_server.go",
+      "line": 188
+    },
+    {
+      "package": "cluster/light",
+      "identifier": "ColorWriter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/light/colorcontrol_server.go",
+      "line": 208
+    },
+    {
+      "package": "cluster/lock",
+      "identifier": "AuthStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/lock/auth.go",
+      "line": 24
     },
     {
       "package": "cluster/lock",
@@ -8507,6 +8627,216 @@
       "line": 31
     },
     {
+      "package": "cluster/media",
+      "identifier": "AccountLogin",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/accountlogin.go",
+      "line": 22
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "AppLauncher",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/applauncher.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "AppLauncherState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/applauncher.go",
+      "line": 20
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "ChannelGuide",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/channel.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "ChannelRecorder",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/channel.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "ChannelState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/channel.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Channels",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/channel.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "ContentLauncher",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/contentlauncher.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "ContentLauncherState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/contentlauncher.go",
+      "line": 20
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "InputRenamer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/mediainput.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "InputState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/mediainput.go",
+      "line": 18
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Inputs",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/mediainput.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Keypad",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/keypad.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "LowPower",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/lowpower.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "OutputRenamer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/audiooutput.go",
+      "line": 38
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "OutputState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/audiooutput.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Outputs",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/audiooutput.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Playback",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackAudioTracks",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 75
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackNext",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 61
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackPrevious",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackSeek",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 71
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackSkip",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackStartOver",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 22
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackTextTracks",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "PlaybackVariableSpeed",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/playback.go",
+      "line": 65
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "TargetState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/targetnavigator.go",
+      "line": 21
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "Targets",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/targetnavigator.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "WakeOnLanState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/media/wakeonlan.go",
+      "line": 19
+    },
+    {
       "package": "cluster/modeselect",
       "identifier": "ChangeToModeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -8519,6 +8849,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
       "line": 122
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "ModeSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/modeselect/modeselect_server.go",
+      "line": 145
     },
     {
       "package": "cluster/modeselect",
@@ -8578,6 +8915,20 @@
     },
     {
       "package": "cluster/pump",
+      "identifier": "ControlModeSetter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 243
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "EnergyConsumedSetter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 251
+    },
+    {
+      "package": "cluster/pump",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/pump/pump_server.go",
@@ -8592,6 +8943,27 @@
     },
     {
       "package": "cluster/pump",
+      "identifier": "RunningHoursSetter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 247
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "State",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 236
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "StateSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 240
+    },
+    {
+      "package": "cluster/pump",
       "identifier": "Status",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/pump/pump_server.go",
@@ -8602,70 +8974,84 @@
       "identifier": "Area",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 84
+      "line": 85
     },
     {
       "package": "cluster/servicearea",
       "identifier": "AreaInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 86
+      "line": 87
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 82
+      "line": 83
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LandmarkInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 90
+      "line": 91
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LocationInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Map",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 92
+      "line": 93
     },
     {
       "package": "cluster/servicearea",
       "identifier": "OperationalStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Progress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 94
+      "line": 95
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SelectAreasStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 98
+      "line": 99
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Selector",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 133
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SkipAreaStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 100
+      "line": 101
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Skipper",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 139
     },
     {
       "package": "cluster/spec",
@@ -8749,14 +9135,14 @@
       "identifier": "HandleOn",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 249
+      "line": 250
     },
     {
       "package": "cluster/spec",
       "identifier": "HandlerOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 272
+      "line": 273
     },
     {
       "package": "cluster/spec",
@@ -8791,21 +9177,21 @@
       "identifier": "OnChangedAsyncOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 210
+      "line": 211
     },
     {
       "package": "cluster/spec",
       "identifier": "OnChangedOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 175
+      "line": 176
     },
     {
       "package": "cluster/spec",
       "identifier": "OnWriteOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 228
+      "line": 229
     },
     {
       "package": "cluster/spec",
@@ -8875,7 +9261,7 @@
       "identifier": "StateOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 141
+      "line": 142
     },
     {
       "package": "cluster/spec",
@@ -8931,14 +9317,14 @@
       "identifier": "TestTypedConvert",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/typed_internal_test.go",
-      "line": 23
+      "line": 38
     },
     {
       "package": "cluster/spec",
       "identifier": "TestTypedFieldsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/typed_internal_test.go",
-      "line": 79
+      "line": 102
     },
     {
       "package": "cluster/spec",
@@ -18028,6 +18414,13 @@
     },
     {
       "package": "cluster/switch",
+      "identifier": "TestSwitchOrigins",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/switch/origin_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/switch",
       "identifier": "TestSwitchServerCustomValidators",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
@@ -18126,6 +18519,13 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "PresetStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/presets.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "PresetType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
@@ -18147,6 +18547,13 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "SettingStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "TemperatureControlFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/temperaturecontrol.go",
@@ -18158,6 +18565,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
       "line": 48
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TemperatureSetter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/temperaturecontrol.go",
+      "line": 73
     },
     {
       "package": "cluster/thermo",
@@ -18182,10 +18596,24 @@
     },
     {
       "package": "cluster/valve",
+      "identifier": "OpenRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/valve/valve_server.go",
+      "line": 139
+    },
+    {
+      "package": "cluster/valve",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
       "line": 116
+    },
+    {
+      "package": "cluster/valve",
+      "identifier": "StateSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/valve/valve_server.go",
+      "line": 157
     },
     {
       "package": "cluster/wire",
@@ -20173,14 +20601,14 @@
       "identifier": "AvailabilityProbe",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 57
+      "line": 61
     },
     {
       "package": "device",
       "identifier": "Option",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 81
+      "line": 84
     },
     {
       "package": "device",
@@ -20188,6 +20616,27 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
       "line": 53
+    },
+    {
+      "package": "device",
+      "identifier": "StringKey",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 57
+    },
+    {
+      "package": "device",
+      "identifier": "TestALevelSourceServesTheSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_selection_test.go",
+      "line": 50
+    },
+    {
+      "package": "device",
+      "identifier": "TestAMeasurementIsDeclaredAndSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 30
     },
     {
       "package": "device",
@@ -20352,6 +20801,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestMediaDefaultsFromTheDeclaration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_media_test.go",
+      "line": 105
+    },
+    {
+      "package": "device",
       "identifier": "TestMediaDeviceTypesMountTheMediaServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/media_test.go",
@@ -20418,7 +20874,14 @@
       "identifier": "TestPortServersNeedTheirPort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_ports_test.go",
-      "line": 163
+      "line": 216
+    },
+    {
+      "package": "device",
+      "identifier": "TestPumpSpeedLimitsWithoutAuto",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_selection_test.go",
+      "line": 70
     },
     {
       "package": "device",
@@ -20496,27 +20959,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 512
-    },
-    {
-      "package": "device",
-      "identifier": "TestWithMeasurement",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "device/measurement_test.go",
-      "line": 38
-    },
-    {
-      "package": "device",
-      "identifier": "TestWithMeasurementComposesWithTheDevicesOwnServers",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "device/measurement_test.go",
-      "line": 88
-    },
-    {
-      "package": "device",
-      "identifier": "TestWithMeasurementRefusals",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "device/measurement_test.go",
-      "line": 106
     },
     {
       "package": "device",
@@ -20663,7 +21105,7 @@
       "identifier": "TestApplicationDeviceTypesMountTheirMandatoryClusterSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/application_device_types_test.go",
-      "line": 259
+      "line": 262
     },
     {
       "package": "endpoint",
@@ -21646,6 +22088,20 @@
       "line": 66
     },
     {
+      "package": "examples/host-view",
+      "identifier": "TestHostViewNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/host-view/main_test.go",
+      "line": 71
+    },
+    {
+      "package": "examples/host-view",
+      "identifier": "TestHostViewOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/host-view/main_test.go",
+      "line": 26
+    },
+    {
       "package": "examples/quickstart-controller",
       "identifier": "TestMain",
       "reason": "auto-whitelist:pattern=test-file",
@@ -21692,14 +22148,14 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 356
+      "line": 362
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestAppPipeCommandsReachTheDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 27
+      "line": 30
     },
     {
       "package": "examples/reference-bridge",
@@ -21713,7 +22169,7 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 187
+      "line": 188
     },
     {
       "package": "examples/reference-bridge",
@@ -21727,7 +22183,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 314
+      "line": 320
     },
     {
       "package": "examples/reference-bridge",
@@ -21741,7 +22197,7 @@
       "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 385
+      "line": 390
     },
     {
       "package": "examples/reference-bridge",
@@ -21762,7 +22218,7 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "examples/reference-bridge",
@@ -21797,14 +22253,14 @@
       "identifier": "TestDemoActionsWithoutTopology",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_node_test.go",
-      "line": 122
+      "line": 123
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "examples/reference-bridge",
@@ -21916,7 +22372,7 @@
       "identifier": "TestMeteringTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 221
+      "line": 230
     },
     {
       "package": "examples/reference-bridge",
@@ -21979,7 +22435,7 @@
       "identifier": "TestOvenPipeDrivesTheCavity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 260
+      "line": 270
     },
     {
       "package": "examples/reference-bridge",
@@ -22000,14 +22456,14 @@
       "identifier": "TestPriceAndGridTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 249
+      "line": 265
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 156
+      "line": 157
     },
     {
       "package": "examples/reference-bridge",
@@ -22021,35 +22477,35 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 331
+      "line": 337
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeSelfTestEndsOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 158
+      "line": 161
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeTestButtonIsIgnoredWhileAlarming",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 243
+      "line": 248
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeTestEventTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 86
+      "line": 89
     },
     {
       "package": "examples/reference-bridge",
@@ -22070,7 +22526,7 @@
       "identifier": "TestTariffTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_market_test.go",
-      "line": 156
+      "line": 165
     },
     {
       "package": "examples/reference-bridge",
@@ -22105,14 +22561,14 @@
       "identifier": "TestWasherFaultBlocksStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 136
+      "line": 139
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestWasherStopReportsTheCycleTimes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 178
+      "line": 181
     },
     {
       "package": "examples/reference-bridge",
@@ -22126,14 +22582,14 @@
       "identifier": "TestWaterHeaterModeAndBoostSequence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_test.go",
-      "line": 92
+      "line": 101
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestWaterHeaterTankPercentSequence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_test.go",
-      "line": 63
+      "line": 73
     },
     {
       "package": "examples/reference-bridge",
