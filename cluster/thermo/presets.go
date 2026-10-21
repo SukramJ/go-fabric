@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -372,7 +373,7 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 	s.mu.Unlock()
 	// Presets is computed from persistedPresets, whose change announces it
 	// (#handlePersistedPresetsChanged, ThermostatServer.ts:1497-1503).
-	s.changes.Notify(tdef.AttrPresets)
+	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrPresets)
 	return nil
 }
 
@@ -450,7 +451,7 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 	s.mu.Lock()
 	s.activePresetHandle = handle
 	s.mu.Unlock()
-	s.changes.Notify(tdef.AttrActivePresetHandle)
+	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
 	return nil
 }
 
@@ -475,7 +476,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	if err := s.savePresets(ctx, presets, nil); err != nil {
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
-	s.changes.Notify(tdef.AttrActivePresetHandle)
+	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
 }
 
 // presetRequest normalises the SetActivePresetRequest payload: the bridge

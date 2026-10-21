@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -571,7 +572,6 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 	if topo == nil {
 		return
 	}
-	mgr := b.subscriptionManagerLocked()
 	for _, ep := range topo.Bridged() {
 		if ep == nil {
 			continue
@@ -579,39 +579,105 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 		if ep.Scope != scope || ep.DeviceAddress != deviceAddress {
 			continue
 		}
-		// Priority INFO, matching the cluster-side emitter and matter.js
-		// HEAD bridged-device-basic-information.element.ts:55.
-		b.MatterEmitEvent(ep.ID,
-			core.BridgedDeviceBasicInformationClusterID,
-			core.EventReachableChanged,
-			core.ReachableChangedEvent{ReachableNewValue: reachable},
-			contract.EventPriorityInfo)
-		// Advance the endpoint-hosted BDBI DataVersion — the reachability
-		// flip is a cluster state change, so DataVersionFilters must miss
-		// afterwards (matter.js Datasource.ts:1035).
+		b.notifyReachable(ep, reachable)
+	}
+}
+
+// NotifyEndpointReachable is [Bridge.NotifyDeviceReachable] for the one
+// bridged endpoint with id endpointID: the ReachableChanged event, the
+// DataVersion bump and the Reachable attribute marked dirty — what
+// device.Device.SetReachable reaches through the node. It reports false
+// when no bridged endpoint has the id. Mirrors matter.js
+// BridgedDeviceBasicInformationServer, whose reachable$Changed reaction
+// emits reachableChanged (BridgedDeviceBasicInformationServer.ts:37,
+// :100-102).
+func (b *Bridge) NotifyEndpointReachable(endpointID uint16, reachable bool) bool {
+	if b == nil {
+		return false
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return false
+	}
+	for _, ep := range topo.Bridged() {
+		if ep != nil && ep.ID == endpointID {
+			b.notifyReachable(ep, reachable)
+			return true
+		}
+	}
+	return false
+}
+
+// NotifyEndpointNodeLabel sets the BridgedDeviceBasicInformation NodeLabel
+// of the bridged endpoint with id endpointID to label — the host's rename,
+// stored and persisted as a controller's write is
+// (endpoint.Endpoint.SetNodeLabel) — bumps the cluster's DataVersion and
+// marks the attribute dirty, so a subscribed controller reads the new
+// name. It reports false when no bridged endpoint has the id.
+func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) bool {
+	if b == nil {
+		return false
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return false
+	}
+	for _, ep := range topo.Bridged() {
+		if ep == nil || ep.ID != endpointID {
+			continue
+		}
+		ep.SetNodeLabel(label)
 		ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
-		// Also dirty the Reachable ATTRIBUTE (BDBI 0x0039 / 0x0011), not
-		// just fire the event: a controller subscribed to the attribute
-		// (Google Home tracks it) otherwise shows stale reachability until
-		// it re-subscribes. matter.js's reactive state marks the attribute
-		// dirty on the same change. Mirrors the Descriptor.PartsList
-		// dirty-mark pattern in bridge.go.
-		if mgr != nil {
+		if mgr := b.subscriptionManagerLocked(); mgr != nil {
 			mgr.OnAttributeChanged(im.ConcreteAttributePath{
 				Endpoint:     ep.ID,
 				Cluster:      core.BridgedDeviceBasicInformationClusterID,
-				Attribute:    0x0011, // Reachable (§9.13.5)
+				Attribute:    bdbidef.AttrNodeLabel,
 				HasEndpoint:  true,
 				HasCluster:   true,
 				HasAttribute: true,
 			})
 		}
-		b.logger.Debug("matter.bridge.reachable_changed",
-			slog.Int("endpoint_id", int(ep.ID)),
-			slog.String("scope", scope),
-			slog.String("address", deviceAddress),
-			slog.Bool("reachable", reachable))
+		return true
 	}
+	return false
+}
+
+// notifyReachable is the reachability flip of one bridged endpoint.
+func (b *Bridge) notifyReachable(ep *endpoint.Endpoint, reachable bool) {
+	mgr := b.subscriptionManagerLocked()
+	// Priority INFO, matching the cluster-side emitter and matter.js
+	// HEAD bridged-device-basic-information.element.ts:55.
+	b.MatterEmitEvent(ep.ID,
+		core.BridgedDeviceBasicInformationClusterID,
+		core.EventReachableChanged,
+		core.ReachableChangedEvent{ReachableNewValue: reachable},
+		contract.EventPriorityInfo)
+	// Advance the endpoint-hosted BDBI DataVersion — the reachability
+	// flip is a cluster state change, so DataVersionFilters must miss
+	// afterwards (matter.js Datasource.ts:1035).
+	ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
+	// Also dirty the Reachable ATTRIBUTE (BDBI 0x0039 / 0x0011), not
+	// just fire the event: a controller subscribed to the attribute
+	// (Google Home tracks it) otherwise shows stale reachability until
+	// it re-subscribes. matter.js's reactive state marks the attribute
+	// dirty on the same change. Mirrors the Descriptor.PartsList
+	// dirty-mark pattern in bridge.go.
+	if mgr != nil {
+		mgr.OnAttributeChanged(im.ConcreteAttributePath{
+			Endpoint:     ep.ID,
+			Cluster:      core.BridgedDeviceBasicInformationClusterID,
+			Attribute:    0x0011, // Reachable (§9.13.5)
+			HasEndpoint:  true,
+			HasCluster:   true,
+			HasAttribute: true,
+		})
+	}
+	b.logger.Debug("matter.bridge.reachable_changed",
+		slog.Int("endpoint_id", int(ep.ID)),
+		slog.String("scope", ep.Scope),
+		slog.String("address", ep.DeviceAddress),
+		slog.Bool("reachable", reachable))
 }
 
 // replyTimedStatus is the rejection path for a checkTimedGate hit. It

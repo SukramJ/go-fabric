@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -43,7 +44,7 @@ func TestTypedFanServer(t *testing.T) {
 	if err := s.Set(fandef.Patch{}); err != nil {
 		t.Errorf("an empty patch: %v", err)
 	}
-	unsubscribe := s.OnChanged(func(fandef.State, []uint32) { t.Error("OnChanged fired") })
+	unsubscribe := s.OnChanged(func(fandef.State, contract.Change) { t.Error("OnChanged fired") })
 	unsubscribe()
 
 	// HandleStep replaces the default step: the host's handler gets the

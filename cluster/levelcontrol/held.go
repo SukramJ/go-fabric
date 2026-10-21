@@ -205,7 +205,7 @@ func (s *Server) followOnOff(n contract.AttributeChangeNotifier) {
 		}
 		if onLevel, known := s.held.OnLevel(); known {
 			s.held.setLevel(&onLevel)
-			s.observeLevel()
+			s.observeLevel(contract.OriginCommand)
 		}
 	})
 }

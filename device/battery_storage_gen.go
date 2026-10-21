@@ -33,9 +33,10 @@ var BatteryStorageType = Type{
 type BatteryStorage struct{ *Device }
 
 // NewBatteryStorage returns a BatteryStorage device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewBatteryStorage(opts Options, with ...Option) (*BatteryStorage, error) {
-	d, err := New(&BatteryStorageType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type BatteryStorageID (see [New]).
+func NewBatteryStorage(opts Options, decls ...Declaration) (*BatteryStorage, error) {
+	d, err := FromSpec(Spec{Type: BatteryStorageID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}

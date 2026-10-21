@@ -44,9 +44,10 @@ var AggregatorType = Type{
 type Aggregator struct{ *Device }
 
 // NewAggregator returns a Aggregator device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewAggregator(opts Options, with ...Option) (*Aggregator, error) {
-	d, err := New(&AggregatorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type AggregatorID (see [New]).
+func NewAggregator(opts Options, decls ...Declaration) (*Aggregator, error) {
+	d, err := FromSpec(Spec{Type: AggregatorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -54,15 +55,23 @@ func NewAggregator(opts Options, with ...Option) (*Aggregator, error) {
 }
 
 // Actions returns the typed Actions server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *Aggregator) Actions() *actionsdef.Server { return actionsdef.Wrap(d.Server(0x0025)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *Aggregator) Actions() *actionsdef.Server {
+	if w, ok := d.typed(0x0025); ok {
+		return &actionsdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // CommissionerControl returns the typed CommissionerControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Aggregator) CommissionerControl() *commissionercontroldef.Server {
-	return commissionercontroldef.Wrap(d.Server(0x0751))
+	if w, ok := d.typed(0x0751); ok {
+		return &commissionercontroldef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -33,9 +33,10 @@ var SolarPowerType = Type{
 type SolarPower struct{ *Device }
 
 // NewSolarPower returns a SolarPower device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewSolarPower(opts Options, with ...Option) (*SolarPower, error) {
-	d, err := New(&SolarPowerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type SolarPowerID (see [New]).
+func NewSolarPower(opts Options, decls ...Declaration) (*SolarPower, error) {
+	d, err := FromSpec(Spec{Type: SolarPowerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}

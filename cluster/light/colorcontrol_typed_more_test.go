@@ -10,6 +10,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // fullColorControl is a ColorControl server with every feature, under
@@ -34,7 +35,7 @@ func TestColorControlSetStartUpMireds(t *testing.T) {
 	t.Parallel()
 	s, srv := fullColorControl(t)
 	var changes [][]uint32
-	defer s.OnChanged(func(_ ccdef.State, ids []uint32) { changes = append(changes, ids) })()
+	defer s.OnChanged(func(_ ccdef.State, change contract.Change) { ids := change.Attributes; changes = append(changes, ids) })()
 
 	set := func(v any) error {
 		return srv.SetAttributes(map[uint32]any{ccdef.AttrStartUpColorTemperatureMireds: v})

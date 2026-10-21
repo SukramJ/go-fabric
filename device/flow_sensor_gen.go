@@ -40,9 +40,10 @@ var FlowSensorType = Type{
 type FlowSensor struct{ *Device }
 
 // NewFlowSensor returns a FlowSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewFlowSensor(opts Options, with ...Option) (*FlowSensor, error) {
-	d, err := New(&FlowSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type FlowSensorID (see [New]).
+func NewFlowSensor(opts Options, decls ...Declaration) (*FlowSensor, error) {
+	d, err := FromSpec(Spec{Type: FlowSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,12 @@ func NewFlowSensor(opts Options, with ...Option) (*FlowSensor, error) {
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *FlowSensor) FlowMeasurement() *flowmeasurementdef.Server {
-	return flowmeasurementdef.Wrap(d.Server(0x0404))
+	if w, ok := d.typed(0x0404); ok {
+		return &flowmeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

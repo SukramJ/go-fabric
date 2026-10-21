@@ -244,12 +244,28 @@ const (
 type (
 	// MoveToLevelRequest carries MoveToLevel / MoveToLevelWithOnOff
 	// (element :72-78).
+	//
+	// Deprecated: a host port takes the generated request types —
+	// implement levelcontroldef.LevelSource and pass it as [Config].Port
+	// (or declare it, levelcontroldef.Declare). May be removed in v0.12.0.
 	MoveToLevelRequest = wire.MoveToLevelRequest
 	// MoveRequest carries Move / MoveWithOnOff (element :80-86).
+	//
+	// Deprecated: a host port takes the generated request types —
+	// implement levelcontroldef.LevelSource and pass it as [Config].Port
+	// (or declare it, levelcontroldef.Declare). May be removed in v0.12.0.
 	MoveRequest = wire.MoveRequest
 	// StepRequest carries Step / StepWithOnOff (element :88-95).
+	//
+	// Deprecated: a host port takes the generated request types —
+	// implement levelcontroldef.LevelSource and pass it as [Config].Port
+	// (or declare it, levelcontroldef.Declare). May be removed in v0.12.0.
 	StepRequest = wire.StepRequest
 	// StopRequest carries Stop / StopWithOnOff (element :97-100).
+	//
+	// Deprecated: a host port takes the generated request types —
+	// implement levelcontroldef.LevelSource and pass it as [Config].Port
+	// (or declare it, levelcontroldef.Declare). May be removed in v0.12.0.
 	StopRequest = wire.StopRequest
 )
 
@@ -277,6 +293,13 @@ type (
 // Under [Config.Transitions] the server calls MoveToLevel alone, with
 // TransitionTime 0 and ExecuteIfOff forced, once per level it applies;
 // the other seven command methods are not called.
+//
+// Deprecated: the host port takes the generated request types —
+// implement levelcontroldef.LevelSource (the same methods over
+// levelcontroldef.MoveToLevelRequest and the other generated requests)
+// and pass it as [Config].Port, or declare it (levelcontroldef.Declare).
+// The module's own sources ([NativeSource]) keep [Config].Source. May be
+// removed in v0.12.0.
 type LevelSource interface {
 	// CurrentLevel reports the level the device is at.
 	CurrentLevel() (level uint8, known bool)
@@ -337,10 +360,14 @@ func EffectiveOptions(attribute, mask, override uint8) uint8 {
 
 // Config carries the construction parameters for [Server].
 type Config struct {
-	// Source is the host port. A nil Source makes every attribute read
-	// null and every command fail — the server never pretends to have
-	// moved a device it cannot reach.
+	// Source is the level the server drives: the module's own source
+	// ([NativeSource]) or a host's [LevelSource]. A nil Source and Port
+	// make every attribute read null and every command fail — the server
+	// never pretends to have moved a device it cannot reach.
 	Source LevelSource
+	// Port is the host port in the generated request types — what
+	// levelcontroldef.Declare carries; set, it wins over Source.
+	Port lvldef.LevelSource
 	// DataVersion is an optional tracker owned by the host. When non-nil
 	// the server bumps and reports the caller's counter, so a level the
 	// device changed on its own reaches a subscriber the moment the host
@@ -397,6 +424,9 @@ type Server struct {
 	// quiescing suppresses the quieter's report while MatterQuiesce drops
 	// the one it holds back.
 	quiescing atomic.Bool
+	// levelOrigin is the contract.Origin of the last level change, for the
+	// quieter's report of it.
+	levelOrigin atomic.Uint32
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -435,7 +465,11 @@ func NewServer(cfg Config) *Server {
 	if cfg.Lighting {
 		features |= FeatureLighting
 	}
-	s := newServer(cfg.Source, cfg.DataVersion, features)
+	src := cfg.Source
+	if cfg.Port != nil {
+		src = portSource{cfg.Port}
+	}
+	s := newServer(src, cfg.DataVersion, features)
 	if cfg.Transitions != nil {
 		s.initEngine(*cfg.Transitions, true)
 	}
@@ -664,10 +698,16 @@ func (s *Server) writeOptions(ctx context.Context, options uint8) error {
 	if s.src == nil {
 		return errNoSource("Options write")
 	}
+	before := s.src.Options()
 	if err := s.src.SetOptions(ctx, options); err != nil {
 		return fmt.Errorf("levelcontrol: Options write: %w", err)
 	}
 	s.tracker().Bump()
+	// A change is reported to the server's listeners, as matter.js emits
+	// options$Changed after the write commits (Datasource.ts:1473-1476).
+	if s.src.Options() != before {
+		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
+	}
 	return nil
 }
 
@@ -677,10 +717,14 @@ func (s *Server) writeOnLevel(ctx context.Context, level *uint8) error {
 	if s.src == nil {
 		return errNoSource("OnLevel write")
 	}
+	before, knownBefore := s.src.OnLevel()
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
 		return fmt.Errorf("levelcontrol: OnLevel write: %w", err)
 	}
 	s.tracker().Bump()
+	if after, known := s.src.OnLevel(); after != before || known != knownBefore {
+		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
+	}
 	return nil
 }
 

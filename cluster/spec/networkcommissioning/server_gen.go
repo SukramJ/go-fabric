@@ -7,6 +7,7 @@ package networkcommissioning
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -73,11 +74,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -124,4 +135,117 @@ func (s *Server) HandleConnectNetwork(fn func(ctx context.Context, req ConnectNe
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleReorderNetwork(fn func(ctx context.Context, req ReorderNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdReorderNetwork, fn)
+}
+
+// Declare is the declaration of the NetworkCommissioning cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleScanNetworks handles the ScanNetworks command in place of the server
+	// (Server.HandleScanNetworks), inline; an optional command it handles is accepted.
+	HandleScanNetworks func(ctx context.Context, req ScanNetworksRequest) (ScanNetworksResponse, error)
+	// HandleAddOrUpdateWiFiNetwork handles the AddOrUpdateWiFiNetwork command in place of the server
+	// (Server.HandleAddOrUpdateWiFiNetwork), inline; an optional command it handles is accepted.
+	HandleAddOrUpdateWiFiNetwork func(ctx context.Context, req AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error)
+	// HandleAddOrUpdateThreadNetwork handles the AddOrUpdateThreadNetwork command in place of the server
+	// (Server.HandleAddOrUpdateThreadNetwork), inline; an optional command it handles is accepted.
+	HandleAddOrUpdateThreadNetwork func(ctx context.Context, req AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error)
+	// HandleRemoveNetwork handles the RemoveNetwork command in place of the server
+	// (Server.HandleRemoveNetwork), inline; an optional command it handles is accepted.
+	HandleRemoveNetwork func(ctx context.Context, req RemoveNetworkRequest) (NetworkConfigResponse, error)
+	// HandleConnectNetwork handles the ConnectNetwork command in place of the server
+	// (Server.HandleConnectNetwork), inline; an optional command it handles is accepted.
+	HandleConnectNetwork func(ctx context.Context, req ConnectNetworkRequest) (ConnectNetworkResponse, error)
+	// HandleReorderNetwork handles the ReorderNetwork command in place of the server
+	// (Server.HandleReorderNetwork), inline; an optional command it handles is accepted.
+	HandleReorderNetwork func(ctx context.Context, req ReorderNetworkRequest) (NetworkConfigResponse, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleScanNetworks != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdScanNetworks)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddOrUpdateWiFiNetwork != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddOrUpdateWiFiNetwork)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddOrUpdateThreadNetwork != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddOrUpdateThreadNetwork)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveNetwork != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveNetwork)
+		decl.Attach = d.attach
+	}
+	if d.HandleConnectNetwork != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdConnectNetwork)
+		decl.Attach = d.attach
+	}
+	if d.HandleReorderNetwork != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdReorderNetwork)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("networkcommissioning OnWrite: %w", err)
+		}
+	}
+	if d.HandleScanNetworks != nil {
+		if err := s.HandleScanNetworks(d.HandleScanNetworks); err != nil {
+			return fmt.Errorf("networkcommissioning HandleScanNetworks: %w", err)
+		}
+	}
+	if d.HandleAddOrUpdateWiFiNetwork != nil {
+		if err := s.HandleAddOrUpdateWiFiNetwork(d.HandleAddOrUpdateWiFiNetwork); err != nil {
+			return fmt.Errorf("networkcommissioning HandleAddOrUpdateWiFiNetwork: %w", err)
+		}
+	}
+	if d.HandleAddOrUpdateThreadNetwork != nil {
+		if err := s.HandleAddOrUpdateThreadNetwork(d.HandleAddOrUpdateThreadNetwork); err != nil {
+			return fmt.Errorf("networkcommissioning HandleAddOrUpdateThreadNetwork: %w", err)
+		}
+	}
+	if d.HandleRemoveNetwork != nil {
+		if err := s.HandleRemoveNetwork(d.HandleRemoveNetwork); err != nil {
+			return fmt.Errorf("networkcommissioning HandleRemoveNetwork: %w", err)
+		}
+	}
+	if d.HandleConnectNetwork != nil {
+		if err := s.HandleConnectNetwork(d.HandleConnectNetwork); err != nil {
+			return fmt.Errorf("networkcommissioning HandleConnectNetwork: %w", err)
+		}
+	}
+	if d.HandleReorderNetwork != nil {
+		if err := s.HandleReorderNetwork(d.HandleReorderNetwork); err != nil {
+			return fmt.Errorf("networkcommissioning HandleReorderNetwork: %w", err)
+		}
+	}
+	return nil
 }

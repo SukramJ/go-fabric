@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func typedPtr[T any](v T) *T { return &v }
@@ -31,7 +32,7 @@ func TestTypedCommodityPriceServer(t *testing.T) {
 	srv.SetMatterEventEmitter(em)
 	s := cp.Wrap(srv)
 	changes := 0
-	defer s.OnChanged(func(cp.State, []uint32) { changes++ })()
+	defer s.OnChanged(func(cp.State, contract.Change) { changes++ })()
 
 	price := cp.CommodityPriceStruct{PeriodStart: 10, PeriodEnd: spec.NullOf[uint32](), Price: typedPtr(int64(25))}
 	if err := s.Set(cp.Patch{CurrentPrice: &price, TariffUnit: typedPtr(cp.TariffUnitKVAh)}); err != nil {

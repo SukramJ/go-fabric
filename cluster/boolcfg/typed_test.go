@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func pv[T any](v T) *T { return &v }
@@ -24,7 +25,7 @@ func TestTypedBooleanStateConfiguration(t *testing.T) {
 	srv, em := newServer(t, full(nil))
 	s := def.Wrap(srv)
 	var changed int
-	defer s.OnChanged(func(def.State, []uint32) { changed++ })()
+	defer s.OnChanged(func(def.State, contract.Change) { changed++ })()
 
 	if err := s.Set(def.Patch{CurrentSensitivityLevel: pv(uint8(2)), AlarmsActive: pv(boolcfg.AlarmVisual)}); err != nil {
 		t.Fatal(err)

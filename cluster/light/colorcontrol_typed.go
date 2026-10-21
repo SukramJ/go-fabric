@@ -80,10 +80,10 @@ func (s *ColorControlServer) SetAttributes(values map[uint32]any) error {
 	}
 	s.mu.Unlock()
 	if next != prev {
-		s.report(prev, next)
+		s.report(contract.OriginHostSet, prev, next)
 	}
 	if len(plain) > 0 {
-		s.changes.Notify(plain...)
+		s.changes.NotifyFrom(contract.OriginHostSet, plain...)
 	}
 	return nil
 }

@@ -84,7 +84,8 @@ func TestTypedOnChanged(t *testing.T) {
 	srv := hepaServer(t, spec.ServerConfig{})
 	var states []hepaState
 	var ids [][]uint32
-	unsubscribe := spec.OnChangedOf(srv, func(s hepaState, changed []uint32) {
+	unsubscribe := spec.OnChangedOf(srv, func(s hepaState, change contract.Change) {
+		changed := change.Attributes
 		states = append(states, s)
 		ids = append(ids, changed)
 	})
@@ -274,13 +275,13 @@ func TestTypedOverAServerWithoutInterfaces(t *testing.T) {
 		t.Errorf("StateOf over MatterRead: %+v", st)
 	}
 	var got [][]uint32
-	unsubscribe := spec.OnChangedOf(vn, func(st hepaState, changed []uint32) { got = append(got, changed) })
+	unsubscribe := spec.OnChangedOf(vn, func(st hepaState, change contract.Change) { changed := change.Attributes; got = append(got, changed) })
 	vn.cb()
 	unsubscribe()
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{0, 2}) {
 		t.Errorf("OnChangedOf over the ChangeNotifier: %v", got)
 	}
-	spec.OnChangedOf(bare{}, func(hepaState, []uint32) { t.Error("a silent server reported") })()
+	spec.OnChangedOf(bare{}, func(hepaState, contract.Change) { t.Error("a silent server reported") })()
 }
 
 func TestTypedEmitAndHandleOn(t *testing.T) {

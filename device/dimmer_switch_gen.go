@@ -62,9 +62,10 @@ var DimmerSwitchType = Type{
 type DimmerSwitch struct{ *Device }
 
 // NewDimmerSwitch returns a DimmerSwitch device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewDimmerSwitch(opts Options, with ...Option) (*DimmerSwitch, error) {
-	d, err := New(&DimmerSwitchType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type DimmerSwitchID (see [New]).
+func NewDimmerSwitch(opts Options, decls ...Declaration) (*DimmerSwitch, error) {
+	d, err := FromSpec(Spec{Type: DimmerSwitchID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +73,12 @@ func NewDimmerSwitch(opts Options, with ...Option) (*DimmerSwitch, error) {
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *DimmerSwitch) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *DimmerSwitch) Binding() *bindingdef.Server {
+	if w, ok := d.typed(0x001E); ok {
+		return &bindingdef.Server{Wrapper: w}
+	}
+	return nil
+}

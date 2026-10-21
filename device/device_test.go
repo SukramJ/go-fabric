@@ -253,7 +253,7 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got [][]uint32
-	stop := d.OnChanged(onoffdef.ClusterID, func(ids []uint32) { got = append(got, ids) })
+	stop := d.OnChanged(onoffdef.ClusterID, func(change contract.Change) { ids := change.Attributes; got = append(got, ids) })
 	_ = d.OnOff().Set(onoffdef.Patch{OnOff: new(true)})
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{onoffdef.AttrOnOff}) {
 		t.Errorf("notified %v", got)
@@ -270,13 +270,13 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	var ids []uint32
-	h.OnChanged(onoffdef.ClusterID, func(a []uint32) { ids = a })
+	h.OnChanged(onoffdef.ClusterID, func(change contract.Change) { a := change.Attributes; ids = a })
 	own.changed()
 	if !slices.Equal(ids, []uint32{0, 1}) {
 		t.Errorf("ChangeNotifier ids %v", ids)
 	}
 	// A cluster the device does not mount never fires.
-	h.OnChanged(0x0201, func([]uint32) { t.Error("fired") })()
+	h.OnChanged(0x0201, func(contract.Change) { t.Error("fired") })()
 }
 
 // TestParts: a part must be a component the type names; BridgedNode hosts

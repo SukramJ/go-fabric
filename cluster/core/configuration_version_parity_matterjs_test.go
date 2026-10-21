@@ -36,7 +36,7 @@ func configVersionDevice(t *testing.T, keys ...string) *fabrictest.Device {
 	eps := make([]node.Endpoint, 0, len(keys))
 	for _, k := range keys {
 		l, err := device.NewOnOffLight(device.Options{
-			StableKey: endpoint.StringKey(k), Name: k, DeviceAddress: k, Clock: site.Clock(),
+			StableKey: endpoint.StringKey(k), Name: k, DeviceAddress: k,
 		})
 		if err != nil {
 			t.Fatal(err)

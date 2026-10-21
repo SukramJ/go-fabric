@@ -62,8 +62,8 @@ func newSwitchPair(t *testing.T, multi bool) *switchPair {
 	if multi {
 		features |= uint32(swdef.FeatureMomentarySwitchMultiPress)
 	}
-	sw, err := device.NewGenericSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1", Clock: site.Clock()},
-		device.WithFeatures(swdef.ClusterID, features))
+	sw, err := device.NewGenericSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"},
+		swdef.Declare{Features: swdef.Feature(features)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -87,9 +87,10 @@ var BasicVideoPlayerType = Type{
 type BasicVideoPlayer struct{ *Device }
 
 // NewBasicVideoPlayer returns a BasicVideoPlayer device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewBasicVideoPlayer(opts Options, with ...Option) (*BasicVideoPlayer, error) {
-	d, err := New(&BasicVideoPlayerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type BasicVideoPlayerID (see [New]).
+func NewBasicVideoPlayer(opts Options, decls ...Declaration) (*BasicVideoPlayer, error) {
+	d, err := FromSpec(Spec{Type: BasicVideoPlayerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -97,78 +98,122 @@ func NewBasicVideoPlayer(opts Options, with ...Option) (*BasicVideoPlayer, error
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *BasicVideoPlayer) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *BasicVideoPlayer) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *BasicVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
-	return mediaplaybackdef.Wrap(d.Server(0x0506))
+	if w, ok := d.typed(0x0506); ok {
+		return &mediaplaybackdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // KeypadInput returns the typed KeypadInput server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *BasicVideoPlayer) KeypadInput() *keypadinputdef.Server {
-	return keypadinputdef.Wrap(d.Server(0x0509))
+	if w, ok := d.typed(0x0509); ok {
+		return &keypadinputdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // Messages returns the typed Messages server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *BasicVideoPlayer) Messages() *messagesdef.Server { return messagesdef.Wrap(d.Server(0x0097)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *BasicVideoPlayer) Messages() *messagesdef.Server {
+	if w, ok := d.typed(0x0097); ok {
+		return &messagesdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // WakeOnLan returns the typed WakeOnLan server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) WakeOnLan() *wakeonlandef.Server {
-	return wakeonlandef.Wrap(d.Server(0x0503))
+	if w, ok := d.typed(0x0503); ok {
+		return &wakeonlandef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // Channel returns the typed Channel server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *BasicVideoPlayer) Channel() *channeldef.Server { return channeldef.Wrap(d.Server(0x0504)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *BasicVideoPlayer) Channel() *channeldef.Server {
+	if w, ok := d.typed(0x0504); ok {
+		return &channeldef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
-	return targetnavigatordef.Wrap(d.Server(0x0505))
+	if w, ok := d.typed(0x0505); ok {
+		return &targetnavigatordef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // MediaInput returns the typed MediaInput server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) MediaInput() *mediainputdef.Server {
-	return mediainputdef.Wrap(d.Server(0x0507))
+	if w, ok := d.typed(0x0507); ok {
+		return &mediainputdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // LowPower returns the typed LowPower server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *BasicVideoPlayer) LowPower() *lowpowerdef.Server { return lowpowerdef.Wrap(d.Server(0x0508)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *BasicVideoPlayer) LowPower() *lowpowerdef.Server {
+	if w, ok := d.typed(0x0508); ok {
+		return &lowpowerdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // AudioOutput returns the typed AudioOutput server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) AudioOutput() *audiooutputdef.Server {
-	return audiooutputdef.Wrap(d.Server(0x050B))
+	if w, ok := d.typed(0x050B); ok {
+		return &audiooutputdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ContentControl returns the typed ContentControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) ContentControl() *contentcontroldef.Server {
-	return contentcontroldef.Wrap(d.Server(0x050F))
+	if w, ok := d.typed(0x050F); ok {
+		return &contentcontroldef.Server{Wrapper: w}
+	}
+	return nil
 }

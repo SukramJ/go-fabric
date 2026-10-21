@@ -40,9 +40,10 @@ var CooktopType = Type{
 type Cooktop struct{ *Device }
 
 // NewCooktop returns a Cooktop device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewCooktop(opts Options, with ...Option) (*Cooktop, error) {
-	d, err := New(&CooktopType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type CooktopID (see [New]).
+func NewCooktop(opts Options, decls ...Declaration) (*Cooktop, error) {
+	d, err := FromSpec(Spec{Type: CooktopID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +51,12 @@ func NewCooktop(opts Options, with ...Option) (*Cooktop, error) {
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *Cooktop) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *Cooktop) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}

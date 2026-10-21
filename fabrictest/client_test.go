@@ -30,7 +30,7 @@ func TestDeviceClientStackOnTheSite(t *testing.T) {
 	ctx := testContext(t)
 	c := site.AddController(fabrictest.ControllerOptions{})
 	a := site.AddDevice(fabrictest.Topology{Configure: func(cfg *node.Config) { cfg.Client.Enabled = true }})
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light", Clock: site.Clock()})
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
 	}

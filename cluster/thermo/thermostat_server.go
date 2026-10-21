@@ -246,11 +246,10 @@ type Sink interface {
 }
 
 // SetpointChange is one attribute a setpoint change would move besides
-// the one asked for: its id and the new value.
-type SetpointChange struct {
-	AttrID uint32
-	Value  int16
-}
+// the one asked for: its id and the new value — the generated
+// thermostat package's type, so a Sink declared there
+// (thermostatdef.Declare) is this Sink.
+type SetpointChange = tdef.SetpointChange
 
 // DefaultThermostatConfig returns a heating+cooling thermostat config with
 // sensible European defaults.
@@ -536,7 +535,7 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 	s.systemMode = mode
 	s.mu.Unlock()
 	if changed {
-		s.changes.Notify(thermoAttrSystemMode)
+		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrSystemMode)
 	}
 }
 
@@ -589,7 +588,7 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.Int("stored", n),
 			slog.Int("min", lo), slog.Int("max", hi))
 	}
-	s.changes.Notify(changed...)
+	s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	// A local change of an occupied setpoint is a direct one: it ends the
 	// active preset (ThermostatServer.ts:744-768 at 862ad75f).
 	if len(changed) > 0 {
@@ -735,7 +734,7 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		}
 		// The written attribute is reported by the write path; what the
 		// reconcile moved besides it is reported here.
-		s.changes.Notify(coupled...)
+		s.changes.NotifyFrom(contract.OriginControllerWrite, coupled...)
 		return nil
 	case thermoAttrControlSequenceOfOperation:
 		// "For backwards compatibility, this attribute is optionally
@@ -1232,7 +1231,7 @@ func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next 
 	s.mu.Lock()
 	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
-	s.changes.Notify(changed...)
+	s.changes.NotifyFrom(contract.OriginCommand, changed...)
 	return nil
 }
 
@@ -1270,7 +1269,7 @@ func (s *ThermostatServer) SetOccupied(occupied bool) {
 	s.occupied = occupied
 	s.mu.Unlock()
 	if changed {
-		s.changes.Notify(thermoAttrOccupancy)
+		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrOccupancy)
 	}
 }
 
@@ -1318,7 +1317,7 @@ func (s *ThermostatServer) SetAbsoluteSetpointLimit(attrID uint32, v int16) erro
 	}
 	s.mu.Unlock()
 	if changed {
-		s.changes.Notify(attrID)
+		s.changes.NotifyFrom(contract.OriginHostSet, attrID)
 	}
 	return nil
 }

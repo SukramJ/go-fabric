@@ -79,6 +79,15 @@ server concurrently.
 
 The module calls host code from its handler goroutines.
 
+**The rule, for every facade callback** — `OnChanged` (typed and
+`device.Device.OnChanged`), `OnWrite`, `Handle<Command>` and a
+declaration's host ports: it runs inline, on the goroutine of the event
+and before the response leaves; the `…Async` variant (`OnChangedAsync`)
+queues it on the device's own goroutine instead, in order, drained when
+the node removes the device or stops. A veto, a handler and a port answer
+the request, so they have no queued form: one that may block hands its
+work to the host's own goroutine and answers.
+
 **Cluster servers** (`MatterRead`, `MatterWrite`, `MatterInvoke`). No
 dispatcher lock is held while a server is called. A call runs on its
 session's turn, so a slow `MatterInvoke` delays that session's next
@@ -109,7 +118,9 @@ network work to your own goroutine. An observer's error or panic is logged
 and never returned.
 
 **`device.Device.OnChanged` callbacks** run on the server's own change
-notification. Keep them short. The quickstart only logs.
+notification, with the change's origin (`contract.Change.Origin`: the
+host's `Set`, a controller's write, a command). Keep them short — the
+quickstart only logs — or use `OnChangedAsync`.
 
 **Controller `SubscribeRequest.Updated`** runs on the goroutine that reads
 the report, inside the report's exchange. The priming report is delivered
@@ -119,7 +130,7 @@ report to a channel.
 **`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`, `node/observers.go:4-21`, `device/device.go:643-661`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
 
 ## Changing the topology
 

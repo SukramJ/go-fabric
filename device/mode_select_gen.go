@@ -34,9 +34,10 @@ var ModeSelectType = Type{
 type ModeSelect struct{ *Device }
 
 // NewModeSelect returns a ModeSelect device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewModeSelect(opts Options, with ...Option) (*ModeSelect, error) {
-	d, err := New(&ModeSelectType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ModeSelectID (see [New]).
+func NewModeSelect(opts Options, decls ...Declaration) (*ModeSelect, error) {
+	d, err := FromSpec(Spec{Type: ModeSelectID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +45,12 @@ func NewModeSelect(opts Options, with ...Option) (*ModeSelect, error) {
 }
 
 // ModeSelect returns the typed ModeSelect server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *ModeSelect) ModeSelect() *modeselectdef.Server { return modeselectdef.Wrap(d.Server(0x0050)) }
+func (d *ModeSelect) ModeSelect() *modeselectdef.Server {
+	if w, ok := d.typed(0x0050); ok {
+		return &modeselectdef.Server{Wrapper: w}
+	}
+	return nil
+}

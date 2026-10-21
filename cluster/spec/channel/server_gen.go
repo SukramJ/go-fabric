@@ -7,6 +7,7 @@ package channel
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -57,11 +58,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -108,4 +119,117 @@ func (s *Server) HandleRecordProgram(fn func(ctx context.Context, req RecordProg
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelRecordProgram, fn)
+}
+
+// Declare is the declaration of the Channel cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleChangeChannel handles the ChangeChannel command in place of the server
+	// (Server.HandleChangeChannel), inline; an optional command it handles is accepted.
+	HandleChangeChannel func(ctx context.Context, req ChangeChannelRequest) (ChangeChannelResponse, error)
+	// HandleChangeChannelByNumber handles the ChangeChannelByNumber command in place of the server
+	// (Server.HandleChangeChannelByNumber), inline; an optional command it handles is accepted.
+	HandleChangeChannelByNumber func(ctx context.Context, req ChangeChannelByNumberRequest) (struct{}, error)
+	// HandleSkipChannel handles the SkipChannel command in place of the server
+	// (Server.HandleSkipChannel), inline; an optional command it handles is accepted.
+	HandleSkipChannel func(ctx context.Context, req SkipChannelRequest) (struct{}, error)
+	// HandleGetProgramGuide handles the GetProgramGuide command in place of the server
+	// (Server.HandleGetProgramGuide), inline; an optional command it handles is accepted.
+	HandleGetProgramGuide func(ctx context.Context, req GetProgramGuideRequest) (ProgramGuideResponse, error)
+	// HandleRecordProgram handles the RecordProgram command in place of the server
+	// (Server.HandleRecordProgram), inline; an optional command it handles is accepted.
+	HandleRecordProgram func(ctx context.Context, req RecordProgramRequest) (struct{}, error)
+	// HandleCancelRecordProgram handles the CancelRecordProgram command in place of the server
+	// (Server.HandleCancelRecordProgram), inline; an optional command it handles is accepted.
+	HandleCancelRecordProgram func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleChangeChannel != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdChangeChannel)
+		decl.Attach = d.attach
+	}
+	if d.HandleChangeChannelByNumber != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdChangeChannelByNumber)
+		decl.Attach = d.attach
+	}
+	if d.HandleSkipChannel != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSkipChannel)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetProgramGuide != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetProgramGuide)
+		decl.Attach = d.attach
+	}
+	if d.HandleRecordProgram != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRecordProgram)
+		decl.Attach = d.attach
+	}
+	if d.HandleCancelRecordProgram != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdCancelRecordProgram)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("channel OnWrite: %w", err)
+		}
+	}
+	if d.HandleChangeChannel != nil {
+		if err := s.HandleChangeChannel(d.HandleChangeChannel); err != nil {
+			return fmt.Errorf("channel HandleChangeChannel: %w", err)
+		}
+	}
+	if d.HandleChangeChannelByNumber != nil {
+		if err := s.HandleChangeChannelByNumber(d.HandleChangeChannelByNumber); err != nil {
+			return fmt.Errorf("channel HandleChangeChannelByNumber: %w", err)
+		}
+	}
+	if d.HandleSkipChannel != nil {
+		if err := s.HandleSkipChannel(d.HandleSkipChannel); err != nil {
+			return fmt.Errorf("channel HandleSkipChannel: %w", err)
+		}
+	}
+	if d.HandleGetProgramGuide != nil {
+		if err := s.HandleGetProgramGuide(d.HandleGetProgramGuide); err != nil {
+			return fmt.Errorf("channel HandleGetProgramGuide: %w", err)
+		}
+	}
+	if d.HandleRecordProgram != nil {
+		if err := s.HandleRecordProgram(d.HandleRecordProgram); err != nil {
+			return fmt.Errorf("channel HandleRecordProgram: %w", err)
+		}
+	}
+	if d.HandleCancelRecordProgram != nil {
+		if err := s.HandleCancelRecordProgram(d.HandleCancelRecordProgram); err != nil {
+			return fmt.Errorf("channel HandleCancelRecordProgram: %w", err)
+		}
+	}
+	return nil
 }

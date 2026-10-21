@@ -187,7 +187,8 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		light, srv := testLight(t, "timed")
 		var reportedMu sync.Mutex
 		var reported [][]uint32
-		srv.OnChanged(func(_ onoffdef.State, ids []uint32) {
+		srv.OnChanged(func(_ onoffdef.State, change contract.Change) {
+			ids := change.Attributes
 			reportedMu.Lock()
 			reported = append(reported, ids)
 			reportedMu.Unlock()
@@ -247,7 +248,8 @@ func TestDelayedOffReportsItsCountdown(t *testing.T) {
 		}
 		var reportedMu sync.Mutex
 		var reported [][]uint32
-		srv.OnChanged(func(_ onoffdef.State, ids []uint32) {
+		srv.OnChanged(func(_ onoffdef.State, change contract.Change) {
+			ids := change.Attributes
 			reportedMu.Lock()
 			reported = append(reported, ids)
 			reportedMu.Unlock()

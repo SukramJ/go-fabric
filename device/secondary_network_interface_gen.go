@@ -47,9 +47,10 @@ var SecondaryNetworkInterfaceType = Type{
 type SecondaryNetworkInterface struct{ *Device }
 
 // NewSecondaryNetworkInterface returns a SecondaryNetworkInterface device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewSecondaryNetworkInterface(opts Options, with ...Option) (*SecondaryNetworkInterface, error) {
-	d, err := New(&SecondaryNetworkInterfaceType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type SecondaryNetworkInterfaceID (see [New]).
+func NewSecondaryNetworkInterface(opts Options, decls ...Declaration) (*SecondaryNetworkInterface, error) {
+	d, err := FromSpec(Spec{Type: SecondaryNetworkInterfaceID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -57,24 +58,34 @@ func NewSecondaryNetworkInterface(opts Options, with ...Option) (*SecondaryNetwo
 }
 
 // NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
-	return networkcommissioningdef.Wrap(d.Server(0x0031))
+	if w, ok := d.typed(0x0031); ok {
+		return &networkcommissioningdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
-	return wifinetworkdiagnosticsdef.Wrap(d.Server(0x0036))
+	if w, ok := d.typed(0x0036); ok {
+		return &wifinetworkdiagnosticsdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
-	return ethernetnetworkdiagnosticsdef.Wrap(d.Server(0x0037))
+	if w, ok := d.typed(0x0037); ok {
+		return &ethernetnetworkdiagnosticsdef.Server{Wrapper: w}
+	}
+	return nil
 }

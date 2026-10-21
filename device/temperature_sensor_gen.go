@@ -48,9 +48,10 @@ var TemperatureSensorType = Type{
 type TemperatureSensor struct{ *Device }
 
 // NewTemperatureSensor returns a TemperatureSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewTemperatureSensor(opts Options, with ...Option) (*TemperatureSensor, error) {
-	d, err := New(&TemperatureSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type TemperatureSensorID (see [New]).
+func NewTemperatureSensor(opts Options, decls ...Declaration) (*TemperatureSensor, error) {
+	d, err := FromSpec(Spec{Type: TemperatureSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -58,16 +59,23 @@ func NewTemperatureSensor(opts Options, with ...Option) (*TemperatureSensor, err
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	if w, ok := d.typed(0x0402); ok {
+		return &temperaturemeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
+	if w, ok := d.typed(0x0204); ok {
+		return &thermostatuserinterfaceconfigurationdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
 	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func ptrTo[T any](v T) *T { return &v }
@@ -32,7 +33,7 @@ func TestTypedLaundryWasherControls(t *testing.T) {
 	}
 	s := lwc.Wrap(srv)
 	changes := 0
-	defer s.OnChanged(func(lwc.State, []uint32) { changes++ })()
+	defer s.OnChanged(func(lwc.State, contract.Change) { changes++ })()
 	if err := s.Set(lwc.Patch{SpinSpeedCurrent: ptrTo(uint8(2)), NumberOfRinses: ptrTo(lwc.NumberOfRinsesExtra)}); err != nil {
 		t.Fatal(err)
 	}

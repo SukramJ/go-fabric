@@ -760,6 +760,11 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.stopReannounceLoop()
 	n.stopHealthProbe()
 	err := n.br.Stop(ctx)
+	// The devices are unbound once no controller reaches them: each
+	// device's queue drains before Stop returns.
+	if n.agg != nil {
+		n.agg.detachAll()
+	}
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()

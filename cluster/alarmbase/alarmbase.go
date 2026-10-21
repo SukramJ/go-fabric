@@ -361,10 +361,10 @@ func (s *Server) bitmap(attrID uint32) uint32 {
 func (s *Server) SetMask(mask uint32) error {
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.setMask(mask)
+	return s.setMask(contract.OriginHostSet, mask)
 }
 
-func (s *Server) setMask(mask uint32) error {
+func (s *Server) setMask(origin contract.Origin, mask uint32) error {
 	if mask&^s.supported != 0 {
 		return fmt.Errorf("%w: Mask 0x%X, Supported 0x%X", ErrNotSupported, mask, s.supported)
 	}
@@ -373,11 +373,11 @@ func (s *Server) setMask(mask uint32) error {
 		// looks at State (AlarmBaseCluster.cpp:37).
 		return nil
 	}
-	if err := s.srv.Set(AttrMask, mask); err != nil {
+	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{AttrMask: mask}); err != nil {
 		return fmt.Errorf("alarmbase: %w", err)
 	}
 	if state := s.State(); state&^mask != 0 {
-		return s.setState(state&mask, true)
+		return s.setState(origin, state&mask, true)
 	}
 	return nil
 }
@@ -390,7 +390,7 @@ func (s *Server) setMask(mask uint32) error {
 func (s *Server) SetState(state uint32) error {
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.setState(state, false)
+	return s.setState(contract.OriginHostSet, state, false)
 }
 
 // ResetLatchedAlarms clears alarms from State, latched or not — chip's
@@ -406,11 +406,11 @@ func (s *Server) resetLatched(alarms uint32) error {
 	if alarms&^s.supported != 0 {
 		return fmt.Errorf("%w: alarms 0x%X, Supported 0x%X", ErrNotSupported, alarms, s.supported)
 	}
-	return s.setState(s.State()&^alarms, true)
+	return s.setState(contract.OriginCommand, s.State()&^alarms, true)
 }
 
 // setState is chip's SetStateInternal.
-func (s *Server) setState(state uint32, ignoreLatch bool) error {
+func (s *Server) setState(origin contract.Origin, state uint32, ignoreLatch bool) error {
 	mask := s.Mask()
 	if state&^s.supported != 0 || state&^mask != 0 {
 		return fmt.Errorf("%w: State 0x%X, Supported 0x%X, Mask 0x%X", ErrNotSupported, state, s.supported, mask)
@@ -424,7 +424,7 @@ func (s *Server) setState(state uint32, ignoreLatch bool) error {
 		// (AlarmBaseCluster.cpp:73).
 		return nil
 	}
-	if err := s.srv.Set(AttrState, state); err != nil {
+	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{AttrState: state}); err != nil {
 		return fmt.Errorf("alarmbase: %w", err)
 	}
 	s.mu.Lock()
@@ -471,7 +471,7 @@ func (s *Server) handleModifyEnabledAlarms(ctx context.Context, fields any) (any
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return nil, s.setMask(mask)
+	return nil, s.setMask(contract.OriginCommand, mask)
 }
 
 // Thresholds returns the served TemperatureAlarm thresholds by attribute

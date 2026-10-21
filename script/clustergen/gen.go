@@ -118,7 +118,7 @@ func generate(snap *snapshot, name string) (*output, error) {
 		snap: snap, c: c, pkg: packageName(c.Name),
 		used: map[string]string{}, data: map[string]*dataInfo{}, attrType: map[uint32]typeInfo{},
 	}
-	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap"} {
+	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap", "Declare"} {
 		g.used[id] = "package identifier"
 	}
 	if err := g.collect(); err != nil {
@@ -1588,10 +1588,12 @@ func (g *generator) test() ([]byte, error) {
 	w.p("")
 	w.p("import (")
 	w.p("\t\"context\"")
+	w.p("\t\"errors\"")
 	w.p("\t\"testing\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec/spectest\"")
+	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
 	w.p(")")
 	w.p("")
 	w.p("var _ = spec.Register")

@@ -45,9 +45,10 @@ var CookSurfaceType = Type{
 type CookSurface struct{ *Device }
 
 // NewCookSurface returns a CookSurface device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewCookSurface(opts Options, with ...Option) (*CookSurface, error) {
-	d, err := New(&CookSurfaceType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type CookSurfaceID (see [New]).
+func NewCookSurface(opts Options, decls ...Declaration) (*CookSurface, error) {
+	d, err := FromSpec(Spec{Type: CookSurfaceID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,23 +56,34 @@ func NewCookSurface(opts Options, with ...Option) (*CookSurface, error) {
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *CookSurface) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *CookSurface) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *CookSurface) TemperatureControl() *temperaturecontroldef.Server {
-	return temperaturecontroldef.Wrap(d.Server(0x0056))
+	if w, ok := d.typed(0x0056); ok {
+		return &temperaturecontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *CookSurface) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	if w, ok := d.typed(0x0402); ok {
+		return &temperaturemeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -56,8 +56,8 @@ func setupLight(t *testing.T, initial map[uint32]any) *mockLight {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	values := map[uint32]any{onoff.AttrOnOff: false}
 	maps.Copy(values, initial)
-	l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light", Clock: site.Clock()},
-		device.WithInitial(onoff.ClusterID, values))
+	l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light"},
+		device.WithInitial(onoff.ClusterID, values)) //nolint:staticcheck // the parity case states matter.js's untyped initial state
 	if err != nil {
 		t.Fatal(err)
 	}

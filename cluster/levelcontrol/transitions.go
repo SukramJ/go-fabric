@@ -89,7 +89,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
 	s.quiet = &cluster.Quieter{Report: func() {
 		if !s.quiescing.Load() {
-			s.changes.Notify(AttrCurrentLevel)
+			s.changes.NotifyFrom(contract.Origin(s.levelOrigin.Load()), AttrCurrentLevel) //nolint:gosec // only an Origin is stored
 		}
 	}, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
@@ -103,7 +103,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 		Apply: s.applyLevel,
 		RemainingTimeChanged: func() {
 			if s.lighting {
-				s.changes.Notify(AttrRemainingTime)
+				s.changes.NotifyFrom(contract.OriginCommand, AttrRemainingTime)
 			}
 		},
 		Settled: func(string) { s.quiet.EmitNow() },
@@ -144,7 +144,7 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 			return fmt.Errorf("levelcontrol: apply level %v: %w", c.Value, err)
 		}
 	}
-	s.observeLevel()
+	s.observeLevel(contract.OriginCommand)
 	s.mu.Lock()
 	c := s.coupling
 	s.mu.Unlock()
@@ -156,8 +156,10 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // otherwise at most once a second, the end of a transition flushing the
 // last value. It runs after every level the engine applied and on every
 // change notification of the host, so a level the device moved by itself
-// is reported the same way.
-func (s *Server) observeLevel() {
+// is reported the same way, from origin — a report the quieter defers
+// carries the origin of the last change before it.
+func (s *Server) observeLevel(origin contract.Origin) {
+	s.levelOrigin.Store(uint32(origin))
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
 	wasNull := !s.levelKnown
@@ -187,7 +189,7 @@ func (s *Server) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscri
 	s.mu.Unlock()
 	if subscribe {
 		if n, ok := s.src.(contract.ChangeNotifier); ok && n != nil {
-			stop := n.OnMatterValueChanged(s.observeLevel)
+			stop := n.OnMatterValueChanged(func() { s.observeLevel(contract.OriginHostSet) }) // the device moved: the host's own change
 			s.mu.Lock()
 			s.unsubSrc = stop
 			s.mu.Unlock()
@@ -400,7 +402,7 @@ func (s *Server) couple(ctx context.Context, withOnOff bool, options uint8, targ
 		if err := s.onOff.SetOnOff(ctx, true); err != nil {
 			return c, fmt.Errorf("levelcontrol: switch on: %w", err)
 		}
-		s.observeLevel()
+		s.observeLevel(contract.OriginCommand)
 	}
 	return c, nil
 }

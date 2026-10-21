@@ -319,7 +319,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 			return err
 		}
 	}
-	s.store(map[uint32]any{attrID: v})
+	s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v})
 	return nil
 }
 
@@ -333,8 +333,17 @@ func (s *Server) Set(attrID uint32, value any) error {
 
 // SetAttributes is [Server.Set] for several attributes at once: every
 // value is checked before any is stored, and the changes are reported
-// with one data-version bump and one notification, in id order.
+// with one data-version bump and one notification, in id order, as the
+// host's ([contract.OriginHostSet]).
 func (s *Server) SetAttributes(values map[uint32]any) error {
+	return s.SetAttributesFrom(contract.OriginHostSet, values)
+}
+
+// SetAttributesFrom is [Server.SetAttributes] with the change's origin: a
+// self-held server that keeps its state in a Server stores what a
+// command made of it with [contract.OriginCommand], so its listeners tell
+// it from the host's own Set.
+func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any) error {
 	checked := make(map[uint32]any, len(values))
 	for _, id := range slices.Sorted(maps.Keys(values)) {
 		v, err := s.check(id, values[id])
@@ -358,7 +367,7 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			return fmt.Errorf("%w: %w", ErrInvalidValue, err)
 		}
 	}
-	s.store(checked)
+	s.store(origin, checked)
 	return nil
 }
 
@@ -422,8 +431,8 @@ func defaultValue(a *Attribute) (any, bool) {
 	return nil, false
 }
 
-// store keeps values and reports the ones that changed.
-func (s *Server) store(values map[uint32]any) {
+// store keeps values and reports the ones that changed, from origin.
+func (s *Server) store(origin contract.Origin, values map[uint32]any) {
 	var changed []uint32
 	s.mu.Lock()
 	for id, v := range values {
@@ -439,7 +448,7 @@ func (s *Server) store(values map[uint32]any) {
 	}
 	slices.Sort(changed)
 	s.tracker().Bump()
-	s.Notify(changed...)
+	s.NotifyFrom(origin, changed...)
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command

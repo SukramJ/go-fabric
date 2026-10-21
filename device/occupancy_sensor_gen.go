@@ -45,9 +45,10 @@ var OccupancySensorType = Type{
 type OccupancySensor struct{ *Device }
 
 // NewOccupancySensor returns a OccupancySensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOccupancySensor(opts Options, with ...Option) (*OccupancySensor, error) {
-	d, err := New(&OccupancySensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OccupancySensorID (see [New]).
+func NewOccupancySensor(opts Options, decls ...Declaration) (*OccupancySensor, error) {
+	d, err := FromSpec(Spec{Type: OccupancySensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +56,23 @@ func NewOccupancySensor(opts Options, with ...Option) (*OccupancySensor, error) 
 }
 
 // OccupancySensing returns the typed OccupancySensing server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *OccupancySensor) OccupancySensing() *occupancysensingdef.Server {
-	return occupancysensingdef.Wrap(d.Server(0x0406))
+	if w, ok := d.typed(0x0406); ok {
+		return &occupancysensingdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *OccupancySensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
+	if w, ok := d.typed(0x0080); ok {
+		return &booleanstateconfigurationdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -142,7 +142,7 @@ func newMockPair(t *testing.T, o mockOptions) *mockPair {
 
 func newLight(t *testing.T, site *fabrictest.Site, key string) *device.OnOffLight {
 	t.Helper()
-	l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()})
+	l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key})
 	if err != nil {
 		t.Fatal(err)
 	}

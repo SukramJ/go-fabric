@@ -40,9 +40,10 @@ var GenericSwitchType = Type{
 type GenericSwitch struct{ *Device }
 
 // NewGenericSwitch returns a GenericSwitch device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewGenericSwitch(opts Options, with ...Option) (*GenericSwitch, error) {
-	d, err := New(&GenericSwitchType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type GenericSwitchID (see [New]).
+func NewGenericSwitch(opts Options, decls ...Declaration) (*GenericSwitch, error) {
+	d, err := FromSpec(Spec{Type: GenericSwitchID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,12 @@ func NewGenericSwitch(opts Options, with ...Option) (*GenericSwitch, error) {
 }
 
 // Switch returns the typed Switch server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *GenericSwitch) Switch() *switchclusterdef.Server {
-	return switchclusterdef.Wrap(d.Server(0x003B))
+	if w, ok := d.typed(0x003B); ok {
+		return &switchclusterdef.Server{Wrapper: w}
+	}
+	return nil
 }

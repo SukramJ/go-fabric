@@ -82,9 +82,10 @@ var VideoRemoteControlType = Type{
 type VideoRemoteControl struct{ *Device }
 
 // NewVideoRemoteControl returns a VideoRemoteControl device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewVideoRemoteControl(opts Options, with ...Option) (*VideoRemoteControl, error) {
-	d, err := New(&VideoRemoteControlType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type VideoRemoteControlID (see [New]).
+func NewVideoRemoteControl(opts Options, decls ...Declaration) (*VideoRemoteControl, error) {
+	d, err := FromSpec(Spec{Type: VideoRemoteControlID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +93,12 @@ func NewVideoRemoteControl(opts Options, with ...Option) (*VideoRemoteControl, e
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *VideoRemoteControl) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *VideoRemoteControl) Binding() *bindingdef.Server {
+	if w, ok := d.typed(0x001E); ok {
+		return &bindingdef.Server{Wrapper: w}
+	}
+	return nil
+}

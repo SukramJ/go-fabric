@@ -40,10 +40,10 @@ var holdTimeLimits = occ.HoldTimeLimitsStruct{HoldTimeMin: 10, HoldTimeMax: 100,
 
 // occupancyDevice is OccupancyDevice (:28-34): PassiveInfrared, PIR, HoldTime 50.
 func occupancyDevice(site *fabrictest.Site, holdTime uint64) (node.Endpoint, error) {
-	return device.NewOccupancySensor(device.Options{StableKey: endpoint.StringKey("occupancy:1"), Name: "occupancy", Clock: site.Clock()},
-		device.WithFeatures(occ.ClusterID, uint32(occ.FeaturePassiveInfrared)),
-		device.WithElements(occ.ClusterID, spec.Options{Attributes: []uint32{occ.AttrHoldTime, occ.AttrHoldTimeLimits}}),
-		device.WithInitial(occ.ClusterID, map[uint32]any{
+	return device.NewOccupancySensor(device.Options{StableKey: endpoint.StringKey("occupancy:1"), Name: "occupancy"},
+		device.WithFeatures(occ.ClusterID, uint32(occ.FeaturePassiveInfrared)), //nolint:staticcheck // the parity case states matter.js's untyped initial state
+		device.WithElements(occ.ClusterID, spec.Options{Attributes: []uint32{occ.AttrHoldTime, occ.AttrHoldTimeLimits}}), //nolint:staticcheck // the parity case states matter.js's untyped initial state
+		device.WithInitial(occ.ClusterID, map[uint32]any{ //nolint:staticcheck // the parity case states matter.js's untyped initial state
 			occ.AttrOccupancySensorType: uint64(occ.OccupancySensorTypeEnumPir),
 			occ.AttrHoldTime:            holdTime,
 			occ.AttrHoldTimeLimits:      holdTimeLimits,
@@ -110,7 +110,7 @@ func TestDotQualifiedConstraintParity(t *testing.T) {
 			t.Helper()
 			pct := uint16(1000)
 			d, err := device.NewSoilSensor(device.Options{StableKey: endpoint.StringKey("soil:1"), Name: "soil"},
-				device.WithInitial(soil.ClusterID, map[uint32]any{
+				device.WithInitial(soil.ClusterID, map[uint32]any{ //nolint:staticcheck // the parity case states matter.js's untyped initial state
 					soil.AttrSoilMoistureMeasurementLimits: soil.MeasurementAccuracyStruct{
 						MeasurementType: soil.MeasurementTypeSoilMoisture, Measured: true, MinMeasuredValue: 20, MaxMeasuredValue: 80,
 						AccuracyRanges: []soil.MeasurementAccuracyRangeStruct{{RangeMin: 20, RangeMax: 80, PercentMax: &pct}},

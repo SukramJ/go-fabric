@@ -314,9 +314,9 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 	// SetTemperatureSetpoint / SetSelectedTemperatureLevel set it
 	// (TemperatureControlCluster.cpp:127, :138).
 	if number {
-		s.apply(tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, *req.TargetTemperature) })
+		s.apply(contract.OriginCommand, tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, *req.TargetTemperature) })
 	} else {
-		s.apply(tc.AttrSelectedTemperatureLevel, func() bool { return swap(&s.level, *req.TargetTemperatureLevel) })
+		s.apply(contract.OriginCommand, tc.AttrSelectedTemperatureLevel, func() bool { return swap(&s.level, *req.TargetTemperatureLevel) })
 	}
 	return nil, nil
 }
@@ -330,7 +330,7 @@ func (s *TemperatureControlServer) SetTemperatureSetpoint(t int16) error {
 	if err := s.checkTarget(t); err != nil {
 		return fmt.Errorf("%w: %w", ErrTemperatureControlValue, err)
 	}
-	s.apply(tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, t) })
+	s.apply(contract.OriginHostSet, tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, t) })
 	return nil
 }
 
@@ -343,12 +343,12 @@ func (s *TemperatureControlServer) SetSelectedTemperatureLevel(l uint8) error {
 	if err := s.checkLevel(l); err != nil {
 		return fmt.Errorf("%w: %w", ErrTemperatureControlValue, err)
 	}
-	s.apply(tc.AttrSelectedTemperatureLevel, func() bool { return swap(&s.level, l) })
+	s.apply(contract.OriginHostSet, tc.AttrSelectedTemperatureLevel, func() bool { return swap(&s.level, l) })
 	return nil
 }
 
 // apply runs change under the lock and reports attr when it changed.
-func (s *TemperatureControlServer) apply(attr uint32, change func() bool) {
+func (s *TemperatureControlServer) apply(origin contract.Origin, attr uint32, change func() bool) {
 	s.mu.Lock()
 	changed := change()
 	s.mu.Unlock()
@@ -356,7 +356,7 @@ func (s *TemperatureControlServer) apply(attr uint32, change func() bool) {
 		return
 	}
 	s.tracker().Bump()
-	s.Notify(attr)
+	s.NotifyFrom(origin, attr)
 }
 
 // swap stores v in *p and reports whether it differed.

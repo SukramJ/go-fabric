@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func ptrOf[T any](v T) *T { return &v }
@@ -34,7 +35,10 @@ func TestColorControlTypedSetGetOnChanged(t *testing.T) {
 	t.Parallel()
 	s := typedColorControl(t)
 	var changes [][]uint32
-	unsubscribe := s.OnChanged(func(_ ccdef.State, changed []uint32) { changes = append(changes, changed) })
+	unsubscribe := s.OnChanged(func(_ ccdef.State, change contract.Change) {
+		changed := change.Attributes
+		changes = append(changes, changed)
+	})
 	defer unsubscribe()
 
 	if err := s.Set(ccdef.Patch{

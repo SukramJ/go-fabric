@@ -19,7 +19,7 @@ import (
 // it serves, Unbolting.
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
-	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: &stubSource{}})
+	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: &stubSource{}})
 	spectest.CheckServer(t, srv, lockdef.Definition, uint32(lockdef.FeatureUnbolting))
 }
 
@@ -31,7 +31,7 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 func TestRequestsTakeTheGeneratedStructs(t *testing.T) {
 	t.Parallel()
 	src := &stubSource{}
-	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: src})
+	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: src})
 	pin := []byte("1234")
 	for cmd, req := range map[uint32]any{
 		lockdef.CmdLockDoor:   lockdef.LockDoorRequest{PinCode: &pin},

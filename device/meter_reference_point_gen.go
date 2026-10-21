@@ -35,9 +35,10 @@ var MeterReferencePointType = Type{
 type MeterReferencePoint struct{ *Device }
 
 // NewMeterReferencePoint returns a MeterReferencePoint device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewMeterReferencePoint(opts Options, with ...Option) (*MeterReferencePoint, error) {
-	d, err := New(&MeterReferencePointType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type MeterReferencePointID (see [New]).
+func NewMeterReferencePoint(opts Options, decls ...Declaration) (*MeterReferencePoint, error) {
+	d, err := FromSpec(Spec{Type: MeterReferencePointID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}

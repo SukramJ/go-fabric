@@ -72,9 +72,10 @@ var PumpControllerType = Type{
 type PumpController struct{ *Device }
 
 // NewPumpController returns a PumpController device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewPumpController(opts Options, with ...Option) (*PumpController, error) {
-	d, err := New(&PumpControllerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type PumpControllerID (see [New]).
+func NewPumpController(opts Options, decls ...Declaration) (*PumpController, error) {
+	d, err := FromSpec(Spec{Type: PumpControllerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +83,12 @@ func NewPumpController(opts Options, with ...Option) (*PumpController, error) {
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *PumpController) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *PumpController) Binding() *bindingdef.Server {
+	if w, ok := d.typed(0x001E); ok {
+		return &bindingdef.Server{Wrapper: w}
+	}
+	return nil
+}

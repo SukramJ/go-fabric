@@ -240,13 +240,25 @@ type AirflowDirectionSetter interface {
 // implementation specific" (resource :214-215); a host with its own
 // idea implements Stepper, and one without gets the server's default
 // (see [Server.MatterInvoke]).
+//
+// Deprecated: a host port takes the generated request — implement
+// fancontroldef.Stepper (Step over fancontroldef.StepRequest) and pass it
+// as [Config].Stepper with [Config].Port, or declare both
+// (fancontroldef.Declare). May be removed in v0.12.0.
 type Stepper interface {
 	Step(ctx context.Context, req clusterwire.FanStepRequest) error
 }
 
 // Config carries the construction parameters for [Server].
 type Config struct {
-	Source   StateSource
+	// Source is the host port; Port in the generated types replaces it.
+	Source StateSource
+	// Port is the host port in the generated types — the fan's State and
+	// a Patch for every setting, what fancontroldef.Declare carries; set,
+	// it wins over Source. Stepper, with Port, takes the Step command
+	// over.
+	Port     fandef.StateSource
+	Stepper  fandef.Stepper
 	Features Feature
 	// Sequence is FanModeSequence (fixed). It must be one of the three
 	// sequences with Auto when FeatureAuto is set and one of the three
@@ -311,6 +323,9 @@ var (
 // NewServer validates cfg against the cluster's conformance and
 // constraints and returns the server.
 func NewServer(cfg Config) (*Server, error) {
+	if cfg.Port != nil {
+		cfg.Source = sourceOf(cfg.Port, cfg.Stepper)
+	}
 	if cfg.Source == nil {
 		return nil, ErrNoSource
 	}

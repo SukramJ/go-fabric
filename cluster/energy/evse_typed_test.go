@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // TestTypedEvseServer drives the self-held EnergyEvse server through its
@@ -23,7 +24,7 @@ func TestTypedEvseServer(t *testing.T) {
 	basicFunctionality(t, srv)
 	s := evsedef.Wrap(srv)
 	changes := 0
-	defer s.OnChanged(func(evsedef.State, []uint32) { changes++ })()
+	defer s.OnChanged(func(evsedef.State, contract.Change) { changes++ })()
 
 	if err := s.Set(evsedef.Patch{CircuitCapacity: typedPtr(int64(16000)), StateOfCharge: typedPtr(uint8(40))}); err != nil {
 		t.Fatal(err)

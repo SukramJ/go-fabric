@@ -7,6 +7,7 @@ package commoditytariff
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -89,11 +90,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -116,4 +127,69 @@ func (s *Server) HandleGetTariffComponent(fn func(ctx context.Context, req GetTa
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleGetDayEntry(fn func(ctx context.Context, req GetDayEntryRequest) (GetDayEntryResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetDayEntry, fn)
+}
+
+// Declare is the declaration of the CommodityTariff cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleGetTariffComponent handles the GetTariffComponent command in place of the server
+	// (Server.HandleGetTariffComponent), inline; an optional command it handles is accepted.
+	HandleGetTariffComponent func(ctx context.Context, req GetTariffComponentRequest) (GetTariffComponentResponse, error)
+	// HandleGetDayEntry handles the GetDayEntry command in place of the server
+	// (Server.HandleGetDayEntry), inline; an optional command it handles is accepted.
+	HandleGetDayEntry func(ctx context.Context, req GetDayEntryRequest) (GetDayEntryResponse, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleGetTariffComponent != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetTariffComponent)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetDayEntry != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetDayEntry)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("commoditytariff OnWrite: %w", err)
+		}
+	}
+	if d.HandleGetTariffComponent != nil {
+		if err := s.HandleGetTariffComponent(d.HandleGetTariffComponent); err != nil {
+			return fmt.Errorf("commoditytariff HandleGetTariffComponent: %w", err)
+		}
+	}
+	if d.HandleGetDayEntry != nil {
+		if err := s.HandleGetDayEntry(d.HandleGetDayEntry); err != nil {
+			return fmt.Errorf("commoditytariff HandleGetDayEntry: %w", err)
+		}
+	}
+	return nil
 }

@@ -43,8 +43,8 @@ func TestClientStructureOffloadParity(t *testing.T) {
 	t.Run("delivers events emitted during the same interaction as attribute data", func(t *testing.T) {
 		t.Parallel()
 		site := quietSite(t)
-		sw, err := device.NewGenericSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1", Clock: site.Clock()},
-			device.WithFeatures(swdef.ClusterID, uint32(swdef.FeatureMomentarySwitch|swdef.FeatureMomentarySwitchRelease)))
+		sw, err := device.NewGenericSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"},
+			swdef.Declare{Features: swdef.FeatureMomentarySwitch | swdef.FeatureMomentarySwitchRelease})
 		if err != nil {
 			t.Fatal(err)
 		}

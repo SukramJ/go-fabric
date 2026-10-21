@@ -41,7 +41,8 @@ func TestTypedSetGetOnChanged(t *testing.T) {
 	s := typedServer(t)
 	var changes [][]uint32
 	var states []levelcontroldef.State
-	unsubscribe := s.OnChanged(func(st levelcontroldef.State, changed []uint32) {
+	unsubscribe := s.OnChanged(func(st levelcontroldef.State, change contract.Change) {
+		changed := change.Attributes
 		states = append(states, st)
 		changes = append(changes, changed)
 	})

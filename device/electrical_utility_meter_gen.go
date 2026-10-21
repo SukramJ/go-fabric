@@ -35,9 +35,10 @@ var ElectricalUtilityMeterType = Type{
 type ElectricalUtilityMeter struct{ *Device }
 
 // NewElectricalUtilityMeter returns a ElectricalUtilityMeter device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewElectricalUtilityMeter(opts Options, with ...Option) (*ElectricalUtilityMeter, error) {
-	d, err := New(&ElectricalUtilityMeterType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ElectricalUtilityMeterID (see [New]).
+func NewElectricalUtilityMeter(opts Options, decls ...Declaration) (*ElectricalUtilityMeter, error) {
+	d, err := FromSpec(Spec{Type: ElectricalUtilityMeterID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +46,12 @@ func NewElectricalUtilityMeter(opts Options, with ...Option) (*ElectricalUtility
 }
 
 // MeterIdentification returns the typed MeterIdentification server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalUtilityMeter) MeterIdentification() *meteridentificationdef.Server {
-	return meteridentificationdef.Wrap(d.Server(0x0B06))
+	if w, ok := d.typed(0x0B06); ok {
+		return &meteridentificationdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -7,6 +7,7 @@ package actions
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -55,11 +56,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -154,4 +165,186 @@ func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitActionFailed(endpoint uint16, data ActionFailedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventActionFailed, data)
+}
+
+// Declare is the declaration of the Actions cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleInstantAction handles the InstantAction command in place of the server
+	// (Server.HandleInstantAction), inline; an optional command it handles is accepted.
+	HandleInstantAction func(ctx context.Context, req InstantActionRequest) (struct{}, error)
+	// HandleInstantActionWithTransition handles the InstantActionWithTransition command in place of the server
+	// (Server.HandleInstantActionWithTransition), inline; an optional command it handles is accepted.
+	HandleInstantActionWithTransition func(ctx context.Context, req InstantActionWithTransitionRequest) (struct{}, error)
+	// HandleStartAction handles the StartAction command in place of the server
+	// (Server.HandleStartAction), inline; an optional command it handles is accepted.
+	HandleStartAction func(ctx context.Context, req StartActionRequest) (struct{}, error)
+	// HandleStartActionWithDuration handles the StartActionWithDuration command in place of the server
+	// (Server.HandleStartActionWithDuration), inline; an optional command it handles is accepted.
+	HandleStartActionWithDuration func(ctx context.Context, req StartActionWithDurationRequest) (struct{}, error)
+	// HandleStopAction handles the StopAction command in place of the server
+	// (Server.HandleStopAction), inline; an optional command it handles is accepted.
+	HandleStopAction func(ctx context.Context, req StopActionRequest) (struct{}, error)
+	// HandlePauseAction handles the PauseAction command in place of the server
+	// (Server.HandlePauseAction), inline; an optional command it handles is accepted.
+	HandlePauseAction func(ctx context.Context, req PauseActionRequest) (struct{}, error)
+	// HandlePauseActionWithDuration handles the PauseActionWithDuration command in place of the server
+	// (Server.HandlePauseActionWithDuration), inline; an optional command it handles is accepted.
+	HandlePauseActionWithDuration func(ctx context.Context, req PauseActionWithDurationRequest) (struct{}, error)
+	// HandleResumeAction handles the ResumeAction command in place of the server
+	// (Server.HandleResumeAction), inline; an optional command it handles is accepted.
+	HandleResumeAction func(ctx context.Context, req ResumeActionRequest) (struct{}, error)
+	// HandleEnableAction handles the EnableAction command in place of the server
+	// (Server.HandleEnableAction), inline; an optional command it handles is accepted.
+	HandleEnableAction func(ctx context.Context, req EnableActionRequest) (struct{}, error)
+	// HandleEnableActionWithDuration handles the EnableActionWithDuration command in place of the server
+	// (Server.HandleEnableActionWithDuration), inline; an optional command it handles is accepted.
+	HandleEnableActionWithDuration func(ctx context.Context, req EnableActionWithDurationRequest) (struct{}, error)
+	// HandleDisableAction handles the DisableAction command in place of the server
+	// (Server.HandleDisableAction), inline; an optional command it handles is accepted.
+	HandleDisableAction func(ctx context.Context, req DisableActionRequest) (struct{}, error)
+	// HandleDisableActionWithDuration handles the DisableActionWithDuration command in place of the server
+	// (Server.HandleDisableActionWithDuration), inline; an optional command it handles is accepted.
+	HandleDisableActionWithDuration func(ctx context.Context, req DisableActionWithDurationRequest) (struct{}, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	if d.HandleInstantAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdInstantAction)
+		decl.Attach = d.attach
+	}
+	if d.HandleInstantActionWithTransition != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdInstantActionWithTransition)
+		decl.Attach = d.attach
+	}
+	if d.HandleStartAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStartAction)
+		decl.Attach = d.attach
+	}
+	if d.HandleStartActionWithDuration != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStartActionWithDuration)
+		decl.Attach = d.attach
+	}
+	if d.HandleStopAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStopAction)
+		decl.Attach = d.attach
+	}
+	if d.HandlePauseAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdPauseAction)
+		decl.Attach = d.attach
+	}
+	if d.HandlePauseActionWithDuration != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdPauseActionWithDuration)
+		decl.Attach = d.attach
+	}
+	if d.HandleResumeAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdResumeAction)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnableAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnableAction)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnableActionWithDuration != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnableActionWithDuration)
+		decl.Attach = d.attach
+	}
+	if d.HandleDisableAction != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdDisableAction)
+		decl.Attach = d.attach
+	}
+	if d.HandleDisableActionWithDuration != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdDisableActionWithDuration)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("actions OnWrite: %w", err)
+		}
+	}
+	if d.HandleInstantAction != nil {
+		if err := s.HandleInstantAction(d.HandleInstantAction); err != nil {
+			return fmt.Errorf("actions HandleInstantAction: %w", err)
+		}
+	}
+	if d.HandleInstantActionWithTransition != nil {
+		if err := s.HandleInstantActionWithTransition(d.HandleInstantActionWithTransition); err != nil {
+			return fmt.Errorf("actions HandleInstantActionWithTransition: %w", err)
+		}
+	}
+	if d.HandleStartAction != nil {
+		if err := s.HandleStartAction(d.HandleStartAction); err != nil {
+			return fmt.Errorf("actions HandleStartAction: %w", err)
+		}
+	}
+	if d.HandleStartActionWithDuration != nil {
+		if err := s.HandleStartActionWithDuration(d.HandleStartActionWithDuration); err != nil {
+			return fmt.Errorf("actions HandleStartActionWithDuration: %w", err)
+		}
+	}
+	if d.HandleStopAction != nil {
+		if err := s.HandleStopAction(d.HandleStopAction); err != nil {
+			return fmt.Errorf("actions HandleStopAction: %w", err)
+		}
+	}
+	if d.HandlePauseAction != nil {
+		if err := s.HandlePauseAction(d.HandlePauseAction); err != nil {
+			return fmt.Errorf("actions HandlePauseAction: %w", err)
+		}
+	}
+	if d.HandlePauseActionWithDuration != nil {
+		if err := s.HandlePauseActionWithDuration(d.HandlePauseActionWithDuration); err != nil {
+			return fmt.Errorf("actions HandlePauseActionWithDuration: %w", err)
+		}
+	}
+	if d.HandleResumeAction != nil {
+		if err := s.HandleResumeAction(d.HandleResumeAction); err != nil {
+			return fmt.Errorf("actions HandleResumeAction: %w", err)
+		}
+	}
+	if d.HandleEnableAction != nil {
+		if err := s.HandleEnableAction(d.HandleEnableAction); err != nil {
+			return fmt.Errorf("actions HandleEnableAction: %w", err)
+		}
+	}
+	if d.HandleEnableActionWithDuration != nil {
+		if err := s.HandleEnableActionWithDuration(d.HandleEnableActionWithDuration); err != nil {
+			return fmt.Errorf("actions HandleEnableActionWithDuration: %w", err)
+		}
+	}
+	if d.HandleDisableAction != nil {
+		if err := s.HandleDisableAction(d.HandleDisableAction); err != nil {
+			return fmt.Errorf("actions HandleDisableAction: %w", err)
+		}
+	}
+	if d.HandleDisableActionWithDuration != nil {
+		if err := s.HandleDisableActionWithDuration(d.HandleDisableActionWithDuration); err != nil {
+			return fmt.Errorf("actions HandleDisableActionWithDuration: %w", err)
+		}
+	}
+	return nil
 }

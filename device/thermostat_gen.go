@@ -72,9 +72,10 @@ var ThermostatType = Type{
 type Thermostat struct{ *Device }
 
 // NewThermostat returns a Thermostat device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewThermostat(opts Options, with ...Option) (*Thermostat, error) {
-	d, err := New(&ThermostatType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ThermostatID (see [New]).
+func NewThermostat(opts Options, decls ...Declaration) (*Thermostat, error) {
+	d, err := FromSpec(Spec{Type: ThermostatID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -82,22 +83,34 @@ func NewThermostat(opts Options, with ...Option) (*Thermostat, error) {
 }
 
 // Thermostat returns the typed Thermostat server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *Thermostat) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }
+func (d *Thermostat) Thermostat() *thermostatdef.Server {
+	if w, ok := d.typed(0x0201); ok {
+		return &thermostatdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // EnergyPreference returns the typed EnergyPreference server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
-	return energypreferencedef.Wrap(d.Server(0x009B))
+	if w, ok := d.typed(0x009B); ok {
+		return &energypreferencedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	return thermostatuserinterfaceconfigurationdef.Wrap(d.Server(0x0204))
+	if w, ok := d.typed(0x0204); ok {
+		return &thermostatuserinterfaceconfigurationdef.Server{Wrapper: w}
+	}
+	return nil
 }

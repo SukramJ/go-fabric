@@ -63,9 +63,10 @@ var DishwasherType = Type{
 type Dishwasher struct{ *Device }
 
 // NewDishwasher returns a Dishwasher device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewDishwasher(opts Options, with ...Option) (*Dishwasher, error) {
-	d, err := New(&DishwasherType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type DishwasherID (see [New]).
+func NewDishwasher(opts Options, decls ...Declaration) (*Dishwasher, error) {
+	d, err := FromSpec(Spec{Type: DishwasherID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -73,38 +74,56 @@ func NewDishwasher(opts Options, with ...Option) (*Dishwasher, error) {
 }
 
 // OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *Dishwasher) OperationalState() *operationalstatedef.Server {
-	return operationalstatedef.Wrap(d.Server(0x0060))
+	if w, ok := d.typed(0x0060); ok {
+		return &operationalstatedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *Dishwasher) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *Dishwasher) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) TemperatureControl() *temperaturecontroldef.Server {
-	return temperaturecontroldef.Wrap(d.Server(0x0056))
+	if w, ok := d.typed(0x0056); ok {
+		return &temperaturecontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // DishwasherMode returns the typed DishwasherMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) DishwasherMode() *dishwashermodedef.Server {
-	return dishwashermodedef.Wrap(d.Server(0x0059))
+	if w, ok := d.typed(0x0059); ok {
+		return &dishwashermodedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // DishwasherAlarm returns the typed DishwasherAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) DishwasherAlarm() *dishwasheralarmdef.Server {
-	return dishwasheralarmdef.Wrap(d.Server(0x005D))
+	if w, ok := d.typed(0x005D); ok {
+		return &dishwasheralarmdef.Server{Wrapper: w}
+	}
+	return nil
 }

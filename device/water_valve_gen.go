@@ -50,9 +50,10 @@ var WaterValveType = Type{
 type WaterValve struct{ *Device }
 
 // NewWaterValve returns a WaterValve device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewWaterValve(opts Options, with ...Option) (*WaterValve, error) {
-	d, err := New(&WaterValveType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type WaterValveID (see [New]).
+func NewWaterValve(opts Options, decls ...Declaration) (*WaterValve, error) {
+	d, err := FromSpec(Spec{Type: WaterValveID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -60,16 +61,23 @@ func NewWaterValve(opts Options, with ...Option) (*WaterValve, error) {
 }
 
 // ValveConfigurationAndControl returns the typed ValveConfigurationAndControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
-	return valveconfigurationandcontroldef.Wrap(d.Server(0x0081))
+	if w, ok := d.typed(0x0081); ok {
+		return &valveconfigurationandcontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
-	return flowmeasurementdef.Wrap(d.Server(0x0404))
+	if w, ok := d.typed(0x0404); ok {
+		return &flowmeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

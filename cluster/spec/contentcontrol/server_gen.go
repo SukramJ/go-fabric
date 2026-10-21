@@ -7,6 +7,7 @@ package contentcontrol
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -71,11 +72,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -194,4 +205,237 @@ func (s *Server) EmitRemainingScreenTimeExpired(endpoint uint16, data RemainingS
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitEnteringBlockContentTimeWindow(endpoint uint16, data EnteringBlockContentTimeWindowEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEnteringBlockContentTimeWindow, data)
+}
+
+// Declare is the declaration of the ContentControl cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleUpdatePin handles the UpdatePin command in place of the server
+	// (Server.HandleUpdatePin), inline; an optional command it handles is accepted.
+	HandleUpdatePin func(ctx context.Context, req UpdatePinRequest) (struct{}, error)
+	// HandleResetPin handles the ResetPin command in place of the server
+	// (Server.HandleResetPin), inline; an optional command it handles is accepted.
+	HandleResetPin func(ctx context.Context, req ResetPinRequest) (ResetPinResponse, error)
+	// HandleEnable handles the Enable command in place of the server
+	// (Server.HandleEnable), inline; an optional command it handles is accepted.
+	HandleEnable func(ctx context.Context, req EnableRequest) (struct{}, error)
+	// HandleDisable handles the Disable command in place of the server
+	// (Server.HandleDisable), inline; an optional command it handles is accepted.
+	HandleDisable func(ctx context.Context, req DisableRequest) (struct{}, error)
+	// HandleAddBonusTime handles the AddBonusTime command in place of the server
+	// (Server.HandleAddBonusTime), inline; an optional command it handles is accepted.
+	HandleAddBonusTime func(ctx context.Context, req AddBonusTimeRequest) (struct{}, error)
+	// HandleSetScreenDailyTime handles the SetScreenDailyTime command in place of the server
+	// (Server.HandleSetScreenDailyTime), inline; an optional command it handles is accepted.
+	HandleSetScreenDailyTime func(ctx context.Context, req SetScreenDailyTimeRequest) (struct{}, error)
+	// HandleBlockUnratedContent handles the BlockUnratedContent command in place of the server
+	// (Server.HandleBlockUnratedContent), inline; an optional command it handles is accepted.
+	HandleBlockUnratedContent func(ctx context.Context, req BlockUnratedContentRequest) (struct{}, error)
+	// HandleUnblockUnratedContent handles the UnblockUnratedContent command in place of the server
+	// (Server.HandleUnblockUnratedContent), inline; an optional command it handles is accepted.
+	HandleUnblockUnratedContent func(ctx context.Context, req UnblockUnratedContentRequest) (struct{}, error)
+	// HandleSetOnDemandRatingThreshold handles the SetOnDemandRatingThreshold command in place of the server
+	// (Server.HandleSetOnDemandRatingThreshold), inline; an optional command it handles is accepted.
+	HandleSetOnDemandRatingThreshold func(ctx context.Context, req SetOnDemandRatingThresholdRequest) (struct{}, error)
+	// HandleSetScheduledContentRatingThreshold handles the SetScheduledContentRatingThreshold command in place of the server
+	// (Server.HandleSetScheduledContentRatingThreshold), inline; an optional command it handles is accepted.
+	HandleSetScheduledContentRatingThreshold func(ctx context.Context, req SetScheduledContentRatingThresholdRequest) (struct{}, error)
+	// HandleAddBlockChannels handles the AddBlockChannels command in place of the server
+	// (Server.HandleAddBlockChannels), inline; an optional command it handles is accepted.
+	HandleAddBlockChannels func(ctx context.Context, req AddBlockChannelsRequest) (struct{}, error)
+	// HandleRemoveBlockChannels handles the RemoveBlockChannels command in place of the server
+	// (Server.HandleRemoveBlockChannels), inline; an optional command it handles is accepted.
+	HandleRemoveBlockChannels func(ctx context.Context, req RemoveBlockChannelsRequest) (struct{}, error)
+	// HandleAddBlockApplications handles the AddBlockApplications command in place of the server
+	// (Server.HandleAddBlockApplications), inline; an optional command it handles is accepted.
+	HandleAddBlockApplications func(ctx context.Context, req AddBlockApplicationsRequest) (struct{}, error)
+	// HandleRemoveBlockApplications handles the RemoveBlockApplications command in place of the server
+	// (Server.HandleRemoveBlockApplications), inline; an optional command it handles is accepted.
+	HandleRemoveBlockApplications func(ctx context.Context, req RemoveBlockApplicationsRequest) (struct{}, error)
+	// HandleSetBlockContentTimeWindow handles the SetBlockContentTimeWindow command in place of the server
+	// (Server.HandleSetBlockContentTimeWindow), inline; an optional command it handles is accepted.
+	HandleSetBlockContentTimeWindow func(ctx context.Context, req SetBlockContentTimeWindowRequest) (struct{}, error)
+	// HandleRemoveBlockContentTimeWindow handles the RemoveBlockContentTimeWindow command in place of the server
+	// (Server.HandleRemoveBlockContentTimeWindow), inline; an optional command it handles is accepted.
+	HandleRemoveBlockContentTimeWindow func(ctx context.Context, req RemoveBlockContentTimeWindowRequest) (struct{}, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleUpdatePin != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUpdatePin)
+		decl.Attach = d.attach
+	}
+	if d.HandleResetPin != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdResetPin)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnable != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnable)
+		decl.Attach = d.attach
+	}
+	if d.HandleDisable != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdDisable)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddBonusTime != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddBonusTime)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetScreenDailyTime != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetScreenDailyTime)
+		decl.Attach = d.attach
+	}
+	if d.HandleBlockUnratedContent != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdBlockUnratedContent)
+		decl.Attach = d.attach
+	}
+	if d.HandleUnblockUnratedContent != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUnblockUnratedContent)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetOnDemandRatingThreshold != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetOnDemandRatingThreshold)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetScheduledContentRatingThreshold != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetScheduledContentRatingThreshold)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddBlockChannels != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddBlockChannels)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveBlockChannels != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveBlockChannels)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddBlockApplications != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddBlockApplications)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveBlockApplications != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveBlockApplications)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetBlockContentTimeWindow != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetBlockContentTimeWindow)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveBlockContentTimeWindow != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveBlockContentTimeWindow)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("contentcontrol OnWrite: %w", err)
+		}
+	}
+	if d.HandleUpdatePin != nil {
+		if err := s.HandleUpdatePin(d.HandleUpdatePin); err != nil {
+			return fmt.Errorf("contentcontrol HandleUpdatePin: %w", err)
+		}
+	}
+	if d.HandleResetPin != nil {
+		if err := s.HandleResetPin(d.HandleResetPin); err != nil {
+			return fmt.Errorf("contentcontrol HandleResetPin: %w", err)
+		}
+	}
+	if d.HandleEnable != nil {
+		if err := s.HandleEnable(d.HandleEnable); err != nil {
+			return fmt.Errorf("contentcontrol HandleEnable: %w", err)
+		}
+	}
+	if d.HandleDisable != nil {
+		if err := s.HandleDisable(d.HandleDisable); err != nil {
+			return fmt.Errorf("contentcontrol HandleDisable: %w", err)
+		}
+	}
+	if d.HandleAddBonusTime != nil {
+		if err := s.HandleAddBonusTime(d.HandleAddBonusTime); err != nil {
+			return fmt.Errorf("contentcontrol HandleAddBonusTime: %w", err)
+		}
+	}
+	if d.HandleSetScreenDailyTime != nil {
+		if err := s.HandleSetScreenDailyTime(d.HandleSetScreenDailyTime); err != nil {
+			return fmt.Errorf("contentcontrol HandleSetScreenDailyTime: %w", err)
+		}
+	}
+	if d.HandleBlockUnratedContent != nil {
+		if err := s.HandleBlockUnratedContent(d.HandleBlockUnratedContent); err != nil {
+			return fmt.Errorf("contentcontrol HandleBlockUnratedContent: %w", err)
+		}
+	}
+	if d.HandleUnblockUnratedContent != nil {
+		if err := s.HandleUnblockUnratedContent(d.HandleUnblockUnratedContent); err != nil {
+			return fmt.Errorf("contentcontrol HandleUnblockUnratedContent: %w", err)
+		}
+	}
+	if d.HandleSetOnDemandRatingThreshold != nil {
+		if err := s.HandleSetOnDemandRatingThreshold(d.HandleSetOnDemandRatingThreshold); err != nil {
+			return fmt.Errorf("contentcontrol HandleSetOnDemandRatingThreshold: %w", err)
+		}
+	}
+	if d.HandleSetScheduledContentRatingThreshold != nil {
+		if err := s.HandleSetScheduledContentRatingThreshold(d.HandleSetScheduledContentRatingThreshold); err != nil {
+			return fmt.Errorf("contentcontrol HandleSetScheduledContentRatingThreshold: %w", err)
+		}
+	}
+	if d.HandleAddBlockChannels != nil {
+		if err := s.HandleAddBlockChannels(d.HandleAddBlockChannels); err != nil {
+			return fmt.Errorf("contentcontrol HandleAddBlockChannels: %w", err)
+		}
+	}
+	if d.HandleRemoveBlockChannels != nil {
+		if err := s.HandleRemoveBlockChannels(d.HandleRemoveBlockChannels); err != nil {
+			return fmt.Errorf("contentcontrol HandleRemoveBlockChannels: %w", err)
+		}
+	}
+	if d.HandleAddBlockApplications != nil {
+		if err := s.HandleAddBlockApplications(d.HandleAddBlockApplications); err != nil {
+			return fmt.Errorf("contentcontrol HandleAddBlockApplications: %w", err)
+		}
+	}
+	if d.HandleRemoveBlockApplications != nil {
+		if err := s.HandleRemoveBlockApplications(d.HandleRemoveBlockApplications); err != nil {
+			return fmt.Errorf("contentcontrol HandleRemoveBlockApplications: %w", err)
+		}
+	}
+	if d.HandleSetBlockContentTimeWindow != nil {
+		if err := s.HandleSetBlockContentTimeWindow(d.HandleSetBlockContentTimeWindow); err != nil {
+			return fmt.Errorf("contentcontrol HandleSetBlockContentTimeWindow: %w", err)
+		}
+	}
+	if d.HandleRemoveBlockContentTimeWindow != nil {
+		if err := s.HandleRemoveBlockContentTimeWindow(d.HandleRemoveBlockContentTimeWindow); err != nil {
+			return fmt.Errorf("contentcontrol HandleRemoveBlockContentTimeWindow: %w", err)
+		}
+	}
+	return nil
 }

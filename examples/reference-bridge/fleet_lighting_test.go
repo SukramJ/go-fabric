@@ -35,7 +35,7 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 		ctx := context.Background()
 		tenths := uint16(20)
 		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff,
-			levelcontrol.MoveToLevelRequest{Level: 227, TransitionTime: &tenths}); err != nil {
+			levelcontrol.MoveToLevelRequest{Level: 227, TransitionTime: &tenths}); err != nil { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
 			t.Fatal(err)
 		}
 		if !lamp.OnOff() || !srv.OnOff() {
@@ -58,7 +58,7 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 		// MoveWithOnOff down at 254/s: 226 to go, 0.9 s; off on arrival.
 		rate := uint8(254)
 		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdMoveWithOnOff,
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: &rate}); err != nil {
+			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: &rate}); err != nil { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
 			t.Fatal(err)
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -74,7 +74,7 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 
 		// A plain Step while off is gated out; Stop halts a ramp.
 		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdStep,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 50}); err != nil {
+			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 50}); err != nil { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
 			t.Fatal(err)
 		}
 		if level, _ := lamp.Level(); level != levelcontrol.LightingLevelMin {
@@ -90,12 +90,12 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 		}
 		tenths = 100
 		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 200, TransitionTime: &tenths}); err != nil {
+			levelcontrol.MoveToLevelRequest{Level: 200, TransitionTime: &tenths}); err != nil { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
 			t.Fatal(err)
 		}
 		time.Sleep(5 * time.Second)
 		synctest.Wait()
-		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdStop, levelcontrol.StopRequest{}); err != nil {
+		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdStop, levelcontrol.StopRequest{}); err != nil { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
 			t.Fatal(err)
 		}
 		halted, _ := lamp.Level()

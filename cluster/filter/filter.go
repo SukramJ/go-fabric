@@ -227,7 +227,7 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 	// The initial values go in as a device-side change: the server holds
 	// no value before, so this is the one data-version bump construction
 	// makes.
-	if err := s.setState(cfg.Initial, fixed); err != nil {
+	if err := s.setState(contract.OriginHostSet, cfg.Initial, fixed); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -317,14 +317,14 @@ func (s *Server) State() State {
 
 // SetState records a change the device made — the resource wearing down,
 // a filter swapped. It is refused when the state breaks the model.
-func (s *Server) SetState(st State) error { return s.setState(st, nil) }
+func (s *Server) SetState(st State) error { return s.setState(contract.OriginHostSet, st, nil) }
 
 // setState holds st to the model and stores it with the extra attribute
 // values; the generated server reports the served attributes that
 // changed. It cannot refuse what check admits: the definition's own
 // checks of these attributes (the percent's "max 100", the enum's
 // conformance, the nullable range) are the same ones.
-func (s *Server) setState(st State, extra map[uint32]any) error {
+func (s *Server) setState(origin contract.Origin, st State, extra map[uint32]any) error {
 	if err := s.check(st); err != nil {
 		return err
 	}
@@ -333,7 +333,7 @@ func (s *Server) setState(st State, extra map[uint32]any) error {
 	s.mu.Lock()
 	s.last = st
 	s.mu.Unlock()
-	return s.srv.SetAttributes(values)
+	return s.srv.SetAttributesFrom(origin, values)
 }
 
 // MatterRead resolves an attribute.
@@ -386,5 +386,5 @@ func (s *Server) resetCondition(ctx context.Context, _ any) (any, error) {
 		}
 	}
 	st.ChangeIndication = ChangeIndicationOk
-	return nil, s.setState(st, nil)
+	return nil, s.setState(contract.OriginCommand, st, nil)
 }

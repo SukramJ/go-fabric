@@ -7,10 +7,12 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 var _ = spec.Register
@@ -64,7 +66,10 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
-	s.OnChanged(func(State, []uint32) {})()
+	s.OnChanged(func(State, contract.Change) {})()
+	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
+		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
+	}
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}

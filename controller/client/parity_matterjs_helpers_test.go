@@ -91,7 +91,7 @@ func newClientPair(t *testing.T, o clientPairOptions) *clientPair {
 	cp := &clientPair{site: site}
 	topo := fabrictest.Topology{Configure: o.configure}
 	if !o.rootOnly {
-		l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1", Clock: site.Clock()})
+		l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +187,7 @@ func boolPtr(v bool) *bool { return &v }
 
 // newLight is an OnOffLight on the site's clock.
 func newLight(site *fabrictest.Site, key string) (*device.OnOffLight, error) {
-	return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()})
+	return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key})
 }
 
 // mustAddr parses an IP address.

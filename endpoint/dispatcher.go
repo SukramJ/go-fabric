@@ -377,7 +377,7 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		resp, err := srv.MatterInvoke(im.WithCommandPath(ctx, path), path.Command, fields)
+		resp, err := srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand), path.Command, fields)
 		if err != nil {
 			status, cs, hasCS := classifyError(err)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
@@ -451,7 +451,7 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 	for _, t := range d.commandTargets(path, authorize) {
 		ePath := path
 		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
-		resp, err := t.srv.MatterInvoke(im.WithCommandPath(ctx, ePath), path.Command, fields)
+		resp, err := t.srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand), path.Command, fields)
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
@@ -799,7 +799,7 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 	if value.IsNull {
 		v = nil
 	}
-	if err := srv.MatterWrite(ctx, path.Attribute, v); err != nil {
+	if err := srv.MatterWrite(contract.WithOrigin(ctx, contract.OriginControllerWrite), path.Attribute, v); err != nil {
 		status, cs, hasCS := classifyError(err)
 		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 	}

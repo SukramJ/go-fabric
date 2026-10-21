@@ -64,9 +64,10 @@ var TemperatureControlledCabinetType = Type{
 type TemperatureControlledCabinet struct{ *Device }
 
 // NewTemperatureControlledCabinet returns a TemperatureControlledCabinet device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewTemperatureControlledCabinet(opts Options, with ...Option) (*TemperatureControlledCabinet, error) {
-	d, err := New(&TemperatureControlledCabinetType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type TemperatureControlledCabinetID (see [New]).
+func NewTemperatureControlledCabinet(opts Options, decls ...Declaration) (*TemperatureControlledCabinet, error) {
+	d, err := FromSpec(Spec{Type: TemperatureControlledCabinetID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -74,48 +75,67 @@ func NewTemperatureControlledCabinet(opts Options, with ...Option) (*Temperature
 }
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontroldef.Server {
-	return temperaturecontroldef.Wrap(d.Server(0x0056))
+	if w, ok := d.typed(0x0056); ok {
+		return &temperaturecontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	if w, ok := d.typed(0x0402); ok {
+		return &temperaturemeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
+	if w, ok := d.typed(0x0052); ok {
+		return &refrigeratorandtemperaturecontrolledcabinetmodedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // OvenMode returns the typed OvenMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
-	return ovenmodedef.Wrap(d.Server(0x0049))
+	if w, ok := d.typed(0x0049); ok {
+		return &ovenmodedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // OvenCavityOperationalState returns the typed OvenCavityOperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityoperationalstatedef.Server {
-	return ovencavityoperationalstatedef.Wrap(d.Server(0x0048))
+	if w, ok := d.typed(0x0048); ok {
+		return &ovencavityoperationalstatedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // TemperatureAlarm returns the typed TemperatureAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureAlarm() *temperaturealarmdef.Server {
-	return temperaturealarmdef.Wrap(d.Server(0x0064))
+	if w, ok := d.typed(0x0064); ok {
+		return &temperaturealarmdef.Server{Wrapper: w}
+	}
+	return nil
 }

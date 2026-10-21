@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite
@@ -96,7 +97,7 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 	alarmsMoved := s.active != active || s.suppressed != suppressed
 	s.current, s.enabled, s.active, s.suppressed = level, enabled, active, suppressed
 	s.mu.Unlock()
-	s.publish(map[uint32]any{
+	s.publish(contract.OriginHostSet, map[uint32]any{
 		def.AttrCurrentSensitivityLevel: level,
 		def.AttrAlarmsEnabled:           enabled,
 		def.AttrAlarmsActive:            active,

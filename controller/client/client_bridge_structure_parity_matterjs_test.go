@@ -25,7 +25,7 @@ func TestClientBridgeStructureBridgeParity(t *testing.T) {
 		t.Parallel()
 		site := quietSite(t)
 		opts := func(key string) device.Options {
-			return device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()}
+			return device.Options{StableKey: endpoint.StringKey(key), Name: key}
 		}
 		composed, err := device.NewBridgedNode(opts("composed"))
 		if err != nil {

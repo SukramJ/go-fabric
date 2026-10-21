@@ -7,6 +7,7 @@ package timesynchronization
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -77,11 +78,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -152,4 +163,105 @@ func (s *Server) EmitTimeFailure(endpoint uint16, data TimeFailureEvent) error {
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitMissingTrustedTimeSource(endpoint uint16, data MissingTrustedTimeSourceEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMissingTrustedTimeSource, data)
+}
+
+// Declare is the declaration of the TimeSynchronization cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleSetUtcTime handles the SetUtcTime command in place of the server
+	// (Server.HandleSetUtcTime), inline; an optional command it handles is accepted.
+	HandleSetUtcTime func(ctx context.Context, req SetUtcTimeRequest) (struct{}, error)
+	// HandleSetTrustedTimeSource handles the SetTrustedTimeSource command in place of the server
+	// (Server.HandleSetTrustedTimeSource), inline; an optional command it handles is accepted.
+	HandleSetTrustedTimeSource func(ctx context.Context, req SetTrustedTimeSourceRequest) (struct{}, error)
+	// HandleSetTimeZone handles the SetTimeZone command in place of the server
+	// (Server.HandleSetTimeZone), inline; an optional command it handles is accepted.
+	HandleSetTimeZone func(ctx context.Context, req SetTimeZoneRequest) (SetTimeZoneResponse, error)
+	// HandleSetDstOffset handles the SetDstOffset command in place of the server
+	// (Server.HandleSetDstOffset), inline; an optional command it handles is accepted.
+	HandleSetDstOffset func(ctx context.Context, req SetDstOffsetRequest) (struct{}, error)
+	// HandleSetDefaultNtp handles the SetDefaultNtp command in place of the server
+	// (Server.HandleSetDefaultNtp), inline; an optional command it handles is accepted.
+	HandleSetDefaultNtp func(ctx context.Context, req SetDefaultNtpRequest) (struct{}, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleSetUtcTime != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetUtcTime)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetTrustedTimeSource != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetTrustedTimeSource)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetTimeZone != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetTimeZone)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetDstOffset != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetDstOffset)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetDefaultNtp != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetDefaultNtp)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("timesynchronization OnWrite: %w", err)
+		}
+	}
+	if d.HandleSetUtcTime != nil {
+		if err := s.HandleSetUtcTime(d.HandleSetUtcTime); err != nil {
+			return fmt.Errorf("timesynchronization HandleSetUtcTime: %w", err)
+		}
+	}
+	if d.HandleSetTrustedTimeSource != nil {
+		if err := s.HandleSetTrustedTimeSource(d.HandleSetTrustedTimeSource); err != nil {
+			return fmt.Errorf("timesynchronization HandleSetTrustedTimeSource: %w", err)
+		}
+	}
+	if d.HandleSetTimeZone != nil {
+		if err := s.HandleSetTimeZone(d.HandleSetTimeZone); err != nil {
+			return fmt.Errorf("timesynchronization HandleSetTimeZone: %w", err)
+		}
+	}
+	if d.HandleSetDstOffset != nil {
+		if err := s.HandleSetDstOffset(d.HandleSetDstOffset); err != nil {
+			return fmt.Errorf("timesynchronization HandleSetDstOffset: %w", err)
+		}
+	}
+	if d.HandleSetDefaultNtp != nil {
+		if err := s.HandleSetDefaultNtp(d.HandleSetDefaultNtp); err != nil {
+			return fmt.Errorf("timesynchronization HandleSetDefaultNtp: %w", err)
+		}
+	}
+	return nil
 }

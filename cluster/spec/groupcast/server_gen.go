@@ -7,6 +7,7 @@ package groupcast
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -60,11 +61,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -111,4 +122,105 @@ func (s *Server) HandleGroupcastTesting(fn func(ctx context.Context, req Groupca
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitGroupcastTesting(endpoint uint16, data GroupcastTestingEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventGroupcastTesting, data)
+}
+
+// Declare is the declaration of the Groupcast cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleJoinGroup handles the JoinGroup command in place of the server
+	// (Server.HandleJoinGroup), inline; an optional command it handles is accepted.
+	HandleJoinGroup func(ctx context.Context, req JoinGroupRequest) (struct{}, error)
+	// HandleLeaveGroup handles the LeaveGroup command in place of the server
+	// (Server.HandleLeaveGroup), inline; an optional command it handles is accepted.
+	HandleLeaveGroup func(ctx context.Context, req LeaveGroupRequest) (LeaveGroupResponse, error)
+	// HandleUpdateGroupKey handles the UpdateGroupKey command in place of the server
+	// (Server.HandleUpdateGroupKey), inline; an optional command it handles is accepted.
+	HandleUpdateGroupKey func(ctx context.Context, req UpdateGroupKeyRequest) (struct{}, error)
+	// HandleConfigureAuxiliaryAcl handles the ConfigureAuxiliaryAcl command in place of the server
+	// (Server.HandleConfigureAuxiliaryAcl), inline; an optional command it handles is accepted.
+	HandleConfigureAuxiliaryAcl func(ctx context.Context, req ConfigureAuxiliaryAclRequest) (struct{}, error)
+	// HandleGroupcastTesting handles the GroupcastTesting command in place of the server
+	// (Server.HandleGroupcastTesting), inline; an optional command it handles is accepted.
+	HandleGroupcastTesting func(ctx context.Context, req GroupcastTestingRequest) (struct{}, error)
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleJoinGroup != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdJoinGroup)
+		decl.Attach = d.attach
+	}
+	if d.HandleLeaveGroup != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdLeaveGroup)
+		decl.Attach = d.attach
+	}
+	if d.HandleUpdateGroupKey != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUpdateGroupKey)
+		decl.Attach = d.attach
+	}
+	if d.HandleConfigureAuxiliaryAcl != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdConfigureAuxiliaryAcl)
+		decl.Attach = d.attach
+	}
+	if d.HandleGroupcastTesting != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGroupcastTesting)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("groupcast OnWrite: %w", err)
+		}
+	}
+	if d.HandleJoinGroup != nil {
+		if err := s.HandleJoinGroup(d.HandleJoinGroup); err != nil {
+			return fmt.Errorf("groupcast HandleJoinGroup: %w", err)
+		}
+	}
+	if d.HandleLeaveGroup != nil {
+		if err := s.HandleLeaveGroup(d.HandleLeaveGroup); err != nil {
+			return fmt.Errorf("groupcast HandleLeaveGroup: %w", err)
+		}
+	}
+	if d.HandleUpdateGroupKey != nil {
+		if err := s.HandleUpdateGroupKey(d.HandleUpdateGroupKey); err != nil {
+			return fmt.Errorf("groupcast HandleUpdateGroupKey: %w", err)
+		}
+	}
+	if d.HandleConfigureAuxiliaryAcl != nil {
+		if err := s.HandleConfigureAuxiliaryAcl(d.HandleConfigureAuxiliaryAcl); err != nil {
+			return fmt.Errorf("groupcast HandleConfigureAuxiliaryAcl: %w", err)
+		}
+	}
+	if d.HandleGroupcastTesting != nil {
+		if err := s.HandleGroupcastTesting(d.HandleGroupcastTesting); err != nil {
+			return fmt.Errorf("groupcast HandleGroupcastTesting: %w", err)
+		}
+	}
+	return nil
 }

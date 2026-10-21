@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/internal/deviceseam"
 )
 
 // Scope is the one [endpoint.Snapshot] scope the Aggregator assembles
@@ -37,6 +39,9 @@ var (
 	ErrDuplicateKey = errors.New("node: an endpoint with this StableKey is already added")
 	// ErrUnknownKey: no endpoint with this key is added.
 	ErrUnknownKey = errors.New("node: no endpoint with this StableKey")
+	// ErrKeyMismatch: a replacement whose StableKey is not the key of the
+	// endpoint it replaces.
+	ErrKeyMismatch = errors.New("node: the replacement has another StableKey")
 )
 
 // Aggregator is the Aggregator endpoint's set of bridged endpoints —
@@ -53,14 +58,24 @@ var (
 // a stored endpoint absent from the set is garbage-collected
 // (endpoint.Snapshot.ModelComplete, BD-Matter-EndpointGC-ModelCompleteGate).
 // Start does not mark the set complete.
+//
+// A device.Device it holds (or a generated type around one) is bound to
+// the node while it is held: it takes the node's clock, runs its `…Async`
+// callbacks on its own goroutine, and answers [device.Device.EndpointNumber],
+// SetReachable and Rename through the node. Remove, Replace and
+// [Node.Stop] unbind it, waiting for its queued callbacks.
 type Aggregator struct {
 	n *Node
 
-	// mu guards complete, eps and started.
+	// mu guards complete, eps, detach and started.
 	mu       sync.Mutex
 	eps      []Endpoint
 	started  bool
 	complete bool
+	// detach unbinds the device under each key from the node; closed is
+	// set once the node stopped, after which no device is bound.
+	detach map[string]func()
+	closed bool
 
 	// reassembleMu serialises reassembly: each snapshot is taken after the
 	// previous topology was installed, so of two concurrent Add/Remove
@@ -77,7 +92,10 @@ func keyOf(spec endpoint.Spec) (string, error) {
 	return spec.StableKey.String(), nil
 }
 
-// Add adds ep under the Aggregator; a running node reassembles.
+// Add adds ep under the Aggregator — matter.js `aggregator.add(endpoint)`
+// (endpoint/Endpoint.ts:755-770) — and binds a device to the node; a running node
+// reassembles. A device another node holds is refused
+// ([device.ErrAddedElsewhere]).
 func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 	key, err := keyOf(ep.Spec())
 	if err != nil {
@@ -88,13 +106,108 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
 	}
+	detach, err := a.attach(ep)
+	if err != nil {
+		a.mu.Unlock()
+		return err
+	}
 	a.eps = append(a.eps, ep)
+	a.detachSetLocked(key, detach)
 	started := a.started
 	a.mu.Unlock()
 	if !started {
 		return nil
 	}
 	return a.reassemble(ctx)
+}
+
+// Replace puts ep in the place of the endpoint with key: ep must carry the
+// same StableKey ([ErrKeyMismatch]), so it keeps the endpoint number the
+// endpoint store holds for the key, and the running node reassembles once
+// — the Aggregator's PartsList unchanged, the endpoint's Descriptor
+// (device types, server list) the one change a controller sees. The old
+// endpoint is unbound after the reassembly. It mirrors matter.js replacing
+// a part: `close()` keeps the endpoint's number reservation
+// (endpoint/Endpoint.ts:1024-1032, ServerEndpointInitializer.ts:67-69,
+// where `delete()` would erase it, endpoint/Endpoint.ts:987-992) and the new endpoint
+// with the same id is assigned it (ServerEndpointInitializer.ts:34-42).
+func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpoint) error {
+	if key == nil {
+		return ErrNoStableKey
+	}
+	newKey, err := keyOf(ep.Spec())
+	if err != nil {
+		return err
+	}
+	if newKey != key.String() {
+		return fmt.Errorf("%w: %s replaces %s", ErrKeyMismatch, newKey, key)
+	}
+	a.mu.Lock()
+	i := a.indexLocked(newKey)
+	if i < 0 {
+		a.mu.Unlock()
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	if a.eps[i] == ep {
+		a.mu.Unlock()
+		return nil
+	}
+	old := a.detach[newKey]
+	detach, err := a.attach(ep)
+	if err != nil {
+		a.mu.Unlock()
+		return err
+	}
+	a.eps[i] = ep
+	a.detachSetLocked(newKey, detach)
+	started := a.started
+	a.mu.Unlock()
+	if started {
+		err = a.reassemble(ctx)
+	}
+	if old != nil {
+		old()
+	}
+	return err
+}
+
+// attach binds ep to the node when it is a device; the returned detach is
+// nil for any other endpoint and on a stopped node. a.mu is held.
+func (a *Aggregator) attach(ep Endpoint) (func(), error) {
+	if a.closed {
+		return nil, nil
+	}
+	detach, isDevice, err := deviceseam.Attach(ep, nodeHost{a.n})
+	if err != nil || !isDevice {
+		return nil, err
+	}
+	return detach, nil
+}
+
+// detachSetLocked records detach for key; a.mu is held.
+func (a *Aggregator) detachSetLocked(key string, detach func()) {
+	if a.detach == nil {
+		a.detach = map[string]func(){}
+	}
+	if detach == nil {
+		delete(a.detach, key)
+		return
+	}
+	a.detach[key] = detach
+}
+
+// detachAll unbinds every device the Aggregator holds — at [Node.Stop],
+// after the bridge stopped — waiting for their queued callbacks. The set
+// stays: a device is bound again only by a new Add.
+func (a *Aggregator) detachAll() {
+	a.mu.Lock()
+	detach := a.detach
+	a.detach = nil
+	a.closed = true
+	a.mu.Unlock()
+	for _, key := range slices.Sorted(maps.Keys(detach)) {
+		detach[key]()
+	}
 }
 
 // Remove drops the endpoint with key; a running node reassembles. Once the
@@ -113,12 +226,19 @@ func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
 	a.eps = slices.Delete(a.eps, i, i+1)
+	detach := a.detach[key.String()]
+	a.detachSetLocked(key.String(), nil)
 	started := a.started
 	a.mu.Unlock()
-	if !started {
-		return nil
+	var err error
+	if started {
+		err = a.reassemble(ctx)
 	}
-	return a.reassemble(ctx)
+	// Unbound after the reassembly: no controller reaches it any more.
+	if detach != nil {
+		detach()
+	}
+	return err
 }
 
 // MarkComplete declares the set authoritative: every later snapshot is

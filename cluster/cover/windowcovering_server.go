@@ -40,6 +40,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -506,7 +507,7 @@ func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, v
 	moved := s.configStatusLocked() != before
 	s.mu.Unlock()
 	if moved {
-		s.changes.Notify(wire.WindowCoveringAttrConfigStatus)
+		s.changes.NotifyFrom(contract.OriginControllerWrite, wire.WindowCoveringAttrConfigStatus)
 	}
 	return nil
 }
@@ -745,7 +746,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 	}
 	s.mu.Unlock()
 	if len(report) > 0 {
-		s.changes.Notify(report...)
+		s.changes.NotifyFrom(contract.OriginHostSet, report...)
 	}
 }
 
@@ -765,7 +766,7 @@ func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 	s.operationalStatus = status
 	s.mu.Unlock()
 	if changed {
-		s.changes.Notify(wire.WindowCoveringAttrOperationalStatus)
+		s.changes.NotifyFrom(contract.OriginHostSet, wire.WindowCoveringAttrOperationalStatus)
 	}
 }
 
@@ -826,7 +827,7 @@ func (s *WindowCoveringServer) tick(a *axis, m *movement) {
 		m.timer.Reset(s.moveStep)
 	}
 	s.mu.Unlock()
-	s.changes.Notify(changed...)
+	s.changes.NotifyFrom(contract.OriginCommand, changed...)
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:

@@ -44,9 +44,10 @@ var ElectricalSensorType = Type{
 type ElectricalSensor struct{ *Device }
 
 // NewElectricalSensor returns a ElectricalSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewElectricalSensor(opts Options, with ...Option) (*ElectricalSensor, error) {
-	d, err := New(&ElectricalSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ElectricalSensorID (see [New]).
+func NewElectricalSensor(opts Options, decls ...Declaration) (*ElectricalSensor, error) {
+	d, err := FromSpec(Spec{Type: ElectricalSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -54,24 +55,34 @@ func NewElectricalSensor(opts Options, with ...Option) (*ElectricalSensor, error
 }
 
 // PowerTopology returns the typed PowerTopology server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalSensor) PowerTopology() *powertopologydef.Server {
-	return powertopologydef.Wrap(d.Server(0x009C))
+	if w, ok := d.typed(0x009C); ok {
+		return &powertopologydef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalSensor) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
-	return electricalpowermeasurementdef.Wrap(d.Server(0x0090))
+	if w, ok := d.typed(0x0090); ok {
+		return &electricalpowermeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalSensor) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
-	return electricalenergymeasurementdef.Wrap(d.Server(0x0091))
+	if w, ok := d.typed(0x0091); ok {
+		return &electricalenergymeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

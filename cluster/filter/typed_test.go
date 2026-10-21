@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func ptrOf[T any](v T) *T { return &v }
@@ -25,7 +26,7 @@ func TestTypedFilterServer(t *testing.T) {
 	srv := full(t, h)
 	s := hepa.Wrap(srv)
 	var changed [][]uint32
-	defer s.OnChanged(func(_ hepa.State, ids []uint32) { changed = append(changed, ids) })()
+	defer s.OnChanged(func(_ hepa.State, change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })()
 
 	if err := s.Set(hepa.Patch{Condition: ptrOf(uint8(20)), ChangeIndication: ptrOf(hepa.ChangeIndicationCritical)}); err != nil {
 		t.Fatal(err)

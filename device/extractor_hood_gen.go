@@ -49,9 +49,10 @@ var ExtractorHoodType = Type{
 type ExtractorHood struct{ *Device }
 
 // NewExtractorHood returns a ExtractorHood device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewExtractorHood(opts Options, with ...Option) (*ExtractorHood, error) {
-	d, err := New(&ExtractorHoodType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ExtractorHoodID (see [New]).
+func NewExtractorHood(opts Options, decls ...Declaration) (*ExtractorHood, error) {
+	d, err := FromSpec(Spec{Type: ExtractorHoodID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -59,24 +60,34 @@ func NewExtractorHood(opts Options, with ...Option) (*ExtractorHood, error) {
 }
 
 // FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtractorHood) FanControl() *fancontroldef.Server {
-	return fancontroldef.Wrap(d.Server(0x0202))
+	if w, ok := d.typed(0x0202); ok {
+		return &fancontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
+	if w, ok := d.typed(0x0071); ok {
+		return &hepafiltermonitoringdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
+	if w, ok := d.typed(0x0072); ok {
+		return &activatedcarbonfiltermonitoringdef.Server{Wrapper: w}
+	}
+	return nil
 }

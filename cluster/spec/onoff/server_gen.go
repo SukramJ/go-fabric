@@ -7,6 +7,7 @@ package onoff
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -61,11 +62,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -112,4 +123,126 @@ func (s *Server) HandleOnWithRecallGlobalScene(fn func(ctx context.Context, req 
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleOnWithTimedOff(fn func(ctx context.Context, req OnWithTimedOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOnWithTimedOff, fn)
+}
+
+// Sink switches the device: the kit's OnOff server calls it before it
+// stores a change of OnOff a command makes, and an error leaves the
+// state and answers FAILURE (cluster/onoff Sink).
+type Sink interface {
+	SetOnOff(ctx context.Context, on bool) error
+}
+
+// Declare is the declaration of the OnOff cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleOff handles the Off command in place of the server
+	// (Server.HandleOff), inline; an optional command it handles is accepted.
+	HandleOff func(ctx context.Context, req OffRequest) (struct{}, error)
+	// HandleOn handles the On command in place of the server
+	// (Server.HandleOn), inline; an optional command it handles is accepted.
+	HandleOn func(ctx context.Context, req OnRequest) (struct{}, error)
+	// HandleToggle handles the Toggle command in place of the server
+	// (Server.HandleToggle), inline; an optional command it handles is accepted.
+	HandleToggle func(ctx context.Context, req ToggleRequest) (struct{}, error)
+	// HandleOffWithEffect handles the OffWithEffect command in place of the server
+	// (Server.HandleOffWithEffect), inline; an optional command it handles is accepted.
+	HandleOffWithEffect func(ctx context.Context, req OffWithEffectRequest) (struct{}, error)
+	// HandleOnWithRecallGlobalScene handles the OnWithRecallGlobalScene command in place of the server
+	// (Server.HandleOnWithRecallGlobalScene), inline; an optional command it handles is accepted.
+	HandleOnWithRecallGlobalScene func(ctx context.Context, req OnWithRecallGlobalSceneRequest) (struct{}, error)
+	// HandleOnWithTimedOff handles the OnWithTimedOff command in place of the server
+	// (Server.HandleOnWithTimedOff), inline; an optional command it handles is accepted.
+	HandleOnWithTimedOff func(ctx context.Context, req OnWithTimedOffRequest) (struct{}, error)
+	// Sink is the host port the kit's server runs on ([Sink]).
+	Sink Sink
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdOff)
+		decl.Attach = d.attach
+	}
+	if d.HandleOn != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdOn)
+		decl.Attach = d.attach
+	}
+	if d.HandleToggle != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdToggle)
+		decl.Attach = d.attach
+	}
+	if d.HandleOffWithEffect != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdOffWithEffect)
+		decl.Attach = d.attach
+	}
+	if d.HandleOnWithRecallGlobalScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdOnWithRecallGlobalScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleOnWithTimedOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdOnWithTimedOff)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("onoff OnWrite: %w", err)
+		}
+	}
+	if d.HandleOff != nil {
+		if err := s.HandleOff(d.HandleOff); err != nil {
+			return fmt.Errorf("onoff HandleOff: %w", err)
+		}
+	}
+	if d.HandleOn != nil {
+		if err := s.HandleOn(d.HandleOn); err != nil {
+			return fmt.Errorf("onoff HandleOn: %w", err)
+		}
+	}
+	if d.HandleToggle != nil {
+		if err := s.HandleToggle(d.HandleToggle); err != nil {
+			return fmt.Errorf("onoff HandleToggle: %w", err)
+		}
+	}
+	if d.HandleOffWithEffect != nil {
+		if err := s.HandleOffWithEffect(d.HandleOffWithEffect); err != nil {
+			return fmt.Errorf("onoff HandleOffWithEffect: %w", err)
+		}
+	}
+	if d.HandleOnWithRecallGlobalScene != nil {
+		if err := s.HandleOnWithRecallGlobalScene(d.HandleOnWithRecallGlobalScene); err != nil {
+			return fmt.Errorf("onoff HandleOnWithRecallGlobalScene: %w", err)
+		}
+	}
+	if d.HandleOnWithTimedOff != nil {
+		if err := s.HandleOnWithTimedOff(d.HandleOnWithTimedOff); err != nil {
+			return fmt.Errorf("onoff HandleOnWithTimedOff: %w", err)
+		}
+	}
+	return nil
 }

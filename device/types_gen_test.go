@@ -10,7 +10,9 @@ import "testing"
 // TestGeneratedConstructorsAndAccessors calls every generated constructor
 // with a host's options (testWith); a device that constructs has every
 // mandatory accessor mounted. Which types refuse, and why, is
-// TestEveryTypeConstructsAndConforms's.
+// TestEveryTypeConstructsAndConforms's. FromSpec with the type's id and
+// the same declarations builds the same device (sameDevice), or refuses
+// it with the same error.
 func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	t.Parallel()
 	if _, err := NewAggregator(Options{}); err == nil {
@@ -26,6 +28,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.CommissionerControl(), d.Server(0x0751); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Aggregator: optional CommissionerControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: AggregatorID, Options: testOptions("Aggregator"), Declarations: testWith(t, "Aggregator")}); err != nil {
+			t.Errorf("Aggregator: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Aggregator", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: AggregatorID, Options: testOptions("Aggregator"), Declarations: testWith(t, "Aggregator")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Aggregator: FromSpec refuses with %v, NewAggregator with %v", serr, err)
 	} else if !refusesFixture("Aggregator") {
 		t.Errorf("Aggregator: %v", err)
 	}
@@ -48,6 +57,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirPurifier: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: AirPurifierID, Options: testOptions("AirPurifier"), Declarations: testWith(t, "AirPurifier")}); err != nil {
+			t.Errorf("AirPurifier: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "AirPurifier", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: AirPurifierID, Options: testOptions("AirPurifier"), Declarations: testWith(t, "AirPurifier")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("AirPurifier: FromSpec refuses with %v, NewAirPurifier with %v", serr, err)
 	} else if !refusesFixture("AirPurifier") {
 		t.Errorf("AirPurifier: %v", err)
 	}
@@ -97,6 +113,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.RadonConcentrationMeasurement(), d.Server(0x042F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("AirQualitySensor: optional RadonConcentrationMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: AirQualitySensorID, Options: testOptions("AirQualitySensor"), Declarations: testWith(t, "AirQualitySensor")}); err != nil {
+			t.Errorf("AirQualitySensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "AirQualitySensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: AirQualitySensorID, Options: testOptions("AirQualitySensor"), Declarations: testWith(t, "AirQualitySensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("AirQualitySensor: FromSpec refuses with %v, NewAirQualitySensor with %v", serr, err)
 	} else if !refusesFixture("AirQualitySensor") {
 		t.Errorf("AirQualitySensor: %v", err)
 	}
@@ -140,6 +163,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ContentControl(), d.Server(0x050F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BasicVideoPlayer: optional ContentControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: BasicVideoPlayerID, Options: testOptions("BasicVideoPlayer"), Declarations: testWith(t, "BasicVideoPlayer")}); err != nil {
+			t.Errorf("BasicVideoPlayer: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "BasicVideoPlayer", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: BasicVideoPlayerID, Options: testOptions("BasicVideoPlayer"), Declarations: testWith(t, "BasicVideoPlayer")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("BasicVideoPlayer: FromSpec refuses with %v, NewBasicVideoPlayer with %v", serr, err)
 	} else if !refusesFixture("BasicVideoPlayer") {
 		t.Errorf("BasicVideoPlayer: %v", err)
 	}
@@ -150,6 +180,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &BatteryStorageType {
 			t.Errorf("BatteryStorage: type %v", d.Type().Name)
 		}
+		if s, err := FromSpec(Spec{Type: BatteryStorageID, Options: testOptions("BatteryStorage"), Declarations: testWith(t, "BatteryStorage")}); err != nil {
+			t.Errorf("BatteryStorage: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "BatteryStorage", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: BatteryStorageID, Options: testOptions("BatteryStorage"), Declarations: testWith(t, "BatteryStorage")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("BatteryStorage: FromSpec refuses with %v, NewBatteryStorage with %v", serr, err)
 	} else if !refusesFixture("BatteryStorage") {
 		t.Errorf("BatteryStorage: %v", err)
 	}
@@ -172,6 +209,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.EcosystemInformation(), d.Server(0x0750); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("BridgedNode: optional EcosystemInformation is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: BridgedNodeID, Options: testOptions("BridgedNode"), Declarations: testWith(t, "BridgedNode")}); err != nil {
+			t.Errorf("BridgedNode: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "BridgedNode", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: BridgedNodeID, Options: testOptions("BridgedNode"), Declarations: testWith(t, "BridgedNode")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("BridgedNode: FromSpec refuses with %v, NewBridgedNode with %v", serr, err)
 	} else if !refusesFixture("BridgedNode") {
 		t.Errorf("BridgedNode: %v", err)
 	}
@@ -224,6 +268,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ContentControl(), d.Server(0x050F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CastingVideoPlayer: optional ContentControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: CastingVideoPlayerID, Options: testOptions("CastingVideoPlayer"), Declarations: testWith(t, "CastingVideoPlayer")}); err != nil {
+			t.Errorf("CastingVideoPlayer: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "CastingVideoPlayer", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CastingVideoPlayerID, Options: testOptions("CastingVideoPlayer"), Declarations: testWith(t, "CastingVideoPlayer")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("CastingVideoPlayer: FromSpec refuses with %v, NewCastingVideoPlayer with %v", serr, err)
 	} else if !refusesFixture("CastingVideoPlayer") {
 		t.Errorf("CastingVideoPlayer: %v", err)
 	}
@@ -237,6 +288,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.ClosureControl(); s == nil || s.Underlying() != d.Server(0x0104) {
 			t.Error("Closure: mandatory ClosureControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ClosureID, Options: testOptions("Closure"), Declarations: testWith(t, "Closure")}); err != nil {
+			t.Errorf("Closure: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Closure", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ClosureID, Options: testOptions("Closure"), Declarations: testWith(t, "Closure")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Closure: FromSpec refuses with %v, NewClosure with %v", serr, err)
 	} else if !refusesFixture("Closure") {
 		t.Errorf("Closure: %v", err)
 	}
@@ -250,6 +308,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ClosureController: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ClosureControllerID, Options: testOptions("ClosureController"), Declarations: testWith(t, "ClosureController")}); err != nil {
+			t.Errorf("ClosureController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ClosureController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ClosureControllerID, Options: testOptions("ClosureController"), Declarations: testWith(t, "ClosureController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ClosureController: FromSpec refuses with %v, NewClosureController with %v", serr, err)
 	} else if !refusesFixture("ClosureController") {
 		t.Errorf("ClosureController: %v", err)
 	}
@@ -263,6 +328,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.ClosureDimension(); s == nil || s.Underlying() != d.Server(0x0105) {
 			t.Error("ClosurePanel: mandatory ClosureDimension not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ClosurePanelID, Options: testOptions("ClosurePanel"), Declarations: testWith(t, "ClosurePanel")}); err != nil {
+			t.Errorf("ClosurePanel: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ClosurePanel", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ClosurePanelID, Options: testOptions("ClosurePanel"), Declarations: testWith(t, "ClosurePanel")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ClosurePanel: FromSpec refuses with %v, NewClosurePanel with %v", serr, err)
 	} else if !refusesFixture("ClosurePanel") {
 		t.Errorf("ClosurePanel: %v", err)
 	}
@@ -276,6 +348,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ColorDimmerSwitch: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ColorDimmerSwitchID, Options: testOptions("ColorDimmerSwitch"), Declarations: testWith(t, "ColorDimmerSwitch")}); err != nil {
+			t.Errorf("ColorDimmerSwitch: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ColorDimmerSwitch", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ColorDimmerSwitchID, Options: testOptions("ColorDimmerSwitch"), Declarations: testWith(t, "ColorDimmerSwitch")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ColorDimmerSwitch: FromSpec refuses with %v, NewColorDimmerSwitch with %v", serr, err)
 	} else if !refusesFixture("ColorDimmerSwitch") {
 		t.Errorf("ColorDimmerSwitch: %v", err)
 	}
@@ -295,6 +374,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.ColorControl(); s == nil || s.Underlying() != d.Server(0x0300) {
 			t.Error("ColorTemperatureLight: mandatory ColorControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ColorTemperatureLightID, Options: testOptions("ColorTemperatureLight"), Declarations: testWith(t, "ColorTemperatureLight")}); err != nil {
+			t.Errorf("ColorTemperatureLight: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ColorTemperatureLight", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ColorTemperatureLightID, Options: testOptions("ColorTemperatureLight"), Declarations: testWith(t, "ColorTemperatureLight")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ColorTemperatureLight: FromSpec refuses with %v, NewColorTemperatureLight with %v", serr, err)
 	} else if !refusesFixture("ColorTemperatureLight") {
 		t.Errorf("ColorTemperatureLight: %v", err)
 	}
@@ -311,6 +397,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContactSensor: optional BooleanStateConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ContactSensorID, Options: testOptions("ContactSensor"), Declarations: testWith(t, "ContactSensor")}); err != nil {
+			t.Errorf("ContactSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ContactSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ContactSensorID, Options: testOptions("ContactSensor"), Declarations: testWith(t, "ContactSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ContactSensor: FromSpec refuses with %v, NewContactSensor with %v", serr, err)
 	} else if !refusesFixture("ContactSensor") {
 		t.Errorf("ContactSensor: %v", err)
 	}
@@ -345,6 +438,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.AccountLogin(), d.Server(0x050E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ContentApp: optional AccountLogin is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ContentAppID, Options: testOptions("ContentApp"), Declarations: testWith(t, "ContentApp")}); err != nil {
+			t.Errorf("ContentApp: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ContentApp", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ContentAppID, Options: testOptions("ContentApp"), Declarations: testWith(t, "ContentApp")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ContentApp: FromSpec refuses with %v, NewContentApp with %v", serr, err)
 	} else if !refusesFixture("ContentApp") {
 		t.Errorf("ContentApp: %v", err)
 	}
@@ -358,6 +458,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ControlBridge: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ControlBridgeID, Options: testOptions("ControlBridge"), Declarations: testWith(t, "ControlBridge")}); err != nil {
+			t.Errorf("ControlBridge: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ControlBridge", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ControlBridgeID, Options: testOptions("ControlBridge"), Declarations: testWith(t, "ControlBridge")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ControlBridge: FromSpec refuses with %v, NewControlBridge with %v", serr, err)
 	} else if !refusesFixture("ControlBridge") {
 		t.Errorf("ControlBridge: %v", err)
 	}
@@ -377,6 +484,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("CookSurface: optional TemperatureMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: CookSurfaceID, Options: testOptions("CookSurface"), Declarations: testWith(t, "CookSurface")}); err != nil {
+			t.Errorf("CookSurface: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "CookSurface", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CookSurfaceID, Options: testOptions("CookSurface"), Declarations: testWith(t, "CookSurface")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("CookSurface: FromSpec refuses with %v, NewCookSurface with %v", serr, err)
 	} else if !refusesFixture("CookSurface") {
 		t.Errorf("CookSurface: %v", err)
 	}
@@ -390,6 +504,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
 			t.Error("Cooktop: mandatory OnOff not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: CooktopID, Options: testOptions("Cooktop"), Declarations: testWith(t, "Cooktop")}); err != nil {
+			t.Errorf("Cooktop: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Cooktop", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CooktopID, Options: testOptions("Cooktop"), Declarations: testWith(t, "Cooktop")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Cooktop: FromSpec refuses with %v, NewCooktop with %v", serr, err)
 	} else if !refusesFixture("Cooktop") {
 		t.Errorf("Cooktop: %v", err)
 	}
@@ -406,6 +527,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.DeviceEnergyManagementMode(), d.Server(0x009F); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("DeviceEnergyManagement: optional DeviceEnergyManagementMode is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: DeviceEnergyManagementID, Options: testOptions("DeviceEnergyManagement"), Declarations: testWith(t, "DeviceEnergyManagement")}); err != nil {
+			t.Errorf("DeviceEnergyManagement: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DeviceEnergyManagement", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DeviceEnergyManagementID, Options: testOptions("DeviceEnergyManagement"), Declarations: testWith(t, "DeviceEnergyManagement")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DeviceEnergyManagement: FromSpec refuses with %v, NewDeviceEnergyManagement with %v", serr, err)
 	} else if !refusesFixture("DeviceEnergyManagement") {
 		t.Errorf("DeviceEnergyManagement: %v", err)
 	}
@@ -422,6 +550,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("DimmableLight: mandatory LevelControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DimmableLightID, Options: testOptions("DimmableLight"), Declarations: testWith(t, "DimmableLight")}); err != nil {
+			t.Errorf("DimmableLight: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DimmableLight", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DimmableLightID, Options: testOptions("DimmableLight"), Declarations: testWith(t, "DimmableLight")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DimmableLight: FromSpec refuses with %v, NewDimmableLight with %v", serr, err)
 	} else if !refusesFixture("DimmableLight") {
 		t.Errorf("DimmableLight: %v", err)
 	}
@@ -438,6 +573,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("DimmablePlugInUnit: mandatory LevelControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DimmablePlugInUnitID, Options: testOptions("DimmablePlugInUnit"), Declarations: testWith(t, "DimmablePlugInUnit")}); err != nil {
+			t.Errorf("DimmablePlugInUnit: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DimmablePlugInUnit", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DimmablePlugInUnitID, Options: testOptions("DimmablePlugInUnit"), Declarations: testWith(t, "DimmablePlugInUnit")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DimmablePlugInUnit: FromSpec refuses with %v, NewDimmablePlugInUnit with %v", serr, err)
 	} else if !refusesFixture("DimmablePlugInUnit") {
 		t.Errorf("DimmablePlugInUnit: %v", err)
 	}
@@ -451,6 +593,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("DimmerSwitch: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DimmerSwitchID, Options: testOptions("DimmerSwitch"), Declarations: testWith(t, "DimmerSwitch")}); err != nil {
+			t.Errorf("DimmerSwitch: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DimmerSwitch", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DimmerSwitchID, Options: testOptions("DimmerSwitch"), Declarations: testWith(t, "DimmerSwitch")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DimmerSwitch: FromSpec refuses with %v, NewDimmerSwitch with %v", serr, err)
 	} else if !refusesFixture("DimmerSwitch") {
 		t.Errorf("DimmerSwitch: %v", err)
 	}
@@ -476,6 +625,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.DishwasherAlarm(), d.Server(0x005D); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Dishwasher: optional DishwasherAlarm is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: DishwasherID, Options: testOptions("Dishwasher"), Declarations: testWith(t, "Dishwasher")}); err != nil {
+			t.Errorf("Dishwasher: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Dishwasher", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DishwasherID, Options: testOptions("Dishwasher"), Declarations: testWith(t, "Dishwasher")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Dishwasher: FromSpec refuses with %v, NewDishwasher with %v", serr, err)
 	} else if !refusesFixture("Dishwasher") {
 		t.Errorf("Dishwasher: %v", err)
 	}
@@ -489,6 +645,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.DoorLock(); s == nil || s.Underlying() != d.Server(0x0101) {
 			t.Error("DoorLock: mandatory DoorLock not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DoorLockID, Options: testOptions("DoorLock"), Declarations: testWith(t, "DoorLock")}); err != nil {
+			t.Errorf("DoorLock: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DoorLock", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DoorLockID, Options: testOptions("DoorLock"), Declarations: testWith(t, "DoorLock")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DoorLock: FromSpec refuses with %v, NewDoorLock with %v", serr, err)
 	} else if !refusesFixture("DoorLock") {
 		t.Errorf("DoorLock: %v", err)
 	}
@@ -502,6 +665,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("DoorLockController: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DoorLockControllerID, Options: testOptions("DoorLockController"), Declarations: testWith(t, "DoorLockController")}); err != nil {
+			t.Errorf("DoorLockController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "DoorLockController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DoorLockControllerID, Options: testOptions("DoorLockController"), Declarations: testWith(t, "DoorLockController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("DoorLockController: FromSpec refuses with %v, NewDoorLockController with %v", serr, err)
 	} else if !refusesFixture("DoorLockController") {
 		t.Errorf("DoorLockController: %v", err)
 	}
@@ -518,6 +688,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("Doorbell: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: DoorbellID, Options: testOptions("Doorbell"), Declarations: testWith(t, "Doorbell")}); err != nil {
+			t.Errorf("Doorbell: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Doorbell", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: DoorbellID, Options: testOptions("Doorbell"), Declarations: testWith(t, "Doorbell")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Doorbell: FromSpec refuses with %v, NewDoorbell with %v", serr, err)
 	} else if !refusesFixture("Doorbell") {
 		t.Errorf("Doorbell: %v", err)
 	}
@@ -537,6 +714,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.CommodityTariff(), d.Server(0x0700); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalEnergyTariff: optional CommodityTariff is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ElectricalEnergyTariffID, Options: testOptions("ElectricalEnergyTariff"), Declarations: testWith(t, "ElectricalEnergyTariff")}); err != nil {
+			t.Errorf("ElectricalEnergyTariff: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ElectricalEnergyTariff", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ElectricalEnergyTariffID, Options: testOptions("ElectricalEnergyTariff"), Declarations: testWith(t, "ElectricalEnergyTariff")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ElectricalEnergyTariff: FromSpec refuses with %v, NewElectricalEnergyTariff with %v", serr, err)
 	} else if !refusesFixture("ElectricalEnergyTariff") {
 		t.Errorf("ElectricalEnergyTariff: %v", err)
 	}
@@ -556,6 +740,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.CommodityMetering(), d.Server(0x0B07); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalMeter: optional CommodityMetering is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ElectricalMeterID, Options: testOptions("ElectricalMeter"), Declarations: testWith(t, "ElectricalMeter")}); err != nil {
+			t.Errorf("ElectricalMeter: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ElectricalMeter", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ElectricalMeterID, Options: testOptions("ElectricalMeter"), Declarations: testWith(t, "ElectricalMeter")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ElectricalMeter: FromSpec refuses with %v, NewElectricalMeter with %v", serr, err)
 	} else if !refusesFixture("ElectricalMeter") {
 		t.Errorf("ElectricalMeter: %v", err)
 	}
@@ -575,6 +766,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ElectricalEnergyMeasurement(), d.Server(0x0091); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ElectricalSensor: optional ElectricalEnergyMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ElectricalSensorID, Options: testOptions("ElectricalSensor"), Declarations: testWith(t, "ElectricalSensor")}); err != nil {
+			t.Errorf("ElectricalSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ElectricalSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ElectricalSensorID, Options: testOptions("ElectricalSensor"), Declarations: testWith(t, "ElectricalSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ElectricalSensor: FromSpec refuses with %v, NewElectricalSensor with %v", serr, err)
 	} else if !refusesFixture("ElectricalSensor") {
 		t.Errorf("ElectricalSensor: %v", err)
 	}
@@ -588,6 +786,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.MeterIdentification(); s == nil || s.Underlying() != d.Server(0x0B06) {
 			t.Error("ElectricalUtilityMeter: mandatory MeterIdentification not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ElectricalUtilityMeterID, Options: testOptions("ElectricalUtilityMeter"), Declarations: testWith(t, "ElectricalUtilityMeter")}); err != nil {
+			t.Errorf("ElectricalUtilityMeter: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ElectricalUtilityMeter", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ElectricalUtilityMeterID, Options: testOptions("ElectricalUtilityMeter"), Declarations: testWith(t, "ElectricalUtilityMeter")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ElectricalUtilityMeter: FromSpec refuses with %v, NewElectricalUtilityMeter with %v", serr, err)
 	} else if !refusesFixture("ElectricalUtilityMeter") {
 		t.Errorf("ElectricalUtilityMeter: %v", err)
 	}
@@ -607,6 +812,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("EnergyEvse: optional TemperatureMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: EnergyEvseID, Options: testOptions("EnergyEvse"), Declarations: testWith(t, "EnergyEvse")}); err != nil {
+			t.Errorf("EnergyEvse: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "EnergyEvse", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: EnergyEvseID, Options: testOptions("EnergyEvse"), Declarations: testWith(t, "EnergyEvse")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("EnergyEvse: FromSpec refuses with %v, NewEnergyEvse with %v", serr, err)
 	} else if !refusesFixture("EnergyEvse") {
 		t.Errorf("EnergyEvse: %v", err)
 	}
@@ -626,6 +838,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.ColorControl(); s == nil || s.Underlying() != d.Server(0x0300) {
 			t.Error("ExtendedColorLight: mandatory ColorControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ExtendedColorLightID, Options: testOptions("ExtendedColorLight"), Declarations: testWith(t, "ExtendedColorLight")}); err != nil {
+			t.Errorf("ExtendedColorLight: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ExtendedColorLight", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ExtendedColorLightID, Options: testOptions("ExtendedColorLight"), Declarations: testWith(t, "ExtendedColorLight")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ExtendedColorLight: FromSpec refuses with %v, NewExtendedColorLight with %v", serr, err)
 	} else if !refusesFixture("ExtendedColorLight") {
 		t.Errorf("ExtendedColorLight: %v", err)
 	}
@@ -645,6 +864,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("ExtractorHood: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ExtractorHoodID, Options: testOptions("ExtractorHood"), Declarations: testWith(t, "ExtractorHood")}); err != nil {
+			t.Errorf("ExtractorHood: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ExtractorHood", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ExtractorHoodID, Options: testOptions("ExtractorHood"), Declarations: testWith(t, "ExtractorHood")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ExtractorHood: FromSpec refuses with %v, NewExtractorHood with %v", serr, err)
 	} else if !refusesFixture("ExtractorHood") {
 		t.Errorf("ExtractorHood: %v", err)
 	}
@@ -661,6 +887,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Fan: optional OnOff is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: FanID, Options: testOptions("Fan"), Declarations: testWith(t, "Fan")}); err != nil {
+			t.Errorf("Fan: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Fan", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: FanID, Options: testOptions("Fan"), Declarations: testWith(t, "Fan")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Fan: FromSpec refuses with %v, NewFan with %v", serr, err)
 	} else if !refusesFixture("Fan") {
 		t.Errorf("Fan: %v", err)
 	}
@@ -674,6 +907,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.FlowMeasurement(); s == nil || s.Underlying() != d.Server(0x0404) {
 			t.Error("FlowSensor: mandatory FlowMeasurement not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: FlowSensorID, Options: testOptions("FlowSensor"), Declarations: testWith(t, "FlowSensor")}); err != nil {
+			t.Errorf("FlowSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "FlowSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: FlowSensorID, Options: testOptions("FlowSensor"), Declarations: testWith(t, "FlowSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("FlowSensor: FromSpec refuses with %v, NewFlowSensor with %v", serr, err)
 	} else if !refusesFixture("FlowSensor") {
 		t.Errorf("FlowSensor: %v", err)
 	}
@@ -687,6 +927,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
 			t.Error("GenericSwitch: mandatory Switch not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: GenericSwitchID, Options: testOptions("GenericSwitch"), Declarations: testWith(t, "GenericSwitch")}); err != nil {
+			t.Errorf("GenericSwitch: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "GenericSwitch", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: GenericSwitchID, Options: testOptions("GenericSwitch"), Declarations: testWith(t, "GenericSwitch")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("GenericSwitch: FromSpec refuses with %v, NewGenericSwitch with %v", serr, err)
 	} else if !refusesFixture("GenericSwitch") {
 		t.Errorf("GenericSwitch: %v", err)
 	}
@@ -697,6 +944,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &HeatPumpType {
 			t.Errorf("HeatPump: type %v", d.Type().Name)
 		}
+		if s, err := FromSpec(Spec{Type: HeatPumpID, Options: testOptions("HeatPump"), Declarations: testWith(t, "HeatPump")}); err != nil {
+			t.Errorf("HeatPump: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "HeatPump", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: HeatPumpID, Options: testOptions("HeatPump"), Declarations: testWith(t, "HeatPump")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("HeatPump: FromSpec refuses with %v, NewHeatPump with %v", serr, err)
 	} else if !refusesFixture("HeatPump") {
 		t.Errorf("HeatPump: %v", err)
 	}
@@ -710,6 +964,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.RelativeHumidityMeasurement(); s == nil || s.Underlying() != d.Server(0x0405) {
 			t.Error("HumiditySensor: mandatory RelativeHumidityMeasurement not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: HumiditySensorID, Options: testOptions("HumiditySensor"), Declarations: testWith(t, "HumiditySensor")}); err != nil {
+			t.Errorf("HumiditySensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "HumiditySensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: HumiditySensorID, Options: testOptions("HumiditySensor"), Declarations: testWith(t, "HumiditySensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("HumiditySensor: FromSpec refuses with %v, NewHumiditySensor with %v", serr, err)
 	} else if !refusesFixture("HumiditySensor") {
 		t.Errorf("HumiditySensor: %v", err)
 	}
@@ -726,6 +987,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("IrrigationSystem: optional FlowMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: IrrigationSystemID, Options: testOptions("IrrigationSystem"), Declarations: testWith(t, "IrrigationSystem")}); err != nil {
+			t.Errorf("IrrigationSystem: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "IrrigationSystem", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: IrrigationSystemID, Options: testOptions("IrrigationSystem"), Declarations: testWith(t, "IrrigationSystem")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("IrrigationSystem: FromSpec refuses with %v, NewIrrigationSystem with %v", serr, err)
 	} else if !refusesFixture("IrrigationSystem") {
 		t.Errorf("IrrigationSystem: %v", err)
 	}
@@ -751,6 +1019,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryDryer: optional TemperatureControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: LaundryDryerID, Options: testOptions("LaundryDryer"), Declarations: testWith(t, "LaundryDryer")}); err != nil {
+			t.Errorf("LaundryDryer: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "LaundryDryer", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: LaundryDryerID, Options: testOptions("LaundryDryer"), Declarations: testWith(t, "LaundryDryer")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("LaundryDryer: FromSpec refuses with %v, NewLaundryDryer with %v", serr, err)
 	} else if !refusesFixture("LaundryDryer") {
 		t.Errorf("LaundryDryer: %v", err)
 	}
@@ -776,6 +1051,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureControl(), d.Server(0x0056); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("LaundryWasher: optional TemperatureControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: LaundryWasherID, Options: testOptions("LaundryWasher"), Declarations: testWith(t, "LaundryWasher")}); err != nil {
+			t.Errorf("LaundryWasher: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "LaundryWasher", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: LaundryWasherID, Options: testOptions("LaundryWasher"), Declarations: testWith(t, "LaundryWasher")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("LaundryWasher: FromSpec refuses with %v, NewLaundryWasher with %v", serr, err)
 	} else if !refusesFixture("LaundryWasher") {
 		t.Errorf("LaundryWasher: %v", err)
 	}
@@ -789,6 +1071,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.IlluminanceMeasurement(); s == nil || s.Underlying() != d.Server(0x0400) {
 			t.Error("LightSensor: mandatory IlluminanceMeasurement not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: LightSensorID, Options: testOptions("LightSensor"), Declarations: testWith(t, "LightSensor")}); err != nil {
+			t.Errorf("LightSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "LightSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: LightSensorID, Options: testOptions("LightSensor"), Declarations: testWith(t, "LightSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("LightSensor: FromSpec refuses with %v, NewLightSensor with %v", serr, err)
 	} else if !refusesFixture("LightSensor") {
 		t.Errorf("LightSensor: %v", err)
 	}
@@ -799,6 +1088,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &MeterReferencePointType {
 			t.Errorf("MeterReferencePoint: type %v", d.Type().Name)
 		}
+		if s, err := FromSpec(Spec{Type: MeterReferencePointID, Options: testOptions("MeterReferencePoint"), Declarations: testWith(t, "MeterReferencePoint")}); err != nil {
+			t.Errorf("MeterReferencePoint: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "MeterReferencePoint", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: MeterReferencePointID, Options: testOptions("MeterReferencePoint"), Declarations: testWith(t, "MeterReferencePoint")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("MeterReferencePoint: FromSpec refuses with %v, NewMeterReferencePoint with %v", serr, err)
 	} else if !refusesFixture("MeterReferencePoint") {
 		t.Errorf("MeterReferencePoint: %v", err)
 	}
@@ -821,6 +1117,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.FanControl(), d.Server(0x0202); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("MicrowaveOven: optional FanControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: MicrowaveOvenID, Options: testOptions("MicrowaveOven"), Declarations: testWith(t, "MicrowaveOven")}); err != nil {
+			t.Errorf("MicrowaveOven: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "MicrowaveOven", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: MicrowaveOvenID, Options: testOptions("MicrowaveOven"), Declarations: testWith(t, "MicrowaveOven")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("MicrowaveOven: FromSpec refuses with %v, NewMicrowaveOven with %v", serr, err)
 	} else if !refusesFixture("MicrowaveOven") {
 		t.Errorf("MicrowaveOven: %v", err)
 	}
@@ -834,6 +1137,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.ModeSelect(); s == nil || s.Underlying() != d.Server(0x0050) {
 			t.Error("ModeSelect: mandatory ModeSelect not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ModeSelectID, Options: testOptions("ModeSelect"), Declarations: testWith(t, "ModeSelect")}); err != nil {
+			t.Errorf("ModeSelect: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ModeSelect", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ModeSelectID, Options: testOptions("ModeSelect"), Declarations: testWith(t, "ModeSelect")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ModeSelect: FromSpec refuses with %v, NewModeSelect with %v", serr, err)
 	} else if !refusesFixture("ModeSelect") {
 		t.Errorf("ModeSelect: %v", err)
 	}
@@ -850,6 +1160,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("MountedDimmableLoadControl: mandatory LevelControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: MountedDimmableLoadControlID, Options: testOptions("MountedDimmableLoadControl"), Declarations: testWith(t, "MountedDimmableLoadControl")}); err != nil {
+			t.Errorf("MountedDimmableLoadControl: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "MountedDimmableLoadControl", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: MountedDimmableLoadControlID, Options: testOptions("MountedDimmableLoadControl"), Declarations: testWith(t, "MountedDimmableLoadControl")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("MountedDimmableLoadControl: FromSpec refuses with %v, NewMountedDimmableLoadControl with %v", serr, err)
 	} else if !refusesFixture("MountedDimmableLoadControl") {
 		t.Errorf("MountedDimmableLoadControl: %v", err)
 	}
@@ -866,6 +1183,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("MountedOnOffControl: optional LevelControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: MountedOnOffControlID, Options: testOptions("MountedOnOffControl"), Declarations: testWith(t, "MountedOnOffControl")}); err != nil {
+			t.Errorf("MountedOnOffControl: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "MountedOnOffControl", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: MountedOnOffControlID, Options: testOptions("MountedOnOffControl"), Declarations: testWith(t, "MountedOnOffControl")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("MountedOnOffControl: FromSpec refuses with %v, NewMountedOnOffControl with %v", serr, err)
 	} else if !refusesFixture("MountedOnOffControl") {
 		t.Errorf("MountedOnOffControl: %v", err)
 	}
@@ -882,6 +1206,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OccupancySensor: optional BooleanStateConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: OccupancySensorID, Options: testOptions("OccupancySensor"), Declarations: testWith(t, "OccupancySensor")}); err != nil {
+			t.Errorf("OccupancySensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OccupancySensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OccupancySensorID, Options: testOptions("OccupancySensor"), Declarations: testWith(t, "OccupancySensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OccupancySensor: FromSpec refuses with %v, NewOccupancySensor with %v", serr, err)
 	} else if !refusesFixture("OccupancySensor") {
 		t.Errorf("OccupancySensor: %v", err)
 	}
@@ -898,6 +1229,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OnOffLight: optional LevelControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: OnOffLightID, Options: testOptions("OnOffLight"), Declarations: testWith(t, "OnOffLight")}); err != nil {
+			t.Errorf("OnOffLight: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OnOffLight", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OnOffLightID, Options: testOptions("OnOffLight"), Declarations: testWith(t, "OnOffLight")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OnOffLight: FromSpec refuses with %v, NewOnOffLight with %v", serr, err)
 	} else if !refusesFixture("OnOffLight") {
 		t.Errorf("OnOffLight: %v", err)
 	}
@@ -911,6 +1249,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("OnOffLightSwitch: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: OnOffLightSwitchID, Options: testOptions("OnOffLightSwitch"), Declarations: testWith(t, "OnOffLightSwitch")}); err != nil {
+			t.Errorf("OnOffLightSwitch: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OnOffLightSwitch", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OnOffLightSwitchID, Options: testOptions("OnOffLightSwitch"), Declarations: testWith(t, "OnOffLightSwitch")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OnOffLightSwitch: FromSpec refuses with %v, NewOnOffLightSwitch with %v", serr, err)
 	} else if !refusesFixture("OnOffLightSwitch") {
 		t.Errorf("OnOffLightSwitch: %v", err)
 	}
@@ -927,6 +1272,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.LevelControl(), d.Server(0x0008); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("OnOffPlugInUnit: optional LevelControl is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: OnOffPlugInUnitID, Options: testOptions("OnOffPlugInUnit"), Declarations: testWith(t, "OnOffPlugInUnit")}); err != nil {
+			t.Errorf("OnOffPlugInUnit: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OnOffPlugInUnit", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OnOffPlugInUnitID, Options: testOptions("OnOffPlugInUnit"), Declarations: testWith(t, "OnOffPlugInUnit")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OnOffPlugInUnit: FromSpec refuses with %v, NewOnOffPlugInUnit with %v", serr, err)
 	} else if !refusesFixture("OnOffPlugInUnit") {
 		t.Errorf("OnOffPlugInUnit: %v", err)
 	}
@@ -940,6 +1292,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("OnOffSensor: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: OnOffSensorID, Options: testOptions("OnOffSensor"), Declarations: testWith(t, "OnOffSensor")}); err != nil {
+			t.Errorf("OnOffSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OnOffSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OnOffSensorID, Options: testOptions("OnOffSensor"), Declarations: testWith(t, "OnOffSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OnOffSensor: FromSpec refuses with %v, NewOnOffSensor with %v", serr, err)
 	} else if !refusesFixture("OnOffSensor") {
 		t.Errorf("OnOffSensor: %v", err)
 	}
@@ -953,6 +1312,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.OtaSoftwareUpdateProvider(); s == nil || s.Underlying() != d.Server(0x0029) {
 			t.Error("OtaProvider: mandatory OtaSoftwareUpdateProvider not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: OtaProviderID, Options: testOptions("OtaProvider"), Declarations: testWith(t, "OtaProvider")}); err != nil {
+			t.Errorf("OtaProvider: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OtaProvider", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OtaProviderID, Options: testOptions("OtaProvider"), Declarations: testWith(t, "OtaProvider")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OtaProvider: FromSpec refuses with %v, NewOtaProvider with %v", serr, err)
 	} else if !refusesFixture("OtaProvider") {
 		t.Errorf("OtaProvider: %v", err)
 	}
@@ -966,6 +1332,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.OtaSoftwareUpdateRequestor(); s == nil || s.Underlying() != d.Server(0x002A) {
 			t.Error("OtaRequestor: mandatory OtaSoftwareUpdateRequestor not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: OtaRequestorID, Options: testOptions("OtaRequestor"), Declarations: testWith(t, "OtaRequestor")}); err != nil {
+			t.Errorf("OtaRequestor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "OtaRequestor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OtaRequestorID, Options: testOptions("OtaRequestor"), Declarations: testWith(t, "OtaRequestor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("OtaRequestor: FromSpec refuses with %v, NewOtaRequestor with %v", serr, err)
 	} else if !refusesFixture("OtaRequestor") {
 		t.Errorf("OtaRequestor: %v", err)
 	}
@@ -976,6 +1349,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &OvenType {
 			t.Errorf("Oven: type %v", d.Type().Name)
 		}
+		if s, err := FromSpec(Spec{Type: OvenID, Options: testOptions("Oven"), Declarations: testWith(t, "Oven")}); err != nil {
+			t.Errorf("Oven: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Oven", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: OvenID, Options: testOptions("Oven"), Declarations: testWith(t, "Oven")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Oven: FromSpec refuses with %v, NewOven with %v", serr, err)
 	} else if !refusesFixture("Oven") {
 		t.Errorf("Oven: %v", err)
 	}
@@ -989,6 +1369,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.PowerSource(); s == nil || s.Underlying() != d.Server(0x002F) {
 			t.Error("PowerSource: mandatory PowerSource not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: PowerSourceID, Options: testOptions("PowerSource"), Declarations: testWith(t, "PowerSource")}); err != nil {
+			t.Errorf("PowerSource: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "PowerSource", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: PowerSourceID, Options: testOptions("PowerSource"), Declarations: testWith(t, "PowerSource")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("PowerSource: FromSpec refuses with %v, NewPowerSource with %v", serr, err)
 	} else if !refusesFixture("PowerSource") {
 		t.Errorf("PowerSource: %v", err)
 	}
@@ -1002,6 +1389,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.PressureMeasurement(); s == nil || s.Underlying() != d.Server(0x0403) {
 			t.Error("PressureSensor: mandatory PressureMeasurement not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: PressureSensorID, Options: testOptions("PressureSensor"), Declarations: testWith(t, "PressureSensor")}); err != nil {
+			t.Errorf("PressureSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "PressureSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: PressureSensorID, Options: testOptions("PressureSensor"), Declarations: testWith(t, "PressureSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("PressureSensor: FromSpec refuses with %v, NewPressureSensor with %v", serr, err)
 	} else if !refusesFixture("PressureSensor") {
 		t.Errorf("PressureSensor: %v", err)
 	}
@@ -1030,6 +1424,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Pump: optional FlowMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: PumpID, Options: testOptions("Pump"), Declarations: testWith(t, "Pump")}); err != nil {
+			t.Errorf("Pump: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Pump", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: PumpID, Options: testOptions("Pump"), Declarations: testWith(t, "Pump")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Pump: FromSpec refuses with %v, NewPump with %v", serr, err)
 	} else if !refusesFixture("Pump") {
 		t.Errorf("Pump: %v", err)
 	}
@@ -1043,6 +1444,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("PumpController: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: PumpControllerID, Options: testOptions("PumpController"), Declarations: testWith(t, "PumpController")}); err != nil {
+			t.Errorf("PumpController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "PumpController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: PumpControllerID, Options: testOptions("PumpController"), Declarations: testWith(t, "PumpController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("PumpController: FromSpec refuses with %v, NewPumpController with %v", serr, err)
 	} else if !refusesFixture("PumpController") {
 		t.Errorf("PumpController: %v", err)
 	}
@@ -1059,6 +1467,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RainSensor: optional BooleanStateConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: RainSensorID, Options: testOptions("RainSensor"), Declarations: testWith(t, "RainSensor")}); err != nil {
+			t.Errorf("RainSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "RainSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: RainSensorID, Options: testOptions("RainSensor"), Declarations: testWith(t, "RainSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("RainSensor: FromSpec refuses with %v, NewRainSensor with %v", serr, err)
 	} else if !refusesFixture("RainSensor") {
 		t.Errorf("RainSensor: %v", err)
 	}
@@ -1078,6 +1493,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ActivatedCarbonFilterMonitoring(), d.Server(0x0072); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Refrigerator: optional ActivatedCarbonFilterMonitoring is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: RefrigeratorID, Options: testOptions("Refrigerator"), Declarations: testWith(t, "Refrigerator")}); err != nil {
+			t.Errorf("Refrigerator: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Refrigerator", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: RefrigeratorID, Options: testOptions("Refrigerator"), Declarations: testWith(t, "Refrigerator")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Refrigerator: FromSpec refuses with %v, NewRefrigerator with %v", serr, err)
 	} else if !refusesFixture("Refrigerator") {
 		t.Errorf("Refrigerator: %v", err)
 	}
@@ -1100,6 +1522,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ServiceArea(), d.Server(0x0150); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoboticVacuumCleaner: optional ServiceArea is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: RoboticVacuumCleanerID, Options: testOptions("RoboticVacuumCleaner"), Declarations: testWith(t, "RoboticVacuumCleaner")}); err != nil {
+			t.Errorf("RoboticVacuumCleaner: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "RoboticVacuumCleaner", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: RoboticVacuumCleanerID, Options: testOptions("RoboticVacuumCleaner"), Declarations: testWith(t, "RoboticVacuumCleaner")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("RoboticVacuumCleaner: FromSpec refuses with %v, NewRoboticVacuumCleaner with %v", serr, err)
 	} else if !refusesFixture("RoboticVacuumCleaner") {
 		t.Errorf("RoboticVacuumCleaner: %v", err)
 	}
@@ -1134,6 +1563,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.RelativeHumidityMeasurement(), d.Server(0x0405); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RoomAirConditioner: optional RelativeHumidityMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: RoomAirConditionerID, Options: testOptions("RoomAirConditioner"), Declarations: testWith(t, "RoomAirConditioner")}); err != nil {
+			t.Errorf("RoomAirConditioner: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "RoomAirConditioner", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: RoomAirConditionerID, Options: testOptions("RoomAirConditioner"), Declarations: testWith(t, "RoomAirConditioner")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("RoomAirConditioner: FromSpec refuses with %v, NewRoomAirConditioner with %v", serr, err)
 	} else if !refusesFixture("RoomAirConditioner") {
 		t.Errorf("RoomAirConditioner: %v", err)
 	}
@@ -1192,6 +1628,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.Groupcast(), d.Server(0x0065); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional Groupcast is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: RootNodeID, Options: testOptions("RootNode"), Declarations: testWith(t, "RootNode")}); err != nil {
+			t.Errorf("RootNode: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "RootNode", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: RootNodeID, Options: testOptions("RootNode"), Declarations: testWith(t, "RootNode")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("RootNode: FromSpec refuses with %v, NewRootNode with %v", serr, err)
 	} else if !refusesFixture("RootNode") {
 		t.Errorf("RootNode: %v", err)
 	}
@@ -1211,6 +1654,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.EthernetNetworkDiagnostics(), d.Server(0x0037); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SecondaryNetworkInterface: optional EthernetNetworkDiagnostics is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: SecondaryNetworkInterfaceID, Options: testOptions("SecondaryNetworkInterface"), Declarations: testWith(t, "SecondaryNetworkInterface")}); err != nil {
+			t.Errorf("SecondaryNetworkInterface: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "SecondaryNetworkInterface", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SecondaryNetworkInterfaceID, Options: testOptions("SecondaryNetworkInterface"), Declarations: testWith(t, "SecondaryNetworkInterface")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("SecondaryNetworkInterface: FromSpec refuses with %v, NewSecondaryNetworkInterface with %v", serr, err)
 	} else if !refusesFixture("SecondaryNetworkInterface") {
 		t.Errorf("SecondaryNetworkInterface: %v", err)
 	}
@@ -1233,6 +1683,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.CarbonMonoxideConcentrationMeasurement(), d.Server(0x040C); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SmokeCoAlarm: optional CarbonMonoxideConcentrationMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: SmokeCoAlarmID, Options: testOptions("SmokeCoAlarm"), Declarations: testWith(t, "SmokeCoAlarm")}); err != nil {
+			t.Errorf("SmokeCoAlarm: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "SmokeCoAlarm", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SmokeCoAlarmID, Options: testOptions("SmokeCoAlarm"), Declarations: testWith(t, "SmokeCoAlarm")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("SmokeCoAlarm: FromSpec refuses with %v, NewSmokeCoAlarm with %v", serr, err)
 	} else if !refusesFixture("SmokeCoAlarm") {
 		t.Errorf("SmokeCoAlarm: %v", err)
 	}
@@ -1249,6 +1706,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureMeasurement(), d.Server(0x0402); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SoilSensor: optional TemperatureMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: SoilSensorID, Options: testOptions("SoilSensor"), Declarations: testWith(t, "SoilSensor")}); err != nil {
+			t.Errorf("SoilSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "SoilSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SoilSensorID, Options: testOptions("SoilSensor"), Declarations: testWith(t, "SoilSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("SoilSensor: FromSpec refuses with %v, NewSoilSensor with %v", serr, err)
 	} else if !refusesFixture("SoilSensor") {
 		t.Errorf("SoilSensor: %v", err)
 	}
@@ -1259,6 +1723,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if d.Type() != &SolarPowerType {
 			t.Errorf("SolarPower: type %v", d.Type().Name)
 		}
+		if s, err := FromSpec(Spec{Type: SolarPowerID, Options: testOptions("SolarPower"), Declarations: testWith(t, "SolarPower")}); err != nil {
+			t.Errorf("SolarPower: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "SolarPower", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SolarPowerID, Options: testOptions("SolarPower"), Declarations: testWith(t, "SolarPower")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("SolarPower: FromSpec refuses with %v, NewSolarPower with %v", serr, err)
 	} else if !refusesFixture("SolarPower") {
 		t.Errorf("SolarPower: %v", err)
 	}
@@ -1275,6 +1746,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.LevelControl(); s == nil || s.Underlying() != d.Server(0x0008) {
 			t.Error("Speaker: mandatory LevelControl not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: SpeakerID, Options: testOptions("Speaker"), Declarations: testWith(t, "Speaker")}); err != nil {
+			t.Errorf("Speaker: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Speaker", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SpeakerID, Options: testOptions("Speaker"), Declarations: testWith(t, "Speaker")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Speaker: FromSpec refuses with %v, NewSpeaker with %v", serr, err)
 	} else if !refusesFixture("Speaker") {
 		t.Errorf("Speaker: %v", err)
 	}
@@ -1303,6 +1781,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.TemperatureAlarm(), d.Server(0x0064); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureControlledCabinet: optional TemperatureAlarm is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: TemperatureControlledCabinetID, Options: testOptions("TemperatureControlledCabinet"), Declarations: testWith(t, "TemperatureControlledCabinet")}); err != nil {
+			t.Errorf("TemperatureControlledCabinet: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "TemperatureControlledCabinet", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: TemperatureControlledCabinetID, Options: testOptions("TemperatureControlledCabinet"), Declarations: testWith(t, "TemperatureControlledCabinet")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("TemperatureControlledCabinet: FromSpec refuses with %v, NewTemperatureControlledCabinet with %v", serr, err)
 	} else if !refusesFixture("TemperatureControlledCabinet") {
 		t.Errorf("TemperatureControlledCabinet: %v", err)
 	}
@@ -1319,6 +1804,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ThermostatUserInterfaceConfiguration(), d.Server(0x0204); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("TemperatureSensor: optional ThermostatUserInterfaceConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: TemperatureSensorID, Options: testOptions("TemperatureSensor"), Declarations: testWith(t, "TemperatureSensor")}); err != nil {
+			t.Errorf("TemperatureSensor: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "TemperatureSensor", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: TemperatureSensorID, Options: testOptions("TemperatureSensor"), Declarations: testWith(t, "TemperatureSensor")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("TemperatureSensor: FromSpec refuses with %v, NewTemperatureSensor with %v", serr, err)
 	} else if !refusesFixture("TemperatureSensor") {
 		t.Errorf("TemperatureSensor: %v", err)
 	}
@@ -1338,6 +1830,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.ThermostatUserInterfaceConfiguration(), d.Server(0x0204); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("Thermostat: optional ThermostatUserInterfaceConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: ThermostatID, Options: testOptions("Thermostat"), Declarations: testWith(t, "Thermostat")}); err != nil {
+			t.Errorf("Thermostat: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Thermostat", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ThermostatID, Options: testOptions("Thermostat"), Declarations: testWith(t, "Thermostat")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Thermostat: FromSpec refuses with %v, NewThermostat with %v", serr, err)
 	} else if !refusesFixture("Thermostat") {
 		t.Errorf("Thermostat: %v", err)
 	}
@@ -1351,6 +1850,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("ThermostatController: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: ThermostatControllerID, Options: testOptions("ThermostatController"), Declarations: testWith(t, "ThermostatController")}); err != nil {
+			t.Errorf("ThermostatController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ThermostatController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ThermostatControllerID, Options: testOptions("ThermostatController"), Declarations: testWith(t, "ThermostatController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ThermostatController: FromSpec refuses with %v, NewThermostatController with %v", serr, err)
 	} else if !refusesFixture("ThermostatController") {
 		t.Errorf("ThermostatController: %v", err)
 	}
@@ -1364,6 +1870,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("VideoRemoteControl: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: VideoRemoteControlID, Options: testOptions("VideoRemoteControl"), Declarations: testWith(t, "VideoRemoteControl")}); err != nil {
+			t.Errorf("VideoRemoteControl: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "VideoRemoteControl", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: VideoRemoteControlID, Options: testOptions("VideoRemoteControl"), Declarations: testWith(t, "VideoRemoteControl")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("VideoRemoteControl: FromSpec refuses with %v, NewVideoRemoteControl with %v", serr, err)
 	} else if !refusesFixture("VideoRemoteControl") {
 		t.Errorf("VideoRemoteControl: %v", err)
 	}
@@ -1380,6 +1893,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterFreezeDetector: optional BooleanStateConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: WaterFreezeDetectorID, Options: testOptions("WaterFreezeDetector"), Declarations: testWith(t, "WaterFreezeDetector")}); err != nil {
+			t.Errorf("WaterFreezeDetector: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WaterFreezeDetector", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WaterFreezeDetectorID, Options: testOptions("WaterFreezeDetector"), Declarations: testWith(t, "WaterFreezeDetector")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WaterFreezeDetector: FromSpec refuses with %v, NewWaterFreezeDetector with %v", serr, err)
 	} else if !refusesFixture("WaterFreezeDetector") {
 		t.Errorf("WaterFreezeDetector: %v", err)
 	}
@@ -1399,6 +1919,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Thermostat(); s == nil || s.Underlying() != d.Server(0x0201) {
 			t.Error("WaterHeater: mandatory Thermostat not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: WaterHeaterID, Options: testOptions("WaterHeater"), Declarations: testWith(t, "WaterHeater")}); err != nil {
+			t.Errorf("WaterHeater: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WaterHeater", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WaterHeaterID, Options: testOptions("WaterHeater"), Declarations: testWith(t, "WaterHeater")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WaterHeater: FromSpec refuses with %v, NewWaterHeater with %v", serr, err)
 	} else if !refusesFixture("WaterHeater") {
 		t.Errorf("WaterHeater: %v", err)
 	}
@@ -1415,6 +1942,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.BooleanStateConfiguration(), d.Server(0x0080); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterLeakDetector: optional BooleanStateConfiguration is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: WaterLeakDetectorID, Options: testOptions("WaterLeakDetector"), Declarations: testWith(t, "WaterLeakDetector")}); err != nil {
+			t.Errorf("WaterLeakDetector: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WaterLeakDetector", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WaterLeakDetectorID, Options: testOptions("WaterLeakDetector"), Declarations: testWith(t, "WaterLeakDetector")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WaterLeakDetector: FromSpec refuses with %v, NewWaterLeakDetector with %v", serr, err)
 	} else if !refusesFixture("WaterLeakDetector") {
 		t.Errorf("WaterLeakDetector: %v", err)
 	}
@@ -1431,6 +1965,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.FlowMeasurement(), d.Server(0x0404); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("WaterValve: optional FlowMeasurement is not the device's server")
 		}
+		if s, err := FromSpec(Spec{Type: WaterValveID, Options: testOptions("WaterValve"), Declarations: testWith(t, "WaterValve")}); err != nil {
+			t.Errorf("WaterValve: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WaterValve", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WaterValveID, Options: testOptions("WaterValve"), Declarations: testWith(t, "WaterValve")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WaterValve: FromSpec refuses with %v, NewWaterValve with %v", serr, err)
 	} else if !refusesFixture("WaterValve") {
 		t.Errorf("WaterValve: %v", err)
 	}
@@ -1444,6 +1985,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.WindowCovering(); s == nil || s.Underlying() != d.Server(0x0102) {
 			t.Error("WindowCovering: mandatory WindowCovering not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: WindowCoveringID, Options: testOptions("WindowCovering"), Declarations: testWith(t, "WindowCovering")}); err != nil {
+			t.Errorf("WindowCovering: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WindowCovering", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WindowCoveringID, Options: testOptions("WindowCovering"), Declarations: testWith(t, "WindowCovering")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WindowCovering: FromSpec refuses with %v, NewWindowCovering with %v", serr, err)
 	} else if !refusesFixture("WindowCovering") {
 		t.Errorf("WindowCovering: %v", err)
 	}
@@ -1457,6 +2005,13 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
 			t.Error("WindowCoveringController: mandatory Binding not mounted")
 		}
+		if s, err := FromSpec(Spec{Type: WindowCoveringControllerID, Options: testOptions("WindowCoveringController"), Declarations: testWith(t, "WindowCoveringController")}); err != nil {
+			t.Errorf("WindowCoveringController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "WindowCoveringController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: WindowCoveringControllerID, Options: testOptions("WindowCoveringController"), Declarations: testWith(t, "WindowCoveringController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("WindowCoveringController: FromSpec refuses with %v, NewWindowCoveringController with %v", serr, err)
 	} else if !refusesFixture("WindowCoveringController") {
 		t.Errorf("WindowCoveringController: %v", err)
 	}

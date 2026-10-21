@@ -75,9 +75,10 @@ var OnOffLightType = Type{
 type OnOffLight struct{ *Device }
 
 // NewOnOffLight returns a OnOffLight device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOnOffLight(opts Options, with ...Option) (*OnOffLight, error) {
-	d, err := New(&OnOffLightType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OnOffLightID (see [New]).
+func NewOnOffLight(opts Options, decls ...Declaration) (*OnOffLight, error) {
+	d, err := FromSpec(Spec{Type: OnOffLightID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +86,23 @@ func NewOnOffLight(opts Options, with ...Option) (*OnOffLight, error) {
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *OnOffLight) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *OnOffLight) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *OnOffLight) LevelControl() *levelcontroldef.Server {
-	return levelcontroldef.Wrap(d.Server(0x0008))
+	if w, ok := d.typed(0x0008); ok {
+		return &levelcontroldef.Server{Wrapper: w}
+	}
+	return nil
 }

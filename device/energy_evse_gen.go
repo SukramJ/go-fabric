@@ -50,9 +50,10 @@ var EnergyEvseType = Type{
 type EnergyEvse struct{ *Device }
 
 // NewEnergyEvse returns a EnergyEvse device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewEnergyEvse(opts Options, with ...Option) (*EnergyEvse, error) {
-	d, err := New(&EnergyEvseType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type EnergyEvseID (see [New]).
+func NewEnergyEvse(opts Options, decls ...Declaration) (*EnergyEvse, error) {
+	d, err := FromSpec(Spec{Type: EnergyEvseID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -60,21 +61,34 @@ func NewEnergyEvse(opts Options, with ...Option) (*EnergyEvse, error) {
 }
 
 // EnergyEvse returns the typed EnergyEvse server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server { return energyevsedef.Wrap(d.Server(0x0099)) }
+func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
+	if w, ok := d.typed(0x0099); ok {
+		return &energyevsedef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // EnergyEvseMode returns the typed EnergyEvseMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
-	return energyevsemodedef.Wrap(d.Server(0x009D))
+	if w, ok := d.typed(0x009D); ok {
+		return &energyevsemodedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	if w, ok := d.typed(0x0402); ok {
+		return &temperaturemeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -129,7 +129,7 @@ func TestCommandInvokeResponseParity(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			h := newInvokeHost(t, store.PrivilegeOperate, endpointSpec{key: "switch:1", build: func(site *fabrictest.Site) (node.Endpoint, error) {
-				return device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch", Clock: site.Clock()})
+				return device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch"})
 			}})
 			ep := h.ep("switch:1")
 			h.assert(t, rawInvoke(t, h.pair, im.InvokeRequest{Invokes: []im.CommandInvocation{on(ep)}}),
@@ -275,7 +275,7 @@ type endpointSpec struct {
 
 func lightSpec(key string, with ...device.Option) endpointSpec {
 	return endpointSpec{key: key, build: func(site *fabrictest.Site) (node.Endpoint, error) {
-		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()}, with...)
+		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key}, with...)
 	}}
 }
 
@@ -303,7 +303,7 @@ func failingLightSpec(key string, fail func() error) endpointSpec {
 			return nil, err
 		}
 		held.Store(srv)
-		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()},
+		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key},
 			device.WithServer(&failingOnOff{Server: srv, fail: fail}))
 	}}
 }

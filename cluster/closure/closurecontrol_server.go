@@ -347,7 +347,7 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	s.targetPosition = &t
 	s.mainState = wire.ClosureMainStateMoving
 	s.mu.Unlock()
-	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
+	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
 }
 
@@ -375,7 +375,7 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 	s.targetPosition = nil
 	s.mainState = wire.ClosureMainStateStopped
 	s.mu.Unlock()
-	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
+	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
 }
 
@@ -528,7 +528,7 @@ func (s *ControlServer) FeatureMap() uint32 { return s.inst.FeatureMap() }
 func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
 	var events []pendingEvent
 	defer func() { s.emit(events) }()
-	defer s.Notify(wire.ClosureControlAttrOverallCurrentState, wire.ClosureControlAttrOverallTargetState)
+	defer s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrOverallCurrentState, wire.ClosureControlAttrOverallTargetState)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	prevSecure := s.secureState
@@ -574,7 +574,7 @@ func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mainState = state
 	s.mu.Unlock()
 	if prev != state {
-		s.Notify(wire.ClosureControlAttrMainState)
+		s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)
 	}
 	if prev == wire.ClosureMainStateMoving && state == wire.ClosureMainStateStopped && s.inst.Emits(closuredef.EventMovementCompleted) {
 		s.emit([]pendingEvent{{closuredef.EventMovementCompleted, MovementCompletedEvent{}, s.inst.EventPriority(closuredef.EventMovementCompleted)}})
@@ -591,5 +591,5 @@ func (s *ControlServer) SetErrorList(list wire.ClosureErrorList) {
 	s.errorList = make(wire.ClosureErrorList, len(list))
 	copy(s.errorList, list)
 	s.mu.Unlock()
-	s.Notify(wire.ClosureControlAttrCurrentErrorList)
+	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrCurrentErrorList)
 }

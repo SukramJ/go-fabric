@@ -51,9 +51,10 @@ var ElectricalEnergyTariffType = Type{
 type ElectricalEnergyTariff struct{ *Device }
 
 // NewElectricalEnergyTariff returns a ElectricalEnergyTariff device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewElectricalEnergyTariff(opts Options, with ...Option) (*ElectricalEnergyTariff, error) {
-	d, err := New(&ElectricalEnergyTariffType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ElectricalEnergyTariffID (see [New]).
+func NewElectricalEnergyTariff(opts Options, decls ...Declaration) (*ElectricalEnergyTariff, error) {
+	d, err := FromSpec(Spec{Type: ElectricalEnergyTariffID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -61,25 +62,34 @@ func NewElectricalEnergyTariff(opts Options, with ...Option) (*ElectricalEnergyT
 }
 
 // CommodityPrice returns the typed CommodityPrice server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
-	return commoditypricedef.Wrap(d.Server(0x0095))
+	if w, ok := d.typed(0x0095); ok {
+		return &commoditypricedef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // ElectricalGridConditions returns the typed ElectricalGridConditions server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
-	return electricalgridconditionsdef.Wrap(d.Server(0x00A0))
+	if w, ok := d.typed(0x00A0); ok {
+		return &electricalgridconditionsdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // CommodityTariff returns the typed CommodityTariff server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
-	return commoditytariffdef.Wrap(d.Server(0x0700))
+	if w, ok := d.typed(0x0700); ok {
+		return &commoditytariffdef.Server{Wrapper: w}
+	}
+	return nil
 }

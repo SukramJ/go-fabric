@@ -546,11 +546,20 @@ func (e *Endpoint) IncreaseConfigurationVersion() uint32 {
 // calls with a written NodeLabel: it stores the label in the endpoint's
 // state and hands it to the host's OnNodeLabelWritten.
 func (e *Endpoint) nodeLabelWriter() func(string) {
-	return func(label string) {
-		e.endpointState().setLabel(label)
-		if e.onNodeLabelWritten != nil {
-			e.onNodeLabelWritten(e.SourceKey, label)
-		}
+	return e.SetNodeLabel
+}
+
+// SetNodeLabel sets the endpoint's BridgedDeviceBasicInformation
+// NodeLabel to label (capped at the Matter maximum), as a controller's
+// write does: stored in the endpoint's state, so every later read serves
+// it, and handed to [Config.OnNodeLabelWritten] to persist. It is the
+// host's rename (device.Device.Rename through the node); the caller marks
+// the attribute changed for subscriptions (bridge.Bridge.NotifyEndpointNodeLabel).
+func (e *Endpoint) SetNodeLabel(label string) {
+	label = truncateLabel(label)
+	e.endpointState().setLabel(label)
+	if e.onNodeLabelWritten != nil {
+		e.onNodeLabelWritten(e.SourceKey, label)
 	}
 }
 

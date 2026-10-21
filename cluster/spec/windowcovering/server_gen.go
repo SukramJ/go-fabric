@@ -7,6 +7,7 @@ package windowcovering
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -79,11 +80,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -124,4 +135,117 @@ func (s *Server) HandleGoToLiftPercentage(fn func(ctx context.Context, req GoToL
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleGoToTiltPercentage(fn func(ctx context.Context, req GoToTiltPercentageRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGoToTiltPercentage, fn)
+}
+
+// Mover moves the covering: GoTo to the targets in percent100ths
+// (nil leaves an axis), Stop stops every movement. It returns once
+// the device accepted the target; the position comes back through
+// the server's Set (cluster/cover Mover). Without one a command
+// moves the covering at once.
+type Mover interface {
+	GoTo(ctx context.Context, lift, tilt *uint16) error
+	Stop(ctx context.Context) error
+}
+
+// Declare is the declaration of the WindowCovering cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleUpOrOpen handles the UpOrOpen command in place of the server
+	// (Server.HandleUpOrOpen), inline; an optional command it handles is accepted.
+	HandleUpOrOpen func(ctx context.Context, req UpOrOpenRequest) (struct{}, error)
+	// HandleDownOrClose handles the DownOrClose command in place of the server
+	// (Server.HandleDownOrClose), inline; an optional command it handles is accepted.
+	HandleDownOrClose func(ctx context.Context, req DownOrCloseRequest) (struct{}, error)
+	// HandleStopMotion handles the StopMotion command in place of the server
+	// (Server.HandleStopMotion), inline; an optional command it handles is accepted.
+	HandleStopMotion func(ctx context.Context, req StopMotionRequest) (struct{}, error)
+	// HandleGoToLiftPercentage handles the GoToLiftPercentage command in place of the server
+	// (Server.HandleGoToLiftPercentage), inline; an optional command it handles is accepted.
+	HandleGoToLiftPercentage func(ctx context.Context, req GoToLiftPercentageRequest) (struct{}, error)
+	// HandleGoToTiltPercentage handles the GoToTiltPercentage command in place of the server
+	// (Server.HandleGoToTiltPercentage), inline; an optional command it handles is accepted.
+	HandleGoToTiltPercentage func(ctx context.Context, req GoToTiltPercentageRequest) (struct{}, error)
+	// Mover is the host port the kit's server runs on ([Mover]).
+	Mover Mover
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleUpOrOpen != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUpOrOpen)
+		decl.Attach = d.attach
+	}
+	if d.HandleDownOrClose != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdDownOrClose)
+		decl.Attach = d.attach
+	}
+	if d.HandleStopMotion != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStopMotion)
+		decl.Attach = d.attach
+	}
+	if d.HandleGoToLiftPercentage != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGoToLiftPercentage)
+		decl.Attach = d.attach
+	}
+	if d.HandleGoToTiltPercentage != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGoToTiltPercentage)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("windowcovering OnWrite: %w", err)
+		}
+	}
+	if d.HandleUpOrOpen != nil {
+		if err := s.HandleUpOrOpen(d.HandleUpOrOpen); err != nil {
+			return fmt.Errorf("windowcovering HandleUpOrOpen: %w", err)
+		}
+	}
+	if d.HandleDownOrClose != nil {
+		if err := s.HandleDownOrClose(d.HandleDownOrClose); err != nil {
+			return fmt.Errorf("windowcovering HandleDownOrClose: %w", err)
+		}
+	}
+	if d.HandleStopMotion != nil {
+		if err := s.HandleStopMotion(d.HandleStopMotion); err != nil {
+			return fmt.Errorf("windowcovering HandleStopMotion: %w", err)
+		}
+	}
+	if d.HandleGoToLiftPercentage != nil {
+		if err := s.HandleGoToLiftPercentage(d.HandleGoToLiftPercentage); err != nil {
+			return fmt.Errorf("windowcovering HandleGoToLiftPercentage: %w", err)
+		}
+	}
+	if d.HandleGoToTiltPercentage != nil {
+		if err := s.HandleGoToTiltPercentage(d.HandleGoToTiltPercentage); err != nil {
+			return fmt.Errorf("windowcovering HandleGoToTiltPercentage: %w", err)
+		}
+	}
+	return nil
 }

@@ -55,7 +55,7 @@ type identifyNode struct {
 func newIdentifyNode(t *testing.T, build func(device.Options) (node.Endpoint, error)) *identifyNode {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	e, err := build(device.Options{StableKey: endpoint.StringKey("dev:1"), Name: "dev", Clock: site.Clock()})
+	e, err := build(device.Options{StableKey: endpoint.StringKey("dev:1"), Name: "dev"})
 	if err != nil {
 		t.Fatal(err)
 	}

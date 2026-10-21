@@ -710,7 +710,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		return nil, statusError{im.StatusFailure, fmt.Sprintf("%v: 0x%02X", ErrInvalidHostStatus, uint8(status))}
 	}
 	if status == StatusSuccess {
-		s.setCurrent(newMode)
+		s.setCurrent(contract.OriginCommand, newMode)
 	}
 	return clusterwire.ChangeToModeResponse{Status: uint8(status), StatusText: truncate(text, LabelMaxBytes)}, nil
 }
@@ -825,11 +825,11 @@ func (s *Server) SetCurrentMode(mode uint8) error {
 	if !s.supports(mode) {
 		return fmt.Errorf("%w: %d", ErrUnsupportedMode, mode)
 	}
-	s.setCurrent(mode)
+	s.setCurrent(contract.OriginHostSet, mode)
 	return nil
 }
 
-func (s *Server) setCurrent(mode uint8) {
+func (s *Server) setCurrent(origin contract.Origin, mode uint8) {
 	s.mu.Lock()
 	if s.current == mode {
 		s.mu.Unlock()
@@ -838,7 +838,7 @@ func (s *Server) setCurrent(mode uint8) {
 	s.current = mode
 	s.mu.Unlock()
 	s.tracker().Bump()
-	s.Notify(AttrCurrentMode)
+	s.NotifyFrom(origin, AttrCurrentMode)
 }
 
 // statusError carries an exact IM status to the dispatcher.

@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // typedOnOff is the endpoint's On/Off state a held server couples to: it
@@ -73,7 +74,7 @@ func TestHeldTypedSetGetOnChanged(t *testing.T) {
 	t.Parallel()
 	s, _ := heldServer(t, nil)
 	var changed [][]uint32
-	defer s.OnChanged(func(_ lvldef.State, ids []uint32) { changed = append(changed, ids) })()
+	defer s.OnChanged(func(_ lvldef.State, change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })()
 
 	if err := s.Set(lvldef.Patch{CurrentLevel: ptr(uint8(100)), OnLevel: ptr(uint8(50))}); err != nil {
 		t.Fatal(err)

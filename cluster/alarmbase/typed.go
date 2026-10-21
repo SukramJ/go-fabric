@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite
@@ -70,12 +71,12 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 	s.op.Lock()
 	defer s.op.Unlock()
 	if setMask {
-		if err := s.setMask(mask); err != nil {
+		if err := s.setMask(contract.OriginHostSet, mask); err != nil {
 			return err
 		}
 	}
 	if setState {
-		return s.setState(state, false)
+		return s.setState(contract.OriginHostSet, state, false)
 	}
 	return nil
 }

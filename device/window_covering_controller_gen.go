@@ -52,9 +52,10 @@ var WindowCoveringControllerType = Type{
 type WindowCoveringController struct{ *Device }
 
 // NewWindowCoveringController returns a WindowCoveringController device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewWindowCoveringController(opts Options, with ...Option) (*WindowCoveringController, error) {
-	d, err := New(&WindowCoveringControllerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type WindowCoveringControllerID (see [New]).
+func NewWindowCoveringController(opts Options, decls ...Declaration) (*WindowCoveringController, error) {
+	d, err := FromSpec(Spec{Type: WindowCoveringControllerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +63,12 @@ func NewWindowCoveringController(opts Options, with ...Option) (*WindowCoveringC
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WindowCoveringController) Binding() *bindingdef.Server {
-	return bindingdef.Wrap(d.Server(0x001E))
+	if w, ok := d.typed(0x001E); ok {
+		return &bindingdef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -140,7 +140,7 @@ func subscribeWithProbe(t *testing.T, paths []im.ConcreteAttributePath) *subscri
 	if err != nil {
 		t.Fatal(err)
 	}
-	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("dimmer:1"), Name: "dimmer", Clock: site.Clock()}, device.WithServer(lvl))
+	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("dimmer:1"), Name: "dimmer"}, device.WithServer(lvl))
 	if err != nil {
 		t.Fatal(err)
 	}

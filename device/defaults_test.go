@@ -82,7 +82,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 		}, (*energy.CommodityMeteringServer)(nil)},
 	}
 	covered := map[uint32]bool{}
-	for _, tc := range cases {
+	for _, tc := range slices.Concat(cases, portCases()) {
 		t.Run(fmt.Sprintf("0x%04X", tc.cluster), func(t *testing.T) {
 			t.Parallel()
 			d, err := tc.build()
@@ -120,9 +120,11 @@ func TestSelfHeldDefaults(t *testing.T) {
 }
 
 // TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe:
-// WindowCovering's default selection (Lift without PositionAware) and a
-// DoorLock without features are selections their self-held servers do not
-// serve, so the cluster keeps the generated server, as before.
+// WindowCovering's default selection (Lift without PositionAware) is a
+// selection its self-held server does not serve, so the cluster keeps the
+// generated server, as before; a DoorLock without features mounts the
+// self-held lock since lock.New reads the empty selection as none
+// (brief BU).
 func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *testing.T) {
 	t.Parallel()
 	wc, err := New(&WindowCoveringType, testOptions("wc"), WithFeatures(0x0102, uint32(wcdef.FeatureLift)))
@@ -136,8 +138,8 @@ func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := dl.Server(0x0101).(*spec.Server); !ok {
-		t.Errorf("DoorLock without features mounts %T, want the generated server", dl.Server(0x0101))
+	if _, ok := dl.Server(0x0101).(*lock.DoorLockServer); !ok {
+		t.Errorf("DoorLock without features mounts %T, want the self-held lock", dl.Server(0x0101))
 	}
 }
 

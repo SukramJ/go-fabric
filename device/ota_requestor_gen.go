@@ -40,9 +40,10 @@ var OtaRequestorType = Type{
 type OtaRequestor struct{ *Device }
 
 // NewOtaRequestor returns a OtaRequestor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOtaRequestor(opts Options, with ...Option) (*OtaRequestor, error) {
-	d, err := New(&OtaRequestorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OtaRequestorID (see [New]).
+func NewOtaRequestor(opts Options, decls ...Declaration) (*OtaRequestor, error) {
+	d, err := FromSpec(Spec{Type: OtaRequestorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,12 @@ func NewOtaRequestor(opts Options, with ...Option) (*OtaRequestor, error) {
 }
 
 // OtaSoftwareUpdateRequestor returns the typed OtaSoftwareUpdateRequestor server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *otasoftwareupdaterequestordef.Server {
-	return otasoftwareupdaterequestordef.Wrap(d.Server(0x002A))
+	if w, ok := d.typed(0x002A); ok {
+		return &otasoftwareupdaterequestordef.Server{Wrapper: w}
+	}
+	return nil
 }

@@ -90,9 +90,10 @@ var PumpType = Type{
 type Pump struct{ *Device }
 
 // NewPump returns a Pump device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewPump(opts Options, with ...Option) (*Pump, error) {
-	d, err := New(&PumpType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type PumpID (see [New]).
+func NewPump(opts Options, decls ...Declaration) (*Pump, error) {
+	d, err := FromSpec(Spec{Type: PumpID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -100,43 +101,67 @@ func NewPump(opts Options, with ...Option) (*Pump, error) {
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *Pump) OnOff() *onoffdef.Server {
+	if w, ok := d.typed(0x0006); ok {
+		return &onoffdef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // PumpConfigurationAndControl returns the typed PumpConfigurationAndControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
-	return pumpconfigurationandcontroldef.Wrap(d.Server(0x0200))
+	if w, ok := d.typed(0x0200); ok {
+		return &pumpconfigurationandcontroldef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *Pump) LevelControl() *levelcontroldef.Server { return levelcontroldef.Wrap(d.Server(0x0008)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *Pump) LevelControl() *levelcontroldef.Server {
+	if w, ok := d.typed(0x0008); ok {
+		return &levelcontroldef.Server{Wrapper: w}
+	}
+	return nil
+}
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	if w, ok := d.typed(0x0402); ok {
+		return &temperaturemeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
-	return pressuremeasurementdef.Wrap(d.Server(0x0403))
+	if w, ok := d.typed(0x0403); ok {
+		return &pressuremeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
-	return flowmeasurementdef.Wrap(d.Server(0x0404))
+	if w, ok := d.typed(0x0404); ok {
+		return &flowmeasurementdef.Server{Wrapper: w}
+	}
+	return nil
 }

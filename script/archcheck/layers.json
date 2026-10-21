@@ -6,7 +6,7 @@
     {"name": "security-and-storage", "packages": ["secure/...", "commissioning", "store", "bdx/...", "diagevent", "bootid"]},
     {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "client/..."]},
     {"name": "servers", "packages": ["cluster/...", "binding"]},
-    {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/..."]},
+    {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam"]},
     {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},
     {"name": "facade", "packages": ["node"]},
     {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/..."]}

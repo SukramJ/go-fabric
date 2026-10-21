@@ -7,6 +7,7 @@ package levelcontrol
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -79,11 +80,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -148,4 +159,179 @@ func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOn
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToClosestFrequency, fn)
+}
+
+// LevelSource is the device's level: the kit's LevelControl server
+// reads it and hands it the eight commands, after its own checks
+// (cluster/levelcontrol). A device that holds no level of its own
+// needs none: the kit's server holds it.
+type LevelSource interface {
+	CurrentLevel() (level uint8, known bool)
+	Options() OptionsBitmap
+	OnLevel() (level uint8, known bool)
+	SetOptions(ctx context.Context, options OptionsBitmap) error
+	SetOnLevel(ctx context.Context, level *uint8) error
+	MoveToLevel(ctx context.Context, req MoveToLevelRequest) error
+	MoveToLevelWithOnOff(ctx context.Context, req MoveToLevelWithOnOffRequest) error
+	Move(ctx context.Context, req MoveRequest) error
+	MoveWithOnOff(ctx context.Context, req MoveWithOnOffRequest) error
+	Step(ctx context.Context, req StepRequest) error
+	StepWithOnOff(ctx context.Context, req StepWithOnOffRequest) error
+	Stop(ctx context.Context, req StopRequest) error
+	StopWithOnOff(ctx context.Context, req StopWithOnOffRequest) error
+}
+
+// Declare is the declaration of the LevelControl cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// Transitions runs the commands as transitions over their
+	// TransitionTime (ADR 0014); false applies the target at once.
+	Transitions bool
+	// HandleMoveToLevel handles the MoveToLevel command in place of the server
+	// (Server.HandleMoveToLevel), inline; an optional command it handles is accepted.
+	HandleMoveToLevel func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)
+	// HandleMove handles the Move command in place of the server
+	// (Server.HandleMove), inline; an optional command it handles is accepted.
+	HandleMove func(ctx context.Context, req MoveRequest) (struct{}, error)
+	// HandleStep handles the Step command in place of the server
+	// (Server.HandleStep), inline; an optional command it handles is accepted.
+	HandleStep func(ctx context.Context, req StepRequest) (struct{}, error)
+	// HandleStop handles the Stop command in place of the server
+	// (Server.HandleStop), inline; an optional command it handles is accepted.
+	HandleStop func(ctx context.Context, req StopRequest) (struct{}, error)
+	// HandleMoveToLevelWithOnOff handles the MoveToLevelWithOnOff command in place of the server
+	// (Server.HandleMoveToLevelWithOnOff), inline; an optional command it handles is accepted.
+	HandleMoveToLevelWithOnOff func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)
+	// HandleMoveWithOnOff handles the MoveWithOnOff command in place of the server
+	// (Server.HandleMoveWithOnOff), inline; an optional command it handles is accepted.
+	HandleMoveWithOnOff func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)
+	// HandleStepWithOnOff handles the StepWithOnOff command in place of the server
+	// (Server.HandleStepWithOnOff), inline; an optional command it handles is accepted.
+	HandleStepWithOnOff func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)
+	// HandleStopWithOnOff handles the StopWithOnOff command in place of the server
+	// (Server.HandleStopWithOnOff), inline; an optional command it handles is accepted.
+	HandleStopWithOnOff func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)
+	// HandleMoveToClosestFrequency handles the MoveToClosestFrequency command in place of the server
+	// (Server.HandleMoveToClosestFrequency), inline; an optional command it handles is accepted.
+	HandleMoveToClosestFrequency func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)
+	// LevelSource is the host port the kit's server runs on ([LevelSource]).
+	LevelSource LevelSource
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Transitions = d.Transitions
+	if d.HandleMoveToLevel != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToLevel)
+		decl.Attach = d.attach
+	}
+	if d.HandleMove != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMove)
+		decl.Attach = d.attach
+	}
+	if d.HandleStep != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStep)
+		decl.Attach = d.attach
+	}
+	if d.HandleStop != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStop)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToLevelWithOnOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToLevelWithOnOff)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveWithOnOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveWithOnOff)
+		decl.Attach = d.attach
+	}
+	if d.HandleStepWithOnOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepWithOnOff)
+		decl.Attach = d.attach
+	}
+	if d.HandleStopWithOnOff != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStopWithOnOff)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToClosestFrequency != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToClosestFrequency)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	if d.OnWrite != nil {
+		if err := s.OnWrite(d.OnWrite); err != nil {
+			return fmt.Errorf("levelcontrol OnWrite: %w", err)
+		}
+	}
+	if d.HandleMoveToLevel != nil {
+		if err := s.HandleMoveToLevel(d.HandleMoveToLevel); err != nil {
+			return fmt.Errorf("levelcontrol HandleMoveToLevel: %w", err)
+		}
+	}
+	if d.HandleMove != nil {
+		if err := s.HandleMove(d.HandleMove); err != nil {
+			return fmt.Errorf("levelcontrol HandleMove: %w", err)
+		}
+	}
+	if d.HandleStep != nil {
+		if err := s.HandleStep(d.HandleStep); err != nil {
+			return fmt.Errorf("levelcontrol HandleStep: %w", err)
+		}
+	}
+	if d.HandleStop != nil {
+		if err := s.HandleStop(d.HandleStop); err != nil {
+			return fmt.Errorf("levelcontrol HandleStop: %w", err)
+		}
+	}
+	if d.HandleMoveToLevelWithOnOff != nil {
+		if err := s.HandleMoveToLevelWithOnOff(d.HandleMoveToLevelWithOnOff); err != nil {
+			return fmt.Errorf("levelcontrol HandleMoveToLevelWithOnOff: %w", err)
+		}
+	}
+	if d.HandleMoveWithOnOff != nil {
+		if err := s.HandleMoveWithOnOff(d.HandleMoveWithOnOff); err != nil {
+			return fmt.Errorf("levelcontrol HandleMoveWithOnOff: %w", err)
+		}
+	}
+	if d.HandleStepWithOnOff != nil {
+		if err := s.HandleStepWithOnOff(d.HandleStepWithOnOff); err != nil {
+			return fmt.Errorf("levelcontrol HandleStepWithOnOff: %w", err)
+		}
+	}
+	if d.HandleStopWithOnOff != nil {
+		if err := s.HandleStopWithOnOff(d.HandleStopWithOnOff); err != nil {
+			return fmt.Errorf("levelcontrol HandleStopWithOnOff: %w", err)
+		}
+	}
+	if d.HandleMoveToClosestFrequency != nil {
+		if err := s.HandleMoveToClosestFrequency(d.HandleMoveToClosestFrequency); err != nil {
+			return fmt.Errorf("levelcontrol HandleMoveToClosestFrequency: %w", err)
+		}
+	}
+	return nil
 }

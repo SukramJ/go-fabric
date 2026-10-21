@@ -62,7 +62,7 @@ func createNode(t *testing.T, cfg servicearea.Config) error {
 		return err
 	}
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	rvc, err := devicelayer.NewRoboticVacuumCleaner(devicelayer.Options{StableKey: endpoint.StringKey("rvc:1"), Name: "rvc", Clock: site.Clock()},
+	rvc, err := devicelayer.NewRoboticVacuumCleaner(devicelayer.Options{StableKey: endpoint.StringKey("rvc:1"), Name: "rvc"},
 		devicelayer.WithServer(srv))
 	if err != nil {
 		t.Fatal(err)

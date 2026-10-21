@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // AttributeChanges is the listener set behind
@@ -43,9 +44,19 @@ func (c *AttributeChanges) OnMatterAttributesChanged(cb func(attrIDs []uint32)) 
 	}
 }
 
-// Notify tells every listener that attrIDs changed. It calls them outside
-// its lock, in registration order; an empty list notifies nobody.
+// Notify tells every listener that attrIDs changed, without saying where
+// the change came from ([contract.OriginUnknown]); [AttributeChanges.NotifyFrom]
+// says it.
 func (c *AttributeChanges) Notify(attrIDs ...uint32) {
+	c.NotifyFrom(contract.OriginUnknown, attrIDs...)
+}
+
+// NotifyFrom tells every listener that attrIDs changed, and where the
+// change came from: each listener gets its own copy of the ids, delivered
+// through [contract.DeliverChange], so [contract.OriginOf] reads origin
+// from inside the listener. It calls them outside its lock, in
+// registration order; an empty list notifies nobody.
+func (c *AttributeChanges) NotifyFrom(origin contract.Origin, attrIDs ...uint32) {
 	if len(attrIDs) == 0 {
 		return
 	}
@@ -61,7 +72,7 @@ func (c *AttributeChanges) Notify(attrIDs ...uint32) {
 	}
 	c.mu.Unlock()
 	for _, cb := range cbs {
-		cb(slices.Clone(attrIDs))
+		contract.DeliverChange(origin, slices.Clone(attrIDs), cb)
 	}
 }
 
