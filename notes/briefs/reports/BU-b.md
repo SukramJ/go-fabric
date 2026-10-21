@@ -17,7 +17,10 @@ reference bridge on the declaration, `WithMeasurement` removed,
 `HeldBooleanState`, the switch's typed interfaces), `1dd6f6e9` (media
 merged), `b6625fab` (the bridge builds and passes; four kit fixes the
 rewrite found), `1aef04ec` (the origin audits, CHANGELOG, migration guide,
-device page), `55b8ea54` (lint), this report.
+device page), `55b8ea54` (lint), `9f1fb4d0` and `171f2b40` (coverage of
+the typed interfaces and the kit's factories, written by a Sonnet helper and
+read here; floors), `e023f46e` (the speaker's PICS slice), `65ae9ef1`
+(snapshots), this report.
 
 ## §5 — the ports in the declarations
 
@@ -94,7 +97,22 @@ the `cluster/spec/<cluster>` packages, plus the exceptions:
 
 ## Guards
 
-GUARDS
+Logs in the agent's scratchpad, read by grep; summary lines carry the HEAD.
+
+| guard | HEAD | exit | note |
+| --- | --- | --- | --- |
+| `make ci` (build, vet, test, lint, cover-check) | e023f46e | 2 | one test: `controller/client TestRegistryDecommission` (`registry_test.go:328`, untouched by the branch) under the race run's load; `-count=10` alone passes; the separate `cover-check` below runs the whole suite green |
+| `make cover-check` | 65ae9ef1 | 0 | every package at or above its floor (221 measured); new floor `examples/host-view` 35 (measured 36.2), `cluster/valve` raised 79 → 98 (measured 99.2) |
+| `make lint` | 55b8ea54 | 0 | 0 issues after the thelper / gocritic / prealloc / staticcheck fixes of 55b8ea54 |
+| `make race` | e023f46e | 0 | no `DATA RACE` |
+| `make reachability-check` | 65ae9ef1 | 0 | unreached 5 (the ratchet); snapshot committed |
+| `make cite-check` | e023f46e | 0 | drift 263 (unchanged), 0 hard errors; snapshot committed (line moves only) |
+| `make testparity-check` | e023f46e | 0 | |
+| `go test ./script/clustergen/... ./script/devicegen/...` | b6625fab | 0 | the media branch's generated files current |
+| `mkdocs build --strict` | 797318a7 | 0 | |
+| `GOFABRIC_CHIP_FAMILIES=LVL,OO,CC,WNCV,DRLK,FAN,IDM,ACE,ACL make chiptool-families` | 9f1fb4d0 | 2 | the PICS slice of ep6 (the speaker) moved: `LVL.S.F00=1 → 0`, the speaker's LevelControl without OO (Differences 1) |
+| the same with `chiptool-families-update` | 9f1fb4d0 (binary) | 0 | 162 passed, 41 skipped, 0 failed; only `testdata/pics/ep6.txt` changed (e023f46e); golden and `docs/certifiability.md` unchanged |
+| `make chiptool-test` | 9f1fb4d0 (binary) | 0 | |
 
 ## Differences
 
