@@ -13,6 +13,8 @@ import (
 	"slices"
 	"testing"
 
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	godevice "github.com/SukramJ/go-fabric/device"
@@ -45,7 +47,7 @@ func TestFanControlServerParityMatterJS(t *testing.T) {
 	t.Run("has not-off-only commands by default", func(t *testing.T) {
 		t.Parallel()
 		purifier, err := godevice.NewAirPurifier(godevice.Options{StableKey: endpoint.StringKey("purifier"), Name: "purifier"},
-			godevice.WithOptional(onoff.ClusterID))
+			onoffdef.Declare{})
 		if err != nil {
 			t.Fatal(err)
 		}

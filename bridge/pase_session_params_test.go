@@ -65,28 +65,3 @@ func TestSessionParametersForStatesTCPOnlyWhenOffered(t *testing.T) {
 		t.Fatal("the other fields must stay the defaults")
 	}
 }
-
-// TestPaseAdapterLegacyTripletSettersStillWork: the deprecated setter
-// and getter keep working through the structure until their removal.
-func TestPaseAdapterLegacyTripletSettersStillWork(t *testing.T) {
-	t.Parallel()
-	a := NewPaseAdapter(nil)
-	idle := uint32(777)
-	a.SetResponderMRPParams(&spake2.MRPParameters{IdleRetransTimeoutMs: &idle}) //nolint:staticcheck // the deprecated triplet API stays under test until its removal
-	a.mu.Lock()
-	got := a.responderSessionParams
-	a.mu.Unlock()
-	if got == nil || got.SessionIdleInterval != 777 || got.MaxPathsPerInvoke != DefaultSessionParameters().MaxPathsPerInvoke {
-		t.Fatalf("legacy setter produced %+v", got)
-	}
-	a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
-	if _, _, err := a.ProcessPBKDFParamRequest(buildTestPBKDFParamRequestWithMRP(t, make([]byte, spake2.PBKDFRandomSize))); err != nil {
-		t.Fatal(err)
-	}
-	if m := a.PeerMRPParams(); m == nil || *m.IdleRetransTimeoutMs != 800 {
-		t.Fatalf("legacy getter = %+v", m)
-	}
-	if p := a.PeerSessionParams(); p == nil || p.SessionActiveThreshold != 3000 {
-		t.Fatalf("PeerSessionParams = %+v", p)
-	}
-}

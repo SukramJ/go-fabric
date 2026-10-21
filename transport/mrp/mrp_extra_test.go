@@ -5,7 +5,6 @@ package mrp_test
 
 import (
 	"encoding/binary"
-	"math/rand/v2"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -134,17 +133,5 @@ func TestLookupAndDischargeAbsent(t *testing.T) {
 	}
 	if counter != 0 {
 		t.Fatalf("counter=%d, want 0 for absent exchange", counter)
-	}
-}
-
-// TestNewRetransmitter_NilRNG verifies that NewRetransmitter falls back to a
-// default math/rand/v2 PCG generator when rng is nil (exercises line 74-76 of
-// retransmit.go). The resulting Retransmitter must be functional.
-func TestNewRetransmitter_NilRNG(t *testing.T) {
-	t.Parallel()
-	// Pass nil to trigger the default-rng branch.
-	r := mrp.NewRetransmitter(func([]byte) error { return nil }, (*rand.Rand)(nil))
-	if r == nil {
-		t.Fatal("NewRetransmitter(nil rng): returned nil")
 	}
 }

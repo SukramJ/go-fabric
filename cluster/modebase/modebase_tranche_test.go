@@ -186,7 +186,7 @@ func TestMicrowaveOvenModeAcceptsNoCommand(t *testing.T) {
 		t.Errorf("command lists %v / %v", srv.MatterAcceptedCommands(), srv.MatterGeneratedCommands())
 	}
 	var sce im.StatusCodeError
-	for _, req := range []any{microwaveovenmode.ChangeToModeRequest{NewMode: 1}, clusterwire.ChangeToModeRequest{NewMode: 1}} { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+	for _, req := range []any{microwaveovenmode.ChangeToModeRequest{NewMode: 1}} {
 		if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, req); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusUnsupportedCommand {
 			t.Errorf("%T: %v", req, err)
 		}

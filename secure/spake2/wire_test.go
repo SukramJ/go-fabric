@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -413,9 +414,9 @@ func TestPBKDFParamResponseDefensiveSaltCopy(t *testing.T) {
 }
 
 // TestPBKDFParamResponse_MarshalWithMRPParams — Marshal must include the
-// ResponderMRPParams nested struct when the field is non-nil, and each
-// optional sub-field must appear in the output. DecodePBKDFParamResponse
-// consumes the response and must reconstruct every pointer field.
+// ResponderSessionParams nested struct when the field is non-nil, and each
+// MRP sub-field must appear in the output. DecodePBKDFParamResponse
+// consumes the response and must reconstruct every field.
 func TestPBKDFParamResponse_MarshalWithMRPParams(t *testing.T) {
 	t.Parallel()
 	initRand := random32()
@@ -432,10 +433,10 @@ func TestPBKDFParamResponse_MarshalWithMRPParams(t *testing.T) {
 			Iterations: spake2.PBKDFMinIterations,
 			Salt:       salt,
 		},
-		ResponderMRPParams: &spake2.MRPParameters{
-			IdleRetransTimeoutMs:   &idleMs,
-			ActiveRetransTimeoutMs: &activeMs,
-			ActiveThresholdTimeMs:  &thresholdMs,
+		ResponderSessionParams: &sessionparams.Parameters{
+			SessionIdleInterval:    idleMs,
+			SessionActiveInterval:  activeMs,
+			SessionActiveThreshold: thresholdMs,
 		},
 	}
 	wire := resp.Marshal()
@@ -443,23 +444,24 @@ func TestPBKDFParamResponse_MarshalWithMRPParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodePBKDFParamResponse: %v", err)
 	}
-	if got.ResponderMRPParams == nil {
-		t.Fatal("ResponderMRPParams is nil after decode, want non-nil")
+	sp := got.ResponderSessionParams
+	if sp == nil {
+		t.Fatal("ResponderSessionParams is nil after decode, want non-nil")
 	}
-	if got.ResponderMRPParams.IdleRetransTimeoutMs == nil || *got.ResponderMRPParams.IdleRetransTimeoutMs != idleMs {
-		t.Errorf("IdleRetransTimeoutMs = %v, want %d", got.ResponderMRPParams.IdleRetransTimeoutMs, idleMs)
+	if sp.SessionIdleInterval != idleMs {
+		t.Errorf("SessionIdleInterval = %d, want %d", sp.SessionIdleInterval, idleMs)
 	}
-	if got.ResponderMRPParams.ActiveRetransTimeoutMs == nil || *got.ResponderMRPParams.ActiveRetransTimeoutMs != activeMs {
-		t.Errorf("ActiveRetransTimeoutMs = %v, want %d", got.ResponderMRPParams.ActiveRetransTimeoutMs, activeMs)
+	if sp.SessionActiveInterval != activeMs {
+		t.Errorf("SessionActiveInterval = %d, want %d", sp.SessionActiveInterval, activeMs)
 	}
-	if got.ResponderMRPParams.ActiveThresholdTimeMs == nil || *got.ResponderMRPParams.ActiveThresholdTimeMs != thresholdMs {
-		t.Errorf("ActiveThresholdTimeMs = %v, want %d", got.ResponderMRPParams.ActiveThresholdTimeMs, thresholdMs)
+	if sp.SessionActiveThreshold != thresholdMs {
+		t.Errorf("SessionActiveThreshold = %d, want %d", sp.SessionActiveThreshold, thresholdMs)
 	}
 }
 
 // TestPBKDFParamResponse_MarshalWithPartialMRPParams — when only some
-// optional MRPParameters fields are set, the others must be nil after
-// the decode round-trip (absent from wire → pointer remains nil).
+// SessionParameters fields are set, the others must stay 0 ("not
+// stated") after the decode round-trip (absent from the wire).
 func TestPBKDFParamResponse_MarshalWithPartialMRPParams(t *testing.T) {
 	t.Parallel()
 	initRand := random32()
@@ -469,9 +471,9 @@ func TestPBKDFParamResponse_MarshalWithPartialMRPParams(t *testing.T) {
 		InitiatorRandom:    initRand,
 		ResponderRandom:    respRand,
 		ResponderSessionID: 5,
-		ResponderMRPParams: &spake2.MRPParameters{
-			IdleRetransTimeoutMs: &idleMs,
-			// ActiveRetransTimeoutMs and ActiveThresholdTimeMs absent.
+		ResponderSessionParams: &sessionparams.Parameters{
+			SessionIdleInterval: idleMs,
+			// SessionActiveInterval and SessionActiveThreshold absent.
 		},
 	}
 	// Note: Parameters is nil so the decode will fail the mandatory random
@@ -486,17 +488,15 @@ func TestPBKDFParamResponse_MarshalWithPartialMRPParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodePBKDFParamResponse: %v", err)
 	}
-	if got.ResponderMRPParams == nil {
-		t.Fatal("ResponderMRPParams is nil")
+	sp := got.ResponderSessionParams
+	if sp == nil {
+		t.Fatal("ResponderSessionParams is nil")
 	}
-	if got.ResponderMRPParams.IdleRetransTimeoutMs == nil || *got.ResponderMRPParams.IdleRetransTimeoutMs != idleMs {
-		t.Errorf("IdleRetransTimeoutMs = %v, want %d", got.ResponderMRPParams.IdleRetransTimeoutMs, idleMs)
+	if sp.SessionIdleInterval != idleMs {
+		t.Errorf("SessionIdleInterval = %d, want %d", sp.SessionIdleInterval, idleMs)
 	}
-	if got.ResponderMRPParams.ActiveRetransTimeoutMs != nil {
-		t.Errorf("ActiveRetransTimeoutMs = %v, want nil", got.ResponderMRPParams.ActiveRetransTimeoutMs)
-	}
-	if got.ResponderMRPParams.ActiveThresholdTimeMs != nil {
-		t.Errorf("ActiveThresholdTimeMs = %v, want nil", got.ResponderMRPParams.ActiveThresholdTimeMs)
+	if sp.SessionActiveInterval != 0 || sp.SessionActiveThreshold != 0 {
+		t.Errorf("absent fields = %d / %d, want 0 / 0", sp.SessionActiveInterval, sp.SessionActiveThreshold)
 	}
 }
 

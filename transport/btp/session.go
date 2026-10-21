@@ -43,37 +43,6 @@ func (r Role) String() string {
 	return "peripheral"
 }
 
-// Clock is the session's time source for its three timers; the system
-// clock's AfterFunc is time.AfterFunc. A test supplies its own.
-//
-// Deprecated: set [Options.TimeSource] to a [clock.Clock], the module's
-// time port; Clock may be removed in v0.10.0.
-type Clock interface {
-	AfterFunc(d time.Duration, f func()) Timer
-}
-
-// Timer is a timer [Clock.AfterFunc] started.
-//
-// Deprecated: a [clock.Clock] returns a [clock.Timer]; Timer may be
-// removed in v0.10.0.
-type Timer interface {
-	Stop() bool
-}
-
-// SystemClock is the [Clock] of the time package.
-//
-// Deprecated: use [clock.System] as [Options.TimeSource]; SystemClock
-// may be removed in v0.10.0.
-type SystemClock struct{}
-
-// AfterFunc is time.AfterFunc.
-func (SystemClock) AfterFunc(d time.Duration, f func()) Timer { return clock.System{}.AfterFunc(d, f) }
-
-// portClock is a [clock.Clock] as the session's [Clock].
-type portClock struct{ c clock.Clock }
-
-func (p portClock) AfterFunc(d time.Duration, f func()) Timer { return p.c.AfterFunc(d, f) }
-
 // Callbacks are the session's way out — matter.js's writeBleCallback,
 // disconnectBleCallback and handleMatterMessagePayload
 // (BtpSessionHandler.ts:205-213). Each is called with no session lock
@@ -93,14 +62,9 @@ type Callbacks struct {
 // Options are the session's clock and logger; the zero value is the
 // system clock and no log.
 type Options struct {
-	// TimeSource paces the session's timers. Set, it wins over Clock;
-	// neither set is [clock.System].
+	// TimeSource paces the session's timers; nil is [clock.System].
 	TimeSource clock.Clock
-	// Clock is the old timer seam.
-	//
-	// Deprecated: set TimeSource; Clock may be removed in v0.10.0.
-	Clock  Clock
-	Logger *slog.Logger
+	Logger     *slog.Logger
 }
 
 // outgoing is one queued Matter message and how much of it is sent —
@@ -116,7 +80,7 @@ type outgoing struct {
 type Session struct {
 	role         Role
 	cb           Callbacks
-	clock        Clock
+	clock        clock.Clock
 	log          *slog.Logger
 	fragmentSize int
 	windowSize   int
@@ -155,7 +119,7 @@ type sessionTimer struct {
 	s       *Session
 	d       time.Duration
 	fn      func()
-	t       Timer
+	t       clock.Timer
 	gen     uint64
 	running bool
 }
@@ -265,17 +229,11 @@ func newSession(role Role, version, fragmentSize, windowSize int, cb Callbacks, 
 	if version != 4 {
 		return nil, protocolError(fmt.Sprintf("Unsupported BTP version %d", version))
 	}
-	switch {
-	case opts.TimeSource != nil:
-		opts.Clock = portClock{opts.TimeSource}
-	case opts.Clock == nil:
-		opts.Clock = portClock{clock.System{}}
-	}
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.DiscardHandler)
 	}
 	s := &Session{
-		role: role, cb: cb, clock: opts.Clock, log: opts.Logger,
+		role: role, cb: cb, clock: clock.Or(opts.TimeSource), log: opts.Logger,
 		fragmentSize: fragmentSize, windowSize: windowSize,
 		prevIncomingSeq: 255, prevIncomingAck: -1,
 		seq: 0, prevAckedSeq: -1,

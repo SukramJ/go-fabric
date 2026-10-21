@@ -168,7 +168,7 @@ func (e *demoEvse) build() {
 			UserMaximumChargeCurrent: true, RandomizationDelayWindow: true, ApproximateEvEfficiency: true,
 			StartDiagnostics: true,
 			Host:             e,
-			Now:              e.now, //nolint:staticcheck // SA1019: the example keeps its own clock (a chip-style TestTimeManager), read through Now
+			Clock:            nowClock{now: e.now},
 			DataVersion:      &e.version.evse,
 		})
 		if err != nil {
@@ -473,7 +473,7 @@ func newDemoDem(name string, now func() time.Time) *demoDem {
 			energy.DemFeaturePausable | energy.DemFeatureForecastAdjustment | energy.DemFeatureConstraintBasedAdjustment,
 		EsaType: dem.ESATypeEvse, EsaState: energy.EsaStateOnline,
 		AbsMinPower: 1200000, AbsMaxPower: 7600000,
-		Manager: d, Now: now, DataVersion: &d.version.dem, //nolint:staticcheck // SA1019: the example keeps its own clock, read through Now
+		Manager: d, Clock: nowClock{now: now}, DataVersion: &d.version.dem,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("evse DeviceEnergyManagement: %v", err))

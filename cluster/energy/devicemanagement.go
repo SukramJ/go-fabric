@@ -208,13 +208,8 @@ type DeviceEnergyConfig struct {
 	// Manager carries out the requests; required.
 	Manager DemManager
 	// Clock is the wall clock the epoch-s times are read from and the
-	// PowerAdjust and Pause timers run on. Set, it wins over Now (which
-	// then only reads); neither set is [clock.System].
+	// PowerAdjust and Pause timers run on. Nil is [clock.System].
 	Clock clock.Clock
-	// Now is the wall clock the epoch-s times are read from.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
 }
@@ -271,7 +266,7 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	if cfg.Manager == nil {
 		return nil, ErrNoDemManager
 	}
-	s := &DeviceEnergyManagementServer{manager: cfg.Manager, now: cfg.Now, clock: clock.Or(cfg.Clock)}
+	s := &DeviceEnergyManagementServer{manager: cfg.Manager, clock: clock.Or(cfg.Clock)}
 	handlers := map[uint32]spec.CommandHandler{
 		dem.CmdPowerAdjustRequest:             s.powerAdjustRequest,
 		dem.CmdCancelPowerAdjustRequest:       s.cancelPowerAdjustRequest,
@@ -287,12 +282,7 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 		return nil, fmt.Errorf("energy: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
-	switch {
-	case cfg.Clock != nil:
-		s.now = cfg.Clock.Now
-	case s.now == nil:
-		s.now = clock.System{}.Now
-	}
+	s.now = s.clock.Now
 	values := map[uint32]any{
 		dem.AttrEsaType:        cfg.EsaType,
 		dem.AttrEsaCanGenerate: cfg.EsaCanGenerate,

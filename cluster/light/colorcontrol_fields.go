@@ -10,23 +10,21 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 // A command's fields reach the server in one of three shapes: the
 // generated request struct the bridge decodes through the ColorControl
 // definition (cluster/spec/colorcontrol, with matter.js's TlvSchema checks
 // and statuses) — by value or by pointer, the primary form — the generic
-// tag map an in-process caller hands over, or, until their removal in
-// v0.12.0, the deprecated cluster/wire structs. Every shape is normalised to the generated
+// tag map an in-process caller hands over. Every shape is normalised to the generated
 // struct, and its values are checked against the field constraints and
 // enums of color-control.element.ts — CONSTRAINT_ERROR, as matter.js's
 // ValueValidator answers a request field out of range — so a shape that
 // bypassed the decoder is held to the same rules.
 
-// requestOf normalises fields to T: T itself, a *T, a legacy struct legacy
-// converts, or a tag map fromMap reads.
-func requestOf[T any](fields any, name string, legacy func(any) (T, bool), fromMap func(map[uint8]any) T) (T, error) {
+// requestOf normalises fields to T: T itself, a *T, or a tag map fromMap
+// reads.
+func requestOf[T any](fields any, name string, fromMap func(map[uint8]any) T) (T, error) {
 	switch v := fields.(type) {
 	case map[uint8]any:
 		return fromMap(v), nil
@@ -36,12 +34,6 @@ func requestOf[T any](fields any, name string, legacy func(any) (T, bool), fromM
 		}
 	case T:
 		return v, nil
-	default:
-		if legacy != nil {
-			if r, ok := legacy(fields); ok {
-				return r, nil
-			}
-		}
 	}
 	var zero T
 	return zero, colorControlInvalidCommandErr(fmt.Sprintf("light: %s carried %T", name, fields))
@@ -150,13 +142,6 @@ func firstErr(errs ...error) error {
 
 func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 	r, err := requestOf(fields, "MoveToHue",
-		func(v any) (ccdef.MoveToHueRequest, bool) {
-			w, ok := v.(wire.MoveToHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveToHueRequest{
-				Hue: w.Hue, Direction: ccdef.DirectionEnum(w.Direction), TransitionTime: w.TransitionTime,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveToHueRequest {
 			return ccdef.MoveToHueRequest{
 				Hue: u8(m, 0), Direction: ccdef.DirectionEnum(u8(m, 1)), TransitionTime: u16(m, 2),
@@ -175,13 +160,6 @@ func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 
 func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 	r, err := requestOf(fields, "MoveHue",
-		func(v any) (ccdef.MoveHueRequest, bool) {
-			w, ok := v.(wire.MoveHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveHueRequest{
-				MoveMode: ccdef.MoveModeEnum(w.MoveMode), Rate: w.Rate,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveHueRequest {
 			return ccdef.MoveHueRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u8(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
@@ -195,14 +173,6 @@ func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 
 func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 	r, err := requestOf(fields, "StepHue",
-		func(v any) (ccdef.StepHueRequest, bool) {
-			w, ok := v.(wire.StepHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.StepHueRequest{
-				StepMode: ccdef.StepModeEnum(w.StepMode), StepSize: w.StepSize,
-				TransitionTime: uint8(min(w.TransitionTime, math.MaxUint8)), //nolint:gosec // bounded by MaxUint8
-				OptionsMask:    ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok && w.TransitionTime <= math.MaxUint8
-		},
 		func(m map[uint8]any) ccdef.StepHueRequest {
 			return ccdef.StepHueRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u8(m, 1), TransitionTime: u8(m, 2),
@@ -217,13 +187,6 @@ func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 
 func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToSaturation",
-		func(v any) (ccdef.MoveToSaturationRequest, bool) {
-			w, ok := v.(wire.MoveToSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveToSaturationRequest{
-				Saturation: w.Saturation, TransitionTime: w.TransitionTime,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveToSaturationRequest {
 			return ccdef.MoveToSaturationRequest{
 				Saturation: u8(m, 0), TransitionTime: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
@@ -240,13 +203,6 @@ func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 
 func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveSaturation",
-		func(v any) (ccdef.MoveSaturationRequest, bool) {
-			w, ok := v.(wire.MoveSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveSaturationRequest{
-				MoveMode: ccdef.MoveModeEnum(w.MoveMode), Rate: w.Rate,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveSaturationRequest {
 			return ccdef.MoveSaturationRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u8(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
@@ -260,14 +216,6 @@ func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 
 func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 	r, err := requestOf(fields, "StepSaturation",
-		func(v any) (ccdef.StepSaturationRequest, bool) {
-			w, ok := v.(wire.StepSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.StepSaturationRequest{
-				StepMode: ccdef.StepModeEnum(w.StepMode), StepSize: w.StepSize,
-				TransitionTime: uint8(min(w.TransitionTime, math.MaxUint8)), //nolint:gosec // bounded by MaxUint8
-				OptionsMask:    ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok && w.TransitionTime <= math.MaxUint8
-		},
 		func(m map[uint8]any) ccdef.StepSaturationRequest {
 			return ccdef.StepSaturationRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u8(m, 1), TransitionTime: u8(m, 2),
@@ -282,13 +230,6 @@ func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 
 func moveToHueAndSaturationFields(fields any) (ccdef.MoveToHueAndSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToHueAndSaturation",
-		func(v any) (ccdef.MoveToHueAndSaturationRequest, bool) {
-			w, ok := v.(wire.MoveToHueAndSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveToHueAndSaturationRequest{
-				Hue: w.Hue, Saturation: w.Saturation, TransitionTime: w.TransitionTime,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveToHueAndSaturationRequest {
 			return ccdef.MoveToHueAndSaturationRequest{
 				Hue: u8(m, 0), Saturation: u8(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -305,7 +246,7 @@ func moveToHueAndSaturationFields(fields any) (ccdef.MoveToHueAndSaturationReque
 }
 
 func moveToColorFields(fields any) (ccdef.MoveToColorRequest, error) {
-	r, err := requestOf(fields, "MoveToColor", nil,
+	r, err := requestOf(fields, "MoveToColor",
 		func(m map[uint8]any) ccdef.MoveToColorRequest {
 			return ccdef.MoveToColorRequest{
 				ColorX: u16(m, 0), ColorY: u16(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -322,14 +263,14 @@ func moveToColorFields(fields any) (ccdef.MoveToColorRequest, error) {
 }
 
 func moveColorFields(fields any) (ccdef.MoveColorRequest, error) {
-	return requestOf(fields, "MoveColor", nil,
+	return requestOf(fields, "MoveColor",
 		func(m map[uint8]any) ccdef.MoveColorRequest {
 			return ccdef.MoveColorRequest{RateX: i16(m, 0), RateY: i16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3)}
 		})
 }
 
 func stepColorFields(fields any) (ccdef.StepColorRequest, error) {
-	r, err := requestOf(fields, "StepColor", nil,
+	r, err := requestOf(fields, "StepColor",
 		func(m map[uint8]any) ccdef.StepColorRequest {
 			return ccdef.StepColorRequest{
 				StepX: i16(m, 0), StepY: i16(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -343,13 +284,6 @@ func stepColorFields(fields any) (ccdef.StepColorRequest, error) {
 
 func moveToColorTemperatureFields(fields any) (ccdef.MoveToColorTemperatureRequest, error) {
 	r, err := requestOf(fields, "MoveToColorTemperature",
-		func(v any) (ccdef.MoveToColorTemperatureRequest, bool) {
-			w, ok := v.(wire.MoveToColorTemperatureRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-			return ccdef.MoveToColorTemperatureRequest{
-				ColorTemperatureMireds: w.ColorTemperatureMireds, TransitionTime: w.TransitionTime,
-				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
-			}, ok
-		},
 		func(m map[uint8]any) ccdef.MoveToColorTemperatureRequest {
 			return ccdef.MoveToColorTemperatureRequest{
 				ColorTemperatureMireds: u16(m, 0), TransitionTime: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
@@ -365,7 +299,7 @@ func moveToColorTemperatureFields(fields any) (ccdef.MoveToColorTemperatureReque
 }
 
 func moveColorTemperatureFields(fields any) (ccdef.MoveColorTemperatureRequest, error) {
-	r, err := requestOf(fields, "MoveColorTemperature", nil,
+	r, err := requestOf(fields, "MoveColorTemperature",
 		func(m map[uint8]any) ccdef.MoveColorTemperatureRequest {
 			return ccdef.MoveColorTemperatureRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u16(m, 1), ColorTemperatureMinimumMireds: u16(m, 2),
@@ -383,7 +317,7 @@ func moveColorTemperatureFields(fields any) (ccdef.MoveColorTemperatureRequest, 
 }
 
 func stepColorTemperatureFields(fields any) (ccdef.StepColorTemperatureRequest, error) {
-	r, err := requestOf(fields, "StepColorTemperature", nil,
+	r, err := requestOf(fields, "StepColorTemperature",
 		func(m map[uint8]any) ccdef.StepColorTemperatureRequest {
 			return ccdef.StepColorTemperatureRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u16(m, 1), TransitionTime: u16(m, 2),
@@ -403,7 +337,7 @@ func stepColorTemperatureFields(fields any) (ccdef.StepColorTemperatureRequest, 
 }
 
 func enhancedMoveToHueFields(fields any) (ccdef.EnhancedMoveToHueRequest, error) {
-	r, err := requestOf(fields, "EnhancedMoveToHue", nil,
+	r, err := requestOf(fields, "EnhancedMoveToHue",
 		func(m map[uint8]any) ccdef.EnhancedMoveToHueRequest {
 			return ccdef.EnhancedMoveToHueRequest{
 				EnhancedHue: u16(m, 0), Direction: ccdef.DirectionEnum(u8(m, 1)), TransitionTime: u16(m, 2),
@@ -420,7 +354,7 @@ func enhancedMoveToHueFields(fields any) (ccdef.EnhancedMoveToHueRequest, error)
 }
 
 func enhancedMoveHueFields(fields any) (ccdef.EnhancedMoveHueRequest, error) {
-	r, err := requestOf(fields, "EnhancedMoveHue", nil,
+	r, err := requestOf(fields, "EnhancedMoveHue",
 		func(m map[uint8]any) ccdef.EnhancedMoveHueRequest {
 			return ccdef.EnhancedMoveHueRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
@@ -433,7 +367,7 @@ func enhancedMoveHueFields(fields any) (ccdef.EnhancedMoveHueRequest, error) {
 }
 
 func enhancedStepHueFields(fields any) (ccdef.EnhancedStepHueRequest, error) {
-	r, err := requestOf(fields, "EnhancedStepHue", nil,
+	r, err := requestOf(fields, "EnhancedStepHue",
 		func(m map[uint8]any) ccdef.EnhancedStepHueRequest {
 			return ccdef.EnhancedStepHueRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u16(m, 1), TransitionTime: u16(m, 2),
@@ -450,7 +384,7 @@ func enhancedStepHueFields(fields any) (ccdef.EnhancedStepHueRequest, error) {
 }
 
 func enhancedMoveToHueAndSaturationFields(fields any) (ccdef.EnhancedMoveToHueAndSaturationRequest, error) {
-	r, err := requestOf(fields, "EnhancedMoveToHueAndSaturation", nil,
+	r, err := requestOf(fields, "EnhancedMoveToHueAndSaturation",
 		func(m map[uint8]any) ccdef.EnhancedMoveToHueAndSaturationRequest {
 			return ccdef.EnhancedMoveToHueAndSaturationRequest{
 				EnhancedHue: u16(m, 0), Saturation: u8(m, 1), TransitionTime: u16(m, 2),
@@ -467,7 +401,7 @@ func enhancedMoveToHueAndSaturationFields(fields any) (ccdef.EnhancedMoveToHueAn
 }
 
 func colorLoopSetFields(fields any) (ccdef.ColorLoopSetRequest, error) {
-	r, err := requestOf(fields, "ColorLoopSet", nil,
+	r, err := requestOf(fields, "ColorLoopSet",
 		func(m map[uint8]any) ccdef.ColorLoopSetRequest {
 			return ccdef.ColorLoopSetRequest{
 				UpdateFlags: ccdef.UpdateFlagsBitmap(u8(m, 0)), Action: ccdef.ColorLoopActionEnum(u8(m, 1)),
@@ -491,7 +425,7 @@ func stopMoveStepFields(fields any) (ccdef.StopMoveStepRequest, error) {
 	if fields == nil {
 		return ccdef.StopMoveStepRequest{}, nil
 	}
-	return requestOf(fields, "StopMoveStep", nil,
+	return requestOf(fields, "StopMoveStep",
 		func(m map[uint8]any) ccdef.StopMoveStepRequest {
 			return ccdef.StopMoveStepRequest{OptionsMask: opts(m, 0), OptionsOverride: opts(m, 1)}
 		})

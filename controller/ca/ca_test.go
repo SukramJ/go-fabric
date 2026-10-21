@@ -246,8 +246,4 @@ func TestRejects(t *testing.T) {
 	if _, err := ca.New(ca.Config{Clock: clocktest.New(time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC))}); err == nil {
 		t.Fatal("a notBefore before the Matter epoch was accepted")
 	}
-	// The deprecated Now keeps working for its window.
-	if _, err := ca.New(ca.Config{Now: func() time.Time { return time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC) }}); err == nil { //nolint:staticcheck // SA1019: the deprecated path is under test
-		t.Fatal("a notBefore before the Matter epoch was accepted through the deprecated Now")
-	}
 }

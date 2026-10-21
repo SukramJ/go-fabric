@@ -29,7 +29,7 @@ import (
 //     supplied by AddTrustedRootCertificate.
 //
 // The verifier carries a clock so tests can pin "now" via a
-// [TimeSource] implementation; production code uses [SystemTime].
+// [TimeSource] implementation; production code uses [clock.System].
 type Verifier struct {
 	root *ecdsa.PublicKey
 	now  TimeSource
@@ -41,14 +41,6 @@ type Verifier struct {
 type TimeSource interface {
 	Now() time.Time
 }
-
-// SystemTime delegates to time.Now.
-//
-// Deprecated: use [clock.System]; SystemTime may be removed in v0.10.0.
-type SystemTime struct{}
-
-// Now implements [TimeSource].
-func (SystemTime) Now() time.Time { return clock.System{}.Now() }
 
 // FixedTime returns a [TimeSource] that always reports t — for tests.
 type FixedTime struct{ T time.Time }

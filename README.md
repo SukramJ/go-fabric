@@ -152,24 +152,22 @@ An identifier on its way out is marked, kept working, and only then removed.
    release in which their code still compiles and the warning is already
    visible.
 
+**Suspended until a second consumer or `v1.0.0`** (owner decision,
+2026-10-21). While the reference consumer is the module's only one and
+migrates in one step, a replaced identifier is removed in the next minor
+release, without the window, once
+[`docs/guides/migrating-to-the-facade.md`](./docs/guides/migrating-to-the-facade.md)
+names its replacement — a removal without its line there is a defect. The
+removal is announced under `### Removed` as below. The window returns, as
+written above, with the second consumer or with `v1.0.0`, whichever comes
+first.
+
 Currently deprecated, each with its replacement and the release its removal
 becomes permissible in:
 
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
-| `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock`, `btp.Options.Clock` | `btp.Options.TimeSource` (a `clock.Clock`), `clock.System` | `v0.10.0` |
-| `cluster/onoff.Clock`, `onoff.Config.Clock` | `onoff.Config.TimeSource` | `v0.10.0` |
-| `cluster/core.OtaClock`, `core.OTARequestorConfig.Clock` | `core.OTARequestorConfig.TimeSource` | `v0.10.0` |
-| `cluster/core.OTAProviderConfig.Now` | `core.OTAProviderConfig.Clock` | `v0.10.0` |
-| `cluster/core.CommissionerControlConfig.Now` | `core.CommissionerControlConfig.Clock` | `v0.10.0` |
-| `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` | `v0.10.0` |
-| `cluster/closure.DimensionConfig.Now` | `closure.DimensionConfig.Clock` | `v0.10.0` |
-| `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each | `v0.10.0` |
-| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) | `v0.10.0` |
-| `controller/ca.Config.Now` | `ca.Config.Clock` | `v0.10.0` |
-| `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error | `v0.10.0` |
-| `cluster/wire.GenericSwitch`, `wire.NewGenericSwitch` (marked by brief BK) | `cluster/switch` (`switchserver.New`), which the MomentarySwitch materialiser builds | `v0.10.0` |
-| `cluster/wire.MoveToHueRequest`, `MoveHueRequest`, `StepHueRequest`, `MoveToSaturationRequest`, `MoveSaturationRequest`, `StepSaturationRequest`, `MoveToHueAndSaturationRequest`, `MoveToColorTemperatureRequest`, `GoToLiftPercentageRequest`, `GoToTiltPercentageRequest`, `SetpointRaiseLowerRequest`, `MoveToRequest`, `ChangeToModeRequest`, and the `Decode…` functions producing them (marked by brief BX1) | the generated request of the cluster, `cluster/spec/<cluster>.<Command>Request` (`colorcontrol`, `windowcovering`, `thermostat`, `closurecontrol`, the mode derivation), which the bridge decodes and every module server takes | `v0.12.0` |
+| `store.SettingUniqueIDRotated` | none: the node reads it once, as the unique-id migration of issue #122, and clears it; kept until the owner decides that migration's end | open |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
@@ -183,7 +181,8 @@ tracked a pseudo-version. `main` is still consumable the same way — see
 `CONTRIBUTING.md` — but a tagged version is what a consumer should pin.
 
 SemVer permits a `v0` module to break on any minor bump. This module does not use that permission as a default. The window
-above applies at `v0` exactly as it would at `v1`: a breaking change is a
+above applies at `v0` exactly as it would at `v1` — outside its suspension
+until a second consumer or `v1.0.0` (above): a breaking change is a
 minor bump, never a patch, and wherever the old identifier can be kept
 working it is kept working for the full window.
 

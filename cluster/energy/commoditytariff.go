@@ -191,13 +191,8 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 type CommodityTariffConfig struct {
 	Features TariffFeature
 	// Clock is the clock the tariff's current day and day entry are read
-	// from. Set, it wins over Now; neither set is [clock.System].
+	// from. Nil is [clock.System].
 	Clock clock.Clock
-	// Now is the clock the tariff's current day and day entry are read
-	// from.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
 }
@@ -253,7 +248,7 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		delete(initial, ct.AttrDefaultRandomizationOffset)
 		delete(initial, ct.AttrDefaultRandomizationType)
 	}
-	s := &CommodityTariffServer{now: cfg.Now}
+	s := &CommodityTariffServer{now: clock.Or(cfg.Clock).Now}
 	handlers := map[uint32]spec.CommandHandler{
 		ct.CmdGetTariffComponent: s.getTariffComponent,
 		ct.CmdGetDayEntry:        s.getDayEntry,
@@ -264,12 +259,6 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		return nil, fmt.Errorf("energy: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
-	switch {
-	case cfg.Clock != nil:
-		s.now = cfg.Clock.Now
-	case s.now == nil:
-		s.now = clock.System{}.Now
-	}
 	return s, nil
 }
 

@@ -106,9 +106,9 @@ func TestMaxRetransmissions_Chip(t *testing.T) {
 // too aggressive and surfaces as increased "Dropping message" frequency
 // in Apple's IM log during CASE handshake bursts.
 //
-// This test drives the [Retransmitter] with a deterministic RNG
-// (zero-jitter approximation) and asserts that the first-retransmit
-// deadline does NOT grow beyond MRPBackoffBase×MRPBackoffMargin×(1+jitter).
+// This test asks [BackoffDuration] for the first retransmit with the
+// largest jitter draw and asserts that its deadline does NOT grow beyond
+// MRPBackoffBase×MRPBackoffMargin×(1+jitter).
 func TestMRPBackoffExponent_MaxZeroOnFirstRetransmit(t *testing.T) {
 	t.Parallel()
 
@@ -118,29 +118,11 @@ func TestMRPBackoffExponent_MaxZeroOnFirstRetransmit(t *testing.T) {
 	// at the first retransmit.
 	const firstRetransmitUpperBound = 413 * time.Millisecond
 
-	var sent int
-	r := mrp.NewRetransmitter(func([]byte) error {
-		sent++
-		return nil
-	}, nil) // nil → default rng
-
-	t0 := time.Unix(1_000_000, 0)
-	r.Track(1, 1, []byte("payload"), t0)
-
-	// No tick before the window — should be quiet.
-	if got := r.Tick(t0.Add(10 * time.Millisecond)); len(got) != 0 {
-		t.Fatalf("Tick at +10ms: got %d results, want 0", len(got))
+	maxJitter := func() float64 { return 0.999999 }
+	if got := mrp.BackoffDuration(mrp.MRPBackoffBase, 1, maxJitter); got > firstRetransmitUpperBound {
+		t.Fatalf("first retransmit waits %v, want at most %v (exponent not clamped)", got, firstRetransmitUpperBound)
 	}
-
-	// At firstRetransmitUpperBound the first retransmit must have fired.
-	results := r.Tick(t0.Add(firstRetransmitUpperBound))
-	if len(results) != 1 {
-		t.Fatalf("Tick at +%v: got %d results, want 1 (first retransmit)", firstRetransmitUpperBound, len(results))
-	}
-	if results[0].Err != nil {
-		t.Fatalf("first retransmit returned error: %v", results[0].Err)
-	}
-	if sent != 1 {
-		t.Fatalf("send called %d times, want 1 (first retransmit only)", sent)
+	if first, initial := mrp.BackoffDuration(mrp.MRPBackoffBase, 1, maxJitter), mrp.BackoffDuration(mrp.MRPBackoffBase, 0, maxJitter); first != initial {
+		t.Fatalf("first retransmit %v differs from the initial wait %v: the threshold grew too early", first, initial)
 	}
 }

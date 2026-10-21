@@ -11,7 +11,5 @@
     {"name": "facade", "packages": ["node"]},
     {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/..."]}
   ],
-  "exceptions": [
-    {"from": "cluster/wire", "to": "cluster/switch", "reason": "deprecated NewGenericSwitch wrapper over switchserver.Server; removed with the deprecation window, see its Deprecated: comment (may be removed in v0.10.0)"}
-  ]
+  "exceptions": []
 }

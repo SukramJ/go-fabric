@@ -341,8 +341,8 @@ gesture input of this entry (`contract.SwitchEventEmitter`) stays as the
 second input: a gesture is emitted as narrated, without the decision
 machine, and moves CurrentPosition (`cluster/switch/server.go` `gesture`),
 because a bus that reports finished gestures cannot be turned back into
-positions without inventing their timing. `wire.GenericSwitch` is a
-deprecated wrapper over the server (removable from v0.10.0).
+positions without inventing their timing. The deprecated wrapper
+`wire.GenericSwitch` is removed in v0.10.0 (brief BZ).
 
 ### BD-Matter-ButtonGroupCurrentPositionReporting — Switch.CurrentPosition answered on read, not proactively reported
 
@@ -2054,8 +2054,9 @@ a source-supplied Groups or ScenesManagement with the stack's. `device/`
 skips them (`device/device.go` `assemblerMounted`) and refuses a
 `WithServer` / `WithOptional` / `WithFeatures` for them, so there is one
 owner per cluster. An optional Groups or ScenesManagement a device type
-allows is opted in through `endpoint.Spec.OptIn` (set by
-`device.WithOptional`, wave 7), and the assembler mounts it only where the
+allows is opted in through `endpoint.Spec.OptIn` (set by its declaration,
+`groupsdef.Declare{}` / `scenesmanagementdef.Declare{}`; `device.WithOptional` until
+brief BZ), and the assembler mounts it only where the
 type allows it — matter.js's `MutableEndpoint.with(GroupsServer)` mounts
 on any endpoint (`MutableEndpoint.ts:95-110`).
 

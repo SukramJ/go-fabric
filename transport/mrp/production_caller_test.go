@@ -18,11 +18,7 @@ import (
 // package that no non-test code in the module calls. Each entry carries the
 // reason it is still here; a new constructor lands with a caller or with an
 // entry, never silently.
-var constructorsWithoutCaller = map[string]string{
-	"NewRetransmitter": "unwired stand-alone tracker; the bridge keeps its own per-session one " +
-		"(bridge/outbound_reliable.go). Kept as public API under README.md's deprecation " +
-		"policy — removing or deprecating it is a CHANGELOG-announced decision, not a cleanup.",
-}
+var constructorsWithoutCaller = map[string]string{}
 
 // TestEveryConstructorHasAProductionCaller guards this package against a
 // second unwired primitive whose doc comment names a consumer that does

@@ -193,13 +193,8 @@ type OTAProviderConfig struct {
 	// matter.js SoftwareUpdateManager.onOtaStatusChange (OP:608-612) — with
 	// the version the update brings; nil observes nothing.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
-	// Clock is the provider's clock. Set, it wins over Now; neither set
-	// is [clock.System].
+	// Clock is the provider's clock. Nil is [clock.System].
 	Clock clock.Clock
-	// Now stands in for the clock in tests.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// Rand stands in for crypto/rand in tests.
 	Rand io.Reader
 	// Logger is the provider's logger; nil is slog.Default().
@@ -263,12 +258,7 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if cfg.BDX != nil && cfg.NodeID == nil {
 		return nil, ErrNoNodeID
 	}
-	switch {
-	case cfg.Clock != nil:
-		cfg.Now = cfg.Clock.Now
-	case cfg.Now == nil:
-		cfg.Now = clock.System{}.Now
-	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
 	}
@@ -474,7 +464,7 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 		// OP:194-196: no transfer runs, the entry is stale.
 		p.removeInProgress(peer)
 		return provdef.QueryImageResponse{}, false
-	case running.Peer().SessionID != sessionID && running.LastActivity().Before(p.cfg.Now()):
+	case running.Peer().SessionID != sessionID && running.LastActivity().Before(p.cfg.Clock.Now()):
 		// OP:197-225: another session, last active before this query's —
 		// matter.js compares the two secure sessions' activeTimestamp; the
 		// query's session is active now, so the transfer's last block
@@ -520,7 +510,7 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string
 		p.updateInProgress(peer, token, OTAUpdateDownloading, &version, false)
 		s.OnProgress(func(uint64, *uint64) { // OP:329-331
 			p.mu.Lock()
-			details.timestamp = p.cfg.Now()
+			details.timestamp = p.cfg.Clock.Now()
 			p.mu.Unlock()
 		})
 		s.OnFinished(func(uint64) { p.updateInProgress(peer, token, OTAUpdateWaitForApply, &version, false) })
@@ -662,7 +652,7 @@ func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress 
 	p.mu.Lock()
 	var cleanup func()
 	var out *otaInProgress
-	now := p.cfg.Now()
+	now := p.cfg.Clock.Now()
 	check := func(key string, d *otaInProgress) {
 		if d.timestamp.Add(otaProgressTimeout).Before(now) {
 			// OP:536-548.
@@ -727,7 +717,7 @@ func (p *OTAProvider) removeInProgress(peer OTAPeer) {
 // :598), as matter.js does.
 func (p *OTAProvider) updateInProgress(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) {
 	key := otaKey(peer, token)
-	now := p.cfg.Now()
+	now := p.cfg.Clock.Now()
 	p.mu.Lock()
 	d := p.inProgress[key]
 	previous := OTAUpdateUnknown

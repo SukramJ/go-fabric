@@ -50,7 +50,7 @@ type Device struct {
 	measurement contract.MeasurementSource
 	measured    map[uint32]bool
 	// optIn are the assembler's optional clusters the host opted into
-	// ([WithOptional] for Groups or ScenesManagement).
+	// (the Groups or ScenesManagement declaration).
 	optIn []uint32
 	// clients are the client clusters the host declared beyond the type's
 	// mandatory ones ([WithClientClusters]).
@@ -77,7 +77,7 @@ var _ contract.EndpointSource = (*Device)(nil)
 // on every bridged endpoint, Identify on every bridged endpoint and on a
 // part whose device type mandates it, Groups and ScenesManagement where the
 // device type mandates them or allows them and the host opts in
-// ([WithOptional] → [endpoint.Spec.OptIn]) — a Groups or ScenesManagement
+// (its declaration → [endpoint.Spec.OptIn]) — a Groups or ScenesManagement
 // server the source supplies is replaced by the stack's
 // (endpoint/materialize.go ClusterServers, partClusterServers,
 // mountGroups, mountScenes).
@@ -282,7 +282,7 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 }
 
 // optInMounted are the assembler's clusters a device opts into with
-// [WithOptional] where its type lists them as optional: the assembler then
+// its declaration where its type lists them as optional: the assembler then
 // mounts the stack's server ([endpoint.Spec.OptIn]).
 var optInMounted = map[uint32]bool{
 	0x0004: true, // Groups

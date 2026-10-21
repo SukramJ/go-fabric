@@ -91,13 +91,9 @@ type Scenes interface {
 	RecallGlobalScene(ctx context.Context, fabricIndex uint8)
 }
 
-// Clock is the timer seam. AfterFunc runs f once after d; stop prevents
-// a run that has not begun. The default is time.AfterFunc; tests pass a
-// clock they advance by hand.
-//
-// Deprecated: set [Config.TimeSource] to a [clock.Clock], the module's
-// time port; Clock may be removed in v0.10.0.
-type Clock interface {
+// timerClock is the timer seam. AfterFunc runs f once after d; stop
+// prevents a run that has not begun.
+type timerClock interface {
 	AfterFunc(d time.Duration, f func()) (stop func() bool)
 }
 
@@ -128,13 +124,8 @@ type Config struct {
 	// (OnOffServer.ts:36, :326-331). nil applies it.
 	BootReason func() uint8
 	// TimeSource paces the OnTime / OffWaitTime countdown and the scene
-	// transitions. Set, it wins over Clock; neither set is
-	// [clock.System].
+	// transitions; nil is [clock.System].
 	TimeSource clock.Clock
-	// Clock is the old timer seam.
-	//
-	// Deprecated: set TimeSource; Clock may be removed in v0.10.0.
-	Clock Clock
 	// Bridged marks a server on an endpoint under the Aggregator: matter.js
 	// does not apply StartUpOnOff there
 	// (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
@@ -181,7 +172,7 @@ type Server struct {
 	srv        *spec.Server
 	host       spec.HostHandlers
 	sink       Sink
-	clock      Clock
+	clock      timerClock
 	lighting   bool
 	timedOn    ticker
 	delayedOff ticker
@@ -236,7 +227,7 @@ var (
 // unless the boot reason is SoftwareUpdateCompleted or the server is
 // Bridged (OnOffServer.ts:34-50).
 func New(cfg Config) (*Server, error) {
-	s := &Server{sink: cfg.Sink, clock: cfg.Clock, scenes: cfg.Scenes}
+	s := &Server{sink: cfg.Sink, clock: portClock{clock.Or(cfg.TimeSource)}, scenes: cfg.Scenes}
 	handlers := map[uint32]spec.CommandHandler{
 		CmdOff:                     s.command(func(ctx context.Context, st *state, _ any) error { return s.off(ctx, st) }),
 		CmdOn:                      s.command(func(ctx context.Context, st *state, _ any) error { return s.on(ctx, st) }),
@@ -250,12 +241,6 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 	s.Instance, s.srv, s.lighting = srv.Instance, srv, srv.HasFeature("LT")
-	switch {
-	case cfg.TimeSource != nil:
-		s.clock = portClock{cfg.TimeSource}
-	case s.clock == nil:
-		s.clock = portClock{clock.System{}}
-	}
 	initial := map[uint32]any{AttrOnOff: false}
 	if s.lighting {
 		initial[AttrGlobalSceneControl] = false
@@ -845,7 +830,7 @@ func (s *Server) OnOff() bool {
 	return b
 }
 
-// ticker is a periodic timer built on [Clock.AfterFunc]: one pending
+// ticker is a periodic timer built on timerClock.AfterFunc: one pending
 // run at a time, re-armed after each tick while running. gen tells a
 // stale run (one that was already due when the timer stopped) to do
 // nothing.

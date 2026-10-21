@@ -192,21 +192,3 @@ func TestGroupKeys_ListGroupKeyMappings_ClosedDB(t *testing.T) {
 		t.Error("ListGroupKeyMappings on closed DB: want error, got nil")
 	}
 }
-
-func TestDiagnostics_LoadDiagnostics_ClosedDB(t *testing.T) {
-	t.Parallel()
-	s := closedStore(t)
-	_, err := s.LoadDiagnostics(context.Background())
-	if err == nil {
-		t.Error("LoadDiagnostics on closed DB: want error, got nil")
-	}
-}
-
-func TestDiagnostics_SaveDiagnostics_ClosedDB(t *testing.T) {
-	t.Parallel()
-	s := closedStore(t)
-	err := s.SaveDiagnostics(context.Background(), mstore.DiagnosticsRecord{})
-	if err == nil {
-		t.Error("SaveDiagnostics on closed DB: want error, got nil")
-	}
-}

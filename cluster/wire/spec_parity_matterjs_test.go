@@ -15,23 +15,18 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// TestServersMatchTheGeneratedDefinitions holds GenericSwitch (both
-// feature selections it serves) and AdministratorCommissioning against
-// matter.js switch.element.ts and administrator-commissioning.element.ts:
+// TestServersMatchTheGeneratedDefinitions holds AdministratorCommissioning
+// against matter.js administrator-commissioning.element.ts:
 // FeatureMap and ClusterRevision, the mandatory attributes, commands and
 // events listed and nothing disallowed, matter.js's invoke privileges,
 // UNSUPPORTED_WRITE on every read-only attribute.
 func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 	t.Parallel()
-	ms := uint32(swdef.FeatureMomentarySwitch | swdef.FeatureMomentarySwitchRelease)
-	spectest.CheckServer(t, wire.NewGenericSwitch(1, &fakeGenericSwitchSource{positions: 2}), swdef.Definition, ms)
-	spectest.CheckServer(t, wire.NewGenericSwitch(1, &fakeGenericSwitchSource{positions: 2, supportsLong: true}), swdef.Definition,
-		ms|uint32(swdef.FeatureMomentarySwitchLongPress))
 	spectest.CheckServer(t, wire.NewAdministratorCommissioning(), admdef.Definition, 0)
 }
 
-// TestSwitchEventsAreTheGeneratedPayloads round-trips the press payloads
-// the server emits through the definition's event decoders.
+// TestSwitchEventsAreTheGeneratedPayloads round-trips the press payload
+// aliases through the definition's event decoders.
 func TestSwitchEventsAreTheGeneratedPayloads(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTripEvent(t, swdef.Definition, wire.MatterEventInitialPress, wire.SwitchInitialPressEvent{NewPosition: 1})

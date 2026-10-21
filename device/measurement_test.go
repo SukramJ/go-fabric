@@ -111,7 +111,7 @@ func TestWithMeasurementRefusals(t *testing.T) {
 		"no cluster":         {WithMeasurement(&reading{class: contract.MeasurementNone})},
 		"server for it":      {WithMeasurement(src), withServer(&hostServer{id: measurement.ClusterTemperatureMeasurement})},
 		"initial for it":     {WithMeasurement(src), withInitial(measurement.ClusterTemperatureMeasurement, map[uint32]any{0: int16(1)})},
-		"opting it in again": {WithMeasurement(src), WithOptional(measurement.ClusterTemperatureMeasurement)},
+		"opting it in again": {WithMeasurement(src), withOptional(measurement.ClusterTemperatureMeasurement)},
 	} {
 		if _, err := NewTemperatureSensor(testOptions("r"), with...); !errors.Is(err, ErrConfiguration) {
 			t.Errorf("%s: %v, want ErrConfiguration", name, err)

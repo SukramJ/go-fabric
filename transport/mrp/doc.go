@@ -13,8 +13,7 @@
 //   - The retransmission schedule for messages flagged "Reliable"
 //     (Exchange Flag R = 1): [BackoffDuration] and the
 //     [MaxRetransmissions] cap. The tracker that re-sends until an ACK
-//     arrives lives in the bridge (bridge/outbound_reliable.go); the
-//     [Retransmitter] here is an unwired stand-alone variant.
+//     arrives lives in the bridge (bridge/outbound_reliable.go).
 //   - Standalone-ACK synthesis ([AckTracker]) when no payload is
 //     queued to piggyback the acknowledgement on. The dispatcher
 //     drains [AckTracker.Due] and emits a Secure-Channel

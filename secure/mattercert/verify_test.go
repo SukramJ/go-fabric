@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -404,7 +405,7 @@ func buildChainWithICA(t *testing.T) certChain {
 func TestNewVerifier_InvalidRootKeyLength(t *testing.T) {
 	t.Parallel()
 	// Wrong length (not 65 bytes).
-	_, err := mattercert.NewVerifier(make([]byte, 33), mattercert.SystemTime{})
+	_, err := mattercert.NewVerifier(make([]byte, 33), clock.System{})
 	if !errors.Is(err, mattercert.ErrMalformed) {
 		t.Fatalf("expected ErrMalformed for short root key, got %v", err)
 	}
@@ -415,7 +416,7 @@ func TestNewVerifier_InvalidRootKeyPrefix(t *testing.T) {
 	// Right length, wrong prefix (0x03 instead of 0x04).
 	key := make([]byte, 65)
 	key[0] = 0x03
-	_, err := mattercert.NewVerifier(key, mattercert.SystemTime{})
+	_, err := mattercert.NewVerifier(key, clock.System{})
 	if !errors.Is(err, mattercert.ErrMalformed) {
 		t.Fatalf("expected ErrMalformed for wrong prefix, got %v", err)
 	}
@@ -429,7 +430,7 @@ func TestNewVerifier_OffCurveRootKey(t *testing.T) {
 	for i := 1; i < 65; i++ {
 		key[i] = 0xFF
 	}
-	_, err := mattercert.NewVerifier(key, mattercert.SystemTime{})
+	_, err := mattercert.NewVerifier(key, clock.System{})
 	if !errors.Is(err, mattercert.ErrMalformed) {
 		t.Fatalf("expected ErrMalformed for off-curve root key, got %v", err)
 	}
@@ -442,7 +443,7 @@ func TestVerifyAndExtractPubKey_NOCDirectFromRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode root: %v", err)
 	}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -474,7 +475,7 @@ func TestVerifyAndExtractPubKey_NOCViaICAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode root: %v", err)
 	}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -502,7 +503,7 @@ func TestVerifyAndExtractPubKey_FakeSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode root: %v", err)
 	}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -558,8 +559,8 @@ func TestVerifyAndExtractPubKey_Expired(t *testing.T) {
 	// seconds). NotAfter=2 maps to 2000-01-01T00:00:02Z (Unix
 	// 946684802); pick year 2033 so the comparison fails on the
 	// upper bound.
-	clock := mattercert.FixedTime{T: time.Unix(2000000000, 0)}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock)
+	fixed := mattercert.FixedTime{T: time.Unix(2000000000, 0)}
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, fixed)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -616,7 +617,7 @@ func TestVerifyAndExtractPubKey_ChainBroken(t *testing.T) {
 	}
 	nocRaw := buildSignedCert(t, nocOpts, icacPriv)
 
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -1240,7 +1241,7 @@ func TestVerifyAndExtractPubKey_NonNOCRejectsWithError(t *testing.T) {
 		t.Fatalf("Decode root: %v", err)
 	}
 
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -1266,7 +1267,7 @@ func TestVerifyAndExtractPubKey_ICAC_NotIsICA(t *testing.T) {
 		t.Fatalf("Decode root: %v", err)
 	}
 
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -1292,7 +1293,7 @@ func TestVerifyAndExtractPubKey_ICAC_BadSignature(t *testing.T) {
 		t.Fatalf("Decode root: %v", err)
 	}
 
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -1537,8 +1538,8 @@ func TestCheckValidity_NotYetValid(t *testing.T) {
 	}
 	nocRaw := buildSignedCert(t, nocOpts, rootPriv)
 
-	// Use SystemTime — the current time is now, which is before futureNotBefore.
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	// Use the system clock — the current time is now, which is before futureNotBefore.
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -1711,7 +1712,7 @@ func TestDecode_ExtensionsUnknownContainer(t *testing.T) {
 }
 
 // TestNewVerifier_NilClockUsesSystemTime verifies that passing a nil clock
-// to NewVerifier defaults to SystemTime (no panic, no error).
+// to NewVerifier defaults to the system clock (no panic, no error).
 func TestNewVerifier_NilClockUsesSystemTime(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -1789,7 +1790,7 @@ func TestVerifyAndExtractPubKey_OffCurvePubKeyInNOC(t *testing.T) {
 		t.Fatalf("Bytes: %v", err)
 	}
 
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -2197,7 +2198,7 @@ func TestVerifyAndExtractPubKey_ICAC_DecodeError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode root: %v", err)
 	}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -2254,8 +2255,8 @@ func TestVerifyAndExtractPubKey_ICAC_Expired(t *testing.T) {
 	}
 	nocRaw := buildSignedCert(t, nocOpts, icacPriv)
 
-	// Use SystemTime — the real clock is well past Matter epoch 2000-01-01T00:00:02Z.
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	// Use the system clock — the real clock is well past Matter epoch 2000-01-01T00:00:02Z.
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}

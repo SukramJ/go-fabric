@@ -120,6 +120,11 @@ func withElements(clusterID uint32, opts spec.Options) Option {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Elements: opts}, mount: true}
 }
 
+// withOptional mounts an optional cluster with its default server.
+func withOptional(clusterID uint32) Option {
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID}, mount: true}
+}
+
 // withServer states the host's own server of a cluster.
 func withServer(srv contract.ClusterServer) Option {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}}

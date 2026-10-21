@@ -750,13 +750,8 @@ func (s *Server) modeHasTag(mode uint8, tag uint16) bool {
 // changeToModeRequest reads the request the bridge hands over: the
 // derivation's generated ChangeToModeRequest, which its definition decodes
 // (bridge/fields_definition.go), by value or by pointer; the payload is
-// ModeBase's in every derivation. cluster/wire's ChangeToModeRequest, which
-// the bridge no longer decodes, is still taken from an in-process caller
-// until its removal (Deprecated, v0.12.0).
+// ModeBase's in every derivation.
 func changeToModeRequest(fields any) (newMode uint8, ok bool) {
-	if r, ok := fields.(clusterwire.ChangeToModeRequest); ok { //nolint:staticcheck // SA1019: the deprecated in-process form, kept for its window
-		return r.NewMode, true
-	}
 	for _, of := range newModeOf {
 		if mode, ok := of(fields); ok {
 			return mode, true

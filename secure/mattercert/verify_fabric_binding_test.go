@@ -18,6 +18,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 )
@@ -59,7 +60,7 @@ func runCaseWithRealCerts(t *testing.T, responderFabricID, peerFabricID uint64) 
 	if err != nil {
 		t.Fatalf("root GenerateKey: %v", err)
 	}
-	verifier, err := mattercert.NewVerifier(marshalPub(rootPriv), mattercert.SystemTime{})
+	verifier, err := mattercert.NewVerifier(marshalPub(rootPriv), clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestVerifier_PeerFabricIDFromNOC_ReadsSubjectFabricID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("root GenerateKey: %v", err)
 	}
-	v, err := mattercert.NewVerifier(marshalPub(rootPriv), mattercert.SystemTime{})
+	v, err := mattercert.NewVerifier(marshalPub(rootPriv), clock.System{})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}

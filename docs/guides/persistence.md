@@ -42,7 +42,7 @@ idempotent.
 | `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
 | `matter_resumption` | v1 | CASE resumption records with the peer's CATs |
-| `matter_diagnostics` | v1 | a single-row counter table with a typed API; the facade keeps its counters in `matter_settings` instead |
+| `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings` |
 | `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling` |
 | `matter_settings` | v1 | string key/value pairs (next section) |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |

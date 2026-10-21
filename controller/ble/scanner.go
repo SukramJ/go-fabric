@@ -43,15 +43,6 @@ const (
 	ScanTransitionTimeout = 10 * time.Second
 )
 
-// ErrScannerClosed was returned by a discovery on a closed scanner.
-//
-// Deprecated: a discovery on a closed scanner returns the stored devices
-// without scanning and without an error, as matter.js's does
-// (common/BleScanner.ts:213-225, :565, :615); nothing returns this error.
-//
-// fabric:reachable:reason="deprecated: kept for the deprecation window; nothing returns it"
-var ErrScannerClosed = errors.New("ble: scanner closed")
-
 // ErrScanTransitionTimeout is a client's scan start or stop that did not
 // settle within [ScanTransitionTimeout] — matter.js's PromiseTimeoutError
 // of withTimeout (common/BleScanner.ts:186-188, :662).

@@ -854,14 +854,6 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 	}
 }
 
-// Fabrics returns the installed fabrics as the store keeps them.
-//
-// Deprecated: use [Node.FabricInfos], which returns the same fabrics as
-// [FabricInfo] without the store's type. Fabrics is removable in v0.11.0.
-func (n *Node) Fabrics(ctx context.Context) ([]store.FabricRecord, error) {
-	return n.st.ListFabrics(ctx)
-}
-
 // FabricInfos returns the installed fabrics in the store's order (by
 // fabric index): index, fabric and node id, root public key, compressed
 // fabric id, vendor and label.

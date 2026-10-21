@@ -52,18 +52,72 @@ deprecated, while loom is the only consumer.
 | `device.WithInitial(id, map[uint32]any{…})` | `<cluster>def.Declare{Initial: <cluster>def.Patch{…}}` — `onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}}` |
 | `device.WithElements(id, spec.Options{Attributes: …, Commands: …})` | an optional attribute is served by its value in `Initial`, an optional command by its `Handle<Command>` field |
 | `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; `WithServer` stays for a cluster without one (a manufacturer-specific cluster) and refuses the others |
+| `device.WithOptional(id)` (a cluster with a generated package) | `<cluster>def.Declare{}` — `levelcontroldef.Declare{}`, `groupsdef.Declare{}` for the Groups opt-in; `WithOptional` stays beside `WithServer` for a cluster without one and refuses the others |
 | `device.Options.Clock` | none: a device takes `node.Config.Clock` when the Aggregator adds it |
 | `levelcontrol.LevelSource` over `cluster/wire` requests, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest` | `levelcontrol.LevelSource` is `levelcontroldef.LevelSource`, over the generated requests: `MoveToLevel(ctx, req levelcontroldef.MoveToLevelRequest) error`, `MoveToLevelWithOnOff(ctx, req levelcontroldef.MoveToLevelWithOnOffRequest) error`, …, `Options() levelcontroldef.OptionsBitmap`; a nullable field is `spec.Nullable` (`req.TransitionTime.Null`, `.Value`); declared as `levelcontroldef.Declare{LevelSource: …}` |
 | `fan.Stepper` over `wire.FanStepRequest` | `fan.Stepper` is `fancontroldef.Stepper`: `Step(ctx, req fancontroldef.StepRequest) error` |
 | `contract.AttributeChangeNotifier.OnMatterAttributesChanged(func([]uint32))` | `OnAttributeChange(func(contract.Change))` — `cb(contract.Change{Attributes: ids, Origin: contract.OriginUnknown})` from a host server that cannot tell the origin |
 | `OnChanged(func(State, []uint32))`, `Device.OnChanged(id, func([]uint32))` | `OnChanged(func(State, contract.Change))`, `Device.OnChanged(id, func(contract.Change))` — `c.Attributes` are the ids, `c.Origin` tells a host `Set` from a controller's write and a command |
 
+## Removed in v0.10.0: the deprecated surface
+
+Owner decision 2026-10-21: while loom is the only consumer and migrates in
+one step, a replaced identifier is removed in the next minor release; this
+section is the condition — each removed identifier has its line here. The
+groups follow the deprecation table the README carried until `v0.9.x`.
+
+### `controller/…` forwarding packages (brief BX4)
+
+| Removed | Route |
+| --- | --- |
+| `controller/discovery`, `controller/exchange`, `controller/handshake`, `controller/interaction`, `controller/peer` | the same identifiers in `github.com/SukramJ/go-fabric/client/<name>`: change the import path, nothing else |
+
+### `cluster/wire` request types (brief BX1) and the switch wrapper (brief BK)
+
+| Removed | Route |
+| --- | --- |
+| `wire.MoveToHueRequest`, `MoveHueRequest`, `StepHueRequest`, `MoveToSaturationRequest`, `MoveSaturationRequest`, `StepSaturationRequest`, `MoveToHueAndSaturationRequest`, `MoveToColorTemperatureRequest` | `cluster/spec/colorcontrol`'s request of the same name (`ccdef.MoveToHueRequest{Hue: 5, Direction: ccdef.DirectionShortest}`) |
+| `wire.GoToLiftPercentageRequest`, `GoToTiltPercentageRequest` | `cluster/spec/windowcovering`'s (`wcdef.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}`) |
+| `wire.SetpointRaiseLowerRequest` | `cluster/spec/thermostat`'s: `tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: 5}` |
+| `wire.MoveToRequest` | `cluster/spec/closurecontrol`'s: `closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pos)}` |
+| `wire.ChangeToModeRequest` | the mode derivation's `cluster/spec/<mode>.ChangeToModeRequest` |
+| `wire.DecodeMoveToHue`, `DecodeMoveToSaturation`, `DecodeMoveToHueAndSaturation`, `DecodeMoveHue`, `DecodeStepHue`, `DecodeMoveSaturation`, `DecodeStepSaturation`, `DecodeMoveToColorTemperature`, `DecodeGoToLiftPercentage`, `DecodeGoToTiltPercentage`, `DecodeSetpointRaiseLower`, `DecodeClosureMoveTo`, and their errors `wire.ErrColorControlMalformed`, `wire.ErrThermostatMalformed` | the bridge decodes the payload through the generated definition; an in-process caller hands the server the generated request. ClosureControl's MoveTo and Thermostat's SetpointRaiseLower no longer take the raw TLV (`[]byte`) |
+| `wire.GenericSwitch`, `wire.NewGenericSwitch` | `cluster/switch`: `switchserver.New(switchserver.Config{…})`, which the MomentarySwitch materialiser builds; `wire.GenericSwitchSource` and the `wire.Switch…Event` aliases stay |
+
+### Clock forms
+
+| Removed | Route |
+| --- | --- |
+| `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock`, `btp.Options.Clock` | `btp.Options.TimeSource` (a `clock.Clock`; nil is `clock.System`) |
+| `cluster/onoff.Clock`, `onoff.Config.Clock` | `onoff.Config.TimeSource` |
+| `cluster/core.OtaClock`, `core.OTARequestorConfig.Clock` | `core.OTARequestorConfig.TimeSource` |
+| `core.OTAProviderConfig.Now`, `core.CommissionerControlConfig.Now`, `closure.DimensionConfig.Now`, `energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now`, `controller/ca.Config.Now` | the `Clock` field beside each; a host with its own reading wraps it: `type nowClock struct{ clock.System; now func() time.Time }` with `Now()` returning `c.now()` (`examples/reference-bridge/fleet_energy_market.go`) |
+| `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` |
+| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
+
+### Session parameters
+
+| Removed | Route |
+| --- | --- |
+| `secure/spake2.MRPParameters` | `secure/sessionparams.Parameters` (the whole structure, tags 1-9; a zero field is "not stated") |
+| `spake2.PBKDFParamRequest.InitiatorMRPParams` | `PBKDFParamRequest.InitiatorSessionParams` |
+| `spake2.PBKDFParamResponse.ResponderMRPParams` | `PBKDFParamResponse.ResponderSessionParams` |
+| `bridge.PaseAdapter.SetResponderMRPParams`, `PaseAdapter.PeerMRPParams` | `PaseAdapter.SetResponderSessionParams`, `PaseAdapter.PeerSessionParams` |
+
+### Others
+
+| Removed | Route |
+| --- | --- |
+| `node.Node.Fabrics` (`[]store.FabricRecord`) | `Node.FabricInfos` (`[]node.FabricInfo`; the compressed fabric id is `CompressedFabricID`) |
+| `controller/ble.ErrScannerClosed` | none needed: a discovery on a closed scanner returns the stored devices without an error, so nothing returned it |
+| `store.DiagnosticsRecord`, `Store.LoadDiagnostics`, `Store.SaveDiagnostics` | the node facade keeps RebootCount and the operational hours in the settings table; the `matter_diagnostics` table stays, created and seeded, read by nothing |
+| `transport/mrp.Retransmitter`, `NewRetransmitter`, `SendFunc`, `TickResult` | none in `mrp`: reliability is the bridge's per-session tracker (`bridge/outbound_reliable.go`); `mrp.BackoffDuration` and `MaxRetransmissions` give the schedule |
+| `cluster/modeselect.ModeOptionFieldLabel`, `ModeOptionFieldMode`, `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode`, `SemanticTagFieldValue` | the generated codec, `msdef.ModeOptionStruct.EncodeTLV` / `msdef.SemanticTagStruct.EncodeTLV` in `cluster/spec/modeselect`, carries the field ids |
+
 ## What a migrating host meets
 
-1. **`Node.Fabrics` is deprecated.** It returns `[]store.FabricRecord`;
-   `Node.FabricInfos` returns `[]node.FabricInfo`. `Fabrics` keeps working
-   and is removable in `v0.11.0`. The compressed fabric id is
-   `CompressedFabricID` on `FabricInfo`.
+1. **`Node.Fabrics` is gone** ([Others](#others)): `Node.FabricInfos`
+   returns `[]node.FabricInfo`.
 2. **A nil `Config.Advertiser` advertises.** Up to `v0.9.0` it was
    `mdns.NewNoop()`; now the node builds Zeroconf with the subtype
    responder. A host that relied on the old default sets

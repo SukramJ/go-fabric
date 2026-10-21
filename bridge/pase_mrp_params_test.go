@@ -6,12 +6,13 @@ package bridge
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // buildTestPBKDFParamRequestWithMRP is buildTestPBKDFParamRequest plus
-// an InitiatorMRPParams (tag 5) nested structure carrying idle=800,
+// an InitiatorSessionParams (tag 5) nested structure carrying idle=800,
 // active=200, threshold=3000 ms.
 func buildTestPBKDFParamRequestWithMRP(t *testing.T, initRand []byte) []byte {
 	t.Helper()
@@ -42,7 +43,7 @@ func buildTestPBKDFParamRequestWithMRP(t *testing.T, initRand []byte) []byte {
 }
 
 // TestPaseAdapter_DecodesInitiatorMRPParams verifies the commissioner's
-// InitiatorMRPParams (PBKDFParamRequest tag 5) is decoded and retained
+// InitiatorSessionParams (PBKDFParamRequest tag 5) is decoded and retained
 // on the adapter for the session opener. Mirrors matter.js
 // PaseServer.ts:155-157.
 func TestPaseAdapter_DecodesInitiatorMRPParams(t *testing.T) {
@@ -58,23 +59,23 @@ func TestPaseAdapter_DecodesInitiatorMRPParams(t *testing.T) {
 	if _, _, err := a.ProcessPBKDFParamRequest(buildTestPBKDFParamRequestWithMRP(t, initRand)); err != nil {
 		t.Fatalf("ProcessPBKDFParamRequest: %v", err)
 	}
-	pm := a.PeerMRPParams()
+	pm := a.PeerSessionParams()
 	if pm == nil {
-		t.Fatal("PeerMRPParams nil — tag 5 not decoded")
+		t.Fatal("PeerSessionParams nil — tag 5 not decoded")
 	}
-	if pm.IdleRetransTimeoutMs == nil || *pm.IdleRetransTimeoutMs != 800 {
-		t.Errorf("idle = %v, want 800", pm.IdleRetransTimeoutMs)
+	if pm.SessionIdleInterval != 800 {
+		t.Errorf("idle = %d, want 800", pm.SessionIdleInterval)
 	}
-	if pm.ActiveRetransTimeoutMs == nil || *pm.ActiveRetransTimeoutMs != 200 {
-		t.Errorf("active = %v, want 200", pm.ActiveRetransTimeoutMs)
+	if pm.SessionActiveInterval != 200 {
+		t.Errorf("active = %d, want 200", pm.SessionActiveInterval)
 	}
-	if pm.ActiveThresholdTimeMs == nil || *pm.ActiveThresholdTimeMs != 3000 {
-		t.Errorf("threshold = %v, want 3000", pm.ActiveThresholdTimeMs)
+	if pm.SessionActiveThreshold != 3000 {
+		t.Errorf("threshold = %d, want 3000", pm.SessionActiveThreshold)
 	}
 }
 
 // TestPaseAdapter_AbsentMRPParamsNil verifies a request WITHOUT tag 5
-// leaves PeerMRPParams nil (spec-default fallback).
+// leaves PeerSessionParams nil (spec-default fallback).
 func TestPaseAdapter_AbsentMRPParamsNil(t *testing.T) {
 	t.Parallel()
 	a := NewPaseAdapter(nil)
@@ -88,24 +89,23 @@ func TestPaseAdapter_AbsentMRPParamsNil(t *testing.T) {
 	if _, _, err := a.ProcessPBKDFParamRequest(buildTestPBKDFParamRequest(t, initRand)); err != nil {
 		t.Fatalf("ProcessPBKDFParamRequest: %v", err)
 	}
-	if pm := a.PeerMRPParams(); pm != nil {
-		t.Errorf("PeerMRPParams = %+v, want nil for a request without tag 5", pm)
+	if pm := a.PeerSessionParams(); pm != nil {
+		t.Errorf("PeerSessionParams = %+v, want nil for a request without tag 5", pm)
 	}
 }
 
 // TestPaseAdapter_EmitsResponderMRPParams verifies the bridge advertises
-// its ResponderMRPParams (PBKDFParamResponse tag 5) when configured.
+// its ResponderSessionParams (PBKDFParamResponse tag 5) when configured.
 // Mirrors matter.js PaseServer.ts:151.
 func TestPaseAdapter_EmitsResponderMRPParams(t *testing.T) {
 	t.Parallel()
 	a := NewPaseAdapter(nil)
 	a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
 	a.randomSource = func() [spake2.PBKDFRandomSize]byte { return [spake2.PBKDFRandomSize]byte{0x11} }
-	idle, active, thresh := uint32(500), uint32(300), uint16(4000)
-	a.SetResponderMRPParams(&spake2.MRPParameters{ //nolint:staticcheck // the deprecated triplet API stays under test until its removal
-		IdleRetransTimeoutMs:   &idle,
-		ActiveRetransTimeoutMs: &active,
-		ActiveThresholdTimeMs:  &thresh,
+	a.SetResponderSessionParams(&sessionparams.Parameters{
+		SessionIdleInterval:    500,
+		SessionActiveInterval:  300,
+		SessionActiveThreshold: 4000,
 	})
 
 	initRand := make([]byte, spake2.PBKDFRandomSize)
@@ -120,11 +120,11 @@ func TestPaseAdapter_EmitsResponderMRPParams(t *testing.T) {
 	if derr != nil {
 		t.Fatalf("DecodePBKDFParamResponse: %v", derr)
 	}
-	if resp.ResponderMRPParams == nil { //nolint:staticcheck // the deprecated triplet API stays under test until its removal
-		t.Fatal("ResponderMRPParams absent from PBKDFParamResponse (tag 5 not emitted)")
+	if resp.ResponderSessionParams == nil {
+		t.Fatal("ResponderSessionParams absent from PBKDFParamResponse (tag 5 not emitted)")
 	}
-	if resp.ResponderMRPParams.IdleRetransTimeoutMs == nil || *resp.ResponderMRPParams.IdleRetransTimeoutMs != 500 { //nolint:staticcheck // the deprecated triplet API stays under test until its removal
-		t.Errorf("responder idle = %v, want 500", resp.ResponderMRPParams.IdleRetransTimeoutMs) //nolint:staticcheck // deprecated triplet API under test
+	if got := resp.ResponderSessionParams; got.SessionIdleInterval != 500 || got.SessionActiveInterval != 300 || got.SessionActiveThreshold != 4000 {
+		t.Errorf("responder session params = %+v, want idle 500, active 300, threshold 4000", got)
 	}
 }
 

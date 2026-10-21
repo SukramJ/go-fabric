@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
@@ -82,6 +83,16 @@ func (c *tariffTestClock) now() time.Time {
 	}
 	return time.Now()
 }
+
+// nowClock is a [clock.Clock] whose Now is the example's own reading (a
+// chip-style TestTimeManager); its timers run on the system clock.
+type nowClock struct {
+	clock.System
+	now func() time.Time
+}
+
+// Now is the example's reading.
+func (c nowClock) Now() time.Time { return c.now() }
 
 // enable is EnableTestTime (:142-172): enabling an enabled clock changes
 // nothing; enabling starts it at unixS, or at the real time when unixS
@@ -175,7 +186,7 @@ func (d *demoEnergyTariff) build() {
 		tariff, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
 			Features: energy.TariffFeaturePricing | energy.TariffFeatureFriendlyCredit | energy.TariffFeatureAuxiliaryLoad |
 				energy.TariffFeaturePeakPeriod | energy.TariffFeaturePowerThreshold | energy.TariffFeatureRandomization,
-			Now: d.clock.now, DataVersion: &d.version.tariff, //nolint:staticcheck // SA1019: the example keeps its own clock (a chip-style TestTimeManager), read through Now
+			Clock: nowClock{now: d.clock.now}, DataVersion: &d.version.tariff,
 		})
 		if err != nil {
 			panic(fmt.Sprintf("tariff CommodityTariff: %v", err))

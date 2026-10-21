@@ -40,28 +40,6 @@ const (
 // command payloads.
 var ErrWindowCoveringMalformed = errors.New("wire: WindowCovering command malformed")
 
-// GoToLiftPercentageRequest mirrors Matter §5.3.7.5.
-// Matter 1.5.1 deprecated the old uint8 LiftPercentageValue field;
-// the canonical encoding is uint16 LiftPercent100thsValue.
-//
-// Deprecated: the bridge decodes the command into the generated request,
-// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToLiftPercentageRequest,
-// which every module server takes by value or by pointer; use it. Marked in
-// v0.10.0 (brief BX1); removal permissible in v0.12.0.
-type GoToLiftPercentageRequest struct {
-	LiftPercent100thsValue uint16
-}
-
-// GoToTiltPercentageRequest mirrors Matter §5.3.7.6.
-//
-// Deprecated: the bridge decodes the command into the generated request,
-// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToTiltPercentageRequest,
-// which every module server takes by value or by pointer; use it. Marked in
-// v0.10.0 (brief BX1); removal permissible in v0.12.0.
-type GoToTiltPercentageRequest struct {
-	TiltPercent100thsValue uint16
-}
-
 // GoToLiftValueRequest mirrors Matter §5.3.7.4.
 type GoToLiftValueRequest struct {
 	LiftValue uint16 // raw position
@@ -70,53 +48,6 @@ type GoToLiftValueRequest struct {
 // GoToTiltValueRequest mirrors Matter §5.3.7.4.
 type GoToTiltValueRequest struct {
 	TiltValue uint16
-}
-
-// DecodeGoToLiftPercentage parses GoToLiftPercentage payloads.
-//
-// Deprecated: the bridge decodes the payload through the generated
-// definition into
-// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToLiftPercentageRequest;
-// a server takes that request. Marked in v0.10.0 (brief BX1); removal
-// permissible in v0.12.0.
-func DecodeGoToLiftPercentage(payload []byte) (GoToLiftPercentageRequest, error) {
-	var req GoToLiftPercentageRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {
-		// Field 0 is LiftPercent100thsValue (uint16 percent100ths);
-		// field 1 is the removed 8-bit percentage, conformance "X"
-		// (disallowed) and therefore ignored. Mirrors matter.js
-		// packages/model/src/standard/elements/window-covering-cluster.element.ts:95-96
-		// (GoToLiftPercentage: Field LiftPercent100thsValue id 0x0,
-		// Field "Ignored" id 0x1 conformance "X").
-		if tag == 0 {
-			req.LiftPercent100thsValue = uint16(el.Uint & 0xFFFF)
-		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
-}
-
-// DecodeGoToTiltPercentage parses GoToTiltPercentage payloads.
-//
-// Deprecated: the bridge decodes the payload through the generated
-// definition into
-// github.com/SukramJ/go-fabric/cluster/spec/windowcovering.GoToTiltPercentageRequest;
-// a server takes that request. Marked in v0.10.0 (brief BX1); removal
-// permissible in v0.12.0.
-func DecodeGoToTiltPercentage(payload []byte) (GoToTiltPercentageRequest, error) {
-	var req GoToTiltPercentageRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) {
-		// Field 0 is TiltPercent100thsValue; field 1 is the removed
-		// 8-bit percentage with conformance "X". Mirrors matter.js
-		// window-covering-cluster.element.ts:104-105.
-		if tag == 0 {
-			req.TiltPercent100thsValue = uint16(el.Uint & 0xFFFF)
-		}
-	}); err != nil {
-		return req, err
-	}
-	return req, nil
 }
 
 // DecodeGoToLiftValue parses GoToLiftValue payloads.

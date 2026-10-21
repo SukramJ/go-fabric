@@ -125,13 +125,8 @@ type CommissionerControlConfig struct {
 	// Rand mints the passcode, discriminator and salt; nil is
 	// crypto/rand.
 	Rand io.Reader
-	// Clock is the clock of ApprovalValidity. Set, it wins over Now;
-	// neither set is [clock.System].
+	// Clock is the clock of ApprovalValidity. Nil is [clock.System].
 	Clock clock.Clock
-	// Now is the clock of ApprovalValidity.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// Logger receives the server's log; nil discards it.
 	Logger *slog.Logger
 }
@@ -208,18 +203,12 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 	if cfg.Commissioner == nil {
 		return nil, fmt.Errorf("core: CommissionerControl: %w", errNilCommissioner)
 	}
-	c := &CommissionerControl{cfg: cfg, log: cfg.Logger, rand: cfg.Rand, now: cfg.Now}
+	c := &CommissionerControl{cfg: cfg, log: cfg.Logger, rand: cfg.Rand, now: clock.Or(cfg.Clock).Now}
 	if c.log == nil {
 		c.log = slog.New(slog.DiscardHandler)
 	}
 	if c.rand == nil {
 		c.rand = rand.Reader
-	}
-	switch {
-	case cfg.Clock != nil:
-		c.now = cfg.Clock.Now
-	case c.now == nil:
-		c.now = clock.System{}.Now
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	handlers := map[uint32]spec.CommandHandler{

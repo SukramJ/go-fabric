@@ -28,7 +28,7 @@ func TestFabricScopedDefaults(t *testing.T) {
 		t.Errorf("Binding list %v, %v", v, ok)
 	}
 
-	node, err := NewBridgedNode(testOptions("node"), WithOptional(ecodef.ClusterID))
+	node, err := NewBridgedNode(testOptions("node"), ecodef.Declare{})
 	if err != nil {
 		t.Fatal(err)
 	}
