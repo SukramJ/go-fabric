@@ -193,6 +193,21 @@ var optionalAttributes = []struct {
 	}},
 }
 
+// OptionalFor is the Optional set that serves attrIDs: an optional
+// attribute among them sets its bit (any one of the automatic limits sets
+// OptionalAutomaticLimits), every other id is ignored.
+func OptionalFor(attrIDs []uint32) Optional {
+	var o Optional
+	for _, a := range optionalAttributes {
+		for _, id := range a.attrs {
+			if slices.Contains(attrIDs, id) {
+				o |= a.opt
+			}
+		}
+	}
+	return o
+}
+
 // Limits are the fixed (quality F), nullable limit attributes; nil is
 // null, "if the value is invalid" (resource :35-133).
 type Limits struct {

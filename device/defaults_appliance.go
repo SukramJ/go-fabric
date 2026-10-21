@@ -12,11 +12,14 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/filter"
+	acfdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	cpdef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	dwadef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	rfadef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
+	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
 	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
@@ -28,17 +31,61 @@ import (
 // (no alarm supported, no spin speed, no price) — the state matter.js's
 // default servers start with — until the host sets it.
 
-// alarmServer builds an AlarmBase derivation; ModifyEnabledAlarms is
-// accepted where the selection mandates it.
+// alarmServer builds an AlarmBase derivation on the declared Delegate:
+// Supported, Latch, Mask, State and a TemperatureAlarm's thresholds from
+// the declaration's Initial, ModifyEnabledAlarms accepted where the
+// selection mandates it. A TemperatureAlarm without the thresholds its
+// features serve keeps the generated server.
 func alarmServer(build func(alarmbase.Config) (*alarmbase.Server, error)) serverFactory {
 	return func(b defaultBuild) (contract.ClusterServer, error) {
-		srv, err := build(alarmbase.Config{
+		cfg := alarmbase.Config{
 			Features:            b.opts.Features,
 			ModifyEnabledAlarms: slices.Contains(b.opts.Commands, dwadef.CmdModifyEnabledAlarms),
+			Delegate:            alarmDelegateOf(b.ports),
 			DataVersion:         b.cfg.DataVersion,
-		})
+		}
+		configFrom(&cfg, b.def, b.initial)
+		for _, id := range []uint32{
+			tadef.AttrCriticalOverTemperatureThreshold, tadef.AttrMajorOverTemperatureThreshold, tadef.AttrMinorOverTemperatureThreshold,
+			tadef.AttrMinorUnderTemperatureThreshold, tadef.AttrMajorUnderTemperatureThreshold, tadef.AttrCriticalUnderTemperatureThreshold,
+		} {
+			if b.def.ID != tadef.ClusterID {
+				break
+			}
+			if v, ok := b.initial[id].(int16); ok {
+				if cfg.Thresholds == nil {
+					cfg.Thresholds = map[uint32]int16{}
+				}
+				cfg.Thresholds[id] = v
+				delete(b.initial, id)
+			}
+		}
+		srv, err := build(cfg)
+		if errors.Is(err, alarmbase.ErrThresholds) || errors.Is(err, alarmbase.ErrAdjustableThresholds) {
+			return nil, notServed(err)
+		}
 		return srv, err
 	}
+}
+
+// alarmDelegateOf is the Delegate an AlarmBase derivation's declaration
+// carries, nil without one.
+func alarmDelegateOf(ports any) alarmbase.Delegate {
+	switch d := ports.(type) {
+	case dwadef.Declare:
+		if d.Delegate != nil {
+			return d.Delegate
+		}
+	case rfadef.Declare:
+		if d.Delegate != nil {
+			return d.Delegate
+		}
+	case tadef.Declare:
+		if d.Delegate != nil {
+			return d.Delegate
+		}
+	}
+	return nil
 }
 
 // newBooleanStateConfigurationServer is the module's
@@ -63,22 +110,59 @@ func newBooleanStateConfigurationServer(b defaultBuild) (contract.ClusterServer,
 }
 
 // filterServer builds a resource-monitoring server with the optional
-// attributes the selection mandates. ResetCondition needs the host's
-// Resetter: a selection that mandates it keeps the generated server.
+// attributes the selection mandates, DegradationDirection and
+// ReplacementProducts from the declaration's Initial, and the declared
+// Resetter and LastChangedTimeWriter. ResetCondition needs the Resetter:
+// a selection that mandates it without one keeps the generated server.
 func filterServer(build func(filter.Config) (*filter.Server, error)) serverFactory {
 	return func(b defaultBuild) (contract.ClusterServer, error) {
-		if slices.Contains(b.opts.Commands, hepadef.CmdResetCondition) {
+		resetter, writer := filterPortsOf(b.ports)
+		reset := slices.Contains(b.opts.Commands, hepadef.CmdResetCondition)
+		if reset && resetter == nil {
 			return nil, notServed(filter.ErrNoResetter)
 		}
 		var optional filter.Optional
+		if reset {
+			optional |= filter.OptionalResetCondition
+		}
 		if slices.Contains(b.opts.Attributes, hepadef.AttrInPlaceIndicator) {
 			optional |= filter.OptionalInPlaceIndicator
 		}
 		if slices.Contains(b.opts.Attributes, hepadef.AttrLastChangedTime) {
 			optional |= filter.OptionalLastChangedTime
 		}
-		return build(filter.Config{Features: filter.Feature(b.opts.Features), Optional: optional, DataVersion: b.cfg.DataVersion})
+		cfg := filter.Config{
+			Features: filter.Feature(b.opts.Features), Optional: optional, Resetter: resetter, LastChangedTimeWriter: writer,
+			DataVersion: b.cfg.DataVersion,
+		}
+		configFrom(&cfg, b.def, b.initial)
+		return build(cfg)
 	}
+}
+
+// filterPortsOf are the ports a resource-monitoring declaration carries.
+func filterPortsOf(ports any) (filter.Resetter, filter.LastChangedTimeWriter) {
+	var (
+		r filter.Resetter
+		w filter.LastChangedTimeWriter
+	)
+	switch d := ports.(type) {
+	case hepadef.Declare:
+		if d.Resetter != nil {
+			r = d.Resetter
+		}
+		if d.LastChangedTimeWriter != nil {
+			w = d.LastChangedTimeWriter
+		}
+	case acfdef.Declare:
+		if d.Resetter != nil {
+			r = d.Resetter
+		}
+		if d.LastChangedTimeWriter != nil {
+			w = d.LastChangedTimeWriter
+		}
+	}
+	return r, w
 }
 
 // newLaundryWasherControlsServer is the module's LaundryWasherControls

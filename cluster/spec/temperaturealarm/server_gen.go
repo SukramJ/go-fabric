@@ -127,6 +127,14 @@ func (s *Server) EmitNotify(endpoint uint16, data NotifyEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNotify, data)
 }
 
+// Delegate is asked before a command changes Mask (ModifyEnabledAlarms)
+// or State (Reset); an error refuses the command and answers FAILURE.
+// Without one every command is accepted (cluster/alarmbase).
+type Delegate interface {
+	ModifyEnabledAlarms(ctx context.Context, mask uint32) error
+	ResetAlarms(ctx context.Context, alarms uint32) error
+}
+
 // Declare is the declaration of the TemperatureAlarm cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -157,6 +165,8 @@ type Declare struct {
 	// HandleSetTemperatureAlarmThresholds handles the SetTemperatureAlarmThresholds command in place of the server
 	// (Server.HandleSetTemperatureAlarmThresholds), inline; an optional command it handles is accepted.
 	HandleSetTemperatureAlarmThresholds func(ctx context.Context, req SetTemperatureAlarmThresholdsRequest) (struct{}, error)
+	// Delegate is the host port the kit's server runs on ([Delegate]).
+	Delegate Delegate
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

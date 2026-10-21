@@ -103,6 +103,20 @@ func (s *Server) HandleResetCondition(fn func(ctx context.Context, req ResetCond
 	return spec.HandleOn(s.Underlying(), CmdResetCondition, fn)
 }
 
+// Resetter resets the device's resource tracking for ResetCondition; on
+// success the kit's server resets Condition and ChangeIndication. The
+// ResetCondition command needs it (cluster/filter).
+type Resetter interface {
+	ResetCondition(ctx context.Context) error
+}
+
+// LastChangedTimeWriter is told a controller's LastChangedTime write
+// (nil for null), so the host can persist it; an error refuses the
+// write (cluster/filter).
+type LastChangedTimeWriter interface {
+	WriteLastChangedTime(ctx context.Context, t *uint32) error
+}
+
 // Declare is the declaration of the HepaFilterMonitoring cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -124,6 +138,10 @@ type Declare struct {
 	// HandleResetCondition handles the ResetCondition command in place of the server
 	// (Server.HandleResetCondition), inline; an optional command it handles is accepted.
 	HandleResetCondition func(ctx context.Context, req ResetConditionRequest) (struct{}, error)
+	// Resetter is the host port the kit's server runs on ([Resetter]).
+	Resetter Resetter
+	// LastChangedTimeWriter is the host port the kit's server runs on ([LastChangedTimeWriter]).
+	LastChangedTimeWriter LastChangedTimeWriter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

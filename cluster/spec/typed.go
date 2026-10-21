@@ -319,6 +319,11 @@ func scalarClass(k reflect.Kind) int {
 	}
 }
 
+// Convert is the conversion the typed form reads every field through
+// ([StateOf]): v as a value of type t ([convert]). The device kit fills a
+// server's configuration from a declaration's Initial with it.
+func Convert(v any, t reflect.Type) (reflect.Value, bool) { return convert(v, t) }
+
 // convert turns a stored value into a value of the generated type t: a
 // width integer into its enum or bitmap type, a list entry by entry, nil
 // into a nil pointer or slice or a null [Nullable], a value into a

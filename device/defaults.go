@@ -37,6 +37,7 @@ import (
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	rfadef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	switchdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -128,6 +129,7 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	washerdef.ClusterID:   newLaundryWasherControlsServer,                          // LaundryWasherControls: cluster/appliance.
 	rfadef.ClusterID:      alarmServer(alarmbase.NewRefrigeratorAlarm),             // RefrigeratorAlarm: cluster/alarmbase.
 	dwadef.ClusterID:      alarmServer(alarmbase.NewDishwasherAlarm),               // DishwasherAlarm: cluster/alarmbase.
+	tadef.ClusterID:       alarmServer(alarmbase.NewTemperatureAlarm),              // TemperatureAlarm: cluster/alarmbase.
 	hepadef.ClusterID:     filterServer(filter.NewHepaFilterMonitoring),            // HepaFilterMonitoring: cluster/filter.
 	acfdef.ClusterID:      filterServer(filter.NewActivatedCarbonFilterMonitoring), // ActivatedCarbonFilterMonitoring: cluster/filter.
 	boolcfgdef.ClusterID:  newBooleanStateConfigurationServer,                      // BooleanStateConfiguration: cluster/boolcfg.

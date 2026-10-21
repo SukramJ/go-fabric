@@ -253,7 +253,48 @@ var operationalCommands = portSet{ports: []portDecl{{
 	methods: []string{"HandleOperationalCommand(ctx context.Context, cmdID uint32) (ErrorStateStruct, error)"},
 }}}
 
+// alarmDelegate is the port of the three AlarmBase derivations: the one
+// engine in cluster/alarmbase asks it before a command changes Mask or
+// State.
+var alarmDelegate = portSet{ports: []portDecl{{
+	name: "Delegate",
+	doc: []string{
+		"Delegate is asked before a command changes Mask (ModifyEnabledAlarms)",
+		"or State (Reset); an error refuses the command and answers FAILURE.",
+		"Without one every command is accepted (cluster/alarmbase).",
+	},
+	methods: []string{
+		"ModifyEnabledAlarms(ctx context.Context, mask uint32) error",
+		"ResetAlarms(ctx context.Context, alarms uint32) error",
+	},
+}}}
+
+// resourceMonitoring is the port of the two ResourceMonitoring
+// derivations (cluster/filter).
+var resourceMonitoring = portSet{ports: []portDecl{{
+	name: "Resetter",
+	doc: []string{
+		"Resetter resets the device's resource tracking for ResetCondition; on",
+		"success the kit's server resets Condition and ChangeIndication. The",
+		"ResetCondition command needs it (cluster/filter).",
+	},
+	methods: []string{"ResetCondition(ctx context.Context) error"},
+}, {
+	name: "LastChangedTimeWriter",
+	doc: []string{
+		"LastChangedTimeWriter is told a controller's LastChangedTime write",
+		"(nil for null), so the host can persist it; an error refuses the",
+		"write (cluster/filter).",
+	},
+	methods: []string{"WriteLastChangedTime(ctx context.Context, t *uint32) error"},
+}}}
+
 func init() {
+	devicePorts["DishwasherAlarm"] = alarmDelegate
+	devicePorts["RefrigeratorAlarm"] = alarmDelegate
+	devicePorts["TemperatureAlarm"] = alarmDelegate
+	devicePorts["HepaFilterMonitoring"] = resourceMonitoring
+	devicePorts["ActivatedCarbonFilterMonitoring"] = resourceMonitoring
 	devicePorts["OperationalState"] = operationalCommands
 	devicePorts["RvcOperationalState"] = operationalCommands
 	devicePorts["OvenCavityOperationalState"] = operationalCommands

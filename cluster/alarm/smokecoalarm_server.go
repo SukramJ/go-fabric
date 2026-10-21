@@ -227,7 +227,20 @@ var optionalAttributes = []struct {
 	{OptionalUnmounted, AttrUnmounted},
 }
 
-// State is one observation of the host's alarm. Its zero value is the
+// OptionalFor is the Optional set that serves attrIDs: each optional
+// attribute among them sets its bit, every other id is ignored.
+func OptionalFor(attrIDs []uint32) Optional {
+	var o Optional
+	for _, a := range optionalAttributes {
+		if slices.Contains(attrIDs, a.attr) {
+			o |= a.opt
+		}
+	}
+	return o
+}
+
+// snapshot is one observation of the host's alarm, as the server reads
+// the source's generated State ([snapshotOf]). Its zero value is the
 // state matter.js SmokeCoAlarmBaseServer.initialize seeds
 // (SmokeCoAlarmServer.ts:20-41) — everything Normal, nothing in progress
 // or faulted — except SmokeSensitivityLevel, whose zero is High; a host
