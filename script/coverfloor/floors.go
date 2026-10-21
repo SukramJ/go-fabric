@@ -107,11 +107,6 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/client/peer", min: 93},
-	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 0, why: "BX4 forwarding package (aliases and variables), no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/controller/exchange", min: 0, why: "BX4 forwarding package (aliases and variables), no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/controller/handshake", min: 0, why: "BX4 forwarding package (aliases and variables), no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/controller/interaction", min: 0, why: "BX4 forwarding package (aliases and variables), no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/controller/peer", min: 0, why: "BX4 forwarding package (aliases and variables), no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/controller/thread", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
@@ -197,7 +192,6 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
 	// BX4's forward generator; main() only writes the files its test compares.
-	{pkg: "github.com/SukramJ/go-fabric/script/bx4-forward", min: 74},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
 		min: 68,
