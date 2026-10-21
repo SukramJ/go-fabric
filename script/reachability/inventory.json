@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6152,
+  "entry_points": 6153,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14431,
+    "total_exported": 14432,
     "reachable": 9995,
-    "whitelisted": 4431,
+    "whitelisted": 4432,
     "unreachable": 5
   },
   "by_package": [
@@ -21616,7 +21616,7 @@
       "identifier": "TestDeviceClockAndQueue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 128
+      "line": 131
     },
     {
       "package": "device",
@@ -21700,14 +21700,14 @@
       "identifier": "TestKitOptionsAndPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 160
+      "line": 163
     },
     {
       "package": "device",
       "identifier": "TestLifecycleThroughTheSeam",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 58
+      "line": 61
     },
     {
       "package": "device",
@@ -21771,6 +21771,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 285
+    },
+    {
+      "package": "device",
+      "identifier": "TestPortConfigurationAndHookRefusal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 212
     },
     {
       "package": "device",
