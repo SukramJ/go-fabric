@@ -20,19 +20,25 @@ import (
 // controller's write of the read-only CurrentMode nothing.
 func TestTheChangesOrigin(t *testing.T) {
 	t.Parallel()
-	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer { return newRun(t, &changer{}) },
+	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+		return newRun(t, &changer{})
+	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			one := uint8(1)
 			if err := rvcrunmode.Wrap(srv).Set(rvcrunmode.Patch{CurrentMode: &one}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, rvcrunmode.ChangeToModeRequest{NewMode: 1}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), modebase.AttrCurrentMode, uint8(1)); err == nil {
 				tb.Fatal("a write of the read-only CurrentMode succeeded")
 			}

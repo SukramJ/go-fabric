@@ -145,7 +145,8 @@ func (s *Server) checkSet(st State, setState bool, es ErrorState, setErr bool, p
 		s.mu.Lock()
 		n := len(s.phases)
 		s.mu.Unlock()
-		if !((n == 0 && cur == nil) || (n > 0 && cur != nil && int(*cur) < n)) {
+		valid := (n == 0 && cur == nil) || (n > 0 && cur != nil && int(*cur) < n)
+		if !valid {
 			return fmt.Errorf("%w: %v for %d phases", ErrCurrentPhase, cur, n)
 		}
 	}

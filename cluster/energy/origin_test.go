@@ -23,20 +23,25 @@ import (
 func TestWaterHeaterManagementOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		return newWaterHeater(t, energy.WaterHeaterFeatureTankPercent, &booster{})
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := whm.Wrap(srv).Set(whm.Patch{TankPercentage: typedPtr(uint8(80))}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			req := whm.BoostRequest{BoostInfo: energy.BoostInfo{Duration: 600, OneShot: typedPtr(true)}}
 			if _, err := srv.MatterInvoke(context.Background(), whm.CmdBoost, req); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), whm.AttrBoostState, uint8(1)); err == nil {
 				tb.Fatal("a write of the read-only BoostState succeeded")
 			}
@@ -51,10 +56,13 @@ func TestWaterHeaterManagementOrigins(t *testing.T) {
 func TestCommodityTariffOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		srv, _ := newTariff(t)
 		return srv
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			tariff := sample2()
 			err := ct.Wrap(srv).Set(ct.Patch{
 				TariffInfo:                 tariff.TariffInfo,
@@ -74,6 +82,7 @@ func TestCommodityTariffOrigins(t *testing.T) {
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), ct.AttrTariffUnit, uint8(1)); err == nil {
 				tb.Fatal("a write of the read-only TariffUnit succeeded")
 			}
@@ -88,6 +97,8 @@ func TestCommodityTariffOrigins(t *testing.T) {
 func TestDeviceEnergyManagementOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		srv, _ := newDEM(t, demPFRSet, &demHost{})
 		if err := srv.SetPowerAdjustmentCapability(triggerCapability()); err != nil {
 			tb.Fatal(err)
@@ -95,17 +106,20 @@ func TestDeviceEnergyManagementOrigins(t *testing.T) {
 		return srv
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := dem.Wrap(srv).Set(dem.Patch{AbsMaxPower: typedPtr(int64(9000000))}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			req := dem.PowerAdjustRequestRequest{Power: 10000000, Duration: 20, Cause: dem.AdjustmentCauseLocalOptimization}
 			if _, err := srv.MatterInvoke(context.Background(), dem.CmdPowerAdjustRequest, req); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), dem.AttrEsaState, uint8(0)); err == nil {
 				tb.Fatal("a write of the read-only EsaState succeeded")
 			}
@@ -120,6 +134,8 @@ func TestDeviceEnergyManagementOrigins(t *testing.T) {
 func TestEnergyPreferenceOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		srv, err := energy.NewEnergyPreference(preferenceConfig(energy.PreferenceFeatureEnergyBalance))
 		if err != nil {
 			tb.Fatal(err)
@@ -127,11 +143,13 @@ func TestEnergyPreferenceOrigins(t *testing.T) {
 		return srv
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := ep.Wrap(srv).Set(ep.Patch{CurrentEnergyBalance: typedPtr(uint8(1))}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Want: contract.OriginControllerWrite, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), ep.AttrCurrentEnergyBalance, uint8(2)); err != nil {
 				tb.Fatal(err)
 			}

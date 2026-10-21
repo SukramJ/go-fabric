@@ -102,7 +102,7 @@ func vacuumAreaEntry(id uint32, name string, tag uint8) sadef.AreaStruct {
 
 // servers are the ServiceArea and the run mode; nil before the vacuum is
 // built.
-func (a *vacuumArea) servers() (*sadef.Server, *rvcrdef.Server) {
+func (a *vacuumArea) servers() (areas *sadef.Server, run *rvcrdef.Server) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.srv, a.run

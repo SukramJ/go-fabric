@@ -68,6 +68,8 @@ func TestHeldBooleanStateEmitsStateChange(t *testing.T) {
 func TestHeldBooleanStateOrigin(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		srv, err := measurement.NewHeldBooleanState(measurement.HeldBooleanStateConfig{Features: bsdef.FeatureChangeEvent})
 		if err != nil {
 			tb.Fatal(err)
@@ -75,12 +77,14 @@ func TestHeldBooleanStateOrigin(t *testing.T) {
 		return srv
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			on := true
 			if err := bsdef.Wrap(srv).Set(bsdef.Patch{StateValue: &on}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), bsdef.AttrStateValue, true); err == nil {
 				tb.Fatal("a write of the read-only StateValue succeeded")
 			}

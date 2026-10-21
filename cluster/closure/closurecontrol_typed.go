@@ -107,12 +107,12 @@ func (s *ControlServer) disengaged() bool {
 // structValue is a checked struct value, by value or pointer.
 func structValue[T any](v any) (T, bool) {
 	switch x := v.(type) {
-	case T:
-		return x, true
 	case *T:
 		if x != nil {
 			return *x, true
 		}
+	case T:
+		return x, true
 	}
 	var zero T
 	return zero, false

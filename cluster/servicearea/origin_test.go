@@ -18,18 +18,24 @@ import (
 // nothing (the cluster has no writable attribute).
 func TestServiceAreaOrigins(t *testing.T) {
 	t.Parallel()
-	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer { return newServer(t, vacuum(&device{})) },
+	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+		return newServer(t, vacuum(&device{}))
+	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := sa.Wrap(srv).Set(sa.Patch{CurrentArea: ptr(uint32(7))}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if _, err := srv.MatterInvoke(context.Background(), sa.CmdSelectAreas, sa.SelectAreasRequest{NewAreas: []uint32{7}}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), sa.AttrSelectedAreas, []uint32{7}); err == nil {
 				tb.Fatal("a write of the read-only SelectedAreas succeeded")
 			}

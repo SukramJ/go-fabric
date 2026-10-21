@@ -282,7 +282,7 @@ func (g *generator) server() ([]byte, error) {
 // typed server once, over a server of an empty definition with the
 // cluster's id, so every cluster's hull runs whatever its feature and
 // handler requirements.
-func (g *generator) serverTest(w *writer) {
+func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated test, written top to bottom
 	cmds := g.hullCommands()
 	w.p("")
 	w.p("// TestTypedServer drives every method of the typed server once.")

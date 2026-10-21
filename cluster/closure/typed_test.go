@@ -23,22 +23,27 @@ func TestControlChangesOrigin(t *testing.T) {
 	t.Parallel()
 	open := closuredef.TargetPositionMoveToFullyOpen
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		s := closure.NewControlServer((&recordingHandlers{}).config())
 		s.SetMainState(0) // Stopped: MoveTo is the drive's
 		return s
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			moving := closuredef.MainStateMoving
 			if err := closuredef.Wrap(srv).Set(closuredef.Patch{MainState: &moving}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if _, err := srv.MatterInvoke(context.Background(), closuredef.CmdMoveTo, closuredef.MoveToRequest{Position: &open}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), closuredef.AttrMainState, uint8(1)); err == nil {
 				tb.Fatal("a write of the read-only MainState succeeded")
 			}
@@ -130,6 +135,8 @@ func TestControlEngage(t *testing.T) {
 func TestDimensionChangesOrigin(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		s, err := closure.NewDimension(chipPanel(&panel{}))
 		if err != nil {
 			tb.Fatal(err)
@@ -137,17 +144,20 @@ func TestDimensionChangesOrigin(t *testing.T) {
 		return s
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			st := cd.DimensionStateStruct{Position: pos(0), Latch: latch(true)}
 			if err := cd.Wrap(srv).Set(cd.Patch{CurrentState: &st}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "command", Want: contract.OriginCommand, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if _, err := srv.MatterInvoke(context.Background(), cd.CmdSetTarget, cd.SetTargetRequest{Position: ptr[uint16](5000), Latch: ptr(false)}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), cd.AttrResolution, uint16(1)); err == nil {
 				tb.Fatal("a write of the read-only Resolution succeeded")
 			}

@@ -232,7 +232,7 @@ func (e *demoEvse) device(opts device.Options) (*device.EnergyEvse, error) {
 
 // ChangeToMode implements [evsemdef.ModeChanger]: every supported mode is
 // taken (energy-evse-mode.cpp:37-40).
-func (e *demoEvse) ChangeToMode(_ context.Context, newMode uint8) (uint8, string, error) {
+func (e *demoEvse) ChangeToMode(_ context.Context, newMode uint8) (status uint8, text string, err error) {
 	slog.Info("evse.mode", slog.String("device", e.name), slog.Int("mode", int(newMode)))
 	return uint8(evsemdef.ModeChangeStatusSuccess), "", nil
 }
@@ -559,7 +559,7 @@ func (d *demoDem) RequestConstraintBasedForecast(context.Context, []dem.Constrai
 
 // ChangeToMode implements [demmdef.ModeChanger]: every supported mode is
 // taken (device-energy-management-mode.cpp:46-50).
-func (d *demoDem) ChangeToMode(_ context.Context, newMode uint8) (uint8, string, error) {
+func (d *demoDem) ChangeToMode(_ context.Context, newMode uint8) (status uint8, text string, err error) {
 	slog.Info("evse.dem.mode", slog.String("device", d.name), slog.Int("mode", int(newMode)))
 	return uint8(demmdef.ModeChangeStatusSuccess), "", nil
 }

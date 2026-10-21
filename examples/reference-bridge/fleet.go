@@ -1109,7 +1109,7 @@ func (f *fleet) numberPowerSources() error {
 	if f.evse.power != nil {
 		sources = append(sources, f.evse.power)
 	}
-	var errs []error
+	errs := make([]error, 0, len(sources))
 	for _, ps := range sources {
 		errs = append(errs, powerSourceEndpointList(ps))
 	}

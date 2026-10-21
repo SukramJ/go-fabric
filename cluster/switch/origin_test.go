@@ -19,6 +19,8 @@ import (
 func TestSwitchOrigins(t *testing.T) {
 	t.Parallel()
 	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+
 		s, err := New(Config{Features: FeatureLS})
 		if err != nil {
 			tb.Fatal(err)
@@ -26,12 +28,14 @@ func TestSwitchOrigins(t *testing.T) {
 		return s
 	},
 		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			one := uint8(1)
 			if err := swdef.Wrap(srv).Set(swdef.Patch{CurrentPosition: &one}); err != nil {
 				tb.Fatal(err)
 			}
 		}},
 		spectest.OriginCase{Name: "controller write", Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
 			if err := srv.MatterWrite(context.Background(), swdef.AttrCurrentPosition, uint8(1)); err == nil {
 				tb.Fatal("a write of the read-only CurrentPosition succeeded")
 			}
