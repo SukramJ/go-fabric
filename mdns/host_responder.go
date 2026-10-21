@@ -72,6 +72,7 @@ const (
 //     where it would claim more than is sent: in a unicast response, and on
 //     a record set that suppression left incomplete (matter.js `sendable`).
 type hostAnswerer struct {
+	// mu guards addrsFor, lastMulticast, name and recentlyAnswered.
 	mu sync.Mutex
 	// name is the host's FQDN with a trailing dot; "" answers nothing.
 	name string

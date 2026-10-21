@@ -26,6 +26,7 @@ type Store interface {
 // MemoryStore is a [Store] in memory, the default: nothing survives the
 // process.
 type MemoryStore struct {
+	// mu guards data.
 	mu   sync.Mutex
 	data []byte
 }

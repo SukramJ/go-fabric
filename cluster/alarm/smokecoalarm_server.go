@@ -330,6 +330,7 @@ type Server struct {
 	priority []ExpressedState
 	inst     *spec.Instance
 
+	// mu guards emitter, endpoint, last and lastExpr.
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16

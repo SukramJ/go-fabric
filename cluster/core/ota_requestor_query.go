@@ -253,7 +253,7 @@ func (r *OTASoftwareUpdateRequestor) updateAvailableFromProvider(ctx context.Con
 		return nil, outcomeFinished, err
 	}
 	if node == nil {
-		return nil, outcomeFinished, errors.New("QueryImage answered without a QueryImageResponse")
+		return nil, outcomeFinished, errors.New("core: QueryImage answered without a QueryImageResponse")
 	}
 	resp, err := spec.DecodeStruct[provdef.QueryImageResponse](*node)
 	if err != nil {
@@ -372,7 +372,7 @@ func (r *OTASoftwareUpdateRequestor) validateApplyUpdate(ctx context.Context, re
 	var resp provdef.ApplyUpdateResponse
 	if err == nil {
 		if node == nil {
-			err = errors.New("ApplyUpdateRequest answered without an ApplyUpdateResponse")
+			err = errors.New("core: ApplyUpdateRequest answered without an ApplyUpdateResponse")
 		} else {
 			resp, err = spec.DecodeStruct[provdef.ApplyUpdateResponse](*node)
 		}
@@ -489,7 +489,7 @@ func (r *OTASoftwareUpdateRequestor) queryOtaProvider(ctx context.Context, sess 
 func (r *OTASoftwareUpdateRequestor) requestUserConsent(ctx context.Context, version uint32, versionString string) (bool, error) {
 	if r.cfg.Applier == nil {
 		// :1301-1303, the unimplemented default.
-		return false, errors.New("seems 'canConsent' is set, but requestUserConsent() not implemented, declining update")
+		return false, errors.New("core: seems 'canConsent' is set, but requestUserConsent() not implemented, declining update")
 	}
 	return r.cfg.Applier.RequestUserConsent(ctx, version, versionString)
 }
@@ -726,7 +726,7 @@ func (r *OTASoftwareUpdateRequestor) applyPreparedUpdate(ctx context.Context, ve
 	}
 	var err error
 	if r.cfg.Applier == nil {
-		err = errors.New("to apply the update the applyUpdate() method must be implemented")
+		err = errors.New("core: to apply the update the applyUpdate() method must be implemented")
 	} else {
 		err = r.cfg.Applier.ApplyUpdate(ctx, version, file)
 	}

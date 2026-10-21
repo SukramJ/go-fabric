@@ -17,28 +17,28 @@ import (
 // kind and, for every kind, [ErrCommissioning].
 var (
 	// ErrCommissioning is CommissioningError, the class of every kind.
-	ErrCommissioning = errors.New("commissioning failed")
+	ErrCommissioning = errors.New("commissioner: commissioning failed")
 	// ErrMaximumCommissionedFabricsReached: the device has no room for
 	// another fabric (:224).
-	ErrMaximumCommissionedFabricsReached = errors.New("maximum commissioned fabrics reached")
+	ErrMaximumCommissionedFabricsReached = errors.New("commissioner: maximum commissioned fabrics reached")
 	// ErrCommissioningTimeout: commissioning took longer than the
 	// device's maximum cumulative failsafe (:227).
-	ErrCommissioningTimeout = errors.New("commissioning timeout")
+	ErrCommissioningTimeout = errors.New("commissioner: commissioning timeout")
 	// ErrDeviceAlreadyCommissionedToThisFabric: AddNOC answered
 	// FabricConflict (:230).
-	ErrDeviceAlreadyCommissionedToThisFabric = errors.New("device already commissioned to this fabric")
+	ErrDeviceAlreadyCommissionedToThisFabric = errors.New("commissioner: device already commissioned to this fabric")
 	// ErrFabricLabelConflict: UpdateFabricLabel answered LabelConflict
 	// (:233).
-	ErrFabricLabelConflict = errors.New("fabric label conflict")
+	ErrFabricLabelConflict = errors.New("commissioner: fabric label conflict")
 	// ErrNodeIDConflict: the node id is already a peer of the fabric
 	// (:245).
-	ErrNodeIDConflict = errors.New("node id conflict")
+	ErrNodeIDConflict = errors.New("commissioner: node id conflict")
 	// ErrOperativeConnectionFailed: the operational CASE connection after
 	// AddNOC failed (:248).
-	ErrOperativeConnectionFailed = errors.New("operative connection failed")
+	ErrOperativeConnectionFailed = errors.New("commissioner: operative connection failed")
 	// errRecoverable is RecoverableCommissioningError (:251, not
 	// exported there either): the flow logs it and continues.
-	errRecoverable = errors.New("recoverable commissioning error")
+	errRecoverable = errors.New("commissioner: recoverable commissioning error")
 )
 
 // CommissioningError is a commissioning failure of one of the kinds above.

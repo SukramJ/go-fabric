@@ -190,7 +190,7 @@ func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) erro
 	}
 	t, err := coerceUint16(value)
 	if err != nil {
-		return fmt.Errorf("matter: Identify.IdentifyTime: %w", err)
+		return fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
 	i.identifyTime.Store(uint32(t))
 	i.maybeStartCountdown()
@@ -223,7 +223,7 @@ func (i *Identify) MatterInvoke(_ context.Context, cmdID uint32, fields any) (an
 		// not flag the cluster as broken during the topology probe.
 		return nil, nil
 	}
-	return nil, im.UnsupportedCommandf("matter: Identify command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: Identify command 0x%02X not supported", cmdID)
 }
 
 // MatterReportable returns the attributes that change over the
@@ -315,7 +315,7 @@ func coerceUint16(v any) (uint16, error) {
 	case map[uint8]any:
 		raw, ok := x[identifyFieldIdentifyTime]
 		if !ok {
-			return 0, errors.New("identify: missing the IdentifyTime field")
+			return 0, errors.New("core: missing the IdentifyTime field")
 		}
 		return coerceUint16(raw)
 	case uint16:

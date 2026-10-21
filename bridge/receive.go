@@ -31,15 +31,15 @@ var (
 	// neither [im.InteractionModelProtocolID] nor
 	// [mrp.SecureChannelProtocolID]. Per Matter §4.10 the bridge
 	// silently drops these.
-	ErrUnknownProtocol = errors.New("receive: unknown protocol id")
+	ErrUnknownProtocol = errors.New("bridge: unknown protocol id")
 	// ErrUnsupportedOpcode is logged when an IM datagram carries an
 	// opcode the bridge does not service (responses, or future opcodes
 	// outside the v1.1 surface).
-	ErrUnsupportedOpcode = errors.New("receive: unsupported IM opcode")
+	ErrUnsupportedOpcode = errors.New("bridge: unsupported IM opcode")
 	// ErrSessionMissing is logged when an encrypted datagram references
 	// a SessionID that the operational session manager does not know.
 	// Per Matter §4.6 the bridge silently drops the datagram.
-	ErrSessionMissing = errors.New("receive: session not found")
+	ErrSessionMissing = errors.New("bridge: session not found")
 )
 
 // SessionLookup is the narrow operational-session port the receive
@@ -141,7 +141,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if hdrLen > len(buf) {
 		// Defensive — UnmarshalHeader should already fail in this
 		// case, but the dispatch loop must never index past the slice.
-		err := fmt.Errorf("receive: header consumed %d > %d bytes", hdrLen, len(buf))
+		err := fmt.Errorf("bridge: header consumed %d > %d bytes", hdrLen, len(buf))
 		b.logger.Warn("matter.rx.header_overflow", slog.String("err", err.Error()))
 		return err
 	}
@@ -227,7 +227,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// payload only.
 	bodyOffset := protocolHeaderSize(proto)
 	if bodyOffset > len(plain) {
-		err := fmt.Errorf("receive: protocol header consumed %d > %d bytes", bodyOffset, len(plain))
+		err := fmt.Errorf("bridge: protocol header consumed %d > %d bytes", bodyOffset, len(plain))
 		b.logger.Warn("matter.rx.protocol_overflow", slog.String("err", err.Error()))
 		return err
 	}

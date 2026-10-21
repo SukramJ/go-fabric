@@ -28,7 +28,8 @@ import (
 // daemon's lifetime should always wire the reaper; without it the
 // adapters map grows unboundedly.
 type PerExchangePaseProvider struct {
-	clock    clockvar.Var // see SetClock
+	clock clockvar.Var // see SetClock
+	// mu guards cancel and entries.
 	mu       sync.Mutex
 	entries  map[uint16]*paseEntry
 	factory  func() *PaseAdapter

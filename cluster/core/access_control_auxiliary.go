@@ -21,7 +21,7 @@ type aclStatusError struct {
 	msg  string
 }
 
-func (e aclStatusError) Error() string { return "matter: AccessControl: " + e.msg }
+func (e aclStatusError) Error() string { return "core: AccessControl: " + e.msg }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e aclStatusError) MatterStatusCode() im.StatusCode { return e.code }

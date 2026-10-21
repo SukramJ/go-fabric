@@ -184,9 +184,9 @@ func TestPanicInHandlerIsRecoveredCountedAndLogged(t *testing.T) {
 
 	var logBuf bytes.Buffer
 	var logMu sync.Mutex
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&lockedWriter{mu: &logMu, w: &logBuf}, &slog.HandlerOptions{Level: slog.LevelError})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	// The listener logs through the logger it was built with (Config.Logger,
+	// slog.Default() at construction), so the test hands it one.
+	a.log = slog.New(slog.NewTextHandler(&lockedWriter{mu: &logMu, w: &logBuf}, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	survived := make(chan struct{}, 1)
 	ctx, cancel := context.WithCancel(context.Background())

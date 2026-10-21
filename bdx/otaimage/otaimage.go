@@ -46,7 +46,7 @@ const (
 
 // ErrInvalid wraps every refusal of an image's content (matter.js
 // OtaImageError, OtaImageReader.ts:22-26).
-var ErrInvalid = errors.New("ota image")
+var ErrInvalid = errors.New("otaimage: ota image")
 
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))

@@ -117,8 +117,8 @@ type MicrowaveConfig struct {
 
 // MicrowaveOvenControl configuration errors.
 var (
-	ErrNoOven         = errors.New("microwaveovencontrol: an Oven is required")
-	ErrMicrowaveValue = errors.New("microwaveovencontrol: value outside the cluster's model")
+	ErrNoOven         = errors.New("appliance: an Oven is required")
+	ErrMicrowaveValue = errors.New("appliance: value outside the cluster's model")
 )
 
 // MicrowaveServer implements [contract.ClusterServer] for
@@ -167,7 +167,7 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 	}
 	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
-		return nil, fmt.Errorf("microwaveovencontrol: %w", err)
+		return nil, fmt.Errorf("appliance: %w", err)
 	}
 	s.Instance, s.srv = srv.Instance, srv
 	cookTime := cfg.CookTime
@@ -250,7 +250,7 @@ func (s *MicrowaveServer) uint8Value(id uint32) uint8 {
 // or CONSTRAINT_ERROR (SetCookTimeSec, MicrowaveOvenControlCluster.cpp:88-95).
 func (s *MicrowaveServer) SetCookTime(seconds uint32) error {
 	if seconds < 1 || seconds > s.MaxCookTime() {
-		return spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: CookTime %d outside 1..%d", seconds, s.MaxCookTime())
+		return spec.Errorf(im.StatusConstraintError, "appliance: CookTime %d outside 1..%d", seconds, s.MaxCookTime())
 	}
 	return s.srv.Set(mwo.AttrCookTime, seconds)
 }
@@ -274,7 +274,7 @@ func (s *MicrowaveServer) SetSelectedWattIndex(index uint8) error {
 		return fmt.Errorf("%w: SelectedWattIndex needs WATTS", ErrMicrowaveValue)
 	}
 	if index > s.maxWattIndex() {
-		return spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: watt index %d above %d", index, s.maxWattIndex())
+		return spec.Errorf(im.StatusConstraintError, "appliance: watt index %d above %d", index, s.maxWattIndex())
 	}
 	return s.srv.Set(mwo.AttrSelectedWattIndex, index)
 }
@@ -293,10 +293,10 @@ func (s *MicrowaveServer) powerLimits() (minPower, maxPower, step uint8) {
 func (s *MicrowaveServer) checkPower(p uint8) error {
 	minPower, maxPower, step := s.powerLimits()
 	if p < minPower || p > maxPower {
-		return spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: PowerSetting %d outside %d..%d", p, minPower, maxPower)
+		return spec.Errorf(im.StatusConstraintError, "appliance: PowerSetting %d outside %d..%d", p, minPower, maxPower)
 	}
 	if step == 0 || (p-minPower)%step != 0 {
-		return spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: PowerSetting %d not on a step of %d from %d", p, step, minPower)
+		return spec.Errorf(im.StatusConstraintError, "appliance: PowerSetting %d not on a step of %d from %d", p, step, minPower)
 	}
 	return nil
 }
@@ -312,30 +312,30 @@ func (s *MicrowaveServer) maxWattIndex() uint8 {
 func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) (any, error) {
 	req, ok := fields.(mwo.SetCookingParametersRequest)
 	if !ok {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: SetCookingParameters fields %T", fields)
+		return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: SetCookingParameters fields %T", fields)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
 	// Only in Stopped (:206-207).
 	if st := s.oven.OperationalState(); st != operationalStopped {
-		return nil, spec.Errorf(im.StatusInvalidInState, "microwaveovencontrol: OperationalState %d is not Stopped", st)
+		return nil, spec.Errorf(im.StatusInvalidInState, "appliance: OperationalState %d is not Stopped", st)
 	}
 	// StartAfterSetting needs OperationalState's Start (:209-217).
 	if req.StartAfterSetting != nil && !s.oven.StartSupported() {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: StartAfterSetting without OperationalState Start")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: StartAfterSetting without OperationalState Start")
 	}
 	start := req.StartAfterSetting != nil && *req.StartAfterSetting
 	// CookMode defaults to the Normal mode, which must exist (:220-226).
 	normal, ok := s.oven.NormalMode()
 	if !ok {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: no Normal mode")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: no Normal mode")
 	}
 	mode := normal
 	if req.CookMode != nil {
 		mode = *req.CookMode
 	}
 	if !s.oven.SupportedMode(mode) {
-		return nil, spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: CookMode %d not supported", mode)
+		return nil, spec.Errorf(im.StatusConstraintError, "appliance: CookMode %d not supported", mode)
 	}
 	// CookTime defaults to 30 s and lies within 1..MaxCookTime (:228-230).
 	cookTime := DefaultCookTime
@@ -343,7 +343,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 		cookTime = *req.CookTime
 	}
 	if cookTime < 1 || cookTime > s.MaxCookTime() {
-		return nil, spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: CookTime %d outside 1..%d", cookTime, s.MaxCookTime())
+		return nil, spec.Errorf(im.StatusConstraintError, "appliance: CookTime %d outside 1..%d", cookTime, s.MaxCookTime())
 	}
 	var power, watt *uint8
 	values := map[uint32]any{mwo.AttrCookTime: cookTime}
@@ -351,7 +351,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 		// No WattSettingIndex (:239-242); PowerSetting defaults to the
 		// maximum and is checked against the limits (:251-260).
 		if req.WattSettingIndex != nil {
-			return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: WattSettingIndex with PWRNUM")
+			return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: WattSettingIndex with PWRNUM")
 		}
 		_, maxPower, _ := s.powerLimits()
 		p := maxPower
@@ -367,7 +367,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 		// No PowerSetting (:278-280); WattSettingIndex defaults to the
 		// last index and must not exceed it (:283-291).
 		if req.PowerSetting != nil {
-			return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: PowerSetting with WATTS")
+			return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: PowerSetting with WATTS")
 		}
 		limit := s.maxWattIndex()
 		w := limit
@@ -375,7 +375,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 			w = *req.WattSettingIndex
 		}
 		if w > limit {
-			return nil, spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: WattSettingIndex %d above %d", w, limit)
+			return nil, spec.Errorf(im.StatusConstraintError, "appliance: WattSettingIndex %d above %d", w, limit)
 		}
 		watt = &w
 		values[mwo.AttrSelectedWattIndex] = w
@@ -392,18 +392,18 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 func (s *MicrowaveServer) addMoreTime(ctx context.Context, fields any) (any, error) {
 	req, ok := fields.(mwo.AddMoreTimeRequest)
 	if !ok {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "microwaveovencontrol: AddMoreTime fields %T", fields)
+		return nil, spec.Errorf(im.StatusInvalidCommand, "appliance: AddMoreTime fields %T", fields)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
 	// Not in Error (:323-324).
 	if st := s.oven.OperationalState(); st == operationalStateErr {
-		return nil, spec.Errorf(im.StatusInvalidInState, "microwaveovencontrol: OperationalState is Error")
+		return nil, spec.Errorf(im.StatusInvalidInState, "appliance: OperationalState is Error")
 	}
 	// The sum may not pass MaxCookTime (:327-330).
 	limit, current := s.MaxCookTime(), s.CookTime()
 	if req.TimeToAdd > limit || current > limit-req.TimeToAdd {
-		return nil, spec.Errorf(im.StatusConstraintError, "microwaveovencontrol: %d + %d above MaxCookTime %d", current, req.TimeToAdd, limit)
+		return nil, spec.Errorf(im.StatusConstraintError, "appliance: %d + %d above MaxCookTime %d", current, req.TimeToAdd, limit)
 	}
 	final := current + req.TimeToAdd
 	if err := s.oven.ModifyCookTime(ctx, final); err != nil {

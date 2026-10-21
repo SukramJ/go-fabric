@@ -44,6 +44,7 @@ type monitor struct {
 	min   time.Duration
 	max   time.Duration
 
+	// mu guards closed, fibCurr, fibPrev, lastProbeAt, running and timer.
 	mu          sync.Mutex
 	timer       exchange.Timer
 	running     *monitorRun

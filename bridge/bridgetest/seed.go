@@ -23,6 +23,7 @@ type seededStream struct {
 	seed  uint64
 	label string
 
+	// mu guards block and buf.
 	mu    sync.Mutex
 	block uint64
 	buf   []byte

@@ -77,6 +77,7 @@ func (r *retries) next() time.Duration {
 type sustainedState struct {
 	finished chan struct{}
 
+	// mu guards failureLogged, hasEvent and maxEvent.
 	mu      sync.Mutex
 	inner   *Subscription
 	active  bool

@@ -125,6 +125,7 @@ type ExchangeKey struct {
 // latest counter implicitly covers earlier counters in the same
 // exchange).
 type AckTracker struct {
+	// mu guards pending.
 	mu      sync.Mutex
 	pending map[ExchangeKey]AckObligation
 	delay   time.Duration

@@ -31,7 +31,7 @@ func (s *Store) ListDefaultOTAProviders(ctx context.Context) ([]OTAProviderLocat
 SELECT fabric_index, provider_node_id, endpoint FROM matter_ota_default_providers
 ORDER BY fabric_index ASC, position ASC`)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list default ota providers: %w", err)
+		return nil, fmt.Errorf("store: list default ota providers: %w", err)
 	}
 	defer rows.Close() //nolint:errcheck // cleanup-only; the scan error is the actionable one
 
@@ -42,16 +42,16 @@ ORDER BY fabric_index ASC, position ASC`)
 			node []byte
 		)
 		if err := rows.Scan(&e.FabricIndex, &node, &e.Endpoint); err != nil {
-			return nil, fmt.Errorf("matter store: list default ota providers: scan: %w", err)
+			return nil, fmt.Errorf("store: list default ota providers: scan: %w", err)
 		}
 		if len(node) != 8 {
-			return nil, fmt.Errorf("matter store: list default ota providers: node id of %d bytes", len(node))
+			return nil, fmt.Errorf("store: list default ota providers: node id of %d bytes", len(node))
 		}
 		e.ProviderNodeID = binary.BigEndian.Uint64(node)
 		out = append(out, e)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list default ota providers: rows: %w", err)
+		return nil, fmt.Errorf("store: list default ota providers: rows: %w", err)
 	}
 	return out, nil
 }
@@ -63,22 +63,22 @@ ORDER BY fabric_index ASC, position ASC`)
 func (s *Store) ReplaceDefaultOTAProviders(ctx context.Context, fabricIndex uint8, entries []OTAProviderLocation) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("matter store: replace default ota providers: begin tx: %w", err)
+		return fmt.Errorf("store: replace default ota providers: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_ota_default_providers WHERE fabric_index = ?`, fabricIndex); err != nil {
-		return fmt.Errorf("matter store: replace default ota providers: delete: %w", err)
+		return fmt.Errorf("store: replace default ota providers: delete: %w", err)
 	}
 	for i, e := range entries {
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO matter_ota_default_providers (fabric_index, position, provider_node_id, endpoint)
 VALUES (?, ?, ?, ?)`, fabricIndex, i, uint64ToBE(e.ProviderNodeID), e.Endpoint); err != nil {
-			return fmt.Errorf("matter store: replace default ota providers: insert %d: %w", i, err)
+			return fmt.Errorf("store: replace default ota providers: insert %d: %w", i, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("matter store: replace default ota providers: commit: %w", err)
+		return fmt.Errorf("store: replace default ota providers: commit: %w", err)
 	}
 	return nil
 }

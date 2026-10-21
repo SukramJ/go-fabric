@@ -551,12 +551,13 @@ func (c *central) matterService(dev dbus.ObjectPath, objs managedObjects) *conne
 
 // connection is a GATT connection to one peripheral's Matter service.
 type connection struct {
-	c           *central
-	dev         dbus.ObjectPath
-	c1, c2, c3  dbus.ObjectPath
-	mtu         int
-	gone        chan struct{}
-	goneOnce    sync.Once
+	c          *central
+	dev        dbus.ObjectPath
+	c1, c2, c3 dbus.ObjectPath
+	mtu        int
+	gone       chan struct{}
+	goneOnce   sync.Once
+	// mu guards delivering, on, queue and unsubscribe.
 	mu          sync.Mutex
 	on          func([]byte)
 	queue       [][]byte

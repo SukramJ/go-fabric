@@ -62,7 +62,7 @@ func (s *Store) GetSetting(ctx context.Context, key string) (value string, ok bo
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", false, nil
 		}
-		return "", false, fmt.Errorf("matter store: get setting %q: %w", key, err)
+		return "", false, fmt.Errorf("store: get setting %q: %w", key, err)
 	}
 	return value, true, nil
 }
@@ -72,7 +72,7 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO matter_settings (key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
-		return fmt.Errorf("matter store: set setting %q: %w", key, err)
+		return fmt.Errorf("store: set setting %q: %w", key, err)
 	}
 	return nil
 }
@@ -86,10 +86,10 @@ func (s *Store) GetMetadataCounter(ctx context.Context, key string) (value uint6
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, false, nil
 		}
-		return 0, false, fmt.Errorf("matter store: get metadata %q: %w", key, err)
+		return 0, false, fmt.Errorf("store: get metadata %q: %w", key, err)
 	}
 	if v < 0 {
-		return 0, false, fmt.Errorf("matter store: metadata %q negative: %d", key, v)
+		return 0, false, fmt.Errorf("store: metadata %q negative: %d", key, v)
 	}
 	return uint64(v), true, nil
 }
@@ -98,12 +98,12 @@ func (s *Store) GetMetadataCounter(ctx context.Context, key string) (value uint6
 // matter_metadata.
 func (s *Store) SetMetadataCounter(ctx context.Context, key string, value uint64) error {
 	if value > 1<<62 {
-		return fmt.Errorf("matter store: metadata %q overflows int64: %d", key, value)
+		return fmt.Errorf("store: metadata %q overflows int64: %d", key, value)
 	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO matter_metadata (key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, int64(value)); err != nil { //nolint:gosec // bounded by the 1<<62 guard above
-		return fmt.Errorf("matter store: set metadata %q: %w", key, err)
+		return fmt.Errorf("store: set metadata %q: %w", key, err)
 	}
 	return nil
 }

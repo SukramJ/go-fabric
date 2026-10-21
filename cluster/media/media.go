@@ -382,6 +382,7 @@ type dataVersion = *cluster.DataVersionTracker
 // events stamps the endpoint a server's events are addressed to; the
 // bridge calls SetEndpoint when it mounts the server.
 type events struct {
+	// epMu guards ep.
 	epMu sync.Mutex
 	ep   uint16
 }

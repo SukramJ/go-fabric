@@ -58,7 +58,7 @@ func parseCert(der []byte, paa bool) (*trustCert, error) {
 		return nil, err
 	}
 	if !c.BasicConstraintsValid || c.KeyUsage == 0 || len(c.SubjectKeyId) == 0 || !paa && len(c.AuthorityKeyId) == 0 {
-		return nil, errors.New("Missing required extensions in certificate") //nolint:staticcheck // matter.js's message
+		return nil, errors.New("dcl: Missing required extensions in certificate") //nolint:staticcheck // matter.js's message
 	}
 	t := &trustCert{x509: c}
 	if t.vendorID, t.productID, err = attestation.MatterIDs(c); err != nil {
@@ -84,14 +84,14 @@ func pemToDER(pem string) ([]byte, error) {
 		start++
 	}
 	if start >= len(lines) {
-		return nil, errors.New("No BEGIN line in PEM file") //nolint:staticcheck // matter.js's message
+		return nil, errors.New("dcl: No BEGIN line in PEM file") //nolint:staticcheck // matter.js's message
 	}
 	end := start + 1
 	for end < len(lines) && !strings.HasPrefix(lines[end], "-----END ") {
 		end++
 	}
 	if end >= len(lines) {
-		return nil, errors.New("No END line in PEM file") //nolint:staticcheck // matter.js's message
+		return nil, errors.New("dcl: No END line in PEM file") //nolint:staticcheck // matter.js's message
 	}
 	b64 := strings.Join(strings.Fields(strings.Join(lines[start+1:end], "")), "")
 	der, err := base64.StdEncoding.DecodeString(b64)

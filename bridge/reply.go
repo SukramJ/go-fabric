@@ -26,12 +26,12 @@ import (
 var (
 	// ErrReplyEncode wraps any TLV-encoding failure when assembling
 	// the response payload.
-	ErrReplyEncode = errors.New("reply: encode")
+	ErrReplyEncode = errors.New("bridge: encode")
 	// ErrReplyEncrypt wraps any AES-CCM seal failure when sealing the
 	// response for an encrypted session.
-	ErrReplyEncrypt = errors.New("reply: encrypt")
+	ErrReplyEncrypt = errors.New("bridge: encrypt")
 	// ErrReplySend wraps any UDP transmit failure.
-	ErrReplySend = errors.New("reply: send")
+	ErrReplySend = errors.New("bridge: send")
 )
 
 // nextUnsecuredCounter returns a fresh per-bridge monotonic counter

@@ -3,7 +3,7 @@
 
 package bridge
 
-// White-box tests for noopPaseHandler, noopCaseHandler, peekBytes, and
+// White-box tests for noopPaseHandler, noopCaseHandler, and
 // resolveCaseHandler. Lives in package bridge to access unexported types.
 
 import (
@@ -66,38 +66,6 @@ func TestNoopCaseHandler_ProcessSigma2Resume(t *testing.T) {
 	_, _, err := h.ProcessSigma2Resume(nil)
 	if !errors.Is(err, ErrCaseHandlerMissing) {
 		t.Errorf("expected ErrCaseHandlerMissing, got %v", err)
-	}
-}
-
-// ─── peekBytes ────────────────────────────────────────────────────────────────
-
-func TestPeekBytes_ShorterThanN(t *testing.T) {
-	t.Parallel()
-	b := []byte{0x01, 0x02}
-	got := peekBytes(b, 10)
-	if len(got) != 2 || got[0] != 0x01 {
-		t.Errorf("shorter than n: expected full slice, got %v", got)
-	}
-}
-
-func TestPeekBytes_ExactlyN(t *testing.T) {
-	t.Parallel()
-	b := []byte{0x01, 0x02, 0x03}
-	got := peekBytes(b, 3)
-	if len(got) != 3 {
-		t.Errorf("exactly n: expected 3 bytes, got %d", len(got))
-	}
-}
-
-func TestPeekBytes_LongerThanN(t *testing.T) {
-	t.Parallel()
-	b := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
-	got := peekBytes(b, 3)
-	if len(got) != 3 {
-		t.Errorf("longer than n: expected 3 bytes, got %d", len(got))
-	}
-	if got[2] != 0x03 {
-		t.Errorf("unexpected last byte: want 0x03, got 0x%02X", got[2])
 	}
 }
 

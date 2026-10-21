@@ -2034,6 +2034,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 	pubCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
+		Logger:             b.logger,
 		CompressedFabricID: compressedFabricID,
 		NodeID:             nodeID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
@@ -2078,6 +2079,7 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 	wCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
+		Logger:             b.logger,
 		CompressedFabricID: compressedFabricID,
 		NodeID:             nodeID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
@@ -2137,6 +2139,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	pubCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildCommissionableService(mdns.CommissionableServiceConfig{
+		Logger:             b.logger,
 		InstanceID:         params.InstanceID,
 		Discriminator:      params.Discriminator,
 		VendorID:           params.VendorID,

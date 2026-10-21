@@ -64,6 +64,7 @@ type Subscription struct {
 	// (matter.js ServerSubscription `useAsSendInterval`).
 	sendIntervalOverride time.Duration
 
+	// mu guards closed, deferredUntil, lastReport, pendingDirty, pendingEvents and priming.
 	mu sync.Mutex
 	// priming is set while the subscription's priming report and
 	// SubscribeResponse are still going out ([SubscribeArgs.Priming]);

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -116,7 +115,7 @@ type WindowSnapshot struct {
 	// window: WindowStatus, AdminFabricIndex, AdminVendorId. The node's
 	// own window reads WindowNotOpen there, as matter.js keeps those
 	// attributes for administrator windows only.
-	Administrator wire.WindowStatusSnapshot
+	Administrator WindowStatus
 	// CommissioningMode is the CM value of the commissionable record the
 	// node publishes after the transition: 0 none, 1 a basic window, 2
 	// an enhanced window with an administrator's verifier.

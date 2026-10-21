@@ -16,6 +16,7 @@ import (
 // with [WithAfterResponse] and calls [AfterResponse.Run] once the
 // response is on the wire.
 type AfterResponse struct {
+	// mu guards fns.
 	mu  sync.Mutex
 	fns []func()
 }

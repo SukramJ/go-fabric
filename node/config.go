@@ -19,7 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -54,7 +53,7 @@ type Config struct {
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
 	// warn mode.
-	DeviceTypeValidation endpoint.DeviceTypeValidationMode
+	DeviceTypeValidation DeviceTypeValidationMode
 	// Attestation is the device attestation material; the zero value is
 	// the CSA test chain and test Certification Declaration for the
 	// configured vendor and product (attestation.BuildTestChain,
@@ -135,7 +134,7 @@ type Config struct {
 	// (GeneralDiagnosticsServer.ts:51-52). Without DataModelTest a
 	// MaxPathsPerInvoke above one fails [Node.Start]
 	// (mattercore.GeneralDiagnostics.CheckDataModelTest).
-	GeneralDiagnosticsFeatures *mattercore.GeneralDiagnosticsFeatures
+	GeneralDiagnosticsFeatures *GeneralDiagnosticsFeatures
 	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
 	// the root BasicInformation advertises it, the PASE and CASE session
 	// parameters carry it and the invoke path refuses a larger batch with
@@ -150,7 +149,7 @@ type Config struct {
 	// revision-6 fields, BasicInformationServer.ts initialize), a value
 	// the host sets wins (CapabilityMinimaTest.ts "caller-provided values
 	// win").
-	CapabilityMinima mattercore.CapabilityMinimaStruct
+	CapabilityMinima CapabilityMinimaStruct
 	// Client is the node's client stack ([Client]): the socket, exchanges
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
@@ -259,8 +258,8 @@ type WiFiCommissioning struct {
 // WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
 type WiFi struct {
 	// Reporter answers the cluster's reads and ResetCounts
-	// (mattercore.WiFiReporter); nil mounts no cluster.
-	Reporter mattercore.WiFiReporter
+	// (WiFiReporter); nil mounts no cluster.
+	Reporter WiFiReporter
 	// Features is the cluster's FeatureMap: wifidiagdef.FeaturePacketCounts
 	// (PKTCNT) and wifidiagdef.FeatureErrorCounts (ERRCNT, which brings
 	// ResetCounts).
@@ -388,7 +387,7 @@ type Attestation struct {
 	BlockCommissioningOnError bool
 	// Chain is the DAC, its key and the PAI; nil is the CSA test chain. A
 	// host with a chain of its own (an HSM-held key, say) sets it here.
-	Chain *attestation.Chain
+	Chain *AttestationChain
 	// CertificationDeclaration is the CMS-signed CD; nil is the CSA test
 	// CD for the vendor and product.
 	CertificationDeclaration []byte
@@ -403,7 +402,7 @@ type OtaConfig struct {
 	Harness bool
 	// Applier carries out an update; nil is the daemon's applier, which
 	// validates the image and keeps it under Dir/applied.
-	Applier mattercore.OtaApplier
+	Applier OTAApplier
 }
 
 // ErrInvalidConfig wraps every [Config.Validate] failure.
@@ -475,16 +474,16 @@ func (c *Config) Validate() error {
 	}
 	errs = append(errs, checkPBKDF(int64(cm.PBKDFIterations), len(cm.Salt))...)
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
-		errs = append(errs, errors.New("ProductDescription.VendorID and ProductID must be non-zero"))
+		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
 	}
 	if strings.TrimSpace(c.BasicInformation.NodeLabel) == "" {
-		errs = append(errs, errors.New("BasicInformation.NodeLabel must be non-empty"))
+		errs = append(errs, errors.New("node: BasicInformation.NodeLabel must be non-empty"))
 	}
 	switch {
 	case c.Store.Path != "" && c.Store.DB != nil:
-		errs = append(errs, errors.New("Store takes Path or DB, not both"))
+		errs = append(errs, errors.New("node: Store takes Path or DB, not both"))
 	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
-		errs = append(errs, errors.New("Store needs Path, DB, or both Credentials and Endpoints"))
+		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
@@ -496,9 +495,9 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
-		errs = append(errs, errors.New("Attestation.Files excludes Chain and CertificationDeclaration"))
+		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
-		errs = append(errs, errors.New("Attestation.BlockCommissioningOnError needs Files"))
+		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
 	if c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
@@ -507,7 +506,7 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
-		errs = append(errs, errors.New("OTA.Dir must be set"))
+		errs = append(errs, errors.New("node: OTA.Dir must be set"))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)

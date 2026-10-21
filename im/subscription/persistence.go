@@ -118,7 +118,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 	m.mu.Unlock()
 
 	m.logger.Debug(
-		"matter subscription restored",
+		"im.subscription.restored",
 		slog.Uint64("id", uint64(sub.ID)),
 		slog.Int("fabric", int(sub.FabricIndex)),
 		slog.Int("max", int(sub.MaxIntervalCeiling)),

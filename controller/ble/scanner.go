@@ -128,6 +128,7 @@ type Scanner struct {
 	// :160-172).
 	scans scanQueue
 
+	// mu guards activeDiscoveries, closed, lastScanEndedAt, records, scanning and waiters.
 	mu                sync.Mutex
 	records           map[string]*record
 	waiters           map[*waiter]struct{}
@@ -142,6 +143,7 @@ type Scanner struct {
 // mutex would not order: a Close queued while a start is in flight must
 // run before the stop a discovery queues once that start returned.
 type scanQueue struct {
+	// mu guards tail.
 	mu   sync.Mutex
 	tail chan struct{}
 }

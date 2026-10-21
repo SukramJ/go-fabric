@@ -101,10 +101,10 @@ func IsAccessGranted(userType lockdef.UserTypeEnum, userIndex uint16, weekDay []
 func (s *DoorLockServer) requireValidUserLocked(userIndex uint16) error {
 	maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported)
 	if userIndex < 1 || userIndex > maxUsers {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid user index %d", userIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid user index %d", userIndex)
 	}
 	if s.findUser(userIndex) == nil {
-		return spec.Errorf(im.StatusFailure, "doorlock: user %d not found", userIndex)
+		return spec.Errorf(im.StatusFailure, "lock: user %d not found", userIndex)
 	}
 	return nil
 }
@@ -150,16 +150,16 @@ func (s *DoorLockServer) handleSetWeekDaySchedule(ctx context.Context, fields an
 func (s *DoorLockServer) setWeekDayScheduleLocked(ctx context.Context, req lockdef.SetWeekDayScheduleRequest) error {
 	maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfWeekDaySchedulesSupportedPerUser)
 	if req.WeekDayIndex < 1 || req.WeekDayIndex > maxSchedules {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.WeekDayIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.WeekDayIndex)
 	}
 	if err := s.requireValidUserLocked(req.UserIndex); err != nil {
 		return err
 	}
 	if req.EndHour < req.StartHour {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: end hour must be >= start hour")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: end hour must be >= start hour")
 	}
 	if req.EndHour == req.StartHour && req.EndMinute <= req.StartMinute {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: end time must be after start time")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: end time must be after start time")
 	}
 	s.data.WeekDaySchedules = append(slices.DeleteFunc(s.data.WeekDaySchedules, func(w store.DoorLockWeekDaySchedule) bool {
 		return w.WeekDayIndex == req.WeekDayIndex && w.UserIndex == req.UserIndex
@@ -224,7 +224,7 @@ func (s *DoorLockServer) clearWeekDayScheduleLocked(ctx context.Context, req loc
 	if req.WeekDayIndex != clearAllSchedules {
 		maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfWeekDaySchedulesSupportedPerUser)
 		if req.WeekDayIndex < 1 || req.WeekDayIndex > maxSchedules {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.WeekDayIndex)
+			return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.WeekDayIndex)
 		}
 	}
 	s.data.WeekDaySchedules = slices.DeleteFunc(s.data.WeekDaySchedules, func(w store.DoorLockWeekDaySchedule) bool {
@@ -249,13 +249,13 @@ func (s *DoorLockServer) handleSetYearDaySchedule(ctx context.Context, fields an
 func (s *DoorLockServer) setYearDayScheduleLocked(ctx context.Context, req lockdef.SetYearDayScheduleRequest) error {
 	maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfYearDaySchedulesSupportedPerUser)
 	if req.YearDayIndex < 1 || req.YearDayIndex > maxSchedules {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.YearDayIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.YearDayIndex)
 	}
 	if err := s.requireValidUserLocked(req.UserIndex); err != nil {
 		return err
 	}
 	if req.LocalEndTime <= req.LocalStartTime {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: end time must be after start time")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: end time must be after start time")
 	}
 	s.data.YearDaySchedules = append(slices.DeleteFunc(s.data.YearDaySchedules, func(y store.DoorLockYearDaySchedule) bool {
 		return y.YearDayIndex == req.YearDayIndex && y.UserIndex == req.UserIndex
@@ -317,7 +317,7 @@ func (s *DoorLockServer) clearYearDayScheduleLocked(ctx context.Context, req loc
 	if req.YearDayIndex != clearAllSchedules {
 		maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfYearDaySchedulesSupportedPerUser)
 		if req.YearDayIndex < 1 || req.YearDayIndex > maxSchedules {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.YearDayIndex)
+			return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.YearDayIndex)
 		}
 	}
 	s.data.YearDaySchedules = slices.DeleteFunc(s.data.YearDaySchedules, func(y store.DoorLockYearDaySchedule) bool {
@@ -348,10 +348,10 @@ func (s *DoorLockServer) handleSetHolidaySchedule(ctx context.Context, fields an
 func (s *DoorLockServer) setHolidayScheduleLocked(ctx context.Context, req lockdef.SetHolidayScheduleRequest) error {
 	maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfHolidaySchedulesSupported)
 	if req.HolidayIndex < 1 || req.HolidayIndex > maxSchedules {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.HolidayIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.HolidayIndex)
 	}
 	if req.LocalEndTime <= req.LocalStartTime {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: end time must be after start time")
+		return spec.Errorf(im.StatusInvalidCommand, "lock: end time must be after start time")
 	}
 	s.data.HolidaySchedules = append(slices.DeleteFunc(s.data.HolidaySchedules, func(h store.DoorLockHolidaySchedule) bool {
 		return h.HolidayIndex == req.HolidayIndex
@@ -404,7 +404,7 @@ func (s *DoorLockServer) clearHolidayScheduleLocked(ctx context.Context, req loc
 	if req.HolidayIndex != clearAllSchedules {
 		maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfHolidaySchedulesSupported)
 		if req.HolidayIndex < 1 || req.HolidayIndex > maxSchedules {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid schedule index %d", req.HolidayIndex)
+			return spec.Errorf(im.StatusInvalidCommand, "lock: invalid schedule index %d", req.HolidayIndex)
 		}
 	}
 	s.data.HolidaySchedules = slices.DeleteFunc(s.data.HolidaySchedules, func(h store.DoorLockHolidaySchedule) bool {

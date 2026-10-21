@@ -50,7 +50,7 @@ func requestAs[T any](fields any) (T, error) {
 		return v, nil
 	}
 	var zero T
-	return zero, spec.Errorf(im.StatusInvalidCommand, "doorlock: command fields %T, want %T", fields, zero)
+	return zero, spec.Errorf(im.StatusInvalidCommand, "lock: command fields %T, want %T", fields, zero)
 }
 
 // requestFabric is matter.js #fabricIndex (DoorLockServer.ts:935-941):
@@ -59,14 +59,14 @@ func requestFabric(ctx context.Context) (uint8, error) {
 	if _, fabricIndex := im.FabricFilterFromContext(ctx); fabricIndex != 0 {
 		return fabricIndex, nil
 	}
-	return 0, spec.Errorf(im.StatusUnsupportedAccess, "doorlock: fabric required")
+	return 0, spec.Errorf(im.StatusUnsupportedAccess, "lock: fabric required")
 }
 
 // invalidField is the INVALID_COMMAND matter.js answers a request field
 // its constraint refuses for the commands DoorLockServer.ts:1494-1511
 // remaps (Supervision onValidationError = throwInvalidCommand).
 func invalidField(field string, v uint64) error {
-	return spec.Errorf(im.StatusInvalidCommand, "doorlock: %s: the cluster does not define the enum value %d", field, v)
+	return spec.Errorf(im.StatusInvalidCommand, "lock: %s: the cluster does not define the enum value %d", field, v)
 }
 
 // checkEnum holds an enum field to the values its constraint lists, or —
@@ -77,7 +77,7 @@ func (s *DoorLockServer) checkEnum(field string, def *spec.Enum, v uint64, allow
 		return invalidField(field, v)
 	}
 	if len(allowed) > 0 && !slices.Contains(allowed, v) {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: %s %d is outside the command's constraint", field, v)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: %s %d is outside the command's constraint", field, v)
 	}
 	return nil
 }
@@ -149,13 +149,13 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		return err
 	}
 	if userIndex < 1 || userIndex > maxUsers {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid user index %d", userIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid user index %d", userIndex)
 	}
 	existing := s.findUser(userIndex)
 	switch req.OperationType {
 	case lockdef.DataOperationTypeAdd:
 		if existing != nil {
-			return occupiedError{fmt.Sprintf("doorlock: user slot %d is occupied", userIndex)}
+			return occupiedError{fmt.Sprintf("lock: user slot %d is occupied", userIndex)}
 		}
 		user := store.DoorLockUser{
 			UserIndex:               userIndex,
@@ -186,13 +186,13 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeAdd, &userIndex, &userIndex)
 	case lockdef.DataOperationTypeModify:
 		if existing == nil {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: user slot %d is available", userIndex)
+			return spec.Errorf(im.StatusInvalidCommand, "lock: user slot %d is available", userIndex)
 		}
 		if !req.UserName.Null && fabricIndex != existing.CreatorFabricIndex {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: cannot modify userName from a different fabric")
+			return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userName from a different fabric")
 		}
 		if !req.UserUniqueId.Null && fabricIndex != existing.CreatorFabricIndex {
-			return spec.Errorf(im.StatusInvalidCommand, "doorlock: cannot modify userUniqueId from a different fabric")
+			return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userUniqueId from a different fabric")
 		}
 		status, userType := existing.UserStatus, existing.UserType
 		if !req.UserStatus.Null {
@@ -223,7 +223,7 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		s.dirty = true
 		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeModify, &userIndex, &userIndex)
 	default:
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid operation type %d", req.OperationType)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid operation type %d", req.OperationType)
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func (s *DoorLockServer) handleGetUser(_ context.Context, fields any) (any, erro
 func (s *DoorLockServer) getUserLocked(req lockdef.GetUserRequest) (any, error) {
 	maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported)
 	if req.UserIndex < 1 || req.UserIndex > maxUsers {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid user index %d", req.UserIndex)
+		return nil, spec.Errorf(im.StatusInvalidCommand, "lock: invalid user index %d", req.UserIndex)
 	}
 	user := s.findUser(req.UserIndex)
 	resp := lockdef.GetUserResponse{
@@ -306,7 +306,7 @@ func (s *DoorLockServer) clearUserLocked(ctx context.Context, userIndex uint16) 
 		return nil
 	}
 	if userIndex < 1 || userIndex > maxUsers {
-		return spec.Errorf(im.StatusInvalidCommand, "doorlock: invalid user index %d", userIndex)
+		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid user index %d", userIndex)
 	}
 	if s.findUser(userIndex) == nil {
 		// CHIP clears a user that does not exist silently (:404-407).

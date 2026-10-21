@@ -4,6 +4,7 @@
 package udp
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -67,12 +68,16 @@ type Config struct {
 	// PreferIPv4 forces an IPv4-only socket. Default (false) opens an
 	// IPv6 dual-stack socket which also accepts IPv4 traffic.
 	PreferIPv4 bool
+	// Logger receives the listener's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // Listener is the Matter UDP transport. Construct with [New], invoke
 // [Listener.Serve] in a goroutine to receive, [Listener.Send] to
 // transmit, [Listener.Close] to tear down. The zero value is unusable.
 type Listener struct {
+	// log is the listener's logger ([Config.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// conn is the socket: a *net.UDPConn from [New], or the in-memory
 	// socket of fabrictest's network through internal/udpseam.
 	conn udpseam.PacketConn
@@ -136,7 +141,9 @@ func New(cfg Config) (*Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("udp: listen %s: %w", addr, err)
 	}
-	return newListener(conn), nil
+	l := newListener(conn)
+	l.log = cmp.Or(cfg.Logger, slog.Default())
+	return l, nil
 }
 
 // newListener returns a Listener ready to Serve on conn.
@@ -262,7 +269,7 @@ func (l *Listener) safeDispatch(handler Handler, buf []byte, src *net.UDPAddr) {
 			if src != nil {
 				peer = src.String()
 			}
-			slog.Default().Error("matter.udp.dispatch_panic",
+			l.logger().Error("matter.udp.dispatch_panic",
 				slog.Any("panic", r),
 				slog.String("src", peer),
 				slog.Int("datagram_bytes", len(buf)),
@@ -332,4 +339,13 @@ func (l *Listener) isClosed() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.closed
+}
+
+// logger is the Listener's logger; a value built without its constructor
+// logs through slog.Default().
+func (l *Listener) logger() *slog.Logger {
+	if l.log != nil {
+		return l.log
+	}
+	return slog.Default()
 }

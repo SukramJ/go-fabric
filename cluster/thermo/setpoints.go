@@ -337,7 +337,7 @@ func (st *setpointState) reconcile(changed string) error {
 	}
 	st.fixSetpoints(changedKeys{changed})
 	if remaining := st.violation(); remaining != "" {
-		return thermoConstraintErr{fmt.Sprintf("thermostat: setpoints could not be reconciled within the configured limits: %s; after adjusting, %s", violation, remaining)}
+		return thermoConstraintErr{fmt.Sprintf("thermo: setpoints could not be reconciled within the configured limits: %s; after adjusting, %s", violation, remaining)}
 	}
 	return nil
 }

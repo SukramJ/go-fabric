@@ -32,6 +32,7 @@ import (
 //     the node is on its Ethernet network from boot; LastConnectErrorValue
 //     stays null.
 type NetworkCommissioning struct {
+	// mu guards interfaceEnabled.
 	mu sync.RWMutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
@@ -226,11 +227,11 @@ func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 func (n *NetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != netcommAttrInterfaceEnabled {
 		_, err := netcommInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("matter: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(bool)
 	if !ok {
-		return fmt.Errorf("matter: InterfaceEnabled write expected bool, got %T", value)
+		return fmt.Errorf("core: InterfaceEnabled write expected bool, got %T", value)
 	}
 	n.mu.Lock()
 	n.interfaceEnabled = v
@@ -241,7 +242,7 @@ func (n *NetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, val
 // MatterInvoke rejects every command — go-fabric ships Ethernet-only
 // and Ethernet has no commissioning surface.
 func (n *NetworkCommissioning) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: NetworkCommissioning command 0x%02X not supported (Ethernet-only)", cmdID)
+	return nil, im.UnsupportedCommandf("core: NetworkCommissioning command 0x%02X not supported (Ethernet-only)", cmdID)
 }
 
 // MatterReportable lists the subscribe-able attributes.

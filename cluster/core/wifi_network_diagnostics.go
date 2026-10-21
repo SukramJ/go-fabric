@@ -106,6 +106,7 @@ type WiFiNetworkDiagnosticsConfig struct {
 type WiFiNetworkDiagnostics struct {
 	*spec.Server
 
+	// mu guards endpoint.
 	mu       sync.Mutex
 	endpoint uint16
 }

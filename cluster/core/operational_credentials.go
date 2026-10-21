@@ -335,7 +335,7 @@ const (
 type opcredsInvalidArgErr struct{}
 
 func (opcredsInvalidArgErr) Error() string {
-	return "matter: OperationalCredentials invalid argument"
+	return "core: OperationalCredentials invalid argument"
 }
 
 func (opcredsInvalidArgErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
@@ -454,10 +454,10 @@ type OpcredsConfig struct {
 // NewOperationalCredentials constructs the cluster.
 func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCredentials, error) {
 	if s == nil {
-		return nil, errors.New("matter: OperationalCredentials store is required")
+		return nil, errors.New("core: OperationalCredentials store is required")
 	}
 	if len(cfg.InitialFabricLabel) > 32 {
-		return nil, fmt.Errorf("matter: OperationalCredentials InitialFabricLabel %q exceeds 32 bytes", cfg.InitialFabricLabel)
+		return nil, fmt.Errorf("core: OperationalCredentials InitialFabricLabel %q exceeds 32 bytes", cfg.InitialFabricLabel)
 	}
 	if cfg.SupportedFabrics == 0 {
 		// Mirrors matter.js packages/node/src/behaviors/
@@ -715,7 +715,7 @@ func (o *OperationalCredentials) notifyChanged() {
 type opcredsFailsafeRequiredErr struct{}
 
 func (opcredsFailsafeRequiredErr) Error() string {
-	return "matter: OperationalCredentials: FailSafe must be armed before fabric mutation"
+	return "core: OperationalCredentials: FailSafe must be armed before fabric mutation"
 }
 
 func (opcredsFailsafeRequiredErr) MatterStatusCode() im.StatusCode { return im.StatusFailsafeRequired }
@@ -1065,7 +1065,7 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 
 // MatterWrite always rejects — every state change goes through commands.
 func (o *OperationalCredentials) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: OperationalCredentials is read-only via attributes (got 0x%04X)", attrID)
+	return fmt.Errorf("core: OperationalCredentials is read-only via attributes (got 0x%04X)", attrID)
 }
 
 // Request / response payload structs.
@@ -1211,7 +1211,7 @@ func (o *OperationalCredentials) dispatchCmd(ctx context.Context, cmdID uint32, 
 	case opcredsCmdSignVidVerificationRequest:
 		return o.handleSignVidVerificationRequest(ctx, fields)
 	}
-	return nil, im.UnsupportedCommandf("matter: OperationalCredentials command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: OperationalCredentials command 0x%02X not supported", cmdID)
 }
 
 func opcredsCmdName(cmdID uint32) string {
@@ -1329,7 +1329,7 @@ func (o *OperationalCredentials) handleAttestationRequest(ctx context.Context, f
 	elements := encodeAttestationElements(cd, req.AttestationNonce)
 	sig, err := signAttestationPayload(dacKey, elements, challenge)
 	if err != nil {
-		return nil, fmt.Errorf("matter: AttestationRequest sign: %w", err)
+		return nil, fmt.Errorf("core: AttestationRequest sign: %w", err)
 	}
 	return AttestationResponse{
 		AttestationElements:  elements,
@@ -1437,7 +1437,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// is the bootstrap channel and only AddNOC is valid over it.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	if req.IsForUpdateNOC && sessFabric == 0 {
-		return nil, errors.New("matter: CSRRequest: invalid command argument: IsForUpdateNOC requires CASE session (got PASE)")
+		return nil, errors.New("core: CSRRequest: invalid command argument: IsForUpdateNOC requires CASE session (got PASE)")
 	}
 	// A CSRRequest requires an armed FailSafe window — the generated CSR is a
 	// FailSafe-scoped ephemeral, so issuing one outside the window leaves
@@ -1460,15 +1460,15 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// OperationalCredentialsServer.ts:132-138 (`if (failsafeContext.fabricIndex
 	// !== undefined) throw ConstraintError`). Matter §11.18.6.5.
 	if nocInvoked {
-		return nil, opcredsConstraintErr{msg: "matter: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
+		return nil, opcredsConstraintErr{msg: "core: CSRRequest illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("matter: CSRRequest: generate key: %w", err)
+		return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
 	}
 	csr, err := buildPKCS10CSR(priv)
 	if err != nil {
-		return nil, fmt.Errorf("matter: CSRRequest: build CSR: %w", err)
+		return nil, fmt.Errorf("core: CSRRequest: build CSR: %w", err)
 	}
 	nocsrElements := encodeNOCSRElements(csr, req.CSRNonce)
 
@@ -1495,7 +1495,7 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 
 	sig, err := signAttestationPayload(dacKey, nocsrElements, challenge)
 	if err != nil {
-		return nil, fmt.Errorf("matter: CSRRequest: sign: %w", err)
+		return nil, fmt.Errorf("core: CSRRequest: sign: %w", err)
 	}
 	return CSRResponse{
 		NOCSRElements:        nocsrElements,
@@ -1584,7 +1584,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// IsVendorIdValidOperationally(adminVendorId), errorStatus =
 	// Status::InvalidCommand)`).
 	if !isOperationalAdminVendorID(req.AdminVendorID) {
-		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("matter: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
+		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("core: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
 	}
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
@@ -1603,7 +1603,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// undefined` → StatusResponseError(ConstraintError)); TC-OPCREDS-3.1
 	// step 25.
 	if nocInvoked {
-		return nil, opcredsConstraintErr{msg: "matter: AddNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
+		return nil, opcredsConstraintErr{msg: "core: AddNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	if len(req.IPKValue) != 16 {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "IPK length"}, nil
@@ -1670,7 +1670,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// StatusResponseError("AddNoc is illegal after CsrRequest for UpdateNOC
 	// in same failsafe context", Status.ConstraintError)).
 	if pendingForUpdate {
-		return nil, opcredsConstraintErr{msg: "matter: AddNOC illegal after CSRRequest for UpdateNOC in same FailSafe context"}
+		return nil, opcredsConstraintErr{msg: "core: AddNOC illegal after CSRRequest for UpdateNOC in same FailSafe context"}
 	}
 	if len(root) == 0 {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "no trusted root"}, nil
@@ -1975,7 +1975,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// matter.js updateNoc: `timedOp.fabricIndex !== undefined` →
 	// ConstraintError, ahead of every other check.
 	if nocInvoked {
-		return nil, opcredsConstraintErr{msg: "matter: UpdateNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
+		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
@@ -1990,7 +1990,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// StatusResponseError("UpdateNoc is illegal after CsrRequest for AddNOC in
 	// same failsafe context", Status.ConstraintError)).
 	if !pendingForUpdate {
-		return nil, opcredsConstraintErr{msg: "matter: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
+		return nil, opcredsConstraintErr{msg: "core: UpdateNOC illegal after CSRRequest for AddNOC in same FailSafe context"}
 	}
 	// UpdateNOC is fabric-scoped (Matter §11.18.6.9 — the NOC update
 	// SHALL target the fabric of the invoking session). Read the
@@ -2290,10 +2290,10 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
 	if dupRoot {
-		return nil, errors.New("matter: AddTrustedRootCertificate: constraint error: root already set for this FailSafe window")
+		return nil, errors.New("core: AddTrustedRootCertificate: constraint error: root already set for this FailSafe window")
 	}
 	if nocInvoked {
-		return nil, errors.New("matter: AddTrustedRootCertificate: constraint error: NOC command already invoked in this FailSafe window")
+		return nil, errors.New("core: AddTrustedRootCertificate: constraint error: NOC command already invoked in this FailSafe window")
 	}
 
 	root, err := mattercert.Decode(req.RootCACertificate)

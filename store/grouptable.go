@@ -26,11 +26,11 @@ type GroupTableEntry struct {
 // as matter.js removeEndpoint does.
 func (s *Store) UpsertGroupTableEntry(ctx context.Context, e GroupTableEntry) error {
 	if len(e.Endpoints) == 0 {
-		return fmt.Errorf("matter store: group table entry %d/%d has no endpoints", e.FabricIndex, e.GroupID)
+		return fmt.Errorf("store: group table entry %d/%d has no endpoints", e.FabricIndex, e.GroupID)
 	}
 	eps, err := json.Marshal(e.Endpoints)
 	if err != nil {
-		return fmt.Errorf("matter store: encode group endpoints: %w", err)
+		return fmt.Errorf("store: encode group endpoints: %w", err)
 	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO matter_group_table (fabric_index, group_id, group_name, endpoints_json)
@@ -39,7 +39,7 @@ ON CONFLICT(fabric_index, group_id) DO UPDATE SET
     group_name     = excluded.group_name,
     endpoints_json = excluded.endpoints_json`,
 		e.FabricIndex, e.GroupID, e.GroupName, string(eps)); err != nil {
-		return fmt.Errorf("matter store: upsert group table entry: %w", err)
+		return fmt.Errorf("store: upsert group table entry: %w", err)
 	}
 	return nil
 }
@@ -50,7 +50,7 @@ func (s *Store) RemoveGroupTableEntry(ctx context.Context, fabricIndex uint8, gr
 	if _, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_group_table WHERE fabric_index = ? AND group_id = ?`,
 		fabricIndex, groupID); err != nil {
-		return fmt.Errorf("matter store: remove group table entry: %w", err)
+		return fmt.Errorf("store: remove group table entry: %w", err)
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ SELECT fabric_index, group_id, group_name, endpoints_json
 FROM matter_group_table WHERE fabric_index = ?
 ORDER BY group_id ASC`, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list group table: %w", err)
+		return nil, fmt.Errorf("store: list group table: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -74,15 +74,15 @@ ORDER BY group_id ASC`, fabricIndex)
 			eps string
 		)
 		if err := rows.Scan(&e.FabricIndex, &e.GroupID, &e.GroupName, &eps); err != nil {
-			return nil, fmt.Errorf("matter store: list group table: scan: %w", err)
+			return nil, fmt.Errorf("store: list group table: scan: %w", err)
 		}
 		if err := json.Unmarshal([]byte(eps), &e.Endpoints); err != nil {
-			return nil, fmt.Errorf("matter store: list group table: decode endpoints of %d/%d: %w", e.FabricIndex, e.GroupID, err)
+			return nil, fmt.Errorf("store: list group table: decode endpoints of %d/%d: %w", e.FabricIndex, e.GroupID, err)
 		}
 		out = append(out, e)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list group table: rows: %w", err)
+		return nil, fmt.Errorf("store: list group table: rows: %w", err)
 	}
 	return out, nil
 }

@@ -101,6 +101,7 @@ type Registry struct {
 	// a leave and Erase (D8).
 	op sync.Mutex
 
+	// mu guards bound, closed, nextID and nodes.
 	mu     sync.Mutex
 	nodes  []*Node
 	bound  map[*Node]func()
@@ -244,6 +245,7 @@ func (r *Registry) build(id string, p *peer.Peer) (*Node, error) {
 
 // nodeHolder hands a node's wrapped hooks the node they belong to.
 type nodeHolder struct {
+	// mu guards n.
 	mu sync.Mutex
 	n  *Node
 }

@@ -31,6 +31,7 @@ type Fake struct {
 	// moving one clock would interleave their firing order.
 	advancing sync.Mutex
 
+	// mu guards entries, now and seq.
 	mu      sync.Mutex
 	now     time.Time
 	seq     uint64

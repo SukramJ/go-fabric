@@ -53,6 +53,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"sync"
 	"time"
@@ -146,6 +147,8 @@ type ColorControlServerConfig struct {
 	// Clock paces the transitions and the quieters; nil is
 	// [clock.System].
 	Clock clock.Clock
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // OnOffState is the On/Off state of the endpoint a [ColorControlServer]
@@ -304,7 +307,7 @@ var (
 // ErrColorFeatures reports a feature selection the ColorControl
 // conformance does not allow: EHUE without HS, CL without EHUE, or an
 // initial colour mode of a feature the server does not have.
-var ErrColorFeatures = errors.New("colorcontrol: feature selection")
+var ErrColorFeatures = errors.New("light: feature selection")
 
 // The defaults matter.js's ColorControlServer State carries for the
 // attributes whose specification default went away in Matter 1.4.2.
@@ -629,3 +632,12 @@ func (s *ColorControlServer) MatterGeneratedCommands() []uint32 { return nil }
 // ColorControlClusterRevision is the cluster revision for ColorControl
 // pinned to matter.js HEAD (the generated definition's).
 const ColorControlClusterRevision = ccdef.Revision
+
+// logger is the ColorControlServer's logger; a value built without its constructor
+// logs through slog.Default().
+func (s *ColorControlServer) logger() *slog.Logger {
+	if s.cfg.Logger != nil {
+		return s.cfg.Logger
+	}
+	return slog.Default()
+}

@@ -191,12 +191,12 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWriter, cw ColorWriter, prev, next colorState) error {
 	if ct != nil && next.mireds != prev.mireds {
 		if err := ct.SetColorTemperatureMireds(ctx, next.mireds); err != nil {
-			return fmt.Errorf("colorcontrol: ColorTemperatureMireds write-through: %w", err)
+			return fmt.Errorf("light: ColorTemperatureMireds write-through: %w", err)
 		}
 	}
 	if cw != nil && next.color() != prev.color() {
 		if err := cw.SetColor(ctx, next.color()); err != nil {
-			return fmt.Errorf("colorcontrol: colour write-through: %w", err)
+			return fmt.Errorf("light: colour write-through: %w", err)
 		}
 	}
 	return nil
