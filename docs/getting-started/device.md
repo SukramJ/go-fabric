@@ -211,7 +211,7 @@ every bridged device with its key, endpoint, device type, name and
 reachability. The [host's view](../guides/host-view.md) walks through a
 program that uses each.
 
-*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`), `examples/reference-bridge/main.go:328-332`.*
+*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
 
 ## Commissioning
 
@@ -289,8 +289,14 @@ of which is something a product would also decide:
   This is the host's `OtaApplier`.
 - **An Actions server** on the Aggregator, root FixedLabels and two
   locales.
-- **A fleet of simulated devices**, one per surface the module serves. The
-  blind's position is persisted in the settings table.
+- **A fleet of simulated devices**, one per surface the module serves,
+  each built from its clusters' declarations (`<cluster>def.Declare`): the
+  initial state, the features, and the ports the simulated device
+  implements — a valve's `StateSource`, a washer's `CommandHandler`, a
+  lock's `AuthStore` on the node's store. The one cluster still mounted
+  as a `HostServer` is the charger's EnergyEvse, whose delegate is not a
+  declared port yet. The blind's position is persisted in the settings
+  table.
 - **Testing-only flags** for certification runs: the app pipe, the
   TestEventTrigger key, the OTA provider and its ledger check, the
   simulated Wi-Fi link and the media devices. None of these belongs in a
