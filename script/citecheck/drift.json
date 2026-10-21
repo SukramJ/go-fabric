@@ -379,7 +379,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1141,
+    "line": 1139,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -388,7 +388,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1180,
+    "line": 1178,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
