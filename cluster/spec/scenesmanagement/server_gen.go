@@ -7,7 +7,7 @@ package scenesmanagement
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -40,12 +40,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -222,53 +228,37 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("scenesmanagement OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleAddScene != nil {
-		if err := s.HandleAddScene(d.HandleAddScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleAddScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleAddScene", s.HandleAddScene(d.HandleAddScene)))
 	}
 	if d.HandleViewScene != nil {
-		if err := s.HandleViewScene(d.HandleViewScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleViewScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleViewScene", s.HandleViewScene(d.HandleViewScene)))
 	}
 	if d.HandleRemoveScene != nil {
-		if err := s.HandleRemoveScene(d.HandleRemoveScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleRemoveScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRemoveScene", s.HandleRemoveScene(d.HandleRemoveScene)))
 	}
 	if d.HandleRemoveAllScenes != nil {
-		if err := s.HandleRemoveAllScenes(d.HandleRemoveAllScenes); err != nil {
-			return fmt.Errorf("scenesmanagement HandleRemoveAllScenes: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRemoveAllScenes", s.HandleRemoveAllScenes(d.HandleRemoveAllScenes)))
 	}
 	if d.HandleStoreScene != nil {
-		if err := s.HandleStoreScene(d.HandleStoreScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleStoreScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStoreScene", s.HandleStoreScene(d.HandleStoreScene)))
 	}
 	if d.HandleRecallScene != nil {
-		if err := s.HandleRecallScene(d.HandleRecallScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleRecallScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRecallScene", s.HandleRecallScene(d.HandleRecallScene)))
 	}
 	if d.HandleGetSceneMembership != nil {
-		if err := s.HandleGetSceneMembership(d.HandleGetSceneMembership); err != nil {
-			return fmt.Errorf("scenesmanagement HandleGetSceneMembership: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetSceneMembership", s.HandleGetSceneMembership(d.HandleGetSceneMembership)))
 	}
 	if d.HandleCopyScene != nil {
-		if err := s.HandleCopyScene(d.HandleCopyScene); err != nil {
-			return fmt.Errorf("scenesmanagement HandleCopyScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleCopyScene", s.HandleCopyScene(d.HandleCopyScene)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

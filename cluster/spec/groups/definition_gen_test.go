@@ -43,7 +43,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -95,5 +95,21 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleAddGroup = func(context.Context, AddGroupRequest) (AddGroupResponse, error) { return AddGroupResponse{}, nil }
+	all.HandleViewGroup = func(context.Context, ViewGroupRequest) (ViewGroupResponse, error) { return ViewGroupResponse{}, nil }
+	all.HandleGetGroupMembership = func(context.Context, GetGroupMembershipRequest) (GetGroupMembershipResponse, error) {
+		return GetGroupMembershipResponse{}, nil
+	}
+	all.HandleRemoveGroup = func(context.Context, RemoveGroupRequest) (RemoveGroupResponse, error) {
+		return RemoveGroupResponse{}, nil
+	}
+	all.HandleRemoveAllGroups = func(context.Context, RemoveAllGroupsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleAddGroupIfIdentifying = func(context.Context, AddGroupIfIdentifyingRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 6 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

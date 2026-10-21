@@ -91,10 +91,7 @@ func NewMountedOnOffControl(opts Options, decls ...Declaration) (*MountedOnOffCo
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *MountedOnOffControl) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
@@ -102,8 +99,5 @@ func (d *MountedOnOffControl) OnOff() *onoffdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *MountedOnOffControl) LevelControl() *levelcontroldef.Server {
-	if w, ok := d.typed(0x0008); ok {
-		return &levelcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

@@ -65,8 +65,5 @@ func NewThermostatController(opts Options, decls ...Declaration) (*ThermostatCon
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ThermostatController) Binding() *bindingdef.Server {
-	if w, ok := d.typed(0x001E); ok {
-		return &bindingdef.Server{Wrapper: w}
-	}
-	return nil
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

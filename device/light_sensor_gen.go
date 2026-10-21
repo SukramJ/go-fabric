@@ -55,8 +55,5 @@ func NewLightSensor(opts Options, decls ...Declaration) (*LightSensor, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *LightSensor) IlluminanceMeasurement() *illuminancemeasurementdef.Server {
-	if w, ok := d.typed(0x0400); ok {
-		return &illuminancemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return illuminancemeasurementdef.WrapOn(d.Server(0x0400), d.queue)
 }

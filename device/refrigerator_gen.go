@@ -63,10 +63,7 @@ func NewRefrigerator(opts Options, decls ...Declaration) (*Refrigerator, error) 
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	if w, ok := d.typed(0x0052); ok {
-		return &refrigeratorandtemperaturecontrolledcabinetmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.WrapOn(d.Server(0x0052), d.queue)
 }
 
 // RefrigeratorAlarm returns the typed RefrigeratorAlarm server over the one the device mounts,
@@ -74,10 +71,7 @@ func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrig
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
-	if w, ok := d.typed(0x0057); ok {
-		return &refrigeratoralarmdef.Server{Wrapper: w}
-	}
-	return nil
+	return refrigeratoralarmdef.WrapOn(d.Server(0x0057), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
@@ -85,8 +79,5 @@ func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0072); ok {
-		return &activatedcarbonfiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

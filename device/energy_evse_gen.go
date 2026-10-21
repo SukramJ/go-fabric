@@ -65,10 +65,7 @@ func NewEnergyEvse(opts Options, decls ...Declaration) (*EnergyEvse, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
-	if w, ok := d.typed(0x0099); ok {
-		return &energyevsedef.Server{Wrapper: w}
-	}
-	return nil
+	return energyevsedef.WrapOn(d.Server(0x0099), d.queue)
 }
 
 // EnergyEvseMode returns the typed EnergyEvseMode server over the one the device mounts,
@@ -76,10 +73,7 @@ func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
-	if w, ok := d.typed(0x009D); ok {
-		return &energyevsemodedef.Server{Wrapper: w}
-	}
-	return nil
+	return energyevsemodedef.WrapOn(d.Server(0x009D), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -87,8 +81,5 @@ func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

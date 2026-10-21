@@ -67,7 +67,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -180,4 +180,42 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ StateSource = d.StateSource
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleLockDoor = func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleUnlockDoor = func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleToggle = func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleUnlockWithTimeout = func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetWeekDaySchedule = func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetWeekDaySchedule = func(context.Context, GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error) {
+		return GetWeekDayScheduleResponse{}, nil
+	}
+	all.HandleClearWeekDaySchedule = func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetYearDaySchedule = func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetYearDaySchedule = func(context.Context, GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error) {
+		return GetYearDayScheduleResponse{}, nil
+	}
+	all.HandleClearYearDaySchedule = func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetHolidaySchedule = func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetHolidaySchedule = func(context.Context, GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error) {
+		return GetHolidayScheduleResponse{}, nil
+	}
+	all.HandleClearHolidaySchedule = func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetUser = func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetUser = func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil }
+	all.HandleClearUser = func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetCredential = func(context.Context, SetCredentialRequest) (SetCredentialResponse, error) {
+		return SetCredentialResponse{}, nil
+	}
+	all.HandleGetCredentialStatus = func(context.Context, GetCredentialStatusRequest) (GetCredentialStatusResponse, error) {
+		return GetCredentialStatusResponse{}, nil
+	}
+	all.HandleClearCredential = func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleUnboltDoor = func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetAliroReaderConfig = func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleClearAliroReaderConfig = func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 22 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
+	}
 }

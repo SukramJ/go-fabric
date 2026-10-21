@@ -51,7 +51,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -119,5 +119,23 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleInstantAction = func(context.Context, InstantActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleInstantActionWithTransition = func(context.Context, InstantActionWithTransitionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStartAction = func(context.Context, StartActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStartActionWithDuration = func(context.Context, StartActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStopAction = func(context.Context, StopActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandlePauseAction = func(context.Context, PauseActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandlePauseActionWithDuration = func(context.Context, PauseActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleResumeAction = func(context.Context, ResumeActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnableAction = func(context.Context, EnableActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnableActionWithDuration = func(context.Context, EnableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleDisableAction = func(context.Context, DisableActionRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleDisableActionWithDuration = func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 12 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

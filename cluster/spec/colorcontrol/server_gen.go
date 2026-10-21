@@ -7,7 +7,7 @@ package colorcontrol
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -140,12 +140,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -469,108 +475,70 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("colorcontrol OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleMoveToHue != nil {
-		if err := s.HandleMoveToHue(d.HandleMoveToHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveToHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToHue", s.HandleMoveToHue(d.HandleMoveToHue)))
 	}
 	if d.HandleMoveHue != nil {
-		if err := s.HandleMoveHue(d.HandleMoveHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveHue", s.HandleMoveHue(d.HandleMoveHue)))
 	}
 	if d.HandleStepHue != nil {
-		if err := s.HandleStepHue(d.HandleStepHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleStepHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStepHue", s.HandleStepHue(d.HandleStepHue)))
 	}
 	if d.HandleMoveToSaturation != nil {
-		if err := s.HandleMoveToSaturation(d.HandleMoveToSaturation); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveToSaturation: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToSaturation", s.HandleMoveToSaturation(d.HandleMoveToSaturation)))
 	}
 	if d.HandleMoveSaturation != nil {
-		if err := s.HandleMoveSaturation(d.HandleMoveSaturation); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveSaturation: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveSaturation", s.HandleMoveSaturation(d.HandleMoveSaturation)))
 	}
 	if d.HandleStepSaturation != nil {
-		if err := s.HandleStepSaturation(d.HandleStepSaturation); err != nil {
-			return fmt.Errorf("colorcontrol HandleStepSaturation: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStepSaturation", s.HandleStepSaturation(d.HandleStepSaturation)))
 	}
 	if d.HandleMoveToHueAndSaturation != nil {
-		if err := s.HandleMoveToHueAndSaturation(d.HandleMoveToHueAndSaturation); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveToHueAndSaturation: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToHueAndSaturation", s.HandleMoveToHueAndSaturation(d.HandleMoveToHueAndSaturation)))
 	}
 	if d.HandleMoveToColor != nil {
-		if err := s.HandleMoveToColor(d.HandleMoveToColor); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveToColor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToColor", s.HandleMoveToColor(d.HandleMoveToColor)))
 	}
 	if d.HandleMoveColor != nil {
-		if err := s.HandleMoveColor(d.HandleMoveColor); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveColor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveColor", s.HandleMoveColor(d.HandleMoveColor)))
 	}
 	if d.HandleStepColor != nil {
-		if err := s.HandleStepColor(d.HandleStepColor); err != nil {
-			return fmt.Errorf("colorcontrol HandleStepColor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStepColor", s.HandleStepColor(d.HandleStepColor)))
 	}
 	if d.HandleMoveToColorTemperature != nil {
-		if err := s.HandleMoveToColorTemperature(d.HandleMoveToColorTemperature); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveToColorTemperature: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToColorTemperature", s.HandleMoveToColorTemperature(d.HandleMoveToColorTemperature)))
 	}
 	if d.HandleEnhancedMoveToHue != nil {
-		if err := s.HandleEnhancedMoveToHue(d.HandleEnhancedMoveToHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleEnhancedMoveToHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveToHue", s.HandleEnhancedMoveToHue(d.HandleEnhancedMoveToHue)))
 	}
 	if d.HandleEnhancedMoveHue != nil {
-		if err := s.HandleEnhancedMoveHue(d.HandleEnhancedMoveHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleEnhancedMoveHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveHue", s.HandleEnhancedMoveHue(d.HandleEnhancedMoveHue)))
 	}
 	if d.HandleEnhancedStepHue != nil {
-		if err := s.HandleEnhancedStepHue(d.HandleEnhancedStepHue); err != nil {
-			return fmt.Errorf("colorcontrol HandleEnhancedStepHue: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedStepHue", s.HandleEnhancedStepHue(d.HandleEnhancedStepHue)))
 	}
 	if d.HandleEnhancedMoveToHueAndSaturation != nil {
-		if err := s.HandleEnhancedMoveToHueAndSaturation(d.HandleEnhancedMoveToHueAndSaturation); err != nil {
-			return fmt.Errorf("colorcontrol HandleEnhancedMoveToHueAndSaturation: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveToHueAndSaturation", s.HandleEnhancedMoveToHueAndSaturation(d.HandleEnhancedMoveToHueAndSaturation)))
 	}
 	if d.HandleColorLoopSet != nil {
-		if err := s.HandleColorLoopSet(d.HandleColorLoopSet); err != nil {
-			return fmt.Errorf("colorcontrol HandleColorLoopSet: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleColorLoopSet", s.HandleColorLoopSet(d.HandleColorLoopSet)))
 	}
 	if d.HandleStopMoveStep != nil {
-		if err := s.HandleStopMoveStep(d.HandleStopMoveStep); err != nil {
-			return fmt.Errorf("colorcontrol HandleStopMoveStep: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStopMoveStep", s.HandleStopMoveStep(d.HandleStopMoveStep)))
 	}
 	if d.HandleMoveColorTemperature != nil {
-		if err := s.HandleMoveColorTemperature(d.HandleMoveColorTemperature); err != nil {
-			return fmt.Errorf("colorcontrol HandleMoveColorTemperature: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveColorTemperature", s.HandleMoveColorTemperature(d.HandleMoveColorTemperature)))
 	}
 	if d.HandleStepColorTemperature != nil {
-		if err := s.HandleStepColorTemperature(d.HandleStepColorTemperature); err != nil {
-			return fmt.Errorf("colorcontrol HandleStepColorTemperature: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStepColorTemperature", s.HandleStepColorTemperature(d.HandleStepColorTemperature)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

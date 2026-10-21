@@ -55,8 +55,5 @@ func NewHumiditySensor(opts Options, decls ...Declaration) (*HumiditySensor, err
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *HumiditySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	if w, ok := d.typed(0x0405); ok {
-		return &relativehumiditymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }

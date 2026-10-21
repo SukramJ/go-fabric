@@ -7,7 +7,7 @@ package microwaveovencontrol
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -52,12 +52,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -156,23 +162,19 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("microwaveovencontrol OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleSetCookingParameters != nil {
-		if err := s.HandleSetCookingParameters(d.HandleSetCookingParameters); err != nil {
-			return fmt.Errorf("microwaveovencontrol HandleSetCookingParameters: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetCookingParameters", s.HandleSetCookingParameters(d.HandleSetCookingParameters)))
 	}
 	if d.HandleAddMoreTime != nil {
-		if err := s.HandleAddMoreTime(d.HandleAddMoreTime); err != nil {
-			return fmt.Errorf("microwaveovencontrol HandleAddMoreTime: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleAddMoreTime", s.HandleAddMoreTime(d.HandleAddMoreTime)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

@@ -75,32 +75,21 @@ func NewAirPurifier(opts Options, decls ...Declaration) (*AirPurifier, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *AirPurifier) FanControl() *fancontroldef.Server {
-	if w, ok := d.typed(0x0202); ok {
-		return &fancontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
-func (d *AirPurifier) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *AirPurifier) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0071); ok {
-		return &hepafiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
@@ -108,8 +97,5 @@ func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0072); ok {
-		return &activatedcarbonfiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

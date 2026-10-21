@@ -7,7 +7,7 @@ package mediaplayback
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -58,12 +58,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -324,83 +330,55 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("mediaplayback OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandlePlay != nil {
-		if err := s.HandlePlay(d.HandlePlay); err != nil {
-			return fmt.Errorf("mediaplayback HandlePlay: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePlay", s.HandlePlay(d.HandlePlay)))
 	}
 	if d.HandlePause != nil {
-		if err := s.HandlePause(d.HandlePause); err != nil {
-			return fmt.Errorf("mediaplayback HandlePause: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePause", s.HandlePause(d.HandlePause)))
 	}
 	if d.HandleStop != nil {
-		if err := s.HandleStop(d.HandleStop); err != nil {
-			return fmt.Errorf("mediaplayback HandleStop: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStop", s.HandleStop(d.HandleStop)))
 	}
 	if d.HandleStartOver != nil {
-		if err := s.HandleStartOver(d.HandleStartOver); err != nil {
-			return fmt.Errorf("mediaplayback HandleStartOver: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStartOver", s.HandleStartOver(d.HandleStartOver)))
 	}
 	if d.HandlePrevious != nil {
-		if err := s.HandlePrevious(d.HandlePrevious); err != nil {
-			return fmt.Errorf("mediaplayback HandlePrevious: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePrevious", s.HandlePrevious(d.HandlePrevious)))
 	}
 	if d.HandleNext != nil {
-		if err := s.HandleNext(d.HandleNext); err != nil {
-			return fmt.Errorf("mediaplayback HandleNext: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleNext", s.HandleNext(d.HandleNext)))
 	}
 	if d.HandleRewind != nil {
-		if err := s.HandleRewind(d.HandleRewind); err != nil {
-			return fmt.Errorf("mediaplayback HandleRewind: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRewind", s.HandleRewind(d.HandleRewind)))
 	}
 	if d.HandleFastForward != nil {
-		if err := s.HandleFastForward(d.HandleFastForward); err != nil {
-			return fmt.Errorf("mediaplayback HandleFastForward: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleFastForward", s.HandleFastForward(d.HandleFastForward)))
 	}
 	if d.HandleSkipForward != nil {
-		if err := s.HandleSkipForward(d.HandleSkipForward); err != nil {
-			return fmt.Errorf("mediaplayback HandleSkipForward: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSkipForward", s.HandleSkipForward(d.HandleSkipForward)))
 	}
 	if d.HandleSkipBackward != nil {
-		if err := s.HandleSkipBackward(d.HandleSkipBackward); err != nil {
-			return fmt.Errorf("mediaplayback HandleSkipBackward: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSkipBackward", s.HandleSkipBackward(d.HandleSkipBackward)))
 	}
 	if d.HandleSeek != nil {
-		if err := s.HandleSeek(d.HandleSeek); err != nil {
-			return fmt.Errorf("mediaplayback HandleSeek: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSeek", s.HandleSeek(d.HandleSeek)))
 	}
 	if d.HandleActivateAudioTrack != nil {
-		if err := s.HandleActivateAudioTrack(d.HandleActivateAudioTrack); err != nil {
-			return fmt.Errorf("mediaplayback HandleActivateAudioTrack: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleActivateAudioTrack", s.HandleActivateAudioTrack(d.HandleActivateAudioTrack)))
 	}
 	if d.HandleActivateTextTrack != nil {
-		if err := s.HandleActivateTextTrack(d.HandleActivateTextTrack); err != nil {
-			return fmt.Errorf("mediaplayback HandleActivateTextTrack: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleActivateTextTrack", s.HandleActivateTextTrack(d.HandleActivateTextTrack)))
 	}
 	if d.HandleDeactivateTextTrack != nil {
-		if err := s.HandleDeactivateTextTrack(d.HandleDeactivateTextTrack); err != nil {
-			return fmt.Errorf("mediaplayback HandleDeactivateTextTrack: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleDeactivateTextTrack", s.HandleDeactivateTextTrack(d.HandleDeactivateTextTrack)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

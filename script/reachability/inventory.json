@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6146,
+  "entry_points": 6152,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14308,
-    "reachable": 9875,
-    "whitelisted": 4428,
+    "total_exported": 14431,
+    "reachable": 9995,
+    "whitelisted": 4431,
     "unreachable": 5
   },
   "by_package": [
@@ -21613,6 +21613,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestDeviceClockAndQueue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 128
+    },
+    {
+      "package": "device",
       "identifier": "TestDeviceRequirementsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/parity_matterjs_test.go",
@@ -21687,6 +21694,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/types_gen_test.go",
       "line": 16
+    },
+    {
+      "package": "device",
+      "identifier": "TestKitOptionsAndPorts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 160
+    },
+    {
+      "package": "device",
+      "identifier": "TestLifecycleThroughTheSeam",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 58
     },
     {
       "package": "device",

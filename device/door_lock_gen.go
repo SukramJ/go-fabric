@@ -55,8 +55,5 @@ func NewDoorLock(opts Options, decls ...Declaration) (*DoorLock, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *DoorLock) DoorLock() *doorlockdef.Server {
-	if w, ok := d.typed(0x0101); ok {
-		return &doorlockdef.Server{Wrapper: w}
-	}
-	return nil
+	return doorlockdef.WrapOn(d.Server(0x0101), d.queue)
 }

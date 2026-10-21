@@ -61,10 +61,7 @@ func NewElectricalMeter(opts Options, decls ...Declaration) (*ElectricalMeter, e
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
-	if w, ok := d.typed(0x0090); ok {
-		return &electricalpowermeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return electricalpowermeasurementdef.WrapOn(d.Server(0x0090), d.queue)
 }
 
 // ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
@@ -72,10 +69,7 @@ func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasureme
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
-	if w, ok := d.typed(0x0091); ok {
-		return &electricalenergymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return electricalenergymeasurementdef.WrapOn(d.Server(0x0091), d.queue)
 }
 
 // CommodityMetering returns the typed CommodityMetering server over the one the device mounts,
@@ -83,8 +77,5 @@ func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasure
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalMeter) CommodityMetering() *commoditymeteringdef.Server {
-	if w, ok := d.typed(0x0B07); ok {
-		return &commoditymeteringdef.Server{Wrapper: w}
-	}
-	return nil
+	return commoditymeteringdef.WrapOn(d.Server(0x0B07), d.queue)
 }

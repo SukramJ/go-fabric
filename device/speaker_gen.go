@@ -54,20 +54,12 @@ func NewSpeaker(opts Options, decls ...Declaration) (*Speaker, error) {
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
-func (d *Speaker) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *Speaker) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Speaker) LevelControl() *levelcontroldef.Server {
-	if w, ok := d.typed(0x0008); ok {
-		return &levelcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

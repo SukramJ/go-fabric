@@ -7,7 +7,7 @@ package actions
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -40,12 +40,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -283,73 +289,49 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("actions OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleInstantAction != nil {
-		if err := s.HandleInstantAction(d.HandleInstantAction); err != nil {
-			return fmt.Errorf("actions HandleInstantAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleInstantAction", s.HandleInstantAction(d.HandleInstantAction)))
 	}
 	if d.HandleInstantActionWithTransition != nil {
-		if err := s.HandleInstantActionWithTransition(d.HandleInstantActionWithTransition); err != nil {
-			return fmt.Errorf("actions HandleInstantActionWithTransition: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleInstantActionWithTransition", s.HandleInstantActionWithTransition(d.HandleInstantActionWithTransition)))
 	}
 	if d.HandleStartAction != nil {
-		if err := s.HandleStartAction(d.HandleStartAction); err != nil {
-			return fmt.Errorf("actions HandleStartAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStartAction", s.HandleStartAction(d.HandleStartAction)))
 	}
 	if d.HandleStartActionWithDuration != nil {
-		if err := s.HandleStartActionWithDuration(d.HandleStartActionWithDuration); err != nil {
-			return fmt.Errorf("actions HandleStartActionWithDuration: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStartActionWithDuration", s.HandleStartActionWithDuration(d.HandleStartActionWithDuration)))
 	}
 	if d.HandleStopAction != nil {
-		if err := s.HandleStopAction(d.HandleStopAction); err != nil {
-			return fmt.Errorf("actions HandleStopAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStopAction", s.HandleStopAction(d.HandleStopAction)))
 	}
 	if d.HandlePauseAction != nil {
-		if err := s.HandlePauseAction(d.HandlePauseAction); err != nil {
-			return fmt.Errorf("actions HandlePauseAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePauseAction", s.HandlePauseAction(d.HandlePauseAction)))
 	}
 	if d.HandlePauseActionWithDuration != nil {
-		if err := s.HandlePauseActionWithDuration(d.HandlePauseActionWithDuration); err != nil {
-			return fmt.Errorf("actions HandlePauseActionWithDuration: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePauseActionWithDuration", s.HandlePauseActionWithDuration(d.HandlePauseActionWithDuration)))
 	}
 	if d.HandleResumeAction != nil {
-		if err := s.HandleResumeAction(d.HandleResumeAction); err != nil {
-			return fmt.Errorf("actions HandleResumeAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleResumeAction", s.HandleResumeAction(d.HandleResumeAction)))
 	}
 	if d.HandleEnableAction != nil {
-		if err := s.HandleEnableAction(d.HandleEnableAction); err != nil {
-			return fmt.Errorf("actions HandleEnableAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnableAction", s.HandleEnableAction(d.HandleEnableAction)))
 	}
 	if d.HandleEnableActionWithDuration != nil {
-		if err := s.HandleEnableActionWithDuration(d.HandleEnableActionWithDuration); err != nil {
-			return fmt.Errorf("actions HandleEnableActionWithDuration: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnableActionWithDuration", s.HandleEnableActionWithDuration(d.HandleEnableActionWithDuration)))
 	}
 	if d.HandleDisableAction != nil {
-		if err := s.HandleDisableAction(d.HandleDisableAction); err != nil {
-			return fmt.Errorf("actions HandleDisableAction: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleDisableAction", s.HandleDisableAction(d.HandleDisableAction)))
 	}
 	if d.HandleDisableActionWithDuration != nil {
-		if err := s.HandleDisableActionWithDuration(d.HandleDisableActionWithDuration); err != nil {
-			return fmt.Errorf("actions HandleDisableActionWithDuration: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleDisableActionWithDuration", s.HandleDisableActionWithDuration(d.HandleDisableActionWithDuration)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

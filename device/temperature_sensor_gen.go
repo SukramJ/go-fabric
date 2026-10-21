@@ -63,10 +63,7 @@ func NewTemperatureSensor(opts Options, decls ...Declaration) (*TemperatureSenso
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
@@ -74,8 +71,5 @@ func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	if w, ok := d.typed(0x0204); ok {
-		return &thermostatuserinterfaceconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }

@@ -42,7 +42,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -101,4 +101,19 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ LevelSource = d.LevelSource
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleMoveToLevel = func(context.Context, MoveToLevelRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMove = func(context.Context, MoveRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStep = func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStop = func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToLevelWithOnOff = func(context.Context, MoveToLevelWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveWithOnOff = func(context.Context, MoveWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStepWithOnOff = func(context.Context, StepWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStopWithOnOff = func(context.Context, StopWithOnOffRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToClosestFrequency = func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 9 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
+	}
 }

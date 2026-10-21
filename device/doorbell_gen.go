@@ -69,19 +69,11 @@ func NewDoorbell(opts Options, decls ...Declaration) (*Doorbell, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Doorbell) Switch() *switchclusterdef.Server {
-	if w, ok := d.typed(0x003B); ok {
-		return &switchclusterdef.Server{Wrapper: w}
-	}
-	return nil
+	return switchclusterdef.WrapOn(d.Server(0x003B), d.queue)
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
-func (d *Doorbell) Binding() *bindingdef.Server {
-	if w, ok := d.typed(0x001E); ok {
-		return &bindingdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *Doorbell) Binding() *bindingdef.Server { return bindingdef.WrapOn(d.Server(0x001E), d.queue) }

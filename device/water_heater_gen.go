@@ -67,10 +67,7 @@ func NewWaterHeater(opts Options, decls ...Declaration) (*WaterHeater, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
-	if w, ok := d.typed(0x0094); ok {
-		return &waterheatermanagementdef.Server{Wrapper: w}
-	}
-	return nil
+	return waterheatermanagementdef.WrapOn(d.Server(0x0094), d.queue)
 }
 
 // WaterHeaterMode returns the typed WaterHeaterMode server over the one the device mounts,
@@ -78,10 +75,7 @@ func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
-	if w, ok := d.typed(0x009E); ok {
-		return &waterheatermodedef.Server{Wrapper: w}
-	}
-	return nil
+	return waterheatermodedef.WrapOn(d.Server(0x009E), d.queue)
 }
 
 // Thermostat returns the typed Thermostat server over the one the device mounts,
@@ -89,8 +83,5 @@ func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterHeater) Thermostat() *thermostatdef.Server {
-	if w, ok := d.typed(0x0201); ok {
-		return &thermostatdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }

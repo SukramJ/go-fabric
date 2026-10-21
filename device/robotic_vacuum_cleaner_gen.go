@@ -74,10 +74,7 @@ func NewRoboticVacuumCleaner(opts Options, decls ...Declaration) (*RoboticVacuum
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
-	if w, ok := d.typed(0x0054); ok {
-		return &rvcrunmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return rvcrunmodedef.WrapOn(d.Server(0x0054), d.queue)
 }
 
 // RvcOperationalState returns the typed RvcOperationalState server over the one the device mounts,
@@ -85,10 +82,7 @@ func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
-	if w, ok := d.typed(0x0061); ok {
-		return &rvcoperationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return rvcoperationalstatedef.WrapOn(d.Server(0x0061), d.queue)
 }
 
 // RvcCleanMode returns the typed RvcCleanMode server over the one the device mounts,
@@ -96,10 +90,7 @@ func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Ser
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
-	if w, ok := d.typed(0x0055); ok {
-		return &rvccleanmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return rvccleanmodedef.WrapOn(d.Server(0x0055), d.queue)
 }
 
 // ServiceArea returns the typed ServiceArea server over the one the device mounts,
@@ -107,8 +98,5 @@ func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
-	if w, ok := d.typed(0x0150); ok {
-		return &serviceareadef.Server{Wrapper: w}
-	}
-	return nil
+	return serviceareadef.WrapOn(d.Server(0x0150), d.queue)
 }

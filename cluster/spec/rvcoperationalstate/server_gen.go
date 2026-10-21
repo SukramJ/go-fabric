@@ -7,7 +7,7 @@ package rvcoperationalstate
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -48,12 +48,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -200,38 +206,28 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("rvcoperationalstate OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandlePause != nil {
-		if err := s.HandlePause(d.HandlePause); err != nil {
-			return fmt.Errorf("rvcoperationalstate HandlePause: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandlePause", s.HandlePause(d.HandlePause)))
 	}
 	if d.HandleStop != nil {
-		if err := s.HandleStop(d.HandleStop); err != nil {
-			return fmt.Errorf("rvcoperationalstate HandleStop: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStop", s.HandleStop(d.HandleStop)))
 	}
 	if d.HandleStart != nil {
-		if err := s.HandleStart(d.HandleStart); err != nil {
-			return fmt.Errorf("rvcoperationalstate HandleStart: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStart", s.HandleStart(d.HandleStart)))
 	}
 	if d.HandleResume != nil {
-		if err := s.HandleResume(d.HandleResume); err != nil {
-			return fmt.Errorf("rvcoperationalstate HandleResume: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleResume", s.HandleResume(d.HandleResume)))
 	}
 	if d.HandleGoHome != nil {
-		if err := s.HandleGoHome(d.HandleGoHome); err != nil {
-			return fmt.Errorf("rvcoperationalstate HandleGoHome: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGoHome", s.HandleGoHome(d.HandleGoHome)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

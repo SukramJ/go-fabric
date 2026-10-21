@@ -65,10 +65,7 @@ func NewWaterValve(opts Options, decls ...Declaration) (*WaterValve, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
-	if w, ok := d.typed(0x0081); ok {
-		return &valveconfigurationandcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return valveconfigurationandcontroldef.WrapOn(d.Server(0x0081), d.queue)
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
@@ -76,8 +73,5 @@ func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontro
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
-	if w, ok := d.typed(0x0404); ok {
-		return &flowmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

@@ -89,20 +89,12 @@ func NewOnOffPlugInUnit(opts Options, decls ...Declaration) (*OnOffPlugInUnit, e
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
-func (d *OnOffPlugInUnit) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *OnOffPlugInUnit) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *OnOffPlugInUnit) LevelControl() *levelcontroldef.Server {
-	if w, ok := d.typed(0x0008); ok {
-		return &levelcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

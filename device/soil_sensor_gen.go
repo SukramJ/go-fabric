@@ -60,10 +60,7 @@ func NewSoilSensor(opts Options, decls ...Declaration) (*SoilSensor, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
-	if w, ok := d.typed(0x0430); ok {
-		return &soilmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return soilmeasurementdef.WrapOn(d.Server(0x0430), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -71,8 +68,5 @@ func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SoilSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

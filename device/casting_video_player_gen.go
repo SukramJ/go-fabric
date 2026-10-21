@@ -119,10 +119,7 @@ func NewCastingVideoPlayer(opts Options, decls ...Declaration) (*CastingVideoPla
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *CastingVideoPlayer) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
 // MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
@@ -130,10 +127,7 @@ func (d *CastingVideoPlayer) OnOff() *onoffdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *CastingVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
-	if w, ok := d.typed(0x0506); ok {
-		return &mediaplaybackdef.Server{Wrapper: w}
-	}
-	return nil
+	return mediaplaybackdef.WrapOn(d.Server(0x0506), d.queue)
 }
 
 // KeypadInput returns the typed KeypadInput server over the one the device mounts,
@@ -141,10 +135,7 @@ func (d *CastingVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *CastingVideoPlayer) KeypadInput() *keypadinputdef.Server {
-	if w, ok := d.typed(0x0509); ok {
-		return &keypadinputdef.Server{Wrapper: w}
-	}
-	return nil
+	return keypadinputdef.WrapOn(d.Server(0x0509), d.queue)
 }
 
 // ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
@@ -152,10 +143,7 @@ func (d *CastingVideoPlayer) KeypadInput() *keypadinputdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *CastingVideoPlayer) ContentLauncher() *contentlauncherdef.Server {
-	if w, ok := d.typed(0x050A); ok {
-		return &contentlauncherdef.Server{Wrapper: w}
-	}
-	return nil
+	return contentlauncherdef.WrapOn(d.Server(0x050A), d.queue)
 }
 
 // Messages returns the typed Messages server over the one the device mounts,
@@ -163,10 +151,7 @@ func (d *CastingVideoPlayer) ContentLauncher() *contentlauncherdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) Messages() *messagesdef.Server {
-	if w, ok := d.typed(0x0097); ok {
-		return &messagesdef.Server{Wrapper: w}
-	}
-	return nil
+	return messagesdef.WrapOn(d.Server(0x0097), d.queue)
 }
 
 // WakeOnLan returns the typed WakeOnLan server over the one the device mounts,
@@ -174,10 +159,7 @@ func (d *CastingVideoPlayer) Messages() *messagesdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) WakeOnLan() *wakeonlandef.Server {
-	if w, ok := d.typed(0x0503); ok {
-		return &wakeonlandef.Server{Wrapper: w}
-	}
-	return nil
+	return wakeonlandef.WrapOn(d.Server(0x0503), d.queue)
 }
 
 // Channel returns the typed Channel server over the one the device mounts,
@@ -185,10 +167,7 @@ func (d *CastingVideoPlayer) WakeOnLan() *wakeonlandef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) Channel() *channeldef.Server {
-	if w, ok := d.typed(0x0504); ok {
-		return &channeldef.Server{Wrapper: w}
-	}
-	return nil
+	return channeldef.WrapOn(d.Server(0x0504), d.queue)
 }
 
 // TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
@@ -196,10 +175,7 @@ func (d *CastingVideoPlayer) Channel() *channeldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
-	if w, ok := d.typed(0x0505); ok {
-		return &targetnavigatordef.Server{Wrapper: w}
-	}
-	return nil
+	return targetnavigatordef.WrapOn(d.Server(0x0505), d.queue)
 }
 
 // MediaInput returns the typed MediaInput server over the one the device mounts,
@@ -207,10 +183,7 @@ func (d *CastingVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) MediaInput() *mediainputdef.Server {
-	if w, ok := d.typed(0x0507); ok {
-		return &mediainputdef.Server{Wrapper: w}
-	}
-	return nil
+	return mediainputdef.WrapOn(d.Server(0x0507), d.queue)
 }
 
 // LowPower returns the typed LowPower server over the one the device mounts,
@@ -218,10 +191,7 @@ func (d *CastingVideoPlayer) MediaInput() *mediainputdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) LowPower() *lowpowerdef.Server {
-	if w, ok := d.typed(0x0508); ok {
-		return &lowpowerdef.Server{Wrapper: w}
-	}
-	return nil
+	return lowpowerdef.WrapOn(d.Server(0x0508), d.queue)
 }
 
 // AudioOutput returns the typed AudioOutput server over the one the device mounts,
@@ -229,10 +199,7 @@ func (d *CastingVideoPlayer) LowPower() *lowpowerdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) AudioOutput() *audiooutputdef.Server {
-	if w, ok := d.typed(0x050B); ok {
-		return &audiooutputdef.Server{Wrapper: w}
-	}
-	return nil
+	return audiooutputdef.WrapOn(d.Server(0x050B), d.queue)
 }
 
 // ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
@@ -240,10 +207,7 @@ func (d *CastingVideoPlayer) AudioOutput() *audiooutputdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) ApplicationLauncher() *applicationlauncherdef.Server {
-	if w, ok := d.typed(0x050C); ok {
-		return &applicationlauncherdef.Server{Wrapper: w}
-	}
-	return nil
+	return applicationlauncherdef.WrapOn(d.Server(0x050C), d.queue)
 }
 
 // AccountLogin returns the typed AccountLogin server over the one the device mounts,
@@ -251,10 +215,7 @@ func (d *CastingVideoPlayer) ApplicationLauncher() *applicationlauncherdef.Serve
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) AccountLogin() *accountlogindef.Server {
-	if w, ok := d.typed(0x050E); ok {
-		return &accountlogindef.Server{Wrapper: w}
-	}
-	return nil
+	return accountlogindef.WrapOn(d.Server(0x050E), d.queue)
 }
 
 // ContentControl returns the typed ContentControl server over the one the device mounts,
@@ -262,8 +223,5 @@ func (d *CastingVideoPlayer) AccountLogin() *accountlogindef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CastingVideoPlayer) ContentControl() *contentcontroldef.Server {
-	if w, ok := d.typed(0x050F); ok {
-		return &contentcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return contentcontroldef.WrapOn(d.Server(0x050F), d.queue)
 }

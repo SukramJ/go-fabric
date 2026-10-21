@@ -60,10 +60,7 @@ func NewDeviceEnergyManagement(opts Options, decls ...Declaration) (*DeviceEnerg
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *DeviceEnergyManagement) DeviceEnergyManagement() *deviceenergymanagementdef.Server {
-	if w, ok := d.typed(0x0098); ok {
-		return &deviceenergymanagementdef.Server{Wrapper: w}
-	}
-	return nil
+	return deviceenergymanagementdef.WrapOn(d.Server(0x0098), d.queue)
 }
 
 // DeviceEnergyManagementMode returns the typed DeviceEnergyManagementMode server over the one the device mounts,
@@ -71,8 +68,5 @@ func (d *DeviceEnergyManagement) DeviceEnergyManagement() *deviceenergymanagemen
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *DeviceEnergyManagement) DeviceEnergyManagementMode() *deviceenergymanagementmodedef.Server {
-	if w, ok := d.typed(0x009F); ok {
-		return &deviceenergymanagementmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return deviceenergymanagementmodedef.WrapOn(d.Server(0x009F), d.queue)
 }

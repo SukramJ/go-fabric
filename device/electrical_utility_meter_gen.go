@@ -50,8 +50,5 @@ func NewElectricalUtilityMeter(opts Options, decls ...Declaration) (*ElectricalU
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalUtilityMeter) MeterIdentification() *meteridentificationdef.Server {
-	if w, ok := d.typed(0x0B06); ok {
-		return &meteridentificationdef.Server{Wrapper: w}
-	}
-	return nil
+	return meteridentificationdef.WrapOn(d.Server(0x0B06), d.queue)
 }

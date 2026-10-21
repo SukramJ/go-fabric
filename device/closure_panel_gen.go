@@ -56,8 +56,5 @@ func NewClosurePanel(opts Options, decls ...Declaration) (*ClosurePanel, error) 
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ClosurePanel) ClosureDimension() *closuredimensiondef.Server {
-	if w, ok := d.typed(0x0105); ok {
-		return &closuredimensiondef.Server{Wrapper: w}
-	}
-	return nil
+	return closuredimensiondef.WrapOn(d.Server(0x0105), d.queue)
 }

@@ -115,10 +115,7 @@ func NewAirQualitySensor(opts Options, decls ...Declaration) (*AirQualitySensor,
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
-	if w, ok := d.typed(0x005B); ok {
-		return &airqualitydef.Server{Wrapper: w}
-	}
-	return nil
+	return airqualitydef.WrapOn(d.Server(0x005B), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -126,10 +123,7 @@ func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
@@ -137,10 +131,7 @@ func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.S
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	if w, ok := d.typed(0x0405); ok {
-		return &relativehumiditymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }
 
 // CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
@@ -148,10 +139,7 @@ func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasur
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x040C); ok {
-		return &carbonmonoxideconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return carbonmonoxideconcentrationmeasurementdef.WrapOn(d.Server(0x040C), d.queue)
 }
 
 // CarbonDioxideConcentrationMeasurement returns the typed CarbonDioxideConcentrationMeasurement server over the one the device mounts,
@@ -159,10 +147,7 @@ func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonox
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxideconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x040D); ok {
-		return &carbondioxideconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return carbondioxideconcentrationmeasurementdef.WrapOn(d.Server(0x040D), d.queue)
 }
 
 // NitrogenDioxideConcentrationMeasurement returns the typed NitrogenDioxideConcentrationMeasurement server over the one the device mounts,
@@ -170,10 +155,7 @@ func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxid
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendioxideconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x0413); ok {
-		return &nitrogendioxideconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return nitrogendioxideconcentrationmeasurementdef.WrapOn(d.Server(0x0413), d.queue)
 }
 
 // OzoneConcentrationMeasurement returns the typed OzoneConcentrationMeasurement server over the one the device mounts,
@@ -181,10 +163,7 @@ func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendi
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x0415); ok {
-		return &ozoneconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return ozoneconcentrationmeasurementdef.WrapOn(d.Server(0x0415), d.queue)
 }
 
 // Pm25ConcentrationMeasurement returns the typed Pm25ConcentrationMeasurement server over the one the device mounts,
@@ -192,10 +171,7 @@ func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationme
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042A); ok {
-		return &pm25concentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return pm25concentrationmeasurementdef.WrapOn(d.Server(0x042A), d.queue)
 }
 
 // FormaldehydeConcentrationMeasurement returns the typed FormaldehydeConcentrationMeasurement server over the one the device mounts,
@@ -203,10 +179,7 @@ func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeas
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydeconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042B); ok {
-		return &formaldehydeconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return formaldehydeconcentrationmeasurementdef.WrapOn(d.Server(0x042B), d.queue)
 }
 
 // Pm1ConcentrationMeasurement returns the typed Pm1ConcentrationMeasurement server over the one the device mounts,
@@ -214,10 +187,7 @@ func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydec
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042C); ok {
-		return &pm1concentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return pm1concentrationmeasurementdef.WrapOn(d.Server(0x042C), d.queue)
 }
 
 // Pm10ConcentrationMeasurement returns the typed Pm10ConcentrationMeasurement server over the one the device mounts,
@@ -225,10 +195,7 @@ func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasur
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042D); ok {
-		return &pm10concentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return pm10concentrationmeasurementdef.WrapOn(d.Server(0x042D), d.queue)
 }
 
 // TotalVolatileOrganicCompoundsConcentrationMeasurement returns the typed TotalVolatileOrganicCompoundsConcentrationMeasurement server over the one the device mounts,
@@ -236,10 +203,7 @@ func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeas
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *totalvolatileorganiccompoundsconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042E); ok {
-		return &totalvolatileorganiccompoundsconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return totalvolatileorganiccompoundsconcentrationmeasurementdef.WrapOn(d.Server(0x042E), d.queue)
 }
 
 // RadonConcentrationMeasurement returns the typed RadonConcentrationMeasurement server over the one the device mounts,
@@ -247,8 +211,5 @@ func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) RadonConcentrationMeasurement() *radonconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x042F); ok {
-		return &radonconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return radonconcentrationmeasurementdef.WrapOn(d.Server(0x042F), d.queue)
 }

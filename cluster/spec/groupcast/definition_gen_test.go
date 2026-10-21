@@ -42,7 +42,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -88,5 +88,16 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleJoinGroup = func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleLeaveGroup = func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil }
+	all.HandleUpdateGroupKey = func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleConfigureAuxiliaryAcl = func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGroupcastTesting = func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 5 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

@@ -54,8 +54,5 @@ func NewOtaProvider(opts Options, decls ...Declaration) (*OtaProvider, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *OtaProvider) OtaSoftwareUpdateProvider() *otasoftwareupdateproviderdef.Server {
-	if w, ok := d.typed(0x0029); ok {
-		return &otasoftwareupdateproviderdef.Server{Wrapper: w}
-	}
-	return nil
+	return otasoftwareupdateproviderdef.WrapOn(d.Server(0x0029), d.queue)
 }

@@ -92,10 +92,7 @@ func NewContentApp(opts Options, decls ...Declaration) (*ContentApp, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
-	if w, ok := d.typed(0x0509); ok {
-		return &keypadinputdef.Server{Wrapper: w}
-	}
-	return nil
+	return keypadinputdef.WrapOn(d.Server(0x0509), d.queue)
 }
 
 // ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
@@ -103,10 +100,7 @@ func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
-	if w, ok := d.typed(0x050C); ok {
-		return &applicationlauncherdef.Server{Wrapper: w}
-	}
-	return nil
+	return applicationlauncherdef.WrapOn(d.Server(0x050C), d.queue)
 }
 
 // ApplicationBasic returns the typed ApplicationBasic server over the one the device mounts,
@@ -114,10 +108,7 @@ func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
-	if w, ok := d.typed(0x050D); ok {
-		return &applicationbasicdef.Server{Wrapper: w}
-	}
-	return nil
+	return applicationbasicdef.WrapOn(d.Server(0x050D), d.queue)
 }
 
 // Channel returns the typed Channel server over the one the device mounts,
@@ -125,10 +116,7 @@ func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContentApp) Channel() *channeldef.Server {
-	if w, ok := d.typed(0x0504); ok {
-		return &channeldef.Server{Wrapper: w}
-	}
-	return nil
+	return channeldef.WrapOn(d.Server(0x0504), d.queue)
 }
 
 // TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
@@ -136,10 +124,7 @@ func (d *ContentApp) Channel() *channeldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
-	if w, ok := d.typed(0x0505); ok {
-		return &targetnavigatordef.Server{Wrapper: w}
-	}
-	return nil
+	return targetnavigatordef.WrapOn(d.Server(0x0505), d.queue)
 }
 
 // MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
@@ -147,10 +132,7 @@ func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
-	if w, ok := d.typed(0x0506); ok {
-		return &mediaplaybackdef.Server{Wrapper: w}
-	}
-	return nil
+	return mediaplaybackdef.WrapOn(d.Server(0x0506), d.queue)
 }
 
 // ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
@@ -158,10 +140,7 @@ func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
-	if w, ok := d.typed(0x050A); ok {
-		return &contentlauncherdef.Server{Wrapper: w}
-	}
-	return nil
+	return contentlauncherdef.WrapOn(d.Server(0x050A), d.queue)
 }
 
 // AccountLogin returns the typed AccountLogin server over the one the device mounts,
@@ -169,8 +148,5 @@ func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContentApp) AccountLogin() *accountlogindef.Server {
-	if w, ok := d.typed(0x050E); ok {
-		return &accountlogindef.Server{Wrapper: w}
-	}
-	return nil
+	return accountlogindef.WrapOn(d.Server(0x050E), d.queue)
 }

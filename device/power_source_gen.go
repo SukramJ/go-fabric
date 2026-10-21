@@ -49,8 +49,5 @@ func NewPowerSource(opts Options, decls ...Declaration) (*PowerSource, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *PowerSource) PowerSource() *powersourcedef.Server {
-	if w, ok := d.typed(0x002F); ok {
-		return &powersourcedef.Server{Wrapper: w}
-	}
-	return nil
+	return powersourcedef.WrapOn(d.Server(0x002F), d.queue)
 }

@@ -59,10 +59,7 @@ func NewElectricalSensor(opts Options, decls ...Declaration) (*ElectricalSensor,
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ElectricalSensor) PowerTopology() *powertopologydef.Server {
-	if w, ok := d.typed(0x009C); ok {
-		return &powertopologydef.Server{Wrapper: w}
-	}
-	return nil
+	return powertopologydef.WrapOn(d.Server(0x009C), d.queue)
 }
 
 // ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
@@ -70,10 +67,7 @@ func (d *ElectricalSensor) PowerTopology() *powertopologydef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalSensor) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
-	if w, ok := d.typed(0x0090); ok {
-		return &electricalpowermeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return electricalpowermeasurementdef.WrapOn(d.Server(0x0090), d.queue)
 }
 
 // ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
@@ -81,8 +75,5 @@ func (d *ElectricalSensor) ElectricalPowerMeasurement() *electricalpowermeasurem
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalSensor) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
-	if w, ok := d.typed(0x0091); ok {
-		return &electricalenergymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return electricalenergymeasurementdef.WrapOn(d.Server(0x0091), d.queue)
 }

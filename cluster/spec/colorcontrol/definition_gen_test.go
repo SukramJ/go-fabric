@@ -52,7 +52,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -139,5 +139,30 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleMoveToHue = func(context.Context, MoveToHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveHue = func(context.Context, MoveHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStepHue = func(context.Context, StepHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToSaturation = func(context.Context, MoveToSaturationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveSaturation = func(context.Context, MoveSaturationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStepSaturation = func(context.Context, StepSaturationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToHueAndSaturation = func(context.Context, MoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToColor = func(context.Context, MoveToColorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveColor = func(context.Context, MoveColorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStepColor = func(context.Context, StepColorRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveToColorTemperature = func(context.Context, MoveToColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnhancedMoveToHue = func(context.Context, EnhancedMoveToHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnhancedMoveHue = func(context.Context, EnhancedMoveHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnhancedStepHue = func(context.Context, EnhancedStepHueRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnhancedMoveToHueAndSaturation = func(context.Context, EnhancedMoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleColorLoopSet = func(context.Context, ColorLoopSetRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStopMoveStep = func(context.Context, StopMoveStepRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleMoveColorTemperature = func(context.Context, MoveColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStepColorTemperature = func(context.Context, StepColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 19 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

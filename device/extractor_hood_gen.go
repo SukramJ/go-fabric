@@ -64,10 +64,7 @@ func NewExtractorHood(opts Options, decls ...Declaration) (*ExtractorHood, error
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtractorHood) FanControl() *fancontroldef.Server {
-	if w, ok := d.typed(0x0202); ok {
-		return &fancontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
 // HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
@@ -75,10 +72,7 @@ func (d *ExtractorHood) FanControl() *fancontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0071); ok {
-		return &hepafiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
@@ -86,8 +80,5 @@ func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0072); ok {
-		return &activatedcarbonfiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

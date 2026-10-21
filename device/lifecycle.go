@@ -145,17 +145,6 @@ func (d *Device) Rename(ctx context.Context, name string) {
 	}
 }
 
-// typed returns the wrapper a typed accessor holds for the device's
-// server of clusterID — the server and the device's queue, for the
-// asynchronous callbacks; false when the device mounts none.
-func (d *Device) typed(clusterID uint32) (spec.Wrapper, bool) {
-	srv := d.Server(clusterID)
-	if srv == nil {
-		return spec.Wrapper{}, false
-	}
-	return spec.NewWrapperOn(srv, d.queue), true
-}
-
 // OnChanged calls fn with every change of the device's clusterID server —
 // matter.js's `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:456)
 // with the origin of the change (contract.Change; Datasource.ts:1473-1476

@@ -7,7 +7,7 @@ package levelcontrol
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -64,12 +64,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -285,58 +291,40 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("levelcontrol OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleMoveToLevel != nil {
-		if err := s.HandleMoveToLevel(d.HandleMoveToLevel); err != nil {
-			return fmt.Errorf("levelcontrol HandleMoveToLevel: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToLevel", s.HandleMoveToLevel(d.HandleMoveToLevel)))
 	}
 	if d.HandleMove != nil {
-		if err := s.HandleMove(d.HandleMove); err != nil {
-			return fmt.Errorf("levelcontrol HandleMove: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMove", s.HandleMove(d.HandleMove)))
 	}
 	if d.HandleStep != nil {
-		if err := s.HandleStep(d.HandleStep); err != nil {
-			return fmt.Errorf("levelcontrol HandleStep: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStep", s.HandleStep(d.HandleStep)))
 	}
 	if d.HandleStop != nil {
-		if err := s.HandleStop(d.HandleStop); err != nil {
-			return fmt.Errorf("levelcontrol HandleStop: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStop", s.HandleStop(d.HandleStop)))
 	}
 	if d.HandleMoveToLevelWithOnOff != nil {
-		if err := s.HandleMoveToLevelWithOnOff(d.HandleMoveToLevelWithOnOff); err != nil {
-			return fmt.Errorf("levelcontrol HandleMoveToLevelWithOnOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToLevelWithOnOff", s.HandleMoveToLevelWithOnOff(d.HandleMoveToLevelWithOnOff)))
 	}
 	if d.HandleMoveWithOnOff != nil {
-		if err := s.HandleMoveWithOnOff(d.HandleMoveWithOnOff); err != nil {
-			return fmt.Errorf("levelcontrol HandleMoveWithOnOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveWithOnOff", s.HandleMoveWithOnOff(d.HandleMoveWithOnOff)))
 	}
 	if d.HandleStepWithOnOff != nil {
-		if err := s.HandleStepWithOnOff(d.HandleStepWithOnOff); err != nil {
-			return fmt.Errorf("levelcontrol HandleStepWithOnOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStepWithOnOff", s.HandleStepWithOnOff(d.HandleStepWithOnOff)))
 	}
 	if d.HandleStopWithOnOff != nil {
-		if err := s.HandleStopWithOnOff(d.HandleStopWithOnOff); err != nil {
-			return fmt.Errorf("levelcontrol HandleStopWithOnOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleStopWithOnOff", s.HandleStopWithOnOff(d.HandleStopWithOnOff)))
 	}
 	if d.HandleMoveToClosestFrequency != nil {
-		if err := s.HandleMoveToClosestFrequency(d.HandleMoveToClosestFrequency); err != nil {
-			return fmt.Errorf("levelcontrol HandleMoveToClosestFrequency: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleMoveToClosestFrequency", s.HandleMoveToClosestFrequency(d.HandleMoveToClosestFrequency)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

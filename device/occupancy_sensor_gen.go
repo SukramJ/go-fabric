@@ -60,10 +60,7 @@ func NewOccupancySensor(opts Options, decls ...Declaration) (*OccupancySensor, e
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *OccupancySensor) OccupancySensing() *occupancysensingdef.Server {
-	if w, ok := d.typed(0x0406); ok {
-		return &occupancysensingdef.Server{Wrapper: w}
-	}
-	return nil
+	return occupancysensingdef.WrapOn(d.Server(0x0406), d.queue)
 }
 
 // BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
@@ -71,8 +68,5 @@ func (d *OccupancySensor) OccupancySensing() *occupancysensingdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *OccupancySensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	if w, ok := d.typed(0x0080); ok {
-		return &booleanstateconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

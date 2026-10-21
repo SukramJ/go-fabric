@@ -66,19 +66,11 @@ func NewFan(opts Options, decls ...Declaration) (*Fan, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Fan) FanControl() *fancontroldef.Server {
-	if w, ok := d.typed(0x0202); ok {
-		return &fancontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
-func (d *Fan) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *Fan) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }

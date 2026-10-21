@@ -55,8 +55,5 @@ func NewGenericSwitch(opts Options, decls ...Declaration) (*GenericSwitch, error
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *GenericSwitch) Switch() *switchclusterdef.Server {
-	if w, ok := d.typed(0x003B); ok {
-		return &switchclusterdef.Server{Wrapper: w}
-	}
-	return nil
+	return switchclusterdef.WrapOn(d.Server(0x003B), d.queue)
 }

@@ -7,7 +7,7 @@ package doorlock
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -129,12 +129,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -535,123 +541,79 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("doorlock OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleLockDoor != nil {
-		if err := s.HandleLockDoor(d.HandleLockDoor); err != nil {
-			return fmt.Errorf("doorlock HandleLockDoor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleLockDoor", s.HandleLockDoor(d.HandleLockDoor)))
 	}
 	if d.HandleUnlockDoor != nil {
-		if err := s.HandleUnlockDoor(d.HandleUnlockDoor); err != nil {
-			return fmt.Errorf("doorlock HandleUnlockDoor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleUnlockDoor", s.HandleUnlockDoor(d.HandleUnlockDoor)))
 	}
 	if d.HandleToggle != nil {
-		if err := s.HandleToggle(d.HandleToggle); err != nil {
-			return fmt.Errorf("doorlock HandleToggle: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleToggle", s.HandleToggle(d.HandleToggle)))
 	}
 	if d.HandleUnlockWithTimeout != nil {
-		if err := s.HandleUnlockWithTimeout(d.HandleUnlockWithTimeout); err != nil {
-			return fmt.Errorf("doorlock HandleUnlockWithTimeout: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleUnlockWithTimeout", s.HandleUnlockWithTimeout(d.HandleUnlockWithTimeout)))
 	}
 	if d.HandleSetWeekDaySchedule != nil {
-		if err := s.HandleSetWeekDaySchedule(d.HandleSetWeekDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleSetWeekDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetWeekDaySchedule", s.HandleSetWeekDaySchedule(d.HandleSetWeekDaySchedule)))
 	}
 	if d.HandleGetWeekDaySchedule != nil {
-		if err := s.HandleGetWeekDaySchedule(d.HandleGetWeekDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleGetWeekDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetWeekDaySchedule", s.HandleGetWeekDaySchedule(d.HandleGetWeekDaySchedule)))
 	}
 	if d.HandleClearWeekDaySchedule != nil {
-		if err := s.HandleClearWeekDaySchedule(d.HandleClearWeekDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleClearWeekDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearWeekDaySchedule", s.HandleClearWeekDaySchedule(d.HandleClearWeekDaySchedule)))
 	}
 	if d.HandleSetYearDaySchedule != nil {
-		if err := s.HandleSetYearDaySchedule(d.HandleSetYearDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleSetYearDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetYearDaySchedule", s.HandleSetYearDaySchedule(d.HandleSetYearDaySchedule)))
 	}
 	if d.HandleGetYearDaySchedule != nil {
-		if err := s.HandleGetYearDaySchedule(d.HandleGetYearDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleGetYearDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetYearDaySchedule", s.HandleGetYearDaySchedule(d.HandleGetYearDaySchedule)))
 	}
 	if d.HandleClearYearDaySchedule != nil {
-		if err := s.HandleClearYearDaySchedule(d.HandleClearYearDaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleClearYearDaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearYearDaySchedule", s.HandleClearYearDaySchedule(d.HandleClearYearDaySchedule)))
 	}
 	if d.HandleSetHolidaySchedule != nil {
-		if err := s.HandleSetHolidaySchedule(d.HandleSetHolidaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleSetHolidaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetHolidaySchedule", s.HandleSetHolidaySchedule(d.HandleSetHolidaySchedule)))
 	}
 	if d.HandleGetHolidaySchedule != nil {
-		if err := s.HandleGetHolidaySchedule(d.HandleGetHolidaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleGetHolidaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetHolidaySchedule", s.HandleGetHolidaySchedule(d.HandleGetHolidaySchedule)))
 	}
 	if d.HandleClearHolidaySchedule != nil {
-		if err := s.HandleClearHolidaySchedule(d.HandleClearHolidaySchedule); err != nil {
-			return fmt.Errorf("doorlock HandleClearHolidaySchedule: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearHolidaySchedule", s.HandleClearHolidaySchedule(d.HandleClearHolidaySchedule)))
 	}
 	if d.HandleSetUser != nil {
-		if err := s.HandleSetUser(d.HandleSetUser); err != nil {
-			return fmt.Errorf("doorlock HandleSetUser: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetUser", s.HandleSetUser(d.HandleSetUser)))
 	}
 	if d.HandleGetUser != nil {
-		if err := s.HandleGetUser(d.HandleGetUser); err != nil {
-			return fmt.Errorf("doorlock HandleGetUser: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetUser", s.HandleGetUser(d.HandleGetUser)))
 	}
 	if d.HandleClearUser != nil {
-		if err := s.HandleClearUser(d.HandleClearUser); err != nil {
-			return fmt.Errorf("doorlock HandleClearUser: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearUser", s.HandleClearUser(d.HandleClearUser)))
 	}
 	if d.HandleSetCredential != nil {
-		if err := s.HandleSetCredential(d.HandleSetCredential); err != nil {
-			return fmt.Errorf("doorlock HandleSetCredential: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetCredential", s.HandleSetCredential(d.HandleSetCredential)))
 	}
 	if d.HandleGetCredentialStatus != nil {
-		if err := s.HandleGetCredentialStatus(d.HandleGetCredentialStatus); err != nil {
-			return fmt.Errorf("doorlock HandleGetCredentialStatus: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleGetCredentialStatus", s.HandleGetCredentialStatus(d.HandleGetCredentialStatus)))
 	}
 	if d.HandleClearCredential != nil {
-		if err := s.HandleClearCredential(d.HandleClearCredential); err != nil {
-			return fmt.Errorf("doorlock HandleClearCredential: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearCredential", s.HandleClearCredential(d.HandleClearCredential)))
 	}
 	if d.HandleUnboltDoor != nil {
-		if err := s.HandleUnboltDoor(d.HandleUnboltDoor); err != nil {
-			return fmt.Errorf("doorlock HandleUnboltDoor: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleUnboltDoor", s.HandleUnboltDoor(d.HandleUnboltDoor)))
 	}
 	if d.HandleSetAliroReaderConfig != nil {
-		if err := s.HandleSetAliroReaderConfig(d.HandleSetAliroReaderConfig); err != nil {
-			return fmt.Errorf("doorlock HandleSetAliroReaderConfig: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetAliroReaderConfig", s.HandleSetAliroReaderConfig(d.HandleSetAliroReaderConfig)))
 	}
 	if d.HandleClearAliroReaderConfig != nil {
-		if err := s.HandleClearAliroReaderConfig(d.HandleClearAliroReaderConfig); err != nil {
-			return fmt.Errorf("doorlock HandleClearAliroReaderConfig: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleClearAliroReaderConfig", s.HandleClearAliroReaderConfig(d.HandleClearAliroReaderConfig)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

@@ -72,8 +72,5 @@ func NewOnOffLightSwitch(opts Options, decls ...Declaration) (*OnOffLightSwitch,
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *OnOffLightSwitch) Binding() *bindingdef.Server {
-	if w, ok := d.typed(0x001E); ok {
-		return &bindingdef.Server{Wrapper: w}
-	}
-	return nil
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

@@ -45,7 +45,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -102,5 +102,26 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandlePause = func(context.Context, PauseRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}
+	all.HandleStop = func(context.Context, StopRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}
+	all.HandleStart = func(context.Context, StartRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}
+	all.HandleResume = func(context.Context, ResumeRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}
+	all.HandleGoHome = func(context.Context, GoHomeRequest) (OperationalCommandResponse, error) {
+		return OperationalCommandResponse{}, nil
+	}
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 5 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

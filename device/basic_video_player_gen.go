@@ -102,10 +102,7 @@ func NewBasicVideoPlayer(opts Options, decls ...Declaration) (*BasicVideoPlayer,
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *BasicVideoPlayer) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
 // MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
@@ -113,10 +110,7 @@ func (d *BasicVideoPlayer) OnOff() *onoffdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *BasicVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
-	if w, ok := d.typed(0x0506); ok {
-		return &mediaplaybackdef.Server{Wrapper: w}
-	}
-	return nil
+	return mediaplaybackdef.WrapOn(d.Server(0x0506), d.queue)
 }
 
 // KeypadInput returns the typed KeypadInput server over the one the device mounts,
@@ -124,10 +118,7 @@ func (d *BasicVideoPlayer) MediaPlayback() *mediaplaybackdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *BasicVideoPlayer) KeypadInput() *keypadinputdef.Server {
-	if w, ok := d.typed(0x0509); ok {
-		return &keypadinputdef.Server{Wrapper: w}
-	}
-	return nil
+	return keypadinputdef.WrapOn(d.Server(0x0509), d.queue)
 }
 
 // Messages returns the typed Messages server over the one the device mounts,
@@ -135,10 +126,7 @@ func (d *BasicVideoPlayer) KeypadInput() *keypadinputdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) Messages() *messagesdef.Server {
-	if w, ok := d.typed(0x0097); ok {
-		return &messagesdef.Server{Wrapper: w}
-	}
-	return nil
+	return messagesdef.WrapOn(d.Server(0x0097), d.queue)
 }
 
 // WakeOnLan returns the typed WakeOnLan server over the one the device mounts,
@@ -146,10 +134,7 @@ func (d *BasicVideoPlayer) Messages() *messagesdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) WakeOnLan() *wakeonlandef.Server {
-	if w, ok := d.typed(0x0503); ok {
-		return &wakeonlandef.Server{Wrapper: w}
-	}
-	return nil
+	return wakeonlandef.WrapOn(d.Server(0x0503), d.queue)
 }
 
 // Channel returns the typed Channel server over the one the device mounts,
@@ -157,10 +142,7 @@ func (d *BasicVideoPlayer) WakeOnLan() *wakeonlandef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) Channel() *channeldef.Server {
-	if w, ok := d.typed(0x0504); ok {
-		return &channeldef.Server{Wrapper: w}
-	}
-	return nil
+	return channeldef.WrapOn(d.Server(0x0504), d.queue)
 }
 
 // TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
@@ -168,10 +150,7 @@ func (d *BasicVideoPlayer) Channel() *channeldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
-	if w, ok := d.typed(0x0505); ok {
-		return &targetnavigatordef.Server{Wrapper: w}
-	}
-	return nil
+	return targetnavigatordef.WrapOn(d.Server(0x0505), d.queue)
 }
 
 // MediaInput returns the typed MediaInput server over the one the device mounts,
@@ -179,10 +158,7 @@ func (d *BasicVideoPlayer) TargetNavigator() *targetnavigatordef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) MediaInput() *mediainputdef.Server {
-	if w, ok := d.typed(0x0507); ok {
-		return &mediainputdef.Server{Wrapper: w}
-	}
-	return nil
+	return mediainputdef.WrapOn(d.Server(0x0507), d.queue)
 }
 
 // LowPower returns the typed LowPower server over the one the device mounts,
@@ -190,10 +166,7 @@ func (d *BasicVideoPlayer) MediaInput() *mediainputdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) LowPower() *lowpowerdef.Server {
-	if w, ok := d.typed(0x0508); ok {
-		return &lowpowerdef.Server{Wrapper: w}
-	}
-	return nil
+	return lowpowerdef.WrapOn(d.Server(0x0508), d.queue)
 }
 
 // AudioOutput returns the typed AudioOutput server over the one the device mounts,
@@ -201,10 +174,7 @@ func (d *BasicVideoPlayer) LowPower() *lowpowerdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) AudioOutput() *audiooutputdef.Server {
-	if w, ok := d.typed(0x050B); ok {
-		return &audiooutputdef.Server{Wrapper: w}
-	}
-	return nil
+	return audiooutputdef.WrapOn(d.Server(0x050B), d.queue)
 }
 
 // ContentControl returns the typed ContentControl server over the one the device mounts,
@@ -212,8 +182,5 @@ func (d *BasicVideoPlayer) AudioOutput() *audiooutputdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BasicVideoPlayer) ContentControl() *contentcontroldef.Server {
-	if w, ok := d.typed(0x050F); ok {
-		return &contentcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return contentcontroldef.WrapOn(d.Server(0x050F), d.queue)
 }

@@ -62,7 +62,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -144,5 +144,29 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleUpdatePin = func(context.Context, UpdatePinRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleResetPin = func(context.Context, ResetPinRequest) (ResetPinResponse, error) { return ResetPinResponse{}, nil }
+	all.HandleEnable = func(context.Context, EnableRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleDisable = func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleAddBonusTime = func(context.Context, AddBonusTimeRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetScreenDailyTime = func(context.Context, SetScreenDailyTimeRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleBlockUnratedContent = func(context.Context, BlockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleUnblockUnratedContent = func(context.Context, UnblockUnratedContentRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetOnDemandRatingThreshold = func(context.Context, SetOnDemandRatingThresholdRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetScheduledContentRatingThreshold = func(context.Context, SetScheduledContentRatingThresholdRequest) (struct{}, error) {
+		return struct{}{}, nil
+	}
+	all.HandleAddBlockChannels = func(context.Context, AddBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleRemoveBlockChannels = func(context.Context, RemoveBlockChannelsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleAddBlockApplications = func(context.Context, AddBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleRemoveBlockApplications = func(context.Context, RemoveBlockApplicationsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetBlockContentTimeWindow = func(context.Context, SetBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleRemoveBlockContentTimeWindow = func(context.Context, RemoveBlockContentTimeWindowRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 16 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

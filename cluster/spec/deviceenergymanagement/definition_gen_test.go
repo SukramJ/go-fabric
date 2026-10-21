@@ -52,7 +52,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -110,5 +110,19 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandlePowerAdjustRequest = func(context.Context, PowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleCancelPowerAdjustRequest = func(context.Context, CancelPowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStartTimeAdjustRequest = func(context.Context, StartTimeAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandlePauseRequest = func(context.Context, PauseRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleResumeRequest = func(context.Context, ResumeRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleModifyForecastRequest = func(context.Context, ModifyForecastRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleRequestConstraintBasedForecast = func(context.Context, RequestConstraintBasedForecastRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleCancelRequest = func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 8 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

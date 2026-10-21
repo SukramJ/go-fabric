@@ -78,10 +78,7 @@ func NewLaundryDryer(opts Options, decls ...Declaration) (*LaundryDryer, error) 
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *LaundryDryer) OperationalState() *operationalstatedef.Server {
-	if w, ok := d.typed(0x0060); ok {
-		return &operationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
 // LaundryWasherMode returns the typed LaundryWasherMode server over the one the device mounts,
@@ -89,32 +86,21 @@ func (d *LaundryDryer) OperationalState() *operationalstatedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *LaundryDryer) LaundryWasherMode() *laundrywashermodedef.Server {
-	if w, ok := d.typed(0x0051); ok {
-		return &laundrywashermodedef.Server{Wrapper: w}
-	}
-	return nil
+	return laundrywashermodedef.WrapOn(d.Server(0x0051), d.queue)
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
-func (d *LaundryDryer) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *LaundryDryer) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // LaundryDryerControls returns the typed LaundryDryerControls server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *LaundryDryer) LaundryDryerControls() *laundrydryercontrolsdef.Server {
-	if w, ok := d.typed(0x004A); ok {
-		return &laundrydryercontrolsdef.Server{Wrapper: w}
-	}
-	return nil
+	return laundrydryercontrolsdef.WrapOn(d.Server(0x004A), d.queue)
 }
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
@@ -122,8 +108,5 @@ func (d *LaundryDryer) LaundryDryerControls() *laundrydryercontrolsdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *LaundryDryer) TemperatureControl() *temperaturecontroldef.Server {
-	if w, ok := d.typed(0x0056); ok {
-		return &temperaturecontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }

@@ -52,7 +52,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -125,5 +125,25 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandlePlay = func(context.Context, PlayRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandlePause = func(context.Context, PauseRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleStop = func(context.Context, StopRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleStartOver = func(context.Context, StartOverRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandlePrevious = func(context.Context, PreviousRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleNext = func(context.Context, NextRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleRewind = func(context.Context, RewindRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleFastForward = func(context.Context, FastForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleSkipForward = func(context.Context, SkipForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleSkipBackward = func(context.Context, SkipBackwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleSeek = func(context.Context, SeekRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }
+	all.HandleActivateAudioTrack = func(context.Context, ActivateAudioTrackRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleActivateTextTrack = func(context.Context, ActivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleDeactivateTextTrack = func(context.Context, DeactivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 14 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

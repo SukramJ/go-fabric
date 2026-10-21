@@ -55,8 +55,5 @@ func NewPressureSensor(opts Options, decls ...Declaration) (*PressureSensor, err
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *PressureSensor) PressureMeasurement() *pressuremeasurementdef.Server {
-	if w, ok := d.typed(0x0403); ok {
-		return &pressuremeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }

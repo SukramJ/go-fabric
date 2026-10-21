@@ -105,10 +105,7 @@ func NewRoomAirConditioner(opts Options, decls ...Declaration) (*RoomAirConditio
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoomAirConditioner) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
 // Thermostat returns the typed Thermostat server over the one the device mounts,
@@ -116,10 +113,7 @@ func (d *RoomAirConditioner) OnOff() *onoffdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoomAirConditioner) Thermostat() *thermostatdef.Server {
-	if w, ok := d.typed(0x0201); ok {
-		return &thermostatdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }
 
 // HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
@@ -127,10 +121,7 @@ func (d *RoomAirConditioner) Thermostat() *thermostatdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0071); ok {
-		return &hepafiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
@@ -138,10 +129,7 @@ func (d *RoomAirConditioner) HepaFilterMonitoring() *hepafiltermonitoringdef.Ser
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	if w, ok := d.typed(0x0072); ok {
-		return &activatedcarbonfiltermonitoringdef.Server{Wrapper: w}
-	}
-	return nil
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }
 
 // FanControl returns the typed FanControl server over the one the device mounts,
@@ -149,10 +137,7 @@ func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *activatedcarbonf
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) FanControl() *fancontroldef.Server {
-	if w, ok := d.typed(0x0202); ok {
-		return &fancontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
 // ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
@@ -160,10 +145,7 @@ func (d *RoomAirConditioner) FanControl() *fancontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	if w, ok := d.typed(0x0204); ok {
-		return &thermostatuserinterfaceconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -171,10 +153,7 @@ func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *thermostatu
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
@@ -182,8 +161,5 @@ func (d *RoomAirConditioner) TemperatureMeasurement() *temperaturemeasurementdef
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RoomAirConditioner) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	if w, ok := d.typed(0x0405); ok {
-		return &relativehumiditymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }

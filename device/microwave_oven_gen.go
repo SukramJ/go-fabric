@@ -75,10 +75,7 @@ func NewMicrowaveOven(opts Options, decls ...Declaration) (*MicrowaveOven, error
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *MicrowaveOven) OperationalState() *operationalstatedef.Server {
-	if w, ok := d.typed(0x0060); ok {
-		return &operationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
 // MicrowaveOvenMode returns the typed MicrowaveOvenMode server over the one the device mounts,
@@ -86,10 +83,7 @@ func (d *MicrowaveOven) OperationalState() *operationalstatedef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *MicrowaveOven) MicrowaveOvenMode() *microwaveovenmodedef.Server {
-	if w, ok := d.typed(0x005E); ok {
-		return &microwaveovenmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return microwaveovenmodedef.WrapOn(d.Server(0x005E), d.queue)
 }
 
 // MicrowaveOvenControl returns the typed MicrowaveOvenControl server over the one the device mounts,
@@ -97,10 +91,7 @@ func (d *MicrowaveOven) MicrowaveOvenMode() *microwaveovenmodedef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *MicrowaveOven) MicrowaveOvenControl() *microwaveovencontroldef.Server {
-	if w, ok := d.typed(0x005F); ok {
-		return &microwaveovencontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return microwaveovencontroldef.WrapOn(d.Server(0x005F), d.queue)
 }
 
 // FanControl returns the typed FanControl server over the one the device mounts,
@@ -108,8 +99,5 @@ func (d *MicrowaveOven) MicrowaveOvenControl() *microwaveovencontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *MicrowaveOven) FanControl() *fancontroldef.Server {
-	if w, ok := d.typed(0x0202); ok {
-		return &fancontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }

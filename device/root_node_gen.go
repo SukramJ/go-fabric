@@ -154,10 +154,7 @@ func NewRootNode(opts Options, decls ...Declaration) (*RootNode, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) BasicInformation() *basicinformationdef.Server {
-	if w, ok := d.typed(0x0028); ok {
-		return &basicinformationdef.Server{Wrapper: w}
-	}
-	return nil
+	return basicinformationdef.WrapOn(d.Server(0x0028), d.queue)
 }
 
 // GeneralCommissioning returns the typed GeneralCommissioning server over the one the device mounts,
@@ -165,10 +162,7 @@ func (d *RootNode) BasicInformation() *basicinformationdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) GeneralCommissioning() *generalcommissioningdef.Server {
-	if w, ok := d.typed(0x0030); ok {
-		return &generalcommissioningdef.Server{Wrapper: w}
-	}
-	return nil
+	return generalcommissioningdef.WrapOn(d.Server(0x0030), d.queue)
 }
 
 // GeneralDiagnostics returns the typed GeneralDiagnostics server over the one the device mounts,
@@ -176,10 +170,7 @@ func (d *RootNode) GeneralCommissioning() *generalcommissioningdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) GeneralDiagnostics() *generaldiagnosticsdef.Server {
-	if w, ok := d.typed(0x0033); ok {
-		return &generaldiagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return generaldiagnosticsdef.WrapOn(d.Server(0x0033), d.queue)
 }
 
 // AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
@@ -187,10 +178,7 @@ func (d *RootNode) GeneralDiagnostics() *generaldiagnosticsdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
-	if w, ok := d.typed(0x003C); ok {
-		return &administratorcommissioningdef.Server{Wrapper: w}
-	}
-	return nil
+	return administratorcommissioningdef.WrapOn(d.Server(0x003C), d.queue)
 }
 
 // LocalizationConfiguration returns the typed LocalizationConfiguration server over the one the device mounts,
@@ -198,10 +186,7 @@ func (d *RootNode) AdministratorCommissioning() *administratorcommissioningdef.S
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) LocalizationConfiguration() *localizationconfigurationdef.Server {
-	if w, ok := d.typed(0x002B); ok {
-		return &localizationconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return localizationconfigurationdef.WrapOn(d.Server(0x002B), d.queue)
 }
 
 // TimeFormatLocalization returns the typed TimeFormatLocalization server over the one the device mounts,
@@ -209,10 +194,7 @@ func (d *RootNode) LocalizationConfiguration() *localizationconfigurationdef.Ser
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) TimeFormatLocalization() *timeformatlocalizationdef.Server {
-	if w, ok := d.typed(0x002C); ok {
-		return &timeformatlocalizationdef.Server{Wrapper: w}
-	}
-	return nil
+	return timeformatlocalizationdef.WrapOn(d.Server(0x002C), d.queue)
 }
 
 // UnitLocalization returns the typed UnitLocalization server over the one the device mounts,
@@ -220,10 +202,7 @@ func (d *RootNode) TimeFormatLocalization() *timeformatlocalizationdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) UnitLocalization() *unitlocalizationdef.Server {
-	if w, ok := d.typed(0x002D); ok {
-		return &unitlocalizationdef.Server{Wrapper: w}
-	}
-	return nil
+	return unitlocalizationdef.WrapOn(d.Server(0x002D), d.queue)
 }
 
 // PowerSourceConfiguration returns the typed PowerSourceConfiguration server over the one the device mounts,
@@ -231,10 +210,7 @@ func (d *RootNode) UnitLocalization() *unitlocalizationdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
-	if w, ok := d.typed(0x002E); ok {
-		return &powersourceconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return powersourceconfigurationdef.WrapOn(d.Server(0x002E), d.queue)
 }
 
 // NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
@@ -242,10 +218,7 @@ func (d *RootNode) PowerSourceConfiguration() *powersourceconfigurationdef.Serve
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) NetworkCommissioning() *networkcommissioningdef.Server {
-	if w, ok := d.typed(0x0031); ok {
-		return &networkcommissioningdef.Server{Wrapper: w}
-	}
-	return nil
+	return networkcommissioningdef.WrapOn(d.Server(0x0031), d.queue)
 }
 
 // DiagnosticLogs returns the typed DiagnosticLogs server over the one the device mounts,
@@ -253,10 +226,7 @@ func (d *RootNode) NetworkCommissioning() *networkcommissioningdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) DiagnosticLogs() *diagnosticlogsdef.Server {
-	if w, ok := d.typed(0x0032); ok {
-		return &diagnosticlogsdef.Server{Wrapper: w}
-	}
-	return nil
+	return diagnosticlogsdef.WrapOn(d.Server(0x0032), d.queue)
 }
 
 // SoftwareDiagnostics returns the typed SoftwareDiagnostics server over the one the device mounts,
@@ -264,10 +234,7 @@ func (d *RootNode) DiagnosticLogs() *diagnosticlogsdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) SoftwareDiagnostics() *softwarediagnosticsdef.Server {
-	if w, ok := d.typed(0x0034); ok {
-		return &softwarediagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return softwarediagnosticsdef.WrapOn(d.Server(0x0034), d.queue)
 }
 
 // WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
@@ -275,10 +242,7 @@ func (d *RootNode) SoftwareDiagnostics() *softwarediagnosticsdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
-	if w, ok := d.typed(0x0036); ok {
-		return &wifinetworkdiagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return wifinetworkdiagnosticsdef.WrapOn(d.Server(0x0036), d.queue)
 }
 
 // EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
@@ -286,10 +250,7 @@ func (d *RootNode) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
-	if w, ok := d.typed(0x0037); ok {
-		return &ethernetnetworkdiagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return ethernetnetworkdiagnosticsdef.WrapOn(d.Server(0x0037), d.queue)
 }
 
 // TimeSynchronization returns the typed TimeSynchronization server over the one the device mounts,
@@ -297,10 +258,7 @@ func (d *RootNode) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.S
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) TimeSynchronization() *timesynchronizationdef.Server {
-	if w, ok := d.typed(0x0038); ok {
-		return &timesynchronizationdef.Server{Wrapper: w}
-	}
-	return nil
+	return timesynchronizationdef.WrapOn(d.Server(0x0038), d.queue)
 }
 
 // IcdManagement returns the typed IcdManagement server over the one the device mounts,
@@ -308,10 +266,7 @@ func (d *RootNode) TimeSynchronization() *timesynchronizationdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) IcdManagement() *icdmanagementdef.Server {
-	if w, ok := d.typed(0x0046); ok {
-		return &icdmanagementdef.Server{Wrapper: w}
-	}
-	return nil
+	return icdmanagementdef.WrapOn(d.Server(0x0046), d.queue)
 }
 
 // Groupcast returns the typed Groupcast server over the one the device mounts,
@@ -319,8 +274,5 @@ func (d *RootNode) IcdManagement() *icdmanagementdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) Groupcast() *groupcastdef.Server {
-	if w, ok := d.typed(0x0065); ok {
-		return &groupcastdef.Server{Wrapper: w}
-	}
-	return nil
+	return groupcastdef.WrapOn(d.Server(0x0065), d.queue)
 }

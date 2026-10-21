@@ -78,32 +78,21 @@ func NewDishwasher(opts Options, decls ...Declaration) (*Dishwasher, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Dishwasher) OperationalState() *operationalstatedef.Server {
-	if w, ok := d.typed(0x0060); ok {
-		return &operationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
-func (d *Dishwasher) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *Dishwasher) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) TemperatureControl() *temperaturecontroldef.Server {
-	if w, ok := d.typed(0x0056); ok {
-		return &temperaturecontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
 // DishwasherMode returns the typed DishwasherMode server over the one the device mounts,
@@ -111,10 +100,7 @@ func (d *Dishwasher) TemperatureControl() *temperaturecontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) DishwasherMode() *dishwashermodedef.Server {
-	if w, ok := d.typed(0x0059); ok {
-		return &dishwashermodedef.Server{Wrapper: w}
-	}
-	return nil
+	return dishwashermodedef.WrapOn(d.Server(0x0059), d.queue)
 }
 
 // DishwasherAlarm returns the typed DishwasherAlarm server over the one the device mounts,
@@ -122,8 +108,5 @@ func (d *Dishwasher) DishwasherMode() *dishwashermodedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Dishwasher) DishwasherAlarm() *dishwasheralarmdef.Server {
-	if w, ok := d.typed(0x005D); ok {
-		return &dishwasheralarmdef.Server{Wrapper: w}
-	}
-	return nil
+	return dishwasheralarmdef.WrapOn(d.Server(0x005D), d.queue)
 }

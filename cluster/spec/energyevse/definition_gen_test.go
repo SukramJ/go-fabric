@@ -49,7 +49,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -106,5 +106,18 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleDisable = func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnableCharging = func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleEnableDischarging = func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStartDiagnostics = func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleSetTargets = func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetTargets = func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil }
+	all.HandleClearTargets = func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 7 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

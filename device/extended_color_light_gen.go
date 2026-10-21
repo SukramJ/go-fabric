@@ -102,10 +102,7 @@ func NewExtendedColorLight(opts Options, decls ...Declaration) (*ExtendedColorLi
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtendedColorLight) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
@@ -113,10 +110,7 @@ func (d *ExtendedColorLight) OnOff() *onoffdef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtendedColorLight) LevelControl() *levelcontroldef.Server {
-	if w, ok := d.typed(0x0008); ok {
-		return &levelcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
 // ColorControl returns the typed ColorControl server over the one the device mounts,
@@ -124,8 +118,5 @@ func (d *ExtendedColorLight) LevelControl() *levelcontroldef.Server {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtendedColorLight) ColorControl() *colorcontroldef.Server {
-	if w, ok := d.typed(0x0300); ok {
-		return &colorcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return colorcontroldef.WrapOn(d.Server(0x0300), d.queue)
 }

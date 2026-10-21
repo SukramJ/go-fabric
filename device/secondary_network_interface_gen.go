@@ -62,10 +62,7 @@ func NewSecondaryNetworkInterface(opts Options, decls ...Declaration) (*Secondar
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
-	if w, ok := d.typed(0x0031); ok {
-		return &networkcommissioningdef.Server{Wrapper: w}
-	}
-	return nil
+	return networkcommissioningdef.WrapOn(d.Server(0x0031), d.queue)
 }
 
 // WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
@@ -73,10 +70,7 @@ func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioning
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
-	if w, ok := d.typed(0x0036); ok {
-		return &wifinetworkdiagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return wifinetworkdiagnosticsdef.WrapOn(d.Server(0x0036), d.queue)
 }
 
 // EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
@@ -84,8 +78,5 @@ func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnos
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
-	if w, ok := d.typed(0x0037); ok {
-		return &ethernetnetworkdiagnosticsdef.Server{Wrapper: w}
-	}
-	return nil
+	return ethernetnetworkdiagnosticsdef.WrapOn(d.Server(0x0037), d.queue)
 }

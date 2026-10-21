@@ -49,8 +49,5 @@ func NewModeSelect(opts Options, decls ...Declaration) (*ModeSelect, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ModeSelect) ModeSelect() *modeselectdef.Server {
-	if w, ok := d.typed(0x0050); ok {
-		return &modeselectdef.Server{Wrapper: w}
-	}
-	return nil
+	return modeselectdef.WrapOn(d.Server(0x0050), d.queue)
 }

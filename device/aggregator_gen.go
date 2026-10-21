@@ -59,10 +59,7 @@ func NewAggregator(opts Options, decls ...Declaration) (*Aggregator, error) {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Aggregator) Actions() *actionsdef.Server {
-	if w, ok := d.typed(0x0025); ok {
-		return &actionsdef.Server{Wrapper: w}
-	}
-	return nil
+	return actionsdef.WrapOn(d.Server(0x0025), d.queue)
 }
 
 // CommissionerControl returns the typed CommissionerControl server over the one the device mounts,
@@ -70,8 +67,5 @@ func (d *Aggregator) Actions() *actionsdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Aggregator) CommissionerControl() *commissionercontroldef.Server {
-	if w, ok := d.typed(0x0751); ok {
-		return &commissionercontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return commissionercontroldef.WrapOn(d.Server(0x0751), d.queue)
 }

@@ -7,7 +7,7 @@ package contentcontrol
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -56,12 +56,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -354,93 +360,61 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("contentcontrol OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleUpdatePin != nil {
-		if err := s.HandleUpdatePin(d.HandleUpdatePin); err != nil {
-			return fmt.Errorf("contentcontrol HandleUpdatePin: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleUpdatePin", s.HandleUpdatePin(d.HandleUpdatePin)))
 	}
 	if d.HandleResetPin != nil {
-		if err := s.HandleResetPin(d.HandleResetPin); err != nil {
-			return fmt.Errorf("contentcontrol HandleResetPin: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleResetPin", s.HandleResetPin(d.HandleResetPin)))
 	}
 	if d.HandleEnable != nil {
-		if err := s.HandleEnable(d.HandleEnable); err != nil {
-			return fmt.Errorf("contentcontrol HandleEnable: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleEnable", s.HandleEnable(d.HandleEnable)))
 	}
 	if d.HandleDisable != nil {
-		if err := s.HandleDisable(d.HandleDisable); err != nil {
-			return fmt.Errorf("contentcontrol HandleDisable: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleDisable", s.HandleDisable(d.HandleDisable)))
 	}
 	if d.HandleAddBonusTime != nil {
-		if err := s.HandleAddBonusTime(d.HandleAddBonusTime); err != nil {
-			return fmt.Errorf("contentcontrol HandleAddBonusTime: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleAddBonusTime", s.HandleAddBonusTime(d.HandleAddBonusTime)))
 	}
 	if d.HandleSetScreenDailyTime != nil {
-		if err := s.HandleSetScreenDailyTime(d.HandleSetScreenDailyTime); err != nil {
-			return fmt.Errorf("contentcontrol HandleSetScreenDailyTime: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetScreenDailyTime", s.HandleSetScreenDailyTime(d.HandleSetScreenDailyTime)))
 	}
 	if d.HandleBlockUnratedContent != nil {
-		if err := s.HandleBlockUnratedContent(d.HandleBlockUnratedContent); err != nil {
-			return fmt.Errorf("contentcontrol HandleBlockUnratedContent: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleBlockUnratedContent", s.HandleBlockUnratedContent(d.HandleBlockUnratedContent)))
 	}
 	if d.HandleUnblockUnratedContent != nil {
-		if err := s.HandleUnblockUnratedContent(d.HandleUnblockUnratedContent); err != nil {
-			return fmt.Errorf("contentcontrol HandleUnblockUnratedContent: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleUnblockUnratedContent", s.HandleUnblockUnratedContent(d.HandleUnblockUnratedContent)))
 	}
 	if d.HandleSetOnDemandRatingThreshold != nil {
-		if err := s.HandleSetOnDemandRatingThreshold(d.HandleSetOnDemandRatingThreshold); err != nil {
-			return fmt.Errorf("contentcontrol HandleSetOnDemandRatingThreshold: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetOnDemandRatingThreshold", s.HandleSetOnDemandRatingThreshold(d.HandleSetOnDemandRatingThreshold)))
 	}
 	if d.HandleSetScheduledContentRatingThreshold != nil {
-		if err := s.HandleSetScheduledContentRatingThreshold(d.HandleSetScheduledContentRatingThreshold); err != nil {
-			return fmt.Errorf("contentcontrol HandleSetScheduledContentRatingThreshold: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetScheduledContentRatingThreshold", s.HandleSetScheduledContentRatingThreshold(d.HandleSetScheduledContentRatingThreshold)))
 	}
 	if d.HandleAddBlockChannels != nil {
-		if err := s.HandleAddBlockChannels(d.HandleAddBlockChannels); err != nil {
-			return fmt.Errorf("contentcontrol HandleAddBlockChannels: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleAddBlockChannels", s.HandleAddBlockChannels(d.HandleAddBlockChannels)))
 	}
 	if d.HandleRemoveBlockChannels != nil {
-		if err := s.HandleRemoveBlockChannels(d.HandleRemoveBlockChannels); err != nil {
-			return fmt.Errorf("contentcontrol HandleRemoveBlockChannels: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRemoveBlockChannels", s.HandleRemoveBlockChannels(d.HandleRemoveBlockChannels)))
 	}
 	if d.HandleAddBlockApplications != nil {
-		if err := s.HandleAddBlockApplications(d.HandleAddBlockApplications); err != nil {
-			return fmt.Errorf("contentcontrol HandleAddBlockApplications: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleAddBlockApplications", s.HandleAddBlockApplications(d.HandleAddBlockApplications)))
 	}
 	if d.HandleRemoveBlockApplications != nil {
-		if err := s.HandleRemoveBlockApplications(d.HandleRemoveBlockApplications); err != nil {
-			return fmt.Errorf("contentcontrol HandleRemoveBlockApplications: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRemoveBlockApplications", s.HandleRemoveBlockApplications(d.HandleRemoveBlockApplications)))
 	}
 	if d.HandleSetBlockContentTimeWindow != nil {
-		if err := s.HandleSetBlockContentTimeWindow(d.HandleSetBlockContentTimeWindow); err != nil {
-			return fmt.Errorf("contentcontrol HandleSetBlockContentTimeWindow: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleSetBlockContentTimeWindow", s.HandleSetBlockContentTimeWindow(d.HandleSetBlockContentTimeWindow)))
 	}
 	if d.HandleRemoveBlockContentTimeWindow != nil {
-		if err := s.HandleRemoveBlockContentTimeWindow(d.HandleRemoveBlockContentTimeWindow); err != nil {
-			return fmt.Errorf("contentcontrol HandleRemoveBlockContentTimeWindow: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleRemoveBlockContentTimeWindow", s.HandleRemoveBlockContentTimeWindow(d.HandleRemoveBlockContentTimeWindow)))
 	}
-	return nil
+	return errors.Join(errs...)
 }

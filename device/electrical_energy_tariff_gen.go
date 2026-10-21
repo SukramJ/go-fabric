@@ -66,10 +66,7 @@ func NewElectricalEnergyTariff(opts Options, decls ...Declaration) (*ElectricalE
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
-	if w, ok := d.typed(0x0095); ok {
-		return &commoditypricedef.Server{Wrapper: w}
-	}
-	return nil
+	return commoditypricedef.WrapOn(d.Server(0x0095), d.queue)
 }
 
 // ElectricalGridConditions returns the typed ElectricalGridConditions server over the one the device mounts,
@@ -77,10 +74,7 @@ func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
-	if w, ok := d.typed(0x00A0); ok {
-		return &electricalgridconditionsdef.Server{Wrapper: w}
-	}
-	return nil
+	return electricalgridconditionsdef.WrapOn(d.Server(0x00A0), d.queue)
 }
 
 // CommodityTariff returns the typed CommodityTariff server over the one the device mounts,
@@ -88,8 +82,5 @@ func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridcondi
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
-	if w, ok := d.typed(0x0700); ok {
-		return &commoditytariffdef.Server{Wrapper: w}
-	}
-	return nil
+	return commoditytariffdef.WrapOn(d.Server(0x0700), d.queue)
 }

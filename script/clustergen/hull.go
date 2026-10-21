@@ -152,7 +152,7 @@ func (g *generator) server() ([]byte, error) {
 	w.p("")
 	w.p("import (")
 	w.p("\t\"context\"")
-	w.p("\t\"fmt\"")
+	w.p("\t\"errors\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
@@ -201,12 +201,18 @@ func (g *generator) server() ([]byte, error) {
 	w.p("type Server struct{ spec.Wrapper }")
 	w.p("")
 	w.p("// Wrap returns srv as the typed server; nil for nil. A typed server is")
-	w.p("// no contract.ClusterServer, so it is never wrapped twice.")
-	w.p("func Wrap(srv contract.ClusterServer) *Server {")
+	w.p("// no contract.ClusterServer, so it is never wrapped twice. Its")
+	w.p("// asynchronous callbacks need a queue: WrapOn.")
+	w.p("func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }")
+	w.p("")
+	w.p("// WrapOn is Wrap with the queue the typed server's asynchronous")
+	w.p("// callbacks (OnChangedAsync) run on — a device's, which its typed")
+	w.p("// accessors pass; nil for a nil srv.")
+	w.p("func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {")
 	w.p("\tif srv == nil {")
 	w.p("\t\treturn nil")
 	w.p("\t}")
-	w.p("\treturn &Server{spec.NewWrapper(srv)}")
+	w.p("\treturn &Server{spec.NewWrapperOn(srv, q)}")
 	w.p("}")
 	w.p("")
 	w.p("// Set applies p through the server's SetAttributes: every value is")
@@ -279,7 +285,7 @@ func (g *generator) serverTest(w *writer) {
 	w.p("// TestTypedServer drives every method of the typed server once.")
 	w.p("func TestTypedServer(t *testing.T) {")
 	w.p("\tt.Parallel()")
-	w.p("\tif Wrap(nil) != nil {")
+	w.p("\tif Wrap(nil) != nil || WrapOn(nil, nil) != nil {")
 	w.p("\t\tt.Error(\"Wrap(nil) is not nil\")")
 	w.p("\t}")
 	w.p("\tsrv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})")
@@ -322,6 +328,17 @@ func (g *generator) serverTest(w *writer) {
 	w.p("\t}")
 	for _, port := range ports[g.c.Name].ports {
 		w.p("\tvar _ %s = d.%s", port.name, port.name)
+	}
+	if len(cmds) > 0 {
+		w.p("\t// Every handler declared: each is installed, and refused by the")
+		w.p("\t// empty definition's AcceptedCommandList.")
+		w.p("\tall := d")
+		for _, hc := range cmds {
+			w.p("\tall.%s = func(context.Context, %s) (%s, error) { return %s{}, nil }", hc.method, hc.request, hc.response, hc.response)
+		}
+		w.p("\tif decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != %d || decl.Attach(srv) == nil {", len(cmds))
+		w.p("\t\tt.Error(\"Declare: every handler accepted by the empty definition\")")
+		w.p("\t}")
 	}
 	w.p("}")
 }

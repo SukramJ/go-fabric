@@ -118,7 +118,7 @@ func generate(snap *snapshot, name string) (*output, error) {
 		snap: snap, c: c, pkg: packageName(c.Name),
 		used: map[string]string{}, data: map[string]*dataInfo{}, attrType: map[uint32]typeInfo{},
 	}
-	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap", "Declare"} {
+	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap", "WrapOn", "Declare"} {
 		g.used[id] = "package identifier"
 	}
 	if err := g.collect(); err != nil {

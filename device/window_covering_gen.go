@@ -60,8 +60,5 @@ func NewWindowCovering(opts Options, decls ...Declaration) (*WindowCovering, err
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *WindowCovering) WindowCovering() *windowcoveringdef.Server {
-	if w, ok := d.typed(0x0102); ok {
-		return &windowcoveringdef.Server{Wrapper: w}
-	}
-	return nil
+	return windowcoveringdef.WrapOn(d.Server(0x0102), d.queue)
 }

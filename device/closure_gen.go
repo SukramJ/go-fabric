@@ -62,8 +62,5 @@ func NewClosure(opts Options, decls ...Declaration) (*Closure, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Closure) ClosureControl() *closurecontroldef.Server {
-	if w, ok := d.typed(0x0104); ok {
-		return &closurecontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return closurecontroldef.WrapOn(d.Server(0x0104), d.queue)
 }

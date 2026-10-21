@@ -3,7 +3,21 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/contract"
+import (
+	"fmt"
+
+	"github.com/SukramJ/go-fabric/contract"
+)
+
+// HookError is the refusal of a declaration's hook (OnWrite, a
+// Handle<Command>) by the cluster's server, naming the cluster and the
+// hook; nil for nil.
+func HookError(cluster, hook string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s %s: %w", cluster, hook, err)
+}
 
 // ClusterDeclaration is one cluster's declaration on a device in the form
 // the device kit applies it: what a generated <cluster>def.Declare states,

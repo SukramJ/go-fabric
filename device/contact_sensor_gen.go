@@ -60,10 +60,7 @@ func NewContactSensor(opts Options, decls ...Declaration) (*ContactSensor, error
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *ContactSensor) BooleanState() *booleanstatedef.Server {
-	if w, ok := d.typed(0x0045); ok {
-		return &booleanstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return booleanstatedef.WrapOn(d.Server(0x0045), d.queue)
 }
 
 // BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
@@ -71,8 +68,5 @@ func (d *ContactSensor) BooleanState() *booleanstatedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *ContactSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	if w, ok := d.typed(0x0080); ok {
-		return &booleanstateconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

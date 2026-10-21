@@ -55,8 +55,5 @@ func NewOtaRequestor(opts Options, decls ...Declaration) (*OtaRequestor, error) 
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *otasoftwareupdaterequestordef.Server {
-	if w, ok := d.typed(0x002A); ok {
-		return &otasoftwareupdaterequestordef.Server{Wrapper: w}
-	}
-	return nil
+	return otasoftwareupdaterequestordef.WrapOn(d.Server(0x002A), d.queue)
 }

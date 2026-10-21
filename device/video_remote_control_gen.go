@@ -97,8 +97,5 @@ func NewVideoRemoteControl(opts Options, decls ...Declaration) (*VideoRemoteCont
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *VideoRemoteControl) Binding() *bindingdef.Server {
-	if w, ok := d.typed(0x001E); ok {
-		return &bindingdef.Server{Wrapper: w}
-	}
-	return nil
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

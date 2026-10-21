@@ -63,10 +63,7 @@ func NewIrrigationSystem(opts Options, decls ...Declaration) (*IrrigationSystem,
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
-	if w, ok := d.typed(0x0060); ok {
-		return &operationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
@@ -74,8 +71,5 @@ func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *IrrigationSystem) FlowMeasurement() *flowmeasurementdef.Server {
-	if w, ok := d.typed(0x0404); ok {
-		return &flowmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

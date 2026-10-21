@@ -79,10 +79,7 @@ func NewTemperatureControlledCabinet(opts Options, decls ...Declaration) (*Tempe
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontroldef.Server {
-	if w, ok := d.typed(0x0056); ok {
-		return &temperaturecontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -90,10 +87,7 @@ func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontrold
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
@@ -101,10 +95,7 @@ func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeas
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	if w, ok := d.typed(0x0052); ok {
-		return &refrigeratorandtemperaturecontrolledcabinetmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.WrapOn(d.Server(0x0052), d.queue)
 }
 
 // OvenMode returns the typed OvenMode server over the one the device mounts,
@@ -112,10 +103,7 @@ func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabin
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
-	if w, ok := d.typed(0x0049); ok {
-		return &ovenmodedef.Server{Wrapper: w}
-	}
-	return nil
+	return ovenmodedef.WrapOn(d.Server(0x0049), d.queue)
 }
 
 // OvenCavityOperationalState returns the typed OvenCavityOperationalState server over the one the device mounts,
@@ -123,10 +111,7 @@ func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityoperationalstatedef.Server {
-	if w, ok := d.typed(0x0048); ok {
-		return &ovencavityoperationalstatedef.Server{Wrapper: w}
-	}
-	return nil
+	return ovencavityoperationalstatedef.WrapOn(d.Server(0x0048), d.queue)
 }
 
 // TemperatureAlarm returns the typed TemperatureAlarm server over the one the device mounts,
@@ -134,8 +119,5 @@ func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityo
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *TemperatureControlledCabinet) TemperatureAlarm() *temperaturealarmdef.Server {
-	if w, ok := d.typed(0x0064); ok {
-		return &temperaturealarmdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturealarmdef.WrapOn(d.Server(0x0064), d.queue)
 }

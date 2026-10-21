@@ -87,10 +87,7 @@ func NewThermostat(opts Options, decls ...Declaration) (*Thermostat, error) {
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Thermostat) Thermostat() *thermostatdef.Server {
-	if w, ok := d.typed(0x0201); ok {
-		return &thermostatdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }
 
 // EnergyPreference returns the typed EnergyPreference server over the one the device mounts,
@@ -98,10 +95,7 @@ func (d *Thermostat) Thermostat() *thermostatdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
-	if w, ok := d.typed(0x009B); ok {
-		return &energypreferencedef.Server{Wrapper: w}
-	}
-	return nil
+	return energypreferencedef.WrapOn(d.Server(0x009B), d.queue)
 }
 
 // ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
@@ -109,8 +103,5 @@ func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
-	if w, ok := d.typed(0x0204); ok {
-		return &thermostatuserinterfaceconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }

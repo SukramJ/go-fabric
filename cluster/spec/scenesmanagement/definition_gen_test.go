@@ -53,7 +53,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -113,5 +113,25 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleAddScene = func(context.Context, AddSceneRequest) (AddSceneResponse, error) { return AddSceneResponse{}, nil }
+	all.HandleViewScene = func(context.Context, ViewSceneRequest) (ViewSceneResponse, error) { return ViewSceneResponse{}, nil }
+	all.HandleRemoveScene = func(context.Context, RemoveSceneRequest) (RemoveSceneResponse, error) {
+		return RemoveSceneResponse{}, nil
+	}
+	all.HandleRemoveAllScenes = func(context.Context, RemoveAllScenesRequest) (RemoveAllScenesResponse, error) {
+		return RemoveAllScenesResponse{}, nil
+	}
+	all.HandleStoreScene = func(context.Context, StoreSceneRequest) (StoreSceneResponse, error) { return StoreSceneResponse{}, nil }
+	all.HandleRecallScene = func(context.Context, RecallSceneRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleGetSceneMembership = func(context.Context, GetSceneMembershipRequest) (GetSceneMembershipResponse, error) {
+		return GetSceneMembershipResponse{}, nil
+	}
+	all.HandleCopyScene = func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 8 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

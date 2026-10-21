@@ -104,22 +104,14 @@ func NewPump(opts Options, decls ...Declaration) (*Pump, error) {
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
-func (d *Pump) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // PumpConfigurationAndControl returns the typed PumpConfigurationAndControl server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
-	if w, ok := d.typed(0x0200); ok {
-		return &pumpconfigurationandcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return pumpconfigurationandcontroldef.WrapOn(d.Server(0x0200), d.queue)
 }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
@@ -127,10 +119,7 @@ func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Ser
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Pump) LevelControl() *levelcontroldef.Server {
-	if w, ok := d.typed(0x0008); ok {
-		return &levelcontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -138,10 +127,7 @@ func (d *Pump) LevelControl() *levelcontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
@@ -149,10 +135,7 @@ func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
-	if w, ok := d.typed(0x0403); ok {
-		return &pressuremeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
@@ -160,8 +143,5 @@ func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
-	if w, ok := d.typed(0x0404); ok {
-		return &flowmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

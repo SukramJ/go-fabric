@@ -455,8 +455,7 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		}
 		fmt.Fprintf(&w, "\n// %s returns the typed %s server over the one the device mounts,\n", method, cr.def.Name)
 		w.WriteString("// whatever its type (Underlying returns it); its OnChangedAsync runs on\n// the device's goroutine.\n" + state)
-		fmt.Fprintf(&w, "func (d *%s) %s() %s {\n", n, method, acc.Type)
-		fmt.Fprintf(&w, "\tif w, ok := d.typed(0x%04X); ok {\n\t\treturn &%s.Server{Wrapper: w}\n\t}\n\treturn nil\n}\n", cr.def.ID, acc.Alias)
+		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.WrapOn(d.Server(0x%04X), d.queue) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
 	}
 	return w.Bytes(), nil
 }

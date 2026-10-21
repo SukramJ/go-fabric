@@ -59,22 +59,14 @@ func NewCookSurface(opts Options, decls ...Declaration) (*CookSurface, error) {
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
-func (d *CookSurface) OnOff() *onoffdef.Server {
-	if w, ok := d.typed(0x0006); ok {
-		return &onoffdef.Server{Wrapper: w}
-	}
-	return nil
-}
+func (d *CookSurface) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
 // whatever its type (Underlying returns it); its OnChangedAsync runs on
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CookSurface) TemperatureControl() *temperaturecontroldef.Server {
-	if w, ok := d.typed(0x0056); ok {
-		return &temperaturecontroldef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -82,8 +74,5 @@ func (d *CookSurface) TemperatureControl() *temperaturecontroldef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *CookSurface) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

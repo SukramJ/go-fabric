@@ -7,7 +7,7 @@ package onoff
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -46,12 +46,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -211,43 +217,31 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	return decl
 }
 
-// attach installs the declaration's veto and handlers on srv.
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
 func (d Declare) attach(srv contract.ClusterServer) error {
 	s := Wrap(srv)
+	var errs []error
 	if d.OnWrite != nil {
-		if err := s.OnWrite(d.OnWrite); err != nil {
-			return fmt.Errorf("onoff OnWrite: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
 	}
 	if d.HandleOff != nil {
-		if err := s.HandleOff(d.HandleOff); err != nil {
-			return fmt.Errorf("onoff HandleOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleOff", s.HandleOff(d.HandleOff)))
 	}
 	if d.HandleOn != nil {
-		if err := s.HandleOn(d.HandleOn); err != nil {
-			return fmt.Errorf("onoff HandleOn: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleOn", s.HandleOn(d.HandleOn)))
 	}
 	if d.HandleToggle != nil {
-		if err := s.HandleToggle(d.HandleToggle); err != nil {
-			return fmt.Errorf("onoff HandleToggle: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleToggle", s.HandleToggle(d.HandleToggle)))
 	}
 	if d.HandleOffWithEffect != nil {
-		if err := s.HandleOffWithEffect(d.HandleOffWithEffect); err != nil {
-			return fmt.Errorf("onoff HandleOffWithEffect: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleOffWithEffect", s.HandleOffWithEffect(d.HandleOffWithEffect)))
 	}
 	if d.HandleOnWithRecallGlobalScene != nil {
-		if err := s.HandleOnWithRecallGlobalScene(d.HandleOnWithRecallGlobalScene); err != nil {
-			return fmt.Errorf("onoff HandleOnWithRecallGlobalScene: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleOnWithRecallGlobalScene", s.HandleOnWithRecallGlobalScene(d.HandleOnWithRecallGlobalScene)))
 	}
 	if d.HandleOnWithTimedOff != nil {
-		if err := s.HandleOnWithTimedOff(d.HandleOnWithTimedOff); err != nil {
-			return fmt.Errorf("onoff HandleOnWithTimedOff: %w", err)
-		}
+		errs = append(errs, spec.HookError(Name, "HandleOnWithTimedOff", s.HandleOnWithTimedOff(d.HandleOnWithTimedOff)))
 	}
-	return nil
+	return errors.Join(errs...)
 }
