@@ -11,6 +11,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 )
 
@@ -50,7 +51,7 @@ func nocChain(t *testing.T, tweakICAC, tweakNOC func(*verifyTestCertOpts)) (v *m
 	if tweakNOC != nil {
 		tweakNOC(&nocOpts)
 	}
-	v, err = mattercert.NewVerifier(rootCert.PublicKey, mattercert.SystemTime{})
+	v, err = mattercert.NewVerifier(rootCert.PublicKey, clock.System{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,8 @@ package mattercert
 import (
 	"errors"
 	"testing"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // TestCheckValidityRejectsAWrappingNotBefore guards an ACCEPTANCE, not a
@@ -23,7 +25,7 @@ import (
 func TestCheckValidityRejectsAWrappingNotBefore(t *testing.T) {
 	t.Parallel()
 
-	v := &Verifier{now: SystemTime{}}
+	v := &Verifier{now: clock.System{}}
 	c := &Certificate{
 		NotBefore: ^uint64(0) - 1000, // wraps once the epoch is added
 		NotAfter:  0,                 // "never expires", so no ordering check applies
@@ -47,7 +49,7 @@ func TestCheckValidityRejectsAWrappingNotBefore(t *testing.T) {
 func TestCheckValidityRejectsAWrappingNotAfter(t *testing.T) {
 	t.Parallel()
 
-	v := &Verifier{now: SystemTime{}}
+	v := &Verifier{now: clock.System{}}
 	c := &Certificate{NotBefore: 0, NotAfter: ^uint64(0) - 1000}
 
 	if err := v.checkValidity(c); !errors.Is(err, ErrMalformed) {
@@ -62,7 +64,7 @@ func TestCheckValidityRejectsAWrappingNotAfter(t *testing.T) {
 func TestCheckValidityAcceptsOrdinaryBounds(t *testing.T) {
 	t.Parallel()
 
-	v := &Verifier{now: SystemTime{}}
+	v := &Verifier{now: clock.System{}}
 	// Matter-epoch 631152000 is 2020-01-01; NotAfter 0 is the long-lived
 	// RCAC convention.
 	c := &Certificate{NotBefore: 631152000, NotAfter: 0}
