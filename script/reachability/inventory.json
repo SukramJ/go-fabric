@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6153,
+  "entry_points": 6154,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14432,
+    "total_exported": 14433,
     "reachable": 9995,
-    "whitelisted": 4432,
+    "whitelisted": 4433,
     "unreachable": 5
   },
   "by_package": [
@@ -8912,6 +8912,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/server_internal_test.go",
       "line": 10
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestStoredKeepsAnOutOfWidthValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/stored_test.go",
+      "line": 11
     },
     {
       "package": "cluster/spec",
