@@ -80,7 +80,7 @@ var floors = []packageFloor{
 		min: 93,
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (94.2 % to 93.8 %)",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 79},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
@@ -121,6 +121,11 @@ var floors = []packageFloor{
 		why: "test scaffolding, exercised through the packages that import it, and go credits that coverage to them; only the device type conformance helper has a test of its own",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
+	{
+		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
+		min: 35,
+		why: "brief BU: measured 36.2. The tests drive the declared devices over the wire and on a node; run and main bind the network, which a unit test does not",
+	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
 		min: 0,
