@@ -101,17 +101,8 @@ type Quieter struct {
 	// Report is called, outside the throttle's lock, when a report goes
 	// out.
 	Report func()
-	// Clock is the throttle's time source. Set, it wins over Now and
-	// AfterFunc; none set is [clock.System].
+	// Clock is the throttle's time source; nil is [clock.System].
 	Clock clock.Clock
-	// Now is the throttle's clock reading.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
-	// AfterFunc arms the deferred report.
-	//
-	// Deprecated: set Clock; AfterFunc may be removed in v0.10.0.
-	AfterFunc func(d time.Duration, f func()) *time.Timer
 
 	// mu guards gen, lastEmit, pending and timer.
 	mu       sync.Mutex
@@ -185,23 +176,9 @@ func (q *Quieter) emitLocked(now time.Time) {
 	}
 }
 
-func (q *Quieter) now() time.Time {
-	switch {
-	case q.Clock != nil:
-		return q.Clock.Now()
-	case q.Now != nil:
-		return q.Now()
-	}
-	return clock.System{}.Now()
-}
+func (q *Quieter) now() time.Time { return clock.Or(q.Clock).Now() }
 
 // afterFunc arms f after d on the throttle's clock and returns its stop.
 func (q *Quieter) afterFunc(d time.Duration, f func()) func() bool {
-	switch {
-	case q.Clock != nil:
-		return q.Clock.AfterFunc(d, f).Stop
-	case q.AfterFunc != nil:
-		return q.AfterFunc(d, f).Stop
-	}
-	return clock.System{}.AfterFunc(d, f).Stop
+	return clock.Or(q.Clock).AfterFunc(d, f).Stop
 }

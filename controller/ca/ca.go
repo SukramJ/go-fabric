@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -161,13 +160,8 @@ type Config struct {
 	// matter.js without a storage context).
 	Store Store
 	// Clock is the issuing instant of every certificate and the
-	// verifier's time. Set, it wins over Now; neither set is
-	// [clock.System].
+	// verifier's time; nil is [clock.System].
 	Clock clock.Clock
-	// Now is the issuing instant of every certificate.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// IntermediateCA issues an ICAC that signs the NOCs (3-tier PKI). A
 	// stored CA must match it.
 	IntermediateCA bool
@@ -267,12 +261,7 @@ type CA struct {
 // (:169-170), the RCAC (:225-249), the ICAC when configured (:251-285),
 // and the result is saved (:181-183).
 func New(cfg Config) (*CA, error) {
-	switch {
-	case cfg.Clock != nil:
-		cfg.Now = cfg.Clock.Now
-	case cfg.Now == nil:
-		cfg.Now = clock.System{}.Now
-	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
 	}
@@ -347,7 +336,7 @@ func New(cfg Config) (*CA, error) {
 
 // initVerifier builds the verifier over the root.
 func (c *CA) initVerifier() error {
-	v, err := mattercert.NewVerifier(c.rootPub, nowSource{c.cfg.Now})
+	v, err := mattercert.NewVerifier(c.rootPub, c.cfg.Clock)
 	if err != nil {
 		return fmt.Errorf("ca: root public key: %w", err)
 	}
@@ -494,7 +483,7 @@ func (c *CA) stored() Stored {
 
 // validity returns notBefore and notAfter around now.
 func (c *CA) validity() (notBefore, notAfter uint32, err error) {
-	now := c.cfg.Now()
+	now := c.cfg.Clock.Now()
 	if notBefore, err = matterDate(now, NotBeforeYears); err != nil {
 		return 0, 0, err
 	}
@@ -596,12 +585,6 @@ func (c *CA) ICACCert() []byte {
 // Verifier is the verifier of NOC chains over the CA's root, with the
 // CA's clock.
 func (c *CA) Verifier() *mattercert.Verifier { return c.verifier }
-
-// nowSource adapts the resolved issuing clock to the verifier's time
-// source.
-type nowSource struct{ now func() time.Time }
-
-func (k nowSource) Now() time.Time { return k.now() }
 
 // GenerateNOC issues a NOC for the subject key pub (65-byte uncompressed
 // P-256), on fabricID for nodeID with the CASE Authenticated Tags cats.

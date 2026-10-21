@@ -158,13 +158,8 @@ type EvseConfig struct {
 	// (EvseDelegate.cpp:1286-1289).
 	Host EvseHost
 	// Clock is the wall clock the epoch-s times are read from and the
-	// enable timer runs on. Set, it wins over Now (which then only
-	// reads); neither set is [clock.System].
+	// enable timer runs on. Nil is [clock.System].
 	Clock clock.Clock
-	// Now is the wall clock the epoch-s times are read from.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
 }
@@ -252,13 +247,8 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 	if cfg.StartDiagnostics {
 		opts.Commands = append(opts.Commands, evse.CmdStartDiagnostics)
 	}
-	s := &EvseServer{host: cfg.Host, now: cfg.Now, clock: clock.Or(cfg.Clock), version: cfg.DataVersion, nominalVoltage: evseDefaultMainsVoltage}
-	switch {
-	case cfg.Clock != nil:
-		s.now = cfg.Clock.Now
-	case s.now == nil:
-		s.now = clock.System{}.Now
-	}
+	s := &EvseServer{host: cfg.Host, clock: clock.Or(cfg.Clock), version: cfg.DataVersion, nominalVoltage: evseDefaultMainsVoltage}
+	s.now = s.clock.Now
 	if s.version == nil {
 		s.version = &s.own
 	}

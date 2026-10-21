@@ -152,13 +152,8 @@ type DimensionConfig struct {
 
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
-	// Clock is the server's time source. Set, it wins over Now; neither
-	// set is [clock.System].
+	// Clock is the server's time source. Nil is [clock.System].
 	Clock clock.Clock
-	// Now is the server's clock reading.
-	//
-	// Deprecated: set Clock; Now may be removed in v0.10.0.
-	Now func() time.Time
 }
 
 // ClosureDimension errors.
@@ -210,12 +205,7 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("closure: %w", err)
 	}
-	switch {
-	case cfg.Clock != nil:
-		cfg.Now = cfg.Clock.Now
-	case cfg.Now == nil:
-		cfg.Now = clock.System{}.Now
-	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	s := &DimensionServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
 	if err := s.checkFixed(); err != nil {
 		return nil, err
@@ -645,7 +635,7 @@ func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 			was = old.Position
 		}
 		if !equalNullable(was, st.Position) {
-			now := s.cfg.Now()
+			now := s.cfg.Clock.Now()
 			reached := s.target != nil && s.target.Position != nil && !s.target.Position.Null && equalNullable(s.target.Position, st.Position)
 			nullness := was == nil || was.Null != st.Position.Null
 			if reached || nullness || s.lastPosDirt.IsZero() || now.Sub(s.lastPosDirt) >= positionQuietInterval {

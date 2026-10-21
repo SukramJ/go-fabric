@@ -82,27 +82,6 @@ func TestQuieterMirrorsMatterJSQuietEvent(t *testing.T) {
 	}
 }
 
-// TestQuieterDeprecatedNowAndAfterFunc: the deprecated Now and AfterFunc
-// keep driving the throttle for their window.
-func TestQuieterDeprecatedNowAndAfterFunc(t *testing.T) {
-	t.Parallel()
-	now := time.Unix(1000, 0)
-	var armed []time.Duration
-	reports := 0
-	q := &cluster.Quieter{Report: func() { reports++ }}
-	q.Now = func() time.Time { return now }                     //nolint:staticcheck // SA1019: the deprecated path is under test
-	q.AfterFunc = func(d time.Duration, _ func()) *time.Timer { //nolint:staticcheck // SA1019: the deprecated path is under test
-		armed = append(armed, d)
-		return time.NewTimer(time.Hour)
-	}
-	q.Changed(false, false)
-	now = now.Add(100 * time.Millisecond)
-	q.Changed(false, false)
-	if reports != 1 || len(armed) != 1 || armed[0] != 900*time.Millisecond {
-		t.Fatalf("deprecated seam: %d reports, armed %v", reports, armed)
-	}
-}
-
 // TestQuieterDefaultsToTheWallClock lets the real timer deliver a held
 // report.
 func TestQuieterDefaultsToTheWallClock(t *testing.T) {
