@@ -16,9 +16,12 @@ const (
 	OvenRevision uint16 = 2
 )
 
-// OvenType is the Oven device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/oven.ts.
-var OvenType = Type{
+// OvenType is the Oven device type, matter.js's packages/node/src/devices/oven.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#oven.
+var OvenType = typeOven
+
+// typeOven holds [OvenType]'s cluster requirements.
+var typeOven = Type{
 	ID: OvenID, Name: "Oven", Revision: OvenRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{

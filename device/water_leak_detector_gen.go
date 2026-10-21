@@ -18,9 +18,12 @@ const (
 	WaterLeakDetectorRevision uint16 = 2
 )
 
-// WaterLeakDetectorType is the WaterLeakDetector device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/water-leak-detector.ts.
-var WaterLeakDetectorType = Type{
+// WaterLeakDetectorType is the WaterLeakDetector device type, matter.js's packages/node/src/devices/water-leak-detector.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#waterleakdetector.
+var WaterLeakDetectorType = typeWaterLeakDetector
+
+// typeWaterLeakDetector holds [WaterLeakDetectorType]'s cluster requirements.
+var typeWaterLeakDetector = Type{
 	ID: WaterLeakDetectorID, Name: "WaterLeakDetector", Revision: WaterLeakDetectorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -59,18 +62,12 @@ func NewWaterLeakDetector(opts Options, decls ...Declaration) (*WaterLeakDetecto
 	return &WaterLeakDetector{d}, nil
 }
 
-// BooleanState returns the typed BooleanState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// BooleanState is the device's typed BooleanState server; the type mandates it.
 func (d *WaterLeakDetector) BooleanState() *booleanstatedef.Server {
 	return booleanstatedef.WrapOn(d.Server(0x0045), d.queue)
 }
 
-// BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// BooleanStateConfiguration is the device's typed BooleanStateConfiguration server, nil until a declaration mounts it.
 func (d *WaterLeakDetector) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
 	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

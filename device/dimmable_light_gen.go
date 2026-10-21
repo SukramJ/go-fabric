@@ -20,9 +20,12 @@ const (
 	DimmableLightRevision uint16 = 4
 )
 
-// DimmableLightType is the DimmableLight device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/dimmable-light.ts.
-var DimmableLightType = Type{
+// DimmableLightType is the DimmableLight device type, matter.js's packages/node/src/devices/dimmable-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dimmablelight.
+var DimmableLightType = typeDimmableLight
+
+// typeDimmableLight holds [DimmableLightType]'s cluster requirements.
+var typeDimmableLight = Type{
 	ID: DimmableLightID, Name: "DimmableLight", Revision: DimmableLightRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "OnOffLight",
@@ -87,16 +90,10 @@ func NewDimmableLight(opts Options, decls ...Declaration) (*DimmableLight, error
 	return &DimmableLight{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *DimmableLight) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *DimmableLight) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

@@ -17,9 +17,12 @@ const (
 	ColorDimmerSwitchRevision uint16 = 4
 )
 
-// ColorDimmerSwitchType is the ColorDimmerSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/color-dimmer-switch.ts.
-var ColorDimmerSwitchType = Type{
+// ColorDimmerSwitchType is the ColorDimmerSwitch device type, matter.js's packages/node/src/devices/color-dimmer-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#colordimmerswitch.
+var ColorDimmerSwitchType = typeColorDimmerSwitch
+
+// typeColorDimmerSwitch holds [ColorDimmerSwitchType]'s cluster requirements.
+var typeColorDimmerSwitch = Type{
 	ID: ColorDimmerSwitchID, Name: "ColorDimmerSwitch", Revision: ColorDimmerSwitchRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "DimmerSwitch",
@@ -76,10 +79,7 @@ func NewColorDimmerSwitch(opts Options, decls ...Declaration) (*ColorDimmerSwitc
 	return &ColorDimmerSwitch{d}, nil
 }
 
-// Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Binding is the device's typed Binding server; the type mandates it.
 func (d *ColorDimmerSwitch) Binding() *bindingdef.Server {
 	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

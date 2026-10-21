@@ -17,9 +17,12 @@ const (
 	CooktopRevision uint16 = 1
 )
 
-// CooktopType is the Cooktop device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/cooktop.ts.
-var CooktopType = Type{
+// CooktopType is the Cooktop device type, matter.js's packages/node/src/devices/cooktop.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#cooktop.
+var CooktopType = typeCooktop
+
+// typeCooktop holds [CooktopType]'s cluster requirements.
+var typeCooktop = Type{
 	ID: CooktopID, Name: "Cooktop", Revision: CooktopRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,8 +53,5 @@ func NewCooktop(opts Options, decls ...Declaration) (*Cooktop, error) {
 	return &Cooktop{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *Cooktop) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }

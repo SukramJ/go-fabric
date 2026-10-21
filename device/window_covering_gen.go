@@ -18,9 +18,12 @@ const (
 	WindowCoveringRevision uint16 = 7
 )
 
-// WindowCoveringType is the WindowCovering device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/window-covering.ts.
-var WindowCoveringType = Type{
+// WindowCoveringType is the WindowCovering device type, matter.js's packages/node/src/devices/window-covering.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#windowcovering.
+var WindowCoveringType = typeWindowCovering
+
+// typeWindowCovering holds [WindowCoveringType]'s cluster requirements.
+var typeWindowCovering = Type{
 	ID: WindowCoveringID, Name: "WindowCovering", Revision: WindowCoveringRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -55,10 +58,7 @@ func NewWindowCovering(opts Options, decls ...Declaration) (*WindowCovering, err
 	return &WindowCovering{d}, nil
 }
 
-// WindowCovering returns the typed WindowCovering server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// WindowCovering is the device's typed WindowCovering server; the type mandates it.
 func (d *WindowCovering) WindowCovering() *windowcoveringdef.Server {
 	return windowcoveringdef.WrapOn(d.Server(0x0102), d.queue)
 }

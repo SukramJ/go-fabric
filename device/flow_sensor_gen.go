@@ -17,9 +17,12 @@ const (
 	FlowSensorRevision uint16 = 3
 )
 
-// FlowSensorType is the FlowSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/flow-sensor.ts.
-var FlowSensorType = Type{
+// FlowSensorType is the FlowSensor device type, matter.js's packages/node/src/devices/flow-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#flowsensor.
+var FlowSensorType = typeFlowSensor
+
+// typeFlowSensor holds [FlowSensorType]'s cluster requirements.
+var typeFlowSensor = Type{
 	ID: FlowSensorID, Name: "FlowSensor", Revision: FlowSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewFlowSensor(opts Options, decls ...Declaration) (*FlowSensor, error) {
 	return &FlowSensor{d}, nil
 }
 
-// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// FlowMeasurement is the device's typed FlowMeasurement server; the type mandates it.
 func (d *FlowSensor) FlowMeasurement() *flowmeasurementdef.Server {
 	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

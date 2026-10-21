@@ -8,7 +8,10 @@
 // generator derives, a constructor and the typed accessors of its default
 // servers — plus device/types_gen.go, the registry of every generated
 // type, device/types_gen_test.go, which calls every constructor and
-// accessor, and contract/devicetype_names_gen.go, the label table of
+// accessor, device/doc_gen.go, the package doc with the lists of typed
+// cluster packages and device types, docs/reference/device-types.md, the
+// requirement tables of every type (docs.go), and
+// contract/devicetype_names_gen.go, the label table of
 // contract.DeviceTypeName over every snapshot device type (labels.go).
 //
 // It is matter.js's support/codegen/src/endpoints translated: matter.js
@@ -21,9 +24,10 @@
 // clustergen, whose committed definitions it references):
 //
 //	go run ./script/devicegen            # regenerate device/*_gen.go
-//	go run ./script/devicegen -out DIR   # into DIR instead (the contract
-//	                                     # label table too, unless
-//	                                     # -contract-out names another)
+//	go run ./script/devicegen -out DIR   # into DIR instead (the reference
+//	                                     # page and the contract label
+//	                                     # table too, unless -contract-out
+//	                                     # names another for the latter)
 //
 // The committed set is the device types in scope (committed in
 // devicetypes.go); every other snapshot device type is listed in
@@ -91,7 +95,18 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	ref, err := g.generateReference(committed)
+	if err != nil {
+		return err
+	}
+	rdir := filepath.Join(root, referenceDir)
+	if *out != "" {
+		rdir = *out
+	}
 	if err := writeAll(stdout, dir, files...); err != nil {
+		return err
+	}
+	if err := writeAll(stdout, rdir, ref); err != nil {
 		return err
 	}
 	return writeAll(stdout, cdir, names)
@@ -156,7 +171,11 @@ func (g *generator) all() ([]*output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(files, reg, test), nil
+	doc, err := g.generatePackageDoc(committed)
+	if err != nil {
+		return nil, err
+	}
+	return append(files, reg, test, doc), nil
 }
 
 // write puts one file in place, touching it only when its content changed.

@@ -19,9 +19,12 @@ const (
 	EnergyEvseRevision uint16 = 2
 )
 
-// EnergyEvseType is the EnergyEvse device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/energy-evse.ts.
-var EnergyEvseType = Type{
+// EnergyEvseType is the EnergyEvse device type, matter.js's packages/node/src/devices/energy-evse.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#energyevse.
+var EnergyEvseType = typeEnergyEvse
+
+// typeEnergyEvse holds [EnergyEvseType]'s cluster requirements.
+var typeEnergyEvse = Type{
 	ID: EnergyEvseID, Name: "EnergyEvse", Revision: EnergyEvseRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -60,26 +63,17 @@ func NewEnergyEvse(opts Options, decls ...Declaration) (*EnergyEvse, error) {
 	return &EnergyEvse{d}, nil
 }
 
-// EnergyEvse returns the typed EnergyEvse server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// EnergyEvse is the device's typed EnergyEvse server; the type mandates it.
 func (d *EnergyEvse) EnergyEvse() *energyevsedef.Server {
 	return energyevsedef.WrapOn(d.Server(0x0099), d.queue)
 }
 
-// EnergyEvseMode returns the typed EnergyEvseMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// EnergyEvseMode is the device's typed EnergyEvseMode server; the type mandates it.
 func (d *EnergyEvse) EnergyEvseMode() *energyevsemodedef.Server {
 	return energyevsemodedef.WrapOn(d.Server(0x009D), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *EnergyEvse) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

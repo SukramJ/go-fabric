@@ -20,9 +20,12 @@ const (
 	ThermostatRevision uint16 = 7
 )
 
-// ThermostatType is the Thermostat device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/thermostat.ts.
-var ThermostatType = Type{
+// ThermostatType is the Thermostat device type, matter.js's packages/node/src/devices/thermostat.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#thermostat.
+var ThermostatType = typeThermostat
+
+// typeThermostat holds [ThermostatType]'s cluster requirements.
+var typeThermostat = Type{
 	ID: ThermostatID, Name: "Thermostat", Revision: ThermostatRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -82,26 +85,17 @@ func NewThermostat(opts Options, decls ...Declaration) (*Thermostat, error) {
 	return &Thermostat{d}, nil
 }
 
-// Thermostat returns the typed Thermostat server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Thermostat is the device's typed Thermostat server; the type mandates it.
 func (d *Thermostat) Thermostat() *thermostatdef.Server {
 	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }
 
-// EnergyPreference returns the typed EnergyPreference server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// EnergyPreference is the device's typed EnergyPreference server, nil until a declaration mounts it.
 func (d *Thermostat) EnergyPreference() *energypreferencedef.Server {
 	return energypreferencedef.WrapOn(d.Server(0x009B), d.queue)
 }
 
-// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ThermostatUserInterfaceConfiguration is the device's typed ThermostatUserInterfaceConfiguration server, nil until a declaration mounts it.
 func (d *Thermostat) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
 	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }

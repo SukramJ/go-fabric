@@ -20,9 +20,12 @@ const (
 	DimmablePlugInUnitRevision uint16 = 6
 )
 
-// DimmablePlugInUnitType is the DimmablePlugInUnit device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/dimmable-plug-in-unit.ts.
-var DimmablePlugInUnitType = Type{
+// DimmablePlugInUnitType is the DimmablePlugInUnit device type, matter.js's packages/node/src/devices/dimmable-plug-in-unit.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dimmablepluginunit.
+var DimmablePlugInUnitType = typeDimmablePlugInUnit
+
+// typeDimmablePlugInUnit holds [DimmablePlugInUnitType]'s cluster requirements.
+var typeDimmablePlugInUnit = Type{
 	ID: DimmablePlugInUnitID, Name: "DimmablePlugInUnit", Revision: DimmablePlugInUnitRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -86,18 +89,12 @@ func NewDimmablePlugInUnit(opts Options, decls ...Declaration) (*DimmablePlugInU
 	return &DimmablePlugInUnit{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *DimmablePlugInUnit) OnOff() *onoffdef.Server {
 	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *DimmablePlugInUnit) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

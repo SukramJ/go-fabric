@@ -17,9 +17,12 @@ const (
 	DoorLockRevision uint16 = 4
 )
 
-// DoorLockType is the DoorLock device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/door-lock.ts.
-var DoorLockType = Type{
+// DoorLockType is the DoorLock device type, matter.js's packages/node/src/devices/door-lock.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#doorlock.
+var DoorLockType = typeDoorLock
+
+// typeDoorLock holds [DoorLockType]'s cluster requirements.
+var typeDoorLock = Type{
 	ID: DoorLockID, Name: "DoorLock", Revision: DoorLockRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewDoorLock(opts Options, decls ...Declaration) (*DoorLock, error) {
 	return &DoorLock{d}, nil
 }
 
-// DoorLock returns the typed DoorLock server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// DoorLock is the device's typed DoorLock server; the type mandates it.
 func (d *DoorLock) DoorLock() *doorlockdef.Server {
 	return doorlockdef.WrapOn(d.Server(0x0101), d.queue)
 }

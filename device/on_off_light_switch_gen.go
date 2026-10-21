@@ -17,9 +17,12 @@ const (
 	OnOffLightSwitchRevision uint16 = 4
 )
 
-// OnOffLightSwitchType is the OnOffLightSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/on-off-light-switch.ts.
-var OnOffLightSwitchType = Type{
+// OnOffLightSwitchType is the OnOffLightSwitch device type, matter.js's packages/node/src/devices/on-off-light-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onofflightswitch.
+var OnOffLightSwitchType = typeOnOffLightSwitch
+
+// typeOnOffLightSwitch holds [OnOffLightSwitchType]'s cluster requirements.
+var typeOnOffLightSwitch = Type{
 	ID: OnOffLightSwitchID, Name: "OnOffLightSwitch", Revision: OnOffLightSwitchRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -67,10 +70,7 @@ func NewOnOffLightSwitch(opts Options, decls ...Declaration) (*OnOffLightSwitch,
 	return &OnOffLightSwitch{d}, nil
 }
 
-// Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Binding is the device's typed Binding server; the type mandates it.
 func (d *OnOffLightSwitch) Binding() *bindingdef.Server {
 	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

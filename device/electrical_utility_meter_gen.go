@@ -16,9 +16,12 @@ const (
 	ElectricalUtilityMeterRevision uint16 = 1
 )
 
-// ElectricalUtilityMeterType is the ElectricalUtilityMeter device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/electrical-utility-meter.ts.
-var ElectricalUtilityMeterType = Type{
+// ElectricalUtilityMeterType is the ElectricalUtilityMeter device type, matter.js's packages/node/src/devices/electrical-utility-meter.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalutilitymeter.
+var ElectricalUtilityMeterType = typeElectricalUtilityMeter
+
+// typeElectricalUtilityMeter holds [ElectricalUtilityMeterType]'s cluster requirements.
+var typeElectricalUtilityMeter = Type{
 	ID: ElectricalUtilityMeterID, Name: "ElectricalUtilityMeter", Revision: ElectricalUtilityMeterRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "MeterReferencePoint",
@@ -45,10 +48,7 @@ func NewElectricalUtilityMeter(opts Options, decls ...Declaration) (*ElectricalU
 	return &ElectricalUtilityMeter{d}, nil
 }
 
-// MeterIdentification returns the typed MeterIdentification server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// MeterIdentification is the device's typed MeterIdentification server; the type mandates it.
 func (d *ElectricalUtilityMeter) MeterIdentification() *meteridentificationdef.Server {
 	return meteridentificationdef.WrapOn(d.Server(0x0B06), d.queue)
 }

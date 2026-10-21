@@ -26,9 +26,12 @@ const (
 	RoomAirConditionerRevision uint16 = 4
 )
 
-// RoomAirConditionerType is the RoomAirConditioner device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/room-air-conditioner.ts.
-var RoomAirConditionerType = Type{
+// RoomAirConditionerType is the RoomAirConditioner device type, matter.js's packages/node/src/devices/room-air-conditioner.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#roomairconditioner.
+var RoomAirConditionerType = typeRoomAirConditioner
+
+// typeRoomAirConditioner holds [RoomAirConditionerType]'s cluster requirements.
+var typeRoomAirConditioner = Type{
 	ID: RoomAirConditionerID, Name: "RoomAirConditioner", Revision: RoomAirConditionerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -100,66 +103,42 @@ func NewRoomAirConditioner(opts Options, decls ...Declaration) (*RoomAirConditio
 	return &RoomAirConditioner{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *RoomAirConditioner) OnOff() *onoffdef.Server {
 	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
-// Thermostat returns the typed Thermostat server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Thermostat is the device's typed Thermostat server; the type mandates it.
 func (d *RoomAirConditioner) Thermostat() *thermostatdef.Server {
 	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }
 
-// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// HepaFilterMonitoring is the device's typed HepaFilterMonitoring server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
 	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
-// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ActivatedCarbonFilterMonitoring is the device's typed ActivatedCarbonFilterMonitoring server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
 	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }
 
-// FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FanControl is the device's typed FanControl server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) FanControl() *fancontroldef.Server {
 	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
-// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ThermostatUserInterfaceConfiguration is the device's typed ThermostatUserInterfaceConfiguration server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
 	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RelativeHumidityMeasurement is the device's typed RelativeHumidityMeasurement server, nil until a declaration mounts it.
 func (d *RoomAirConditioner) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
 	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }

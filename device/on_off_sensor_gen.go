@@ -17,9 +17,12 @@ const (
 	OnOffSensorRevision uint16 = 4
 )
 
-// OnOffSensorType is the OnOffSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/on-off-sensor.ts.
-var OnOffSensorType = Type{
+// OnOffSensorType is the OnOffSensor device type, matter.js's packages/node/src/devices/on-off-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onoffsensor.
+var OnOffSensorType = typeOnOffSensor
+
+// typeOnOffSensor holds [OnOffSensorType]'s cluster requirements.
+var typeOnOffSensor = Type{
 	ID: OnOffSensorID, Name: "OnOffSensor", Revision: OnOffSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -73,10 +76,7 @@ func NewOnOffSensor(opts Options, decls ...Declaration) (*OnOffSensor, error) {
 	return &OnOffSensor{d}, nil
 }
 
-// Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Binding is the device's typed Binding server; the type mandates it.
 func (d *OnOffSensor) Binding() *bindingdef.Server {
 	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

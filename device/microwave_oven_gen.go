@@ -20,9 +20,12 @@ const (
 	MicrowaveOvenRevision uint16 = 2
 )
 
-// MicrowaveOvenType is the MicrowaveOven device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/microwave-oven.ts.
-var MicrowaveOvenType = Type{
+// MicrowaveOvenType is the MicrowaveOven device type, matter.js's packages/node/src/devices/microwave-oven.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#microwaveoven.
+var MicrowaveOvenType = typeMicrowaveOven
+
+// typeMicrowaveOven holds [MicrowaveOvenType]'s cluster requirements.
+var typeMicrowaveOven = Type{
 	ID: MicrowaveOvenID, Name: "MicrowaveOven", Revision: MicrowaveOvenRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -70,34 +73,22 @@ func NewMicrowaveOven(opts Options, decls ...Declaration) (*MicrowaveOven, error
 	return &MicrowaveOven{d}, nil
 }
 
-// OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OperationalState is the device's typed OperationalState server; the type mandates it.
 func (d *MicrowaveOven) OperationalState() *operationalstatedef.Server {
 	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
-// MicrowaveOvenMode returns the typed MicrowaveOvenMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// MicrowaveOvenMode is the device's typed MicrowaveOvenMode server; the type mandates it.
 func (d *MicrowaveOven) MicrowaveOvenMode() *microwaveovenmodedef.Server {
 	return microwaveovenmodedef.WrapOn(d.Server(0x005E), d.queue)
 }
 
-// MicrowaveOvenControl returns the typed MicrowaveOvenControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// MicrowaveOvenControl is the device's typed MicrowaveOvenControl server; the type mandates it.
 func (d *MicrowaveOven) MicrowaveOvenControl() *microwaveovencontroldef.Server {
 	return microwaveovencontroldef.WrapOn(d.Server(0x005F), d.queue)
 }
 
-// FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FanControl is the device's typed FanControl server, nil until a declaration mounts it.
 func (d *MicrowaveOven) FanControl() *fancontroldef.Server {
 	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }

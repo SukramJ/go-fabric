@@ -20,9 +20,12 @@ const (
 	OnOffPlugInUnitRevision uint16 = 5
 )
 
-// OnOffPlugInUnitType is the OnOffPlugInUnit device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/on-off-plug-in-unit.ts.
-var OnOffPlugInUnitType = Type{
+// OnOffPlugInUnitType is the OnOffPlugInUnit device type, matter.js's packages/node/src/devices/on-off-plug-in-unit.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onoffpluginunit.
+var OnOffPlugInUnitType = typeOnOffPlugInUnit
+
+// typeOnOffPlugInUnit holds [OnOffPlugInUnitType]'s cluster requirements.
+var typeOnOffPlugInUnit = Type{
 	ID: OnOffPlugInUnitID, Name: "OnOffPlugInUnit", Revision: OnOffPlugInUnitRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -85,16 +88,10 @@ func NewOnOffPlugInUnit(opts Options, decls ...Declaration) (*OnOffPlugInUnit, e
 	return &OnOffPlugInUnit{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *OnOffPlugInUnit) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// LevelControl is the device's typed LevelControl server, nil until a declaration mounts it.
 func (d *OnOffPlugInUnit) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

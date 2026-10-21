@@ -17,9 +17,12 @@ const (
 	DeviceEnergyManagementRevision uint16 = 3
 )
 
-// DeviceEnergyManagementType is the DeviceEnergyManagement device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/device-energy-management.ts.
-var DeviceEnergyManagementType = Type{
+// DeviceEnergyManagementType is the DeviceEnergyManagement device type, matter.js's packages/node/src/endpoints/device-energy-management.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#deviceenergymanagement.
+var DeviceEnergyManagementType = typeDeviceEnergyManagement
+
+// typeDeviceEnergyManagement holds [DeviceEnergyManagementType]'s cluster requirements.
+var typeDeviceEnergyManagement = Type{
 	ID: DeviceEnergyManagementID, Name: "DeviceEnergyManagement", Revision: DeviceEnergyManagementRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Conditions: []string{"ControllableEsa"},
@@ -55,18 +58,12 @@ func NewDeviceEnergyManagement(opts Options, decls ...Declaration) (*DeviceEnerg
 	return &DeviceEnergyManagement{d}, nil
 }
 
-// DeviceEnergyManagement returns the typed DeviceEnergyManagement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// DeviceEnergyManagement is the device's typed DeviceEnergyManagement server; the type mandates it.
 func (d *DeviceEnergyManagement) DeviceEnergyManagement() *deviceenergymanagementdef.Server {
 	return deviceenergymanagementdef.WrapOn(d.Server(0x0098), d.queue)
 }
 
-// DeviceEnergyManagementMode returns the typed DeviceEnergyManagementMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// DeviceEnergyManagementMode is the device's typed DeviceEnergyManagementMode server, nil until a declaration mounts it.
 func (d *DeviceEnergyManagement) DeviceEnergyManagementMode() *deviceenergymanagementmodedef.Server {
 	return deviceenergymanagementmodedef.WrapOn(d.Server(0x009F), d.queue)
 }

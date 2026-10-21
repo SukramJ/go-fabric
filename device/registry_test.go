@@ -47,7 +47,7 @@ func TestEveryGeneratedFileIsRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	decl := regexp.MustCompile(`(?m)^var (\w+)Type = Type\{`)
+	decl := regexp.MustCompile(`(?m)^var type(\w+) = Type\{`)
 	var declared []string
 	for _, f := range files {
 		if strings.HasSuffix(f, "_test.go") {

@@ -16,9 +16,12 @@ const (
 	HeatPumpRevision uint16 = 1
 )
 
-// HeatPumpType is the HeatPump device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/heat-pump.ts.
-var HeatPumpType = Type{
+// HeatPumpType is the HeatPump device type, matter.js's packages/node/src/devices/heat-pump.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#heatpump.
+var HeatPumpType = typeHeatPump
+
+// typeHeatPump holds [HeatPumpType]'s cluster requirements.
+var typeHeatPump = Type{
 	ID: HeatPumpID, Name: "HeatPump", Revision: HeatPumpRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{

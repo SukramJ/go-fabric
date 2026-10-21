@@ -18,9 +18,12 @@ const (
 	ContactSensorRevision uint16 = 2
 )
 
-// ContactSensorType is the ContactSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/contact-sensor.ts.
-var ContactSensorType = Type{
+// ContactSensorType is the ContactSensor device type, matter.js's packages/node/src/devices/contact-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#contactsensor.
+var ContactSensorType = typeContactSensor
+
+// typeContactSensor holds [ContactSensorType]'s cluster requirements.
+var typeContactSensor = Type{
 	ID: ContactSensorID, Name: "ContactSensor", Revision: ContactSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -55,18 +58,12 @@ func NewContactSensor(opts Options, decls ...Declaration) (*ContactSensor, error
 	return &ContactSensor{d}, nil
 }
 
-// BooleanState returns the typed BooleanState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// BooleanState is the device's typed BooleanState server; the type mandates it.
 func (d *ContactSensor) BooleanState() *booleanstatedef.Server {
 	return booleanstatedef.WrapOn(d.Server(0x0045), d.queue)
 }
 
-// BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// BooleanStateConfiguration is the device's typed BooleanStateConfiguration server, nil until a declaration mounts it.
 func (d *ContactSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
 	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

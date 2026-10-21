@@ -23,9 +23,12 @@ const (
 	ContentAppRevision uint16 = 2
 )
 
-// ContentAppType is the ContentApp device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/content-app.ts.
-var ContentAppType = Type{
+// ContentAppType is the ContentApp device type, matter.js's packages/node/src/devices/content-app.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#contentapp.
+var ContentAppType = typeContentApp
+
+// typeContentApp holds [ContentAppType]'s cluster requirements.
+var typeContentApp = Type{
 	ID: ContentAppID, Name: "ContentApp", Revision: ContentAppRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Conditions: []string{"ObserverClient"},
@@ -87,66 +90,42 @@ func NewContentApp(opts Options, decls ...Declaration) (*ContentApp, error) {
 	return &ContentApp{d}, nil
 }
 
-// KeypadInput returns the typed KeypadInput server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// KeypadInput is the device's typed KeypadInput server; the type mandates it.
 func (d *ContentApp) KeypadInput() *keypadinputdef.Server {
 	return keypadinputdef.WrapOn(d.Server(0x0509), d.queue)
 }
 
-// ApplicationLauncher returns the typed ApplicationLauncher server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ApplicationLauncher is the device's typed ApplicationLauncher server; the type mandates it.
 func (d *ContentApp) ApplicationLauncher() *applicationlauncherdef.Server {
 	return applicationlauncherdef.WrapOn(d.Server(0x050C), d.queue)
 }
 
-// ApplicationBasic returns the typed ApplicationBasic server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ApplicationBasic is the device's typed ApplicationBasic server; the type mandates it.
 func (d *ContentApp) ApplicationBasic() *applicationbasicdef.Server {
 	return applicationbasicdef.WrapOn(d.Server(0x050D), d.queue)
 }
 
-// Channel returns the typed Channel server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// Channel is the device's typed Channel server, nil until a declaration mounts it.
 func (d *ContentApp) Channel() *channeldef.Server {
 	return channeldef.WrapOn(d.Server(0x0504), d.queue)
 }
 
-// TargetNavigator returns the typed TargetNavigator server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TargetNavigator is the device's typed TargetNavigator server, nil until a declaration mounts it.
 func (d *ContentApp) TargetNavigator() *targetnavigatordef.Server {
 	return targetnavigatordef.WrapOn(d.Server(0x0505), d.queue)
 }
 
-// MediaPlayback returns the typed MediaPlayback server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// MediaPlayback is the device's typed MediaPlayback server, nil until a declaration mounts it.
 func (d *ContentApp) MediaPlayback() *mediaplaybackdef.Server {
 	return mediaplaybackdef.WrapOn(d.Server(0x0506), d.queue)
 }
 
-// ContentLauncher returns the typed ContentLauncher server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ContentLauncher is the device's typed ContentLauncher server, nil until a declaration mounts it.
 func (d *ContentApp) ContentLauncher() *contentlauncherdef.Server {
 	return contentlauncherdef.WrapOn(d.Server(0x050A), d.queue)
 }
 
-// AccountLogin returns the typed AccountLogin server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// AccountLogin is the device's typed AccountLogin server, nil until a declaration mounts it.
 func (d *ContentApp) AccountLogin() *accountlogindef.Server {
 	return accountlogindef.WrapOn(d.Server(0x050E), d.queue)
 }

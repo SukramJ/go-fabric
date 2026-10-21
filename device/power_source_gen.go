@@ -16,9 +16,12 @@ const (
 	PowerSourceRevision uint16 = 1
 )
 
-// PowerSourceType is the PowerSource device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/power-source.ts.
-var PowerSourceType = Type{
+// PowerSourceType is the PowerSource device type, matter.js's packages/node/src/endpoints/power-source.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#powersource.
+var PowerSourceType = typePowerSource
+
+// typePowerSource holds [PowerSourceType]'s cluster requirements.
+var typePowerSource = Type{
 	ID: PowerSourceID, Name: "PowerSource", Revision: PowerSourceRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -44,10 +47,7 @@ func NewPowerSource(opts Options, decls ...Declaration) (*PowerSource, error) {
 	return &PowerSource{d}, nil
 }
 
-// PowerSource returns the typed PowerSource server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// PowerSource is the device's typed PowerSource server; the type mandates it.
 func (d *PowerSource) PowerSource() *powersourcedef.Server {
 	return powersourcedef.WrapOn(d.Server(0x002F), d.queue)
 }

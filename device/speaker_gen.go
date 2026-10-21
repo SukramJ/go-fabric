@@ -17,9 +17,12 @@ const (
 	SpeakerRevision uint16 = 1
 )
 
-// SpeakerType is the Speaker device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/speaker.ts.
-var SpeakerType = Type{
+// SpeakerType is the Speaker device type, matter.js's packages/node/src/devices/speaker.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#speaker.
+var SpeakerType = typeSpeaker
+
+// typeSpeaker holds [SpeakerType]'s cluster requirements.
+var typeSpeaker = Type{
 	ID: SpeakerID, Name: "Speaker", Revision: SpeakerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,16 +53,10 @@ func NewSpeaker(opts Options, decls ...Declaration) (*Speaker, error) {
 	return &Speaker{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *Speaker) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *Speaker) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

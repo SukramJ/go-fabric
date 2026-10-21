@@ -403,10 +403,11 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	var w bytes.Buffer
 	fmt.Fprintf(&w, "// %s device type identity: 0x%04X, revision %d.\n", dt.Name, *dt.ID, dt.Revision)
 	fmt.Fprintf(&w, "const (\n\t%sID uint16 = 0x%04X\n\t%sRevision uint16 = %d\n)\n\n", n, *dt.ID, n, dt.Revision)
-	fmt.Fprintf(&w, "// %sType is the %s device type, from the matter.js model at %s (Matter %s):\n",
-		n, dt.Name, shortCommit(g.snap.Matter.SourceCommit), g.snap.Matter.Revision)
-	fmt.Fprintf(&w, "// what matter.js generates into %s.\n", matterjsPath(dt))
-	fmt.Fprintf(&w, "var %sType = Type{\n", n)
+	fmt.Fprintf(&w, "// %sType is the %s device type, matter.js's %s;\n", n, dt.Name, matterjsPath(dt))
+	fmt.Fprintf(&w, "// its cluster requirements are listed in %s.\n", referenceLink(dt.Name))
+	fmt.Fprintf(&w, "var %sType = %s\n\n", n, typeVar(n))
+	fmt.Fprintf(&w, "// %s holds [%sType]'s cluster requirements.\n", typeVar(n), n)
+	fmt.Fprintf(&w, "var %s = Type{\n", typeVar(n))
 	fmt.Fprintf(&w, "\tID: %sID, Name: %q, Revision: %sRevision,\n", n, dt.Name, n)
 	fmt.Fprintf(&w, "\tClassification: %q, Composition: %s,\n", dt.Classification, compositionConst(dt.Effective.Composition))
 	if dt.Effective.Base != "" {
@@ -449,12 +450,11 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		if deviceMethods[method] {
 			return nil, fmt.Errorf("%s: accessor %s shadows a Device method", dt.Name, method)
 		}
-		state := "// The device type mandates the cluster.\n"
-		if !cr.mandatory {
-			state = "// It is nil until a declaration mounts the optional cluster.\n"
+		if cr.mandatory {
+			fmt.Fprintf(&w, "\n// %s is the device's typed %s server; the type mandates it.\n", method, cr.def.Name)
+		} else {
+			fmt.Fprintf(&w, "\n// %s is the device's typed %s server, nil until a declaration mounts it.\n", method, cr.def.Name)
 		}
-		fmt.Fprintf(&w, "\n// %s returns the typed %s server over the one the device mounts,\n", method, cr.def.Name)
-		w.WriteString("// whatever its type (Underlying returns it); its OnChangedAsync runs on\n// the device's goroutine.\n" + state)
 		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.WrapOn(d.Server(0x%04X), d.queue) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
 	}
 	return w.Bytes(), nil

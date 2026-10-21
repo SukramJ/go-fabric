@@ -16,9 +16,12 @@ const (
 	SolarPowerRevision uint16 = 1
 )
 
-// SolarPowerType is the SolarPower device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/solar-power.ts.
-var SolarPowerType = Type{
+// SolarPowerType is the SolarPower device type, matter.js's packages/node/src/devices/solar-power.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#solarpower.
+var SolarPowerType = typeSolarPower
+
+// typeSolarPower holds [SolarPowerType]'s cluster requirements.
+var typeSolarPower = Type{
 	ID: SolarPowerID, Name: "SolarPower", Revision: SolarPowerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{

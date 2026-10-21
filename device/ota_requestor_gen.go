@@ -16,9 +16,12 @@ const (
 	OtaRequestorRevision uint16 = 1
 )
 
-// OtaRequestorType is the OtaRequestor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/ota-requestor.ts.
-var OtaRequestorType = Type{
+// OtaRequestorType is the OtaRequestor device type, matter.js's packages/node/src/endpoints/ota-requestor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#otarequestor.
+var OtaRequestorType = typeOtaRequestor
+
+// typeOtaRequestor holds [OtaRequestorType]'s cluster requirements.
+var typeOtaRequestor = Type{
 	ID: OtaRequestorID, Name: "OtaRequestor", Revision: OtaRequestorRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewOtaRequestor(opts Options, decls ...Declaration) (*OtaRequestor, error) 
 	return &OtaRequestor{d}, nil
 }
 
-// OtaSoftwareUpdateRequestor returns the typed OtaSoftwareUpdateRequestor server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OtaSoftwareUpdateRequestor is the device's typed OtaSoftwareUpdateRequestor server; the type mandates it.
 func (d *OtaRequestor) OtaSoftwareUpdateRequestor() *otasoftwareupdaterequestordef.Server {
 	return otasoftwareupdaterequestordef.WrapOn(d.Server(0x002A), d.queue)
 }

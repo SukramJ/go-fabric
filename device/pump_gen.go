@@ -24,9 +24,12 @@ const (
 	PumpRevision uint16 = 4
 )
 
-// PumpType is the Pump device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/pump.ts.
-var PumpType = Type{
+// PumpType is the Pump device type, matter.js's packages/node/src/devices/pump.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#pump.
+var PumpType = typePump
+
+// typePump holds [PumpType]'s cluster requirements.
+var typePump = Type{
 	ID: PumpID, Name: "Pump", Revision: PumpRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -100,48 +103,30 @@ func NewPump(opts Options, decls ...Declaration) (*Pump, error) {
 	return &Pump{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// PumpConfigurationAndControl returns the typed PumpConfigurationAndControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// PumpConfigurationAndControl is the device's typed PumpConfigurationAndControl server; the type mandates it.
 func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
 	return pumpconfigurationandcontroldef.WrapOn(d.Server(0x0200), d.queue)
 }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// LevelControl is the device's typed LevelControl server, nil until a declaration mounts it.
 func (d *Pump) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// PressureMeasurement is the device's typed PressureMeasurement server, nil until a declaration mounts it.
 func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
 	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }
 
-// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FlowMeasurement is the device's typed FlowMeasurement server, nil until a declaration mounts it.
 func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
 	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

@@ -18,9 +18,12 @@ const (
 	IrrigationSystemRevision uint16 = 1
 )
 
-// IrrigationSystemType is the IrrigationSystem device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/irrigation-system.ts.
-var IrrigationSystemType = Type{
+// IrrigationSystemType is the IrrigationSystem device type, matter.js's packages/node/src/devices/irrigation-system.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#irrigationsystem.
+var IrrigationSystemType = typeIrrigationSystem
+
+// typeIrrigationSystem holds [IrrigationSystemType]'s cluster requirements.
+var typeIrrigationSystem = Type{
 	ID: IrrigationSystemID, Name: "IrrigationSystem", Revision: IrrigationSystemRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -58,18 +61,12 @@ func NewIrrigationSystem(opts Options, decls ...Declaration) (*IrrigationSystem,
 	return &IrrigationSystem{d}, nil
 }
 
-// OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OperationalState is the device's typed OperationalState server, nil until a declaration mounts it.
 func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
 	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
-// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FlowMeasurement is the device's typed FlowMeasurement server, nil until a declaration mounts it.
 func (d *IrrigationSystem) FlowMeasurement() *flowmeasurementdef.Server {
 	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

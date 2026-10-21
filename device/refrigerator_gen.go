@@ -19,9 +19,12 @@ const (
 	RefrigeratorRevision uint16 = 3
 )
 
-// RefrigeratorType is the Refrigerator device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/refrigerator.ts.
-var RefrigeratorType = Type{
+// RefrigeratorType is the Refrigerator device type, matter.js's packages/node/src/devices/refrigerator.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#refrigerator.
+var RefrigeratorType = typeRefrigerator
+
+// typeRefrigerator holds [RefrigeratorType]'s cluster requirements.
+var typeRefrigerator = Type{
 	ID: RefrigeratorID, Name: "Refrigerator", Revision: RefrigeratorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -58,26 +61,17 @@ func NewRefrigerator(opts Options, decls ...Declaration) (*Refrigerator, error) 
 	return &Refrigerator{d}, nil
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RefrigeratorAndTemperatureControlledCabinetMode is the device's typed RefrigeratorAndTemperatureControlledCabinetMode server, nil until a declaration mounts it.
 func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
 	return refrigeratorandtemperaturecontrolledcabinetmodedef.WrapOn(d.Server(0x0052), d.queue)
 }
 
-// RefrigeratorAlarm returns the typed RefrigeratorAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RefrigeratorAlarm is the device's typed RefrigeratorAlarm server, nil until a declaration mounts it.
 func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
 	return refrigeratoralarmdef.WrapOn(d.Server(0x0057), d.queue)
 }
 
-// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ActivatedCarbonFilterMonitoring is the device's typed ActivatedCarbonFilterMonitoring server, nil until a declaration mounts it.
 func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
 	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

@@ -424,6 +424,26 @@ func TestSyntheticElements(t *testing.T) {
 	}
 }
 
+// TestReferenceIsCurrent fails when docs/reference/device-types.md is not
+// what the generator makes of parity/schema.json now.
+func TestReferenceIsCurrent(t *testing.T) {
+	t.Parallel()
+	g := testGenerator(t)
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err := g.generateReference(committed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, referenceDir, o.File)
+	got, err := os.ReadFile(path) //nolint:gosec // a committed file of this module
+	if err != nil || !bytes.Equal(got, o.Source) {
+		t.Errorf("%s is stale: run go run ./script/devicegen", path)
+	}
+}
+
 // TestContractNamesAreCurrent fails when contract/devicetype_names_gen.go
 // is not what the generator makes of parity/schema.json now.
 func TestContractNamesAreCurrent(t *testing.T) {

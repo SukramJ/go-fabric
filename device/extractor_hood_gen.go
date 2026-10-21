@@ -19,9 +19,12 @@ const (
 	ExtractorHoodRevision uint16 = 1
 )
 
-// ExtractorHoodType is the ExtractorHood device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/extractor-hood.ts.
-var ExtractorHoodType = Type{
+// ExtractorHoodType is the ExtractorHood device type, matter.js's packages/node/src/devices/extractor-hood.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#extractorhood.
+var ExtractorHoodType = typeExtractorHood
+
+// typeExtractorHood holds [ExtractorHoodType]'s cluster requirements.
+var typeExtractorHood = Type{
 	ID: ExtractorHoodID, Name: "ExtractorHood", Revision: ExtractorHoodRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -59,26 +62,17 @@ func NewExtractorHood(opts Options, decls ...Declaration) (*ExtractorHood, error
 	return &ExtractorHood{d}, nil
 }
 
-// FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// FanControl is the device's typed FanControl server; the type mandates it.
 func (d *ExtractorHood) FanControl() *fancontroldef.Server {
 	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
-// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// HepaFilterMonitoring is the device's typed HepaFilterMonitoring server, nil until a declaration mounts it.
 func (d *ExtractorHood) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
 	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
-// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ActivatedCarbonFilterMonitoring is the device's typed ActivatedCarbonFilterMonitoring server, nil until a declaration mounts it.
 func (d *ExtractorHood) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
 	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

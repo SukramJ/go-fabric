@@ -21,9 +21,12 @@ const (
 	SmokeCoAlarmRevision uint16 = 2
 )
 
-// SmokeCoAlarmType is the SmokeCoAlarm device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/smoke-co-alarm.ts.
-var SmokeCoAlarmType = Type{
+// SmokeCoAlarmType is the SmokeCoAlarm device type, matter.js's packages/node/src/devices/smoke-co-alarm.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#smokecoalarm.
+var SmokeCoAlarmType = typeSmokeCoAlarm
+
+// typeSmokeCoAlarm holds [SmokeCoAlarmType]'s cluster requirements.
+var typeSmokeCoAlarm = Type{
 	ID: SmokeCoAlarmID, Name: "SmokeCoAlarm", Revision: SmokeCoAlarmRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -70,34 +73,22 @@ func NewSmokeCoAlarm(opts Options, decls ...Declaration) (*SmokeCoAlarm, error) 
 	return &SmokeCoAlarm{d}, nil
 }
 
-// SmokeCoAlarm returns the typed SmokeCoAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// SmokeCoAlarm is the device's typed SmokeCoAlarm server; the type mandates it.
 func (d *SmokeCoAlarm) SmokeCoAlarm() *smokecoalarmdef.Server {
 	return smokecoalarmdef.WrapOn(d.Server(0x005C), d.queue)
 }
 
-// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RelativeHumidityMeasurement is the device's typed RelativeHumidityMeasurement server, nil until a declaration mounts it.
 func (d *SmokeCoAlarm) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
 	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *SmokeCoAlarm) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CarbonMonoxideConcentrationMeasurement is the device's typed CarbonMonoxideConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *SmokeCoAlarm) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
 	return carbonmonoxideconcentrationmeasurementdef.WrapOn(d.Server(0x040C), d.queue)
 }
