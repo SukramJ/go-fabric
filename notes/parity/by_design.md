@@ -3766,3 +3766,40 @@ empties without the Sender feature" (`GroupcastServerTest.ts:358-405`,
 the loop's second title) stays `missing` in the register with this entry
 as its reason. A host-selectable feature set is milestone 4's node
 options, with the other feature selections.
+
+### BD-Matter-TypedHandle-ReplacesTheCommand — a host's `Handle<Command>` replaces the whole command, checks included
+
+matter.js names the override point of a command its logic method and
+keeps the request's checks and the ExecuteIfOff gate around it:
+`packages/node/src/behaviors/level-control/LevelControlServer.ts:256-261`
+at `862ad75f` ("After checking input we use moveToLevelLogic … To
+replace the default logic, override moveToLevelLogic"). The typed
+server's `Handle<Command>` (`spec.CommandRegistrar.Handle`, the self-held
+servers' `spec.HostHandlers`) replaces the command including its checks:
+it is the one hook the generated and the self-held servers share, and a
+server-specific "logic" seam would give every server a second hook of
+its own shape. Reasoning: one shape over every server (ADR 0025
+principle 7, gate 1 G1-5, brief BX1); a host that wants the server's
+checks keeps the default and reacts through `OnChanged`. `Handle(cmd,
+nil)` restores the server's own handling.
+
+### BD-Matter-SelfHeldDefault-SelectionNotServed — a feature selection the self-held server does not serve keeps the generated server
+
+matter.js mounts its behavior for every feature selection of a cluster:
+`WindowCoveringServer` serves Lift without PositionAwareLift
+(`packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:123-141`
+branches per feature) and `DoorLockServer` is the server "with no
+features enabled" (`packages/node/src/behaviors/door-lock/DoorLockServer.ts:1591-1593`).
+The kit's default for a cluster with a self-held server is that server
+(`device/defaults.go`, gate 1 G1-1), but where the self-held server does
+not serve the device type's selection — WindowCovering with Lift but
+without PositionAwareLift, DoorLock without features, a filter monitor
+with ResetCondition, LaundryWasherControls with Rinse — the kit keeps the
+generated `spec.Server` for that endpoint (`errSelectionNotServed`), and
+a host that needs the self-held server there selects its features or
+mounts it with `WithServer`. Reasoning: a self-held server that advertises
+elements it cannot serve is worse than the generated stub, which answers
+each command by the definition; the gap closes per server as it learns
+the selection (the DoorLock case is brief BU's, with the declaration
+that carries the lock's port).
+
