@@ -5,6 +5,7 @@ package core
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/ecdh"
 	"crypto/ecdsa"
@@ -53,6 +54,8 @@ type OperationalCredentials struct {
 	// initialFabricLabel is [OpcredsConfig.InitialFabricLabel].
 	initialFabricLabel string
 	store              StoreFacade
+	// log is [OpcredsConfig.Logger]; slog.Default() when nil.
+	log *slog.Logger
 
 	// vid holds each fabric's VID Verification Statement and VVSC when the
 	// store cannot persist them (no [vidVerificationSettings]).
@@ -450,6 +453,8 @@ type OpcredsConfig struct {
 	// nodeID) of an operational mDNS instance that must be withdrawn —
 	// see the field doc on [OperationalCredentials]. May be nil.
 	OnFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // NewOperationalCredentials constructs the cluster.
@@ -472,6 +477,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		cfg.SupportedFabrics = 254
 	}
 	return &OperationalCredentials{
+		log:                    cmp.Or(cfg.Logger, slog.Default()),
 		store:                  s,
 		supportedFabrics:       cfg.SupportedFabrics,
 		initialFabricLabel:     cfg.InitialFabricLabel,
@@ -1173,16 +1179,16 @@ type SignVidVerificationResponse struct {
 // MatterInvoke implements [contract.ClusterServer].
 func (o *OperationalCredentials) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	cmdName := opcredsCmdName(cmdID)
-	slog.Default().Info("matter.opcreds.cmd",
+	o.logger().Info("matter.opcreds.cmd",
 		slog.String("cmd", cmdName),
 		slog.String("cmdID", fmt.Sprintf("0x%02X", cmdID)))
 	resp, err := o.dispatchCmd(ctx, cmdID, fields)
 	if err != nil {
-		slog.Default().Warn("matter.opcreds.cmd_err",
+		o.logger().Warn("matter.opcreds.cmd_err",
 			slog.String("cmd", cmdName),
 			slog.String("err", err.Error()))
 	} else {
-		slog.Default().Info("matter.opcreds.cmd_ok",
+		o.logger().Info("matter.opcreds.cmd_ok",
 			slog.String("cmd", cmdName),
 			slog.String("respType", fmt.Sprintf("%T", resp)))
 	}
@@ -1759,7 +1765,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		// TC-OPCREDS-3.7 reads exactly that after commissioning.
 		Label: o.initialFabricLabel,
 	}
-	slog.Default().Debug("matter.opcreds.addnoc.params",
+	o.logger().Debug("matter.opcreds.addnoc.params",
 		slog.String("noc_subject_fabric_id", fmt.Sprintf("0x%016X", noc.Subject.MatterFabricID)),
 		slog.String("noc_subject_node_id", fmt.Sprintf("0x%016X", noc.Subject.MatterNodeID)),
 		slog.String("admin_vendor_id", fmt.Sprintf("0x%04X", req.AdminVendorID)),
@@ -1817,7 +1823,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		// Non-fatal: the identity and fabric rows are already committed;
 		// log and continue so the pair does not fail over a GKM write
 		// error. Matches chip's tolerant handling of secondary state.
-		slog.Default().Warn("matter.opcreds.addnoc.ipk_gkm_write_failed",
+		o.logger().Warn("matter.opcreds.addnoc.ipk_gkm_write_failed",
 			slog.Int("fabric_index", int(idx)),
 			slog.String("err", err.Error()))
 	}
@@ -2125,7 +2131,7 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if idx == 0 {
 		idx = curIdx
 	}
-	slog.Default().Debug("matter.opcreds.update_fabric_label",
+	o.logger().Debug("matter.opcreds.update_fabric_label",
 		slog.Int("ctx_fabric_index", int(ctxIdx)),
 		slog.Int("current_fabric", int(curIdx)),
 		slog.Int("resolved_idx", int(idx)),
@@ -2464,4 +2470,13 @@ func isOperationalAdminVendorID(v uint16) bool {
 		return false
 	}
 	return true
+}
+
+// logger is the server's logger ([OpcredsConfig.Logger]); a value built
+// without its constructor logs through slog.Default() (ADR 0026 P9).
+func (o *OperationalCredentials) logger() *slog.Logger {
+	if o.log != nil {
+		return o.log
+	}
+	return slog.Default()
 }
