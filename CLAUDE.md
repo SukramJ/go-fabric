@@ -88,6 +88,14 @@ package doc lists every port, in call order, with what a skip costs and
 whether it fails closed (visible) or silently (not). Read it before wiring
 anything.
 
+**`client/` is the client machinery, `controller/` the role.** The
+discovery browser, exchanges, the PASE/CASE initiator, the client
+interaction and the peer set (`client/discovery`, `client/exchange`,
+`client/handshake`, `client/interaction`, `client/peer`) serve both
+roles — `binding` and `node` use them as much as the commissioner does —
+so they sit below the roles (ADR 0026 principle 12, brief BX4); the old
+`controller/<name>` paths forward to them until v0.12.0.
+
 The request path, top to bottom:
 
 ```

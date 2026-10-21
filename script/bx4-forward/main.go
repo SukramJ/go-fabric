@@ -174,10 +174,14 @@ func render(m move, pkg *types.Package) ([]byte, error) {
 	b.WriteString("// aliases, and a forwarded variable is the same value at init (errors.Is\n// holds).\n//\n")
 	fmt.Fprintf(&b, "// Deprecated: moved to %s/%s (brief BX4, v0.10.0); removable in v0.12.0.\n", modulePath, m.new)
 	fmt.Fprintf(&b, "package %s\n\nimport %q\n", name, modulePath+"/"+m.new)
-	block(&b, "", "type", typs)
-	block(&b, "", "const", consts)
-	block(&b, "", "var", vars)
-	block(&b, "Functions forward as variables of the same function type.", "var", funcs)
+	// The reachability marker sits directly above each value block: a test
+	// reaches the identifier through its new path, never through the forward
+	// (script/reachability whitelists type aliases by itself).
+	reason := fmt.Sprintf("// fabric:reachable:reason=\"BX4 forward of %s; tests reach it there\"", m.new)
+	block(&b, nil, "type", typs)
+	block(&b, []string{reason}, "const", consts)
+	block(&b, []string{reason}, "var", vars)
+	block(&b, []string{"// Functions forward as variables of the same function type.", reason}, "var", funcs)
 	src, err := format.Source(b.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("bx4-forward: format %s: %w", m.old, err)
@@ -185,13 +189,13 @@ func render(m move, pkg *types.Package) ([]byte, error) {
 	return src, nil
 }
 
-func block(b *bytes.Buffer, comment, kw string, lines []string) {
+func block(b *bytes.Buffer, comments []string, kw string, lines []string) {
 	if len(lines) == 0 {
 		return
 	}
 	b.WriteString("\n")
-	if comment != "" {
-		fmt.Fprintf(b, "// %s\n", comment)
+	for _, c := range comments {
+		b.WriteString(c + "\n")
 	}
 	fmt.Fprintf(b, "%s (\n\t%s\n)\n", kw, strings.Join(lines, "\n\t"))
 }

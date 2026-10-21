@@ -37,6 +37,7 @@ type (
 	TXTData             = discovery.TXTData
 )
 
+// fabric:reachable:reason="BX4 forward of client/discovery; tests reach it there"
 const (
 	AddressAdded               = discovery.AddressAdded
 	AddressDeleted             = discovery.AddressDeleted
@@ -55,12 +56,14 @@ const (
 	TypeTXT                    = discovery.TypeTXT
 )
 
+// fabric:reachable:reason="BX4 forward of client/discovery; tests reach it there"
 var (
 	DefaultRetries = discovery.DefaultRetries
 	ErrClosed      = discovery.ErrClosed
 )
 
 // Functions forward as variables of the same function type.
+// fabric:reachable:reason="BX4 forward of client/discovery; tests reach it there"
 var (
 	AnyCommissionable    = discovery.AnyCommissionable
 	ByDeviceType         = discovery.ByDeviceType

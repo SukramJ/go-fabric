@@ -1869,8 +1869,8 @@
       "path": "packages/node/test/node/ClientAddressProbeTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestMonitorScheduledByAServiceChange",
-        "controller/peer:TestProbeReadsTheReports"
+        "client/peer:TestMonitorScheduledByAServiceChange",
+        "client/peer:TestProbeReadsTheReports"
       ],
       "missing": [
         "keeps session when probe confirms current address is reachable"
@@ -1940,7 +1940,7 @@
       "path": "packages/node/test/node/ClientChunkedWriteTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestWriteChunksLists"
+        "client/interaction:TestWriteChunksLists"
       ],
       "missing": [
         "writes a whole list larger than one message as an empty REPLACE and ADDs across chunks",
@@ -1956,9 +1956,9 @@
       "path": "packages/node/test/node/ClientConnectivityTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestTwoAddressesStaggered",
-        "controller/peer:TestOperationalAddressStaysAsFallback",
-        "controller/peer:TestConnectDiscoveredAddress",
+        "client/peer:TestTwoAddressesStaggered",
+        "client/peer:TestOperationalAddressStaysAsFallback",
+        "client/peer:TestConnectDiscoveredAddress",
         "controller/client:TestClientConnectivityParity"
       ],
       "missing": [
@@ -1969,7 +1969,7 @@
         "closes a non-sustained subscription when the node is disabled",
         "subscribes to a peer that is not initially available (recreate)"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their controller/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path).",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path).",
       "snapshotSha": "d8d5ef04cd30330aea21df86f89bd871e5043671"
     },
     {
@@ -2061,7 +2061,7 @@
         "correctly splits different-path commands when maxPathsPerInvoke is 1",
         "splits duplicate command paths into separate batches"
       ],
-      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). Missing: matter.js's invoke batcher — batching up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), splitting, commandRef matching, the cache cleared when the node goes offline, closing the batcher, the batch exchange aborted with its context — and the network propagation of invoke options (network profiles, MRP delays, expected processing times observed on the exchange): the Go client sends one command per InvokeRequest (controller/interaction Interaction.Invoke) and offers no seam to observe the exchange's timing; the device's maxPathsPerInvoke is not configurable on the Go node (always 10).",
+      "reason": "Sequential commands through a client node reach the device in order (controller/client:TestClientInvokeParity on fabrictest). Missing: matter.js's invoke batcher — batching up to the peer's maxPathsPerInvoke, its bypasses (maxPathsPerInvoke 1, timed, per-request options), splitting, commandRef matching, the cache cleared when the node goes offline, closing the batcher, the batch exchange aborted with its context — and the network propagation of invoke options (network profiles, MRP delays, expected processing times observed on the exchange): the Go client sends one command per InvokeRequest (client/interaction Interaction.Invoke) and offers no seam to observe the exchange's timing; the device's maxPathsPerInvoke is not configurable on the Go node (always 10).",
       "snapshotSha": "a743554ce3a6060f13492259bb66a152d9bfca31"
     },
     {
@@ -2286,15 +2286,15 @@
         "answers the priming report with INVALID_SUBSCRIPTION when processing fails before reading it",
         "answers the priming report with INVALID_SUBSCRIPTION when processing it fails"
       ],
-      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks); and the priming report answered INVALID_SUBSCRIPTION after a cancel or a failing updated (controller/interaction acknowledges it Success and its Updated cannot fail — brief BH's path).",
+      "reason": "The empty subscription refused, the version filters a read or subscription sends (injected; the caller's kept, first and winning; none with the other fabric filter; recomputed from the caller's filters and its refreshRequest when a sustained subscription is replaced; the replacement applied by the refreshed request's fabric filter) and the versions kept across a controller restart run on fabrictest through a client node (controller/client:TestClientSubscribe*; fix: ClientStructure.injectVersionFilters' caller and fabric-filter rules and ClientNodeInteraction.subscribe's refreshRequest at 862ad75f). Missing: includeKnownVersions on a subscription (client.Node.Subscribe takes an interaction.SubscribeRequest, which has no such field — an API change); the run-time change of the default subscription (autoSubscribe, defaultSubscription, its fabric filter) and the reactions serialised against Start, the cache's recorded fabric filter with adoptFabricFilter and its storage failures (the Go cache records no filter; the default subscription is fixed at Start); the default subscription's ownership across replacements (no replacement at run time; matter.js drives the internal request callbacks); and the priming report answered INVALID_SUBSCRIPTION after a cancel or a failing updated (client/interaction acknowledges it Success and its Updated cannot fail — brief BH's path).",
       "snapshotSha": "135021253b6d8e65e441f9ad42fdb5dd5f695ff9"
     },
     {
       "path": "packages/node/test/node/ClientTuningTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestParityTimingMerge"
+        "client/peer:TestParityTimingDefaults",
+        "client/peer:TestParityTimingMerge"
       ],
       "missing": [
         "ethernet-operational peers use the fast profile with no MRP margin",
@@ -2492,7 +2492,7 @@
       "go": [
         "controller/client:TestPeerDescriptorRecordParity",
         "controller/client:TestPeerDescriptorParity",
-        "controller/peer:TestAddKnownPeerMergeAndCoalescedSave"
+        "client/peer:TestAddKnownPeerMergeAndCoalescedSave"
       ],
       "missing": [
         "bounds paths per invoke by the negotiated session rather than the reported attribute",
@@ -2511,7 +2511,7 @@
         "fall back to BasicInformation before any session reported",
         "stay as reported when TCP is marked unsupported"
       ],
-      "reason": "What the commissioning record keeps of the peer's descriptor (session intervals above the DNS-SD maximum, a vendor-specific device type, the reported parameters without fallbacks; controller/client:TestPeerDescriptorRecordParity) and what the controller restores into the protocol peer after a restart (later-session intervals winning over the advertised ones, the stored parameters before the first session, only what the device sent; TestPeerDescriptorParity on fabrictest, the record set through client.UpdateRecord where matter.js assigns the descriptor) are ported; a known peer's reported parameters and discovery data kept over a later descriptor is controller/peer:TestAddKnownPeerMergeAndCoalescedSave. Missing: paths per invoke bounded by the session against BasicInformation and the BasicInformation fallback before any session (the Go peer takes no BasicInformation input; the descriptor is not assignable); TCP (markTcpUnsupported, the transport selection, the descriptor flag — no TCP client); the migration of the legacy sessionParameters storage key (Go never stored it); the advertised intervals kept or dropped by DNS-SD changes as the record sees them (covered at the peer level by TestServiceChangeUpdatesDiscoveryData, but not the empty-TXT, T=4 and no-TXT steps nor through fabrictest, whose devices' TXT the test cannot change).",
+      "reason": "What the commissioning record keeps of the peer's descriptor (session intervals above the DNS-SD maximum, a vendor-specific device type, the reported parameters without fallbacks; controller/client:TestPeerDescriptorRecordParity) and what the controller restores into the protocol peer after a restart (later-session intervals winning over the advertised ones, the stored parameters before the first session, only what the device sent; TestPeerDescriptorParity on fabrictest, the record set through client.UpdateRecord where matter.js assigns the descriptor) are ported; a known peer's reported parameters and discovery data kept over a later descriptor is client/peer:TestAddKnownPeerMergeAndCoalescedSave. Missing: paths per invoke bounded by the session against BasicInformation and the BasicInformation fallback before any session (the Go peer takes no BasicInformation input; the descriptor is not assignable); TCP (markTcpUnsupported, the transport selection, the descriptor flag — no TCP client); the migration of the legacy sessionParameters storage key (Go never stored it); the advertised intervals kept or dropped by DNS-SD changes as the record sees them (covered at the peer level by TestServiceChangeUpdatesDiscoveryData, but not the empty-TXT, T=4 and no-TXT steps nor through fabrictest, whose devices' TXT the test cannot change).",
       "snapshotSha": "5ee3894c828d2d9058e8634f79050b767cd07446"
     },
     {
@@ -2568,7 +2568,7 @@
         "ends commissioning when the device does not acknowledge the scan",
         "commissions over a PASE session that suppresses peer loss"
       ],
-      "reason": "The rejected scan (Wi-Fi and Thread), the failure that names it and the fail-safe re-arming are covered on the commissioner's scripted device; the late answer and the unacknowledged scan need the scripted device to answer late or never, and the PASE session's peer-loss suppression is not observable outside controller/exchange.",
+      "reason": "The rejected scan (Wi-Fi and Thread), the failure that names it and the fail-safe re-arming are covered on the commissioner's scripted device; the late answer and the unacknowledged scan need the scripted device to answer late or never, and the PASE session's peer-loss suppression is not observable outside client/exchange.",
       "snapshotSha": "a044dded9f253d1868a6a0add6933dd5ab58f415"
     },
     {
@@ -2867,10 +2867,10 @@
       "path": "packages/protocol/test/action/client/ClientInteractionInvokeTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestClientInteractionInvokeCommandRefWireHandling",
-        "controller/interaction:TestClientInteractionInvokeDelayReportData",
-        "controller/interaction:TestClientInteractionInvokeResponseWithoutInteractionModelRevision",
-        "controller/interaction:TestClientInteractionInvokeStatusOrigin"
+        "client/interaction:TestClientInteractionInvokeCommandRefWireHandling",
+        "client/interaction:TestClientInteractionInvokeDelayReportData",
+        "client/interaction:TestClientInteractionInvokeResponseWithoutInteractionModelRevision",
+        "client/interaction:TestClientInteractionInvokeStatusOrigin"
       ],
       "missing": [
         "synthesizes NO_COMMAND_RESPONSE for a request command that received no response",
@@ -2899,10 +2899,10 @@
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
       "status": "ported",
       "go": [
-        "controller/interaction:TestInputChunkAttributes",
-        "controller/interaction:TestInputChunkEvents",
-        "controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
-        "controller/interaction:TestInputChunkRelaxedIntegerTypeChecks"
+        "client/interaction:TestInputChunkAttributes",
+        "client/interaction:TestInputChunkEvents",
+        "client/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
+        "client/interaction:TestInputChunkRelaxedIntegerTypeChecks"
       ],
       "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
       "snapshotSha": "772ad2cf993296093f21c9d2ebc71b6ac3f5092b"
@@ -2928,8 +2928,8 @@
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestClientSubscriptionsResetTimer",
-        "controller/interaction:TestClientSubscriptionsReportStarted"
+        "client/interaction:TestClientSubscriptionsResetTimer",
+        "client/interaction:TestClientSubscriptionsReportStarted"
       ],
       "missing": [
         "keeps a healthy subscription alive across a forward wall-clock step",
@@ -2942,14 +2942,14 @@
       "path": "packages/protocol/test/action/client/subscription/SustainedSubscriptionTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestSustainedSubscription",
-        "controller/interaction:TestSustainedCloseWhileRetrying",
-        "controller/interaction:TestSustainedRefreshRequest",
-        "controller/interaction:TestSustainedRefreshAfterBootstrap",
-        "controller/interaction:TestSustainedSubscriptionClose",
-        "controller/interaction:TestSustainedSubscriptionNonICD",
-        "controller/interaction:TestSustainedSubscriptionEventNumbers",
-        "controller/interaction:TestSustainedSubscriptionMaxEventNumberChanged"
+        "client/interaction:TestSustainedSubscription",
+        "client/interaction:TestSustainedCloseWhileRetrying",
+        "client/interaction:TestSustainedRefreshRequest",
+        "client/interaction:TestSustainedRefreshAfterBootstrap",
+        "client/interaction:TestSustainedSubscriptionClose",
+        "client/interaction:TestSustainedSubscriptionNonICD",
+        "client/interaction:TestSustainedSubscriptionEventNumbers",
+        "client/interaction:TestSustainedSubscriptionMaxEventNumberChanged"
       ],
       "missing": [
         "never reports active when an inactive observer closes the subscription while going live",
@@ -2997,9 +2997,9 @@
       "path": "packages/protocol/test/action/request/InvokeTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestInvokeRequestBuildBasic",
-        "controller/interaction:TestInvokeRequestBuildMultipleCommands",
-        "controller/interaction:TestInvokeRequestBuildOptions"
+        "client/interaction:TestInvokeRequestBuildBasic",
+        "client/interaction:TestInvokeRequestBuildMultipleCommands",
+        "client/interaction:TestInvokeRequestBuildOptions"
       ],
       "missing": [
         "throws when commandRef missing for multiple commands",
@@ -3026,13 +3026,13 @@
       "path": "packages/protocol/test/action/request/ReadTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestReadRequestBuildAttributes",
-        "controller/interaction:TestReadRequestBuildFabricFiltering",
-        "controller/interaction:TestReadRequestBuildDataVersionFilters",
-        "controller/interaction:TestReadRequestBuildEvents",
-        "controller/interaction:TestReadRequestBuildCombined",
-        "controller/interaction:TestReadRequestBuildValidation",
-        "controller/interaction:TestReadRequestBuildInteractionModelRevision"
+        "client/interaction:TestReadRequestBuildAttributes",
+        "client/interaction:TestReadRequestBuildFabricFiltering",
+        "client/interaction:TestReadRequestBuildDataVersionFilters",
+        "client/interaction:TestReadRequestBuildEvents",
+        "client/interaction:TestReadRequestBuildCombined",
+        "client/interaction:TestReadRequestBuildValidation",
+        "client/interaction:TestReadRequestBuildInteractionModelRevision"
       ],
       "missing": [
         "validates request has attributes using containsAttribute",
@@ -3054,14 +3054,14 @@
       "path": "packages/protocol/test/action/request/SubscribeTest.ts",
       "status": "ported",
       "go": [
-        "controller/interaction:TestSubscribeRequestBuildBasic",
-        "controller/interaction:TestSubscribeRequestBuildKeepSubscriptions",
-        "controller/interaction:TestSubscribeRequestBuildIntervals",
-        "controller/interaction:TestSubscribeRequestBuildIntervalValidation",
-        "controller/interaction:TestSubscribeRequestBuildWildcards",
-        "controller/interaction:TestSubscribeRequestBuildFabricFiltering",
-        "controller/interaction:TestSubscribeRequestBuildDataVersionFilters",
-        "controller/interaction:TestSubscribeRequestBuildEventFilters"
+        "client/interaction:TestSubscribeRequestBuildBasic",
+        "client/interaction:TestSubscribeRequestBuildKeepSubscriptions",
+        "client/interaction:TestSubscribeRequestBuildIntervals",
+        "client/interaction:TestSubscribeRequestBuildIntervalValidation",
+        "client/interaction:TestSubscribeRequestBuildWildcards",
+        "client/interaction:TestSubscribeRequestBuildFabricFiltering",
+        "client/interaction:TestSubscribeRequestBuildDataVersionFilters",
+        "client/interaction:TestSubscribeRequestBuildEventFilters"
       ],
       "reason": "Every case runs against the SubscribeRequest Interaction.Subscribe sends (paths and wildcards, keepSubscriptions, interval bounds with the ClientInteraction defaults for unset ones, fabric filtering, data version and event filters) or the out-of-range refusal it returns before sending.",
       "snapshotSha": "1ae482b1028184daed89da56401c1b4c4ff7cb93"
@@ -3070,12 +3070,12 @@
       "path": "packages/protocol/test/action/request/WriteTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestWriteRequestBuildBasic",
-        "controller/interaction:TestWriteRequestBuildTimed",
-        "controller/interaction:TestWriteRequestBuildDataVersions",
-        "controller/interaction:TestWriteRequestBuildChunked",
-        "controller/interaction:TestWriteRequestBuildValidation",
-        "controller/interaction:TestWriteRequestBuildInteractionModelRevision"
+        "client/interaction:TestWriteRequestBuildBasic",
+        "client/interaction:TestWriteRequestBuildTimed",
+        "client/interaction:TestWriteRequestBuildDataVersions",
+        "client/interaction:TestWriteRequestBuildChunked",
+        "client/interaction:TestWriteRequestBuildValidation",
+        "client/interaction:TestWriteRequestBuildInteractionModelRevision"
       ],
       "missing": [
         "throws when undefined options",
@@ -3471,12 +3471,12 @@
       "path": "packages/protocol/test/common/DiscoveryDataTest.ts",
       "status": "ported",
       "go": [
-        "controller/discovery:TestParityDiscovery_TXTParameters",
-        "controller/discovery:TestParityDiscovery_TXTData",
-        "controller/discovery:TestDiscoveryDataCaseInsensitiveKeys",
-        "controller/discovery:TestDiscoveryDataSessionIntervals",
-        "controller/discovery:TestDiscoveryDataIdentity",
-        "controller/discovery:TestDiscoveryDataTransports"
+        "client/discovery:TestParityDiscovery_TXTParameters",
+        "client/discovery:TestParityDiscovery_TXTData",
+        "client/discovery:TestDiscoveryDataCaseInsensitiveKeys",
+        "client/discovery:TestDiscoveryDataSessionIntervals",
+        "client/discovery:TestDiscoveryDataIdentity",
+        "client/discovery:TestDiscoveryDataTransports"
       ],
       "reason": "Every it case runs against ParseTXTData: case-insensitive keys (on a hand-built and on a discovered Name's parameters) and the SII/SAI/SAT, VP/DT/PH and T/ICD accept and drop vectors.",
       "snapshotSha": "a33584fd792721ab0c81c706c643f1fe918cbd3f"
@@ -3979,9 +3979,9 @@
         "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestRoundTrip",
         "im:TestMessengerParity_ReadRequestFitsPayload",
-        "controller/interaction:TestInteractionClientMessengerRead",
-        "controller/interaction:TestInteractionClientMessengerSubscribe",
-        "controller/interaction:TestInteractionClientMessengerWrites"
+        "client/interaction:TestInteractionClientMessengerRead",
+        "client/interaction:TestInteractionClientMessengerSubscribe",
+        "client/interaction:TestInteractionClientMessengerWrites"
       ],
       "missing": [
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
@@ -4013,9 +4013,9 @@
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerTest.ts",
       "status": "ported",
       "go": [
-        "controller/discovery:TestParityDiscovery_CommissionableDevice",
-        "controller/discovery:TestNames_ExpiryRemovesRecordsAndTheName",
-        "controller/discovery:TestCommissionableMdnsScanner"
+        "client/discovery:TestParityDiscovery_CommissionableDevice",
+        "client/discovery:TestNames_ExpiryRemovesRecordsAndTheName",
+        "client/discovery:TestCommissionableMdnsScanner"
       ],
       "reason": "Every case is ported against the Scanner on the in-memory query connection and the fake clock: the D/CM range filter, the goodbye eviction delay and re-announcement, TTL eviction and re-discovery, concurrent searches (the matter.js timeouts as caller contexts cancelled on the fake clock), the reported host, deferred delivery, PTR-follow, staged addresses and the address re-solicit.",
       "snapshotSha": "40364c02024c3a8f779f299934da5775c9c63f09"
@@ -4117,7 +4117,7 @@
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "status": "planned",
-      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: controller/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
+      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: client/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
       "until": "M5 phase 25",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
@@ -4125,13 +4125,13 @@
       "path": "packages/protocol/test/peer/PeerAddressMonitorTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestMonitorSessionSuspect",
-        "controller/peer:TestMonitorMigratesToAnAlternate",
-        "controller/peer:TestMonitorStillDiscoveredAndCooldown",
-        "controller/peer:TestMonitorAllProbesFail",
-        "controller/peer:TestPeerAddressMonitorVerifyReachability",
-        "controller/peer:TestPeerAddressMonitorCoalescing",
-        "controller/peer:TestPeerAddressMonitorBackoff"
+        "client/peer:TestMonitorSessionSuspect",
+        "client/peer:TestMonitorMigratesToAnAlternate",
+        "client/peer:TestMonitorStillDiscoveredAndCooldown",
+        "client/peer:TestMonitorAllProbesFail",
+        "client/peer:TestPeerAddressMonitorVerifyReachability",
+        "client/peer:TestPeerAddressMonitorCoalescing",
+        "client/peer:TestPeerAddressMonitorBackoff"
       ],
       "missing": [
         "sleeping LIT ICD whose address left mDNS: adopts a discovered address on trust, no probe",
@@ -4157,9 +4157,9 @@
       "path": "packages/protocol/test/peer/PeerConnectTimeoutTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestConnectReuseSharedProcessAndTimeout",
-        "controller/peer:TestPeerConnectTimeout"
+        "client/peer:TestParityTimingDefaults",
+        "client/peer:TestConnectReuseSharedProcessAndTimeout",
+        "client/peer:TestPeerConnectTimeout"
       ],
       "missing": [
         "normalizes non-positive timeouts to Instant"
@@ -4171,53 +4171,53 @@
       "path": "packages/protocol/test/peer/PeerConnectionErrorHandlerTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestHandleErrorOverrideAndFatal",
-        "controller/peer:TestConnectionErrorDelays",
-        "controller/peer:TestPeerConnectionErrorHandlerSelection",
-        "controller/peer:TestPeerConnectionErrorHandlerDelayContract",
-        "controller/peer:TestPeerConnectionErrorHandlerRediscoveryGate",
+        "client/peer:TestHandleErrorOverrideAndFatal",
+        "client/peer:TestConnectionErrorDelays",
+        "client/peer:TestPeerConnectionErrorHandlerSelection",
+        "client/peer:TestPeerConnectionErrorHandlerDelayContract",
+        "client/peer:TestPeerConnectionErrorHandlerRediscoveryGate",
         "controller/commissioner:TestPeerConnectionErrorHandlerNoSharedTrustRoots"
       ],
       "missing": [
         "overrides default peer error delay in full flow",
         "does not override delay for unrelated errors in commissioning"
       ],
-      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler, now the commissioner method handleNoSharedTrustRoots, is ported in controller/commissioner; its two full-flow cases are missing because the commissioner cannot be driven through controller/peer.s connection harness (an import cycle), the delay contract itself being TestPeerConnectionErrorHandlerDelayContract.",
+      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler, now the commissioner method handleNoSharedTrustRoots, is ported in controller/commissioner; its two full-flow cases are missing because the commissioner cannot be driven through client/peer.s connection harness (an import cycle), the delay contract itself being TestPeerConnectionErrorHandlerDelayContract.",
       "snapshotSha": "0c50761bbbb22c729a1df590be8c1285b0661bc5"
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionFallbackRetirementTest.ts",
       "status": "ported",
       "go": [
-        "controller/peer:TestFallbackRetiredAfterStabilization",
-        "controller/peer:TestFallbackOnlyAndNotFirst",
-        "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestPeerConnectionFallbackRetirementAfterStabilization",
-        "controller/peer:TestPeerConnectionFallbackRetirementSuperseded",
-        "controller/peer:TestPeerConnectionFallbackRetirementKeepAlive",
-        "controller/peer:TestPeerConnectionFallbackRetirementStagger"
+        "client/peer:TestFallbackRetiredAfterStabilization",
+        "client/peer:TestFallbackOnlyAndNotFirst",
+        "client/peer:TestParityTimingDefaults",
+        "client/peer:TestPeerConnectionFallbackRetirementAfterStabilization",
+        "client/peer:TestPeerConnectionFallbackRetirementSuperseded",
+        "client/peer:TestPeerConnectionFallbackRetirementKeepAlive",
+        "client/peer:TestPeerConnectionFallbackRetirementStagger"
       ],
-      "reason": "The stabilization debounce, retiring a superseded fallback and keeping a re-advertised or alternative-less one, the fallbackSuperseded decision, the deleteAddress keep-alive guard with its force bypass and the scheduler stagger are ported against controller/peer's connection process and its closures.",
+      "reason": "The stabilization debounce, retiring a superseded fallback and keeping a re-advertised or alternative-less one, the fallbackSuperseded decision, the deleteAddress keep-alive guard with its force bypass and the scheduler stagger are ported against client/peer's connection process and its closures.",
       "snapshotSha": "56b81559e7a471d841107791d7c8835cd0147ec4"
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionKickTest.ts",
       "status": "partial",
       "go": [
-        "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestKickRestartsTheExchange",
-        "controller/peer:TestDiscoverKick",
-        "controller/peer:TestPeerConnectionKickTiming",
-        "controller/peer:TestPeerConnectionKickOrigin",
-        "controller/peer:TestPeerConnectionKickRateLimiting",
-        "controller/peer:TestPeerConnectionKickGate",
-        "controller/peer:TestPeerConnectionKickLocalAbort",
-        "controller/peer:TestPeerConnectionKickObserver"
+        "client/peer:TestParityTimingDefaults",
+        "client/peer:TestKickRestartsTheExchange",
+        "client/peer:TestDiscoverKick",
+        "client/peer:TestPeerConnectionKickTiming",
+        "client/peer:TestPeerConnectionKickOrigin",
+        "client/peer:TestPeerConnectionKickRateLimiting",
+        "client/peer:TestPeerConnectionKickGate",
+        "client/peer:TestPeerConnectionKickLocalAbort",
+        "client/peer:TestPeerConnectionKickObserver"
       ],
       "missing": [
         "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>"
       ],
-      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against controller/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
+      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against client/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
       "snapshotSha": "4f67a160bce7d60f1b3c61366ac4d836bdee7267"
     },
     {
@@ -4238,11 +4238,11 @@
       "path": "packages/protocol/test/peer/PeerEstablishmentProgressTest.ts",
       "status": "ported",
       "go": [
-        "controller/peer:TestParityUnresponsiveDetector",
-        "controller/peer:TestEstablishmentUnresponsive",
-        "controller/peer:TestPeerEstablishmentProgressDetector"
+        "client/peer:TestParityUnresponsiveDetector",
+        "client/peer:TestEstablishmentUnresponsive",
+        "client/peer:TestPeerEstablishmentProgressDetector"
       ],
-      "reason": "The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against controller/peer.",
+      "reason": "The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against client/peer.",
       "snapshotSha": "c24a7e3957d9be9c8550459acf4ccf8828b94b3a"
     },
     {
@@ -4298,9 +4298,9 @@
       "path": "packages/protocol/test/protocol/ExchangeManagerTest.ts",
       "status": "partial",
       "go": [
-        "controller/exchange:TestExchangeManagerPeerLoss",
-        "controller/exchange:TestExchangeManagerInboundSecureMessages",
-        "controller/exchange:TestExchangeManagerInboundUnsecuredSessions"
+        "client/exchange:TestExchangeManagerPeerLoss",
+        "client/exchange:TestExchangeManagerInboundSecureMessages",
+        "client/exchange:TestExchangeManagerInboundUnsecuredSessions"
       ],
       "missing": [
         "reports the session lost when the clock stepped back since the session was created",
@@ -4318,9 +4318,9 @@
         "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
         "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
         "transport/mrp:TestBackoffDuration_TransmissionExponent",
-        "controller/exchange:TestMRPRetransmissionIntervalOf",
-        "controller/exchange:TestMRPMaxRetransmissionIntervalOf",
-        "controller/exchange:TestMRPMaxPeerResponseTimeOf"
+        "client/exchange:TestMRPRetransmissionIntervalOf",
+        "client/exchange:TestMRPMaxRetransmissionIntervalOf",
+        "client/exchange:TestMRPMaxPeerResponseTimeOf"
       ],
       "missing": [
         "selects the bdx margin for bulk transfer",
@@ -4333,14 +4333,14 @@
         "includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends",
         "adds our sender-side fixedBackoff to the local return leg only"
       ],
-      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against controller/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
+      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against client/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
       "snapshotSha": "bed8f378fbba434e2451dcd1446b4815d0730193"
     },
     {
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
       "status": "partial",
       "go": [
-        "controller/exchange:TestMessageChannelSocketSwap"
+        "client/exchange:TestMessageChannelSocketSwap"
       ],
       "missing": [
         "stops observing the transport channel address without closing the channel",
@@ -4374,15 +4374,15 @@
       "path": "packages/protocol/test/protocol/MessageExchangeTest.ts",
       "status": "partial",
       "go": [
-        "controller/exchange:TestMessageExchangePeerLossDeclaration",
-        "controller/exchange:TestMessageExchangeHasUnackedMessage",
-        "controller/exchange:TestMessageExchangeLivenessKickOnDuplicate",
-        "controller/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
-        "controller/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
-        "controller/exchange:TestMessageExchangeActivityTracking",
-        "controller/exchange:TestMessageExchangeCloseNotification",
-        "controller/exchange:TestMessageExchangeCrossProtocolStatusReport",
-        "controller/exchange:TestMessageExchangeAckWaitAbort"
+        "client/exchange:TestMessageExchangePeerLossDeclaration",
+        "client/exchange:TestMessageExchangeHasUnackedMessage",
+        "client/exchange:TestMessageExchangeLivenessKickOnDuplicate",
+        "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
+        "client/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
+        "client/exchange:TestMessageExchangeActivityTracking",
+        "client/exchange:TestMessageExchangeCloseNotification",
+        "client/exchange:TestMessageExchangeCrossProtocolStatusReport",
+        "client/exchange:TestMessageExchangeAckWaitAbort"
       ],
       "missing": [
         "retransmits a BDX message within the peer's response budget",
@@ -4427,7 +4427,7 @@
       "go": [
         "transport/mrp:TestEncodeStatusReportMinimalPayload",
         "transport/mrp:TestEncodeStatusReportWithPayload",
-        "controller/exchange:TestProtocolStatusCode"
+        "client/exchange:TestProtocolStatusCode"
       ],
       "reason": "All three StatusReport vectors (standard, vendor-specific without and with protocol data) are ported as an encode/decode round-trip through StatusReport.Encode and DecodeStatusReport, the vendor id in the upper 16 bits of the Go ProtocolID.",
       "snapshotSha": "dd6c059350965b26d9728d18d9d5b6aa05cba848"
@@ -4452,19 +4452,19 @@
         "skips closing TCP sessions",
         "returns undefined when all TCP sessions are closing"
       ],
-      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp. Missing: \"gives the closed exchange a cause that claims nothing about the peer\", js-runtime-only: the error cause of the rejected promise a closed exchange holds (the device bridge's exchanges hold no awaitable); \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object; the four TCP session selection cases (\"finds a TCP session among mixed sessions\", \"returns undefined when no TCP session exists\", \"skips closing TCP sessions\", \"returns undefined when all TCP sessions are closing\"), controller-side: PeerExchangeProvider's choice of a TCP session among a peer's sessions, which the module's controller does not make (controller/peer opens UDP sessions); Register candidate.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp. Missing: \"gives the closed exchange a cause that claims nothing about the peer\", js-runtime-only: the error cause of the rejected promise a closed exchange holds (the device bridge's exchanges hold no awaitable); \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object; the four TCP session selection cases (\"finds a TCP session among mixed sessions\", \"returns undefined when no TCP session exists\", \"skips closing TCP sessions\", \"returns undefined when all TCP sessions are closing\"), controller-side: PeerExchangeProvider's choice of a TCP session among a peer's sessions, which the module's controller does not make (client/peer opens UDP sessions); Register candidate.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {
       "path": "packages/protocol/test/protocol/interaction/AttributeDataDecoderTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestAttributeDataDecoderChunkedArrays",
-        "controller/interaction:TestAttributeDataDecoderChipToolCaptures",
-        "controller/interaction:TestAttributeDataDecoderUnknownValues",
-        "controller/interaction:TestAttributeDataDecoderDuplicates",
-        "controller/interaction:TestAttributeDataDecoderNormalize",
-        "controller/interaction:TestAttributeDataDecoderUnknownCluster"
+        "client/interaction:TestAttributeDataDecoderChunkedArrays",
+        "client/interaction:TestAttributeDataDecoderChipToolCaptures",
+        "client/interaction:TestAttributeDataDecoderUnknownValues",
+        "client/interaction:TestAttributeDataDecoderDuplicates",
+        "client/interaction:TestAttributeDataDecoderNormalize",
+        "client/interaction:TestAttributeDataDecoderUnknownCluster"
       ],
       "missing": [
         "preserves insertion order and deduplicates when same attribute appears twice with another attribute in between"
@@ -4490,9 +4490,9 @@
       "path": "packages/protocol/test/protocol/interaction/EventDataDecoderTest.ts",
       "status": "partial",
       "go": [
-        "controller/interaction:TestEventDataDecoderNormalize",
-        "controller/interaction:TestEventDataDecoderDecode",
-        "controller/interaction:TestEventDataDecoderUnknownEvent"
+        "client/interaction:TestEventDataDecoderNormalize",
+        "client/interaction:TestEventDataDecoderDecode",
+        "client/interaction:TestEventDataDecoderUnknownEvent"
       ],
       "missing": [
         "normalize data with all paths given for multiple events",
@@ -4505,7 +4505,7 @@
       "path": "packages/protocol/test/securechannel/SecureChannelMessengerTest.ts",
       "status": "partial",
       "go": [
-        "controller/exchange:TestSecureChannelMessengerStatusReportsThatMustNotBeReliable"
+        "client/exchange:TestSecureChannelMessengerStatusReportsThatMustNotBeReliable"
       ],
       "missing": [
         "sends Busy with the R flag clear",
@@ -4545,8 +4545,8 @@
       "path": "packages/protocol/test/session/SessionIntervalsTest.ts",
       "status": "partial",
       "go": [
-        "controller/exchange:TestSessionIntervals",
-        "controller/exchange:TestSessionIntervalsForAdvertisement"
+        "client/exchange:TestSessionIntervals",
+        "client/exchange:TestSessionIntervalsForAdvertisement"
       ],
       "missing": [
         "accepts an active threshold over 65535 milliseconds",
@@ -4570,9 +4570,9 @@
         "secure/operational:TestSessionManagerEvictsOnlyForSessionsThePeerEstablished",
         "secure/operational:TestSessionManagerWallClockSteps",
         "groups:TestSessionManagerGroupDataMessageCounter",
-        "controller/exchange:TestSessionManagerActiveThresholdValidation",
-        "controller/exchange:TestSessionManagerMaxPathsPerInvokeValidation",
-        "controller/exchange:TestSessionManagerSessionParameterSetter"
+        "client/exchange:TestSessionManagerActiveThresholdValidation",
+        "client/exchange:TestSessionManagerMaxPathsPerInvokeValidation",
+        "client/exchange:TestSessionManagerSessionParameterSetter"
       ],
       "missing": [
         "stays within the ID range after reusing the session with the highest ID",
@@ -4595,7 +4595,7 @@
         "closes a session on peer shutdown after the clock stepped back",
         "reports session activity on the wall clock as it reads now"
       ],
-      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; missing are live-session reuse under a compressed id range (by design only placeholders are reused), the session pick (controller/peer.NewestSession, BH-3), subscriptions and log origins (no Go counterpart), the Lifetime and legacy-counter migration cases (JS runtime, no legacy store), the rejections of values a Go uint16 or zero-means-unset field cannot carry, and the wall-clock steps, which clocktest.Fake cannot separate from the monotonic reading Go's time.Time compares by.",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; missing are live-session reuse under a compressed id range (by design only placeholders are reused), the session pick (client/peer.NewestSession, BH-3), subscriptions and log origins (no Go counterpart), the Lifetime and legacy-counter migration cases (JS runtime, no legacy store), the rejections of values a Go uint16 or zero-means-unset field cannot carry, and the wall-clock steps, which clocktest.Fake cannot separate from the monotonic reading Go's time.Time compares by.",
       "snapshotSha": "db7bfa3a82d2296b888015c59abf7695f84c43b5"
     },
     {
@@ -4604,10 +4604,10 @@
       "go": [
         "secure/sessionparams:TestEffectiveTransportsGateOnMatter15",
         "secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP",
-        "controller/exchange:TestSessionParameters",
-        "controller/exchange:TestSessionParametersMaxPathsPerInvoke",
-        "controller/exchange:TestSessionParametersTCPSpecVersionGate",
-        "controller/exchange:TestSessionParametersReported"
+        "client/exchange:TestSessionParameters",
+        "client/exchange:TestSessionParametersMaxPathsPerInvoke",
+        "client/exchange:TestSessionParametersTCPSpecVersionGate",
+        "client/exchange:TestSessionParametersReported"
       ],
       "missing": [
         "assumes one for a persisted limit the wire could not have carried",
@@ -4639,7 +4639,7 @@
         "secure:TestParityMatterJS_PasePairing_LeadingZeroW0_PBKDF",
         "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF",
         "secure/spake2:TestPasePairingSpake2Process",
-        "controller/handshake:TestPasePairingPBKDFIterationsFromTheResponder"
+        "client/handshake:TestPasePairingPBKDFIterationsFromTheResponder"
       ],
       "missing": [
         "does not throw when sending the error status report fails",

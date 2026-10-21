@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6134,
+  "entry_points": 6136,
   "entry_packages": [
     ".",
     "bdx",
@@ -9,6 +9,11 @@
     "bootid",
     "bridge",
     "bridge/bridgetest",
+    "client/discovery",
+    "client/exchange",
+    "client/handshake",
+    "client/interaction",
+    "client/peer",
     "clock",
     "clock/clocktest",
     "cluster",
@@ -172,11 +177,6 @@
     "controller/commissioner",
     "controller/dcl",
     "controller/dcl/snapshot",
-    "controller/discovery",
-    "controller/exchange",
-    "controller/handshake",
-    "controller/interaction",
-    "controller/peer",
     "controller/thread",
     "device",
     "diagevent",
@@ -201,6 +201,7 @@
     "parity",
     "schema",
     "script/archcheck",
+    "script/bx4-forward",
     "script/citecheck",
     "script/clustergen",
     "script/coverfloor",
@@ -227,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 13957,
+    "total_exported": 14151,
     "reachable": 9722,
-    "whitelisted": 4230,
+    "whitelisted": 4424,
     "unreachable": 5
   },
   "by_package": [
@@ -5474,6 +5475,1441 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
       "line": 23
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestCommissionableMdnsScanner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_parity_matterjs_test.go",
+      "line": 105
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 172
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDiscoveryDataCaseInsensitiveKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/txt_data_parity_matterjs_test.go",
+      "line": 70
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDiscoveryDataIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/txt_data_parity_matterjs_test.go",
+      "line": 117
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDiscoveryDataSessionIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/txt_data_parity_matterjs_test.go",
+      "line": 86
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDiscoveryDataTransports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/txt_data_parity_matterjs_test.go",
+      "line": 146
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_ChangesAreCoalescedPerTask",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 165
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_ClosedCacheRefusesWork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 210
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_Constructors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 239
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_DependencyReleasedWithTheSRV",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 196
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_ExpiryRemovesRecordsAndTheName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 148
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_InterfaceNameOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 232
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_IrrelevantPacketIsNotStaged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 85
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_PruneCapsStagedHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 132
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_QueryKnownAnswersAreNotCached",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 50
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_SRVTargetAddressesEnterWithTheSRV",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_SourceInterfaceKeptForAAAAOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 181
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_StagedAddressReplayedWhenAnSRVNamesTheHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 64
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_StagedGoodbyeAndFlushAndPrune",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 95
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_UnrelatedRecordsStayOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_test.go",
+      "line": 38
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOperational_ResolveFindsTheSRVTargetsAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/operational_test.go",
+      "line": 52
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOperational_ResolveFollowsSRVTargetChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/operational_test.go",
+      "line": 120
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOperational_ResolveOnAClosedCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/operational_test.go",
+      "line": 151
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOperational_ResolveWaitsForANewAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/operational_test.go",
+      "line": 86
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_AddressOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 198
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 97
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_CommissionableDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 546
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_IdentifierMatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 494
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_IngressFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 174
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_OperationalQName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 628
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_QueryNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 469
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_RecordKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 24
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_ResolutionQueries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 643
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_RetrySchedule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 299
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_ScannerFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 608
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_ServiceAddressShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 256
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_TTLRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 51
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_TXTData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 363
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_TXTParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 145
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestParityDiscovery_UnavailableSRVIgnored",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/parity_matterjs_test.go",
+      "line": 124
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_CachedMatchesFirstAndCancelInCallbackSkipsTheNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 116
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_CachedWithoutAddressIsSolicitedOnSearch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 227
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_CancelCloseAndClosedCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 251
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_CleanupTimerRunsEveryHalfHour",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 321
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_FindByLongDiscriminator",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 66
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_FollowsPointersSpeculatively",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 140
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_InvalidTXTNeverBuildsAndNameExpiryDropsTheCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 187
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_SpeculativeTargetsAreBoundedAndPruned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_test.go",
+      "line": 287
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_AddressChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 114
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_AddressChangesEndWithTheService",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 152
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_AddressesFollowTheSRVTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 34
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_Changes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/status_test.go",
+      "line": 104
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 73
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_SeededFromTheCacheAndUnzonedWithoutInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/service_test.go",
+      "line": 62
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestService_TXTDataFromTheOperationalRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/txt_data_test.go",
+      "line": 13
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestSolicitor_ClosedSolicitorSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/solicitor_test.go",
+      "line": 154
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestSolicitor_DiscoverEndsWithTheScheduleAndTheCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/solicitor_test.go",
+      "line": 117
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestSolicitor_DiscoverRunsOneScheduleForAllCallers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/solicitor_test.go",
+      "line": 75
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestSolicitor_KnownAnswersIncludeAssociatedNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/solicitor_test.go",
+      "line": 51
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestSolicitor_SolicitationsOfOneTaskShareAPacket",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/solicitor_test.go",
+      "line": 25
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestStatus_ConnectingResolvesUntilAnAddressAppears",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/status_test.go",
+      "line": 30
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestStatus_FailedAttemptAndReachabilityStopResolving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/status_test.go",
+      "line": 67
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "Clock",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/exchange/clock.go",
+      "line": 15
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "SystemClock",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/exchange/clock.go",
+      "line": 21
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestActiveTimestamp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/address_test.go",
+      "line": 65
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestAddressOverrideAndSetAddr",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/address_test.go",
+      "line": 21
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestCloseBehaviour",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 403
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestCloseSessionSendsCloseSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 643
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestCloseTimerExpires",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 481
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestDefaultsAndAccessors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 752
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 157
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 506
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 33
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangeManagerInboundSecureMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
+      "line": 92
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangeManagerInboundUnsecuredSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
+      "line": 125
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangeManagerPeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
+      "line": 41
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestExchangePeerLossClosesThePeersSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/peerloss_test.go",
+      "line": 123
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 108
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestHandlerTakesPeerOpenedIMExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 53
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMRPMaxPeerResponseTimeOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/mrp_parity_matterjs_test.go",
+      "line": 73
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMRPMaxRetransmissionIntervalOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/mrp_parity_matterjs_test.go",
+      "line": 49
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMRPRetransmissionIntervalOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/mrp_parity_matterjs_test.go",
+      "line": 33
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestManagerHandlePeerLossAsOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/peerloss_test.go",
+      "line": 95
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageChannelSocketSwap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messagechannel_parity_matterjs_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeAckWaitAbort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 543
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeActivityTracking",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 429
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeBDXRetransmissionIntervalCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 411
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeCloseNotification",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 457
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeCrossProtocolStatusReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 485
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeHasUnackedMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 238
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeLivenessKickOnDuplicate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 319
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangePeerLossDeclaration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 159
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 352
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 365
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestOnSendAndOnReceive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/hooks_test.go",
+      "line": 43
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPBKDFParamRequestIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 244
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParityMRPConstants",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 23
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParityMaxPeerResponseTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 79
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParityPeerOpenedExchangeDispatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 192
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParityRetransmissionInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 51
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParitySessionParameterFallbacks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 100
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestParityStatusReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/parity_matterjs_test.go",
+      "line": 144
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPeerCloseSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/securechannel_test.go",
+      "line": 30
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPeerLostHook",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 590
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 271
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPeerSecureChannelOthers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/securechannel_test.go",
+      "line": 64
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestProtocolStatusCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/protocolstatuscode_parity_matterjs_test.go",
+      "line": 17
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestReliableManagerRunsNoMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/reliable_test.go",
+      "line": 20
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestRetransmissionCountAndRestartSaving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/retransmission_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestRetransmissionOptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 300
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestRetransmissionSchedule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 245
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 193
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSecondSendWhileUnackedIsFlowError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 138
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSecureSessionRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 551
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSendContextCancelled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 336
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 95
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSessionHandlePeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/peerloss_test.go",
+      "line": 61
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSessionIDAllocation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 670
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestShutdownWaitsForTheHandlers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 302
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSigma1ReachesHandlerOnInboundSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 172
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/handler_test.go",
+      "line": 226
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestStatusReportTravelsOnSecureChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 220
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestUnsecuredSessionParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 715
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 69
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "Timer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/exchange/clock.go",
+      "line": 18
+    },
+    {
+      "package": "client/handshake",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/handshake/resumption.go",
+      "line": 21
+    },
+    {
+      "package": "client/handshake",
+      "identifier": "TestParityCASEServerErrorReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/handshake/parity_matterjs_test.go",
+      "line": 53
+    },
+    {
+      "package": "client/handshake",
+      "identifier": "TestParityCASEServerStatusCodes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/handshake/parity_matterjs_test.go",
+      "line": 28
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAssemblerEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_internal_test.go",
+      "line": 128
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAssemblerLists",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_internal_test.go",
+      "line": 81
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAssemblerTagCompression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_internal_test.go",
+      "line": 48
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderChipToolCaptures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 277
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderChunkedArrays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 232
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderDuplicates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 381
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderNormalize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 396
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderUnknownCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 437
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestAttributeDataDecoderUnknownValues",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/attribute_data_decoder_parity_matterjs_test.go",
+      "line": 341
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestEncodeFitting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_internal_test.go",
+      "line": 161
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestEventDataDecoderDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/event_data_decoder_parity_matterjs_test.go",
+      "line": 104
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestEventDataDecoderNormalize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/event_data_decoder_parity_matterjs_test.go",
+      "line": 94
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestEventDataDecoderUnknownEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/event_data_decoder_parity_matterjs_test.go",
+      "line": 115
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 64
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 219
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkOrderingAcrossAttributesAndEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 286
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInputChunkRelaxedIntegerTypeChecks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/input_chunk_parity_matterjs_test.go",
+      "line": 301
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_internal_test.go",
+      "line": 14
+    },
+    {
+      "package": "client/peer",
+      "identifier": "MemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/peer/store.go",
+      "line": 93
+    },
+    {
+      "package": "client/peer",
+      "identifier": "Probe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/export_test.go",
+      "line": 16
+    },
+    {
+      "package": "client/peer",
+      "identifier": "ResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "client/peer/store.go",
+      "line": 89
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestAddKnownPeerMergeAndCoalescedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 68
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestAdoptSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 152
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestCloseDeleteAndDisconnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 209
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectDiscoveredAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 59
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectReuseSharedProcessAndTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 312
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectionErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 189
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestDiscoverKick",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 403
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestEstablishmentUnresponsive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 436
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestFallbackOnlyAndNotFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 91
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestFallbackRetiredAfterStabilization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 121
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestHandleErrorOverrideAndFatal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 259
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestKickRestartsTheExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 355
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/store_test.go",
+      "line": 45
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMemoryStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/store_test.go",
+      "line": 15
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorAllProbesFail",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 167
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorMigratesToAnAlternate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 133
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorScheduledByAServiceChange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 224
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSessionSuspect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 193
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorStillDiscoveredAndCooldown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 95
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestNewSetNeedsItsCollaborators",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 22
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 243
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestObserve",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/observer_test.go",
+      "line": 18
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestObserveEstablishmentUnresponsive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/observer_test.go",
+      "line": 68
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestOperationalAddressStaysAsFallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 164
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 93
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityKnownPeerMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 176
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityProbeCooldownFibonacci",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 153
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityTimingDefaults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 23
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityTimingMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 58
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestParityUnresponsiveDetector",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/parity_matterjs_test.go",
+      "line": 132
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerAddressMonitorBackoff",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 237
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerAddressMonitorCoalescing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 200
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerAddressMonitorVerifyReachability",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
+      "line": 111
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connect_timeout_parity_matterjs_test.go",
+      "line": 52
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionErrorHandlerDelayContract",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 81
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionErrorHandlerRediscoveryGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 109
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionErrorHandlerSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_error_handler_parity_matterjs_test.go",
+      "line": 58
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementAfterStabilization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 50
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementKeepAlive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 126
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementStagger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 168
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionFallbackRetirementSuperseded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
+      "line": 97
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 224
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickLocalAbort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 282
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickObserver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 344
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickOrigin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 91
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickRateLimiting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 154
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerConnectionKickTiming",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_connection_kick_parity_matterjs_test.go",
+      "line": 25
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerEstablishmentProgressDetector",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_establishment_progress_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProbeFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/probe_test.go",
+      "line": 132
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestProbeReadsTheReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/probe_test.go",
+      "line": 86
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestServiceChangeUpdatesDiscoveryData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 124
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestSessionParametersPreferTheReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 191
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestSetForGetAndUnknownFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/set_test.go",
+      "line": 43
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestStoresImplementTheInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/store_test.go",
+      "line": 72
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestTwoAddressesStaggered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 145
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestUnhandledErrorAndDisconnectedSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/connection_test.go",
+      "line": 292
     },
     {
       "package": "clock/clocktest",
@@ -18651,1438 +20087,1361 @@
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestCommissionableMdnsScanner",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_parity_matterjs_test.go",
-      "line": 105
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
-      "line": 172
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestDiscoveryDataCaseInsensitiveKeys",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
-      "line": 70
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestDiscoveryDataIdentity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
-      "line": 117
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestDiscoveryDataSessionIntervals",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
-      "line": 86
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestDiscoveryDataTransports",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/txt_data_parity_matterjs_test.go",
-      "line": 146
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_ChangesAreCoalescedPerTask",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 165
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_ClosedCacheRefusesWork",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 210
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_Constructors",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 239
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_DependencyReleasedWithTheSRV",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 196
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_ExpiryRemovesRecordsAndTheName",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 148
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_InterfaceNameOf",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 232
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_IrrelevantPacketIsNotStaged",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 85
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_PruneCapsStagedHosts",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 132
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_QueryKnownAnswersAreNotCached",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 50
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestNames_SRVTargetAddressesEnterWithTheSRV",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
+      "identifier": "Address",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
       "line": 19
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestNames_SourceInterfaceKeptForAAAAOnly",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 181
+      "identifier": "AddressAdded",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 42
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestNames_StagedAddressReplayedWhenAnSRVNamesTheHost",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 64
+      "identifier": "AddressChange",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 20
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestNames_StagedGoodbyeAndFlushAndPrune",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 95
+      "identifier": "AddressChangeKind",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 21
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestNames_UnrelatedRecordsStayOut",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/names_test.go",
-      "line": 38
+      "identifier": "AddressDeleted",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 43
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestOperational_ResolveFindsTheSRVTargetsAddress",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/operational_test.go",
-      "line": 52
+      "identifier": "AnyCommissionable",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 68
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestOperational_ResolveFollowsSRVTargetChanges",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/operational_test.go",
-      "line": 120
+      "identifier": "ByDeviceType",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 69
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestOperational_ResolveOnAClosedCache",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/operational_test.go",
-      "line": 151
+      "identifier": "ByInstanceID",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 70
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestOperational_ResolveWaitsForANewAddress",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/operational_test.go",
-      "line": 86
+      "identifier": "ByLongDiscriminator",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 71
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_AddressOrder",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 198
+      "identifier": "ByProduct",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 72
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 97
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_CommissionableDevice",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 546
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_IdentifierMatches",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 494
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_IngressFilter",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 174
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_OperationalQName",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 628
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_QueryNames",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 469
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_RecordKeys",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 24
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_ResolutionQueries",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 643
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_RetrySchedule",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 299
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_ScannerFilter",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 608
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_ServiceAddressShape",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 256
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_TTLRules",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 51
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_TXTData",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 363
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_TXTParameters",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 145
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestParityDiscovery_UnavailableSRVIgnored",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 124
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_CachedMatchesFirstAndCancelInCallbackSkipsTheNetwork",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 116
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_CachedWithoutAddressIsSolicitedOnSearch",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 227
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_CancelCloseAndClosedCache",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 251
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_CleanupTimerRunsEveryHalfHour",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 321
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_FindByLongDiscriminator",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 66
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_FollowsPointersSpeculatively",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 140
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_InvalidTXTNeverBuildsAndNameExpiryDropsTheCache",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 187
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestScanner_SpeculativeTargetsAreBoundedAndPruned",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/scanner_test.go",
-      "line": 287
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestService_AddressChanges",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
-      "line": 114
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestService_AddressChangesEndWithTheService",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
-      "line": 152
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestService_AddressesFollowTheSRVTarget",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
-      "line": 34
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestService_Changes",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/status_test.go",
-      "line": 104
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
+      "identifier": "ByShortDiscriminator",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
       "line": 73
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestService_SeededFromTheCacheAndUnzonedWithoutInterface",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/service_test.go",
-      "line": 62
+      "identifier": "ByVendor",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 74
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestService_TXTDataFromTheOperationalRecord",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/txt_data_test.go",
-      "line": 13
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestSolicitor_ClosedSolicitorSendsNothing",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/solicitor_test.go",
-      "line": 154
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestSolicitor_DiscoverEndsWithTheScheduleAndTheCache",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/solicitor_test.go",
-      "line": 117
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TestSolicitor_DiscoverRunsOneScheduleForAllCallers",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/solicitor_test.go",
+      "identifier": "ByVendorProduct",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
       "line": 75
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestSolicitor_KnownAnswersIncludeAssociatedNames",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/solicitor_test.go",
-      "line": 51
+      "identifier": "Changes",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 22
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestSolicitor_SolicitationsOfOneTaskShareAPacket",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/solicitor_test.go",
+      "identifier": "CommissioningRetryInterval",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 44
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "CompareDesirability",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 76
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "DefaultEvictionDelay",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 45
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "DefaultMinTTL",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 46
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "DefaultRetries",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 61
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "DefaultTTLGraceFactor",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 47
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Device",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 23
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Discovery",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 24
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "ErrClosed",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 62
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Identifier",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
       "line": 25
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestStatus_ConnectingResolvesUntilAnAddressAppears",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/status_test.go",
+      "identifier": "Name",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 26
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Names",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 27
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "NewNames",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 77
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "NewScanner",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 78
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "NewService",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 79
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Open",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 80
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "OperationalQName",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 81
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Parameters",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 28
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "ParseTXTData",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 82
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "ParseTxtDecimal",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 83
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "PreferenceIPv4",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 48
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "PreferenceIPv6",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 49
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "PreferenceIPv6LinkLocal",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 50
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "PreferenceIPv6ULA",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 51
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Record",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 29
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Retries",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
       "line": 30
     },
     {
       "package": "controller/discovery",
-      "identifier": "TestStatus_FailedAttemptAndReachabilityStopResolving",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/discovery/status_test.go",
-      "line": 67
+      "identifier": "Scanner",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 31
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "SelectionPreference",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 84
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Service",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 32
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Solicitation",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 33
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Solicitor",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 34
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "Status",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 35
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "SupportedTransports",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 36
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TXTData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/discovery/forward.go",
+      "line": 37
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TypeA",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 52
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TypeAAAA",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 53
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TypePTR",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 54
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TypeSRV",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 55
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TypeTXT",
+      "reason": "BX4 forward of client/discovery; tests reach it there",
+      "file": "controller/discovery/forward.go",
+      "line": 56
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "CheckStatusReport",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 74
     },
     {
       "package": "controller/exchange",
       "identifier": "Clock",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/clock.go",
-      "line": 15
+      "file": "controller/exchange/forward.go",
+      "line": 19
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Config",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 20
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Conn",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 21
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "DecodeStatusReport",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 75
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "DefaultExpectedProcessingTime",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 45
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "DefaultLocalParameters",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 76
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrExchangeClosed",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 61
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrFlow",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 62
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrNetwork",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 63
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrNoSessionID",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 64
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrRetransmissionLimit",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 65
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrSessionClosed",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 66
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrTransient",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 67
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ErrUnexpectedMessage",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 68
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Exchange",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 22
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackActiveInterval",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 46
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackActiveThreshold",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 47
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackDataModelRevision",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 48
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackIdleInterval",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 49
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackInteractionModelRevision",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 50
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "FallbackMaxPathsPerInvoke",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 51
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Intervals",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 23
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "IntervalsOf",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 77
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Manager",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 24
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "MaxConcurrentExchangesPerSession",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 52
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "MaxPayloadSize",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 53
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "MaxPeerResponseTime",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 78
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "MaxTransmissions",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 54
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Message",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 25
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "NewManager",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 79
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Options",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 26
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Overlay",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 80
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 27
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "PeerInitiatedCloseError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 28
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "PeerMessageMissingError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 29
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "PeerParameters",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 81
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "PeerUnresponsiveError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 30
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ProtocolHandler",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 31
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ReceiveOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 32
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "ReliableMaxPeerResponseTime",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 82
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "RetransmissionInterval",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 83
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "SecureSessionConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 33
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "SendOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 34
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "Session",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 35
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "StandaloneAckTimeout",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 55
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "StatusReport",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 36
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "StatusReportError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 37
     },
     {
       "package": "controller/exchange",
       "identifier": "SystemClock",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/clock.go",
-      "line": 21
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestActiveTimestamp",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/address_test.go",
-      "line": 65
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestAddressOverrideAndSetAddr",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/address_test.go",
-      "line": 21
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestCloseBehaviour",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 403
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestCloseSessionSendsCloseSession",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 643
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestCloseTimerExpires",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 481
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestDefaultsAndAccessors",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 752
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 157
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 506
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 33
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangeManagerInboundSecureMessages",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 92
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangeManagerInboundUnsecuredSessions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 125
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangeManagerPeerLoss",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 41
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestExchangePeerLossClosesThePeersSessions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/peerloss_test.go",
-      "line": 123
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 108
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestHandlerTakesPeerOpenedIMExchange",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 53
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMRPMaxPeerResponseTimeOf",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/mrp_parity_matterjs_test.go",
-      "line": 73
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMRPMaxRetransmissionIntervalOf",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/mrp_parity_matterjs_test.go",
-      "line": 49
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMRPRetransmissionIntervalOf",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/mrp_parity_matterjs_test.go",
-      "line": 33
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestManagerHandlePeerLossAsOf",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/peerloss_test.go",
-      "line": 95
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageChannelSocketSwap",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messagechannel_parity_matterjs_test.go",
-      "line": 19
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeAckWaitAbort",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 543
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeActivityTracking",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 429
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeBDXRetransmissionIntervalCap",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 411
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeCloseNotification",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 457
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeCrossProtocolStatusReport",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 485
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeHasUnackedMessage",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 238
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeLivenessKickOnDuplicate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 319
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangePeerLossDeclaration",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 159
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 352
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 365
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestOnSendAndOnReceive",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/hooks_test.go",
-      "line": 43
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestPBKDFParamRequestIsRefused",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 244
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParityMRPConstants",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 23
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParityMaxPeerResponseTime",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 79
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParityPeerOpenedExchangeDispatch",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 192
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParityRetransmissionInterval",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 51
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParitySessionParameterFallbacks",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 100
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestParityStatusReport",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 144
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestPeerCloseSession",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/securechannel_test.go",
-      "line": 30
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestPeerLostHook",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 590
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 271
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestPeerSecureChannelOthers",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/securechannel_test.go",
-      "line": 64
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestProtocolStatusCode",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/protocolstatuscode_parity_matterjs_test.go",
-      "line": 17
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestReliableManagerRunsNoMRP",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/reliable_test.go",
-      "line": 20
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestRetransmissionCountAndRestartSaving",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/retransmission_test.go",
-      "line": 19
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestRetransmissionOptions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 300
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestRetransmissionSchedule",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 245
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 193
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSecondSendWhileUnackedIsFlowError",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 138
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSecureSessionRoundTrip",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 551
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSendContextCancelled",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 336
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 95
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSessionHandlePeerLoss",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/peerloss_test.go",
-      "line": 61
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSessionIDAllocation",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 670
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestShutdownWaitsForTheHandlers",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 302
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSigma1ReachesHandlerOnInboundSession",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 172
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/handler_test.go",
-      "line": 226
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestStatusReportTravelsOnSecureChannel",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 220
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestUnsecuredSessionParameters",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 715
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/exchange_test.go",
-      "line": 69
+      "file": "controller/exchange/forward.go",
+      "line": 38
     },
     {
       "package": "controller/exchange",
       "identifier": "Timer",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/clock.go",
-      "line": 18
+      "file": "controller/exchange/forward.go",
+      "line": 39
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "UnexpectedMessageError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/exchange/forward.go",
+      "line": 40
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "UnsecuredSessionID",
+      "reason": "BX4 forward of client/exchange; tests reach it there",
+      "file": "controller/exchange/forward.go",
+      "line": 56
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "CASE",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 48
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "CASEOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 19
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "CASEServer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 20
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "CASEServerConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 21
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "DefaultNormalProcessingTime",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 34
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "DefaultPasscodeID",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 35
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "ErrPasscodeMismatch",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 41
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "ErrUnexpectedData",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 42
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "ExpectedCryptoProcessingTime",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 36
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "Fabric",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 22
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "FabricList",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 23
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "FabricResolver",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 24
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "MemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 25
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "NewCASEServer",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 49
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "PASE",
+      "reason": "BX4 forward of client/handshake; tests reach it there",
+      "file": "controller/handshake/forward.go",
+      "line": 50
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "PASEOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 26
     },
     {
       "package": "controller/handshake",
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/resumption.go",
-      "line": 21
+      "file": "controller/handshake/forward.go",
+      "line": 27
     },
     {
       "package": "controller/handshake",
-      "identifier": "TestParityCASEServerErrorReport",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/handshake/parity_matterjs_test.go",
-      "line": 53
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "TestParityCASEServerStatusCodes",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/handshake/parity_matterjs_test.go",
+      "identifier": "ResumptionRecord",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
       "line": 28
     },
     {
-      "package": "controller/interaction",
-      "identifier": "TestAssemblerEvents",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/report_internal_test.go",
-      "line": 128
+      "package": "controller/handshake",
+      "identifier": "ResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/forward.go",
+      "line": 29
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAssemblerLists",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/report_internal_test.go",
-      "line": 81
+      "identifier": "AttributeData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 19
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAssemblerTagCompression",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/report_internal_test.go",
+      "identifier": "AttributeStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 20
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Bind",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 70
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Config",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 21
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "DefaultMinIntervalFloor",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 45
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "DefaultMinimumResponseTimeoutWithFailsafe",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 46
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "DefaultReadPathsSupported",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 47
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "DefaultSubscribePathsSupported",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
       "line": 48
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderChipToolCaptures",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 277
+      "identifier": "DefaultSustainRetries",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 57
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderChunkedArrays",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 232
+      "identifier": "DefaultTimedRequestTimeout",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 49
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderDuplicates",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 381
+      "identifier": "ErrMalformedRequest",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 58
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderNormalize",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 396
+      "identifier": "ErrNoResponse",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 59
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderUnknownCluster",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 437
+      "identifier": "ErrNoSession",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 60
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestAttributeDataDecoderUnknownValues",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/attribute_data_decoder_parity_matterjs_test.go",
-      "line": 341
+      "identifier": "ErrNoSubscriptions",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 61
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestEncodeFitting",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/report_internal_test.go",
-      "line": 161
+      "identifier": "ErrRequestTooLarge",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 62
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestEventDataDecoderDecode",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/event_data_decoder_parity_matterjs_test.go",
-      "line": 104
+      "identifier": "ErrUncommissioned",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 63
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestEventDataDecoderNormalize",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/event_data_decoder_parity_matterjs_test.go",
-      "line": 94
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "TestEventDataDecoderUnknownEvent",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/event_data_decoder_parity_matterjs_test.go",
-      "line": 115
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "TestInputChunkAttributes",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
+      "identifier": "ErrUnexpectedMessage",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
       "line": 64
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestInputChunkEvents",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
-      "line": 219
+      "identifier": "EventData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 22
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestInputChunkOrderingAcrossAttributesAndEvents",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
-      "line": 286
+      "identifier": "EventStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 23
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestInputChunkRelaxedIntegerTypeChecks",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/input_chunk_parity_matterjs_test.go",
-      "line": 301
+      "identifier": "ExchangeOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 24
     },
     {
       "package": "controller/interaction",
-      "identifier": "TestRetries",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/interaction/sustained_internal_test.go",
-      "line": 14
+      "identifier": "ForPeer",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 71
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Interaction",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 25
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Interval",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 72
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "InvokeOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 26
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "ListChunked",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 73
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "New",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 74
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "NewSubscriptions",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 75
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "NoSubscription",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 50
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "PeerProvider",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 76
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Provider",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 27
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Raw",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 77
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "ReadRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 28
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Report",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 29
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Result",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 30
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "RetrySchedule",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 31
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "SessionProvider",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 78
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "StatusError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 32
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "SubscribeRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 33
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Subscription",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 34
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "SubscriptionMaxIntervalPublisherLimit",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 51
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "SubscriptionProcessingTime",
+      "reason": "BX4 forward of client/interaction; tests reach it there",
+      "file": "controller/interaction/forward.go",
+      "line": 52
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "Subscriptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 35
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "SubscriptionsConfig",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 36
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "WriteOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 37
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "WriteRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 38
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "WriteStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 39
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "WriteStatuses",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/interaction/forward.go",
+      "line": 40
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ConnectOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 19
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "Context",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 20
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "DefaultTiming",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 52
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "Descriptor",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 21
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ErrClosed",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 45
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ErrNotConnectable",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 46
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ErrorHandler",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 22
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "KickRestartCooldown",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 23
     },
     {
       "package": "controller/peer",
       "identifier": "MemoryResumptionStore",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/store.go",
-      "line": 93
+      "file": "controller/peer/forward.go",
+      "line": 24
     },
     {
       "package": "controller/peer",
-      "identifier": "Probe",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/export_test.go",
-      "line": 16
+      "identifier": "MemoryStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 25
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "Merge",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 53
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "NewSet",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 54
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "Observer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 26
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "Peer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 27
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ProbeCooldown",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 28
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ReachabilityReason",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 29
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ReasonAddressChange",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 39
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ReasonSessionSuspect",
+      "reason": "BX4 forward of client/peer; tests reach it there",
+      "file": "controller/peer/forward.go",
+      "line": 40
     },
     {
       "package": "controller/peer",
       "identifier": "ResumptionStore",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/store.go",
-      "line": 89
+      "file": "controller/peer/forward.go",
+      "line": 30
     },
     {
       "package": "controller/peer",
-      "identifier": "TestAddKnownPeerMergeAndCoalescedSave",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 68
+      "identifier": "Set",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 31
     },
     {
       "package": "controller/peer",
-      "identifier": "TestAdoptSessions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 152
+      "identifier": "Store",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 32
     },
     {
       "package": "controller/peer",
-      "identifier": "TestCloseDeleteAndDisconnect",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 209
+      "identifier": "Timing",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 33
     },
     {
       "package": "controller/peer",
-      "identifier": "TestConnectDiscoveredAddress",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 59
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestConnectReuseSharedProcessAndTimeout",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 312
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestConnectionErrorDelays",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 189
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestDiscoverKick",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 403
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestEstablishmentUnresponsive",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 436
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestFallbackOnlyAndNotFirst",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 91
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestFallbackRetiredAfterStabilization",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 121
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestHandleErrorOverrideAndFatal",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 259
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestKickRestartsTheExchange",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 355
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMemoryResumptionStore",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/store_test.go",
-      "line": 45
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMemoryStore",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/store_test.go",
-      "line": 15
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMonitorAllProbesFail",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/monitor_test.go",
-      "line": 167
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMonitorMigratesToAnAlternate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/monitor_test.go",
-      "line": 133
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMonitorScheduledByAServiceChange",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/monitor_test.go",
-      "line": 224
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMonitorSessionSuspect",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/monitor_test.go",
-      "line": 193
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestMonitorStillDiscoveredAndCooldown",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/monitor_test.go",
-      "line": 95
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestNewSetNeedsItsCollaborators",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 22
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 243
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestObserve",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/observer_test.go",
-      "line": 18
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestObserveEstablishmentUnresponsive",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/observer_test.go",
-      "line": 68
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestOperationalAddressStaysAsFallback",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 164
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityErrorDelays",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 93
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityKnownPeerMerge",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 176
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityProbeCooldownFibonacci",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 153
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityTimingDefaults",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 23
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityTimingMerge",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 58
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestParityUnresponsiveDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/parity_matterjs_test.go",
-      "line": 132
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerAddressMonitorBackoff",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 237
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerAddressMonitorCoalescing",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 200
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerAddressMonitorVerifyReachability",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 111
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectTimeout",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connect_timeout_parity_matterjs_test.go",
-      "line": 52
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionErrorHandlerDelayContract",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
-      "line": 81
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionErrorHandlerRediscoveryGate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
-      "line": 109
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionErrorHandlerSelection",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_error_handler_parity_matterjs_test.go",
-      "line": 58
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionFallbackRetirementAfterStabilization",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 50
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionFallbackRetirementKeepAlive",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 126
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionFallbackRetirementStagger",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 168
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionFallbackRetirementSuperseded",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 97
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickGate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 224
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickLocalAbort",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 282
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickObserver",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 344
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickOrigin",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 91
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickRateLimiting",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 154
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerConnectionKickTiming",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_connection_kick_parity_matterjs_test.go",
-      "line": 25
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestPeerEstablishmentProgressDetector",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/peer_establishment_progress_parity_matterjs_test.go",
-      "line": 18
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestProbeFailures",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/probe_test.go",
-      "line": 132
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestProbeReadsTheReports",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/probe_test.go",
-      "line": 86
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestServiceChangeUpdatesDiscoveryData",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 124
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestSessionParametersPreferTheReport",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 191
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestSetForGetAndUnknownFabric",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/set_test.go",
-      "line": 43
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestStoresImplementTheInterfaces",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/store_test.go",
-      "line": 72
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestTwoAddressesStaggered",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 145
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestUnhandledErrorAndDisconnectedSet",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/connection_test.go",
-      "line": 292
+      "identifier": "UnreachableError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/forward.go",
+      "line": 34
     },
     {
       "package": "controller/thread",

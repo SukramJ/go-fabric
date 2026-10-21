@@ -40,6 +40,7 @@ type (
 	WriteStatuses       = interaction.WriteStatuses
 )
 
+// fabric:reachable:reason="BX4 forward of client/interaction; tests reach it there"
 const (
 	DefaultMinIntervalFloor                   = interaction.DefaultMinIntervalFloor
 	DefaultMinimumResponseTimeoutWithFailsafe = interaction.DefaultMinimumResponseTimeoutWithFailsafe
@@ -51,6 +52,7 @@ const (
 	SubscriptionProcessingTime                = interaction.SubscriptionProcessingTime
 )
 
+// fabric:reachable:reason="BX4 forward of client/interaction; tests reach it there"
 var (
 	DefaultSustainRetries = interaction.DefaultSustainRetries
 	ErrMalformedRequest   = interaction.ErrMalformedRequest
@@ -63,6 +65,7 @@ var (
 )
 
 // Functions forward as variables of the same function type.
+// fabric:reachable:reason="BX4 forward of client/interaction; tests reach it there"
 var (
 	Bind             = interaction.Bind
 	ForPeer          = interaction.ForPeer

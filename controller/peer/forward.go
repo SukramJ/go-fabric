@@ -34,17 +34,20 @@ type (
 	UnreachableError      = peer.UnreachableError
 )
 
+// fabric:reachable:reason="BX4 forward of client/peer; tests reach it there"
 const (
 	ReasonAddressChange  = peer.ReasonAddressChange
 	ReasonSessionSuspect = peer.ReasonSessionSuspect
 )
 
+// fabric:reachable:reason="BX4 forward of client/peer; tests reach it there"
 var (
 	ErrClosed         = peer.ErrClosed
 	ErrNotConnectable = peer.ErrNotConnectable
 )
 
 // Functions forward as variables of the same function type.
+// fabric:reachable:reason="BX4 forward of client/peer; tests reach it there"
 var (
 	DefaultTiming = peer.DefaultTiming
 	Merge         = peer.Merge

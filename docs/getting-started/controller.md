@@ -17,10 +17,10 @@ reference controller's `openStack` builds them in this order:
 | Database | `store`, `controller/client/sqlstore` | the settings table and the client images; both schemas applied |
 | Certificate authority | `controller/ca` | the fabric's root of trust; issues our NOC and every node's |
 | Fabric | `controller/commissioner` (`NewFabric`) | our operational identity on the fabric |
-| Socket | `transport/udp`, `controller/exchange` | one UDP socket; sessions and exchanges with MRP |
-| DNS-SD | `controller/discovery` | the browser for commissionable and operational records |
-| Peers | `controller/peer` | the nodes of our fabrics, with CASE on demand |
-| Subscriptions | `controller/interaction` | the registry of client subscriptions |
+| Socket | `transport/udp`, `client/exchange` | one UDP socket; sessions and exchanges with MRP |
+| DNS-SD | `client/discovery` | the browser for commissionable and operational records |
+| Peers | `client/peer` | the nodes of our fabrics, with CASE on demand |
+| Subscriptions | `client/interaction` | the registry of client subscriptions |
 | Commissioner | `controller/commissioner` (`New`) | PASE, attestation, CSR, NOC, CommissioningComplete |
 | Registry | `controller/client` | one image per remote node, persisted |
 
@@ -188,7 +188,7 @@ establishes CASE when no session is live.
   hands each report to a channel. `Sustain` re-establishes a subscription
   that was lost.
 
-*Source: `controller/client/interact.go:15-120`, `controller/interaction/write.go:39-52`, `controller/interaction/invoke.go:19-31`, `controller/interaction/subscribe.go:44-90`, `controller/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
+*Source: `controller/client/interact.go:15-120`, `client/interaction/write.go:39-52`, `client/interaction/invoke.go:19-31`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
 
 ## What is not here yet
 
@@ -197,4 +197,4 @@ side are outside the current stages. Group messages and OTA images need a node o
 the fabric. The reference controller starts its own node for `group` and
 `ota` and keeps it in the same database.
 
-*Source: `controller/commissioner/doc.go:15-19`, `controller/peer/doc.go:12-16`, `examples/reference-controller/README.md` (The controller's own node).*
+*Source: `controller/commissioner/doc.go:15-19`, `client/peer/doc.go:12-16`, `examples/reference-controller/README.md` (The controller's own node).*

@@ -29,18 +29,21 @@ type (
 	ResumptionStore       = handshake.ResumptionStore
 )
 
+// fabric:reachable:reason="BX4 forward of client/handshake; tests reach it there"
 const (
 	DefaultNormalProcessingTime  = handshake.DefaultNormalProcessingTime
 	DefaultPasscodeID            = handshake.DefaultPasscodeID
 	ExpectedCryptoProcessingTime = handshake.ExpectedCryptoProcessingTime
 )
 
+// fabric:reachable:reason="BX4 forward of client/handshake; tests reach it there"
 var (
 	ErrPasscodeMismatch = handshake.ErrPasscodeMismatch
 	ErrUnexpectedData   = handshake.ErrUnexpectedData
 )
 
 // Functions forward as variables of the same function type.
+// fabric:reachable:reason="BX4 forward of client/handshake; tests reach it there"
 var (
 	CASE          = handshake.CASE
 	NewCASEServer = handshake.NewCASEServer

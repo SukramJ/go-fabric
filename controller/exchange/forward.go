@@ -40,6 +40,7 @@ type (
 	UnexpectedMessageError  = exchange.UnexpectedMessageError
 )
 
+// fabric:reachable:reason="BX4 forward of client/exchange; tests reach it there"
 const (
 	DefaultExpectedProcessingTime    = exchange.DefaultExpectedProcessingTime
 	FallbackActiveInterval           = exchange.FallbackActiveInterval
@@ -55,6 +56,7 @@ const (
 	UnsecuredSessionID               = exchange.UnsecuredSessionID
 )
 
+// fabric:reachable:reason="BX4 forward of client/exchange; tests reach it there"
 var (
 	ErrExchangeClosed      = exchange.ErrExchangeClosed
 	ErrFlow                = exchange.ErrFlow
@@ -67,6 +69,7 @@ var (
 )
 
 // Functions forward as variables of the same function type.
+// fabric:reachable:reason="BX4 forward of client/exchange; tests reach it there"
 var (
 	CheckStatusReport           = exchange.CheckStatusReport
 	DecodeStatusReport          = exchange.DecodeStatusReport
