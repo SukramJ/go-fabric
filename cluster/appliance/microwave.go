@@ -105,6 +105,7 @@ var (
 // MicrowaveOvenControl.
 type MicrowaveServer struct {
 	*spec.Instance
+	spec.SelfHeld
 
 	srv  *spec.Server
 	oven Oven
@@ -149,7 +150,7 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("appliance: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	cookTime := cfg.CookTime
 	if cookTime == 0 {
 		// mCookTimeSec(kDefaultCookTimeSec) (MicrowaveOvenControlCluster.cpp:58).
@@ -203,9 +204,10 @@ func (s *MicrowaveServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
-// MatterInvoke dispatches an accepted command.
+// MatterInvoke dispatches an accepted command: the host's handler where
+// it registered one ([spec.SelfHeld]), the server's own otherwise.
 func (s *MicrowaveServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
 
 // CookTime returns the current CookTime.
@@ -389,7 +391,7 @@ func (s *MicrowaveServer) addMoreTime(ctx context.Context, fields any) (any, err
 	if err := s.oven.ModifyCookTime(ctx, final); err != nil {
 		return nil, hostError("AddMoreTime", err)
 	}
-	return nil, s.SetCookTime(final)
+	return nil, s.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{mwo.AttrCookTime: final})
 }
 
 // hostError answers a host refusal: its own status when it carries one,

@@ -109,6 +109,7 @@ var (
 // with their events.
 type WaterHeaterManagementServer struct {
 	*spec.Instance
+	spec.SelfHeld
 
 	srv     *spec.Server
 	booster Booster
@@ -147,7 +148,7 @@ func NewWaterHeaterManagement(cfg WaterHeaterConfig) (*WaterHeaterManagementServ
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	values := s.stateValues(cfg.Initial)
 	values[whm.AttrHeaterTypes] = cfg.HeaterTypes
 	values[whm.AttrBoostState] = BoostStateInactive
@@ -171,7 +172,8 @@ func (s *WaterHeaterManagementServer) stateValues(st WaterHeaterState) map[uint3
 }
 
 // set checks values against the definition (bitmap bits, "min 0",
-// "max 100") and stores them; HeatDemand must lie inside HeaterTypes.
+// "max 100") and stores them as the host's; HeatDemand must lie inside
+// HeaterTypes.
 func (s *WaterHeaterManagementServer) set(values map[uint32]any) error {
 	if d, ok := values[whm.AttrHeatDemand]; ok {
 		types := s.heaterTypes()
@@ -247,18 +249,22 @@ func (s *WaterHeaterManagementServer) BoostState() BoostState {
 // both paths (WaterHeaterDelegateImpl.cpp:234-259 HandleBoostTimerExpiry,
 // :439-455 the one-shot end in ChangeHeatingIfNecessary). Without a
 // running boost it does nothing.
-func (s *WaterHeaterManagementServer) EndBoost() error {
+func (s *WaterHeaterManagementServer) EndBoost() error { return s.endBoost(contract.OriginHostSet) }
+
+// endBoost is [WaterHeaterManagementServer.EndBoost] with the change's
+// origin: the host's own, or a CancelBoost's.
+func (s *WaterHeaterManagementServer) endBoost(origin contract.Origin) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.BoostState() != BoostStateActive {
 		return nil
 	}
-	return s.transitionLocked(BoostStateInactive, whm.EventBoostEnded, whm.BoostEndedEvent{})
+	return s.transitionLocked(origin, BoostStateInactive, whm.EventBoostEnded, whm.BoostEndedEvent{})
 }
 
 // transitionLocked stores state and emits the event that goes with it.
-func (s *WaterHeaterManagementServer) transitionLocked(state BoostState, eventID uint32, data any) error {
-	if err := s.srv.Set(whm.AttrBoostState, state); err != nil {
+func (s *WaterHeaterManagementServer) transitionLocked(origin contract.Origin, state BoostState, eventID uint32, data any) error {
+	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{whm.AttrBoostState: state}); err != nil {
 		return fmt.Errorf("energy: BoostState: %w", err)
 	}
 	if err := s.srv.Emit(s.endpoint, eventID, data); err != nil {
@@ -296,7 +302,7 @@ func (s *WaterHeaterManagementServer) boost(ctx context.Context, fields any) (an
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return nil, s.transitionLocked(BoostStateActive, whm.EventBoostStarted, whm.BoostStartedEvent{BoostInfo: info})
+	return nil, s.transitionLocked(contract.OriginCommand, BoostStateActive, whm.EventBoostStarted, whm.BoostStartedEvent{BoostInfo: info})
 }
 
 // checkBoost applies chip's HandleBoost field rules
@@ -339,7 +345,7 @@ func (s *WaterHeaterManagementServer) cancelBoost(ctx context.Context, _ any) (a
 	if err := s.booster.CancelBoost(ctx); err != nil {
 		return nil, fmt.Errorf("energy: CancelBoost: %w", err)
 	}
-	return nil, s.EndBoost()
+	return nil, s.endBoost(contract.OriginCommand)
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
@@ -373,9 +379,55 @@ func (s *WaterHeaterManagementServer) MatterWrite(ctx context.Context, attrID ui
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
-// MatterInvoke dispatches Boost and CancelBoost.
+// MatterInvoke dispatches Boost and CancelBoost: the host's handler where
+// it registered one ([spec.SelfHeld]), the server's own otherwise.
 func (s *WaterHeaterManagementServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
+}
+
+// SetAttributes implements [spec.AttributeSetter]: the device's own
+// report, all or nothing, through [WaterHeaterManagementServer.set] —
+// HeatDemand inside HeaterTypes, the tank values in range. BoostState
+// Inactive ends a running boost ([WaterHeaterManagementServer.EndBoost],
+// the BoostEnded event); a boost starts only with the Boost command, and
+// HeaterTypes is the configuration's ([spec.ErrNotHeld]).
+func (s *WaterHeaterManagementServer) SetAttributes(values map[uint32]any) error {
+	state := map[uint32]any{}
+	end := false
+	for id, v := range values {
+		switch id {
+		case whm.AttrBoostState:
+			c, err := s.CheckSet(id, v, nil)
+			if err != nil {
+				return err
+			}
+			if n, _ := c.(uint8); BoostState(n) != BoostStateInactive {
+				return fmt.Errorf("%w: energy: a boost starts with the Boost command", spec.ErrNotHeld)
+			}
+			end = true
+		case whm.AttrHeaterTypes:
+			return fmt.Errorf("%w: energy: HeaterTypes is the configuration's", spec.ErrNotHeld)
+		default:
+			c, err := s.CheckSet(id, v, nil)
+			if err != nil {
+				return err
+			}
+			if id == whm.AttrHeatDemand {
+				n, _ := c.(uint8)
+				c = HeatSource(n)
+			}
+			state[id] = c
+		}
+	}
+	if len(state) > 0 {
+		if err := s.set(state); err != nil {
+			return err
+		}
+	}
+	if end {
+		return s.EndBoost()
+	}
+	return nil
 }
 
 // statusError carries an exact IM status to the dispatcher.

@@ -118,6 +118,7 @@ type ControlServer struct {
 	// change the drive reports between commands (an arrival, an error)
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
+	spec.Hooks
 
 	// mu guards currentPosition, errorList, mainState, secureState and targetPosition.
 	mu sync.RWMutex
@@ -167,7 +168,7 @@ func New(cfg Config) (*ControlServer, error) {
 	// (Positioning, so "O.a+" and "[PS]" hold), and no optional element is
 	// declared, so spec.New cannot refuse it.
 	inst, _ := spec.New(closuredef.Definition, spec.Options{Features: fm})
-	return &ControlServer{
+	s := &ControlServer{
 		inst:  inst,
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
@@ -175,7 +176,9 @@ func New(cfg Config) (*ControlServer, error) {
 		// Mirrors matter.js closure-control.element.ts:113 MainStateEnum.
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
-	}, nil
+	}
+	s.Init(inst)
+	return s, nil
 }
 
 // NewControlServer constructs a [ControlServer] from cfg, as [New] does; it
@@ -236,9 +239,12 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 // AttributeWriteResponse — a plain error read as FAILURE, which TC-ACE-2.2's
 // write-access checker refuses) and any other UNSUPPORTED_ATTRIBUTE. State
 // changes travel through MoveTo and Stop.
-func (s *ControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := s.inst.ValidateWrite(attrID, value, nil)
-	return err
+func (s *ControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
+	}
+	return s.CheckWrite(ctx, attrID, v)
 }
 
 // closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
@@ -281,6 +287,9 @@ var (
 func (s *ControlServer) MatterInvoke(
 	ctx context.Context, cmdID uint32, fields any,
 ) (response any, err error) {
+	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	switch cmdID {
 	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)

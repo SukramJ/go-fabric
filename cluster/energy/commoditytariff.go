@@ -191,8 +191,15 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 type CommodityTariffConfig struct {
 	Features TariffFeature
 	// Clock is the clock the tariff's current day and day entry are read
-	// from. Nil is [clock.System].
+	// from, and the time sync runs on. Nil is [clock.System].
 	Clock clock.Clock
+	// SyncInterval is the time sync's period: every interval the server
+	// runs [CommodityTariffServer.SyncTime] itself — chip's energy-gateway
+	// app polls every 30 s (CommodityTariffInstance.h:27
+	// kTimerPollIntervalInSec) — from construction until MatterQuiesce,
+	// and again from the next tariff update. Zero leaves SyncTime to the
+	// host.
+	SyncInterval time.Duration
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
 }
@@ -203,12 +210,16 @@ type CommodityTariffConfig struct {
 // attributes and the two commands are chip's.
 type CommodityTariffServer struct {
 	*spec.Instance
+	spec.SelfHeld
 
-	srv *spec.Server
-	now func() time.Time
+	srv       *spec.Server
+	now       func() time.Time
+	clock     clock.Clock
+	syncEvery time.Duration
 
-	// mu guards active, assigned and pending.
-	mu sync.Mutex
+	// mu guards active, assigned, pending and syncTimer.
+	mu        sync.Mutex
+	syncTimer clock.Timer
 	// active is a tariff the current attributes are derived from —
 	// mServerTariffAttrsCtx.mTariffProvider != nullptr (Server.cpp:896-904).
 	active bool
@@ -248,7 +259,8 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		delete(initial, ct.AttrDefaultRandomizationOffset)
 		delete(initial, ct.AttrDefaultRandomizationType)
 	}
-	s := &CommodityTariffServer{now: clock.Or(cfg.Clock).Now}
+	clk := clock.Or(cfg.Clock)
+	s := &CommodityTariffServer{now: clk.Now, clock: clk, syncEvery: cfg.SyncInterval}
 	handlers := map[uint32]spec.CommandHandler{
 		ct.CmdGetTariffComponent: s.getTariffComponent,
 		ct.CmdGetDayEntry:        s.getDayEntry,
@@ -258,7 +270,10 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
+	s.mu.Lock()
+	s.startSyncLocked()
+	s.mu.Unlock()
 	return s, nil
 }
 
@@ -319,6 +334,7 @@ func addIDs(ids []uint32, seen map[uint32]bool, what string) error {
 func (s *CommodityTariffServer) UpdateTariff(t Tariff) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.startSyncLocked()
 	if s.pending != nil {
 		return ErrTariffUpdatePending
 	}
@@ -1193,5 +1209,5 @@ func (s *CommodityTariffServer) MatterWrite(ctx context.Context, attrID uint32, 
 
 // MatterInvoke dispatches GetTariffComponent and GetDayEntry.
 func (s *CommodityTariffServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }

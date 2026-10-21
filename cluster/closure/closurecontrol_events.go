@@ -80,6 +80,7 @@ func (s *ControlServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
+	s.Hooks.SetMatterEventEmitter(emitter)
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
@@ -129,7 +130,7 @@ func (s *ControlServer) ReportError(errs wire.ClosureErrorList) {
 	s.errorList = list
 	s.mainState = wire.ClosureMainStateError
 	s.mu.Unlock()
-	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrCurrentErrorList)
+	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState, wire.ClosureControlAttrCurrentErrorList)
 	s.emit([]pendingEvent{{closuredef.EventOperationalError, OperationalErrorEvent{ErrorState: list}, s.inst.EventPriority(closuredef.EventOperationalError)}})
 }
 
@@ -149,7 +150,7 @@ func (s *ControlServer) SetEngaged(engaged bool) {
 		s.mainState = wire.ClosureMainStateStopped
 	}
 	s.mu.Unlock()
-	s.Notify(wire.ClosureControlAttrMainState)
+	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)
 	if was != engaged {
 		s.emit([]pendingEvent{{closuredef.EventEngageStateChanged, EngageStateChangedEvent{EngageValue: engaged}, s.inst.EventPriority(closuredef.EventEngageStateChanged)}})
 	}

@@ -434,6 +434,7 @@ func checkDeviceEnergyManagement(modes []ModeOption) error {
 // Server implements [contract.ClusterServer] for one ModeBase derivation.
 type Server struct {
 	cluster.AttributeChanges
+	spec.Hooks
 
 	k        kind
 	inst     *spec.Instance
@@ -512,6 +513,7 @@ func newServer(k kind, cfg Config) (*Server, error) {
 		modes[i] = ModeOption{Label: m.Label, Mode: m.Mode, Tags: slices.Clone(m.Tags)}
 	}
 	s := &Server{k: k, inst: inst, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
+	s.Init(inst)
 	// The mode servers' initialize: ModeUtils.assertMode(supportedModes,
 	// currentMode).
 	if !s.supports(cfg.CurrentMode) {
@@ -679,6 +681,9 @@ func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error 
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if cmdID != CmdChangeToMode || !s.inst.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("modebase: command 0x%02X is not supported", cmdID)
+	}
+	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
 	}
 	newMode, ok := changeToModeRequest(fields)
 	if !ok {
