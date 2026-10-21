@@ -88,7 +88,12 @@ hold gets the guard (principle 11).
    written at the outer one; a lock is never held while calling host
    code, a callback, or the network, and never across a `clock` wait
    (`docs/guides/concurrency.md` states this for servers; it holds
-   everywhere). `make race` is a release gate because of this principle.
+   everywhere). A command queue (`op`) that serialises one server's
+   commands, writes and ticks and that the host never takes may span that
+   server's own host call; a state mutex (`mu`) never does, and a host
+   port's call path never waits on a lock the library holds across host
+   code (gate 1, brief BX2, 2026-10-21). `make race` is a release gate
+   because of this principle.
 7. **Persistence is one seam.** `store.Store` (credentials, fabrics, ACL,
    groups, subscriptions, settings), `endpoint.Store` (endpoint numbers)
    and the controller's client store are the three interfaces; SQLite is

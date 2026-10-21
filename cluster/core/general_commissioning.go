@@ -4,6 +4,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -41,6 +42,8 @@ type GeneralCommissioning struct {
 	mu sync.RWMutex
 
 	clock clock.Clock
+	// log is [GeneralCommissioningConfig.Logger]; slog.Default() when nil.
+	log *slog.Logger
 
 	breadcrumb                   uint64
 	regulatoryConfig             uint8
@@ -216,6 +219,8 @@ type GeneralCommissioningConfig struct {
 	// Clock is the fail-safe's clock: its expiry, the cumulative limit and
 	// the expiry watcher. nil is [clock.System].
 	Clock clock.Clock
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // NewGeneralCommissioning constructs the cluster.
@@ -241,6 +246,7 @@ func NewGeneralCommissioning(cfg GeneralCommissioningConfig) (*GeneralCommission
 		cfg.CumulativeFailSafeMaxSeconds = cfg.FailSafeMaxSeconds
 	}
 	return &GeneralCommissioning{
+		log:                          cmp.Or(cfg.Logger, slog.Default()),
 		regulatoryConfig:             cfg.LocationCapability,
 		locationCapability:           cfg.LocationCapability,
 		supportsConcurrentConnection: cfg.SupportsConcurrentConnection,
@@ -429,16 +435,16 @@ type CommissioningCompleteResponse struct {
 // MatterInvoke implements [contract.ClusterServer].
 func (g *GeneralCommissioning) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	cmdName := gencommCmdName(cmdID)
-	slog.Default().Info("matter.gencomm.cmd",
+	g.logger().Info("matter.gencomm.cmd",
 		slog.String("cmd", cmdName),
 		slog.String("cmdID", fmt.Sprintf("0x%02X", cmdID)))
 	resp, err := g.dispatchCmd(ctx, cmdID, fields)
 	if err != nil {
-		slog.Default().Warn("matter.gencomm.cmd_err",
+		g.logger().Warn("matter.gencomm.cmd_err",
 			slog.String("cmd", cmdName),
 			slog.String("err", err.Error()))
 	} else {
-		slog.Default().Info("matter.gencomm.cmd_ok",
+		g.logger().Info("matter.gencomm.cmd_ok",
 			slog.String("cmd", cmdName),
 			slog.String("respType", fmt.Sprintf("%T", resp)))
 	}
@@ -985,4 +991,14 @@ func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
 		return
 	}
 	_ = g.ArmFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0)
+}
+
+// logger is the server's logger ([GeneralCommissioningConfig.Logger]); a
+// value built without its constructor logs through slog.Default()
+// (ADR 0026 P9).
+func (g *GeneralCommissioning) logger() *slog.Logger {
+	if g.log != nil {
+		return g.log
+	}
+	return slog.Default()
 }

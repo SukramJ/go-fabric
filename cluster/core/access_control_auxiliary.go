@@ -99,7 +99,7 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool) {
 	}
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
-		slog.Default().Warn("matter.access_control.auxiliary_sync", slog.String("err", err.Error()))
+		a.logger().Warn("matter.access_control.auxiliary_sync", slog.String("err", err.Error()))
 		return
 	}
 	next := make(map[uint8][]store.ACLEntry)
