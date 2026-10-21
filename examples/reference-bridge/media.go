@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
@@ -62,9 +61,6 @@ import (
 // "Operation":"Playing"|"Paused"|"NotPlaying"|"Buffering"} (a command of
 // this daemon; the tv-app has no app pipe).
 
-// mediaAppKey is the content app's StableKey (bridged("contentapp", …)).
-const mediaAppKey device.StringKey = "demo:contentapp:1"
-
 // The test suite's content app (AppTv.cpp:548-551, :667-669).
 const (
 	mediaCatalogVendorID uint16 = 123
@@ -81,11 +77,6 @@ type demoMedia struct {
 
 	player *device.CastingVideoPlayer
 	app    *device.ContentApp
-
-	mu sync.Mutex
-	// appEndpoint resolves the app's endpoint number; set by
-	// attachNodeProviders.
-	appEndpoint func() (uint16, bool)
 }
 
 func newDemoMedia(logger *slog.Logger) (*demoMedia, error) {
@@ -218,30 +209,18 @@ func (m *demoMedia) devices() ([]node.Endpoint, error) { //nolint:unparam // the
 	return []node.Endpoint{m.player, m.app}, nil
 }
 
-// setAppEndpoint hands the platform the resolver of the app's endpoint
-// number (attachNodeProviders).
-func (m *demoMedia) setAppEndpoint(resolve func() (uint16, bool)) {
-	m.mu.Lock()
-	m.appEndpoint = resolve
-	m.mu.Unlock()
-}
-
 // appStatus moves the content app's ApplicationBasic.Status.
 func (m *demoMedia) appStatus(s basicdef.ApplicationStatusEnum) error {
 	return m.app.ApplicationBasic().Set(basicdef.Patch{Status: &s})
 }
 
 // currentApp is the platform's CurrentApp for the test app: its
-// application and endpoint (the endpoint left out until it is known).
+// application and endpoint — the app device's own number
+// (Device.EndpointNumber), left out until the node has numbered it.
 func (m *demoMedia) currentApp() *launcherdef.ApplicationEPStruct {
 	cur := &launcherdef.ApplicationEPStruct{Application: launcherdef.ApplicationStruct{CatalogVendorId: mediaCatalogVendorID, ApplicationId: mediaAppID}}
-	m.mu.Lock()
-	resolve := m.appEndpoint
-	m.mu.Unlock()
-	if resolve != nil {
-		if id, ok := resolve(); ok {
-			cur.Endpoint = &id
-		}
+	if id, ok := m.app.EndpointNumber(); ok {
+		cur.Endpoint = &id
 	}
 	return cur
 }

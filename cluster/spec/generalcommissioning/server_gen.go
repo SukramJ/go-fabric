@@ -53,6 +53,56 @@ type Patch struct {
 	Null                         []uint32                    // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Breadcrumb != nil {
+		v[AttrBreadcrumb] = *p.Breadcrumb
+	}
+	if p.BasicCommissioningInfo != nil {
+		v[AttrBasicCommissioningInfo] = *p.BasicCommissioningInfo
+	}
+	if p.RegulatoryConfig != nil {
+		v[AttrRegulatoryConfig] = *p.RegulatoryConfig
+	}
+	if p.LocationCapability != nil {
+		v[AttrLocationCapability] = *p.LocationCapability
+	}
+	if p.SupportsConcurrentConnection != nil {
+		v[AttrSupportsConcurrentConnection] = *p.SupportsConcurrentConnection
+	}
+	if p.TcAcceptedVersion != nil {
+		v[AttrTcAcceptedVersion] = *p.TcAcceptedVersion
+	}
+	if p.TcMinRequiredVersion != nil {
+		v[AttrTcMinRequiredVersion] = *p.TcMinRequiredVersion
+	}
+	if p.TcAcknowledgements != nil {
+		v[AttrTcAcknowledgements] = *p.TcAcknowledgements
+	}
+	if p.TcAcknowledgementsRequired != nil {
+		v[AttrTcAcknowledgementsRequired] = *p.TcAcknowledgementsRequired
+	}
+	if p.TcUpdateDeadline != nil {
+		v[AttrTcUpdateDeadline] = *p.TcUpdateDeadline
+	}
+	if p.RecoveryIdentifier != nil {
+		v[AttrRecoveryIdentifier] = *p.RecoveryIdentifier
+	}
+	if p.NetworkRecoveryReason != nil {
+		v[AttrNetworkRecoveryReason] = *p.NetworkRecoveryReason
+	}
+	if p.IsCommissioningWithoutPower != nil {
+		v[AttrIsCommissioningWithoutPower] = *p.IsCommissioningWithoutPower
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed GeneralCommissioning server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

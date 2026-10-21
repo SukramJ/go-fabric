@@ -53,6 +53,9 @@ type hullField struct {
 	goType   string // the State type, a nullable one a pointer
 	base     string // the attribute's Go type
 	nullable bool
+	// list is the entry type of a list of a generated struct, which the
+	// patch stores as its spec.List; empty otherwise.
+	list string
 }
 
 // hullOmitted is an attribute the hull's State leaves out.
@@ -79,6 +82,9 @@ func (g *generator) hullAttributes() ([]hullField, []hullOmitted) {
 			continue
 		}
 		f := hullField{a: a, goName: exportName(a.Name), base: t.goType, goType: t.goType, nullable: v.Quality["nullable"]}
+		if t.kind == kindList && t.elem != nil && t.elem.t.kind == kindStruct {
+			f.list = t.elem.t.goType
+		}
 		if f.nullable {
 			f.goType = "*" + t.goType
 		}
@@ -194,6 +200,7 @@ func (g *generator) server() ([]byte, error) {
 	}
 	w.p("}")
 	w.p("")
+	g.patchValues(w, fields, nullable)
 
 	w.p("// Server is the typed %s server over the cluster's server — the", c.Name)
 	w.p("// generated spec.Server or a self-held one (Underlying) — with a typed")
@@ -303,6 +310,7 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
 	w.p("\t_ = s.Get()")
+	g.patchValuesTest(w)
 	w.p("\ts.OnChanged(func(State, contract.Change) {})()")
 	w.p("\tif _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {")
 	w.p("\t\tt.Errorf(\"OnChangedAsync without a queue: %%v, want spec.ErrNoQueue\", err)")
@@ -369,4 +377,72 @@ func (g *generator) hullEvents() []hullEvent {
 		}
 	}
 	return out
+}
+
+// patchValues renders Patch.AttributeValues: the patch as attribute
+// values, a list of a generated struct as its spec.List — the stored form
+// the attribute writer encodes, set where the entry type is known rather
+// than discovered by reflection where the value is written.
+func (g *generator) patchValues(w *writer, fields []hullField, nullable bool) {
+	w.p("// AttributeValues implements spec.PatchValuer: the attributes p sets,")
+	w.p("// by id, in their stored form — a list of a structure as its")
+	w.p("// spec.List — and nil for each id in Null.")
+	w.p("func (p Patch) AttributeValues() map[uint32]any {")
+	w.p("	v := map[uint32]any{}")
+	for _, f := range fields {
+		w.p("	if p.%s != nil {", f.goName)
+		if f.list != "" {
+			w.p("		v[Attr%s] = spec.List[%s](*p.%s)", f.goName, f.list, f.goName)
+		} else {
+			w.p("		v[Attr%s] = *p.%s", f.goName, f.goName)
+		}
+		w.p("	}")
+	}
+	if nullable {
+		w.p("	for _, id := range p.Null {")
+		w.p("		v[id] = nil")
+		w.p("	}")
+	}
+	w.p("	return v")
+	w.p("}")
+	w.p("")
+}
+
+// patchValuesTest renders the generated test's check of
+// Patch.AttributeValues: every field set gives one value each, a list of
+// a structure is stored as its spec.List, and Null adds its ids.
+func (g *generator) patchValuesTest(w *writer) {
+	fields, _ := g.hullAttributes()
+	nullable := false
+	for _, f := range fields {
+		nullable = nullable || f.nullable
+	}
+	if len(fields) == 0 {
+		w.p("\tif got := (Patch{}).AttributeValues(); len(got) != 0 {")
+		w.p("\t\tt.Errorf(\"an empty patch sets %%v\", got)")
+		w.p("\t}")
+		return
+	}
+	w.p("\tfull := Patch{")
+	for _, f := range fields {
+		w.p("\t\t%s: new(%s),", f.goName, f.base)
+	}
+	want := len(fields)
+	if nullable {
+		w.p("\t\tNull: []uint32{0xFFFFFFFF},")
+		want++
+	}
+	w.p("\t}")
+	w.p("\tvalues := full.AttributeValues()")
+	w.p("\tif len(values) != %d {", want)
+	w.p("\t\tt.Errorf(\"a patch of every field sets %%d values, want %d\", len(values))", want)
+	w.p("\t}")
+	for _, f := range fields {
+		if f.list == "" {
+			continue
+		}
+		w.p("\tif _, ok := values[Attr%s].(spec.List[%s]); !ok {", f.goName, f.list)
+		w.p("\t\tt.Errorf(\"%s is stored as %%T, want its spec.List\", values[Attr%s])", f.goName, f.goName)
+		w.p("\t}")
+	}
 }

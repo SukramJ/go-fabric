@@ -55,6 +55,59 @@ type Patch struct {
 	Null                             []uint32                 // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Type != nil {
+		v[AttrType] = *p.Type
+	}
+	if p.NumberOfActuationsLift != nil {
+		v[AttrNumberOfActuationsLift] = *p.NumberOfActuationsLift
+	}
+	if p.NumberOfActuationsTilt != nil {
+		v[AttrNumberOfActuationsTilt] = *p.NumberOfActuationsTilt
+	}
+	if p.ConfigStatus != nil {
+		v[AttrConfigStatus] = *p.ConfigStatus
+	}
+	if p.CurrentPositionLiftPercentage != nil {
+		v[AttrCurrentPositionLiftPercentage] = *p.CurrentPositionLiftPercentage
+	}
+	if p.CurrentPositionTiltPercentage != nil {
+		v[AttrCurrentPositionTiltPercentage] = *p.CurrentPositionTiltPercentage
+	}
+	if p.OperationalStatus != nil {
+		v[AttrOperationalStatus] = *p.OperationalStatus
+	}
+	if p.TargetPositionLiftPercent100ths != nil {
+		v[AttrTargetPositionLiftPercent100ths] = *p.TargetPositionLiftPercent100ths
+	}
+	if p.TargetPositionTiltPercent100ths != nil {
+		v[AttrTargetPositionTiltPercent100ths] = *p.TargetPositionTiltPercent100ths
+	}
+	if p.EndProductType != nil {
+		v[AttrEndProductType] = *p.EndProductType
+	}
+	if p.CurrentPositionLiftPercent100ths != nil {
+		v[AttrCurrentPositionLiftPercent100ths] = *p.CurrentPositionLiftPercent100ths
+	}
+	if p.CurrentPositionTiltPercent100ths != nil {
+		v[AttrCurrentPositionTiltPercent100ths] = *p.CurrentPositionTiltPercent100ths
+	}
+	if p.Mode != nil {
+		v[AttrMode] = *p.Mode
+	}
+	if p.SafetyStatus != nil {
+		v[AttrSafetyStatus] = *p.SafetyStatus
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed WindowCovering server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

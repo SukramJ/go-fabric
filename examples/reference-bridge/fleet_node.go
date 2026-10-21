@@ -71,9 +71,6 @@ func attachNodeProviders(topology func() node.BridgeTopology, pscfg *mattercore.
 	if actions != nil {
 		actions.setLampEndpoint(func() (uint16, bool) { return resolve(lampKey) })
 	}
-	if f.media != nil {
-		f.media.setAppEndpoint(func() (uint16, bool) { return resolve(mediaAppKey) })
-	}
 }
 
 // --- Actions on the Aggregator -------------------------------------------

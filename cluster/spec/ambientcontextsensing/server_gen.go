@@ -49,6 +49,50 @@ type Patch struct {
 	PredictedActivity           *[]PredictedActivityStruct  `matter:"0x000B"` // attribute 0x000B
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.HumanActivityDetected != nil {
+		v[AttrHumanActivityDetected] = *p.HumanActivityDetected
+	}
+	if p.ObjectIdentified != nil {
+		v[AttrObjectIdentified] = *p.ObjectIdentified
+	}
+	if p.AudioContextDetected != nil {
+		v[AttrAudioContextDetected] = *p.AudioContextDetected
+	}
+	if p.AmbientContextType != nil {
+		v[AttrAmbientContextType] = spec.List[AmbientContextTypeStruct](*p.AmbientContextType)
+	}
+	if p.AmbientContextTypeSupported != nil {
+		v[AttrAmbientContextTypeSupported] = spec.List[Semtag](*p.AmbientContextTypeSupported)
+	}
+	if p.ObjectCountThresholdReached != nil {
+		v[AttrObjectCountThresholdReached] = *p.ObjectCountThresholdReached
+	}
+	if p.ObjectCountConfig != nil {
+		v[AttrObjectCountConfig] = *p.ObjectCountConfig
+	}
+	if p.ObjectCount != nil {
+		v[AttrObjectCount] = *p.ObjectCount
+	}
+	if p.SimultaneousDetectionLimit != nil {
+		v[AttrSimultaneousDetectionLimit] = *p.SimultaneousDetectionLimit
+	}
+	if p.HoldTime != nil {
+		v[AttrHoldTime] = *p.HoldTime
+	}
+	if p.HoldTimeLimits != nil {
+		v[AttrHoldTimeLimits] = *p.HoldTimeLimits
+	}
+	if p.PredictedActivity != nil {
+		v[AttrPredictedActivity] = spec.List[PredictedActivityStruct](*p.PredictedActivity)
+	}
+	return v
+}
+
 // Server is the typed AmbientContextSensing server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

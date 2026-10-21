@@ -82,6 +82,58 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		LockState:                                new(LockStateEnum),
+		LockType:                                 new(LockTypeEnum),
+		ActuatorEnabled:                          new(bool),
+		DoorState:                                new(DoorStateEnum),
+		DoorOpenEvents:                           new(uint32),
+		DoorClosedEvents:                         new(uint32),
+		OpenPeriod:                               new(uint16),
+		NumberOfTotalUsersSupported:              new(uint16),
+		NumberOfPinUsersSupported:                new(uint16),
+		NumberOfRfidUsersSupported:               new(uint16),
+		NumberOfWeekDaySchedulesSupportedPerUser: new(uint8),
+		NumberOfYearDaySchedulesSupportedPerUser: new(uint8),
+		NumberOfHolidaySchedulesSupported:        new(uint8),
+		MaxPinCodeLength:                         new(uint8),
+		MinPinCodeLength:                         new(uint8),
+		MaxRfidCodeLength:                        new(uint8),
+		MinRfidCodeLength:                        new(uint8),
+		CredentialRulesSupport:                   new(CredentialRulesBitmap),
+		NumberOfCredentialsSupportedPerUser:      new(uint8),
+		Language:                                 new(string),
+		LedSettings:                              new(LEDSettingEnum),
+		AutoRelockTime:                           new(uint32),
+		SoundVolume:                              new(SoundVolumeEnum),
+		OperatingMode:                            new(OperatingModeEnum),
+		SupportedOperatingModes:                  new(OperatingModesBitmap),
+		DefaultConfigurationRegister:             new(ConfigurationRegisterBitmap),
+		EnableLocalProgramming:                   new(bool),
+		EnableOneTouchLocking:                    new(bool),
+		EnableInsideStatusLed:                    new(bool),
+		EnablePrivacyModeButton:                  new(bool),
+		LocalProgrammingFeatures:                 new(LocalProgrammingFeaturesBitmap),
+		WrongCodeEntryLimit:                      new(uint8),
+		UserCodeTemporaryDisableTime:             new(uint8),
+		SendPinOverTheAir:                        new(bool),
+		RequirePinForRemoteOperation:             new(bool),
+		ExpiringUserTimeout:                      new(uint16),
+		AliroReaderVerificationKey:               new([]byte),
+		AliroReaderGroupIdentifier:               new([]byte),
+		AliroReaderGroupSubIdentifier:            new([]byte),
+		AliroExpeditedTransactionSupportedProtocolVersions: new([][]byte),
+		AliroGroupResolvingKey:                             new([]byte),
+		AliroSupportedBleuwbProtocolVersions:               new([][]byte),
+		AliroBleAdvertisingVersion:                         new(uint8),
+		NumberOfAliroCredentialIssuerKeysSupported:         new(uint16),
+		NumberOfAliroEndpointKeysSupported:                 new(uint16),
+		Null:                                               []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 46 {
+		t.Errorf("a patch of every field sets %d values, want 46", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

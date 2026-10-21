@@ -39,6 +39,35 @@ type Patch struct {
 	Null                 []uint32                  // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.PhaseList != nil {
+		v[AttrPhaseList] = *p.PhaseList
+	}
+	if p.CurrentPhase != nil {
+		v[AttrCurrentPhase] = *p.CurrentPhase
+	}
+	if p.CountdownTime != nil {
+		v[AttrCountdownTime] = *p.CountdownTime
+	}
+	if p.OperationalStateList != nil {
+		v[AttrOperationalStateList] = spec.List[OperationalStateStruct](*p.OperationalStateList)
+	}
+	if p.OperationalState != nil {
+		v[AttrOperationalState] = *p.OperationalState
+	}
+	if p.OperationalError != nil {
+		v[AttrOperationalError] = *p.OperationalError
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed OperationalState server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

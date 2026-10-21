@@ -49,6 +49,50 @@ type Patch struct {
 	Null                []uint32          // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.OpenDuration != nil {
+		v[AttrOpenDuration] = *p.OpenDuration
+	}
+	if p.DefaultOpenDuration != nil {
+		v[AttrDefaultOpenDuration] = *p.DefaultOpenDuration
+	}
+	if p.AutoCloseTime != nil {
+		v[AttrAutoCloseTime] = *p.AutoCloseTime
+	}
+	if p.RemainingDuration != nil {
+		v[AttrRemainingDuration] = *p.RemainingDuration
+	}
+	if p.CurrentState != nil {
+		v[AttrCurrentState] = *p.CurrentState
+	}
+	if p.TargetState != nil {
+		v[AttrTargetState] = *p.TargetState
+	}
+	if p.CurrentLevel != nil {
+		v[AttrCurrentLevel] = *p.CurrentLevel
+	}
+	if p.TargetLevel != nil {
+		v[AttrTargetLevel] = *p.TargetLevel
+	}
+	if p.DefaultOpenLevel != nil {
+		v[AttrDefaultOpenLevel] = *p.DefaultOpenLevel
+	}
+	if p.ValveFault != nil {
+		v[AttrValveFault] = *p.ValveFault
+	}
+	if p.LevelStep != nil {
+		v[AttrLevelStep] = *p.LevelStep
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed ValveConfigurationAndControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

@@ -35,6 +35,29 @@ type Patch struct {
 	CurrentLowPowerModeSensitivity *uint8                `matter:"0x0004"` // attribute 0x0004
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.EnergyBalances != nil {
+		v[AttrEnergyBalances] = spec.List[BalanceStruct](*p.EnergyBalances)
+	}
+	if p.CurrentEnergyBalance != nil {
+		v[AttrCurrentEnergyBalance] = *p.CurrentEnergyBalance
+	}
+	if p.EnergyPriorities != nil {
+		v[AttrEnergyPriorities] = *p.EnergyPriorities
+	}
+	if p.LowPowerModeSensitivities != nil {
+		v[AttrLowPowerModeSensitivities] = spec.List[BalanceStruct](*p.LowPowerModeSensitivities)
+	}
+	if p.CurrentLowPowerModeSensitivity != nil {
+		v[AttrCurrentLowPowerModeSensitivity] = *p.CurrentLowPowerModeSensitivity
+	}
+	return v
+}
+
 // Server is the typed EnergyPreference server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

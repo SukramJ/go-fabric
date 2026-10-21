@@ -37,6 +37,32 @@ type Patch struct {
 	BoostState            *BoostStateEnum              `matter:"0x0005"` // attribute 0x0005
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.HeaterTypes != nil {
+		v[AttrHeaterTypes] = *p.HeaterTypes
+	}
+	if p.HeatDemand != nil {
+		v[AttrHeatDemand] = *p.HeatDemand
+	}
+	if p.TankVolume != nil {
+		v[AttrTankVolume] = *p.TankVolume
+	}
+	if p.EstimatedHeatRequired != nil {
+		v[AttrEstimatedHeatRequired] = *p.EstimatedHeatRequired
+	}
+	if p.TankPercentage != nil {
+		v[AttrTankPercentage] = *p.TankPercentage
+	}
+	if p.BoostState != nil {
+		v[AttrBoostState] = *p.BoostState
+	}
+	return v
+}
+
 // Server is the typed WaterHeaterManagement server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

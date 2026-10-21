@@ -53,6 +53,56 @@ type Patch struct {
 	Null                 []uint32                 // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.UtcTime != nil {
+		v[AttrUtcTime] = *p.UtcTime
+	}
+	if p.Granularity != nil {
+		v[AttrGranularity] = *p.Granularity
+	}
+	if p.TimeSource != nil {
+		v[AttrTimeSource] = *p.TimeSource
+	}
+	if p.TrustedTimeSource != nil {
+		v[AttrTrustedTimeSource] = *p.TrustedTimeSource
+	}
+	if p.DefaultNtp != nil {
+		v[AttrDefaultNtp] = *p.DefaultNtp
+	}
+	if p.TimeZone != nil {
+		v[AttrTimeZone] = spec.List[TimeZoneStruct](*p.TimeZone)
+	}
+	if p.DstOffset != nil {
+		v[AttrDstOffset] = spec.List[DSTOffsetStruct](*p.DstOffset)
+	}
+	if p.LocalTime != nil {
+		v[AttrLocalTime] = *p.LocalTime
+	}
+	if p.TimeZoneDatabase != nil {
+		v[AttrTimeZoneDatabase] = *p.TimeZoneDatabase
+	}
+	if p.NtpServerAvailable != nil {
+		v[AttrNtpServerAvailable] = *p.NtpServerAvailable
+	}
+	if p.TimeZoneListMaxSize != nil {
+		v[AttrTimeZoneListMaxSize] = *p.TimeZoneListMaxSize
+	}
+	if p.DstOffsetListMaxSize != nil {
+		v[AttrDstOffsetListMaxSize] = *p.DstOffsetListMaxSize
+	}
+	if p.SupportsDnsResolve != nil {
+		v[AttrSupportsDnsResolve] = *p.SupportsDnsResolve
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed TimeSynchronization server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

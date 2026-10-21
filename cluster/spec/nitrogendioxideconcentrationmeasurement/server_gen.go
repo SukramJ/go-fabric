@@ -49,6 +49,50 @@ type Patch struct {
 	Null                       []uint32               // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MeasuredValue != nil {
+		v[AttrMeasuredValue] = *p.MeasuredValue
+	}
+	if p.MinMeasuredValue != nil {
+		v[AttrMinMeasuredValue] = *p.MinMeasuredValue
+	}
+	if p.MaxMeasuredValue != nil {
+		v[AttrMaxMeasuredValue] = *p.MaxMeasuredValue
+	}
+	if p.PeakMeasuredValue != nil {
+		v[AttrPeakMeasuredValue] = *p.PeakMeasuredValue
+	}
+	if p.PeakMeasuredValueWindow != nil {
+		v[AttrPeakMeasuredValueWindow] = *p.PeakMeasuredValueWindow
+	}
+	if p.AverageMeasuredValue != nil {
+		v[AttrAverageMeasuredValue] = *p.AverageMeasuredValue
+	}
+	if p.AverageMeasuredValueWindow != nil {
+		v[AttrAverageMeasuredValueWindow] = *p.AverageMeasuredValueWindow
+	}
+	if p.Uncertainty != nil {
+		v[AttrUncertainty] = *p.Uncertainty
+	}
+	if p.MeasurementUnit != nil {
+		v[AttrMeasurementUnit] = *p.MeasurementUnit
+	}
+	if p.MeasurementMedium != nil {
+		v[AttrMeasurementMedium] = *p.MeasurementMedium
+	}
+	if p.LevelValue != nil {
+		v[AttrLevelValue] = *p.LevelValue
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed NitrogenDioxideConcentrationMeasurement server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

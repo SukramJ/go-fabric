@@ -241,7 +241,7 @@ var fixtures = map[string]fixture{
 		tolerate: map[string]string{"instanceCount device:PowerSource#1": tagListReason, "missing device:SolarPower/PowerSource": tagListReason},
 	},
 	"Thermostat":     {with: opts(heating)},
-	"WindowCovering": {with: opts(feat(0x0102, wcdef.FeatureLift))},
+	"WindowCovering": {with: opts(feat(0x0102, wcdef.FeatureLift|wcdef.FeaturePositionAwareLift))},
 }
 
 // noFixture are the device types the table assembles no device of, with

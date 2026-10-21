@@ -52,6 +52,22 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Description:       new(string),
+		StandardNamespace: new(Namespace),
+		SupportedModes:    new([]ModeOptionStruct),
+		CurrentMode:       new(uint8),
+		StartUpMode:       new(uint8),
+		OnMode:            new(uint8),
+		Null:              []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 7 {
+		t.Errorf("a patch of every field sets %d values, want 7", len(values))
+	}
+	if _, ok := values[AttrSupportedModes].(spec.List[ModeOptionStruct]); !ok {
+		t.Errorf("SupportedModes is stored as %T, want its spec.List", values[AttrSupportedModes])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

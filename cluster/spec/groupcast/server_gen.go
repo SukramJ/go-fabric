@@ -36,6 +36,26 @@ type Patch struct {
 	FabricUnderTest    *uint8  `matter:"0x0004"` // attribute 0x0004
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MaxMembershipCount != nil {
+		v[AttrMaxMembershipCount] = *p.MaxMembershipCount
+	}
+	if p.MaxMcastAddrCount != nil {
+		v[AttrMaxMcastAddrCount] = *p.MaxMcastAddrCount
+	}
+	if p.UsedMcastAddrCount != nil {
+		v[AttrUsedMcastAddrCount] = *p.UsedMcastAddrCount
+	}
+	if p.FabricUnderTest != nil {
+		v[AttrFabricUnderTest] = *p.FabricUnderTest
+	}
+	return v
+}
+
 // Server is the typed Groupcast server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

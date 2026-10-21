@@ -50,6 +50,20 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		VendorName:         new(string),
+		VendorId:           new(uint16),
+		ApplicationName:    new(string),
+		ProductId:          new(uint16),
+		Application:        new(ApplicationStruct),
+		Status:             new(ApplicationStatusEnum),
+		ApplicationVersion: new(string),
+		AllowedVendorList:  new([]uint16),
+	}
+	values := full.AttributeValues()
+	if len(values) != 8 {
+		t.Errorf("a patch of every field sets %d values, want 8", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

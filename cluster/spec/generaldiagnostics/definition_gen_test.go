@@ -61,6 +61,25 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		NetworkInterfaces:        new([]NetworkInterface),
+		RebootCount:              new(uint16),
+		UpTime:                   new(uint64),
+		TotalOperationalHours:    new(uint32),
+		BootReason:               new(BootReasonEnum),
+		ActiveHardwareFaults:     new([]HardwareFaultEnum),
+		ActiveRadioFaults:        new([]RadioFaultEnum),
+		ActiveNetworkFaults:      new([]NetworkFaultEnum),
+		TestEventTriggersEnabled: new(bool),
+		DeviceLoadStatus:         new(DeviceLoadStruct),
+	}
+	values := full.AttributeValues()
+	if len(values) != 10 {
+		t.Errorf("a patch of every field sets %d values, want 10", len(values))
+	}
+	if _, ok := values[AttrNetworkInterfaces].(spec.List[NetworkInterface]); !ok {
+		t.Errorf("NetworkInterfaces is stored as %T, want its spec.List", values[AttrNetworkInterfaces])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

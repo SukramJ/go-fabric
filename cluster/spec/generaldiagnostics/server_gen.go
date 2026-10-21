@@ -48,6 +48,44 @@ type Patch struct {
 	DeviceLoadStatus         *DeviceLoadStruct    `matter:"0x000A"` // attribute 0x000A
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.NetworkInterfaces != nil {
+		v[AttrNetworkInterfaces] = spec.List[NetworkInterface](*p.NetworkInterfaces)
+	}
+	if p.RebootCount != nil {
+		v[AttrRebootCount] = *p.RebootCount
+	}
+	if p.UpTime != nil {
+		v[AttrUpTime] = *p.UpTime
+	}
+	if p.TotalOperationalHours != nil {
+		v[AttrTotalOperationalHours] = *p.TotalOperationalHours
+	}
+	if p.BootReason != nil {
+		v[AttrBootReason] = *p.BootReason
+	}
+	if p.ActiveHardwareFaults != nil {
+		v[AttrActiveHardwareFaults] = *p.ActiveHardwareFaults
+	}
+	if p.ActiveRadioFaults != nil {
+		v[AttrActiveRadioFaults] = *p.ActiveRadioFaults
+	}
+	if p.ActiveNetworkFaults != nil {
+		v[AttrActiveNetworkFaults] = *p.ActiveNetworkFaults
+	}
+	if p.TestEventTriggersEnabled != nil {
+		v[AttrTestEventTriggersEnabled] = *p.TestEventTriggersEnabled
+	}
+	if p.DeviceLoadStatus != nil {
+		v[AttrDeviceLoadStatus] = *p.DeviceLoadStatus
+	}
+	return v
+}
+
 // Server is the typed GeneralDiagnostics server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

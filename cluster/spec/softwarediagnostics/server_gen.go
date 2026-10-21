@@ -33,6 +33,26 @@ type Patch struct {
 	CurrentHeapHighWatermark *uint64                `matter:"0x0003"` // attribute 0x0003
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.ThreadMetrics != nil {
+		v[AttrThreadMetrics] = spec.List[ThreadMetricsStruct](*p.ThreadMetrics)
+	}
+	if p.CurrentHeapFree != nil {
+		v[AttrCurrentHeapFree] = *p.CurrentHeapFree
+	}
+	if p.CurrentHeapUsed != nil {
+		v[AttrCurrentHeapUsed] = *p.CurrentHeapUsed
+	}
+	if p.CurrentHeapHighWatermark != nil {
+		v[AttrCurrentHeapHighWatermark] = *p.CurrentHeapHighWatermark
+	}
+	return v
+}
+
 // Server is the typed SoftwareDiagnostics server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

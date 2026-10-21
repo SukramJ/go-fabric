@@ -53,6 +53,18 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		HeaterTypes:           new(WaterHeaterHeatSourceBitmap),
+		HeatDemand:            new(WaterHeaterHeatSourceBitmap),
+		TankVolume:            new(uint16),
+		EstimatedHeatRequired: new(int64),
+		TankPercentage:        new(uint8),
+		BoostState:            new(BoostStateEnum),
+	}
+	values := full.AttributeValues()
+	if len(values) != 6 {
+		t.Errorf("a patch of every field sets %d values, want 6", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

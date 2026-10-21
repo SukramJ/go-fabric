@@ -41,6 +41,38 @@ type Patch struct {
 	SensorFault                *SensorFaultBitmap `matter:"0x0007"` // attribute 0x0007
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentSensitivityLevel != nil {
+		v[AttrCurrentSensitivityLevel] = *p.CurrentSensitivityLevel
+	}
+	if p.SupportedSensitivityLevels != nil {
+		v[AttrSupportedSensitivityLevels] = *p.SupportedSensitivityLevels
+	}
+	if p.DefaultSensitivityLevel != nil {
+		v[AttrDefaultSensitivityLevel] = *p.DefaultSensitivityLevel
+	}
+	if p.AlarmsActive != nil {
+		v[AttrAlarmsActive] = *p.AlarmsActive
+	}
+	if p.AlarmsSuppressed != nil {
+		v[AttrAlarmsSuppressed] = *p.AlarmsSuppressed
+	}
+	if p.AlarmsEnabled != nil {
+		v[AttrAlarmsEnabled] = *p.AlarmsEnabled
+	}
+	if p.AlarmsSupported != nil {
+		v[AttrAlarmsSupported] = *p.AlarmsSupported
+	}
+	if p.SensorFault != nil {
+		v[AttrSensorFault] = *p.SensorFault
+	}
+	return v
+}
+
 // Server is the typed BooleanStateConfiguration server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

@@ -45,6 +45,44 @@ type Patch struct {
 	Null             []uint32 // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MeasuredValue != nil {
+		v[AttrMeasuredValue] = *p.MeasuredValue
+	}
+	if p.MinMeasuredValue != nil {
+		v[AttrMinMeasuredValue] = *p.MinMeasuredValue
+	}
+	if p.MaxMeasuredValue != nil {
+		v[AttrMaxMeasuredValue] = *p.MaxMeasuredValue
+	}
+	if p.Tolerance != nil {
+		v[AttrTolerance] = *p.Tolerance
+	}
+	if p.ScaledValue != nil {
+		v[AttrScaledValue] = *p.ScaledValue
+	}
+	if p.MinScaledValue != nil {
+		v[AttrMinScaledValue] = *p.MinScaledValue
+	}
+	if p.MaxScaledValue != nil {
+		v[AttrMaxScaledValue] = *p.MaxScaledValue
+	}
+	if p.ScaledTolerance != nil {
+		v[AttrScaledTolerance] = *p.ScaledTolerance
+	}
+	if p.Scale != nil {
+		v[AttrScale] = *p.Scale
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed PressureMeasurement server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

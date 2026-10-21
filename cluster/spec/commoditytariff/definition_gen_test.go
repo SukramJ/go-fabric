@@ -65,6 +65,56 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		TariffInfo:                 new(TariffInformationStruct),
+		TariffUnit:                 new(TariffUnitEnum),
+		StartDate:                  new(uint32),
+		DayEntries:                 new([]DayEntryStruct),
+		DayPatterns:                new([]DayPatternStruct),
+		CalendarPeriods:            new([]CalendarPeriodStruct),
+		IndividualDays:             new([]DayStruct),
+		CurrentDay:                 new(DayStruct),
+		NextDay:                    new(DayStruct),
+		CurrentDayEntry:            new(DayEntryStruct),
+		CurrentDayEntryDate:        new(uint32),
+		NextDayEntry:               new(DayEntryStruct),
+		NextDayEntryDate:           new(uint32),
+		TariffComponents:           new([]TariffComponentStruct),
+		TariffPeriods:              new([]TariffPeriodStruct),
+		CurrentTariffComponents:    new([]TariffComponentStruct),
+		NextTariffComponents:       new([]TariffComponentStruct),
+		DefaultRandomizationOffset: new(int16),
+		DefaultRandomizationType:   new(DayEntryRandomizationTypeEnum),
+		Null:                       []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 20 {
+		t.Errorf("a patch of every field sets %d values, want 20", len(values))
+	}
+	if _, ok := values[AttrDayEntries].(spec.List[DayEntryStruct]); !ok {
+		t.Errorf("DayEntries is stored as %T, want its spec.List", values[AttrDayEntries])
+	}
+	if _, ok := values[AttrDayPatterns].(spec.List[DayPatternStruct]); !ok {
+		t.Errorf("DayPatterns is stored as %T, want its spec.List", values[AttrDayPatterns])
+	}
+	if _, ok := values[AttrCalendarPeriods].(spec.List[CalendarPeriodStruct]); !ok {
+		t.Errorf("CalendarPeriods is stored as %T, want its spec.List", values[AttrCalendarPeriods])
+	}
+	if _, ok := values[AttrIndividualDays].(spec.List[DayStruct]); !ok {
+		t.Errorf("IndividualDays is stored as %T, want its spec.List", values[AttrIndividualDays])
+	}
+	if _, ok := values[AttrTariffComponents].(spec.List[TariffComponentStruct]); !ok {
+		t.Errorf("TariffComponents is stored as %T, want its spec.List", values[AttrTariffComponents])
+	}
+	if _, ok := values[AttrTariffPeriods].(spec.List[TariffPeriodStruct]); !ok {
+		t.Errorf("TariffPeriods is stored as %T, want its spec.List", values[AttrTariffPeriods])
+	}
+	if _, ok := values[AttrCurrentTariffComponents].(spec.List[TariffComponentStruct]); !ok {
+		t.Errorf("CurrentTariffComponents is stored as %T, want its spec.List", values[AttrCurrentTariffComponents])
+	}
+	if _, ok := values[AttrNextTariffComponents].(spec.List[TariffComponentStruct]); !ok {
+		t.Errorf("NextTariffComponents is stored as %T, want its spec.List", values[AttrNextTariffComponents])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

@@ -100,10 +100,21 @@ func fieldsOf(t reflect.Type) []typedField {
 	return out
 }
 
-// PatchValues returns the attribute values a generated Patch sets, for
-// [Server.SetAttributes]: each non-nil field's value, and nil for every id
-// its Null field lists. The patch is the struct or a pointer to it.
+// PatchValuer is a generated Patch: AttributeValues returns the
+// attributes it sets in their stored form, generated per cluster
+// (script/clustergen), so a list of a structure is its [List].
+type PatchValuer interface {
+	AttributeValues() map[uint32]any
+}
+
+// PatchValues returns the attribute values a patch sets, for
+// [Server.SetAttributes]: a generated Patch's own [PatchValuer] form;
+// for another struct (or a pointer to one) with `matter` tags, each
+// non-nil field's value, and nil for every id its Null field lists.
 func PatchValues(patch any) map[uint32]any {
+	if pv, ok := patch.(PatchValuer); ok {
+		return pv.AttributeValues()
+	}
 	rv := reflect.Indirect(reflect.ValueOf(patch))
 	out := map[uint32]any{}
 	if rv.Kind() != reflect.Struct {

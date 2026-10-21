@@ -52,6 +52,22 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Mask:                              new(AlarmBitmap),
+		Latch:                             new(AlarmBitmap),
+		State:                             new(AlarmBitmap),
+		Supported:                         new(AlarmBitmap),
+		CriticalOverTemperatureThreshold:  new(int16),
+		MajorOverTemperatureThreshold:     new(int16),
+		MinorOverTemperatureThreshold:     new(int16),
+		MinorUnderTemperatureThreshold:    new(int16),
+		MajorUnderTemperatureThreshold:    new(int16),
+		CriticalUnderTemperatureThreshold: new(int16),
+	}
+	values := full.AttributeValues()
+	if len(values) != 10 {
+		t.Errorf("a patch of every field sets %d values, want 10", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

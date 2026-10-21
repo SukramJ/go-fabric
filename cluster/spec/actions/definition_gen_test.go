@@ -66,6 +66,21 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		ActionList:    new([]ActionStruct),
+		EndpointLists: new([]EndpointListStruct),
+		SetupUrl:      new(string),
+	}
+	values := full.AttributeValues()
+	if len(values) != 3 {
+		t.Errorf("a patch of every field sets %d values, want 3", len(values))
+	}
+	if _, ok := values[AttrActionList].(spec.List[ActionStruct]); !ok {
+		t.Errorf("ActionList is stored as %T, want its spec.List", values[AttrActionList])
+	}
+	if _, ok := values[AttrEndpointLists].(spec.List[EndpointListStruct]); !ok {
+		t.Errorf("EndpointLists is stored as %T, want its spec.List", values[AttrEndpointLists])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

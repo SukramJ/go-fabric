@@ -77,6 +77,38 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Enabled:                         new(bool),
+		OnDemandRatings:                 new([]RatingNameStruct),
+		OnDemandRatingThreshold:         new(string),
+		ScheduledContentRatings:         new([]RatingNameStruct),
+		ScheduledContentRatingThreshold: new(string),
+		ScreenDailyTime:                 new(uint32),
+		RemainingScreenTime:             new(uint32),
+		BlockUnrated:                    new(bool),
+		BlockChannelList:                new([]BlockChannelStruct),
+		BlockApplicationList:            new([]AppInfoStruct),
+		BlockContentTimeWindow:          new([]TimeWindowStruct),
+	}
+	values := full.AttributeValues()
+	if len(values) != 11 {
+		t.Errorf("a patch of every field sets %d values, want 11", len(values))
+	}
+	if _, ok := values[AttrOnDemandRatings].(spec.List[RatingNameStruct]); !ok {
+		t.Errorf("OnDemandRatings is stored as %T, want its spec.List", values[AttrOnDemandRatings])
+	}
+	if _, ok := values[AttrScheduledContentRatings].(spec.List[RatingNameStruct]); !ok {
+		t.Errorf("ScheduledContentRatings is stored as %T, want its spec.List", values[AttrScheduledContentRatings])
+	}
+	if _, ok := values[AttrBlockChannelList].(spec.List[BlockChannelStruct]); !ok {
+		t.Errorf("BlockChannelList is stored as %T, want its spec.List", values[AttrBlockChannelList])
+	}
+	if _, ok := values[AttrBlockApplicationList].(spec.List[AppInfoStruct]); !ok {
+		t.Errorf("BlockApplicationList is stored as %T, want its spec.List", values[AttrBlockApplicationList])
+	}
+	if _, ok := values[AttrBlockContentTimeWindow].(spec.List[TimeWindowStruct]); !ok {
+		t.Errorf("BlockContentTimeWindow is stored as %T, want its spec.List", values[AttrBlockContentTimeWindow])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

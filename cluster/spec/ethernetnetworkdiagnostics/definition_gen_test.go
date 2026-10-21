@@ -49,6 +49,22 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		PhyRate:        new(PHYRateEnum),
+		FullDuplex:     new(bool),
+		PacketRxCount:  new(uint64),
+		PacketTxCount:  new(uint64),
+		TxErrCount:     new(uint64),
+		CollisionCount: new(uint64),
+		OverrunCount:   new(uint64),
+		CarrierDetect:  new(bool),
+		TimeSinceReset: new(uint64),
+		Null:           []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 10 {
+		t.Errorf("a patch of every field sets %d values, want 10", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

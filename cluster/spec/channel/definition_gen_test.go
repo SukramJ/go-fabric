@@ -66,6 +66,19 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		ChannelList:    new([]ChannelInfoStruct),
+		Lineup:         new(LineupInfoStruct),
+		CurrentChannel: new(ChannelInfoStruct),
+		Null:           []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 4 {
+		t.Errorf("a patch of every field sets %d values, want 4", len(values))
+	}
+	if _, ok := values[AttrChannelList].(spec.List[ChannelInfoStruct]); !ok {
+		t.Errorf("ChannelList is stored as %T, want its spec.List", values[AttrChannelList])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

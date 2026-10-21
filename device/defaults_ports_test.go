@@ -223,7 +223,7 @@ func TestPortServersNeedTheirPort(t *testing.T) {
 		t.Errorf("Fan without a StateSource mounts %T, want the generated server", d.Server(fandef.ClusterID))
 	}
 	_, err = selfHeldDefaults[lwmdef.ClusterID](defaultBuild{def: lwmdef.Definition, sibling: noSiblings})
-	if !errors.Is(err, errSelectionNotServed) || !errors.Is(err, errNoPort) {
+	if !errors.Is(err, ErrSelectionNotServed) || !errors.Is(err, errNoPort) {
 		t.Errorf("LaundryWasherMode without a ModeChanger: %v, want errNoPort", err)
 	}
 }

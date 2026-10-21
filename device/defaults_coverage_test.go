@@ -90,8 +90,8 @@ func TestColorControlDefaultTakesTheDeclaration(t *testing.T) {
 		t.Errorf("ColorControl is %T, want the module's server", srv)
 	}
 	b.opts.Features = 1 << 9
-	if _, err := selfHeldDefaults[ccdef.ClusterID](b); !errors.Is(err, errSelectionNotServed) {
-		t.Errorf("an unknown feature bit: %v, want errSelectionNotServed", err)
+	if _, err := selfHeldDefaults[ccdef.ClusterID](b); !errors.Is(err, ErrSelectionNotServed) {
+		t.Errorf("an unknown feature bit: %v, want ErrSelectionNotServed", err)
 	}
 }
 
@@ -189,8 +189,8 @@ func TestWindowCoveringDefaultTakesTheDeclaration(t *testing.T) {
 		t.Fatalf("with transitions: %v", err)
 	}
 	b.opts.Features = 0x1
-	if _, err := selfHeldDefaults[wcdef.ClusterID](b); !errors.Is(err, errSelectionNotServed) {
-		t.Errorf("Lift alone: %v, want errSelectionNotServed", err)
+	if _, err := selfHeldDefaults[wcdef.ClusterID](b); !errors.Is(err, ErrSelectionNotServed) {
+		t.Errorf("Lift alone: %v, want ErrSelectionNotServed", err)
 	}
 }
 
@@ -285,8 +285,8 @@ func TestTemperatureAlarmWithoutItsThresholds(t *testing.T) {
 		opts:  spec.Options{Features: uint32(tadef.FeatureOverTemperature)},
 		ports: tadef.Declare{Delegate: portTempDelegate{}},
 	})
-	if !errors.Is(err, errSelectionNotServed) {
-		t.Errorf("TemperatureAlarm without thresholds: %v, want errSelectionNotServed", err)
+	if !errors.Is(err, ErrSelectionNotServed) {
+		t.Errorf("TemperatureAlarm without thresholds: %v, want ErrSelectionNotServed", err)
 	}
 }
 
@@ -304,8 +304,8 @@ func TestBooleanStateConfigurationDefault(t *testing.T) {
 		t.Fatalf("with a delegate: %v", err)
 	}
 	b.opts.Features = uint32(bscdef.FeatureAlarmSuppress)
-	if _, err := selfHeldDefaults[bscdef.ClusterID](b); !errors.Is(err, errSelectionNotServed) {
-		t.Errorf("SPRS without VIS or AUD: %v, want errSelectionNotServed", err)
+	if _, err := selfHeldDefaults[bscdef.ClusterID](b); !errors.Is(err, ErrSelectionNotServed) {
+		t.Errorf("SPRS without VIS or AUD: %v, want ErrSelectionNotServed", err)
 	}
 }
 
@@ -370,8 +370,8 @@ func TestLaundryWasherControlsWithoutItsRinses(t *testing.T) {
 		def: washerdef.Definition, sibling: noSiblings, initial: map[uint32]any{},
 		opts: spec.Options{Features: uint32(washerdef.FeatureRinse)},
 	})
-	if !errors.Is(err, errSelectionNotServed) {
-		t.Errorf("RINSE without rinses: %v, want errSelectionNotServed", err)
+	if !errors.Is(err, ErrSelectionNotServed) {
+		t.Errorf("RINSE without rinses: %v, want ErrSelectionNotServed", err)
 	}
 }
 

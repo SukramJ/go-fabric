@@ -53,6 +53,56 @@ type Patch struct {
 	Unmounted              *bool                   `matter:"0x000D"` // attribute 0x000D
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.ExpressedState != nil {
+		v[AttrExpressedState] = *p.ExpressedState
+	}
+	if p.SmokeState != nil {
+		v[AttrSmokeState] = *p.SmokeState
+	}
+	if p.CoState != nil {
+		v[AttrCoState] = *p.CoState
+	}
+	if p.BatteryAlert != nil {
+		v[AttrBatteryAlert] = *p.BatteryAlert
+	}
+	if p.DeviceMuted != nil {
+		v[AttrDeviceMuted] = *p.DeviceMuted
+	}
+	if p.TestInProgress != nil {
+		v[AttrTestInProgress] = *p.TestInProgress
+	}
+	if p.HardwareFaultAlert != nil {
+		v[AttrHardwareFaultAlert] = *p.HardwareFaultAlert
+	}
+	if p.EndOfServiceAlert != nil {
+		v[AttrEndOfServiceAlert] = *p.EndOfServiceAlert
+	}
+	if p.InterconnectSmokeAlarm != nil {
+		v[AttrInterconnectSmokeAlarm] = *p.InterconnectSmokeAlarm
+	}
+	if p.InterconnectCoAlarm != nil {
+		v[AttrInterconnectCoAlarm] = *p.InterconnectCoAlarm
+	}
+	if p.ContaminationState != nil {
+		v[AttrContaminationState] = *p.ContaminationState
+	}
+	if p.SmokeSensitivityLevel != nil {
+		v[AttrSmokeSensitivityLevel] = *p.SmokeSensitivityLevel
+	}
+	if p.ExpiryDate != nil {
+		v[AttrExpiryDate] = *p.ExpiryDate
+	}
+	if p.Unmounted != nil {
+		v[AttrUnmounted] = *p.Unmounted
+	}
+	return v
+}
+
 // Server is the typed SmokeCoAlarm server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

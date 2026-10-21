@@ -49,6 +49,50 @@ type Patch struct {
 	Null                    []uint32                        // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MaxNetworks != nil {
+		v[AttrMaxNetworks] = *p.MaxNetworks
+	}
+	if p.Networks != nil {
+		v[AttrNetworks] = spec.List[NetworkInfoStruct](*p.Networks)
+	}
+	if p.ScanMaxTimeSeconds != nil {
+		v[AttrScanMaxTimeSeconds] = *p.ScanMaxTimeSeconds
+	}
+	if p.ConnectMaxTimeSeconds != nil {
+		v[AttrConnectMaxTimeSeconds] = *p.ConnectMaxTimeSeconds
+	}
+	if p.InterfaceEnabled != nil {
+		v[AttrInterfaceEnabled] = *p.InterfaceEnabled
+	}
+	if p.LastNetworkingStatus != nil {
+		v[AttrLastNetworkingStatus] = *p.LastNetworkingStatus
+	}
+	if p.LastNetworkId != nil {
+		v[AttrLastNetworkId] = *p.LastNetworkId
+	}
+	if p.LastConnectErrorValue != nil {
+		v[AttrLastConnectErrorValue] = *p.LastConnectErrorValue
+	}
+	if p.SupportedWiFiBands != nil {
+		v[AttrSupportedWiFiBands] = *p.SupportedWiFiBands
+	}
+	if p.SupportedThreadFeatures != nil {
+		v[AttrSupportedThreadFeatures] = *p.SupportedThreadFeatures
+	}
+	if p.ThreadVersion != nil {
+		v[AttrThreadVersion] = *p.ThreadVersion
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed NetworkCommissioning server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

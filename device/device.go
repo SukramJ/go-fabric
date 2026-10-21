@@ -6,6 +6,7 @@ package device
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
@@ -358,11 +359,20 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		switch {
 		case err == nil:
 			return srv, nil
-		case !errors.Is(err, errSelectionNotServed):
+		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
+		case s.declared[r.ID] && (hasPorts(s.ports[r.ID]) || !errors.Is(err, errNoPort)):
+			// The host declared the cluster — a port, or features the
+			// kit's server takes without one — and so asked for the
+			// self-held server.
+			return nil, fmt.Errorf("%s %s: %w", t.Name, r.Name, err)
 		}
-		// A selection the self-held server does not serve keeps the
-		// generated server.
+		// The device type's default selection the self-held server does
+		// not serve keeps the generated server (by_design
+		// BD-Matter-SelfHeldDefault-SelectionNotServed).
+		Logger.Info("device.default_server.generated",
+			slog.String("device_type", t.Name), slog.String("cluster", r.Name),
+			slog.String("features", fmt.Sprintf("0x%X", opts.Features)), slog.String("reason", err.Error()))
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers

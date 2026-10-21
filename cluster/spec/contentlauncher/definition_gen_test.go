@@ -59,6 +59,14 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		AcceptHeader:                new([]string),
+		SupportedStreamingProtocols: new(SupportedProtocolsBitmap),
+	}
+	values := full.AttributeValues()
+	if len(values) != 2 {
+		t.Errorf("a patch of every field sets %d values, want 2", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

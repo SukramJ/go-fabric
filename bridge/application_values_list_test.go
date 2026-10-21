@@ -8,30 +8,47 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// TestAPlainGeneratedListEncodesAsItsList: a plain slice of a generated
-// struct — what a generated server stores for a list a typed Patch sets —
-// goes on the wire byte for byte as its spec.List, not as null.
-func TestAPlainGeneratedListEncodesAsItsList(t *testing.T) {
-	entries := []ct.DayEntryStruct{{DayEntryId: 1, StartTime: 0}, {DayEntryId: 2, StartTime: 720}}
-	plain, err := callAttributeWriter(im.AttributeValue{Value: entries}).Bytes()
+// TestATypedPatchListIsStoredAsItsList: a list of a structure a typed
+// Patch sets is stored as its spec.List (the generated
+// Patch.AttributeValues), so the attribute writer encodes it byte for byte
+// as the list, not as null.
+func TestATypedPatchListIsStoredAsItsList(t *testing.T) {
+	srv, err := spec.NewServer(epmdef.Definition, spec.Options{Features: uint32(epmdef.FeatureAlternatingCurrent)}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed := uint64(1)
+	accuracy := []epmdef.MeasurementAccuracyStruct{{
+		MeasurementType: epmdef.MeasurementTypeActivePower, Measured: true, MinMeasuredValue: -10, MaxMeasuredValue: 10,
+		AccuracyRanges: []epmdef.MeasurementAccuracyRangeStruct{{RangeMin: -10, RangeMax: 10, FixedMax: &fixed}},
+	}}
+	if err := epmdef.Wrap(srv).Set(epmdef.Patch{Accuracy: &accuracy}); err != nil {
+		t.Fatal(err)
+	}
+	v, _ := srv.MatterRead(epmdef.AttrAccuracy)
+	list, ok := v.(spec.List[epmdef.MeasurementAccuracyStruct])
+	if !ok {
+		t.Fatalf("Accuracy is stored as %T, want its spec.List", v)
+	}
+	got, err := callAttributeWriter(im.AttributeValue{Value: v}).Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
 	enc := tlv.NewEncoder()
-	spec.List[ct.DayEntryStruct](entries).EncodeTLV(enc, tlv.AnonymousTag())
+	list.EncodeTLV(enc, tlv.AnonymousTag())
 	want, err := enc.Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(plain, want) {
-		t.Errorf("plain slice % X, want its spec.List % X", plain, want)
+	if !bytes.Equal(got, want) {
+		t.Errorf("written % X, want the list's % X", got, want)
 	}
-	if EncodesAttributeValue([]struct{ X int }{{1}}) {
-		t.Error("a slice of a struct the writer does not know encodes")
+	if st := epmdef.Wrap(srv).Get(); len(st.Accuracy) != 1 || st.Accuracy[0].AccuracyRanges[0].RangeMax != 10 {
+		t.Errorf("Get reads Accuracy back as %+v", st.Accuracy)
 	}
 }

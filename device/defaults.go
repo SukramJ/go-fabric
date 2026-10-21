@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"slices"
 	"time"
@@ -76,12 +77,21 @@ type defaultBuild struct {
 // serverFactory builds a cluster's default server.
 type serverFactory func(b defaultBuild) (contract.ClusterServer, error)
 
-// errSelectionNotServed: a selection the self-held server does not serve;
-// the cluster keeps the generated server.
-var errSelectionNotServed = errors.New("device: the self-held server does not serve the selection")
+// ErrSelectionNotServed is a selection the cluster's self-held server does
+// not serve, wrapping the server's reason. A cluster the host declared —
+// a Declare with a port, or with features the kit's server takes without
+// one — fails the device's construction with it: the host asked for the
+// self-held server. For the device type's default selection the cluster
+// keeps the generated server and the kit logs one Info line
+// (device.default_server.generated).
+var ErrSelectionNotServed = errors.New("device: the self-held server does not serve the selection")
+
+// Logger receives the device kit's diagnostics (a cluster that keeps the
+// generated server); replace it once, before building devices.
+var Logger = slog.Default()
 
 // notServed wraps a self-held server's refusal of the selection.
-func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotServed, err) }
+func notServed(err error) error { return fmt.Errorf("%w: %w", ErrSelectionNotServed, err) }
 
 // selfHeldDefaults is the device kit's list of self-held defaults: every
 // cluster for which the module has a server with its own command logic
@@ -100,7 +110,7 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotSer
 // device type and the host make — its FeatureMap and every attribute,
 // command and event the selection mandates; a selection it does not serve
 // (WindowCovering's Lift without PositionAware, a DoorLock without
-// features) keeps the generated server ([errSelectionNotServed]), so no
+// features) keeps the generated server ([ErrSelectionNotServed]), so no
 // selection that built a device before is refused now.
 //
 // The table is hand-written: each entry maps the selection onto its

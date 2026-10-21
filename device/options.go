@@ -128,6 +128,9 @@ type settings struct {
 	attach      map[uint32][]func(contract.ClusterServer) error
 	ports       map[uint32]any
 	transitions map[uint32]bool
+	// declared are the clusters whose declaration carries a port or a
+	// feature selection: their self-held server is asked for.
+	declared map[uint32]bool
 }
 
 func newSettings() *settings {
@@ -136,7 +139,7 @@ func newSettings() *settings {
 		servers: map[uint32]contract.ClusterServer{}, initial: map[uint32]map[uint32]any{},
 		elements: map[uint32]spec.Options{}, typed: map[uint32]bool{}, implied: map[uint32]spec.Options{},
 		attach: map[uint32][]func(contract.ClusterServer) error{}, ports: map[uint32]any{},
-		transitions: map[uint32]bool{},
+		transitions: map[uint32]bool{}, declared: map[uint32]bool{},
 	}
 }
 
@@ -217,6 +220,10 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 	}
 	if decl.HasFeatures {
 		s.features[id] = decl.Features
+		s.declared[id] = true
+	}
+	if hasPorts(decl.Ports) {
+		s.declared[id] = true
 	}
 	if decl.Initial != nil {
 		m := s.initial[id]

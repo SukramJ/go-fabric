@@ -53,6 +53,56 @@ type Patch struct {
 	PhysicalContactUnoccupiedToOccupiedThreshold *uint8                     `matter:"0x0032"` // attribute 0x0032
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Occupancy != nil {
+		v[AttrOccupancy] = *p.Occupancy
+	}
+	if p.OccupancySensorType != nil {
+		v[AttrOccupancySensorType] = *p.OccupancySensorType
+	}
+	if p.OccupancySensorTypeBitmap != nil {
+		v[AttrOccupancySensorTypeBitmap] = *p.OccupancySensorTypeBitmap
+	}
+	if p.HoldTime != nil {
+		v[AttrHoldTime] = *p.HoldTime
+	}
+	if p.HoldTimeLimits != nil {
+		v[AttrHoldTimeLimits] = *p.HoldTimeLimits
+	}
+	if p.PirOccupiedToUnoccupiedDelay != nil {
+		v[AttrPirOccupiedToUnoccupiedDelay] = *p.PirOccupiedToUnoccupiedDelay
+	}
+	if p.PirUnoccupiedToOccupiedDelay != nil {
+		v[AttrPirUnoccupiedToOccupiedDelay] = *p.PirUnoccupiedToOccupiedDelay
+	}
+	if p.PirUnoccupiedToOccupiedThreshold != nil {
+		v[AttrPirUnoccupiedToOccupiedThreshold] = *p.PirUnoccupiedToOccupiedThreshold
+	}
+	if p.UltrasonicOccupiedToUnoccupiedDelay != nil {
+		v[AttrUltrasonicOccupiedToUnoccupiedDelay] = *p.UltrasonicOccupiedToUnoccupiedDelay
+	}
+	if p.UltrasonicUnoccupiedToOccupiedDelay != nil {
+		v[AttrUltrasonicUnoccupiedToOccupiedDelay] = *p.UltrasonicUnoccupiedToOccupiedDelay
+	}
+	if p.UltrasonicUnoccupiedToOccupiedThreshold != nil {
+		v[AttrUltrasonicUnoccupiedToOccupiedThreshold] = *p.UltrasonicUnoccupiedToOccupiedThreshold
+	}
+	if p.PhysicalContactOccupiedToUnoccupiedDelay != nil {
+		v[AttrPhysicalContactOccupiedToUnoccupiedDelay] = *p.PhysicalContactOccupiedToUnoccupiedDelay
+	}
+	if p.PhysicalContactUnoccupiedToOccupiedDelay != nil {
+		v[AttrPhysicalContactUnoccupiedToOccupiedDelay] = *p.PhysicalContactUnoccupiedToOccupiedDelay
+	}
+	if p.PhysicalContactUnoccupiedToOccupiedThreshold != nil {
+		v[AttrPhysicalContactUnoccupiedToOccupiedThreshold] = *p.PhysicalContactUnoccupiedToOccupiedThreshold
+	}
+	return v
+}
+
 // Server is the typed OccupancySensing server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

@@ -60,6 +60,22 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		PhaseList:            new([]string),
+		CurrentPhase:         new(uint8),
+		CountdownTime:        new(uint32),
+		OperationalStateList: new([]OperationalStateStruct),
+		OperationalState:     new(OperationalStateEnum),
+		OperationalError:     new(ErrorStateStruct),
+		Null:                 []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 7 {
+		t.Errorf("a patch of every field sets %d values, want 7", len(values))
+	}
+	if _, ok := values[AttrOperationalStateList].(spec.List[OperationalStateStruct]); !ok {
+		t.Errorf("OperationalStateList is stored as %T, want its spec.List", values[AttrOperationalStateList])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

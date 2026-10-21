@@ -45,6 +45,44 @@ type Patch struct {
 	CriticalUnderTemperatureThreshold *int16       `matter:"0x0085"` // attribute 0x0085
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Mask != nil {
+		v[AttrMask] = *p.Mask
+	}
+	if p.Latch != nil {
+		v[AttrLatch] = *p.Latch
+	}
+	if p.State != nil {
+		v[AttrState] = *p.State
+	}
+	if p.Supported != nil {
+		v[AttrSupported] = *p.Supported
+	}
+	if p.CriticalOverTemperatureThreshold != nil {
+		v[AttrCriticalOverTemperatureThreshold] = *p.CriticalOverTemperatureThreshold
+	}
+	if p.MajorOverTemperatureThreshold != nil {
+		v[AttrMajorOverTemperatureThreshold] = *p.MajorOverTemperatureThreshold
+	}
+	if p.MinorOverTemperatureThreshold != nil {
+		v[AttrMinorOverTemperatureThreshold] = *p.MinorOverTemperatureThreshold
+	}
+	if p.MinorUnderTemperatureThreshold != nil {
+		v[AttrMinorUnderTemperatureThreshold] = *p.MinorUnderTemperatureThreshold
+	}
+	if p.MajorUnderTemperatureThreshold != nil {
+		v[AttrMajorUnderTemperatureThreshold] = *p.MajorUnderTemperatureThreshold
+	}
+	if p.CriticalUnderTemperatureThreshold != nil {
+		v[AttrCriticalUnderTemperatureThreshold] = *p.CriticalUnderTemperatureThreshold
+	}
+	return v
+}
+
 // Server is the typed TemperatureAlarm server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

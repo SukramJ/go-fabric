@@ -51,6 +51,45 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Status:                      new(PowerSourceStatusEnum),
+		Order:                       new(uint8),
+		Description:                 new(string),
+		WiredAssessedInputVoltage:   new(uint32),
+		WiredAssessedInputFrequency: new(uint16),
+		WiredCurrentType:            new(WiredCurrentTypeEnum),
+		WiredAssessedCurrent:        new(uint32),
+		WiredNominalVoltage:         new(uint32),
+		WiredMaximumCurrent:         new(uint32),
+		WiredPresent:                new(bool),
+		ActiveWiredFaults:           new([]WiredFaultEnum),
+		BatVoltage:                  new(uint32),
+		BatPercentRemaining:         new(uint8),
+		BatTimeRemaining:            new(uint32),
+		BatChargeLevel:              new(BatChargeLevelEnum),
+		BatReplacementNeeded:        new(bool),
+		BatReplaceability:           new(BatReplaceabilityEnum),
+		BatPresent:                  new(bool),
+		ActiveBatFaults:             new([]BatFaultEnum),
+		BatReplacementDescription:   new(string),
+		BatCommonDesignation:        new(BatCommonDesignationEnum),
+		BatAnsiDesignation:          new(string),
+		BatIecDesignation:           new(string),
+		BatApprovedChemistry:        new(BatApprovedChemistryEnum),
+		BatCapacity:                 new(uint32),
+		BatQuantity:                 new(uint8),
+		BatChargeState:              new(BatChargeStateEnum),
+		BatTimeToFullCharge:         new(uint32),
+		BatFunctionalWhileCharging:  new(bool),
+		BatChargingCurrent:          new(uint32),
+		ActiveBatChargeFaults:       new([]BatChargeFaultEnum),
+		EndpointList:                new([]uint16),
+		Null:                        []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 33 {
+		t.Errorf("a patch of every field sets %d values, want 33", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

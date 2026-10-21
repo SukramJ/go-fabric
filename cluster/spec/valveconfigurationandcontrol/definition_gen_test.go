@@ -52,6 +52,24 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		OpenDuration:        new(uint32),
+		DefaultOpenDuration: new(uint32),
+		AutoCloseTime:       new(uint64),
+		RemainingDuration:   new(uint32),
+		CurrentState:        new(ValveStateEnum),
+		TargetState:         new(ValveStateEnum),
+		CurrentLevel:        new(uint8),
+		TargetLevel:         new(uint8),
+		DefaultOpenLevel:    new(uint8),
+		ValveFault:          new(ValveFaultBitmap),
+		LevelStep:           new(uint8),
+		Null:                []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 12 {
+		t.Errorf("a patch of every field sets %d values, want 12", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

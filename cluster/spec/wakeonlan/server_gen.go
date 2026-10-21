@@ -29,6 +29,20 @@ type Patch struct {
 	LinkLocalAddress *[]byte `matter:"0x0001"` // attribute 0x0001
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MacAddress != nil {
+		v[AttrMacAddress] = *p.MacAddress
+	}
+	if p.LinkLocalAddress != nil {
+		v[AttrLinkLocalAddress] = *p.LinkLocalAddress
+	}
+	return v
+}
+
 // Server is the typed WakeOnLan server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

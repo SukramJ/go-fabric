@@ -27,6 +27,17 @@ type Patch struct {
 	AirQuality *AirQualityEnum `matter:"0x0000"` // attribute 0x0000
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.AirQuality != nil {
+		v[AttrAirQuality] = *p.AirQuality
+	}
+	return v
+}
+
 // Server is the typed AirQuality server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

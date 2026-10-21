@@ -53,7 +53,7 @@ func TestConfigFromLeavesWhatNoAttributeNames(t *testing.T) {
 
 // TestDeclaredServersRefuseASelectionOrAPortTheyLack: each declared server
 // answers a missing port, a selection it does not serve or state it
-// needs with errSelectionNotServed, so the cluster keeps the generated
+// needs with ErrSelectionNotServed, so the cluster keeps the generated
 // server.
 func TestDeclaredServersRefuseASelectionOrAPortTheyLack(t *testing.T) {
 	t.Parallel()
@@ -87,8 +87,8 @@ func TestDeclaredServersRefuseASelectionOrAPortTheyLack(t *testing.T) {
 	for _, c := range cases {
 		c.build.sibling = noSiblings
 		_, err := selfHeldDefaults[c.cluster](c.build)
-		if !errors.Is(err, errSelectionNotServed) {
-			t.Errorf("%s: %v, want errSelectionNotServed", c.name, err)
+		if !errors.Is(err, ErrSelectionNotServed) {
+			t.Errorf("%s: %v, want ErrSelectionNotServed", c.name, err)
 		}
 	}
 }

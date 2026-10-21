@@ -45,6 +45,44 @@ type Patch struct {
 	Null           []uint32     // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.PhyRate != nil {
+		v[AttrPhyRate] = *p.PhyRate
+	}
+	if p.FullDuplex != nil {
+		v[AttrFullDuplex] = *p.FullDuplex
+	}
+	if p.PacketRxCount != nil {
+		v[AttrPacketRxCount] = *p.PacketRxCount
+	}
+	if p.PacketTxCount != nil {
+		v[AttrPacketTxCount] = *p.PacketTxCount
+	}
+	if p.TxErrCount != nil {
+		v[AttrTxErrCount] = *p.TxErrCount
+	}
+	if p.CollisionCount != nil {
+		v[AttrCollisionCount] = *p.CollisionCount
+	}
+	if p.OverrunCount != nil {
+		v[AttrOverrunCount] = *p.OverrunCount
+	}
+	if p.CarrierDetect != nil {
+		v[AttrCarrierDetect] = *p.CarrierDetect
+	}
+	if p.TimeSinceReset != nil {
+		v[AttrTimeSinceReset] = *p.TimeSinceReset
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed EthernetNetworkDiagnostics server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

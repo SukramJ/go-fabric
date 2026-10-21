@@ -51,6 +51,53 @@ type Patch struct {
 	Null             []uint32              // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.FanMode != nil {
+		v[AttrFanMode] = *p.FanMode
+	}
+	if p.FanModeSequence != nil {
+		v[AttrFanModeSequence] = *p.FanModeSequence
+	}
+	if p.PercentSetting != nil {
+		v[AttrPercentSetting] = *p.PercentSetting
+	}
+	if p.PercentCurrent != nil {
+		v[AttrPercentCurrent] = *p.PercentCurrent
+	}
+	if p.SpeedMax != nil {
+		v[AttrSpeedMax] = *p.SpeedMax
+	}
+	if p.SpeedSetting != nil {
+		v[AttrSpeedSetting] = *p.SpeedSetting
+	}
+	if p.SpeedCurrent != nil {
+		v[AttrSpeedCurrent] = *p.SpeedCurrent
+	}
+	if p.RockSupport != nil {
+		v[AttrRockSupport] = *p.RockSupport
+	}
+	if p.RockSetting != nil {
+		v[AttrRockSetting] = *p.RockSetting
+	}
+	if p.WindSupport != nil {
+		v[AttrWindSupport] = *p.WindSupport
+	}
+	if p.WindSetting != nil {
+		v[AttrWindSetting] = *p.WindSetting
+	}
+	if p.AirflowDirection != nil {
+		v[AttrAirflowDirection] = *p.AirflowDirection
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed FanControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

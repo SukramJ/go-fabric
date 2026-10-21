@@ -120,12 +120,18 @@ Logs in the agent's scratchpad, read by grep; summary lines carry the HEAD.
    a declared `LevelSource` advertised OnOff whatever the selection, so the
    kit silently fell back to the generated server for the speaker
    (`levelcontrol.Config.Features`/`HasFeatures`, matter.js
-   `LevelControlServer.with()`); a constant-speed pump's `Initial` limits
+   `LevelControlServer.ts:865` `LevelControlBaseServer.with()`, a defined
+   empty feature list applied as the selection, `ClusterBehaviorType.ts:75-76`);
+   a constant-speed pump's `Initial` limits
    were read as AUTO's optional group and refused; the pull servers (valve,
    pump, fan, lock) did not forward their port's `ChangeNotifier`, so a
-   change reached no subscriber without `WithChangeNotifier`; the wire
-   writer put a plain slice of a generated struct — what a generated
-   server stores for a list a `Patch` sets — on the wire as null.
+   change reached no subscriber without `WithChangeNotifier`; a typed
+   `Patch` stored a list of a structure as a plain slice, which the wire
+   writer put on the wire as null — the generated `Patch.AttributeValues`
+   (`spec.PatchValuer`) stores its `spec.List` now (review: the value is
+   fixed where it is produced, no reflection in the writer). The read side
+   is BT's `spec.StateOf`, which converts the `spec.List` back to the
+   State's `[]T` entry by entry.
 2. **Kit gaps closed during the rewrite**: zero thermostat limits (a latent
    BU-a bug: the factory now starts from `DefaultThermostatConfig`),
    ColorControl's mireds, the washer controls' config, the filter's
@@ -153,21 +159,23 @@ Logs in the agent's scratchpad, read by grep; summary lines carry the HEAD.
 
 ## Left out
 
-- The media agent's questions, for the owner: a silent fallback when an
-  unimplemented optional command is invoked; ContentControl and
-  ContentAppObserver as a follow-up; `EndpointNumber` versus the bridge's
-  `endpointByKey` for the content app's endpoint (now `node.Topology`).
 - The FixedLabel route above (a generated declaration would serve it).
-- The kit's silent fallback to the generated server on a selection a
-  self-held server does not serve (`device/device.go`, `errSelectionNotServed`)
-  hid defect 1; a log line or an error there is a question for gate 2.
+- `powersourcedef.Declare{Endpoints}` or a topology-derived EndpointList
+  default (BV): the PowerSource EndpointList stays the host's, as matter.js's
+  PowerSourceServer sets none (`PowerSourceServer.ts` initialize sets status
+  and description only).
+- ContentControl and ContentAppObserver (BV).
 
 ## Questions
 
-1. Should the kit refuse — or log — instead of falling back silently when a
-   self-held server does not serve the selection (Left out)?
-2. Should the PowerSource's EndpointList be the kit's (its own endpoint,
-   set at numbering) rather than every host's `numberPowerSources`?
+Answered in review: a declared selection the self-held server does not
+serve is an error (`device.ErrSelectionNotServed`), the default selection
+keeps the generated server and logs `device.default_server.generated`
+(by_design BD-Matter-SelfHeldDefault-SelectionNotServed); the
+EndpointList stays the host's (Left out); an optional media command the
+port lacks is left out of AcceptedCommandList and answers
+UNSUPPORTED_COMMAND (`device/defaults_media_optional_test.go`); the content
+app's endpoint is `Device.EndpointNumber()` (`media.go currentApp`).
 
 ## by_design candidates
 

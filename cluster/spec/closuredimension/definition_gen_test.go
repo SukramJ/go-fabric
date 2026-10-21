@@ -54,6 +54,25 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentState:         new(DimensionStateStruct),
+		TargetState:          new(DimensionStateStruct),
+		Resolution:           new(uint16),
+		StepValue:            new(uint16),
+		Unit:                 new(ClosureUnitEnum),
+		UnitRange:            new(UnitRangeStruct),
+		LimitRange:           new(RangePercent100thsStruct),
+		TranslationDirection: new(TranslationDirectionEnum),
+		RotationAxis:         new(RotationAxisEnum),
+		Overflow:             new(OverflowEnum),
+		ModulationType:       new(ModulationTypeEnum),
+		LatchControlModes:    new(LatchControlModesBitmap),
+		Null:                 []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 13 {
+		t.Errorf("a patch of every field sets %d values, want 13", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

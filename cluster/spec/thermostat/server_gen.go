@@ -149,6 +149,200 @@ type Patch struct {
 	Null                                   []uint32                                      // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.LocalTemperature != nil {
+		v[AttrLocalTemperature] = *p.LocalTemperature
+	}
+	if p.OutdoorTemperature != nil {
+		v[AttrOutdoorTemperature] = *p.OutdoorTemperature
+	}
+	if p.Occupancy != nil {
+		v[AttrOccupancy] = *p.Occupancy
+	}
+	if p.AbsMinHeatSetpointLimit != nil {
+		v[AttrAbsMinHeatSetpointLimit] = *p.AbsMinHeatSetpointLimit
+	}
+	if p.AbsMaxHeatSetpointLimit != nil {
+		v[AttrAbsMaxHeatSetpointLimit] = *p.AbsMaxHeatSetpointLimit
+	}
+	if p.AbsMinCoolSetpointLimit != nil {
+		v[AttrAbsMinCoolSetpointLimit] = *p.AbsMinCoolSetpointLimit
+	}
+	if p.AbsMaxCoolSetpointLimit != nil {
+		v[AttrAbsMaxCoolSetpointLimit] = *p.AbsMaxCoolSetpointLimit
+	}
+	if p.PiCoolingDemand != nil {
+		v[AttrPiCoolingDemand] = *p.PiCoolingDemand
+	}
+	if p.PiHeatingDemand != nil {
+		v[AttrPiHeatingDemand] = *p.PiHeatingDemand
+	}
+	if p.HvacSystemTypeConfiguration != nil {
+		v[AttrHvacSystemTypeConfiguration] = *p.HvacSystemTypeConfiguration
+	}
+	if p.LocalTemperatureCalibration != nil {
+		v[AttrLocalTemperatureCalibration] = *p.LocalTemperatureCalibration
+	}
+	if p.OccupiedCoolingSetpoint != nil {
+		v[AttrOccupiedCoolingSetpoint] = *p.OccupiedCoolingSetpoint
+	}
+	if p.OccupiedHeatingSetpoint != nil {
+		v[AttrOccupiedHeatingSetpoint] = *p.OccupiedHeatingSetpoint
+	}
+	if p.UnoccupiedCoolingSetpoint != nil {
+		v[AttrUnoccupiedCoolingSetpoint] = *p.UnoccupiedCoolingSetpoint
+	}
+	if p.UnoccupiedHeatingSetpoint != nil {
+		v[AttrUnoccupiedHeatingSetpoint] = *p.UnoccupiedHeatingSetpoint
+	}
+	if p.MinHeatSetpointLimit != nil {
+		v[AttrMinHeatSetpointLimit] = *p.MinHeatSetpointLimit
+	}
+	if p.MaxHeatSetpointLimit != nil {
+		v[AttrMaxHeatSetpointLimit] = *p.MaxHeatSetpointLimit
+	}
+	if p.MinCoolSetpointLimit != nil {
+		v[AttrMinCoolSetpointLimit] = *p.MinCoolSetpointLimit
+	}
+	if p.MaxCoolSetpointLimit != nil {
+		v[AttrMaxCoolSetpointLimit] = *p.MaxCoolSetpointLimit
+	}
+	if p.MinSetpointDeadBand != nil {
+		v[AttrMinSetpointDeadBand] = *p.MinSetpointDeadBand
+	}
+	if p.RemoteSensing != nil {
+		v[AttrRemoteSensing] = *p.RemoteSensing
+	}
+	if p.ControlSequenceOfOperation != nil {
+		v[AttrControlSequenceOfOperation] = *p.ControlSequenceOfOperation
+	}
+	if p.SystemMode != nil {
+		v[AttrSystemMode] = *p.SystemMode
+	}
+	if p.ThermostatRunningMode != nil {
+		v[AttrThermostatRunningMode] = *p.ThermostatRunningMode
+	}
+	if p.TemperatureSetpointHold != nil {
+		v[AttrTemperatureSetpointHold] = *p.TemperatureSetpointHold
+	}
+	if p.TemperatureSetpointHoldDuration != nil {
+		v[AttrTemperatureSetpointHoldDuration] = *p.TemperatureSetpointHoldDuration
+	}
+	if p.ThermostatProgrammingOperationMode != nil {
+		v[AttrThermostatProgrammingOperationMode] = *p.ThermostatProgrammingOperationMode
+	}
+	if p.ThermostatRunningState != nil {
+		v[AttrThermostatRunningState] = *p.ThermostatRunningState
+	}
+	if p.SetpointChangeSource != nil {
+		v[AttrSetpointChangeSource] = *p.SetpointChangeSource
+	}
+	if p.SetpointChangeAmount != nil {
+		v[AttrSetpointChangeAmount] = *p.SetpointChangeAmount
+	}
+	if p.SetpointChangeSourceTimestamp != nil {
+		v[AttrSetpointChangeSourceTimestamp] = *p.SetpointChangeSourceTimestamp
+	}
+	if p.OccupiedSetback != nil {
+		v[AttrOccupiedSetback] = *p.OccupiedSetback
+	}
+	if p.OccupiedSetbackMin != nil {
+		v[AttrOccupiedSetbackMin] = *p.OccupiedSetbackMin
+	}
+	if p.OccupiedSetbackMax != nil {
+		v[AttrOccupiedSetbackMax] = *p.OccupiedSetbackMax
+	}
+	if p.UnoccupiedSetback != nil {
+		v[AttrUnoccupiedSetback] = *p.UnoccupiedSetback
+	}
+	if p.UnoccupiedSetbackMin != nil {
+		v[AttrUnoccupiedSetbackMin] = *p.UnoccupiedSetbackMin
+	}
+	if p.UnoccupiedSetbackMax != nil {
+		v[AttrUnoccupiedSetbackMax] = *p.UnoccupiedSetbackMax
+	}
+	if p.EmergencyHeatDelta != nil {
+		v[AttrEmergencyHeatDelta] = *p.EmergencyHeatDelta
+	}
+	if p.AcType != nil {
+		v[AttrAcType] = *p.AcType
+	}
+	if p.AcCapacity != nil {
+		v[AttrAcCapacity] = *p.AcCapacity
+	}
+	if p.AcRefrigerantType != nil {
+		v[AttrAcRefrigerantType] = *p.AcRefrigerantType
+	}
+	if p.AcCompressorType != nil {
+		v[AttrAcCompressorType] = *p.AcCompressorType
+	}
+	if p.AcErrorCode != nil {
+		v[AttrAcErrorCode] = *p.AcErrorCode
+	}
+	if p.AcLouverPosition != nil {
+		v[AttrAcLouverPosition] = *p.AcLouverPosition
+	}
+	if p.AcCoilTemperature != nil {
+		v[AttrAcCoilTemperature] = *p.AcCoilTemperature
+	}
+	if p.AcCapacityFormat != nil {
+		v[AttrAcCapacityFormat] = *p.AcCapacityFormat
+	}
+	if p.PresetTypes != nil {
+		v[AttrPresetTypes] = spec.List[PresetTypeStruct](*p.PresetTypes)
+	}
+	if p.ScheduleTypes != nil {
+		v[AttrScheduleTypes] = spec.List[ScheduleTypeStruct](*p.ScheduleTypes)
+	}
+	if p.NumberOfPresets != nil {
+		v[AttrNumberOfPresets] = *p.NumberOfPresets
+	}
+	if p.NumberOfSchedules != nil {
+		v[AttrNumberOfSchedules] = *p.NumberOfSchedules
+	}
+	if p.NumberOfScheduleTransitions != nil {
+		v[AttrNumberOfScheduleTransitions] = *p.NumberOfScheduleTransitions
+	}
+	if p.NumberOfScheduleTransitionPerDay != nil {
+		v[AttrNumberOfScheduleTransitionPerDay] = *p.NumberOfScheduleTransitionPerDay
+	}
+	if p.ActivePresetHandle != nil {
+		v[AttrActivePresetHandle] = *p.ActivePresetHandle
+	}
+	if p.ActiveScheduleHandle != nil {
+		v[AttrActiveScheduleHandle] = *p.ActiveScheduleHandle
+	}
+	if p.Presets != nil {
+		v[AttrPresets] = spec.List[PresetStruct](*p.Presets)
+	}
+	if p.Schedules != nil {
+		v[AttrSchedules] = spec.List[ScheduleStruct](*p.Schedules)
+	}
+	if p.SetpointHoldExpiryTimestamp != nil {
+		v[AttrSetpointHoldExpiryTimestamp] = *p.SetpointHoldExpiryTimestamp
+	}
+	if p.MaxThermostatSuggestions != nil {
+		v[AttrMaxThermostatSuggestions] = *p.MaxThermostatSuggestions
+	}
+	if p.ThermostatSuggestions != nil {
+		v[AttrThermostatSuggestions] = spec.List[ThermostatSuggestionStruct](*p.ThermostatSuggestions)
+	}
+	if p.CurrentThermostatSuggestion != nil {
+		v[AttrCurrentThermostatSuggestion] = *p.CurrentThermostatSuggestion
+	}
+	if p.ThermostatSuggestionNotFollowingReason != nil {
+		v[AttrThermostatSuggestionNotFollowingReason] = *p.ThermostatSuggestionNotFollowingReason
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed Thermostat server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

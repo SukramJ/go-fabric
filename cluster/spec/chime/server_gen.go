@@ -31,6 +31,23 @@ type Patch struct {
 	Enabled              *bool               `matter:"0x0002"` // attribute 0x0002
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.InstalledChimeSounds != nil {
+		v[AttrInstalledChimeSounds] = spec.List[ChimeSoundStruct](*p.InstalledChimeSounds)
+	}
+	if p.SelectedChime != nil {
+		v[AttrSelectedChime] = *p.SelectedChime
+	}
+	if p.Enabled != nil {
+		v[AttrEnabled] = *p.Enabled
+	}
+	return v
+}
+
 // Server is the typed Chime server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

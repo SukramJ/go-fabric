@@ -52,6 +52,20 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentSensitivityLevel:    new(uint8),
+		SupportedSensitivityLevels: new(uint8),
+		DefaultSensitivityLevel:    new(uint8),
+		AlarmsActive:               new(AlarmModeBitmap),
+		AlarmsSuppressed:           new(AlarmModeBitmap),
+		AlarmsEnabled:              new(AlarmModeBitmap),
+		AlarmsSupported:            new(AlarmModeBitmap),
+		SensorFault:                new(SensorFaultBitmap),
+	}
+	values := full.AttributeValues()
+	if len(values) != 8 {
+		t.Errorf("a patch of every field sets %d values, want 8", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

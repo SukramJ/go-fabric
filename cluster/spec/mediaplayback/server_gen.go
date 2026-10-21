@@ -49,6 +49,50 @@ type Patch struct {
 	Null                 []uint32                // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentState != nil {
+		v[AttrCurrentState] = *p.CurrentState
+	}
+	if p.StartTime != nil {
+		v[AttrStartTime] = *p.StartTime
+	}
+	if p.Duration != nil {
+		v[AttrDuration] = *p.Duration
+	}
+	if p.SampledPosition != nil {
+		v[AttrSampledPosition] = *p.SampledPosition
+	}
+	if p.PlaybackSpeed != nil {
+		v[AttrPlaybackSpeed] = *p.PlaybackSpeed
+	}
+	if p.SeekRangeEnd != nil {
+		v[AttrSeekRangeEnd] = *p.SeekRangeEnd
+	}
+	if p.SeekRangeStart != nil {
+		v[AttrSeekRangeStart] = *p.SeekRangeStart
+	}
+	if p.ActiveAudioTrack != nil {
+		v[AttrActiveAudioTrack] = *p.ActiveAudioTrack
+	}
+	if p.AvailableAudioTracks != nil {
+		v[AttrAvailableAudioTracks] = spec.List[TrackStruct](*p.AvailableAudioTracks)
+	}
+	if p.ActiveTextTrack != nil {
+		v[AttrActiveTextTrack] = *p.ActiveTextTrack
+	}
+	if p.AvailableTextTracks != nil {
+		v[AttrAvailableTextTracks] = spec.List[TrackStruct](*p.AvailableTextTracks)
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed MediaPlayback server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

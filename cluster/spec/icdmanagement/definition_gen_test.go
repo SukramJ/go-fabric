@@ -55,6 +55,21 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		IdleModeDuration:                 new(uint32),
+		ActiveModeDuration:               new(uint32),
+		ActiveModeThreshold:              new(uint16),
+		IcdCounter:                       new(uint32),
+		ClientsSupportedPerFabric:        new(uint16),
+		UserActiveModeTriggerHint:        new(UserActiveModeTriggerBitmap),
+		UserActiveModeTriggerInstruction: new(string),
+		OperatingMode:                    new(OperatingModeEnum),
+		MaximumCheckInBackoff:            new(uint32),
+	}
+	values := full.AttributeValues()
+	if len(values) != 9 {
+		t.Errorf("a patch of every field sets %d values, want 9", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

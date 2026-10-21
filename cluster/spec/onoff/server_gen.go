@@ -37,6 +37,32 @@ type Patch struct {
 	Null               []uint32          // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.OnOff != nil {
+		v[AttrOnOff] = *p.OnOff
+	}
+	if p.GlobalSceneControl != nil {
+		v[AttrGlobalSceneControl] = *p.GlobalSceneControl
+	}
+	if p.OnTime != nil {
+		v[AttrOnTime] = *p.OnTime
+	}
+	if p.OffWaitTime != nil {
+		v[AttrOffWaitTime] = *p.OffWaitTime
+	}
+	if p.StartUpOnOff != nil {
+		v[AttrStartUpOnOff] = *p.StartUpOnOff
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed OnOff server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

@@ -44,7 +44,8 @@ func (fakeLevel) StopWithOnOff(context.Context, lvldef.StopWithOnOffRequest) err
 
 // TestALevelSourceServesTheSelection: a declared LevelSource gets the
 // module's LevelControl server with the device type's selection — none
-// for a Speaker, matter.js's LevelControlServer.with()
+// for a Speaker: matter.js's LevelControlServer is .with() with no
+// features, a selection of none (ClusterBehaviorType.ts:75-76)
 // (LevelControlServer.ts:865) — not the generated server a FeatureMap
 // mismatch would leave behind.
 func TestALevelSourceServesTheSelection(t *testing.T) {

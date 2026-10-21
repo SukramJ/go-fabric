@@ -121,6 +121,152 @@ type Patch struct {
 	Null                                               []uint32                        // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.LockState != nil {
+		v[AttrLockState] = *p.LockState
+	}
+	if p.LockType != nil {
+		v[AttrLockType] = *p.LockType
+	}
+	if p.ActuatorEnabled != nil {
+		v[AttrActuatorEnabled] = *p.ActuatorEnabled
+	}
+	if p.DoorState != nil {
+		v[AttrDoorState] = *p.DoorState
+	}
+	if p.DoorOpenEvents != nil {
+		v[AttrDoorOpenEvents] = *p.DoorOpenEvents
+	}
+	if p.DoorClosedEvents != nil {
+		v[AttrDoorClosedEvents] = *p.DoorClosedEvents
+	}
+	if p.OpenPeriod != nil {
+		v[AttrOpenPeriod] = *p.OpenPeriod
+	}
+	if p.NumberOfTotalUsersSupported != nil {
+		v[AttrNumberOfTotalUsersSupported] = *p.NumberOfTotalUsersSupported
+	}
+	if p.NumberOfPinUsersSupported != nil {
+		v[AttrNumberOfPinUsersSupported] = *p.NumberOfPinUsersSupported
+	}
+	if p.NumberOfRfidUsersSupported != nil {
+		v[AttrNumberOfRfidUsersSupported] = *p.NumberOfRfidUsersSupported
+	}
+	if p.NumberOfWeekDaySchedulesSupportedPerUser != nil {
+		v[AttrNumberOfWeekDaySchedulesSupportedPerUser] = *p.NumberOfWeekDaySchedulesSupportedPerUser
+	}
+	if p.NumberOfYearDaySchedulesSupportedPerUser != nil {
+		v[AttrNumberOfYearDaySchedulesSupportedPerUser] = *p.NumberOfYearDaySchedulesSupportedPerUser
+	}
+	if p.NumberOfHolidaySchedulesSupported != nil {
+		v[AttrNumberOfHolidaySchedulesSupported] = *p.NumberOfHolidaySchedulesSupported
+	}
+	if p.MaxPinCodeLength != nil {
+		v[AttrMaxPinCodeLength] = *p.MaxPinCodeLength
+	}
+	if p.MinPinCodeLength != nil {
+		v[AttrMinPinCodeLength] = *p.MinPinCodeLength
+	}
+	if p.MaxRfidCodeLength != nil {
+		v[AttrMaxRfidCodeLength] = *p.MaxRfidCodeLength
+	}
+	if p.MinRfidCodeLength != nil {
+		v[AttrMinRfidCodeLength] = *p.MinRfidCodeLength
+	}
+	if p.CredentialRulesSupport != nil {
+		v[AttrCredentialRulesSupport] = *p.CredentialRulesSupport
+	}
+	if p.NumberOfCredentialsSupportedPerUser != nil {
+		v[AttrNumberOfCredentialsSupportedPerUser] = *p.NumberOfCredentialsSupportedPerUser
+	}
+	if p.Language != nil {
+		v[AttrLanguage] = *p.Language
+	}
+	if p.LedSettings != nil {
+		v[AttrLedSettings] = *p.LedSettings
+	}
+	if p.AutoRelockTime != nil {
+		v[AttrAutoRelockTime] = *p.AutoRelockTime
+	}
+	if p.SoundVolume != nil {
+		v[AttrSoundVolume] = *p.SoundVolume
+	}
+	if p.OperatingMode != nil {
+		v[AttrOperatingMode] = *p.OperatingMode
+	}
+	if p.SupportedOperatingModes != nil {
+		v[AttrSupportedOperatingModes] = *p.SupportedOperatingModes
+	}
+	if p.DefaultConfigurationRegister != nil {
+		v[AttrDefaultConfigurationRegister] = *p.DefaultConfigurationRegister
+	}
+	if p.EnableLocalProgramming != nil {
+		v[AttrEnableLocalProgramming] = *p.EnableLocalProgramming
+	}
+	if p.EnableOneTouchLocking != nil {
+		v[AttrEnableOneTouchLocking] = *p.EnableOneTouchLocking
+	}
+	if p.EnableInsideStatusLed != nil {
+		v[AttrEnableInsideStatusLed] = *p.EnableInsideStatusLed
+	}
+	if p.EnablePrivacyModeButton != nil {
+		v[AttrEnablePrivacyModeButton] = *p.EnablePrivacyModeButton
+	}
+	if p.LocalProgrammingFeatures != nil {
+		v[AttrLocalProgrammingFeatures] = *p.LocalProgrammingFeatures
+	}
+	if p.WrongCodeEntryLimit != nil {
+		v[AttrWrongCodeEntryLimit] = *p.WrongCodeEntryLimit
+	}
+	if p.UserCodeTemporaryDisableTime != nil {
+		v[AttrUserCodeTemporaryDisableTime] = *p.UserCodeTemporaryDisableTime
+	}
+	if p.SendPinOverTheAir != nil {
+		v[AttrSendPinOverTheAir] = *p.SendPinOverTheAir
+	}
+	if p.RequirePinForRemoteOperation != nil {
+		v[AttrRequirePinForRemoteOperation] = *p.RequirePinForRemoteOperation
+	}
+	if p.ExpiringUserTimeout != nil {
+		v[AttrExpiringUserTimeout] = *p.ExpiringUserTimeout
+	}
+	if p.AliroReaderVerificationKey != nil {
+		v[AttrAliroReaderVerificationKey] = *p.AliroReaderVerificationKey
+	}
+	if p.AliroReaderGroupIdentifier != nil {
+		v[AttrAliroReaderGroupIdentifier] = *p.AliroReaderGroupIdentifier
+	}
+	if p.AliroReaderGroupSubIdentifier != nil {
+		v[AttrAliroReaderGroupSubIdentifier] = *p.AliroReaderGroupSubIdentifier
+	}
+	if p.AliroExpeditedTransactionSupportedProtocolVersions != nil {
+		v[AttrAliroExpeditedTransactionSupportedProtocolVersions] = *p.AliroExpeditedTransactionSupportedProtocolVersions
+	}
+	if p.AliroGroupResolvingKey != nil {
+		v[AttrAliroGroupResolvingKey] = *p.AliroGroupResolvingKey
+	}
+	if p.AliroSupportedBleuwbProtocolVersions != nil {
+		v[AttrAliroSupportedBleuwbProtocolVersions] = *p.AliroSupportedBleuwbProtocolVersions
+	}
+	if p.AliroBleAdvertisingVersion != nil {
+		v[AttrAliroBleAdvertisingVersion] = *p.AliroBleAdvertisingVersion
+	}
+	if p.NumberOfAliroCredentialIssuerKeysSupported != nil {
+		v[AttrNumberOfAliroCredentialIssuerKeysSupported] = *p.NumberOfAliroCredentialIssuerKeysSupported
+	}
+	if p.NumberOfAliroEndpointKeysSupported != nil {
+		v[AttrNumberOfAliroEndpointKeysSupported] = *p.NumberOfAliroEndpointKeysSupported
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed DoorLock server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

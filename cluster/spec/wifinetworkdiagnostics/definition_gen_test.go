@@ -52,6 +52,26 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Bssid:                  new([]byte),
+		SecurityType:           new(SecurityTypeEnum),
+		WiFiVersion:            new(WiFiVersionEnum),
+		ChannelNumber:          new(uint16),
+		Rssi:                   new(int8),
+		BeaconLostCount:        new(uint32),
+		BeaconRxCount:          new(uint32),
+		PacketMulticastRxCount: new(uint32),
+		PacketMulticastTxCount: new(uint32),
+		PacketUnicastRxCount:   new(uint32),
+		PacketUnicastTxCount:   new(uint32),
+		CurrentMaxRate:         new(uint64),
+		OverrunCount:           new(uint64),
+		Null:                   []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 14 {
+		t.Errorf("a patch of every field sets %d values, want 14", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

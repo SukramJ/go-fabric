@@ -29,6 +29,20 @@ type Patch struct {
 	CurrentOutput *uint8              `matter:"0x0001"` // attribute 0x0001
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.OutputList != nil {
+		v[AttrOutputList] = spec.List[OutputInfoStruct](*p.OutputList)
+	}
+	if p.CurrentOutput != nil {
+		v[AttrCurrentOutput] = *p.CurrentOutput
+	}
+	return v
+}
+
 // Server is the typed AudioOutput server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

@@ -66,6 +66,74 @@ type Patch struct {
 	Null                       []uint32                       // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.TariffInfo != nil {
+		v[AttrTariffInfo] = *p.TariffInfo
+	}
+	if p.TariffUnit != nil {
+		v[AttrTariffUnit] = *p.TariffUnit
+	}
+	if p.StartDate != nil {
+		v[AttrStartDate] = *p.StartDate
+	}
+	if p.DayEntries != nil {
+		v[AttrDayEntries] = spec.List[DayEntryStruct](*p.DayEntries)
+	}
+	if p.DayPatterns != nil {
+		v[AttrDayPatterns] = spec.List[DayPatternStruct](*p.DayPatterns)
+	}
+	if p.CalendarPeriods != nil {
+		v[AttrCalendarPeriods] = spec.List[CalendarPeriodStruct](*p.CalendarPeriods)
+	}
+	if p.IndividualDays != nil {
+		v[AttrIndividualDays] = spec.List[DayStruct](*p.IndividualDays)
+	}
+	if p.CurrentDay != nil {
+		v[AttrCurrentDay] = *p.CurrentDay
+	}
+	if p.NextDay != nil {
+		v[AttrNextDay] = *p.NextDay
+	}
+	if p.CurrentDayEntry != nil {
+		v[AttrCurrentDayEntry] = *p.CurrentDayEntry
+	}
+	if p.CurrentDayEntryDate != nil {
+		v[AttrCurrentDayEntryDate] = *p.CurrentDayEntryDate
+	}
+	if p.NextDayEntry != nil {
+		v[AttrNextDayEntry] = *p.NextDayEntry
+	}
+	if p.NextDayEntryDate != nil {
+		v[AttrNextDayEntryDate] = *p.NextDayEntryDate
+	}
+	if p.TariffComponents != nil {
+		v[AttrTariffComponents] = spec.List[TariffComponentStruct](*p.TariffComponents)
+	}
+	if p.TariffPeriods != nil {
+		v[AttrTariffPeriods] = spec.List[TariffPeriodStruct](*p.TariffPeriods)
+	}
+	if p.CurrentTariffComponents != nil {
+		v[AttrCurrentTariffComponents] = spec.List[TariffComponentStruct](*p.CurrentTariffComponents)
+	}
+	if p.NextTariffComponents != nil {
+		v[AttrNextTariffComponents] = spec.List[TariffComponentStruct](*p.NextTariffComponents)
+	}
+	if p.DefaultRandomizationOffset != nil {
+		v[AttrDefaultRandomizationOffset] = *p.DefaultRandomizationOffset
+	}
+	if p.DefaultRandomizationType != nil {
+		v[AttrDefaultRandomizationType] = *p.DefaultRandomizationType
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed CommodityTariff server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

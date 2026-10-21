@@ -43,6 +43,41 @@ type Patch struct {
 	WattRating        *uint16   `matter:"0x0008"` // attribute 0x0008
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CookTime != nil {
+		v[AttrCookTime] = *p.CookTime
+	}
+	if p.MaxCookTime != nil {
+		v[AttrMaxCookTime] = *p.MaxCookTime
+	}
+	if p.PowerSetting != nil {
+		v[AttrPowerSetting] = *p.PowerSetting
+	}
+	if p.MinPower != nil {
+		v[AttrMinPower] = *p.MinPower
+	}
+	if p.MaxPower != nil {
+		v[AttrMaxPower] = *p.MaxPower
+	}
+	if p.PowerStep != nil {
+		v[AttrPowerStep] = *p.PowerStep
+	}
+	if p.SupportedWatts != nil {
+		v[AttrSupportedWatts] = *p.SupportedWatts
+	}
+	if p.SelectedWattIndex != nil {
+		v[AttrSelectedWattIndex] = *p.SelectedWattIndex
+	}
+	if p.WattRating != nil {
+		v[AttrWattRating] = *p.WattRating
+	}
+	return v
+}
+
 // Server is the typed MicrowaveOvenControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

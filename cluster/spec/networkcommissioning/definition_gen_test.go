@@ -61,6 +61,27 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		MaxNetworks:             new(uint8),
+		Networks:                new([]NetworkInfoStruct),
+		ScanMaxTimeSeconds:      new(uint8),
+		ConnectMaxTimeSeconds:   new(uint8),
+		InterfaceEnabled:        new(bool),
+		LastNetworkingStatus:    new(NetworkCommissioningStatusEnum),
+		LastNetworkId:           new([]byte),
+		LastConnectErrorValue:   new(int32),
+		SupportedWiFiBands:      new([]WiFiBandEnum),
+		SupportedThreadFeatures: new(ThreadCapabilitiesBitmap),
+		ThreadVersion:           new(uint16),
+		Null:                    []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 12 {
+		t.Errorf("a patch of every field sets %d values, want 12", len(values))
+	}
+	if _, ok := values[AttrNetworks].(spec.List[NetworkInfoStruct]); !ok {
+		t.Errorf("Networks is stored as %T, want its spec.List", values[AttrNetworks])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

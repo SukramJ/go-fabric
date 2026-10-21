@@ -353,8 +353,12 @@ type Config struct {
 	// Features, with HasFeatures, is the FeatureMap the server advertises
 	// — OO and LT, each optional, so every subset conforms — in place of
 	// OO with Lighting above: a device kit's selection, which matter.js's
-	// LevelControlServer starts empty (LevelControlServer.ts:865,
-	// LevelControlBaseServer.with()). LT then decides the Lighting surface.
+	// LevelControlServer starts empty: it is LevelControlBaseServer.with()
+	// (LevelControlServer.ts:865), and a defined feature list, the empty
+	// one included, is applied as the selection (packages/node/src/
+	// behavior/cluster/ClusterBehaviorType.ts:75-76, `features !==
+	// undefined` → applyFeatureSelection). LT then decides the Lighting
+	// surface.
 	Features    uint32
 	HasFeatures bool
 	// Transitions, when non-nil, runs the module's transition engine

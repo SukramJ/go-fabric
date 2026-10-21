@@ -67,6 +67,30 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentState:         new(PlaybackStateEnum),
+		StartTime:            new(uint64),
+		Duration:             new(uint64),
+		SampledPosition:      new(PlaybackPositionStruct),
+		PlaybackSpeed:        new(float32),
+		SeekRangeEnd:         new(uint64),
+		SeekRangeStart:       new(uint64),
+		ActiveAudioTrack:     new(TrackStruct),
+		AvailableAudioTracks: new([]TrackStruct),
+		ActiveTextTrack:      new(TrackStruct),
+		AvailableTextTracks:  new([]TrackStruct),
+		Null:                 []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 12 {
+		t.Errorf("a patch of every field sets %d values, want 12", len(values))
+	}
+	if _, ok := values[AttrAvailableAudioTracks].(spec.List[TrackStruct]); !ok {
+		t.Errorf("AvailableAudioTracks is stored as %T, want its spec.List", values[AttrAvailableAudioTracks])
+	}
+	if _, ok := values[AttrAvailableTextTracks].(spec.List[TrackStruct]); !ok {
+		t.Errorf("AvailableTextTracks is stored as %T, want its spec.List", values[AttrAvailableTextTracks])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

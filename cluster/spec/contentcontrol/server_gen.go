@@ -47,6 +47,47 @@ type Patch struct {
 	BlockContentTimeWindow          *[]TimeWindowStruct   `matter:"0x000A"` // attribute 0x000A
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Enabled != nil {
+		v[AttrEnabled] = *p.Enabled
+	}
+	if p.OnDemandRatings != nil {
+		v[AttrOnDemandRatings] = spec.List[RatingNameStruct](*p.OnDemandRatings)
+	}
+	if p.OnDemandRatingThreshold != nil {
+		v[AttrOnDemandRatingThreshold] = *p.OnDemandRatingThreshold
+	}
+	if p.ScheduledContentRatings != nil {
+		v[AttrScheduledContentRatings] = spec.List[RatingNameStruct](*p.ScheduledContentRatings)
+	}
+	if p.ScheduledContentRatingThreshold != nil {
+		v[AttrScheduledContentRatingThreshold] = *p.ScheduledContentRatingThreshold
+	}
+	if p.ScreenDailyTime != nil {
+		v[AttrScreenDailyTime] = *p.ScreenDailyTime
+	}
+	if p.RemainingScreenTime != nil {
+		v[AttrRemainingScreenTime] = *p.RemainingScreenTime
+	}
+	if p.BlockUnrated != nil {
+		v[AttrBlockUnrated] = *p.BlockUnrated
+	}
+	if p.BlockChannelList != nil {
+		v[AttrBlockChannelList] = spec.List[BlockChannelStruct](*p.BlockChannelList)
+	}
+	if p.BlockApplicationList != nil {
+		v[AttrBlockApplicationList] = spec.List[AppInfoStruct](*p.BlockApplicationList)
+	}
+	if p.BlockContentTimeWindow != nil {
+		v[AttrBlockContentTimeWindow] = spec.List[TimeWindowStruct](*p.BlockContentTimeWindow)
+	}
+	return v
+}
+
 // Server is the typed ContentControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
