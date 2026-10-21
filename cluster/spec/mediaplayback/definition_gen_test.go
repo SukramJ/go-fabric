@@ -126,6 +126,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Playback = d.Playback
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

@@ -1,0 +1,227 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package main
+
+// The host ports of the media servers (brief BU-b, ADR 0022): each is the
+// port its server in cluster/media runs on, in the generated types, and
+// cluster/media names it by alias — one form. A command of a cluster with
+// state hands the port the state the attributes report (*State) to
+// change; the server commits the change when the command succeeds. The
+// optional commands are the further interfaces under types, accepted when
+// the port implements them.
+var mediaPorts = map[string]portSet{
+	"MediaPlayback": {
+		ports: []portDecl{{
+			name: "Playback",
+			doc: []string{
+				"Playback is the transport behind the kit's MediaPlayback server: the",
+				"three mandatory commands, each answering a PlaybackResponse; st is",
+				"the state the attributes report, changed to what the command did.",
+				"A port that also implements PlaybackStartOver, PlaybackPrevious,",
+				"PlaybackNext, PlaybackVariableSpeed, PlaybackSkip, PlaybackSeek,",
+				"PlaybackAudioTracks or PlaybackTextTracks takes those commands",
+				"(cluster/media).",
+			},
+			methods: []string{
+				"Play(ctx context.Context, st *State) (PlaybackResponse, error)",
+				"Pause(ctx context.Context, st *State) (PlaybackResponse, error)",
+				"Stop(ctx context.Context, st *State) (PlaybackResponse, error)",
+			},
+		}},
+		types: []string{
+			"// PlaybackStartOver is a Playback that takes StartOver.",
+			"type PlaybackStartOver interface {",
+			"\tStartOver(ctx context.Context, st *State) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackPrevious is a Playback that takes Previous.",
+			"type PlaybackPrevious interface {",
+			"\tPrevious(ctx context.Context, st *State) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackNext is a Playback that takes Next.",
+			"type PlaybackNext interface {",
+			"\tNext(ctx context.Context, st *State) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackVariableSpeed is a Playback that takes Rewind and",
+			"// FastForward; VariableSpeed (VS) requires it.",
+			"type PlaybackVariableSpeed interface {",
+			"\tRewind(ctx context.Context, st *State, req RewindRequest) (PlaybackResponse, error)",
+			"\tFastForward(ctx context.Context, st *State, req FastForwardRequest) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackSkip is a Playback that takes SkipForward and SkipBackward.",
+			"type PlaybackSkip interface {",
+			"\tSkipForward(ctx context.Context, st *State, req SkipForwardRequest) (PlaybackResponse, error)",
+			"\tSkipBackward(ctx context.Context, st *State, req SkipBackwardRequest) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackSeek is a Playback that takes Seek; AdvancedSeek (AS)",
+			"// requires it.",
+			"type PlaybackSeek interface {",
+			"\tSeek(ctx context.Context, st *State, req SeekRequest) (PlaybackResponse, error)",
+			"}",
+			"",
+			"// PlaybackAudioTracks is a Playback that takes ActivateAudioTrack",
+			"// (status only); AudioTracks (AT) requires it.",
+			"type PlaybackAudioTracks interface {",
+			"\tActivateAudioTrack(ctx context.Context, st *State, req ActivateAudioTrackRequest) error",
+			"}",
+			"",
+			"// PlaybackTextTracks is a Playback that takes ActivateTextTrack and",
+			"// DeactivateTextTrack (status only); TextTracks (TT) requires it.",
+			"type PlaybackTextTracks interface {",
+			"\tActivateTextTrack(ctx context.Context, st *State, req ActivateTextTrackRequest) error",
+			"\tDeactivateTextTrack(ctx context.Context, st *State) error",
+			"}",
+		},
+	},
+	"KeypadInput": {ports: []portDecl{{
+		name: "Keypad",
+		doc: []string{
+			"Keypad takes SendKey with the CEC key code and answers its",
+			"SendKeyResponse: UnsupportedKey or InvalidKeyInCurrentState for a",
+			"key the device does not take (cluster/media).",
+		},
+		methods: []string{"SendKey(ctx context.Context, req SendKeyRequest) (SendKeyResponse, error)"},
+	}}},
+	"ContentLauncher": {ports: []portDecl{{
+		name: "ContentLauncher",
+		doc: []string{
+			"ContentLauncher carries out LaunchContent (ContentSearch, CS) and",
+			"LaunchURL (UrlPlayback, UP), each answered by LauncherResponse; a",
+			"command whose feature the selection leaves out is not accepted",
+			"(cluster/media).",
+		},
+		methods: []string{
+			"LaunchContent(ctx context.Context, st *State, req LaunchContentRequest) (LauncherResponse, error)",
+			"LaunchURL(ctx context.Context, st *State, req LaunchUrlRequest) (LauncherResponse, error)",
+		},
+	}}},
+	"ApplicationLauncher": {ports: []portDecl{{
+		name: "AppLauncher",
+		doc: []string{
+			"AppLauncher carries out LaunchApp, StopApp and HideApp, each",
+			"answered by LauncherResponse. On a content app platform (AP) the",
+			"Application field names the app; the port makes it current in st",
+			"and moves the app's ApplicationBasic Status (cluster/media).",
+		},
+		methods: []string{
+			"LaunchApp(ctx context.Context, st *State, req LaunchAppRequest) (LauncherResponse, error)",
+			"StopApp(ctx context.Context, st *State, req StopAppRequest) (LauncherResponse, error)",
+			"HideApp(ctx context.Context, st *State, req HideAppRequest) (LauncherResponse, error)",
+		},
+	}}},
+	"MediaInput": {
+		ports: []portDecl{{
+			name: "Inputs",
+			doc: []string{
+				"Inputs carries out SelectInput, ShowInputStatus and",
+				"HideInputStatus, status only; a port that also implements",
+				"InputRenamer takes RenameInput (cluster/media).",
+			},
+			methods: []string{
+				"SelectInput(ctx context.Context, st *State, req SelectInputRequest) error",
+				"ShowInputStatus(ctx context.Context, st *State) error",
+				"HideInputStatus(ctx context.Context, st *State) error",
+			},
+		}},
+		types: []string{
+			"// InputRenamer is an Inputs that takes RenameInput; NameUpdates (NU)",
+			"// requires it.",
+			"type InputRenamer interface {",
+			"\tRenameInput(ctx context.Context, st *State, req RenameInputRequest) error",
+			"}",
+		},
+	},
+	"AudioOutput": {
+		ports: []portDecl{{
+			name: "Outputs",
+			doc: []string{
+				"Outputs carries out SelectOutput, status only, making the output",
+				"current in st; a port that also implements OutputRenamer takes",
+				"RenameOutput (cluster/media).",
+			},
+			methods: []string{"SelectOutput(ctx context.Context, st *State, req SelectOutputRequest) error"},
+		}},
+		types: []string{
+			"// OutputRenamer is an Outputs that takes RenameOutput; NameUpdates",
+			"// (NU) requires it.",
+			"type OutputRenamer interface {",
+			"\tRenameOutput(ctx context.Context, st *State, req RenameOutputRequest) error",
+			"}",
+		},
+	},
+	"Channel": {
+		ports: []portDecl{{
+			name: "Channels",
+			doc: []string{
+				"Channels tunes: ChangeChannel answers ChangeChannelResponse,",
+				"ChangeChannelByNumber and SkipChannel are status only; the port",
+				"makes the channel current in st. A port that also implements",
+				"ChannelGuide takes the ElectronicGuide commands, ChannelRecorder",
+				"RecordProgram's (cluster/media).",
+			},
+			methods: []string{
+				"ChangeChannel(ctx context.Context, st *State, req ChangeChannelRequest) (ChangeChannelResponse, error)",
+				"ChangeChannelByNumber(ctx context.Context, st *State, req ChangeChannelByNumberRequest) error",
+				"SkipChannel(ctx context.Context, st *State, req SkipChannelRequest) error",
+			},
+		}},
+		types: []string{
+			"// ChannelGuide is a Channels that takes GetProgramGuide;",
+			"// ElectronicGuide (EG) requires it.",
+			"type ChannelGuide interface {",
+			"\tGetProgramGuide(ctx context.Context, st *State, req GetProgramGuideRequest) (ProgramGuideResponse, error)",
+			"}",
+			"",
+			"// ChannelRecorder is a Channels that takes RecordProgram and",
+			"// CancelRecordProgram (status only); RecordProgram with",
+			"// ElectronicGuide (RP & EG) requires it.",
+			"type ChannelRecorder interface {",
+			"\tRecordProgram(ctx context.Context, st *State, req RecordProgramRequest) error",
+			"\tCancelRecordProgram(ctx context.Context, st *State, req CancelRecordProgramRequest) error",
+			"}",
+		},
+	},
+	"TargetNavigator": {ports: []portDecl{{
+		name: "Targets",
+		doc: []string{
+			"Targets carries out NavigateTarget, answered by",
+			"NavigateTargetResponse; the port makes the target current in st",
+			"(cluster/media).",
+		},
+		methods: []string{"NavigateTarget(ctx context.Context, st *State, req NavigateTargetRequest) (NavigateTargetResponse, error)"},
+	}}},
+	"LowPower": {ports: []portDecl{{
+		name: "LowPower",
+		doc: []string{
+			"LowPower carries out Sleep, status only: it puts the device into",
+			"its low-power mode (cluster/media).",
+		},
+		methods: []string{"Sleep(ctx context.Context) error"},
+	}}},
+	"AccountLogin": {ports: []portDecl{{
+		name: "AccountLogin",
+		doc: []string{
+			"AccountLogin carries out the three fabric-scoped, timed commands;",
+			"the accessing fabric is on ctx (cluster/media).",
+		},
+		methods: []string{
+			"// GetSetupPIN answers the setup PIN for TempAccountIdentifier.",
+			"GetSetupPIN(ctx context.Context, req GetSetupPinRequest) (GetSetupPinResponse, error)",
+			"// Login logs the account in with the setup PIN; status only.",
+			"Login(ctx context.Context, req LoginRequest) error",
+			"// Logout logs the account out; status only.",
+			"Logout(ctx context.Context, req LogoutRequest) error",
+		},
+	}}},
+}
+
+func init() {
+	for name, ps := range mediaPorts {
+		ports[name] = ps
+	}
+}

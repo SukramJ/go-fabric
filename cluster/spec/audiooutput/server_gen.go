@@ -99,6 +99,19 @@ func (s *Server) HandleRenameOutput(fn func(ctx context.Context, req RenameOutpu
 	return spec.HandleOn(s.Underlying(), CmdRenameOutput, fn)
 }
 
+// OutputRenamer is an Outputs that takes RenameOutput; NameUpdates
+// (NU) requires it.
+type OutputRenamer interface {
+	RenameOutput(ctx context.Context, st *State, req RenameOutputRequest) error
+}
+
+// Outputs carries out SelectOutput, status only, making the output
+// current in st; a port that also implements OutputRenamer takes
+// RenameOutput (cluster/media).
+type Outputs interface {
+	SelectOutput(ctx context.Context, st *State, req SelectOutputRequest) error
+}
+
 // Declare is the declaration of the AudioOutput cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -123,6 +136,8 @@ type Declare struct {
 	// HandleRenameOutput handles the RenameOutput command in place of the server
 	// (Server.HandleRenameOutput), inline; an optional command it handles is accepted.
 	HandleRenameOutput func(ctx context.Context, req RenameOutputRequest) (struct{}, error)
+	// Outputs is the host port the kit's server runs on ([Outputs]).
+	Outputs Outputs
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

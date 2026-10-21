@@ -107,6 +107,17 @@ func (s *Server) EmitLoggedOut(endpoint uint16, data LoggedOutEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLoggedOut, data)
 }
 
+// AccountLogin carries out the three fabric-scoped, timed commands;
+// the accessing fabric is on ctx (cluster/media).
+type AccountLogin interface {
+	// GetSetupPIN answers the setup PIN for TempAccountIdentifier.
+	GetSetupPIN(ctx context.Context, req GetSetupPinRequest) (GetSetupPinResponse, error)
+	// Login logs the account in with the setup PIN; status only.
+	Login(ctx context.Context, req LoginRequest) error
+	// Logout logs the account out; status only.
+	Logout(ctx context.Context, req LogoutRequest) error
+}
+
 // Declare is the declaration of the AccountLogin cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -135,6 +146,8 @@ type Declare struct {
 	// HandleLogout handles the Logout command in place of the server
 	// (Server.HandleLogout), inline; an optional command it handles is accepted.
 	HandleLogout func(ctx context.Context, req LogoutRequest) (struct{}, error)
+	// AccountLogin is the host port the kit's server runs on ([AccountLogin]).
+	AccountLogin AccountLogin
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

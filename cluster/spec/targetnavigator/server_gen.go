@@ -99,6 +99,13 @@ func (s *Server) EmitTargetUpdated(endpoint uint16, data TargetUpdatedEvent) err
 	return spec.EmitOn(s.Underlying(), endpoint, EventTargetUpdated, data)
 }
 
+// Targets carries out NavigateTarget, answered by
+// NavigateTargetResponse; the port makes the target current in st
+// (cluster/media).
+type Targets interface {
+	NavigateTarget(ctx context.Context, st *State, req NavigateTargetRequest) (NavigateTargetResponse, error)
+}
+
 // Declare is the declaration of the TargetNavigator cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -121,6 +128,8 @@ type Declare struct {
 	// HandleNavigateTarget handles the NavigateTarget command in place of the server
 	// (Server.HandleNavigateTarget), inline; an optional command it handles is accepted.
 	HandleNavigateTarget func(ctx context.Context, req NavigateTargetRequest) (NavigateTargetResponse, error)
+	// Targets is the host port the kit's server runs on ([Targets]).
+	Targets Targets
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -11,13 +11,12 @@ import (
 	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 )
 
-// Keypad is the KeypadInput host port: SendKey with the CEC key code
+// Keypad is the KeypadInput host port (the generated [keypaddef.Keypad],
+// the declaration's Keypad): SendKey with the CEC key code
 // (keypad-input.element.ts:29-32), answered by SendKeyResponse with its
 // Status (:33-36) — UnsupportedKey or InvalidKeyInCurrentState for a key
 // the device does not take.
-type Keypad interface {
-	SendKey(ctx context.Context, req keypaddef.SendKeyRequest) (keypaddef.SendKeyResponse, error)
-}
+type Keypad = keypaddef.Keypad
 
 // KeypadConfig carries the construction parameters of a KeypadInput
 // server.

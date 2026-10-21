@@ -107,6 +107,16 @@ func (s *Server) HandleHideApp(fn func(ctx context.Context, req HideAppRequest) 
 	return spec.HandleOn(s.Underlying(), CmdHideApp, fn)
 }
 
+// AppLauncher carries out LaunchApp, StopApp and HideApp, each
+// answered by LauncherResponse. On a content app platform (AP) the
+// Application field names the app; the port makes it current in st
+// and moves the app's ApplicationBasic Status (cluster/media).
+type AppLauncher interface {
+	LaunchApp(ctx context.Context, st *State, req LaunchAppRequest) (LauncherResponse, error)
+	StopApp(ctx context.Context, st *State, req StopAppRequest) (LauncherResponse, error)
+	HideApp(ctx context.Context, st *State, req HideAppRequest) (LauncherResponse, error)
+}
+
 // Declare is the declaration of the ApplicationLauncher cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -134,6 +144,8 @@ type Declare struct {
 	// HandleHideApp handles the HideApp command in place of the server
 	// (Server.HandleHideApp), inline; an optional command it handles is accepted.
 	HandleHideApp func(ctx context.Context, req HideAppRequest) (LauncherResponse, error)
+	// AppLauncher is the host port the kit's server runs on ([AppLauncher]).
+	AppLauncher AppLauncher
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

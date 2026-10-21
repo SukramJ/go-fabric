@@ -111,6 +111,21 @@ func (s *Server) HandleRenameInput(fn func(ctx context.Context, req RenameInputR
 	return spec.HandleOn(s.Underlying(), CmdRenameInput, fn)
 }
 
+// InputRenamer is an Inputs that takes RenameInput; NameUpdates (NU)
+// requires it.
+type InputRenamer interface {
+	RenameInput(ctx context.Context, st *State, req RenameInputRequest) error
+}
+
+// Inputs carries out SelectInput, ShowInputStatus and
+// HideInputStatus, status only; a port that also implements
+// InputRenamer takes RenameInput (cluster/media).
+type Inputs interface {
+	SelectInput(ctx context.Context, st *State, req SelectInputRequest) error
+	ShowInputStatus(ctx context.Context, st *State) error
+	HideInputStatus(ctx context.Context, st *State) error
+}
+
 // Declare is the declaration of the MediaInput cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -141,6 +156,8 @@ type Declare struct {
 	// HandleRenameInput handles the RenameInput command in place of the server
 	// (Server.HandleRenameInput), inline; an optional command it handles is accepted.
 	HandleRenameInput func(ctx context.Context, req RenameInputRequest) (struct{}, error)
+	// Inputs is the host port the kit's server runs on ([Inputs]).
+	Inputs Inputs
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

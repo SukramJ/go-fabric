@@ -99,6 +99,15 @@ func (s *Server) HandleLaunchUrl(fn func(ctx context.Context, req LaunchUrlReque
 	return spec.HandleOn(s.Underlying(), CmdLaunchUrl, fn)
 }
 
+// ContentLauncher carries out LaunchContent (ContentSearch, CS) and
+// LaunchURL (UrlPlayback, UP), each answered by LauncherResponse; a
+// command whose feature the selection leaves out is not accepted
+// (cluster/media).
+type ContentLauncher interface {
+	LaunchContent(ctx context.Context, st *State, req LaunchContentRequest) (LauncherResponse, error)
+	LaunchURL(ctx context.Context, st *State, req LaunchUrlRequest) (LauncherResponse, error)
+}
+
 // Declare is the declaration of the ContentLauncher cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -123,6 +132,8 @@ type Declare struct {
 	// HandleLaunchUrl handles the LaunchUrl command in place of the server
 	// (Server.HandleLaunchUrl), inline; an optional command it handles is accepted.
 	HandleLaunchUrl func(ctx context.Context, req LaunchUrlRequest) (LauncherResponse, error)
+	// ContentLauncher is the host port the kit's server runs on ([ContentLauncher]).
+	ContentLauncher ContentLauncher
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -92,7 +92,7 @@ func (p *transport) Seek(_ context.Context, st *media.PlaybackState, req mpdef.S
 
 func (p *transport) ActivateAudioTrack(_ context.Context, st *media.PlaybackState, req mpdef.ActivateAudioTrackRequest) error {
 	p.calls, p.reqs = append(p.calls, "ActivateAudioTrack"), append(p.reqs, req)
-	for _, tr := range st.AvailableAudioTracks {
+	for _, tr := range *st.AvailableAudioTracks {
 		if tr.Id == req.TrackId {
 			st.ActiveAudioTrack = &tr
 			return nil
@@ -141,8 +141,8 @@ func newPlayer(t *testing.T) (*media.PlaybackServer, *transport) {
 		Events:   []uint32{mpdef.EventStateChanged},
 		Initial: media.PlaybackState{
 			CurrentState: mpdef.PlaybackStatePaused, Duration: &duration,
-			AvailableAudioTracks: []mpdef.TrackStruct{{Id: "a0", TrackAttributes: mpdef.TrackAttributesStruct{LanguageCode: "en"}}},
-			AvailableTextTracks:  []mpdef.TrackStruct{},
+			AvailableAudioTracks: &[]mpdef.TrackStruct{{Id: "a0", TrackAttributes: mpdef.TrackAttributesStruct{LanguageCode: "en"}}},
+			AvailableTextTracks:  &[]mpdef.TrackStruct{},
 		},
 	})
 	if err != nil {
@@ -308,7 +308,7 @@ func TestPlaybackOptionalCommands(t *testing.T) {
 	for _, f := range []mpdef.Feature{mpdef.FeatureAdvancedSeek, mpdef.FeatureVariableSpeed, mpdef.FeatureTextTracks, mpdef.FeatureAudioTracks} {
 		_, err := media.NewPlayback(media.PlaybackConfig{
 			Port: &basicTransport{}, Features: f,
-			Initial: media.PlaybackState{AvailableAudioTracks: []mpdef.TrackStruct{}, AvailableTextTracks: []mpdef.TrackStruct{}},
+			Initial: media.PlaybackState{AvailableAudioTracks: &[]mpdef.TrackStruct{}, AvailableTextTracks: &[]mpdef.TrackStruct{}},
 		})
 		if !errors.Is(err, media.ErrNotImplemented) {
 			t.Errorf("feature 0x%X without its commands: %v, want ErrNotImplemented", f, err)
