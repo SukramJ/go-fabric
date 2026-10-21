@@ -303,6 +303,33 @@ func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req Ste
 	return spec.HandleOn(s.Underlying(), CmdStepColorTemperature, fn)
 }
 
+// Color is a colour in the attributes' Matter units: Mode says which
+// fields describe it — X / Y (CurrentX, CurrentY), Hue / Saturation
+// (CurrentHue, CurrentSaturation), EnhancedHue / Saturation, or
+// ColorTemperatureMireds; the others keep the last value of their mode.
+type Color struct {
+	Mode                   EnhancedColorModeEnum
+	X, Y                   uint16
+	Hue                    uint8
+	EnhancedHue            uint16
+	Saturation             uint8
+	ColorTemperatureMireds uint16
+}
+
+// ColorTemperatureWriter drives the device's colour temperature
+// (mireds) whenever the kit's ColorControl server changes it; an
+// error refuses the change (cluster/light ColorTemperatureWriter).
+type ColorTemperatureWriter interface {
+	SetColorTemperatureMireds(ctx context.Context, mireds uint16) error
+}
+
+// ColorWriter drives the device with the whole colour whenever the
+// kit's ColorControl server changes it (not on a colour mode
+// switch); an error refuses the change (cluster/light ColorWriter).
+type ColorWriter interface {
+	SetColor(ctx context.Context, c Color) error
+}
+
 // Declare is the declaration of the ColorControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -381,6 +408,10 @@ type Declare struct {
 	// HandleStepColorTemperature handles the StepColorTemperature command in place of the server
 	// (Server.HandleStepColorTemperature), inline; an optional command it handles is accepted.
 	HandleStepColorTemperature func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)
+	// ColorTemperatureWriter is the host port the kit's server runs on ([ColorTemperatureWriter]).
+	ColorTemperatureWriter ColorTemperatureWriter
+	// ColorWriter is the host port the kit's server runs on ([ColorWriter]).
+	ColorWriter ColorWriter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

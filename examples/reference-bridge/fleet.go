@@ -12,19 +12,14 @@ import (
 	"sync"
 	"time"
 
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-
-	"github.com/SukramJ/go-fabric/cluster"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/modeselect"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -159,8 +154,8 @@ func (d *demoLight) isOn() bool {
 // operation lock: changed may read any server of the endpoint, but must
 // not invoke or Set the OnOff server itself.
 func followOnOff(dev *device.Device, srv *onoffdef.Server, changed func(on bool)) {
-	dev.OnChanged(onoff.ClusterID, func(c contract.Change) {
-		if slices.Contains(c.Attributes, onoff.AttrOnOff) {
+	dev.OnChanged(onoffdef.ClusterID, func(c contract.Change) {
+		if slices.Contains(c.Attributes, onoffdef.AttrOnOff) {
 			changed(srv.Get().OnOff)
 		}
 	})
@@ -168,31 +163,10 @@ func followOnOff(dev *device.Device, srv *onoffdef.Server, changed func(on bool)
 
 // --- device 2: a temperature sensor -------------------------------------
 
-// demoThermometer is a measurement-only device. It implements
-// [contract.FloatMeasurementSource] and nothing else: the assembler picks
-// the cluster (TemperatureMeasurement 0x0402) and the standalone device type
-// from the declared class, so no cluster server is written on this side.
-type demoThermometer struct {
-	mu      sync.RWMutex
-	celsius float64
-}
-
-func newDemoThermometer(celsius float64) *demoThermometer {
-	return &demoThermometer{celsius: celsius}
-}
-
-// MatterMeasurementClass implements [contract.MeasurementSource].
-func (t *demoThermometer) MatterMeasurementClass() contract.MeasurementClass {
-	return contract.MeasurementTemperature
-}
-
-// MatterFloatValue implements [contract.FloatMeasurementSource]. The unit is
-// the model's own — °C for temperature; the cluster server converts.
-func (t *demoThermometer) MatterFloatValue() (float64, bool) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return t.celsius, true
-}
+// thermometerCelsius is the study thermometer's reading: a fixed
+// TemperatureMeasurement (temperatureDeclaration), nothing on this side
+// moves it.
+const thermometerCelsius = 21.5
 
 // --- device 3: an irrigation valve --------------------------------------
 
@@ -215,23 +189,9 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 type demoValve struct {
 	name string
 	notifier
-	// version is held by the device model, not by the cluster server, so a
-	// server built anew — the device layer builds it once, when the device
-	// is (fleet.endpoints) — never starts the counter over.
-	//
-	// On a bridged endpoint a controller never sees this counter:
-	// endpoint/dispatcher.go:38-42 answers from the ENDPOINT's version for
-	// anything that is not the root or the aggregator, and that one is bumped
-	// by the subscription manager (bridge/subscribe.go:997). So the tracker
-	// passed here is inert on the path this daemon actually uses. It is
-	// wired anyway because the server's contract asks for one and a host that
-	// mounts the same server on a root endpoint would need it — but nothing
-	// here depends on its value, and a reader should not go looking for the
-	// effect.
-	version cluster.DataVersionTracker
 
 	mu    sync.Mutex
-	state valve.State
+	state valvedef.ValveStateEnum
 	// openFor is the duration of the current opening; nil means the valve is
 	// closed, or open until something closes it.
 	openFor *uint32
@@ -243,7 +203,7 @@ type demoValve struct {
 	closer *time.Timer
 	// target is the position the head is travelling to; nil when it is not
 	// moving. arrive fires when it gets there.
-	target *valve.State
+	target *valvedef.ValveStateEnum
 	arrive *time.Timer
 }
 
@@ -251,7 +211,7 @@ type demoValve struct {
 const valveTravel = 200 * time.Millisecond
 
 // travelLocked starts the head towards to. Caller holds v.mu.
-func (v *demoValve) travelLocked(to valve.State) {
+func (v *demoValve) travelLocked(to valvedef.ValveStateEnum) {
 	if v.target == nil && v.state == to {
 		// Already there: the head does not move, and nothing reads
 		// Transitioning (TC-VALCC-3.1 closes a closed valve first).
@@ -261,7 +221,7 @@ func (v *demoValve) travelLocked(to valve.State) {
 		v.arrive.Stop()
 	}
 	v.target = &to
-	v.state = valve.StateTransitioning
+	v.state = valvedef.ValveStateTransitioning
 	v.arrive = time.AfterFunc(valveTravel, v.arrived)
 }
 
@@ -283,7 +243,7 @@ func (v *demoValve) arrived() {
 // an opening's durations hold from the Open command on (TC-VALCC-4.1 reads
 // OpenDuration right after it). Caller holds v.mu.
 func (v *demoValve) openingLocked() bool {
-	return v.state == valve.StateOpen || (v.target != nil && *v.target == valve.StateOpen)
+	return v.state == valvedef.ValveStateOpen || (v.target != nil && *v.target == valvedef.ValveStateOpen)
 }
 
 // stopTravelLocked abandons a travel in progress. Caller holds v.mu.
@@ -299,7 +259,7 @@ func (v *demoValve) stopTravelLocked() {
 // of the ValveConfigurationAndControl server, and its own change notifier.
 var (
 	_ contract.ChangeNotifier = (*demoValve)(nil)
-	_ valve.StateSource       = (*demoValve)(nil)
+	_ valvedef.StateSource    = (*demoValve)(nil)
 )
 
 // newDemoValve returns a closed valve whose default opening lasts
@@ -307,50 +267,47 @@ var (
 // field applies.
 func newDemoValve(name string, defaultOpenSeconds uint32) *demoValve {
 	seconds := defaultOpenSeconds
-	return &demoValve{name: name, state: valve.StateClosed, defaultOpen: &seconds}
+	return &demoValve{name: name, state: valvedef.ValveStateClosed, defaultOpen: &seconds}
 }
 
-// servers are the cluster servers the device supplies. The device is
-// the server's narrow port: every attribute the cluster answers is read back
-// out of it, and both commands land on it.
-func (v *demoValve) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{valve.NewServer(valve.Config{
-		Source:      v,
-		DataVersion: &v.version,
-	})}
+// declaration declares the valve's cluster: the device is the kit's
+// server's port — every attribute the cluster answers is read back out of
+// it, and both commands land on it.
+func (v *demoValve) declaration() device.Declaration {
+	return valvedef.Declare{StateSource: v}
 }
 
 // expireLocked applies a lapsed opening deadline. Caller holds v.mu.
 func (v *demoValve) expireLocked(now time.Time) {
-	if v.state != valve.StateOpen || v.closesAt.IsZero() || now.Before(v.closesAt) {
+	if v.state != valvedef.ValveStateOpen || v.closesAt.IsZero() || now.Before(v.closesAt) {
 		return
 	}
-	v.state = valve.StateClosed
+	v.state = valvedef.ValveStateClosed
 	v.openFor = nil
 	v.closesAt = time.Time{}
 }
 
-// CurrentState implements [valve.StateSource]. Transitioning while the head
+// CurrentState implements [valvedef.StateSource]. Transitioning while the head
 // travels.
-func (v *demoValve) CurrentState() (valve.State, bool) {
+func (v *demoValve) CurrentState() (valvedef.ValveStateEnum, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.expireLocked(time.Now())
 	return v.state, true
 }
 
-// TargetState implements [valve.StateSource]: the position the head is
+// TargetState implements [valvedef.StateSource]: the position the head is
 // travelling to, null once it has arrived.
-func (v *demoValve) TargetState() (valve.State, bool) {
+func (v *demoValve) TargetState() (valvedef.ValveStateEnum, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.target == nil {
-		return valve.StateClosed, false
+		return valvedef.ValveStateClosed, false
 	}
 	return *v.target, true
 }
 
-// OpenDuration implements [valve.StateSource]. Null while the valve is
+// OpenDuration implements [valvedef.StateSource]. Null while the valve is
 // closed, and null for an indefinite opening — the spec's own meaning for
 // the attribute rather than an unknown value.
 func (v *demoValve) OpenDuration() (uint32, bool) {
@@ -363,7 +320,7 @@ func (v *demoValve) OpenDuration() (uint32, bool) {
 	return *v.openFor, true
 }
 
-// RemainingDuration implements [valve.StateSource]. Null unless a timed
+// RemainingDuration implements [valvedef.StateSource]. Null unless a timed
 // opening is running.
 func (v *demoValve) RemainingDuration() (uint32, bool) {
 	v.mu.Lock()
@@ -376,7 +333,7 @@ func (v *demoValve) RemainingDuration() (uint32, bool) {
 	return secondsUntil(v.closesAt.Sub(now)), true
 }
 
-// DefaultOpenDuration implements [valve.StateSource].
+// DefaultOpenDuration implements [valvedef.StateSource].
 func (v *demoValve) DefaultOpenDuration() (uint32, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -386,7 +343,7 @@ func (v *demoValve) DefaultOpenDuration() (uint32, bool) {
 	return *v.defaultOpen, true
 }
 
-// SetDefaultOpenDuration implements [valve.StateSource]. Nothing is fanned
+// SetDefaultOpenDuration implements [valvedef.StateSource]. Nothing is fanned
 // out: DefaultOpenDuration is not a reportable attribute, and the cluster
 // server bumps the DataVersion for the write itself.
 func (v *demoValve) SetDefaultOpenDuration(_ context.Context, seconds *uint32) error {
@@ -398,10 +355,10 @@ func (v *demoValve) SetDefaultOpenDuration(_ context.Context, seconds *uint32) e
 	return nil
 }
 
-// Open implements [valve.StateSource]. An absent OpenDuration field means
+// Open implements [valvedef.StateSource]. An absent OpenDuration field means
 // "use DefaultOpenDuration"; a present null means "stay open until something
 // closes me", which is why the two are kept apart rather than folded.
-func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
+func (v *demoValve) Open(_ context.Context, req valvedef.OpenRequest) error {
 	v.mu.Lock()
 	duration := v.defaultOpen
 	if d := req.OpenDuration; d != nil {
@@ -410,7 +367,7 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 			duration = &d.Value
 		}
 	}
-	v.travelLocked(valve.StateOpen)
+	v.travelLocked(valvedef.ValveStateOpen)
 	v.openFor = copyUint32(duration)
 	if v.closer != nil {
 		v.closer.Stop()
@@ -439,14 +396,14 @@ func (v *demoValve) timedClose() {
 	v.notify()
 }
 
-// Close implements [valve.StateSource].
+// Close implements [valvedef.StateSource].
 func (v *demoValve) Close(context.Context) error {
 	v.mu.Lock()
 	if v.closer != nil {
 		v.closer.Stop()
 		v.closer = nil
 	}
-	v.travelLocked(valve.StateClosed)
+	v.travelLocked(valvedef.ValveStateClosed)
 	v.openFor = nil
 	v.closesAt = time.Time{}
 	v.mu.Unlock()
@@ -461,11 +418,11 @@ func (v *demoValve) Close(context.Context) error {
 // event stream; this example has no southbound bus, so the only caller is
 // the fleet's own test, where it stands for a change that starts at the
 // device rather than at a controller.
-func (v *demoValve) reportFromDevice(state valve.State) {
+func (v *demoValve) reportFromDevice(state valvedef.ValveStateEnum) {
 	v.mu.Lock()
 	v.stopTravelLocked()
 	v.state = state
-	if state != valve.StateOpen {
+	if state != valvedef.ValveStateOpen {
 		v.openFor = nil
 		v.closesAt = time.Time{}
 	}
@@ -513,11 +470,9 @@ type demoSelector struct {
 	name        string
 	description string
 	notifier
-	// version is held by the device for the reason given on [demoValve].
-	version cluster.DataVersionTracker
 
 	// modes is immutable after construction, so it needs no lock.
-	modes []modeselect.ModeOptionStruct
+	modes []modeselectdef.ModeOptionStruct
 
 	mu      sync.Mutex
 	current uint8
@@ -525,8 +480,8 @@ type demoSelector struct {
 
 // Compile-time assertions.
 var (
-	_ contract.ChangeNotifier = (*demoSelector)(nil)
-	_ modeselect.ModeSource   = (*demoSelector)(nil)
+	_ contract.ChangeNotifier  = (*demoSelector)(nil)
+	_ modeselectdef.ModeSource = (*demoSelector)(nil)
 )
 
 // Brew-strength positions of [demoSelector]. The values are this host's own
@@ -543,7 +498,7 @@ func newDemoSelector(name string) *demoSelector {
 	return &demoSelector{
 		name:        name,
 		description: "Brew strength",
-		modes: []modeselect.ModeOptionStruct{
+		modes: []modeselectdef.ModeOptionStruct{
 			// SemanticTags is conformance M, so every option carries the
 			// field; leaving it empty is how an option says it has no tag a
 			// client could act on without reading the label. No standard
@@ -557,33 +512,31 @@ func newDemoSelector(name string) *demoSelector {
 	}
 }
 
-// servers are the cluster servers the device supplies.
-func (s *demoSelector) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{modeselect.NewServer(modeselect.Config{
-		Source:      s,
-		DataVersion: &s.version,
-	})}
+// declaration declares the selector's cluster, the device as the kit's
+// server's port.
+func (s *demoSelector) declaration() device.Declaration {
+	return modeselectdef.Declare{ModeSource: s}
 }
 
-// ModeDescription implements [modeselect.ModeSource].
+// ModeDescription implements [modeselectdef.ModeSource].
 func (s *demoSelector) ModeDescription() string { return s.description }
 
-// ModeNamespace implements [modeselect.ModeSource]. No standard namespace
+// ModeNamespace implements [modeselectdef.ModeSource]. No standard namespace
 // describes brew strength, so StandardNamespace reads null.
 func (s *demoSelector) ModeNamespace() (uint8, bool) { return 0, false }
 
-// SupportedModes implements [modeselect.ModeSource]. The server deep-copies
+// SupportedModes implements [modeselectdef.ModeSource]. The server deep-copies
 // what it is given, so handing out the fixed slice cannot leak host state.
-func (s *demoSelector) SupportedModes() []modeselect.ModeOptionStruct { return s.modes }
+func (s *demoSelector) SupportedModes() []modeselectdef.ModeOptionStruct { return s.modes }
 
-// CurrentMode implements [modeselect.ModeSource].
+// CurrentMode implements [modeselectdef.ModeSource].
 func (s *demoSelector) CurrentMode() uint8 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.current
 }
 
-// ChangeToMode implements [modeselect.ModeSource]. The server has already
+// ChangeToMode implements [modeselectdef.ModeSource]. The server has already
 // refused any mode outside SupportedModes, so what arrives here turns the
 // knob.
 func (s *demoSelector) ChangeToMode(_ context.Context, newMode uint8) error {
@@ -664,8 +617,6 @@ type dimmer struct {
 	// lighting selects the ceiling-light surface; see servers.
 	lighting *lightingSurface
 	notifier
-	// version is held by the device for the reason given on [demoValve].
-	version cluster.DataVersionTracker
 
 	mu      sync.Mutex
 	on      bool
@@ -680,28 +631,40 @@ type dimmer struct {
 
 // Compile-time assertions.
 var (
-	_ contract.ChangeNotifier  = (*dimmer)(nil)
-	_ levelcontrol.LevelSource = (*dimmer)(nil)
+	_ contract.ChangeNotifier     = (*dimmer)(nil)
+	_ levelcontroldef.LevelSource = (*dimmer)(nil)
 )
 
 // newDemoSpeaker returns a speaker that is off, at the given volume.
 func newDemoSpeaker(name string, level uint8) *dimmer {
-	return &dimmer{name: name, kind: "speaker", minLevel: levelcontrol.LevelMin, level: level}
+	return &dimmer{name: name, kind: "speaker", minLevel: levelMin, level: level}
 }
 
-// servers are the cluster servers the device supplies besides OnOff,
-// which is the device layer's default: the speaker's LevelControl; the
-// ceiling light adds the Lighting surface (fleet_lighting.go).
-func (s *dimmer) servers() []contract.ClusterServer {
+// The levels of a dimmer without the Lighting feature: MinLevel 0
+// (matter.js LevelControlServer.ts:89-90 `this.features.lighting ? 1 :
+// 0`) and the MoveToLevel Level constraint "max 254".
+const (
+	levelMin uint8 = 0
+	levelMax uint8 = 254
+)
+
+// effectiveOptions is the Options bitmap a command runs under: the
+// attribute with the command's OptionsOverride bits where its OptionsMask
+// is set, ExecuteIfOff the one bit the speaker serves (matter.js
+// LevelControlServer.ts:729-736 #optionsAllowExecution).
+func effectiveOptions(attribute, mask, override uint8) uint8 {
+	return ((attribute &^ mask) | (override & mask)) & uint8(levelcontroldef.OptionsExecuteIfOff)
+}
+
+// declarations declare the dimmer's clusters besides OnOff, which is the
+// device layer's default: the speaker's LevelControl on the dimmer as its
+// LevelSource; the ceiling light adds the Lighting surface
+// (fleet_lighting.go).
+func (s *dimmer) declarations() []device.Option {
 	if s.lighting != nil {
-		return s.lightingServers()
+		return s.lightingDeclarations()
 	}
-	return []contract.ClusterServer{
-		levelcontrol.NewServer(levelcontrol.Config{
-			Source:      s,
-			DataVersion: &s.version,
-		}),
-	}
+	return []device.Option{levelcontroldef.Declare{LevelSource: s}}
 }
 
 // device builds the dimmer's device: a Speaker, a ColorTemperatureLight or
@@ -716,7 +679,7 @@ func (s *dimmer) servers() []contract.ClusterServer {
 // LevelControl (dimmable-light.element.ts:19-33), a surface the speaker's
 // server does not serve.
 func (s *dimmer) device(opts device.Options) (*device.Device, error) {
-	with := serve(s.servers(), device.WithChangeNotifier(s))
+	with := append(s.declarations(), device.WithChangeNotifier(s))
 	if s.lighting != nil {
 		with = append(with, onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}})
 	}
@@ -741,7 +704,7 @@ func (s *dimmer) device(opts device.Options) (*device.Device, error) {
 		}
 		d = sp.Device
 	}
-	srv := onoffdef.Wrap(d.Server(onoff.ClusterID))
+	srv := onoffdef.Wrap(d.Server(onoffdef.ClusterID))
 	if srv == nil {
 		return nil, fmt.Errorf("%s: no default OnOff server", s.name)
 	}
@@ -789,7 +752,7 @@ func (s *dimmer) setOn(on bool) {
 	s.notify()
 }
 
-// CurrentLevel implements [levelcontrol.LevelSource]. The level is always
+// CurrentLevel implements [levelcontroldef.LevelSource]. The level is always
 // known: this device answers for itself rather than caching a reading taken
 // somewhere else.
 func (s *dimmer) CurrentLevel() (uint8, bool) {
@@ -798,14 +761,14 @@ func (s *dimmer) CurrentLevel() (uint8, bool) {
 	return s.level, true
 }
 
-// Options implements [levelcontrol.LevelSource].
+// Options implements [levelcontroldef.LevelSource].
 func (s *dimmer) Options() levelcontroldef.OptionsBitmap {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return levelcontroldef.OptionsBitmap(s.options)
 }
 
-// OnLevel implements [levelcontrol.LevelSource].
+// OnLevel implements [levelcontroldef.LevelSource].
 func (s *dimmer) OnLevel() (uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -815,7 +778,7 @@ func (s *dimmer) OnLevel() (uint8, bool) {
 	return *s.onLevel, true
 }
 
-// SetOptions implements [levelcontrol.LevelSource]. The server has already
+// SetOptions implements [levelcontroldef.LevelSource]. The server has already
 // refused a bitmap carrying a bit the advertised FeatureMap does not cover.
 func (s *dimmer) SetOptions(_ context.Context, options levelcontroldef.OptionsBitmap) error {
 	s.mu.Lock()
@@ -825,7 +788,7 @@ func (s *dimmer) SetOptions(_ context.Context, options levelcontroldef.OptionsBi
 	return nil
 }
 
-// SetOnLevel implements [levelcontrol.LevelSource]. A nil level is the
+// SetOnLevel implements [levelcontroldef.LevelSource]. A nil level is the
 // spec's null: the on-level has no effect.
 func (s *dimmer) SetOnLevel(_ context.Context, level *uint8) error {
 	s.mu.Lock()
@@ -840,7 +803,7 @@ func (s *dimmer) SetOnLevel(_ context.Context, level *uint8) error {
 	return nil
 }
 
-// MoveToLevel implements [levelcontrol.LevelSource].
+// MoveToLevel implements [levelcontroldef.LevelSource].
 func (s *dimmer) MoveToLevel(_ context.Context, req levelcontroldef.MoveToLevelRequest) error {
 	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
 		return nil
@@ -849,13 +812,13 @@ func (s *dimmer) MoveToLevel(_ context.Context, req levelcontroldef.MoveToLevelR
 	return nil
 }
 
-// MoveToLevelWithOnOff implements [levelcontrol.LevelSource].
+// MoveToLevelWithOnOff implements [levelcontroldef.LevelSource].
 func (s *dimmer) MoveToLevelWithOnOff(_ context.Context, req levelcontroldef.MoveToLevelWithOnOffRequest) error {
 	s.applyLevel(req.Level, true)
 	return nil
 }
 
-// Move implements [levelcontrol.LevelSource]. With no travel time the move
+// Move implements [levelcontroldef.LevelSource]. With no travel time the move
 // arrives at the end of its direction inside the command.
 func (s *dimmer) Move(_ context.Context, req levelcontroldef.MoveRequest) error {
 	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
@@ -865,13 +828,13 @@ func (s *dimmer) Move(_ context.Context, req levelcontroldef.MoveRequest) error 
 	return nil
 }
 
-// MoveWithOnOff implements [levelcontrol.LevelSource].
+// MoveWithOnOff implements [levelcontroldef.LevelSource].
 func (s *dimmer) MoveWithOnOff(_ context.Context, req levelcontroldef.MoveWithOnOffRequest) error {
 	s.applyLevel(s.moveTarget(uint8(req.MoveMode)), true)
 	return nil
 }
 
-// Step implements [levelcontrol.LevelSource].
+// Step implements [levelcontroldef.LevelSource].
 func (s *dimmer) Step(_ context.Context, req levelcontroldef.StepRequest) error {
 	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
 		return nil
@@ -880,17 +843,17 @@ func (s *dimmer) Step(_ context.Context, req levelcontroldef.StepRequest) error 
 	return nil
 }
 
-// StepWithOnOff implements [levelcontrol.LevelSource].
+// StepWithOnOff implements [levelcontroldef.LevelSource].
 func (s *dimmer) StepWithOnOff(_ context.Context, req levelcontroldef.StepWithOnOffRequest) error {
 	s.applyLevel(s.steppedLevel(levelcontroldef.StepRequest(req)), true)
 	return nil
 }
 
-// Stop implements [levelcontrol.LevelSource]. See the type doc: this model
+// Stop implements [levelcontroldef.LevelSource]. See the type doc: this model
 // never has a move in flight to halt.
 func (s *dimmer) Stop(context.Context, levelcontroldef.StopRequest) error { return nil }
 
-// StopWithOnOff implements [levelcontrol.LevelSource].
+// StopWithOnOff implements [levelcontroldef.LevelSource].
 func (s *dimmer) StopWithOnOff(context.Context, levelcontroldef.StopWithOnOffRequest) error {
 	return nil
 }
@@ -911,12 +874,12 @@ func (s *dimmer) reportFromDevice(level uint8) {
 // attribute of another cluster on the endpoint, which a single-cluster
 // server cannot see (matter.js LevelControlServer.ts:729-736
 // #optionsAllowExecution). The bitmap arithmetic is the cluster's, so it
-// comes from [levelcontrol.EffectiveOptions] rather than being restated.
+// is the cluster's ([effectiveOptions]).
 func (s *dimmer) executes(mask, override uint8) bool {
 	if s.isOn() {
 		return true
 	}
-	return levelcontrol.EffectiveOptions(uint8(s.Options()), mask, override)&levelcontrol.OptionExecuteIfOff != 0
+	return effectiveOptions(uint8(s.Options()), mask, override)&uint8(levelcontroldef.OptionsExecuteIfOff) != 0
 }
 
 // applyLevel moves the speaker to level. withOnOff drives the on/off state
@@ -950,9 +913,9 @@ func (s *dimmer) steppedLevel(req levelcontroldef.StepRequest) uint8 {
 	s.mu.Lock()
 	current := s.level
 	s.mu.Unlock()
-	if uint8(req.StepMode) == levelcontrol.StepModeUp {
-		if uint16(current)+uint16(req.StepSize) > uint16(levelcontrol.LevelMax) {
-			return levelcontrol.LevelMax
+	if uint8(req.StepMode) == uint8(levelcontroldef.StepModeUp) {
+		if uint16(current)+uint16(req.StepSize) > uint16(levelMax) {
+			return levelMax
 		}
 		return current + req.StepSize
 	}
@@ -964,8 +927,8 @@ func (s *dimmer) steppedLevel(req levelcontroldef.StepRequest) uint8 {
 
 // moveTarget is where a Move ends on a device with no travel time.
 func (s *dimmer) moveTarget(moveMode uint8) uint8 {
-	if moveMode == levelcontrol.MoveModeUp {
-		return levelcontrol.LevelMax
+	if moveMode == uint8(levelcontroldef.MoveModeUp) {
+		return levelMax
 	}
 	return s.minLevel
 }
@@ -976,11 +939,10 @@ func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 // device models, which [fleet.endpoints] turns into the node's bridged
 // endpoints.
 type fleet struct {
-	light       *demoLight
-	thermometer *demoThermometer
-	valve       *demoValve
-	selector    *demoSelector
-	speaker     *dimmer
+	light    *demoLight
+	valve    *demoValve
+	selector *demoSelector
+	speaker  *dimmer
 
 	// One example device per surface the chip-tool suite drives
 	// (internal/chiptool). Each lives in the fleet_*.go file named after
@@ -1018,12 +980,15 @@ type fleet struct {
 	actions *demoActions
 	// endpointOf resolves a StableKey to its live endpoint id
 	// (attachNodeProviders); nil until the node runs.
-	endpointOf func(key endpoint.StringKey) (uint16, bool)
+	endpointOf func(key device.StringKey) (uint16, bool)
 	// The energy-market devices (fleet_energy_market.go).
 	energyTariff    *demoEnergyTariff
 	electricalMeter *demoElectricalMeter
 	// esa is the state-forecast ESA (fleet_esa.go).
 	esa *demoEsa
+	// powerSources are the battery parts, whose EndpointList names their
+	// own endpoint once the node has numbered them (numberPowerSources).
+	powerSources []*device.PowerSource
 	// wifi is the root's simulated Wi-Fi link (wifi.go), served with --wifi.
 	wifi *demoWiFi
 	// otaImages is the OTA provider's test image and consent
@@ -1042,42 +1007,41 @@ func newFleet() *fleet {
 	vacuum := newDemoVacuum("Robot Vacuum")
 	light := newDemoLight("Desk Lamp")
 	return &fleet{
-		wifi:        newDemoWiFi(),
-		light:       light,
-		thermometer: newDemoThermometer(21.5),
-		valve:       newDemoValve("Garden Tap", 600),
-		selector:    newDemoSelector("Coffee Machine"),
-		speaker:     newDemoSpeaker("Kitchen Speaker", 120),
-		ceiling:     newDemoCeilingLight("Ceiling Light"),
-		fan:         newDemoFan("Ceiling Fan"),
-		smoke:       newDemoSmokeAlarm("Hallway Smoke Alarm"),
-		pump:        newDemoPump("Heating Pump"),
-		flow:        newDemoReading("Water Meter", contract.MeasurementFlow, 0.8),
-		washer:      newDemoWasher("Washing Machine"),
-		vacuum:      vacuum,
-		thermostat:  newDemoThermostat("Living Room Thermostat"),
-		blind:       newDemoBlind("Bedroom Blind"),
-		lock:        newDemoLock("Front Door"),
-		humidity:    newDemoReading("Bathroom Humidity", contract.MeasurementHumidity, 48),
-		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
-		contact:     newDemoContactSensor("Window Contact"),
-		button:      newDemoButton("Wall Button"),
-		purifier:    newDemoAirPurifier("Air Purifier"),
-		garage:      newDemoGarage("Garage Door"),
-		colorLight:  newDemoColorLight("Color Bulb"),
-		fridge:      newDemoFridge("Kitchen Fridge"),
-		airQuality:  newDemoAirQualitySensor("Air Quality Sensor"),
-		heater:      newDemoWaterHeater("Water Heater"),
-		meter:       newDemoMeter("Electricity Meter"),
-		dishwasher:  newDemoDishwasher("Dishwasher"),
-		oven:        newDemoOven("Oven"),
-		microwave:   newDemoMicrowave("Microwave"),
-		dryer:       newDemoDryer("Tumble Dryer"),
-		evse:        newDemoEvse("EV Charger"),
-		vacuumArea:  newVacuumArea(vacuum),
-		panel:       newDemoPanel("Patio Door Panel"),
-		soil:        newDemoSoilSensor("Garden Soil"),
-		actions:     newDemoActions(light),
+		wifi:       newDemoWiFi(),
+		light:      light,
+		valve:      newDemoValve("Garden Tap", 600),
+		selector:   newDemoSelector("Coffee Machine"),
+		speaker:    newDemoSpeaker("Kitchen Speaker", 120),
+		ceiling:    newDemoCeilingLight("Ceiling Light"),
+		fan:        newDemoFan("Ceiling Fan"),
+		smoke:      newDemoSmokeAlarm("Hallway Smoke Alarm"),
+		pump:       newDemoPump("Heating Pump"),
+		flow:       newDemoReading("Water Meter", 0.8),
+		washer:     newDemoWasher("Washing Machine"),
+		vacuum:     vacuum,
+		thermostat: newDemoThermostat("Living Room Thermostat"),
+		blind:      newDemoBlind("Bedroom Blind"),
+		lock:       newDemoLock("Front Door"),
+		humidity:   newDemoReading("Bathroom Humidity", 48),
+		occupancy:  newDemoBinary("Hall Motion", false),
+		contact:    newDemoContactSensor("Window Contact"),
+		button:     newDemoButton("Wall Button"),
+		purifier:   newDemoAirPurifier("Air Purifier"),
+		garage:     newDemoGarage("Garage Door"),
+		colorLight: newDemoColorLight("Color Bulb"),
+		fridge:     newDemoFridge("Kitchen Fridge"),
+		airQuality: newDemoAirQualitySensor("Air Quality Sensor"),
+		heater:     newDemoWaterHeater("Water Heater"),
+		meter:      newDemoMeter("Electricity Meter"),
+		dishwasher: newDemoDishwasher("Dishwasher"),
+		oven:       newDemoOven("Oven"),
+		microwave:  newDemoMicrowave("Microwave"),
+		dryer:      newDemoDryer("Tumble Dryer"),
+		evse:       newDemoEvse("EV Charger"),
+		vacuumArea: newVacuumArea(vacuum),
+		panel:      newDemoPanel("Patio Door Panel"),
+		soil:       newDemoSoilSensor("Garden Soil"),
+		actions:    newDemoActions(light),
 
 		energyTariff:    newDemoEnergyTariff("Energy Tariff"),
 		electricalMeter: newDemoElectricalMeter("Grid Meter"),
@@ -1091,7 +1055,7 @@ func newFleet() *fleet {
 // releases — and the addresses this host derives from the same key.
 func bridged(key, name string) device.Options {
 	return device.Options{
-		StableKey:      endpoint.StringKey("demo:" + key + ":1"),
+		StableKey:      device.StringKey("demo:" + key + ":1"),
 		DeviceAddress:  "demo-" + key + "-1",
 		ChannelAddress: "demo-" + key + "-1:0",
 		Name:           name,
@@ -1101,41 +1065,55 @@ func bridged(key, name string) device.Options {
 // part are the Options of a part: its own StableKey and the conditions it
 // states.
 func part(key string, conditions ...string) device.Options {
-	return device.Options{StableKey: endpoint.StringKey(key), Conditions: conditions}
+	return device.Options{StableKey: device.StringKey(key), Conditions: conditions}
 }
-
-// serve hands a model's servers to the device layer, each in place of the
-// default the device type would mount, then the further options.
-func serve(servers []contract.ClusterServer, with ...device.Option) []device.Option {
-	out := make([]device.Option, 0, len(servers)+len(with))
-	for _, srv := range servers {
-		out = append(out, hosted(srv))
-	}
-	return append(out, with...)
-}
-
-// measured is the device option of a sensor whose cluster the assembler
-// materialises from the host's live reading (device.WithMeasurement →
-// endpoint.Spec.Measurement, cluster/measurement FromMeasurementClass).
-func measured(m contract.MeasurementSource) device.Option { return device.WithMeasurement(m) }
 
 // smokeDevice is the smoke alarm with its battery: SmokeCoAlarm requires a
-// PowerSource device-type component, a part of its own whose PowerSource
-// cluster the assembler materialises from the battery reading, as matter.js
-// composes it (examples/device-smoke-co-alarm, parts: [PowerSourceEndpoint]).
-func (f *fleet) smokeDevice() (node.Endpoint, error) {
-	smoke, err := device.NewSmokeCoAlarm(bridged("smoke", f.smoke.name), serve(f.smoke.servers(), device.WithChangeNotifier(f.smoke))...)
+// PowerSource device-type component, a part of its own carrying the
+// battery, as matter.js composes it (examples/device-smoke-co-alarm,
+// parts: [PowerSourceEndpoint]).
+func (f *fleet) smokeDevice() (*device.SmokeCoAlarm, error) {
+	smoke, err := device.NewSmokeCoAlarm(bridged("smoke", f.smoke.name), f.smoke.declaration())
 	if err != nil {
 		return nil, err
 	}
-	battery, err := device.NewPowerSource(part("demo:smoke:battery"), measured(f.smoke.battery))
+	battery, err := device.NewPowerSource(part("demo:smoke:battery"), batteryDeclaration(f.smoke.battery))
 	if err != nil {
 		return nil, err
 	}
 	if err := smoke.AddPart(battery.Device); err != nil {
 		return nil, err
 	}
+	f.smoke.bind(smoke)
+	f.powerSources = append(f.powerSources, battery)
 	return smoke, nil
+}
+
+// vacuumDevice is the robot with its ServiceArea on the same endpoint
+// (fleet_servicearea.go).
+func (f *fleet) vacuumDevice() (*device.RoboticVacuumCleaner, error) {
+	d, err := device.NewRoboticVacuumCleaner(bridged("vacuum", f.vacuum.name),
+		append(f.vacuum.declarations(), f.vacuumArea.declaration())...)
+	if err != nil {
+		return nil, err
+	}
+	f.vacuum.bind(d)
+	f.vacuumArea.bind(d)
+	return d, nil
+}
+
+// numberPowerSources sets each PowerSource part's EndpointList to its own
+// endpoint, once the node has numbered the parts.
+func (f *fleet) numberPowerSources() error {
+	sources := f.powerSources
+	if f.evse.power != nil {
+		sources = append(sources, f.evse.power)
+	}
+	var errs []error
+	for _, ps := range sources {
+		errs = append(errs, powerSourceEndpointList(ps))
+	}
+	return errors.Join(errs...)
 }
 
 // endpoints builds the fleet's bridged endpoints, in the order their
@@ -1156,54 +1134,47 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		}
 		out = append(out, ep)
 	}
-	notifying := func(src contract.ChangeNotifier, servers []contract.ClusterServer) []device.Option {
-		return serve(servers, device.WithChangeNotifier(src))
-	}
-
 	add(f.light.device(bridged("light", f.light.name)))
-	add(device.NewTemperatureSensor(bridged("thermometer", "Study Thermometer"), measured(f.thermometer)))
-	add(device.NewWaterValve(bridged("valve", f.valve.name), notifying(f.valve, f.valve.servers())...))
-	add(device.NewModeSelect(bridged("selector", f.selector.name), notifying(f.selector, f.selector.servers())...))
+	add(device.NewTemperatureSensor(bridged("thermometer", "Study Thermometer"), temperatureDeclaration(thermometerCelsius)))
+	add(device.NewWaterValve(bridged("valve", f.valve.name), f.valve.declaration()))
+	add(device.NewModeSelect(bridged("selector", f.selector.name), f.selector.declaration()))
 	add(f.speaker.device(bridged("speaker", f.speaker.name)))
 
 	add(f.ceiling.device(bridged("ceiling", f.ceiling.name)))
-	add(device.NewFan(bridged("fan", f.fan.name), notifying(f.fan, f.fan.servers())...))
+	add(device.NewFan(bridged("fan", f.fan.name), f.fan.declaration()))
 	add(f.smokeDevice())
 	add(f.pump.device(bridged("pump", f.pump.name)))
-	add(device.NewFlowSensor(bridged("flow", f.flow.name), measured(f.flow)))
-	add(device.NewLaundryWasher(bridged("washer", f.washer.name), serve(f.washer.servers())...))
-	// The vacuum's endpoint carries its ServiceArea too
-	// (fleet_servicearea.go).
-	add(device.NewRoboticVacuumCleaner(bridged("vacuum", f.vacuum.name),
-		serve(append(f.vacuum.servers(), f.vacuumArea.server()))...))
-	add(device.NewThermostat(bridged("thermostat", f.thermostat.name), serve(f.thermostat.servers())...))
-	add(device.NewWindowCovering(bridged("blind", f.blind.name), serve(f.blind.servers())...))
-	add(device.NewDoorLock(bridged("lock", f.lock.name), notifying(f.lock, f.lock.servers())...))
-	add(device.NewHumiditySensor(bridged("humidity", f.humidity.name), measured(f.humidity)))
-	add(device.NewOccupancySensor(bridged("occupancy", f.occupancy.name), measured(f.occupancy)))
-	add(device.NewContactSensor(bridged("contact", f.contact.name), notifying(f.contact, f.contact.servers())...))
-	add(device.NewGenericSwitch(bridged("button", f.button.name), measured(f.button)))
-	add(device.NewAirPurifier(bridged("purifier", f.purifier.name), notifying(f.purifier, f.purifier.servers())...))
-	add(device.NewClosure(bridged("garage", f.garage.name), notifying(f.garage, f.garage.servers())...))
+	add(f.flow.flowSensor(bridged("flow", f.flow.name)))
+	add(f.washer.device(bridged("washer", f.washer.name)))
+	add(f.vacuumDevice())
+	add(f.thermostat.device(bridged("thermostat", f.thermostat.name)))
+	add(f.blind.device(bridged("blind", f.blind.name)))
+	add(device.NewDoorLock(bridged("lock", f.lock.name), f.lock.declaration()))
+	add(f.humidity.humiditySensor(bridged("humidity", f.humidity.name)))
+	add(f.occupancy.occupancySensor(bridged("occupancy", f.occupancy.name)))
+	add(f.contact.device(bridged("contact", f.contact.name)))
+	add(f.button.device(bridged("button", f.button.name)))
+	add(device.NewAirPurifier(bridged("purifier", f.purifier.name), f.purifier.declarations()...))
+	add(f.garage.device(bridged("garage", f.garage.name)))
 	add(f.colorLight.device(bridged("colorlight", f.colorLight.name)))
 	// Refrigerator requires a TemperatureControlledCabinet part: the
 	// compartment is a part of the fridge's endpoint.
 	add(f.fridge.device(bridged("fridge", f.fridge.name)))
-	add(device.NewAirQualitySensor(bridged("airquality", f.airQuality.name), serve(f.airQuality.servers())...))
-	add(device.NewWaterHeater(bridged("waterheater", f.heater.name), serve(f.heater.servers())...))
-	add(device.NewElectricalUtilityMeter(bridged("meter", f.meter.name), serve(f.meter.servers())...))
-	add(device.NewDishwasher(bridged("dishwasher", f.dishwasher.name), serve(f.dishwasher.servers())...))
+	add(device.NewAirQualitySensor(bridged("airquality", f.airQuality.name), f.airQuality.declarations()...))
+	add(f.heater.device(bridged("waterheater", f.heater.name)))
+	add(f.meter.device(bridged("meter", f.meter.name)))
+	add(f.dishwasher.device(bridged("dishwasher", f.dishwasher.name)))
 	// Oven requires a TemperatureControlledCabinet part with the Heater
 	// condition: the cavity is a part of the oven's endpoint.
 	add(f.oven.device(bridged("oven", f.oven.name)))
-	add(device.NewMicrowaveOven(bridged("microwave", f.microwave.name), serve(f.microwave.servers())...))
-	add(device.NewLaundryDryer(bridged("dryer", f.dryer.name), serve(f.dryer.servers())...))
+	add(f.microwave.device(bridged("microwave", f.microwave.name)))
+	add(f.dryer.device(bridged("dryer", f.dryer.name)))
 	// EnergyEvse requires PowerSource, DeviceEnergyManagement and
 	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
 	add(f.evse.device(bridged("evse", f.evse.name)))
-	add(device.NewClosurePanel(bridged("panel", f.panel.name), serve(f.panel.servers())...))
-	add(device.NewSoilSensor(bridged("soil", f.soil.name), measured(f.soil)))
-	add(device.NewElectricalEnergyTariff(bridged("tariff", f.energyTariff.name), serve(f.energyTariff.servers())...))
+	add(f.panel.device(bridged("panel", f.panel.name)))
+	add(f.soil.device(bridged("soil", f.soil.name)))
+	add(f.energyTariff.device(bridged("tariff", f.energyTariff.name)))
 	add(f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)))
 	add(f.esa.device(bridged("esa", f.esa.name)))
 	// The media pair (--media, TESTING ONLY) comes last, so every device

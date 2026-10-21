@@ -250,6 +250,10 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		return err
 	}
 	started = true
+	// The PowerSource parts name their own endpoint, numbered now.
+	if err := devices.numberPowerSources(); err != nil {
+		logger.Warn("powersource.endpointlist", slog.Any("err", err))
+	}
 	if err := printPairingInfo(n, discriminator, passcode); err != nil {
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
@@ -296,7 +300,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
 	devices.lock.auth = n.Store()
-	devices.thermostat.attachStore(n.Store())
+	devices.thermostat.attachStore(n.Store().ThermostatPresets(thermostatStoreKey), n.Store())
 
 	eps, err := devices.endpoints() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
 	if err != nil {

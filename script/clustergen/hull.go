@@ -156,6 +156,9 @@ func (g *generator) server() ([]byte, error) {
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
+	for _, imp := range ports[c.Name].imports {
+		w.p("\t%q", imp)
+	}
 	w.p(")")
 	w.p("")
 

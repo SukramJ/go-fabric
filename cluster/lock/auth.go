@@ -4,12 +4,13 @@
 package lock
 
 import (
-	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
 	"fmt"
+
+	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -20,17 +21,7 @@ import (
 // on matter_doorlock_users, matter_doorlock_credentials,
 // matter_doorlock_schedules and matter_settings; a host with its own store
 // implements the four methods.
-type AuthStore interface {
-	// GetSetting and SetSetting read and write the node's credential key
-	// under [store.SettingDoorLockCredentialKey].
-	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
-	SetSetting(ctx context.Context, key, value string) error
-	// LoadDoorLockAuth returns the records saved for endpointKey; saved is
-	// false when none were.
-	LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth store.DoorLockAuth, saved bool, err error)
-	// SaveDoorLockAuth replaces the records of endpointKey.
-	SaveDoorLockAuth(ctx context.Context, endpointKey string, auth store.DoorLockAuth) error
-}
+type AuthStore = lockdef.AuthStore
 
 var _ AuthStore = (*store.Store)(nil)
 

@@ -122,6 +122,7 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ Sink = d.Sink
+	var _ PresetStore = d.PresetStore
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

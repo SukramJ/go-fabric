@@ -258,7 +258,7 @@ type Config struct {
 	Source StateSource
 	// Stepper takes the Step command over; nil steps by the server's own
 	// rule.
-	Stepper Stepper
+	Stepper  Stepper
 	Features Feature
 	// Sequence is FanModeSequence (fixed). It must be one of the three
 	// sequences with Auto when FeatureAuto is set and one of the three
@@ -485,7 +485,7 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) err
 	case AttrWindSetting:
 		return s.writeWindSetting(ctx, WindBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
 	default: // AttrAirflowDirection, the last writable attribute
-		setter, _ := s.src.(airflowSetter)                                  // guaranteed by NewServer
+		setter, _ := s.src.(airflowSetter)                                           // guaranteed by NewServer
 		if err := setter.SetAirflowDirection(ctx, AirflowDirection(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
 			return fmt.Errorf("fan: AirflowDirection write: %w", err)
 		}

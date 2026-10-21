@@ -72,8 +72,7 @@ type Spec struct {
 	// Measurement instead.
 	Source contract.EndpointSource
 	// Measurement is set on sensor endpoints assembled from a
-	// measurement source. nil otherwise. With Source also set (a
-	// device-layer device built with device.WithMeasurement), the
+	// measurement source. nil otherwise. With Source also set, the
 	// clusters it materialises follow the source's own.
 	Measurement contract.MeasurementSource
 	// NodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller

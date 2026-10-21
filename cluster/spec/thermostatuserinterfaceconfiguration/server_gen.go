@@ -89,6 +89,14 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// SettingStore persists KeypadLockout under the device's StableKey;
+// the node's store (node.Node.Store) is one. Without one it stays in
+// memory (cluster/thermo SettingStore).
+type SettingStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
 // Declare is the declaration of the ThermostatUserInterfaceConfiguration cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -101,6 +109,8 @@ type Declare struct {
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// SettingStore is the host port the kit's server runs on ([SettingStore]).
+	SettingStore SettingStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

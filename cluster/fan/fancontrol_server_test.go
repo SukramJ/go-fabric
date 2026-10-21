@@ -80,8 +80,10 @@ func (d *device) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
 		d.st.AirflowDirection = *p.AirflowDirection
 		return nil
 	}
-	s := fanSettings{FanMode: p.FanMode, PercentSetting: settingOf(p.PercentSetting, fandef.AttrPercentSetting, p.Null),
-		SpeedSetting: settingOf(p.SpeedSetting, fandef.AttrSpeedSetting, p.Null)}
+	s := fanSettings{
+		FanMode: p.FanMode, PercentSetting: settingOf(p.PercentSetting, fandef.AttrPercentSetting, p.Null),
+		SpeedSetting: settingOf(p.SpeedSetting, fandef.AttrSpeedSetting, p.Null),
+	}
 	d.applied = append(d.applied, s)
 	if s.FanMode != nil {
 		d.st.FanMode = *s.FanMode

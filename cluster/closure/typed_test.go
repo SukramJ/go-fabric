@@ -10,8 +10,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
+	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	"github.com/SukramJ/go-fabric/contract"
 )

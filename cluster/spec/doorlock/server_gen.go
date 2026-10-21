@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // State is the typed state of the DoorLock cluster: one field per attribute
@@ -350,6 +351,17 @@ type StateSource interface {
 	LockInvoke(ctx context.Context, cmdID uint32) error
 }
 
+// AuthStore persists the lock's users, credentials and schedules
+// under the device's StableKey, and its credential key; the node's
+// store (node.Node.Store) is one. Without one they stay in memory
+// (cluster/lock AuthStore).
+type AuthStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+	LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth store.DoorLockAuth, saved bool, err error)
+	SaveDoorLockAuth(ctx context.Context, endpointKey string, auth store.DoorLockAuth) error
+}
+
 // Declare is the declaration of the DoorLock cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -439,6 +451,8 @@ type Declare struct {
 	HandleClearAliroReaderConfig func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)
 	// StateSource is the host port the kit's server runs on ([StateSource]).
 	StateSource StateSource
+	// AuthStore is the host port the kit's server runs on ([AuthStore]).
+	AuthStore AuthStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

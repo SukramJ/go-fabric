@@ -5,6 +5,7 @@ package device
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/alarmbase"
@@ -12,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/filter"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	acfdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	cpdef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
@@ -102,7 +104,14 @@ func newBooleanStateConfigurationServer(b defaultBuild) (contract.ClusterServer,
 			optional |= o
 		}
 	}
-	srv, err := boolcfg.New(boolcfg.Config{Features: boolcfg.Feature(b.opts.Features), Optional: optional, DataVersion: b.cfg.DataVersion})
+	cfg := boolcfg.Config{Features: boolcfg.Feature(b.opts.Features), Optional: optional, DataVersion: b.cfg.DataVersion}
+	if d, ok := b.ports.(bscdef.Declare); ok && d.Delegate != nil {
+		cfg.Delegate = d.Delegate
+	}
+	// The sensitivity levels and the alarms the sensor supports are its
+	// configuration.
+	configFrom(&cfg, b.def, b.initial)
+	srv, err := boolcfg.New(cfg)
 	if errors.Is(err, boolcfg.ErrInvalidConfig) {
 		return nil, notServed(err)
 	}
@@ -136,6 +145,13 @@ func filterServer(build func(filter.Config) (*filter.Server, error)) serverFacto
 			DataVersion: b.cfg.DataVersion,
 		}
 		configFrom(&cfg, b.def, b.initial)
+		// ReplacementProductList is Config.ReplacementProducts.
+		if v, ok := b.initial[hepadef.AttrReplacementProductList]; ok {
+			if c, ok := spec.Convert(v, reflect.TypeFor[[]filter.ReplacementProduct]()); ok && c.IsValid() {
+				cfg.ReplacementProducts, _ = c.Interface().([]filter.ReplacementProduct)
+				delete(b.initial, hepadef.AttrReplacementProductList)
+			}
+		}
 		return build(cfg)
 	}
 }
@@ -166,11 +182,15 @@ func filterPortsOf(ports any) (filter.Resetter, filter.LastChangedTimeWriter) {
 }
 
 // newLaundryWasherControlsServer is the module's LaundryWasherControls
-// server without spin speeds. The rinses a RINSE selection serves are host
-// data (an empty list leaves no valid NumberOfRinses): that selection
-// keeps the generated server.
+// server, its spin speeds and rinses from the declaration's Initial
+// (SpinSpeeds, SpinSpeedCurrent, SupportedRinses, NumberOfRinses). The
+// rinses a RINSE selection serves are host data (an empty list leaves no
+// valid NumberOfRinses): without them that selection keeps the generated
+// server.
 func newLaundryWasherControlsServer(b defaultBuild) (contract.ClusterServer, error) {
-	srv, err := appliance.NewLaundryWasherControls(appliance.WasherConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion})
+	cfg := appliance.WasherConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion}
+	configFrom(&cfg, b.def, b.initial)
+	srv, err := appliance.NewLaundryWasherControls(cfg)
 	if errors.Is(err, appliance.ErrLaundryValue) {
 		return nil, notServed(err)
 	}
@@ -183,6 +203,12 @@ func newLaundryWasherControlsServer(b defaultBuild) (contract.ClusterServer, err
 // mandates it.
 func newThermostatUIServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := thermo.ThermostatUIConfig{DataVersion: b.cfg.DataVersion}
+	if d, ok := b.ports.(tuidef.Declare); ok && d.SettingStore != nil {
+		cfg.Settings = d.SettingStore
+		if b.key != "" {
+			cfg.SettingKey = b.key + ".keypad_lockout"
+		}
+	}
 	if slices.Contains(b.opts.Attributes, tuidef.AttrScheduleProgrammingVisibility) {
 		v := tuidef.ScheduleProgrammingVisibilityScheduleProgrammingPermitted
 		cfg.ScheduleProgrammingVisibility = &v

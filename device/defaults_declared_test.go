@@ -11,11 +11,13 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/appliance"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/energy"
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	cddef "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	ctdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
@@ -91,7 +93,7 @@ func (fakePanel) Step(context.Context, cddef.StepDirectionEnum, uint16, *cddef.T
 
 func (fakeTemp) SetTemperature(context.Context, *int16, *uint8) error { return nil }
 
-func (fakeOven) OperationalState() uint8 { return 0 }
+func (fakeOven) OperationalState() uint8   { return 0 }
 func (fakeOven) NormalMode() (uint8, bool) { return 0, true }
 
 func (fakeOven) SupportedMode(uint8) bool { return true }
@@ -195,6 +197,9 @@ func declaredCases() []struct {
 		{ctdef.ClusterID, func() (*Device, error) {
 			return New(&ElectricalEnergyTariffType, testOptions("ct"), ctdef.Declare{Features: ctdef.FeaturePricing})
 		}, (*energy.CommodityTariffServer)(nil)},
+		{bsdef.ClusterID, func() (*Device, error) {
+			return New(&ContactSensorType, testOptions("bs"), bsdef.Declare{Features: bsdef.FeatureChangeEvent})
+		}, (*measurement.HeldBooleanState)(nil)},
 		{epdef.ClusterID, func() (*Device, error) {
 			zero := uint8(0)
 			return New(&ThermostatType, testOptions("ep"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), epdef.Declare{

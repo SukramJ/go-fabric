@@ -4,14 +4,9 @@
 package main
 
 import (
-	"fmt"
 	"sync"
-	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 )
 
@@ -38,53 +33,14 @@ type demoEsa struct {
 }
 
 func newDemoEsa(name string) *demoEsa {
-	return &demoEsa{name: name, dem: newStateForecastDem(name, time.Now)}
+	return &demoEsa{name: name, dem: newDemoDem(name, esaFeatures)}
 }
 
-// newStateForecastDem is newDemoDem (fleet_evse.go) with the feature set
-// of TC-DEM-2.6/2.8's app: the same ESA type, power range, delegate and
-// modes (EVSEManufacturerImpl.cpp:73-78, device-energy-management-mode.cpp).
-func newStateForecastDem(name string, now func() time.Time) *demoDem {
-	d := &demoDem{name: name}
-	srv, err := energy.NewDeviceEnergyManagement(energy.DeviceEnergyConfig{
-		Features: energy.DemFeatureStateForecastReporting | energy.DemFeatureStartTimeAdjustment |
-			energy.DemFeaturePausable | energy.DemFeatureForecastAdjustment | energy.DemFeatureConstraintBasedAdjustment,
-		EsaType: dem.ESATypeEvse, EsaState: energy.EsaStateOnline,
-		AbsMinPower: 1200000, AbsMaxPower: 7600000,
-		Manager: d, Clock: nowClock{now: now}, DataVersion: &d.version.dem,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("esa DeviceEnergyManagement: %v", err))
-	}
-	modes, err := modebase.NewDeviceEnergyManagementMode(modebase.Config{
-		Changer: d,
-		SupportedModes: []modebase.ModeOption{
-			{Label: "No energy management (forecast only)", Mode: demModeNoOptimization, Tags: []modebase.ModeTag{{Value: modebase.DemTagNoOptimization}}},
-			{Label: "Device optimizes (no local or grid control)", Mode: demModeDeviceOnlyOptimization, Tags: []modebase.ModeTag{{Value: modebase.DemTagDeviceOptimization}}},
-			{Label: "Optimized within building", Mode: demModeDeviceAndLocalOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagLocalOptimization}, {Value: modebase.DemTagDeviceOptimization},
-			}},
-			{Label: "Optimized for grid", Mode: demModeDeviceAndGridOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagDeviceOptimization}, {Value: modebase.DemTagGridOptimization},
-			}},
-			{Label: "Optimized for grid and building", Mode: demModeAllOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagLocalOptimization}, {Value: modebase.DemTagDeviceOptimization}, {Value: modebase.DemTagGridOptimization},
-			}},
-		},
-		CurrentMode: demModeNoOptimization,
-		DataVersion: &d.version.modes,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("esa DeviceEnergyManagementMode: %v", err))
-	}
-	d.srv, d.modes = srv, modes
-	return d
-}
-
-// servers are the cluster servers the device supplies.
-func (e *demoEsa) servers() []contract.ClusterServer {
-	return e.dem.servers()
-}
+// esaFeatures are TC-DEM-2.6/2.8's app's: SFR, STA, PAU, FA and CON, with
+// the charger's ESA type, power range, delegate and modes
+// (EVSEManufacturerImpl.cpp:73-78, device-energy-management-mode.cpp).
+const esaFeatures = dem.FeatureStateForecastReporting | dem.FeatureStartTimeAdjustment |
+	dem.FeaturePausable | dem.FeatureForecastAdjustment | dem.FeatureConstraintBasedAdjustment
 
 // device builds the ESA's bridged endpoint, stating ControllableEsa so
 // DeviceEnergyManagementMode is mounted, as the charger's part does. It is
@@ -93,7 +49,7 @@ func (e *demoEsa) servers() []contract.ClusterServer {
 // (internal/chiptool dtStateForecastEsa).
 func (e *demoEsa) device(opts device.Options) (*device.DeviceEnergyManagement, error) {
 	opts.Conditions = []string{conditionControllableEsa}
-	return device.NewDeviceEnergyManagement(opts, serve(e.servers())...)
+	return e.dem.device(opts)
 }
 
 // testEventTrigger hands a DEM trigger to the ESA's handler

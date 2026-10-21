@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"time"
 )
 
 // State is the typed state of the CommodityTariff cluster: one field per attribute
@@ -135,6 +136,17 @@ func (s *Server) HandleGetDayEntry(fn func(ctx context.Context, req GetDayEntryR
 	return spec.HandleOn(s.Underlying(), CmdGetDayEntry, fn)
 }
 
+// TimeSource is the time the kit's CommodityTariff server reads the
+// current day and day entry from, in place of the node's clock — a
+// host that runs the tariff on its own time, as chip's
+// energy-gateway app runs it on its TestTimeManager. A TimeSource
+// that is also a contract.ChangeNotifier makes the server derive
+// the current attributes again whenever it notifies: a clock that
+// jumped (cluster/energy).
+type TimeSource interface {
+	Now() time.Time
+}
+
 // Declare is the declaration of the CommodityTariff cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -159,6 +171,8 @@ type Declare struct {
 	// HandleGetDayEntry handles the GetDayEntry command in place of the server
 	// (Server.HandleGetDayEntry), inline; an optional command it handles is accepted.
 	HandleGetDayEntry func(ctx context.Context, req GetDayEntryRequest) (GetDayEntryResponse, error)
+	// TimeSource is the host port the kit's server runs on ([TimeSource]).
+	TimeSource TimeSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

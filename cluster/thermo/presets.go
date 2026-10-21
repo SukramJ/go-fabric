@@ -49,10 +49,7 @@ const presetHandleLength = 16
 // when nothing was saved, and the server then seeds from
 // [ThermostatConfig.Presets]. store.ThermostatPresetStore implements it on
 // the module's store.
-type PresetStore interface {
-	LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error)
-	SavePresets(ctx context.Context, presets, activeHandle []byte) error
-}
+type PresetStore = tdef.PresetStore
 
 // EncodePresets is the TLV encoding of a Presets list a [PresetStore]
 // keeps.

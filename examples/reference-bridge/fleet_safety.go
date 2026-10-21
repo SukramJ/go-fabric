@@ -5,23 +5,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/lock"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // --- device: a smoke and CO alarm ---------------------------------------------
@@ -32,10 +26,11 @@ var smokeExpiryDate = uint32(time.Date(2036, 1, 1, 0, 0, 0, 0, time.UTC).Sub(tim
 
 // demoSmokeAlarm is a battery-powered smoke and CO alarm.
 //
-// The SmokeCoAlarm server derives ExpressedState and the alarm events from
-// the State the device reports; the device calls [alarm.Server.Refresh]
-// after every change so the transition events go out, and fires its
-// [notifier] so a subscriber sees the new attribute values.
+// The device kit's SmokeCoAlarm server derives ExpressedState and the
+// alarm events from the State the device reports: the alarm fires its
+// [notifier] after every change, and the server, a change notifier over
+// it, emits the transition events before a subscriber sees the new
+// attribute values.
 //
 // SelfTestRequest is accepted: the test "runs" until the device reports it
 // finished (control hook `smoke selftest-done`), which is the transition
@@ -43,27 +38,26 @@ var smokeExpiryDate = uint32(time.Date(2036, 1, 1, 0, 0, 0, 0, time.UTC).Sub(tim
 type demoSmokeAlarm struct {
 	name string
 	notifier
-	version cluster.DataVersionTracker
-	battery *demoReading
+	battery float64
 
 	mu    sync.Mutex
 	state smokedef.State
-	srv   *alarm.Server
+	srv   *smokedef.Server
 }
 
 var (
-	_ alarm.StateSource       = (*demoSmokeAlarm)(nil)
-	_ alarm.SelfTester        = (*demoSmokeAlarm)(nil)
-	_ alarm.SensitivitySetter = (*demoSmokeAlarm)(nil)
+	_ smokedef.StateSource       = (*demoSmokeAlarm)(nil)
+	_ smokedef.SelfTester        = (*demoSmokeAlarm)(nil)
+	_ smokedef.SensitivitySetter = (*demoSmokeAlarm)(nil)
 )
 
 func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 	return &demoSmokeAlarm{
 		name:    name,
-		battery: newDemoReading(name+" battery", contract.MeasurementBattery, 87),
+		battery: 87,
 		// A device expires some years after it was made; TC-SMOKECO-2.1
 		// reads an ExpiryDate in the future (epoch-s, from 2000-01-01).
-		state: smokedef.State{SmokeSensitivityLevel: alarm.SensitivityStandard, ExpiryDate: smokeExpiryDate},
+		state: smokedef.State{SmokeSensitivityLevel: smokedef.SensitivityStandard, ExpiryDate: smokeExpiryDate},
 	}
 }
 
@@ -71,44 +65,32 @@ func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 // (power-source.element.ts, 0x0011), the component the alarm's battery is.
 const deviceTypePowerSource uint16 = 0x0011
 
-// servers are the cluster servers the device supplies. The
-// PowerSource component SmokeCoAlarm requires is a part of the alarm's
-// endpoint carrying the battery reading (fleet.go), not served from here.
-//
-// The server is built once: it carries the event emitter the bridge wires
-// at reassembly, and Refresh must emit through that same instance — a
-// server rebuilt per call left the alarm events unsent (TC-SMOKECO-2.2).
-func (a *demoSmokeAlarm) servers() []contract.ClusterServer {
-	a.mu.Lock()
-	if a.srv != nil {
-		srv := a.srv
-		a.mu.Unlock()
-		return []contract.ClusterServer{srv}
+// declaration declares the alarm's SmokeCoAlarm: smoke and CO, with every
+// optional attribute the server offers, so the CHIP SMOKECO cases have the
+// whole surface to read; the alarm is the kit's server's StateSource (it
+// reports their values). The PowerSource component SmokeCoAlarm requires
+// is a part of the alarm's endpoint carrying the battery (fleet.go).
+func (a *demoSmokeAlarm) declaration() device.Declaration {
+	var st smokedef.State
+	return smokedef.Declare{
+		Features:    smokedef.FeatureSmokeAlarm | smokedef.FeatureCoAlarm,
+		StateSource: a,
+		Initial: smokedef.Patch{
+			DeviceMuted: &st.DeviceMuted, InterconnectSmokeAlarm: &st.InterconnectSmokeAlarm,
+			InterconnectCoAlarm: &st.InterconnectCoAlarm, ContaminationState: &st.ContaminationState,
+			SmokeSensitivityLevel: &st.SmokeSensitivityLevel, ExpiryDate: &st.ExpiryDate, Unmounted: &st.Unmounted,
+		},
 	}
-	a.mu.Unlock()
-	srv, err := alarm.NewServer(alarm.Config{
-		Source:   a,
-		Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm,
-		// Every optional attribute the server offers, so the CHIP SMOKECO
-		// cases have the whole surface to read.
-		Optional: alarm.OptionalDeviceMuted | alarm.OptionalInterconnectSmokeAlarm |
-			alarm.OptionalInterconnectCOAlarm | alarm.OptionalContaminationState |
-			alarm.OptionalSmokeSensitivityLevel | alarm.OptionalExpiryDate | alarm.OptionalUnmounted,
-		DataVersion: &a.version,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("smoke alarm SmokeCoAlarm: %v", err))
-	}
-	a.mu.Lock()
-	if a.srv == nil {
-		a.srv = srv
-	}
-	srv = a.srv
-	a.mu.Unlock()
-	return []contract.ClusterServer{srv}
 }
 
-// SmokeCOState implements [alarm.StateSource].
+// bind keeps the alarm's server.
+func (a *demoSmokeAlarm) bind(d *device.SmokeCoAlarm) {
+	a.mu.Lock()
+	a.srv = d.SmokeCoAlarm()
+	a.mu.Unlock()
+}
+
+// SmokeCOState implements [smokedef.StateSource].
 func (a *demoSmokeAlarm) SmokeCOState() smokedef.State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -118,7 +100,7 @@ func (a *demoSmokeAlarm) SmokeCOState() smokedef.State {
 // smokeSelfTestDuration is how long the alarm's self-test runs.
 const smokeSelfTestDuration = 5 * time.Second
 
-// SelfTest implements [alarm.SelfTester]: the test runs for
+// SelfTest implements [smokedef.SelfTester]: the test runs for
 // [smokeSelfTestDuration] and then ends on its own — TestInProgress goes
 // back to false, which is what emits SelfTestComplete and, with
 // ExpressedState back at Normal, AllClear (TC-SMOKECO-2.4 waits for both).
@@ -132,144 +114,125 @@ func (a *demoSmokeAlarm) SelfTest(context.Context) error {
 	return nil
 }
 
-// pressTestButton is the test button on the alarm (CHIP's smoke-co-alarm
-// app's LongPress). It starts a self-test by the same rule a
-// SelfTestRequest follows — the server refuses one while the alarm sounds
-// or already tests (TC-SMOKECO-2.2 step 9) — and a refused press does
-// nothing, as on the device.
-func (a *demoSmokeAlarm) pressTestButton(ctx context.Context) error {
-	srv := a.servers()[0]
-	_, err := srv.MatterInvoke(ctx, alarm.CmdSelfTestRequest, nil)
-	var st interface{ MatterStatusCode() im.StatusCode }
-	if errors.As(err, &st) && st.MatterStatusCode() == im.StatusBusy {
-		slog.Info("smoke.selftest_refused", slog.String("device", a.name), slog.String("reason", err.Error()))
-		return nil
-	}
-	return err
+// selfTestBusy are the ExpressedStates in which the alarm refuses a self
+// test (resource :201-204: SmokeAlarm, CoAlarm, Testing,
+// InterconnectSmoke, InterconnectCO — BUSY to a SelfTestRequest).
+var selfTestBusy = []smokedef.ExpressedStateEnum{
+	smokedef.ExpressedStateSmokeAlarm, smokedef.ExpressedStateCoAlarm, smokedef.ExpressedStateTesting,
+	smokedef.ExpressedStateInterconnectSmoke, smokedef.ExpressedStateInterconnectCo,
 }
 
-// SetSmokeSensitivityLevel implements [alarm.SensitivitySetter].
-func (a *demoSmokeAlarm) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
+// pressTestButton is the test button on the alarm (CHIP's smoke-co-alarm
+// app's LongPress). It starts a self-test by the same rule a
+// SelfTestRequest follows — refused while the alarm sounds or already
+// tests (TC-SMOKECO-2.2 step 9) — and a refused press does nothing, as on
+// the device.
+func (a *demoSmokeAlarm) pressTestButton(ctx context.Context) error {
+	a.mu.Lock()
+	srv := a.srv
+	a.mu.Unlock()
+	if srv == nil {
+		return errNotBuilt
+	}
+	if expressed := srv.Get().ExpressedState; slices.Contains(selfTestBusy, expressed) {
+		slog.Info("smoke.selftest_refused", slog.String("device", a.name), slog.Int("expressed_state", int(expressed)))
+		return nil
+	}
+	return a.SelfTest(ctx)
+}
+
+// SetSmokeSensitivityLevel implements [smokedef.SensitivitySetter].
+func (a *demoSmokeAlarm) SetSmokeSensitivityLevel(_ context.Context, level smokedef.SensitivityEnum) error {
 	slog.Info("smoke.sensitivity", slog.String("device", a.name), slog.Int("level", int(level)))
 	a.update(func(st *smokedef.State) { st.SmokeSensitivityLevel = level })
 	return nil
 }
 
-// update applies a change the device observed, then lets the server emit
-// the transition events and pushes the attributes.
+// update applies a change the device observed and tells the server, which
+// emits the transition events, and the bridge.
 func (a *demoSmokeAlarm) update(change func(*smokedef.State)) {
 	a.mu.Lock()
 	change(&a.state)
-	srv := a.srv
 	a.mu.Unlock()
-	if srv != nil {
-		srv.Refresh()
-	}
 	a.notify()
 }
 
 // --- device: a front-door lock ---------------------------------------------------
 
-// demoLock is a motorised door lock with a user database: the DoorLock
-// server serves users with PIN credentials, the three schedule kinds, PINs
-// over the air and Unbolting, with the limits matter.js's CHIP test lock
-// states (support/chip-testing/src/AllClustersTestInstance.ts:704-724 at
-// 862ad75f), and keeps its users, credentials and schedules in the node's
-// store. It emits LockOperation after every successful remote command and
-// LockOperationError for a refused one; the device reports a jam on its own
-// (control hook `lock jam`), which the server reads back as LockState
-// NotFullyLocked. A jammed bolt refuses LockDoor / UnlockDoor, which the
-// controller sees as FAILURE.
+// demoLock is a motorised door lock with a user database: the device kit's
+// DoorLock server serves users with PIN credentials, the three schedule
+// kinds, PINs over the air and Unbolting, with the limits matter.js's CHIP
+// test lock states (support/chip-testing/src/AllClustersTestInstance.ts:
+// 704-724 at 862ad75f), and keeps its users, credentials and schedules in
+// the node's store under the lock's StableKey. It emits LockOperation after
+// every successful remote command and LockOperationError for a refused
+// one; the device reports a jam on its own (control hook `lock jam`), which
+// the server reads back as LockState NotFullyLocked. A jammed bolt refuses
+// LockDoor / UnlockDoor, which the controller sees as FAILURE.
 type demoLock struct {
 	name string
 	notifier
-	version cluster.DataVersionTracker
 
 	mu     sync.Mutex
 	locked bool
 	jammed bool
 
-	// auth is the node's store, set before the server is built
-	// (restoreLock); nil keeps the records in memory.
-	auth lock.AuthStore
-
-	// srv is built once: the bridge asks for the cluster servers on every
-	// dispatch, and the server holds OperatingMode, the records and the
-	// event emitter the bridge wired at reassembly (TC-DRLK-2.1).
-	srvOnce sync.Once
-	srv     *lock.DoorLockServer
+	// auth is the node's store, set before the device is built
+	// (main.go); nil keeps the records in memory.
+	auth lockdef.AuthStore
 }
 
-var _ lock.StateSource = (*demoLock)(nil)
+var _ lockdef.StateSource = (*demoLock)(nil)
 
 func newDemoLock(name string) *demoLock { return &demoLock{name: name, locked: true} }
 
-// lockAuthKey names the lock's records in the store: the endpoint's
-// StableKey (fleet.endpoints, bridged("lock", …)).
-const lockAuthKey = "demo:lock:1"
-
-// config is the lock's server configuration.
-func (l *demoLock) config() lock.DoorLockConfig {
-	autoRelock := uint32(60)
-	return lock.DoorLockConfig{
-		Source:      l,
-		DataVersion: &l.version,
-		Features: lock.FeatureUSR | lock.FeaturePIN | lock.FeatureCOTA | lock.FeatureWDSCH |
-			lock.FeatureYDSCH | lock.FeatureHDSCH | lock.FeatureUBOLT,
-		NumberOfTotalUsersSupported:              10,
-		NumberOfPinUsersSupported:                10,
-		NumberOfCredentialsSupportedPerUser:      5,
-		CredentialRulesSupport:                   lockdef.CredentialRulesSingle,
-		MaxPinCodeLength:                         8,
-		MinPinCodeLength:                         4,
-		NumberOfWeekDaySchedulesSupportedPerUser: 10,
-		NumberOfYearDaySchedulesSupportedPerUser: 10,
-		NumberOfHolidaySchedulesSupported:        10,
-		WrongCodeEntryLimit:                      3,
-		UserCodeTemporaryDisableTime:             10,
-		AutoRelockTime:                           &autoRelock,
-		Auth:                                     l.auth,
-		AuthKey:                                  lockAuthKey,
+// declaration declares the lock's DoorLock.
+func (l *demoLock) declaration() device.Declaration {
+	users, pinUsers, perUser := uint16(10), uint16(10), uint8(5)
+	rules, maxPIN, minPIN := lockdef.CredentialRulesSingle, uint8(8), uint8(4)
+	weekDay, yearDay, holiday := uint8(10), uint8(10), uint8(10)
+	wrongCodes, disable, relock := uint8(3), uint8(10), uint32(60)
+	return lockdef.Declare{
+		Features: lockdef.FeatureUser | lockdef.FeaturePinCredential | lockdef.FeatureCredentialOverTheAirAccess |
+			lockdef.FeatureWeekDayAccessSchedules | lockdef.FeatureYearDayAccessSchedules | lockdef.FeatureHolidaySchedules |
+			lockdef.FeatureUnbolting,
+		StateSource: l,
+		AuthStore:   l.auth,
+		Initial: lockdef.Patch{
+			NumberOfTotalUsersSupported: &users, NumberOfPinUsersSupported: &pinUsers,
+			NumberOfCredentialsSupportedPerUser: &perUser, CredentialRulesSupport: &rules,
+			MaxPinCodeLength: &maxPIN, MinPinCodeLength: &minPIN,
+			NumberOfWeekDaySchedulesSupportedPerUser: &weekDay, NumberOfYearDaySchedulesSupportedPerUser: &yearDay,
+			NumberOfHolidaySchedulesSupported: &holiday,
+			WrongCodeEntryLimit:               &wrongCodes, UserCodeTemporaryDisableTime: &disable,
+			AutoRelockTime: &relock,
+		},
 	}
 }
 
-// servers are the cluster servers the device supplies.
-func (l *demoLock) servers() []contract.ClusterServer {
-	l.srvOnce.Do(func() {
-		srv, err := lock.New(l.config())
-		if err != nil {
-			// The configuration is fixed; a store that cannot be read leaves
-			// the lock without its users rather than without the lock.
-			slog.Error("lock.config", slog.String("device", l.name), slog.String("err", err.Error()))
-			srv = lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})
-		}
-		l.srv = srv
-	})
-	return []contract.ClusterServer{l.srv}
-}
-
-// IsJammed implements [lock.StateSource].
+// IsJammed implements [lockdef.StateSource].
 func (l *demoLock) IsJammed() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.jammed
 }
 
-// IsLocked implements [lock.StateSource].
+// IsLocked implements [lockdef.StateSource].
 func (l *demoLock) IsLocked() (locked, observed bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.locked, true
 }
 
-// LockInvoke implements [lock.StateSource]. A jammed bolt refuses to move.
+// LockInvoke implements [lockdef.StateSource]. A jammed bolt refuses to
+// move.
 func (l *demoLock) LockInvoke(_ context.Context, cmdID uint32) error {
 	l.mu.Lock()
 	if l.jammed {
 		l.mu.Unlock()
 		return fmt.Errorf("lock %s: bolt jammed", l.name)
 	}
-	l.locked = cmdID == wire.DoorLockCmdLockDoor
+	l.locked = cmdID == lockdef.CmdLockDoor
 	locked := l.locked
 	l.mu.Unlock()
 	slog.Info("lock.set", slog.String("device", l.name), slog.Bool("locked", locked))
@@ -288,59 +251,42 @@ func (l *demoLock) reportJam(jammed bool) {
 
 // --- device: a roller blind -------------------------------------------------------
 
-// demoBlind is a roller blind. The module's WindowCovering server holds the
-// position itself (cluster/cover is a conformance reference that drives no
-// device), so the endpoint keeps one instance across reassemblies.
+// demoBlind is a roller blind. The device kit's WindowCovering server holds
+// the position itself (cluster/cover is a conformance reference that drives
+// no device) and travels a movement: six steps of 950 ms, as matter.js's
+// CHIP test node (TestWindowCoveringServer.ts) — the TC-WNCV-3.x cases read
+// OperationalStatus while it moves.
 type demoBlind struct {
 	name string
-	once sync.Once
-	srv  *cover.WindowCoveringServer
 
 	// position is where the blind starts (0, open, for a new one), and
 	// persist is told every position it reaches — WindowCovering state is
 	// non-volatile in matter.js, and TC-WNCV-4.5 reads the lift position
-	// back after a reboot. Both are set before the first
-	// servers call (restoreBlind, before fleet.endpoints); persist may be nil.
+	// back after a reboot. Both are set before the device is built
+	// (restoreBlind, before fleet.endpoints); persist may be nil.
 	position uint16
 	persist  func(position uint16)
 }
 
-// WindowCovering FeatureMap bits (window-covering-cluster.element.ts):
-// Lift and PositionAwareLift.
-const (
-	coverFeatureLift              uint32 = 1 << 0
-	coverFeaturePositionAwareLift uint32 = 1 << 2
-)
-
 func newDemoBlind(name string) *demoBlind { return &demoBlind{name: name} }
 
-// servers are the cluster servers the device supplies.
-func (b *demoBlind) servers() []contract.ClusterServer {
-	b.once.Do(func() {
-		b.srv = cover.NewWindowCoveringServer(cover.Config{
-			Type:                         0, // Rollershade
-			EndProductType:               0, // RollerShade
-			FeatureMap:                   coverFeatureLift | coverFeaturePositionAwareLift,
-			InitialPositionPercent100ths: b.position,
-			// The blind travels: six steps of 950 ms, as matter.js's CHIP
-			// test node (TestWindowCoveringServer.ts) — the TC-WNCV-3.x
-			// cases read OperationalStatus while it moves.
-			MoveStep: 950 * time.Millisecond,
-		})
-		if b.persist != nil {
-			srv := b.srv
-			srv.OnAttributeChange(func(change contract.Change) {
-				ids := change.Attributes
-				if !slices.Contains(ids, wire.WindowCoveringAttrCurrentPositionLiftPercent100ths) {
-					return
-				}
-				if v, ok := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); ok {
-					if pos, isU16 := v.(uint16); isU16 {
-						b.persist(pos)
-					}
-				}
-			})
-		}
+// device builds the blind: a roller shade with Lift and PositionAwareLift.
+func (b *demoBlind) device(opts device.Options) (*device.WindowCovering, error) {
+	kind, product, position := wcdef.TypeRollershade, wcdef.EndProductTypeRollerShade, b.position
+	d, err := device.NewWindowCovering(opts, wcdef.Declare{
+		Features:    wcdef.FeatureLift | wcdef.FeaturePositionAwareLift,
+		Transitions: true,
+		Initial:     wcdef.Patch{Type: &kind, EndProductType: &product, CurrentPositionLiftPercent100ths: &position},
 	})
-	return []contract.ClusterServer{b.srv}
+	if err != nil {
+		return nil, err
+	}
+	if b.persist != nil {
+		d.WindowCovering().OnChanged(func(st wcdef.State, change contract.Change) {
+			if slices.Contains(change.Attributes, wcdef.AttrCurrentPositionLiftPercent100ths) && st.CurrentPositionLiftPercent100ths != nil {
+				b.persist(*st.CurrentPositionLiftPercent100ths)
+			}
+		})
+	}
+	return d, nil
 }

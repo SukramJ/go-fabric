@@ -123,6 +123,17 @@ func (s *Server) EmitSensorFault(endpoint uint16, data SensorFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data)
 }
 
+// Delegate is told what a controller changed — CurrentSensitivityLevel
+// (quality N, the host persists it), and what EnableDisableAlarm and
+// SuppressAlarm did; an error answers FAILURE (cluster/boolcfg
+// Delegate).
+type Delegate interface {
+	CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error
+	AlarmsEnabledChanged(ctx context.Context, enabled AlarmModeBitmap) error
+	AlarmsActiveChanged(ctx context.Context, active AlarmModeBitmap) error
+	AlarmsSuppressedChanged(ctx context.Context, suppressed AlarmModeBitmap) error
+}
+
 // Declare is the declaration of the BooleanStateConfiguration cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -150,6 +161,8 @@ type Declare struct {
 	// HandleEnableDisableAlarm handles the EnableDisableAlarm command in place of the server
 	// (Server.HandleEnableDisableAlarm), inline; an optional command it handles is accepted.
 	HandleEnableDisableAlarm func(ctx context.Context, req EnableDisableAlarmRequest) (struct{}, error)
+	// Delegate is the host port the kit's server runs on ([Delegate]).
+	Delegate Delegate
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

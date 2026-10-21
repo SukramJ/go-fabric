@@ -73,6 +73,79 @@ var devicePorts = map[string]portSet{
 			"}",
 		},
 	},
+	"ThermostatUserInterfaceConfiguration": {ports: []portDecl{{
+		name: "SettingStore",
+		doc: []string{
+			"SettingStore persists KeypadLockout under the device's StableKey;",
+			"the node's store (node.Node.Store) is one. Without one it stays in",
+			"memory (cluster/thermo SettingStore).",
+		},
+		methods: []string{
+			"GetSetting(ctx context.Context, key string) (value string, ok bool, err error)",
+			"SetSetting(ctx context.Context, key, value string) error",
+		},
+	}}},
+	"BooleanStateConfiguration": {ports: []portDecl{{
+		name: "Delegate",
+		doc: []string{
+			"Delegate is told what a controller changed — CurrentSensitivityLevel",
+			"(quality N, the host persists it), and what EnableDisableAlarm and",
+			"SuppressAlarm did; an error answers FAILURE (cluster/boolcfg",
+			"Delegate).",
+		},
+		methods: []string{
+			"CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error",
+			"AlarmsEnabledChanged(ctx context.Context, enabled AlarmModeBitmap) error",
+			"AlarmsActiveChanged(ctx context.Context, active AlarmModeBitmap) error",
+			"AlarmsSuppressedChanged(ctx context.Context, suppressed AlarmModeBitmap) error",
+		},
+	}}},
+	"ColorControl": {
+		ports: []portDecl{{
+			name: "ColorTemperatureWriter",
+			doc: []string{
+				"ColorTemperatureWriter drives the device's colour temperature",
+				"(mireds) whenever the kit's ColorControl server changes it; an",
+				"error refuses the change (cluster/light ColorTemperatureWriter).",
+			},
+			methods: []string{"SetColorTemperatureMireds(ctx context.Context, mireds uint16) error"},
+		}, {
+			name: "ColorWriter",
+			doc: []string{
+				"ColorWriter drives the device with the whole colour whenever the",
+				"kit's ColorControl server changes it (not on a colour mode",
+				"switch); an error refuses the change (cluster/light ColorWriter).",
+			},
+			methods: []string{"SetColor(ctx context.Context, c Color) error"},
+		}},
+		types: []string{
+			"// Color is a colour in the attributes' Matter units: Mode says which",
+			"// fields describe it — X / Y (CurrentX, CurrentY), Hue / Saturation",
+			"// (CurrentHue, CurrentSaturation), EnhancedHue / Saturation, or",
+			"// ColorTemperatureMireds; the others keep the last value of their mode.",
+			"type Color struct {",
+			"\tMode                   EnhancedColorModeEnum",
+			"\tX, Y                   uint16",
+			"\tHue                    uint8",
+			"\tEnhancedHue            uint16",
+			"\tSaturation             uint8",
+			"\tColorTemperatureMireds uint16",
+			"}",
+		},
+	},
+	"CommodityTariff": {ports: []portDecl{{
+		name: "TimeSource",
+		doc: []string{
+			"TimeSource is the time the kit's CommodityTariff server reads the",
+			"current day and day entry from, in place of the node's clock — a",
+			"host that runs the tariff on its own time, as chip's",
+			"energy-gateway app runs it on its TestTimeManager. A TimeSource",
+			"that is also a contract.ChangeNotifier makes the server derive",
+			"the current attributes again whenever it notifies: a clock that",
+			"jumped (cluster/energy).",
+		},
+		methods: []string{"Now() time.Time"},
+	}}, imports: []string{"time"}},
 	"ValveConfigurationAndControl": {ports: []portDecl{{
 		name: "StateSource",
 		doc: []string{

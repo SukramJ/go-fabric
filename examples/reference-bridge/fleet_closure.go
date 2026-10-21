@@ -5,80 +5,90 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
+	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // garageTravel is how long the simulated drive takes between two stops.
 const garageTravel = 2 * time.Second
 
 // demoGarage is a garage door drive with a ventilation stop: ClosureControl
-// with Positioning and Ventilation (closure.PositioningVentilationFeatureMap),
-// the profile a host's garage projection uses. The drive is simulated: a
-// MoveTo starts it (MainState Moving), and after garageTravel it reports
-// the target position and stops, which emits MovementCompleted and, at or
-// away from FullyClosed, SecureStateChanged.
+// with Positioning and Ventilation, the profile a host's garage projection
+// uses. The drive is simulated: a MoveTo starts it (MainState Moving), and
+// after garageTravel it reports the target position and stops, which emits
+// MovementCompleted and, at or away from FullyClosed, SecureStateChanged —
+// the device kit's ClosureControl server derives both from the drive's
+// report.
 type demoGarage struct {
 	name string
-	notifier
 
 	mu     sync.Mutex
 	travel *time.Timer
-	ctl    *closure.ControlServer
+	ctl    *ccldef.Server
 }
 
-var _ contract.ChangeNotifier = (*demoGarage)(nil)
+var _ ccldef.Mover = (*demoGarage)(nil)
 
-func newDemoGarage(name string) *demoGarage {
-	g := &demoGarage{name: name}
-	g.ctl = closure.NewControlServer(closure.Config{Mover: garageMover{g}})
-	closed := clusterwire.ClosureCurrentPositionFullyClosed
-	g.ctl.SetCurrentPosition(&closed)
-	g.ctl.SetMainState(clusterwire.ClosureMainStateStopped)
-	return g
+func newDemoGarage(name string) *demoGarage { return &demoGarage{name: name} }
+
+// device builds the garage: fully closed and stopped.
+func (g *demoGarage) device(opts device.Options) (*device.Closure, error) {
+	closed, stopped := ccldef.CurrentPositionFullyClosed, ccldef.MainStateStopped
+	d, err := device.NewClosure(opts, ccldef.Declare{
+		Features: ccldef.FeaturePositioning | ccldef.FeatureVentilation,
+		Mover:    g,
+		Initial: ccldef.Patch{
+			MainState:           &stopped,
+			OverallCurrentState: &ccldef.OverallCurrentStateStruct{Position: &spec.Nullable[ccldef.CurrentPositionEnum]{Value: closed}},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	g.mu.Lock()
+	g.ctl = d.ClosureControl()
+	g.mu.Unlock()
+	return d, nil
 }
 
-// servers are the cluster servers the device supplies. The server is
-// the same instance on every call: it holds the drive's state and the
-// event emitter the bridge wires into it.
-func (g *demoGarage) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{g.ctl}
+// server is the garage's ClosureControl; nil before the device is built.
+func (g *demoGarage) server() *ccldef.Server {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.ctl
+}
+
+// report is the drive reporting its position (nil: between the stops) and,
+// when given, its main state.
+func (g *demoGarage) report(pos *ccldef.CurrentPositionEnum, state *ccldef.MainStateEnum) {
+	current := &ccldef.OverallCurrentStateStruct{Position: &spec.Nullable[ccldef.CurrentPositionEnum]{Null: true}}
+	if pos != nil {
+		current.Position = &spec.Nullable[ccldef.CurrentPositionEnum]{Value: *pos}
+	}
+	if err := g.server().Set(ccldef.Patch{OverallCurrentState: current, MainState: state}); err != nil {
+		slog.Warn("garage.report", slog.String("device", g.name), slog.Any("err", err))
+	}
 }
 
 // arrivalOf is where a target leaves the drive.
-var arrivalOf = map[clusterwire.ClosureTargetPosition]clusterwire.ClosureCurrentPosition{
-	clusterwire.ClosureTargetPositionMoveToFullyClosed:         clusterwire.ClosureCurrentPositionFullyClosed,
-	clusterwire.ClosureTargetPositionMoveToFullyOpen:           clusterwire.ClosureCurrentPositionFullyOpened,
-	clusterwire.ClosureTargetPositionMoveToVentilationPosition: clusterwire.ClosureCurrentPositionOpenedForVentilation,
-	clusterwire.ClosureTargetPositionMoveToPedestrianPosition:  clusterwire.ClosureCurrentPositionOpenedForPedestrian,
-	clusterwire.ClosureTargetPositionMoveToSignaturePosition:   clusterwire.ClosureCurrentPositionOpenedAtSignature,
+var arrivalOf = map[ccldef.TargetPositionEnum]ccldef.CurrentPositionEnum{
+	ccldef.TargetPositionMoveToFullyClosed:         ccldef.CurrentPositionFullyClosed,
+	ccldef.TargetPositionMoveToFullyOpen:           ccldef.CurrentPositionFullyOpened,
+	ccldef.TargetPositionMoveToVentilationPosition: ccldef.CurrentPositionOpenedForVentilation,
+	ccldef.TargetPositionMoveToPedestrianPosition:  ccldef.CurrentPositionOpenedForPedestrian,
+	ccldef.TargetPositionMoveToSignaturePosition:   ccldef.CurrentPositionOpenedAtSignature,
 }
 
-// garageMover is the garage's drive as the server's [closure.Mover].
-type garageMover struct{ g *demoGarage }
-
-// MoveTo implements [closure.Mover].
-func (m garageMover) MoveTo(ctx context.Context, target closurecontroldef.TargetPositionEnum) error {
-	return m.g.move(ctx, clusterwire.ClosureTargetPosition(target))
-}
-
-// Stop implements [closure.Mover].
-func (m garageMover) Stop(ctx context.Context) error { return m.g.stop(ctx) }
-
-// move is the drive's MoveTo: it starts travelling and arrives after
-// garageTravel. The server sets MainState Moving and the target once this
-// returns.
-func (g *demoGarage) move(_ context.Context, target clusterwire.ClosureTargetPosition) error {
+// MoveTo implements [ccldef.Mover]: the drive starts travelling and
+// arrives after garageTravel. The server sets MainState Moving and the
+// target once this returns.
+func (g *demoGarage) MoveTo(_ context.Context, target ccldef.TargetPositionEnum) error {
 	arrival := arrivalOf[target]
 	g.mu.Lock()
 	if g.travel != nil {
@@ -88,20 +98,18 @@ func (g *demoGarage) move(_ context.Context, target clusterwire.ClosureTargetPos
 		g.mu.Lock()
 		g.travel = nil
 		g.mu.Unlock()
-		pos := arrival
-		g.ctl.SetCurrentPosition(&pos)
-		g.ctl.SetMainState(clusterwire.ClosureMainStateStopped)
+		pos, stopped := arrival, ccldef.MainStateStopped
+		g.report(&pos, &stopped)
 		slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(pos)))
-		g.notify()
 	})
 	g.mu.Unlock()
 	slog.Info("garage.move", slog.String("device", g.name), slog.Int("target", int(target)))
 	return nil
 }
 
-// stop halts the drive between its stops: the position is no longer one of
-// them.
-func (g *demoGarage) stop(context.Context) error {
+// Stop implements [ccldef.Mover]: the drive halts between its stops, so
+// the position is no longer one of them.
+func (g *demoGarage) Stop(context.Context) error {
 	g.mu.Lock()
 	moving := g.travel != nil
 	if moving {
@@ -110,10 +118,9 @@ func (g *demoGarage) stop(context.Context) error {
 	}
 	g.mu.Unlock()
 	if moving {
-		partial := clusterwire.ClosureCurrentPositionPartiallyOpened
-		g.ctl.SetCurrentPosition(&partial)
+		partial := ccldef.CurrentPositionPartiallyOpened
+		g.report(&partial, nil)
 	}
-	go g.notify()
 	return nil
 }
 
@@ -135,20 +142,27 @@ const (
 // trigger (matter_testing.py _update_legacy_test_event_triggers); the
 // daemon has one closure, so the endpoint is masked off.
 func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool) {
+	var patch ccldef.Patch
 	switch trigger &^ (0xFFFF << 32) {
 	case triggerClosureError:
-		g.ctl.ReportError(clusterwire.ClosureErrorList{clusterwire.ClosureError(0)}) // PhysicallyBlocked
+		// The error state with the error that caused it: the
+		// OperationalError event goes out.
+		state, errs := ccldef.MainStateError, []ccldef.ClosureErrorEnum{ccldef.ClosureErrorPhysicallyBlocked}
+		patch = ccldef.Patch{MainState: &state, CurrentErrorList: &errs}
 	case triggerClosureSetupRequired:
-		g.ctl.SetMainState(clusterwire.ClosureMainStateSetupRequired)
+		state := ccldef.MainStateSetupRequired
+		patch = ccldef.Patch{MainState: &state}
 	case triggerClosureClear:
-		g.ctl.SetErrorList(clusterwire.ClosureErrorList{})
-		g.ctl.SetMainState(clusterwire.ClosureMainStateStopped)
+		state, errs := ccldef.MainStateStopped, []ccldef.ClosureErrorEnum{}
+		patch = ccldef.Patch{MainState: &state, CurrentErrorList: &errs}
 	default:
 		// Protected (…01) and Disengaged (…02) too: their features are not
 		// advertised.
 		return false
 	}
-	g.notify()
+	if err := g.server().Set(patch); err != nil {
+		slog.Warn("garage.trigger", slog.String("device", g.name), slog.Any("err", err))
+	}
 	return true
 }
 
@@ -164,6 +178,8 @@ const (
 	// panelStepValue is the panel's StepValue, 10 %
 	// (ClosureDimensionEndpoint.cpp:63).
 	panelStepValue = uint16(1000)
+	// percent100thsMax is 100.00 %.
+	percent100thsMax = uint16(10000)
 )
 
 // demoPanel is a closure panel (ClosurePanel, 0x0231): one movable part
@@ -179,67 +195,69 @@ const (
 // HandlePanelSetTargetAction, UpdateCurrentStateFromTargetState).
 type demoPanel struct {
 	name string
-	srv  *closure.DimensionServer
 
-	mu      sync.Mutex
-	motion  *time.Timer
-	stepBy  uint16
-	version cluster.DataVersionTracker
+	mu     sync.Mutex
+	srv    *cdim.Server
+	motion *time.Timer
+	stepBy uint16
 }
 
-func newDemoPanel(name string) *demoPanel {
-	p := &demoPanel{name: name}
+var _ cdim.DimensionHandler = (*demoPanel)(nil)
+
+func newDemoPanel(name string) *demoPanel { return &demoPanel{name: name} }
+
+// device builds the ClosurePanel.
+func (p *demoPanel) device(opts device.Options) (*device.ClosurePanel, error) {
 	auto := cdim.ThreeLevelAutoAuto
-	srv, err := closure.NewDimension(closure.DimensionConfig{
-		Features: closure.DimensionFeaturePositioning | closure.DimensionFeatureMotionLatching | closure.DimensionFeatureUnit |
-			closure.DimensionFeatureLimitation | closure.DimensionFeatureSpeed | closure.DimensionFeatureRotation,
-		Handler:    panelHandler{p},
-		Resolution: 100, StepValue: panelStepValue,
-		Unit:              cdim.ClosureUnitMillimeter,
-		UnitRange:         &closure.UnitRange{Min: 0, Max: 10000},
-		LimitRange:        closure.LimitRange{Min: 0, Max: closure.Percent100thsMax},
-		RotationAxis:      cdim.RotationAxisCenteredVertical,
-		Overflow:          cdim.OverflowTopInside,
-		LatchControlModes: cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching,
-		CurrentState: &closure.DimensionState{
-			Position: &spec.Nullable[uint16]{Value: closure.Percent100thsMax},
-			Latch:    &spec.Nullable[bool]{Value: true},
-			Speed:    &auto,
+	resolution, step, unit := uint16(100), panelStepValue, cdim.ClosureUnitMillimeter
+	axis, overflow := cdim.RotationAxisCenteredVertical, cdim.OverflowTopInside
+	latching := cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching
+	d, err := device.NewClosurePanel(opts, cdim.Declare{
+		Features: cdim.FeaturePositioning | cdim.FeatureMotionLatching | cdim.FeatureUnit |
+			cdim.FeatureLimitation | cdim.FeatureSpeed | cdim.FeatureRotation,
+		DimensionHandler: p,
+		Initial: cdim.Patch{
+			Resolution: &resolution, StepValue: &step, Unit: &unit,
+			UnitRange:         &cdim.UnitRangeStruct{Min: 0, Max: 10000},
+			LimitRange:        &cdim.RangePercent100thsStruct{Min: 0, Max: percent100thsMax},
+			RotationAxis:      &axis,
+			Overflow:          &overflow,
+			LatchControlModes: &latching,
+			CurrentState: &cdim.DimensionStateStruct{
+				Position: &spec.Nullable[uint16]{Value: percent100thsMax},
+				Latch:    &spec.Nullable[bool]{Value: true},
+				Speed:    &auto,
+			},
+			TargetState: &cdim.DimensionStateStruct{
+				Position: &spec.Nullable[uint16]{Null: true},
+				Latch:    &spec.Nullable[bool]{Null: true},
+				Speed:    &auto,
+			},
 		},
-		TargetState: &closure.DimensionState{
-			Position: &spec.Nullable[uint16]{Null: true},
-			Latch:    &spec.Nullable[bool]{Null: true},
-			Speed:    &auto,
-		},
-		DataVersion: &p.version,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("panel ClosureDimension: %v", err))
+		return nil, err
 	}
-	p.srv = srv
-	return p
+	p.mu.Lock()
+	p.srv = d.ClosureDimension()
+	p.mu.Unlock()
+	return d, nil
 }
 
-// servers are the cluster servers the device supplies.
-func (p *demoPanel) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{p.srv}
-}
-
-// panelHandler is the panel's [closure.DimensionHandler]: both commands
-// start the motion one tick later, as the closure-app's OnSetTargetCommand
-// and OnStepCommand start their timers. The server sets the target once
-// they return.
-type panelHandler struct{ p *demoPanel }
-
-func (h panelHandler) SetTarget(_ context.Context, position *uint16, latch *bool, _ *closure.ThreeLevelAuto) error {
-	slog.Info("panel.set_target", slog.String("device", h.p.name), slog.Any("position", position), slog.Any("latch", latch))
-	h.p.start(panelPositionStep)
+// SetTarget implements [cdim.DimensionHandler]: both commands start the
+// motion one tick later, as the closure-app's OnSetTargetCommand and
+// OnStepCommand start their timers. The server sets the target once they
+// return.
+func (p *demoPanel) SetTarget(_ context.Context, position *uint16, latch *bool, _ *cdim.ThreeLevelAutoEnum) error {
+	slog.Info("panel.set_target", slog.String("device", p.name), slog.Any("position", position), slog.Any("latch", latch))
+	p.start(panelPositionStep)
 	return nil
 }
 
-func (h panelHandler) Step(_ context.Context, direction closure.StepDirection, steps uint16, _ *closure.ThreeLevelAuto) error {
-	slog.Info("panel.step", slog.String("device", h.p.name), slog.Int("direction", int(direction)), slog.Int("steps", int(steps)))
-	h.p.start(panelStepValue)
+// Step implements [cdim.DimensionHandler].
+func (p *demoPanel) Step(_ context.Context, direction cdim.StepDirectionEnum, steps uint16, _ *cdim.ThreeLevelAutoEnum) error {
+	slog.Info("panel.step", slog.String("device", p.name), slog.Int("direction", int(direction)), slog.Int("steps", int(steps)))
+	p.start(panelStepValue)
 	return nil
 }
 
@@ -254,25 +272,33 @@ func (p *demoPanel) start(stepBy uint16) {
 	p.motion = time.AfterFunc(panelTick, p.tick)
 }
 
+// setCurrent records the panel's current state.
+func (p *demoPanel) setCurrent(srv *cdim.Server, cur *cdim.DimensionStateStruct) {
+	if err := srv.Set(cdim.Patch{CurrentState: cur}); err != nil {
+		slog.Warn("panel.state", slog.String("device", p.name), slog.Any("err", err))
+	}
+}
+
 // tick is one motion step: unlatch when the target unlatches, move toward
 // the target position, and at the target latch when asked and take the
 // target's fields as current.
 func (p *demoPanel) tick() {
 	p.mu.Lock()
 	p.motion = nil
-	stepBy := p.stepBy
+	stepBy, srv := p.stepBy, p.srv
 	p.mu.Unlock()
-	cur, tgt := p.srv.CurrentState(), p.srv.TargetState()
+	st := srv.Get()
+	cur, tgt := st.CurrentState, st.TargetState
 	if cur == nil || tgt == nil {
 		return
 	}
 	if isTrue(cur.Latch) && isFalse(tgt.Latch) {
 		cur.Latch = &spec.Nullable[bool]{Value: false}
-		_ = p.srv.SetCurrentState(cur)
+		p.setCurrent(srv, cur)
 	}
 	if next, moving := nextPosition(cur.Position, tgt.Position, stepBy); moving {
 		cur.Position = &spec.Nullable[uint16]{Value: next}
-		_ = p.srv.SetCurrentState(cur)
+		p.setCurrent(srv, cur)
 		if next != tgt.Position.Value {
 			p.mu.Lock()
 			p.motion = time.AfterFunc(panelTick, p.tick)
@@ -290,7 +316,7 @@ func (p *demoPanel) tick() {
 	if tgt.Speed != nil {
 		cur.Speed = tgt.Speed
 	}
-	_ = p.srv.SetCurrentState(cur)
+	p.setCurrent(srv, cur)
 	slog.Info("panel.arrived", slog.String("device", p.name))
 }
 

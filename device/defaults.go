@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/alarmbase"
@@ -57,8 +59,10 @@ type defaultBuild struct {
 	cfg     spec.ServerConfig
 	clock   clock.Clock
 	sibling func(clusterID uint32) contract.ClusterServer
-	// deviceType is the device's type id.
+	// deviceType is the device's type id; key its StableKey, which names
+	// what a server persists (a lock's records, a keypad lockout).
 	deviceType uint16
+	key        string
 	// ports is the cluster's typed declaration (<cluster>def.Declare),
 	// nil without one; transitions is its Transitions.
 	ports       any
@@ -251,11 +255,54 @@ func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
+	colorConfigFrom(&cfg, b.initial)
 	srv, err := light.NewColorControl(cfg)
 	if errors.Is(err, light.ErrColorFeatures) {
 		return nil, notServed(err)
 	}
-	return srv, err
+	if err != nil {
+		return nil, err
+	}
+	if d, ok := b.ports.(ccdef.Declare); ok {
+		if d.ColorTemperatureWriter != nil {
+			srv.SetWriter(d.ColorTemperatureWriter)
+		}
+		if d.ColorWriter != nil {
+			srv.SetColorWriter(d.ColorWriter)
+		}
+	}
+	return srv, nil
+}
+
+// colorConfigFrom takes the ColorControl configuration the declaration's
+// Initial states — the physical colour-temperature range, the coupling
+// floor, the colour the light starts with and its mode — into cfg, whose
+// fields name them otherwise.
+func colorConfigFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any) {
+	for id, dst := range map[uint32]*uint16{
+		ccdef.AttrColorTempPhysicalMinMireds: &cfg.MinMireds, ccdef.AttrColorTempPhysicalMaxMireds: &cfg.MaxMireds,
+		ccdef.AttrColorTemperatureMireds: &cfg.InitialMireds, ccdef.AttrCoupleColorTempToLevelMinMireds: &cfg.CoupleColorTempToLevelMinMireds,
+		ccdef.AttrCurrentX: &cfg.InitialX, ccdef.AttrCurrentY: &cfg.InitialY, ccdef.AttrEnhancedCurrentHue: &cfg.InitialEnhancedHue,
+	} {
+		if v, ok := consume(initial, id); ok && v <= math.MaxUint16 {
+			*dst = uint16(v)
+		}
+	}
+	for id, dst := range map[uint32]*uint8{ccdef.AttrCurrentHue: &cfg.InitialHue, ccdef.AttrCurrentSaturation: &cfg.InitialSaturation} {
+		if v, ok := consume8(initial, id); ok {
+			*dst = v
+		}
+	}
+	// The mode the light starts in: EnhancedColorMode, else ColorMode (the
+	// two read the same but for the enhanced hue mode).
+	mode, ok := consume8(initial, ccdef.AttrEnhancedColorMode)
+	if m, has := consume8(initial, ccdef.AttrColorMode); has && !ok {
+		mode, ok = m, true
+	}
+	if ok {
+		m := light.ColorMode(mode)
+		cfg.InitialColorMode = &m
+	}
 }
 
 // newWindowCoveringServer is the module's WindowCovering server
@@ -267,6 +314,20 @@ func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d, ok := b.ports.(wcdef.Declare); ok && d.Mover != nil {
 		cfg.Mover = d.Mover
 	}
+	if b.transitions {
+		cfg.MoveStep = coverMoveStep
+	}
+	// Type and EndProductType are the configuration's; the position the
+	// covering starts at is the current and the target position.
+	configFrom(&cfg, b.def, b.initial)
+	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionLiftPercent100ths); ok && v <= math.MaxUint16 {
+		cfg.InitialPositionPercent100ths = uint16(v)
+		delete(b.initial, wcdef.AttrTargetPositionLiftPercent100ths)
+	}
+	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionTiltPercent100ths); ok && v <= math.MaxUint16 {
+		cfg.InitialTiltPositionPercent100ths = uint16(v)
+		delete(b.initial, wcdef.AttrTargetPositionTiltPercent100ths)
+	}
 	srv, err := cover.New(cfg)
 	if errors.Is(err, cover.ErrFeatureMap) {
 		return nil, notServed(err)
@@ -274,13 +335,51 @@ func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
 	return srv, err
 }
 
+// coverMoveStep is a travelling movement's step: matter.js's CHIP test
+// node moves in six steps of 950 ms (support/chip-testing/src/cluster/
+// TestWindowCoveringServer.ts).
+const coverMoveStep = 950 * time.Millisecond
+
 // newThermostatServer is the module's Thermostat server ([thermo.New]),
 // at its default limits and setpoints; a declared Sink
 // (thermostatdef.Declare) is told every change it admits.
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := thermo.ThermostatConfig{Features: b.opts.Features, Clock: b.clock}
-	if d, ok := b.ports.(thermostatdef.Declare); ok && d.Sink != nil {
-		cfg.Sink = d.Sink
+	// The element's defaults: the absolute limits 7 / 30 °C (heat) and
+	// 16 / 32 °C (cool), the occupied setpoints 20 and 26 °C (matter.js
+	// packages/model/src/standard/elements/thermostat-cluster.element.ts:
+	// 44-72) — thermo.DefaultThermostatConfig's.
+	cfg := thermo.DefaultThermostatConfig()
+	cfg.Features, cfg.Clock = b.opts.Features, b.clock
+	if d, ok := b.ports.(thermostatdef.Declare); ok {
+		if d.Sink != nil {
+			cfg.Sink = d.Sink
+		}
+		if d.PresetStore != nil {
+			cfg.PresetStore = d.PresetStore
+		}
+	}
+	// The limits and the presets the device ships with (NumberOfPresets,
+	// PresetTypes, Presets, ActivePresetHandle) are the server's
+	// configuration; the setpoints it starts with are too, under their
+	// Config names.
+	configFrom(&cfg, b.def, b.initial)
+	for id, dst := range map[uint32]*int16{
+		thermostatdef.AttrOccupiedHeatingSetpoint: &cfg.InitialHeatingSetpoint,
+		thermostatdef.AttrOccupiedCoolingSetpoint: &cfg.InitialCoolingSetpoint,
+	} {
+		if v, ok := b.initial[id].(int16); ok {
+			*dst = v
+			delete(b.initial, id)
+		}
+	}
+	for id, dst := range map[uint32]**int16{
+		thermostatdef.AttrUnoccupiedHeatingSetpoint: &cfg.InitialUnoccupiedHeatingSetpoint,
+		thermostatdef.AttrUnoccupiedCoolingSetpoint: &cfg.InitialUnoccupiedCoolingSetpoint,
+	} {
+		if v, ok := b.initial[id].(int16); ok {
+			*dst = &v
+			delete(b.initial, id)
+		}
 	}
 	srv, err := thermo.New(cfg)
 	if errors.Is(err, thermo.ErrFeatures) {
@@ -296,9 +395,18 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 // nothing. An empty selection is none, as matter.js's.
 func newDoorLockServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := lock.DoorLockConfig{Features: lock.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion, Clock: b.clock}
-	if d, ok := b.ports.(doorlockdef.Declare); ok && d.StateSource != nil {
-		cfg.Source = d.StateSource
+	if d, ok := b.ports.(doorlockdef.Declare); ok {
+		if d.StateSource != nil {
+			cfg.Source = d.StateSource
+		}
+		if d.AuthStore != nil {
+			cfg.Auth, cfg.AuthKey = d.AuthStore, b.key
+		}
 	}
+	// The lock's capacities and policies (the user and credential counts,
+	// the PIN lengths, WrongCodeEntryLimit, AutoRelockTime, …) are its
+	// configuration.
+	configFrom(&cfg, b.def, b.initial)
 	srv, err := lock.New(cfg)
 	if errors.Is(err, lock.ErrConfig) {
 		return nil, notServed(err)
@@ -307,8 +415,12 @@ func newDoorLockServer(b defaultBuild) (contract.ClusterServer, error) {
 }
 
 // newSwitchServer is the module's Switch server ([switchserver.New]).
+// NumberOfPositions, MultiPressMax and the position it starts at come from
+// the declaration's Initial.
 func newSwitchServer(b defaultBuild) (contract.ClusterServer, error) {
-	return switchserver.New(switchserver.Config{Features: switchserver.Feature(b.opts.Features), Clock: b.clock, DataVersion: b.cfg.DataVersion})
+	cfg := switchserver.Config{Features: switchserver.Feature(b.opts.Features), Clock: b.clock, DataVersion: b.cfg.DataVersion}
+	configFrom(&cfg, b.def, b.initial)
+	return switchserver.New(cfg)
 }
 
 // onOffPort is the endpoint's OnOff server as the On/Off state a

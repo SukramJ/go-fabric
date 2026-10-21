@@ -180,6 +180,7 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ StateSource = d.StateSource
+	var _ AuthStore = d.AuthStore
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

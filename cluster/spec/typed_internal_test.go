@@ -71,8 +71,11 @@ func TestTypedConvert(t *testing.T) {
 		{"list of structs", List[typedPair]{{A: 2}}, []typedPair(nil), []typedPair{{A: 2}}, true},
 		{"struct mismatch", struct{ B string }{}, typedPair{}, nil, false},
 		{
-			"wire struct by field name", typedWire{ID: 3, Label: "x", Extra: true}, typedState{},
-			typedState{Id: 3, Label: ptrTo("x")}, true,
+			"wire struct by field name",
+			typedWire{ID: 3, Label: "x", Extra: true},
+			typedState{},
+			typedState{Id: 3, Label: ptrTo("x")},
+			true,
 		},
 		{"wire struct field misfit", struct{ ID string }{"x"}, typedState{}, nil, false},
 	}

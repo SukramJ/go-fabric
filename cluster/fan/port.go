@@ -24,11 +24,11 @@ type portStepper struct {
 }
 
 var (
-	_ source            = portSource{}
-	_ rockSetter             = portSource{}
-	_ windSetter             = portSource{}
+	_ source        = portSource{}
+	_ rockSetter    = portSource{}
+	_ windSetter    = portSource{}
 	_ airflowSetter = portSource{}
-	_ Stepper                = portStepper{}
+	_ Stepper       = portStepper{}
 )
 
 // sourceOf returns the port as the server's source.

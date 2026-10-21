@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // The app-pipe commands of the soil sensor and the node clusters, kept
@@ -17,7 +17,7 @@ import (
 // they drive no pipe command; the soil cases do.
 
 // soilKey is the soil sensor's StableKey (fleet.go endpoints).
-const soilKey = endpoint.StringKey("demo:soil:1")
+const soilKey = device.StringKey("demo:soil:1")
 
 // errWrongSoilEndpoint: SetSimulatedSoilMoisture named an endpoint that
 // is not the soil sensor's.

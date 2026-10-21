@@ -1575,8 +1575,15 @@ type booleanStateEvents struct {
 }
 
 // newBooleanStateEvents returns nil when the notifier does not cover
-// BooleanState.StateValue.
+// BooleanState.StateValue, or when the endpoint's BooleanState server
+// holds the value and emits StateChange itself
+// (measurement.HeldBooleanState, the device kit's default).
 func newBooleanStateEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.ConcreteAttributePath) *booleanStateEvents {
+	for _, srv := range endpointpkg.ClusterServers(ep) {
+		if _, held := srv.(*measurement.HeldBooleanState); held {
+			return nil
+		}
+	}
 	for _, p := range pathSet {
 		if p.Cluster == measurement.ClusterBooleanState && p.Attribute == 0x0000 {
 			e := &booleanStateEvents{b: b, ep: ep}

@@ -95,10 +95,7 @@ type ThermostatUIConfig struct {
 
 // SettingStore is the settings table KeypadLockout persists in:
 // store.Store's GetSetting / SetSetting.
-type SettingStore interface {
-	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
-	SetSetting(ctx context.Context, key, value string) error
-}
+type SettingStore = tsuic.SettingStore
 
 // DefaultKeypadLockoutSetting is the settings key KeypadLockout persists
 // under when [ThermostatUIConfig.SettingKey] is empty.

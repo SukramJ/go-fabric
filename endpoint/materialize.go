@@ -76,8 +76,8 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
 	}
 	// A measurement source's clusters follow the source's own: a sensor
-	// endpoint has no source servers, a device-layer device built with
-	// device.WithMeasurement has its other clusters there.
+	// endpoint has no source servers, a host's endpoint with both has its
+	// other clusters there.
 	if ep.Measurement != nil {
 		inner = append(inner, measurement.FromMeasurementClass(
 			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,

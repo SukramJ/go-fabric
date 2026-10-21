@@ -171,6 +171,12 @@ type Declare struct {
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// Transitions makes a movement travel: the kit's server moves the
+	// axis in six steps, OperationalStatus Opening or Closing until it
+	// arrives — matter.js's CHIP test node (TestWindowCoveringServer.ts,
+	// six 950 ms steps); false moves at once. A Mover moves the device
+	// instead, and excludes it.
+	Transitions bool
 	// HandleUpOrOpen handles the UpOrOpen command in place of the server
 	// (Server.HandleUpOrOpen), inline; an optional command it handles is accepted.
 	HandleUpOrOpen func(ctx context.Context, req UpOrOpenRequest) (struct{}, error)
@@ -207,6 +213,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Transitions = d.Transitions
 	if d.HandleUpOrOpen != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdUpOrOpen)
 		decl.Attach = d.attach

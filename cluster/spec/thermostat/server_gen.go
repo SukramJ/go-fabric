@@ -307,6 +307,15 @@ type Sink interface {
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
 }
 
+// PresetStore persists the presets (their TLV encoding) and the
+// active handle (nil for null); Load reports ok false when nothing
+// was saved, and the kit's server starts with the declaration's
+// Presets (cluster/thermo PresetStore).
+type PresetStore interface {
+	LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error)
+	SavePresets(ctx context.Context, presets, activeHandle []byte) error
+}
+
 // Declare is the declaration of the Thermostat cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -348,6 +357,8 @@ type Declare struct {
 	HandleAtomicRequest func(ctx context.Context, req AtomicRequestRequest) (AtomicResponse, error)
 	// Sink is the host port the kit's server runs on ([Sink]).
 	Sink Sink
+	// PresetStore is the host port the kit's server runs on ([PresetStore]).
+	PresetStore PresetStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

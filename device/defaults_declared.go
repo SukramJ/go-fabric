@@ -12,15 +12,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/appliance"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/energy"
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	cddef "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	ctdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
@@ -68,6 +71,7 @@ func init() {
 		smokedef.ClusterID: newSmokeCoAlarmServer,
 		ctdef.ClusterID:    newCommodityTariffServer,
 		epdef.ClusterID:    newEnergyPreferenceServer,
+		bsdef.ClusterID:    newBooleanStateServer,
 	} {
 		selfHeldDefaults[id] = f
 	}
@@ -312,13 +316,41 @@ func newSmokeCoAlarmServer(b defaultBuild) (contract.ClusterServer, error) {
 // every [tariffSyncInterval]; the host sets the tariff through the typed
 // Set.
 func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
+	clk := b.clock
+	d, _ := b.ports.(ctdef.Declare)
+	if d.TimeSource != nil {
+		clk = sourceClock{Clock: b.clock, now: d.TimeSource.Now}
+	}
 	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
-		Features: energy.TariffFeature(b.opts.Features), Clock: b.clock, SyncInterval: tariffSyncInterval, DataVersion: b.cfg.DataVersion,
+		Features: energy.TariffFeature(b.opts.Features), Clock: clk, SyncInterval: tariffSyncInterval, DataVersion: b.cfg.DataVersion,
 	})
 	if err != nil {
 		return nil, notServed(err)
 	}
+	if n, ok := d.TimeSource.(contract.ChangeNotifier); ok {
+		n.OnMatterValueChanged(func() { _ = srv.SyncTime() }) // the device's lifetime: the source is the device's
+	}
 	return srv, nil
+}
+
+// sourceClock is a clock whose Now is a declared TimeSource's; its timers
+// run on the device's clock.
+type sourceClock struct {
+	clock.Clock
+	now func() time.Time
+}
+
+// Now implements [clock.Clock].
+func (c sourceClock) Now() time.Time { return c.now() }
+
+// newBooleanStateServer is the module's BooleanState server that holds
+// StateValue ([measurement.NewHeldBooleanState]) — matter.js's
+// BooleanStateServer, which emits StateChange on every change with the
+// ChangeEvent feature; the host sets StateValue through the typed Set.
+func newBooleanStateServer(b defaultBuild) (contract.ClusterServer, error) {
+	return measurement.NewHeldBooleanState(measurement.HeldBooleanStateConfig{
+		Features: bsdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion,
+	})
 }
 
 // newEnergyPreferenceServer is the module's EnergyPreference server
