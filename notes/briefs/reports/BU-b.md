@@ -114,6 +114,8 @@ Logs in the agent's scratchpad, read by grep; summary lines carry the HEAD.
 | the same with `chiptool-families-update` | 9f1fb4d0 (binary) | 0 | 162 passed, 41 skipped, 0 failed; only `testdata/pics/ep6.txt` changed (e023f46e); golden and `docs/certifiability.md` unchanged |
 | `make chiptool-test` | 9f1fb4d0 (binary) | 0 | |
 
+After the review (d2397eb8 … 8442b838): `make ci` up to cover-check, `make race` (no `DATA RACE`), the generator tests (goldens updated with `-update`), `make reachability` + `-check` (unreached 5), `make cite-check` (drift 263, 0 hard errors), `make testparity-check` — green at 9264da84, `make cover-check` and `reachability-check` green at 8442b838 after the filter's coverage. No chip-tool rerun: no composition change.
+
 ## Differences
 
 1. **The rewrite found four kit defects, fixed here** (each with a test):
