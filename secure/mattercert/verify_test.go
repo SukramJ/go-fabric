@@ -559,8 +559,8 @@ func TestVerifyAndExtractPubKey_Expired(t *testing.T) {
 	// seconds). NotAfter=2 maps to 2000-01-01T00:00:02Z (Unix
 	// 946684802); pick year 2033 so the comparison fails on the
 	// upper bound.
-	clock := mattercert.FixedTime{T: time.Unix(2000000000, 0)}
-	v, err := mattercert.NewVerifier(rootCert.PublicKey, clock)
+	fixed := mattercert.FixedTime{T: time.Unix(2000000000, 0)}
+	v, err := mattercert.NewVerifier(rootCert.PublicKey, fixed)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
