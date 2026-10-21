@@ -57,17 +57,16 @@ func TestStepTakesTheGeneratedRequest(t *testing.T) {
 	}
 }
 
-// refusingDevice is a device whose three setters fail.
+// refusingDevice is a device that refuses a rock, wind or airflow setting.
 type refusingDevice struct{ device }
 
 var errRefused = errors.New("refused")
 
-func (*refusingDevice) SetRockSetting(context.Context, fan.RockBitmap) error { return errRefused }
-
-func (*refusingDevice) SetWindSetting(context.Context, fan.WindBitmap) error { return errRefused }
-
-func (*refusingDevice) SetAirflowDirection(context.Context, fan.AirflowDirection) error {
-	return errRefused
+func (r *refusingDevice) ApplyFanSettings(ctx context.Context, p fandef.Patch) error {
+	if p.RockSetting != nil || p.WindSetting != nil || p.AirflowDirection != nil {
+		return errRefused
+	}
+	return r.device.ApplyFanSettings(ctx, p)
 }
 
 // TestSetterRefusalReachesTheController pins that a host refusing a

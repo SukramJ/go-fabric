@@ -65,7 +65,7 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("fancontrol: %w", errNoPort))
 	}
 	cfg := fan.Config{
-		Port: d.StateSource, Stepper: d.Stepper,
+		Source: d.StateSource, Stepper: d.Stepper,
 		Features: fan.Feature(b.opts.Features), DeviceType: b.deviceType, DataVersion: b.cfg.DataVersion,
 	}
 	if v, ok := consume8(b.initial, fandef.AttrFanModeSequence); ok {

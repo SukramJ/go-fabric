@@ -12,8 +12,8 @@ import (
 
 // portSource is the host port in the generated types — fandef.StateSource
 // and, optionally, fandef.Stepper, what fancontroldef.Declare carries — as
-// the [StateSource] the server reads and drives: FanState is the generated
-// State, every setting the server applies one ApplyFanSettings with a
+// the [source] the server reads and drives: FanState is the generated
+// fanState, every setting the server applies one ApplyFanSettings with a
 // Patch, the rock, wind and airflow settings included.
 type portSource struct{ p fandef.StateSource }
 
@@ -24,36 +24,36 @@ type portStepper struct {
 }
 
 var (
-	_ StateSource            = portSource{}
-	_ RockSetter             = portSource{}
-	_ WindSetter             = portSource{}
-	_ AirflowDirectionSetter = portSource{}
+	_ source            = portSource{}
+	_ rockSetter             = portSource{}
+	_ windSetter             = portSource{}
+	_ airflowSetter = portSource{}
 	_ Stepper                = portStepper{}
 )
 
 // sourceOf returns the port as the server's source.
-func sourceOf(p fandef.StateSource, step fandef.Stepper) StateSource {
+func sourceOf(p fandef.StateSource, step fandef.Stepper) source {
 	if step != nil {
 		return portStepper{portSource{p}, step}
 	}
 	return portSource{p}
 }
 
-// FanState implements [StateSource].
-func (s portSource) FanState() State {
+// FanState implements [source].
+func (s portSource) FanState() fanState {
 	st := s.p.FanState()
-	return State{
+	return fanState{
 		FanMode: st.FanMode, PercentSetting: st.PercentSetting, PercentCurrent: st.PercentCurrent,
 		SpeedSetting: st.SpeedSetting, SpeedCurrent: st.SpeedCurrent,
 		RockSetting: st.RockSetting, WindSetting: st.WindSetting, AirflowDirection: st.AirflowDirection,
 	}
 }
 
-// ApplyFanSettings implements [StateSource]: the settings as a Patch, a
+// ApplyFanSettings implements [source]: the settings as a Patch, a
 // null setting in Null.
-func (s portSource) ApplyFanSettings(ctx context.Context, set Settings) error {
+func (s portSource) ApplyFanSettings(ctx context.Context, set settings) error {
 	p := fandef.Patch{FanMode: set.FanMode}
-	setting := func(v *Setting, attr uint32) *uint8 {
+	setting := func(v *setting, attr uint32) *uint8 {
 		switch {
 		case v == nil:
 			return nil
@@ -70,17 +70,17 @@ func (s portSource) ApplyFanSettings(ctx context.Context, set Settings) error {
 	return s.p.ApplyFanSettings(ctx, p)
 }
 
-// SetRockSetting implements [RockSetter].
+// SetRockSetting implements [rockSetter].
 func (s portSource) SetRockSetting(ctx context.Context, rock RockBitmap) error {
 	return s.p.ApplyFanSettings(ctx, fandef.Patch{RockSetting: &rock})
 }
 
-// SetWindSetting implements [WindSetter].
+// SetWindSetting implements [windSetter].
 func (s portSource) SetWindSetting(ctx context.Context, wind WindBitmap) error {
 	return s.p.ApplyFanSettings(ctx, fandef.Patch{WindSetting: &wind})
 }
 
-// SetAirflowDirection implements [AirflowDirectionSetter].
+// SetAirflowDirection implements [airflowSetter].
 func (s portSource) SetAirflowDirection(ctx context.Context, dir AirflowDirection) error {
 	return s.p.ApplyFanSettings(ctx, fandef.Patch{AirflowDirection: &dir})
 }

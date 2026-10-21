@@ -38,6 +38,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	dishdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
@@ -133,25 +134,23 @@ func newSmokeAlarmServer() *alarm.Server {
 }
 
 // fanSource is a FanControl host that accepts every change.
-type fanSource struct{ st fan.State }
+type fanSource struct{ st fandef.State }
 
-func (f *fanSource) FanState() fan.State { return f.st }
+func (f *fanSource) FanState() fandef.State { return f.st }
 
-func (f *fanSource) ApplyFanSettings(_ context.Context, s fan.Settings) error {
-	if s.FanMode != nil {
-		f.st.FanMode = *s.FanMode
+func (f *fanSource) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
+	if p.FanMode != nil {
+		f.st.FanMode = *p.FanMode
 	}
-	if p := s.PercentSetting; p != nil && !p.Null {
-		f.st.PercentSetting = &p.Value
+	if p.PercentSetting != nil {
+		f.st.PercentSetting = p.PercentSetting
 	}
-	if v := s.SpeedSetting; v != nil && !v.Null {
-		f.st.SpeedSetting = &v.Value
+	if p.SpeedSetting != nil {
+		f.st.SpeedSetting = p.SpeedSetting
 	}
-	return nil
-}
-
-func (f *fanSource) SetRockSetting(_ context.Context, r fan.RockBitmap) error {
-	f.st.RockSetting = r
+	if p.RockSetting != nil {
+		f.st.RockSetting = *p.RockSetting
+	}
 	return nil
 }
 

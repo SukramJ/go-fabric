@@ -33,7 +33,7 @@ func (p *genPort) Step(_ context.Context, req fandef.StepRequest) error {
 }
 
 // TestPortInTheGeneratedTypes: a host port in the generated types
-// (Config.Port, Config.Stepper — what fancontroldef.Declare carries)
+// (Config.Source, Config.Stepper — what fancontroldef.Declare carries)
 // receives every setting as a Patch, a null setting in Null, the rock,
 // wind and airflow settings too, and the Step command as the generated
 // request.
@@ -42,7 +42,7 @@ func TestPortInTheGeneratedTypes(t *testing.T) {
 	ctx := context.Background()
 	p := &genPort{state: fandef.State{FanMode: fandef.FanModeLow, PercentCurrent: 33}}
 	srv, err := fan.NewServer(fan.Config{
-		Port: p, Stepper: p,
+		Source: p, Stepper: p,
 		Features:    fandef.FeatureRocking | fandef.FeatureWind | fandef.FeatureAirflowDirection | fandef.FeatureStep | fandef.FeatureAuto,
 		Sequence:    fandef.FanModeSequenceOffLowMedHighAuto,
 		RockSupport: fandef.RockRockLeftRight, WindSupport: fandef.WindSleepWind,

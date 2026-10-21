@@ -24,7 +24,7 @@ import (
 func TestTypedFanServer(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	d := &device{st: fan.State{FanMode: fan.FanModeLow, PercentSetting: u8(30), PercentCurrent: 30}}
+	d := &device{st: fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(30), PercentCurrent: 30}}
 	srv := newFull(t, d)
 	s := fandef.Wrap(srv)
 
@@ -116,7 +116,7 @@ func TestStepRequestForms(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	st := &stepper{plainDevice: plainDevice{d: &device{}}}
-	srv, err := fan.NewServer(fan.Config{Source: st, Features: fan.FeatureStep, Sequence: fan.SequenceOffLowMedHigh})
+	srv, err := fan.NewServer(fan.Config{Source: st, Stepper: st, Features: fan.FeatureStep, Sequence: fan.SequenceOffLowMedHigh})
 	if err != nil {
 		t.Fatal(err)
 	}

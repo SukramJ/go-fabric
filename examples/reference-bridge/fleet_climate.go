@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -16,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	hepaspec "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -40,12 +42,12 @@ type demoFan struct {
 	version cluster.DataVersionTracker
 
 	mu    sync.Mutex
-	state fan.State
+	state fandef.State
 }
 
 var (
 	_ contract.ChangeNotifier = (*demoFan)(nil)
-	_ fan.StateSource         = (*demoFan)(nil)
+	_ fandef.StateSource      = (*demoFan)(nil)
 )
 
 // fanSpeedMax is SpeedMax: ten speeds, so one speed is ten percent.
@@ -53,7 +55,7 @@ const fanSpeedMax uint8 = 10
 
 func newDemoFan(name string) *demoFan {
 	zero := uint8(0)
-	return &demoFan{name: name, state: fan.State{
+	return &demoFan{name: name, state: fandef.State{
 		FanMode: fan.FanModeOff, PercentSetting: &zero, SpeedSetting: &zero,
 	}}
 }
@@ -74,8 +76,8 @@ func (f *demoFan) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{srv}
 }
 
-// FanState implements [fan.StateSource].
-func (f *demoFan) FanState() fan.State {
+// FanState implements [fandef.StateSource].
+func (f *demoFan) FanState() fandef.State {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	st := f.state
@@ -89,10 +91,10 @@ var fanModePercent = map[fan.FanMode]uint8{
 	fan.FanModeLow: 30, fan.FanModeMedium: 60, fan.FanModeHigh: 100,
 }
 
-// ApplyFanSettings implements [fan.StateSource]. A nil field is one the
+// ApplyFanSettings implements [fandef.StateSource]. A nil field is one the
 // cluster's rules leave to the device; the device fills it from its own
 // mapping and reports the outcome through FanState.
-func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
+func (f *demoFan) ApplyFanSettings(_ context.Context, s fandef.Patch) error {
 	f.mu.Lock()
 	st := &f.state
 	if s.FanMode != nil {
@@ -103,12 +105,8 @@ func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
 			st.SpeedSetting = &speed
 		}
 	}
-	if s.PercentSetting != nil {
-		st.PercentSetting = settingPtr(*s.PercentSetting)
-	}
-	if s.SpeedSetting != nil {
-		st.SpeedSetting = settingPtr(*s.SpeedSetting)
-	}
+	st.PercentSetting = settingOf(st.PercentSetting, s.PercentSetting, fandef.AttrPercentSetting, s.Null)
+	st.SpeedSetting = settingOf(st.SpeedSetting, s.SpeedSetting, fandef.AttrSpeedSetting, s.Null)
 	// A percentage or speed with no mode decided by the rules lands on the
 	// named speed the device associates with it.
 	if s.FanMode == nil && st.PercentSetting != nil && *st.PercentSetting > 0 {
@@ -127,12 +125,18 @@ func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
 	return nil
 }
 
-func settingPtr(s fan.Setting) *uint8 {
-	if s.Null {
+// settingOf is the setting after a patch: null when the patch names the
+// attribute in Null, the patched value when it sets one, else unchanged.
+func settingOf(cur, v *uint8, attr uint32, null []uint32) *uint8 {
+	switch {
+	case slices.Contains(null, attr):
 		return nil
+	case v != nil:
+		out := *v
+		return &out
+	default:
+		return cur
 	}
-	v := s.Value
-	return &v
 }
 
 func percentToSpeed(p uint8) uint8 {
