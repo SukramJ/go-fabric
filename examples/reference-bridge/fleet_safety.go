@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
@@ -45,7 +47,7 @@ type demoSmokeAlarm struct {
 	battery *demoReading
 
 	mu    sync.Mutex
-	state alarm.State
+	state smokedef.State
 	srv   *alarm.Server
 }
 
@@ -61,7 +63,7 @@ func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 		battery: newDemoReading(name+" battery", contract.MeasurementBattery, 87),
 		// A device expires some years after it was made; TC-SMOKECO-2.1
 		// reads an ExpiryDate in the future (epoch-s, from 2000-01-01).
-		state: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard, ExpiryDate: smokeExpiryDate},
+		state: smokedef.State{SmokeSensitivityLevel: alarm.SensitivityStandard, ExpiryDate: smokeExpiryDate},
 	}
 }
 
@@ -107,7 +109,7 @@ func (a *demoSmokeAlarm) servers() []contract.ClusterServer {
 }
 
 // SmokeCOState implements [alarm.StateSource].
-func (a *demoSmokeAlarm) SmokeCOState() alarm.State {
+func (a *demoSmokeAlarm) SmokeCOState() smokedef.State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.state
@@ -122,10 +124,10 @@ const smokeSelfTestDuration = 5 * time.Second
 // ExpressedState back at Normal, AllClear (TC-SMOKECO-2.4 waits for both).
 func (a *demoSmokeAlarm) SelfTest(context.Context) error {
 	slog.Info("smoke.selftest", slog.String("device", a.name))
-	a.update(func(st *alarm.State) { st.TestInProgress = true })
+	a.update(func(st *smokedef.State) { st.TestInProgress = true })
 	time.AfterFunc(smokeSelfTestDuration, func() {
 		slog.Info("smoke.selftest_done", slog.String("device", a.name))
-		a.update(func(st *alarm.State) { st.TestInProgress = false })
+		a.update(func(st *smokedef.State) { st.TestInProgress = false })
 	})
 	return nil
 }
@@ -149,13 +151,13 @@ func (a *demoSmokeAlarm) pressTestButton(ctx context.Context) error {
 // SetSmokeSensitivityLevel implements [alarm.SensitivitySetter].
 func (a *demoSmokeAlarm) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
 	slog.Info("smoke.sensitivity", slog.String("device", a.name), slog.Int("level", int(level)))
-	a.update(func(st *alarm.State) { st.SmokeSensitivityLevel = level })
+	a.update(func(st *smokedef.State) { st.SmokeSensitivityLevel = level })
 	return nil
 }
 
 // update applies a change the device observed, then lets the server emit
 // the transition events and pushes the attributes.
-func (a *demoSmokeAlarm) update(change func(*alarm.State)) {
+func (a *demoSmokeAlarm) update(change func(*smokedef.State)) {
 	a.mu.Lock()
 	change(&a.state)
 	srv := a.srv

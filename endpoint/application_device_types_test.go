@@ -8,6 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -133,7 +135,7 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 // smokeReading is a host smoke/CO alarm's state port.
 type smokeReading struct{}
 
-func (smokeReading) SmokeCOState() alarm.State { return alarm.State{} }
+func (smokeReading) SmokeCOState() smokedef.State { return smokedef.State{} }
 
 // fanReading is a host fan's port.
 type fanReading struct{}

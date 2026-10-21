@@ -14,6 +14,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
@@ -66,7 +68,7 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 	if on, _ := f.contact.MatterBoolValue(); on {
 		t.Error("contact still closed")
 	}
-	if st := f.smoke.SmokeCOState(); !st.Unmounted || !st.Inoperative || !st.TestInProgress {
+	if st := f.smoke.SmokeCOState(); !st.Unmounted || st.ExpressedState != smokedef.ExpressedStateInoperative || !st.TestInProgress {
 		t.Errorf("smoke alarm after SetUnmounted and LongPress = %+v, want unmounted, inoperative and testing", st)
 	}
 	if !f.lock.IsJammed() {
@@ -87,25 +89,25 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 	f, _ := startFleetBridge(t)
 	cases := []struct {
 		trigger uint64
-		check   func(alarm.State) bool
+		check   func(smokedef.State) bool
 	}{
-		{triggerForceSmokeCritical, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmCritical }},
-		{triggerClearSmoke, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmNormal }},
-		{triggerForceCOWarning, func(s alarm.State) bool { return s.COState == alarm.AlarmWarning }},
-		{triggerForceLowBatteryCrit, func(s alarm.State) bool { return s.BatteryAlert == alarm.AlarmCritical }},
-		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.Muted }},
-		{triggerClearSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		{triggerForceSmokeCritical, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmCritical }},
+		{triggerClearSmoke, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmNormal }},
+		{triggerForceCOWarning, func(s smokedef.State) bool { return s.CoState == alarm.AlarmWarning }},
+		{triggerForceLowBatteryCrit, func(s smokedef.State) bool { return s.BatteryAlert == alarm.AlarmCritical }},
+		{triggerForceSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.Muted }},
+		{triggerClearSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.NotMuted }},
 		// A critical alarm cannot be muted (TC-SMOKECO-2.5 step 55).
-		{triggerForceSmokeCritical, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmCritical }},
-		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
-		{triggerClearSmoke, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmNormal }},
-		{triggerForceMalfunction, func(s alarm.State) bool { return s.HardwareFaultAlert }},
-		{triggerForceEndOfLife, func(s alarm.State) bool { return s.EndOfServiceAlert == alarm.EndOfServiceExpired }},
-		{triggerForceContaminationHigh, func(s alarm.State) bool { return s.ContaminationState == alarm.ContaminationCritical }},
-		{triggerForceSensitivityLow, func(s alarm.State) bool { return s.SmokeSensitivityLevel == alarm.SensitivityLow }},
-		{triggerForceUnmounted, func(s alarm.State) bool { return s.Unmounted }},
+		{triggerForceSmokeCritical, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmCritical }},
+		{triggerForceSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		{triggerClearSmoke, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmNormal }},
+		{triggerForceMalfunction, func(s smokedef.State) bool { return s.HardwareFaultAlert }},
+		{triggerForceEndOfLife, func(s smokedef.State) bool { return s.EndOfServiceAlert == alarm.EndOfServiceExpired }},
+		{triggerForceContaminationHigh, func(s smokedef.State) bool { return s.ContaminationState == alarm.ContaminationCritical }},
+		{triggerForceSensitivityLow, func(s smokedef.State) bool { return s.SmokeSensitivityLevel == alarm.SensitivityLow }},
+		{triggerForceUnmounted, func(s smokedef.State) bool { return s.Unmounted }},
 		// The endpoint bits CHIP clears (clearEndpointInEventTrigger).
-		{triggerForceSmokeInterconnect | 0x0000_0009_0000_0000, func(s alarm.State) bool { return s.InterconnectSmokeAlarm == alarm.AlarmWarning }},
+		{triggerForceSmokeInterconnect | 0x0000_0009_0000_0000, func(s smokedef.State) bool { return s.InterconnectSmokeAlarm == alarm.AlarmWarning }},
 	}
 	for _, tc := range cases {
 		if err := f.testEventTrigger(context.Background(), tc.trigger); err != nil {
@@ -242,7 +244,7 @@ func (c *eventCapture) all() []any {
 // BUSY (TC-SMOKECO-2.2 steps 9-10).
 func TestSmokeTestButtonIsIgnoredWhileAlarming(t *testing.T) {
 	a := newDemoSmokeAlarm("busy")
-	a.update(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })
+	a.update(func(s *smokedef.State) { s.SmokeState = alarm.AlarmWarning })
 	if err := a.pressTestButton(context.Background()); err != nil {
 		t.Fatalf("press while alarming: %v", err)
 	}

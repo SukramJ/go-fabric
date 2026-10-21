@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
@@ -156,7 +158,12 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		// An unmounted alarm cannot detect: it expresses Inoperative until it
 		// is mounted again (TC-SMOKECO-2.7 step 8).
 		unmounted := *cmd.Unmounted != 0
-		f.smoke.update(func(s *alarm.State) { s.Unmounted, s.Inoperative = unmounted, unmounted })
+		f.smoke.update(func(s *smokedef.State) {
+			s.Unmounted, s.ExpressedState = unmounted, smokedef.ExpressedStateNormal
+			if unmounted {
+				s.ExpressedState = smokedef.ExpressedStateInoperative
+			}
+		})
 		return nil
 	case "SimulateConfigurationVersionChange":
 		// CHIP's name (TC-BRBINFO-3.2): the bridged devices' functionality
@@ -404,7 +411,7 @@ const (
 // handler. It mirrors what CHIP's smoke-co-alarm app does for each trigger
 // (HandleSmokeCOTestEventTrigger): set one condition, or clear it.
 func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //nolint:gocyclo,cyclop,funlen // a flat dispatch table: one case per trigger
-	set := func(change func(*alarm.State)) error {
+	set := func(change func(*smokedef.State)) error {
 		f.smoke.update(change)
 		return nil
 	}
@@ -424,65 +431,65 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	}
 	switch trigger & smokeTriggerMask {
 	case triggerForceSmokeWarning:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.SmokeState = alarm.AlarmWarning })
 	case triggerForceSmokeCritical:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.SmokeState = alarm.AlarmCritical })
 	case triggerClearSmoke:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.SmokeState = alarm.AlarmNormal })
 	case triggerForceCOWarning:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.CoState = alarm.AlarmWarning })
 	case triggerForceCOCritical:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.CoState = alarm.AlarmCritical })
 	case triggerClearCO:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.CoState = alarm.AlarmNormal })
 	case triggerForceSmokeInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectSmokeAlarm = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.InterconnectSmokeAlarm = alarm.AlarmWarning })
 	case triggerClearSmokeInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectSmokeAlarm = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.InterconnectSmokeAlarm = alarm.AlarmNormal })
 	case triggerForceCOInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectCOAlarm = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.InterconnectCoAlarm = alarm.AlarmWarning })
 	case triggerClearCOInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectCOAlarm = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.InterconnectCoAlarm = alarm.AlarmNormal })
 	case triggerForceMalfunction:
-		return set(func(s *alarm.State) { s.HardwareFaultAlert = true })
+		return set(func(s *smokedef.State) { s.HardwareFaultAlert = true })
 	case triggerClearMalfunction:
-		return set(func(s *alarm.State) { s.HardwareFaultAlert = false })
+		return set(func(s *smokedef.State) { s.HardwareFaultAlert = false })
 	case triggerForceLowBatteryWarning:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.BatteryAlert = alarm.AlarmWarning })
 	case triggerForceLowBatteryCrit:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.BatteryAlert = alarm.AlarmCritical })
 	case triggerClearBatteryLevelLow:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.BatteryAlert = alarm.AlarmNormal })
 	case triggerForceContaminationHigh:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationCritical })
+		return set(func(s *smokedef.State) { s.ContaminationState = alarm.ContaminationCritical })
 	case triggerForceContaminationLow:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationLow })
+		return set(func(s *smokedef.State) { s.ContaminationState = alarm.ContaminationLow })
 	case triggerClearContamination:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationNormal })
+		return set(func(s *smokedef.State) { s.ContaminationState = alarm.ContaminationNormal })
 	case triggerForceSensitivityHigh:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityHigh })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = alarm.SensitivityHigh })
 	case triggerForceSensitivityLow:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityLow })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = alarm.SensitivityLow })
 	case triggerClearSensitivity:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityStandard })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = alarm.SensitivityStandard })
 	case triggerForceEndOfLife:
-		return set(func(s *alarm.State) { s.EndOfServiceAlert = alarm.EndOfServiceExpired })
+		return set(func(s *smokedef.State) { s.EndOfServiceAlert = alarm.EndOfServiceExpired })
 	case triggerClearEndOfLife:
-		return set(func(s *alarm.State) { s.EndOfServiceAlert = alarm.EndOfServiceNormal })
+		return set(func(s *smokedef.State) { s.EndOfServiceAlert = alarm.EndOfServiceNormal })
 	case triggerForceSilence:
 		// A critical alarm cannot be muted (the SmokeCoAlarm "mute" rule
 		// CHIP's smoke-co-alarm app applies; TC-SMOKECO-2.5 step 55).
-		return set(func(s *alarm.State) {
-			if s.SmokeState != alarm.AlarmCritical && s.COState != alarm.AlarmCritical {
+		return set(func(s *smokedef.State) {
+			if s.SmokeState != alarm.AlarmCritical && s.CoState != alarm.AlarmCritical {
 				s.DeviceMuted = alarm.Muted
 			}
 		})
 	case triggerClearSilence:
-		return set(func(s *alarm.State) { s.DeviceMuted = alarm.NotMuted })
+		return set(func(s *smokedef.State) { s.DeviceMuted = alarm.NotMuted })
 	case triggerForceUnmounted:
-		return set(func(s *alarm.State) { s.Unmounted = true })
+		return set(func(s *smokedef.State) { s.Unmounted = true })
 	case triggerClearUnmounted:
-		return set(func(s *alarm.State) { s.Unmounted = false })
+		return set(func(s *smokedef.State) { s.Unmounted = false })
 	}
 	return fmt.Errorf("test event trigger 0x%016X is not one this daemon implements", trigger)
 }

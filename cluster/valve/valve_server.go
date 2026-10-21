@@ -167,6 +167,10 @@ type Config struct {
 	// version survives server reconstruction; when nil an embedded
 	// tracker is used.
 	DataVersion *cluster.DataVersionTracker
+	// Events are the optional events the server declares
+	// (ValveStateChanged, ValveFault), which the host emits through the
+	// typed server's Emit.
+	Events []uint32
 }
 
 // Server implements [contract.ClusterServer] for
@@ -175,6 +179,8 @@ type Server struct {
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
 	src      StateSource
+	inst     *spec.Instance // the definition with Config.Events
+	hooks    spec.Hooks
 }
 
 // Compile-time assertions.
@@ -187,8 +193,21 @@ var (
 
 // NewServer constructs a [Server] over the host port in cfg.
 func NewServer(cfg Config) *Server {
-	return &Server{src: cfg.Source, ext: cfg.DataVersion}
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion, inst: instance}
+	if len(cfg.Events) > 0 {
+		// An event id outside the definition leaves the EventList empty,
+		// as without Events.
+		if inst, err := spec.New(valvedef.Definition, spec.Options{Features: featureMapNone, Events: cfg.Events}); err == nil {
+			s.inst = inst
+		}
+	}
+	s.hooks.Init(s.inst)
+	return s
 }
+
+// MatterEvents implements [contract.ClusterEventLister]: the optional
+// events Config.Events declares.
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // tracker returns the active DataVersion counter — the host's when it
 // supplied one, the embedded one otherwise.
@@ -276,6 +295,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+		return err
+	}
 	var seconds *uint32
 	if n, ok := v.(uint64); ok {
 		sec := uint32(n) //nolint:gosec // a nullable uint32 per ValidateWrite
@@ -299,6 +321,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // nothing in the port says a refusal came from a valve fault, and
 // claiming one would put a diagnosis on the wire that was never measured.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	switch cmdID {
 	case CmdOpen:
 		req, err := openRequestFrom(fields)

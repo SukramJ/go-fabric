@@ -29,6 +29,8 @@ import (
 	"errors"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -112,9 +114,9 @@ func newWindowCoveringServer() *cover.WindowCoveringServer {
 
 // smokeAlarmSource is a SmokeCoAlarm host that accepts every sensitivity
 // write and remembers the level.
-type smokeAlarmSource struct{ st alarm.State }
+type smokeAlarmSource struct{ st smokedef.State }
 
-func (s *smokeAlarmSource) SmokeCOState() alarm.State { return s.st }
+func (s *smokeAlarmSource) SmokeCOState() smokedef.State { return s.st }
 
 func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
 	s.st.SmokeSensitivityLevel = level
@@ -123,7 +125,7 @@ func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level ala
 
 func newSmokeAlarmServer() *alarm.Server {
 	srv, err := alarm.NewServer(alarm.Config{
-		Source:   &smokeAlarmSource{st: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
+		Source:   &smokeAlarmSource{st: smokedef.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
 		Features: alarm.FeatureSmokeAlarm,
 		Optional: alarm.OptionalSmokeSensitivityLevel,
 	})

@@ -232,7 +232,7 @@ var optionalAttributes = []struct {
 // (SmokeCoAlarmServer.ts:20-41) — everything Normal, nothing in progress
 // or faulted — except SmokeSensitivityLevel, whose zero is High; a host
 // that serves that attribute reports its real level.
-type State struct {
+type snapshot struct {
 	SmokeState             AlarmState
 	COState                AlarmState
 	BatteryAlert           AlarmState
@@ -259,9 +259,14 @@ type State struct {
 // StateSource is the host port. SmokeCOState is read on every attribute
 // read and on every [Server.Refresh]; it must be cheap and must not
 // block on the device.
-type StateSource interface {
-	SmokeCOState() State
-}
+//
+// It is the generated port (smokecoalarmdef.StateSource): the source
+// reports the generated State, and an ExpressedState of Inoperative in it
+// is the host's "the sensor cannot detect" ([snapshot] Inoperative); any
+// other ExpressedState is the server's to derive. A source that is a
+// [contract.ChangeNotifier] has the server refresh — emit the events of
+// the change — before each of its notifications reaches the bridge.
+type StateSource = sdef.StateSource
 
 // SelfTester is the optional capability that enables SelfTestRequest.
 // A source without it leaves the command out of AcceptedCommandList, as
@@ -269,15 +274,11 @@ type StateSource interface {
 // for. SelfTest starts the test and returns; the host then reports
 // TestInProgress true until the test finishes, and the transition back
 // to false is what emits SelfTestComplete.
-type SelfTester interface {
-	SelfTest(ctx context.Context) error
-}
+type SelfTester = sdef.SelfTester
 
 // SensitivitySetter is the capability [OptionalSmokeSensitivityLevel]
 // requires: a write that reaches the device.
-type SensitivitySetter interface {
-	SetSmokeSensitivityLevel(ctx context.Context, level Sensitivity) error
-}
+type SensitivitySetter = sdef.SensitivitySetter
 
 // DefaultExpressedStatePriority is the order ExpressedState is derived
 // in when the host gives none: the condition earliest in the list that
@@ -329,6 +330,7 @@ type Server struct {
 	optional Optional
 	priority []ExpressedState
 	inst     *spec.Instance
+	hooks    spec.Hooks
 
 	// mu guards emitter, endpoint, last and lastExpr.
 	mu       sync.Mutex
@@ -336,7 +338,7 @@ type Server struct {
 	endpoint uint16
 	// last is the snapshot the previous Refresh saw; events are the
 	// differences between it and the next one.
-	last     State
+	last     snapshot
 	lastExpr ExpressedState
 }
 
@@ -405,8 +407,44 @@ func NewServer(cfg Config) (*Server, error) {
 		}
 		s.priority = slices.Clone(cfg.ExpressedStatePriority)
 	}
+	s.hooks.Init(inst)
 	return s, nil
 }
+
+// SetAttributes implements spec.AttributeSetter: every attribute is the
+// StateSource's — the host changes the alarm there and notifies through
+// the source's contract.ChangeNotifier ([spec.ErrNotHeld]).
+func (*Server) SetAttributes(values map[uint32]any) error {
+	for id := range values {
+		return fmt.Errorf("%w: alarm: attribute 0x%04X is the StateSource's", spec.ErrNotHeld, id)
+	}
+	return nil
+}
+
+// Handle implements spec.CommandRegistrar ([spec.Hooks]).
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.hooks.Handle(cmdID, fn) }
+
+// Emit implements spec.EventEmitting: an event of the EventList the host
+// raises itself ([spec.Hooks]); the state's events are the server's
+// ([Server.Refresh]).
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.hooks.Emit(endpoint, eventID, data)
+}
+
+// SetBeforeWrite implements spec.BeforeWriteSetter: the veto of a
+// controller's SmokeSensitivityLevel write, before the source takes it.
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.hooks.SetBeforeWrite(fn)
+}
+
+// The typed server's optional interfaces.
+var (
+	_ spec.AttributeSetter    = (*Server)(nil)
+	_ spec.CommandRegistrar   = (*Server)(nil)
+	_ spec.EventEmitting      = (*Server)(nil)
+	_ spec.BeforeWriteSetter  = (*Server)(nil)
+	_ contract.ChangeNotifier = (*Server)(nil)
+)
 
 // instanceOptions declares the optional elements cfg serves: the optional
 // attributes, SelfTestRequest when the source can run one, AlarmMuted and
@@ -472,17 +510,42 @@ func (s *Server) canExpress(e ExpressedState) bool {
 
 // state reads the host snapshot, or the matter.js initial state without
 // a source.
-func (s *Server) state() State {
+func (s *Server) state() snapshot {
 	if s.src == nil {
-		return State{SmokeSensitivityLevel: SensitivityStandard}
+		return snapshot{SmokeSensitivityLevel: SensitivityStandard}
 	}
-	return s.src.SmokeCOState()
+	return snapshotOf(s.src.SmokeCOState())
+}
+
+// snapshotOf is the server's reading of the source's generated State.
+func snapshotOf(st sdef.State) snapshot {
+	return snapshot{
+		SmokeState: st.SmokeState, COState: st.CoState, BatteryAlert: st.BatteryAlert, DeviceMuted: st.DeviceMuted,
+		TestInProgress: st.TestInProgress, HardwareFaultAlert: st.HardwareFaultAlert, EndOfServiceAlert: st.EndOfServiceAlert,
+		InterconnectSmokeAlarm: st.InterconnectSmokeAlarm, InterconnectCOAlarm: st.InterconnectCoAlarm,
+		ContaminationState: st.ContaminationState, SmokeSensitivityLevel: st.SmokeSensitivityLevel,
+		ExpiryDate: st.ExpiryDate, Unmounted: st.Unmounted, Inoperative: st.ExpressedState == ExpressedInoperative,
+	}
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// source's: the server refreshes — emits the events of the change — and
+// then cb runs. A source that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || cb == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.Refresh()
+		cb()
+	})
 }
 
 // holds reports whether the condition behind e is present in st —
 // the "attribute corresponding to the value shall NOT be Normal" rule
 // (resource :30-34) read from the other side.
-func holds(e ExpressedState, st State) bool {
+func holds(e ExpressedState, st snapshot) bool {
 	switch e {
 	case ExpressedSmokeAlarm:
 		return alarming(st.SmokeState)
@@ -510,7 +573,12 @@ func holds(e ExpressedState, st State) bool {
 // priority order that holds, otherwise Normal. Only conditions the
 // configuration can express are considered, so a value the
 // ExpressedStateEnum conformance forbids never reaches the wire.
-func (s *Server) ExpressedStateOf(st State) ExpressedState {
+func (s *Server) ExpressedStateOf(st sdef.State) ExpressedState {
+	return s.expressedOf(snapshotOf(st))
+}
+
+// expressedOf is [Server.ExpressedStateOf] of the server's reading.
+func (s *Server) expressedOf(st snapshot) ExpressedState {
 	if st.Inoperative {
 		return ExpressedInoperative
 	}
@@ -541,7 +609,7 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	st := s.state()
 	switch attrID {
 	case AttrExpressedState:
-		return uint8(s.ExpressedStateOf(st)), true
+		return uint8(s.expressedOf(st)), true
 	case AttrSmokeState:
 		return uint8(st.SmokeState), true
 	case AttrCOState:
@@ -580,6 +648,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+		return err
+	}
 	n, _ := v.(uint64)                                                           // an enum8 per ValidateWrite
 	setter, _ := s.src.(SensitivitySetter)                                       // guaranteed by NewServer
 	if err := setter.SetSmokeSensitivityLevel(ctx, Sensitivity(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
@@ -608,12 +679,15 @@ var selfTestBusy = []ExpressedState{
 // BUSY". Otherwise the request reaches the host; on success the server
 // refreshes, so the TestInProgress / Testing the host now reports is
 // diffed from here on.
-func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, error) {
+func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	tester, ok := s.src.(SelfTester)
 	if cmdID != CmdSelfTestRequest || !ok {
 		return nil, im.UnsupportedCommandf("alarm: unknown command 0x%02X", cmdID)
 	}
-	if slices.Contains(selfTestBusy, s.ExpressedStateOf(s.state())) {
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
+	if slices.Contains(selfTestBusy, s.expressedOf(s.state())) {
 		return nil, statusError{im.StatusBusy, "alarm: SelfTestRequest while alarming or testing"}
 	}
 	if err := tester.SelfTest(ctx); err != nil {
@@ -650,6 +724,7 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
+	s.hooks.SetMatterEventEmitter(emitter)
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the
@@ -702,7 +777,7 @@ type pendingEvent struct {
 // be told about is not replayed later as if it had just happened.
 func (s *Server) Refresh() {
 	st := s.state()
-	expr := s.ExpressedStateOf(st)
+	expr := s.expressedOf(st)
 
 	s.mu.Lock()
 	prev, prevExpr := s.last, s.lastExpr
@@ -721,7 +796,7 @@ func (s *Server) Refresh() {
 
 // transitions lists the events between two snapshots, in event-id order
 // with AllClear last.
-func (s *Server) transitions(prev, cur State, prevExpr, curExpr ExpressedState) []pendingEvent {
+func (s *Server) transitions(prev, cur snapshot, prevExpr, curExpr ExpressedState) []pendingEvent {
 	var out []pendingEvent
 	severity := func(id uint32, was, now AlarmState) {
 		if now != was && alarming(now) {

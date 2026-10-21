@@ -19,6 +19,8 @@ import (
 	"sync"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
 	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
 	matterpump "github.com/SukramJ/go-fabric/cluster/pump"
@@ -161,11 +163,11 @@ func (h *secureHarness) readEvents(endpointID uint16, cluster uint32) []struct {
 // smokeDevice is a host smoke/CO alarm.
 type smokeDevice struct {
 	mu        sync.Mutex
-	st        matteralarm.State
+	st        smokedef.State
 	selfTests int
 }
 
-func (d *smokeDevice) SmokeCOState() matteralarm.State {
+func (d *smokeDevice) SmokeCOState() smokedef.State {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.st
@@ -188,7 +190,7 @@ func (d *smokeDevice) SetSmokeSensitivityLevel(_ context.Context, level matteral
 
 func TestSmokeCoAlarmOverTheWire(t *testing.T) {
 	t.Parallel()
-	dev := &smokeDevice{st: matteralarm.State{SmokeSensitivityLevel: matteralarm.SensitivityStandard}}
+	dev := &smokeDevice{st: smokedef.State{SmokeSensitivityLevel: matteralarm.SensitivityStandard}}
 	srv, err := matteralarm.NewServer(matteralarm.Config{
 		Source:   dev,
 		Features: matteralarm.FeatureSmokeAlarm | matteralarm.FeatureCOAlarm,

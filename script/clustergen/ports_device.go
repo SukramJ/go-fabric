@@ -44,6 +44,35 @@ var devicePorts = map[string]portSet{
 			"}",
 		},
 	},
+	"SmokeCoAlarm": {
+		ports: []portDecl{{
+			name: "StateSource",
+			doc: []string{
+				"StateSource is the alarm: SmokeCOState reports its state, read on",
+				"every attribute read; the kit's server derives ExpressedState from",
+				"it by the priority order — an ExpressedState of Inoperative is the",
+				"host's \"the sensor cannot detect\" — and emits the events of each",
+				"change when the source, a contract.ChangeNotifier, reports one. A",
+				"source that also implements SelfTester takes SelfTestRequest, one",
+				"that implements SensitivitySetter the SmokeSensitivityLevel write",
+				"(cluster/alarm).",
+			},
+			methods: []string{"SmokeCOState() State"},
+		}},
+		types: []string{
+			"// SelfTester is a StateSource that runs the self-test: SelfTest starts",
+			"// it and returns; the source then reports TestInProgress until it ends.",
+			"type SelfTester interface {",
+			"\tSelfTest(ctx context.Context) error",
+			"}",
+			"",
+			"// SensitivitySetter is a StateSource that takes a controller's",
+			"// SmokeSensitivityLevel write.",
+			"type SensitivitySetter interface {",
+			"\tSetSmokeSensitivityLevel(ctx context.Context, level SensitivityEnum) error",
+			"}",
+		},
+	},
 	"ValveConfigurationAndControl": {ports: []portDecl{{
 		name: "StateSource",
 		doc: []string{

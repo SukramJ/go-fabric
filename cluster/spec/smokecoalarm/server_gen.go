@@ -183,6 +183,30 @@ func (s *Server) EmitAllClear(endpoint uint16, data AllClearEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data)
 }
 
+// SelfTester is a StateSource that runs the self-test: SelfTest starts
+// it and returns; the source then reports TestInProgress until it ends.
+type SelfTester interface {
+	SelfTest(ctx context.Context) error
+}
+
+// SensitivitySetter is a StateSource that takes a controller's
+// SmokeSensitivityLevel write.
+type SensitivitySetter interface {
+	SetSmokeSensitivityLevel(ctx context.Context, level SensitivityEnum) error
+}
+
+// StateSource is the alarm: SmokeCOState reports its state, read on
+// every attribute read; the kit's server derives ExpressedState from
+// it by the priority order — an ExpressedState of Inoperative is the
+// host's "the sensor cannot detect" — and emits the events of each
+// change when the source, a contract.ChangeNotifier, reports one. A
+// source that also implements SelfTester takes SelfTestRequest, one
+// that implements SensitivitySetter the SmokeSensitivityLevel write
+// (cluster/alarm).
+type StateSource interface {
+	SmokeCOState() State
+}
+
 // Declare is the declaration of the SmokeCoAlarm cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -207,6 +231,8 @@ type Declare struct {
 	// HandleSelfTestRequest handles the SelfTestRequest command in place of the server
 	// (Server.HandleSelfTestRequest), inline; an optional command it handles is accepted.
 	HandleSelfTestRequest func(ctx context.Context, req SelfTestRequestRequest) (struct{}, error)
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
