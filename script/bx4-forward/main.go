@@ -118,7 +118,7 @@ func load(root string, patterns []string) (map[string]*packages.Package, error) 
 	out := make(map[string]*packages.Package, len(pkgs))
 	for _, p := range pkgs {
 		if len(p.Errors) > 0 {
-			return nil, fmt.Errorf("bx4-forward: %s: %v", p.PkgPath, p.Errors[0])
+			return nil, fmt.Errorf("bx4-forward: %s: %w", p.PkgPath, p.Errors[0])
 		}
 		out[p.PkgPath] = p
 	}

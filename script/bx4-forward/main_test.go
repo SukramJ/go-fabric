@@ -41,7 +41,7 @@ func TestForwardFilesAreCurrent(t *testing.T) {
 // alias of the new type, a constant has the same value, a variable or a
 // function is a variable of the identical type.
 func TestEveryExportHasItsForward(t *testing.T) {
-	var paths []string
+	paths := make([]string, 0, 2*len(moves))
 	for _, m := range moves {
 		paths = append(paths, "./"+m.old, "./"+m.new)
 	}
