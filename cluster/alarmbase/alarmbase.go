@@ -146,24 +146,33 @@ var (
 		notify: func(a, i, s, m uint32) any {
 			return dwa.NotifyEvent{Active: dwa.AlarmBitmap(a), Inactive: dwa.AlarmBitmap(i), State: dwa.AlarmBitmap(s), Mask: dwa.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(dwa.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(dwa.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[dwa.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[dwa.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 	refrigerator = variant{
 		def: rfa.Definition,
 		notify: func(a, i, s, m uint32) any {
 			return rfa.NotifyEvent{Active: rfa.AlarmBitmap(a), Inactive: rfa.AlarmBitmap(i), State: rfa.AlarmBitmap(s), Mask: rfa.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(rfa.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(rfa.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[rfa.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[rfa.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 	temperature = variant{
 		def: tma.Definition,
 		notify: func(a, i, s, m uint32) any {
 			return tma.NotifyEvent{Active: tma.AlarmBitmap(a), Inactive: tma.AlarmBitmap(i), State: tma.AlarmBitmap(s), Mask: tma.AlarmBitmap(m)}
 		},
-		resetOf: func(f any) (uint32, bool) { r, ok := f.(tma.ResetRequest); return uint32(r.Alarms), ok },
-		maskOf:  func(f any) (uint32, bool) { r, ok := f.(tma.ModifyEnabledAlarmsRequest); return uint32(r.Mask), ok },
+		resetOf: func(f any) (uint32, bool) { r, ok := spec.RequestOf[tma.ResetRequest](f); return uint32(r.Alarms), ok },
+		maskOf: func(f any) (uint32, bool) {
+			r, ok := spec.RequestOf[tma.ModifyEnabledAlarmsRequest](f)
+			return uint32(r.Mask), ok
+		},
 	}
 )
 
@@ -187,6 +196,9 @@ var thresholdAttrs = []uint32{
 // AlarmBase rules.
 type Server struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (typed.go).
+	spec.SelfHeld
 
 	v         variant
 	srv       *spec.Server
@@ -274,7 +286,7 @@ func newServer(v variant, cfg Config) (*Server, error) {
 	if err := srv.SetAttributes(initial); err != nil {
 		return nil, fmt.Errorf("alarmbase: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	// The initial Mask, then the initial State, as chip's integration sets
 	// them (dishwasher-alarm-server/CodegenIntegration.cpp:158-167). No
 	// emitter is attached yet, so the State's Notify goes nowhere, as
@@ -304,10 +316,11 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
-// MatterInvoke dispatches an accepted command; the generated server
+// MatterInvoke dispatches an accepted command — to the host's handler
+// when one is registered ([spec.SelfHeld.Handle]); the generated server
 // answers any other with UNSUPPORTED_COMMAND.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].

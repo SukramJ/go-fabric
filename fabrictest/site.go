@@ -50,7 +50,11 @@ type Options struct {
 	// run on, since "nothing ran for 10 ms" is a statement about the
 	// process; nil is [clock.System].
 	Wall clock.Clock
-	// Logger receives the hosts' logs; nil discards them.
+	// Logger receives the logs of the hosts the site builds — the nodes,
+	// the controllers and their components; nil discards those. A
+	// component that logs to slog.Default() rather than to the logger it
+	// is given (OperationalCredentials' matter.opcreds.cmd lines, gate 1
+	// G1-18) still reaches the process's default logger.
 	Logger *slog.Logger
 }
 

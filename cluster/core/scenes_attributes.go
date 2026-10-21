@@ -6,7 +6,9 @@ package core
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -350,15 +352,14 @@ func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneCluste
 			}
 		case 0x0008:
 			if v, ok := get(cv, 0x0000); ok && !v.Null {
-				tt := tenths
-				_, _ = srv.MatterInvoke(ctx, 0x00, wire.MoveToLevelRequest{
-					Level: uint8(v.Unsigned), TransitionTime: &tt, OptionsMask: 1, OptionsOverride: 1, //nolint:gosec // bounded by 254
+				_, _ = srv.MatterInvoke(ctx, lvldef.CmdMoveToLevel, lvldef.MoveToLevelRequest{
+					Level: uint8(v.Unsigned), TransitionTime: spec.ValueOf(tenths), OptionsMask: 1, OptionsOverride: 1, //nolint:gosec // bounded by 254
 				})
 			}
 		case 0x0300:
 			mode, hasMode := get(cv, 0x4001)
 			if ct, ok := get(cv, 0x0007); ok && !ct.Null && (!hasMode || mode.Unsigned == 2) {
-				_, _ = srv.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{
+				_, _ = srv.MatterInvoke(ctx, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{
 					ColorTemperatureMireds: uint16(ct.Unsigned), TransitionTime: tenths, OptionsMask: 1, OptionsOverride: 1, //nolint:gosec // bounded by 65279
 				})
 				continue
@@ -366,7 +367,7 @@ func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneCluste
 			hue, okH := get(cv, 0x4000)
 			sat, okS := get(cv, 0x0001)
 			if okH && okS && !hue.Null && !sat.Null && (!hasMode || mode.Unsigned == 0 || mode.Unsigned == 3) {
-				_, _ = srv.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToHueAndSaturation, wire.MoveToHueAndSaturationRequest{
+				_, _ = srv.MatterInvoke(ctx, ccdef.CmdMoveToHueAndSaturation, ccdef.MoveToHueAndSaturationRequest{
 					Hue: uint8(hue.Unsigned >> 8), Saturation: uint8(sat.Unsigned), TransitionTime: tenths, //nolint:gosec // bounded
 					OptionsMask: 1, OptionsOverride: 1,
 				})

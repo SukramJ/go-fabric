@@ -473,7 +473,7 @@ func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t
 		fields any
 	}{
 		{"bridge tag map", map[uint8]any{0: uint64(2500)}},
-		{"typed request", clusterwire.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}},
+		{"typed request", clusterwire.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

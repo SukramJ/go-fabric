@@ -180,7 +180,7 @@ func rebuild(t *testing.T, name string, c *changer) *modebase.Server {
 }
 
 // changeRequestTo asks for the second supported mode, never the current one.
-func changeRequestTo(srv *modebase.Server) clusterwire.ChangeToModeRequest {
+func changeRequestTo(srv *modebase.Server) any {
 	v, _ := srv.MatterRead(modebase.AttrSupportedModes)
-	return clusterwire.ChangeToModeRequest{NewMode: v.([]clusterwire.ModeOptionStruct)[1].Mode}
+	return changeRequest(srv, v.([]clusterwire.ModeOptionStruct)[1].Mode)
 }

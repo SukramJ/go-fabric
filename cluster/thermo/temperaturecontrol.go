@@ -273,7 +273,7 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("thermo: command 0x%02X is not supported", cmdID)
 	}
-	req, ok := fields.(tc.SetTemperatureRequest)
+	req, ok := spec.RequestOf[tc.SetTemperatureRequest](fields)
 	if !ok {
 		return nil, invalidCommand(fmt.Sprintf("thermo: SetTemperature fields %T", fields))
 	}

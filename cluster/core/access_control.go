@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
@@ -697,8 +698,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		//  11. DeviceType and Endpoint on the same Target are mutually exclusive.
 		//  12. At least one of (Cluster, Endpoint, DeviceType) must be set on each Target.
 		// Limit failures → ResourceExhausted; semantic failures →
-		// ConstraintError (both via the dispatcher's `writeErrorStatus`
-		// substring matching).
+		// ConstraintError (both typed, spec.Errorf).
 		// Every entry in the list is persisted under the writer's fabric
 		// (the stamp below), so every entry counts against the writer's
 		// per-fabric limit — the FabricIndex a client puts on the wire is
@@ -709,14 +709,14 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// entries tagged with a foreign index pass the limit and then be
 		// stored, all of them, on the writer's fabric.
 		if fabricACLs := len(entries); fabricACLs > int(accessControlEntriesPerFabricLimit) {
-			return fmt.Errorf("core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, accessControlEntriesPerFabricLimit)
+			return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, accessControlEntriesPerFabricLimit)
 		}
 		for i, e := range entries {
 			if len(e.Subjects) > int(accessControlSubjectsPerEntry) {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), accessControlSubjectsPerEntry)
+				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), accessControlSubjectsPerEntry)
 			}
 			if len(e.Targets) > int(accessControlTargetsPerEntry) {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), accessControlTargetsPerEntry)
+				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), accessControlTargetsPerEntry)
 			}
 			// Enum validity: reject out-of-range Privilege / AuthMode values
 			// before the semantic checks below. matter.js enforces these via
@@ -725,34 +725,34 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// Privilege=7 / AuthMode=9. Mirrors chip AccessControl.cpp
 			// Entry::IsValid() privilege/authMode guards.
 			if e.Privilege < accessControlPrivilegeView || e.Privilege > accessControlPrivilegeAdminister {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: constraint error: Privilege=%d not in 1..5 (View..Administer)", i, e.Privilege)
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Privilege=%d not in 1..5 (View..Administer)", i, e.Privilege)
 			}
 			if e.AuthMode < accessControlAuthModePASE || e.AuthMode > accessControlAuthModeGroup {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: constraint error: AuthMode=%d not in 1..3 (PASE/CASE/Group)", i, e.AuthMode)
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=%d not in 1..3 (PASE/CASE/Group)", i, e.AuthMode)
 			}
 			if e.AuthMode == accessControlAuthModePASE {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: constraint error: AuthMode=PASE is forbidden in ACL", i)
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: AuthMode=PASE is forbidden in ACL", i)
 			}
 			if e.AuthMode == accessControlAuthModeGroup && e.Privilege == accessControlPrivilegeAdminister {
-				return fmt.Errorf("core: AccessControl.ACL[%d] write: constraint error: Group authmode + Administer privilege rejected", i)
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d] write: constraint error: Group authmode + Administer privilege rejected", i)
 			}
 			// Subject range validation per AuthMode.
 			// Mirrors chip src/access/AccessControl.cpp:735 IsValidCaseNodeId /
 			// IsValidGroupNodeId per-subject checks inside Entry::IsValid().
 			for j, subj := range e.Subjects {
 				if subj == 0 {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: subject 0 is the undefined node ID", i, j)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: subject 0 is the undefined node ID", i, j)
 				}
 				if e.AuthMode == accessControlAuthModeCASE {
 					// CASE subjects: operational node ID or CASE Auth Tag (CAT).
 					if !aclIsValidCASESubject(subj) {
-						return fmt.Errorf("core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: CASE subject 0x%016X is not a valid operational node ID or CASE auth tag", i, j, subj)
+						return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: CASE subject 0x%016X is not a valid operational node ID or CASE auth tag", i, j, subj)
 					}
 				}
 				if e.AuthMode == accessControlAuthModeGroup {
 					// Group subjects: a Group ID, 0x0001 .. 0xFFFF.
 					if !aclIsValidGroupSubject(subj) {
-						return fmt.Errorf("core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X is not a group id", i, j, subj)
+						return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X is not a group id", i, j, subj)
 					}
 				}
 			}
@@ -762,10 +762,10 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// Additionally validate cluster/endpoint/device-type ID ranges.
 			for j, t := range e.Targets {
 				if t.DeviceType != nil && t.Endpoint != nil {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType and Endpoint mutually exclusive", i, j)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType and Endpoint mutually exclusive", i, j)
 				}
 				if t.Cluster == nil && t.Endpoint == nil && t.DeviceType == nil {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Targets[%d] write: constraint error: at least one of Cluster/Endpoint/DeviceType must be set", i, j)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: at least one of Cluster/Endpoint/DeviceType must be set", i, j)
 				}
 				// Cluster / Endpoint / DeviceType ID validity, in the same
 				// order matter.js checks them. Mirrors matter.js
@@ -775,16 +775,16 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				// AccessControl.cpp:746-748 IsValidClusterId / IsValidEndpointId /
 				// IsValidDeviceTypeId guards in Entry::IsValid().
 				if t.Cluster != nil && !aclIsValidClusterID(*t.Cluster) {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Targets[%d] write: constraint error: Cluster 0x%08X is not a valid ClusterId", i, j, *t.Cluster)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: Cluster 0x%08X is not a valid ClusterId", i, j, *t.Cluster)
 				}
 				// EndpointNumber.isValid rejects 0xFFFF (the reserved wildcard);
 				// a uint16 endpoint cannot exceed that, so 0xFFFF is the only
 				// invalid value.
 				if t.Endpoint != nil && *t.Endpoint == 0xFFFF {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Targets[%d] write: constraint error: EndpointId 0xFFFF is reserved", i, j)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: EndpointId 0xFFFF is reserved", i, j)
 				}
 				if t.DeviceType != nil && !aclIsValidDeviceTypeID(*t.DeviceType) {
-					return fmt.Errorf("core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType 0x%08X is not a valid DeviceTypeId", i, j, *t.DeviceType)
+					return spec.Errorf(im.StatusConstraintError, "core: AccessControl.ACL[%d].Targets[%d] write: constraint error: DeviceType 0x%08X is not a valid DeviceTypeId", i, j, *t.DeviceType)
 				}
 			}
 		}
@@ -897,11 +897,11 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
 		// most one AccessControlExtensionStruct.
 		if len(entries) > 1 {
-			return fmt.Errorf("core: AccessControl.Extension write: constraint error: a fabric may hold at most one entry, got %d", len(entries))
+			return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension write: constraint error: a fabric may hold at most one entry, got %d", len(entries))
 		}
 		for i, e := range entries {
 			if len(e.Data) > 128 {
-				return fmt.Errorf("core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
 			}
 			// Data must itself decode as a well-formed TLV List — mirrors
 			// matter.js AccessControlServer.ts:424-441
@@ -909,7 +909,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			// that fails this is rejected rather than stored, so a
 			// garbage write cannot wedge a later fabric-scoped read.
 			if err := validateAccessControlExtensionData(e.Data); err != nil {
-				return fmt.Errorf("core: AccessControl.Extension[%d] write: constraint error: %w", i, err)
+				return spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: %w", i, err)
 			}
 		}
 		_, ctxFabric := im.FabricFilterFromContext(ctx)

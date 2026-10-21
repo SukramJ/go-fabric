@@ -179,6 +179,9 @@ type evseSession struct {
 // EvseServer implements [contract.ClusterServer] for EnergyEvse.
 type EvseServer struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (evse_typed.go).
+	spec.SelfHeld
 
 	srv     *spec.Server
 	version *cluster.DataVersionTracker
@@ -272,7 +275,7 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.srv, s.Instance = srv, srv.Instance
+	s.srv, s.Instance, s.SelfHeld = srv, srv.Instance, spec.NewSelfHeld(srv)
 	values := map[uint32]any{
 		evse.AttrState:                EvseNotPluggedIn,
 		evse.AttrSupplyState:          SupplyDisabled,
@@ -1379,7 +1382,8 @@ func (s *EvseServer) MatterWrite(ctx context.Context, attrID uint32, value any) 
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
-// MatterInvoke dispatches the commands.
+// MatterInvoke dispatches the commands — to the host's handler when one
+// is registered ([spec.SelfHeld.Handle]).
 func (s *EvseServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }

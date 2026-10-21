@@ -79,25 +79,25 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSetpointRaiseLower(func(context.Context, SetpointRaiseLowerRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetpointRaiseLower(func(context.Context, SetpointRaiseLowerRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetpointRaiseLower: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetActiveScheduleRequest(func(context.Context, SetActiveScheduleRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetActiveScheduleRequest(func(context.Context, SetActiveScheduleRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetActiveScheduleRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetActivePresetRequest(func(context.Context, SetActivePresetRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetActivePresetRequest(func(context.Context, SetActivePresetRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetActivePresetRequest: a command the server does not accept was registered")
 	}
 	if err := s.HandleAddThermostatSuggestion(func(context.Context, AddThermostatSuggestionRequest) (AddThermostatSuggestionResponse, error) {
 		return AddThermostatSuggestionResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleAddThermostatSuggestion: a command the server does not accept was registered")
 	}
-	if err := s.HandleRemoveThermostatSuggestion(func(context.Context, RemoveThermostatSuggestionRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRemoveThermostatSuggestion(func(context.Context, RemoveThermostatSuggestionRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRemoveThermostatSuggestion: a command the server does not accept was registered")
 	}
-	if err := s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAtomicRequest(func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil }); err == nil {
+		t.Error("HandleAtomicRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitSystemModeChange(0, SystemModeChangeEvent{})             // not in the empty definition's EventList: refused
 	_ = s.EmitLocalTemperatureChange(0, LocalTemperatureChangeEvent{}) // not in the empty definition's EventList: refused

@@ -680,7 +680,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if cmdID != CmdChangeToMode || !s.inst.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("modebase: command 0x%02X is not supported", cmdID)
 	}
-	req, ok := changeToModeRequest(fields)
+	newMode, ok := changeToModeRequest(fields)
 	if !ok {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("modebase: ChangeToMode fields %T", fields)}
 	}
@@ -688,29 +688,29 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	current := s.current
 	s.mu.Unlock()
 	// ModeUtils.assertModeChange.
-	if req.NewMode == current {
+	if newMode == current {
 		return clusterwire.ChangeToModeResponse{Status: uint8(StatusSuccess)}, nil
 	}
-	if !s.supports(req.NewMode) {
+	if !s.supports(newMode) {
 		return clusterwire.ChangeToModeResponse{
-			Status: uint8(StatusUnsupportedMode), StatusText: fmt.Sprintf("Unsupported mode: %d", req.NewMode),
+			Status: uint8(StatusUnsupportedMode), StatusText: fmt.Sprintf("Unsupported mode: %d", newMode),
 		}, nil
 	}
-	if s.runModeLocked(current, req.NewMode) {
+	if s.runModeLocked(current, newMode) {
 		return clusterwire.ChangeToModeResponse{
 			Status:     uint8(StatusInvalidInMode),
 			StatusText: "Change to a non-idle mode is only allowed from idle",
 		}, nil
 	}
-	status, text, err := s.changer.ChangeToMode(ctx, req.NewMode)
+	status, text, err := s.changer.ChangeToMode(ctx, newMode)
 	if err != nil {
-		return nil, fmt.Errorf("modebase: ChangeToMode %d: %w", req.NewMode, err)
+		return nil, fmt.Errorf("modebase: ChangeToMode %d: %w", newMode, err)
 	}
 	if !s.validHostStatus(status) {
 		return nil, statusError{im.StatusFailure, fmt.Sprintf("%v: 0x%02X", ErrInvalidHostStatus, uint8(status))}
 	}
 	if status == StatusSuccess {
-		s.setCurrent(req.NewMode)
+		s.setCurrent(newMode)
 	}
 	return clusterwire.ChangeToModeResponse{Status: uint8(status), StatusText: truncate(text, LabelMaxBytes)}, nil
 }
@@ -747,38 +747,47 @@ func (s *Server) modeHasTag(mode uint8, tag uint16) bool {
 	return false
 }
 
-// changeToModeRequest reads the fields the bridge hands over: cluster/wire's
-// ChangeToModeRequest, which its hand-written reader decodes for
-// LaundryWasherMode, RvcRunMode, RvcCleanMode and DishwasherMode, or a
-// generated definition's, which spec.DecodeRequest decodes for the other
-// derivations. The payload is ModeBase's in every derivation.
-func changeToModeRequest(fields any) (clusterwire.ChangeToModeRequest, bool) {
-	var mode uint8
-	switch r := fields.(type) {
-	case clusterwire.ChangeToModeRequest:
-		return r, true
-	case laundrywashermode.ChangeToModeRequest:
-		mode = r.NewMode
-	case rvcrunmode.ChangeToModeRequest:
-		mode = r.NewMode
-	case rvccleanmode.ChangeToModeRequest:
-		mode = r.NewMode
-	case dishwashermode.ChangeToModeRequest:
-		mode = r.NewMode
-	case ovenmode.ChangeToModeRequest:
-		mode = r.NewMode
-	case rtcc.ChangeToModeRequest:
-		mode = r.NewMode
-	case energyevsemode.ChangeToModeRequest:
-		mode = r.NewMode
-	case waterheatermode.ChangeToModeRequest:
-		mode = r.NewMode
-	case deviceenergymanagementmode.ChangeToModeRequest:
-		mode = r.NewMode
-	default:
-		return clusterwire.ChangeToModeRequest{}, false
+// changeToModeRequest reads the request the bridge hands over: the
+// derivation's generated ChangeToModeRequest, which its definition decodes
+// (bridge/fields_definition.go), by value or by pointer; the payload is
+// ModeBase's in every derivation. cluster/wire's ChangeToModeRequest, which
+// the bridge no longer decodes, is still taken from an in-process caller
+// until its removal (Deprecated, v0.12.0).
+func changeToModeRequest(fields any) (newMode uint8, ok bool) {
+	if r, ok := fields.(clusterwire.ChangeToModeRequest); ok { //nolint:staticcheck // SA1019: the deprecated in-process form, kept for its window
+		return r.NewMode, true
 	}
-	return clusterwire.ChangeToModeRequest{NewMode: mode}, true
+	for _, of := range newModeOf {
+		if mode, ok := of(fields); ok {
+			return mode, true
+		}
+	}
+	return 0, false
+}
+
+// newModeOf reads NewMode from each derivation's generated request.
+var newModeOf = []func(any) (uint8, bool){
+	modeOf[laundrywashermode.ChangeToModeRequest](func(r laundrywashermode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[rvcrunmode.ChangeToModeRequest](func(r rvcrunmode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[rvccleanmode.ChangeToModeRequest](func(r rvccleanmode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[dishwashermode.ChangeToModeRequest](func(r dishwashermode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[ovenmode.ChangeToModeRequest](func(r ovenmode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[rtcc.ChangeToModeRequest](func(r rtcc.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[energyevsemode.ChangeToModeRequest](func(r energyevsemode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[waterheatermode.ChangeToModeRequest](func(r waterheatermode.ChangeToModeRequest) uint8 { return r.NewMode }),
+	modeOf[deviceenergymanagementmode.ChangeToModeRequest](func(r deviceenergymanagementmode.ChangeToModeRequest) uint8 { return r.NewMode }),
+}
+
+// modeOf adapts one generated request type, by value or by pointer
+// ([spec.RequestOf]).
+func modeOf[T any](get func(T) uint8) func(any) (uint8, bool) {
+	return func(fields any) (uint8, bool) {
+		r, ok := spec.RequestOf[T](fields)
+		if !ok {
+			return 0, false
+		}
+		return get(r), true
+	}
 }
 
 // validHostStatus accepts what a device may answer: ModeChangeStatus as

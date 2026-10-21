@@ -84,81 +84,81 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleLockDoor(func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLockDoor(func(context.Context, LockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleLockDoor: a command the server does not accept was registered")
 	}
-	if err := s.HandleUnlockDoor(func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUnlockDoor(func(context.Context, UnlockDoorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUnlockDoor: a command the server does not accept was registered")
 	}
-	if err := s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleToggle: a command the server does not accept was registered")
 	}
-	if err := s.HandleUnlockWithTimeout(func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUnlockWithTimeout(func(context.Context, UnlockWithTimeoutRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUnlockWithTimeout: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetWeekDaySchedule(func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetWeekDaySchedule(func(context.Context, SetWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetWeekDaySchedule: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetWeekDaySchedule(func(context.Context, GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error) {
 		return GetWeekDayScheduleResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetWeekDaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearWeekDaySchedule(func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearWeekDaySchedule(func(context.Context, ClearWeekDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearWeekDaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetYearDaySchedule(func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetYearDaySchedule(func(context.Context, SetYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetYearDaySchedule: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetYearDaySchedule(func(context.Context, GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error) {
 		return GetYearDayScheduleResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetYearDaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearYearDaySchedule(func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearYearDaySchedule(func(context.Context, ClearYearDayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearYearDaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetHolidaySchedule(func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetHolidaySchedule(func(context.Context, SetHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetHolidaySchedule: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetHolidaySchedule(func(context.Context, GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error) {
 		return GetHolidayScheduleResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetHolidaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearHolidaySchedule(func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearHolidaySchedule(func(context.Context, ClearHolidayScheduleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearHolidaySchedule: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetUser(func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetUser(func(context.Context, SetUserRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetUser: a command the server does not accept was registered")
 	}
-	if err := s.HandleGetUser(func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleGetUser(func(context.Context, GetUserRequest) (GetUserResponse, error) { return GetUserResponse{}, nil }); err == nil {
+		t.Error("HandleGetUser: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearUser(func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearUser(func(context.Context, ClearUserRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearUser: a command the server does not accept was registered")
 	}
 	if err := s.HandleSetCredential(func(context.Context, SetCredentialRequest) (SetCredentialResponse, error) {
 		return SetCredentialResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSetCredential: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetCredentialStatus(func(context.Context, GetCredentialStatusRequest) (GetCredentialStatusResponse, error) {
 		return GetCredentialStatusResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetCredentialStatus: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearCredential(func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearCredential(func(context.Context, ClearCredentialRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearCredential: a command the server does not accept was registered")
 	}
-	if err := s.HandleUnboltDoor(func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUnboltDoor(func(context.Context, UnboltDoorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUnboltDoor: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetAliroReaderConfig(func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetAliroReaderConfig(func(context.Context, SetAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetAliroReaderConfig: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearAliroReaderConfig(func(context.Context, ClearAliroReaderConfigRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearAliroReaderConfig: a command the server does not accept was registered")
 	}
 	_ = s.EmitDoorLockAlarm(0, DoorLockAlarmEvent{})           // not in the empty definition's EventList: refused
 	_ = s.EmitDoorStateChange(0, DoorStateChangeEvent{})       // not in the empty definition's EventList: refused

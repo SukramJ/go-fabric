@@ -50,8 +50,8 @@ func TestWindowCoveringGoToLiftPercentageAcceptsEveryPayloadShape(t *testing.T) 
 
 	shapes := map[string]any{
 		"bare uint16":    want,
-		"typed request":  wire.GoToLiftPercentageRequest{LiftPercent100thsValue: want},
-		"typed pointer":  &wire.GoToLiftPercentageRequest{LiftPercent100thsValue: want},
+		"typed request":  wire.GoToLiftPercentageRequest{LiftPercent100thsValue: want},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		"typed pointer":  &wire.GoToLiftPercentageRequest{LiftPercent100thsValue: want}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		"bridge tag map": map[uint8]any{0: uint64(want)},
 		"string map":     map[string]any{"percent": want},
 	}
@@ -78,7 +78,7 @@ func TestWindowCoveringGoToLiftPercentageAcceptsEveryPayloadShape(t *testing.T) 
 func TestWindowCoveringGoToLiftPercentageRejectsAPayloadItCannotRead(t *testing.T) {
 	t.Parallel()
 	cases := map[string]any{
-		"nil typed pointer":  (*wire.GoToLiftPercentageRequest)(nil),
+		"nil typed pointer":  (*wire.GoToLiftPercentageRequest)(nil), //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		"tag map missing 0":  map[uint8]any{1: uint64(0)},
 		"tag map wrong type": map[uint8]any{0: "half"},
 		// percent100ths is uint16 on the wire; a wider integer is a

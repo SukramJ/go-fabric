@@ -211,6 +211,12 @@ type WindowCoveringServer struct {
 	// changes reports what a travelling movement changes between
 	// requests (contract.AttributeChangeNotifier).
 	changes cluster.AttributeChanges
+
+	// host, events and veto are the typed server's command handlers,
+	// event path and write veto (windowcovering_typed.go).
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 }
 
 // axis is one position-aware axis of the covering: its positions, its
@@ -474,7 +480,7 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // calibration procedure; and ConfigStatus follows ([configStatusLocked]),
 // reported when it moved. In MaintenanceMode the movement commands answer
 // BUSY ([WindowCoveringServer.MatterInvoke]).
-func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
@@ -490,6 +496,9 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 	}
 	if mode&calibration != 0 {
 		return windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
+	}
+	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
+		return err
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -565,7 +574,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		}
 		return command{tilt: &pct}, nil
 	default:
-		return command{}, fmt.Errorf("cover: unknown command 0x%02X", cmdID)
+		return command{}, im.UnsupportedCommandf("cover: unknown command 0x%02X", cmdID)
 	}
 }
 
@@ -575,6 +584,9 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 // they return Success without forwarding anywhere. With one, see
 // [WindowCoveringServer.invokeMover].
 func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	c, err := s.parseCommand(cmdID, fields)
 	if err != nil {
 		return nil, err
@@ -856,10 +868,11 @@ func (s *WindowCoveringServer) MatterAttributes() []uint32 { return s.inst.Matte
 // [wcdef.GoToTiltPercentageRequest] (a missing field already answered
 // INVALID_COMMAND there, a value above 10000 CONSTRAINT_ERROR, as
 // matter.js's request schema answers them); a host that decodes the
-// command itself may pass the wire request or the tag-keyed map of the
-// bridge's generic salvage path (bridge/fields_reader.go
+// command itself may pass the tag-keyed map of the bridge's generic
+// salvage path (bridge/fields_reader.go
 // decodeGenericTagMap, the value a uint64), and the bare uint16 and the
-// "percent"-keyed map stay accepted for direct callers. Values > 10000
+// "percent"-keyed map stay accepted for direct callers, the deprecated
+// cluster/wire requests until their removal in v0.12.0. Values > 10000
 // are rejected with ConstraintError per
 // window-covering-cluster.element.ts:72, :76 constraint "max 10000".
 func extractPercent100ths(fields any, cmd string) (uint16, error) {
@@ -874,9 +887,9 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
-	case wire.GoToLiftPercentageRequest:
+	case wire.GoToLiftPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		pct = v.LiftPercent100thsValue
-	case *wire.GoToLiftPercentageRequest:
+	case *wire.GoToLiftPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if v == nil {
 			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
@@ -888,9 +901,9 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
-	case wire.GoToTiltPercentageRequest:
+	case wire.GoToTiltPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		pct = v.TiltPercent100thsValue
-	case *wire.GoToTiltPercentageRequest:
+	case *wire.GoToTiltPercentageRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if v == nil {
 			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}

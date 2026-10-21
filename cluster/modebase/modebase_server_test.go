@@ -11,8 +11,19 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
+	"github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
+	rtcc "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
+	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -76,7 +87,7 @@ func newRun(t *testing.T, c *changer) *modebase.Server {
 
 func change(t *testing.T, srv *modebase.Server, mode uint8) clusterwire.ChangeToModeResponse {
 	t.Helper()
-	resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: mode})
+	resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, changeRequest(srv, mode))
 	if err != nil {
 		t.Fatalf("ChangeToMode %d: %v", mode, err)
 	}
@@ -235,14 +246,14 @@ func TestChangeToModeFollowsModeUtils(t *testing.T) {
 	var sce im.StatusCodeError
 	for _, st := range []modebase.Status{modebase.StatusUnsupportedMode, modebase.StatusCleaningInProgress, 0x04, 0xC0, 0xFF} {
 		c.status = st
-		_, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 0})
+		_, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, changeRequest(srv, 0))
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure || !strings.Contains(err.Error(), modebase.ErrInvalidHostStatus.Error()) {
 			t.Errorf("host status 0x%02X: %v", uint8(st), err)
 		}
 	}
 	// A device error fails the invoke.
 	c.status, c.err = modebase.StatusSuccess, errors.New("offline")
-	if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 0}); err == nil || current(srv) != 1 {
+	if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, changeRequest(srv, 0)); err == nil || current(srv) != 1 {
 		t.Errorf("device error: %v", err)
 	}
 	// Malformed fields and other commands.
@@ -326,5 +337,32 @@ func TestRvcRunModeDirectModeChange(t *testing.T) {
 	}
 	if r := change(t, direct, 2); r.Status != uint8(modebase.StatusSuccess) || current(direct) != 2 {
 		t.Errorf("Cleaning → Mapping with DIRECTMODECH: %+v, current %d", r, current(direct))
+	}
+}
+
+// changeRequest is the ChangeToMode request of srv's derivation, as the
+// bridge decodes it: the derivation's generated request.
+func changeRequest(srv *modebase.Server, mode uint8) any {
+	switch srv.MatterClusterID() {
+	case modebase.ClusterIDLaundryWasherMode:
+		return laundrywashermode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDRvcRunMode:
+		return rvcrunmode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDRvcCleanMode:
+		return rvccleanmode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDDishwasherMode:
+		return dishwashermode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDOvenMode:
+		return ovenmode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDRefrigeratorAndTemperatureControlledCabinetMode:
+		return rtcc.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDMicrowaveOvenMode:
+		return microwaveovenmode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDEnergyEvseMode:
+		return energyevsemode.ChangeToModeRequest{NewMode: mode}
+	case modebase.ClusterIDWaterHeaterMode:
+		return waterheatermode.ChangeToModeRequest{NewMode: mode}
+	default:
+		return deviceenergymanagementmode.ChangeToModeRequest{NewMode: mode}
 	}
 }

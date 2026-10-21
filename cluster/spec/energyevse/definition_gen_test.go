@@ -66,26 +66,26 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDisable(func(context.Context, DisableRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDisable: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnableCharging(func(context.Context, EnableChargingRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnableCharging: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnableDischarging(func(context.Context, EnableDischargingRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnableDischarging: a command the server does not accept was registered")
 	}
-	if err := s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStartDiagnostics(func(context.Context, StartDiagnosticsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStartDiagnostics: a command the server does not accept was registered")
 	}
-	if err := s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetTargets(func(context.Context, SetTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetTargets: a command the server does not accept was registered")
 	}
-	if err := s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleGetTargets(func(context.Context, GetTargetsRequest) (GetTargetsResponse, error) { return GetTargetsResponse{}, nil }); err == nil {
+		t.Error("HandleGetTargets: a command the server does not accept was registered")
 	}
-	if err := s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleClearTargets: a command the server does not accept was registered")
 	}
 	_ = s.EmitEvConnected(0, EvConnectedEvent{})                     // not in the empty definition's EventList: refused
 	_ = s.EmitEvNotDetected(0, EvNotDetectedEvent{})                 // not in the empty definition's EventList: refused

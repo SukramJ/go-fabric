@@ -324,19 +324,19 @@ func TestLifetimeCounterWrites(t *testing.T) {
 func TestEmitRaisesDeclaredEventsAtTheirPriority(t *testing.T) {
 	t.Parallel()
 	srv := newFull(t, &device{})
-	if err := srv.Emit(pump.EventDryRunning); err != nil {
+	if err := srv.Emit(srv.Endpoint(), pump.EventDryRunning, nil); err != nil {
 		t.Fatalf("Emit before an emitter is wired: %v", err)
 	}
 	rec := &recorder{}
 	srv.SetMatterEventEmitter(rec)
 	srv.SetEndpoint(4)
-	if err := srv.Emit(pump.EventDryRunning); err != nil {
+	if err := srv.Emit(srv.Endpoint(), pump.EventDryRunning, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Emit(pump.EventSupplyVoltageLow); err != nil {
+	if err := srv.Emit(srv.Endpoint(), pump.EventSupplyVoltageLow, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Emit(pump.EventPumpBlocked); !errors.Is(err, pump.ErrEventUndeclared) {
+	if err := srv.Emit(srv.Endpoint(), pump.EventPumpBlocked, nil); !errors.Is(err, pump.ErrEventUndeclared) {
 		t.Errorf("undeclared event: %v", err)
 	}
 	if len(rec.events) != 2 {

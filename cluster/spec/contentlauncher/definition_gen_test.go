@@ -61,10 +61,10 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleLaunchContent(func(context.Context, LaunchContentRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLaunchContent(func(context.Context, LaunchContentRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err == nil {
+		t.Error("HandleLaunchContent: a command the server does not accept was registered")
 	}
-	if err := s.HandleLaunchUrl(func(context.Context, LaunchUrlRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLaunchUrl(func(context.Context, LaunchUrlRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err == nil {
+		t.Error("HandleLaunchUrl: a command the server does not accept was registered")
 	}
 }

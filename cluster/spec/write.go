@@ -15,23 +15,40 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// StatusError carries an exact IM status to the dispatcher.
+// StatusError carries an exact IM status to the dispatcher: the one
+// typed error a server spells a wire status with (ADR 0026 principle 8),
+// which the dispatcher maps to the status by type, never by its text.
 type StatusError struct {
 	Status im.StatusCode
 	Msg    string
+	// wrapped are the errors the message wrapped with %w ([Errorf]).
+	wrapped []error
 }
 
 // Error implements error.
 func (e *StatusError) Error() string { return e.Msg }
+
+// Unwrap returns the errors [Errorf] wrapped with %w, so errors.Is and
+// errors.As reach a sentinel the message wraps.
+func (e *StatusError) Unwrap() []error { return e.wrapped }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e *StatusError) MatterStatusCode() im.StatusCode { return e.Status }
 
 var _ im.StatusCodeError = (*StatusError)(nil)
 
-// Errorf returns a [StatusError] with status and a formatted message.
+// Errorf returns a [StatusError] with status and a formatted message;
+// a %w verb wraps its operand as [fmt.Errorf] does.
 func Errorf(status im.StatusCode, format string, args ...any) error {
-	return &StatusError{Status: status, Msg: fmt.Sprintf(format, args...)}
+	err := fmt.Errorf(format, args...)
+	e := &StatusError{Status: status, Msg: err.Error()}
+	switch u := err.(type) { //nolint:errorlint // the wrapping fmt.Errorf built, not a chain
+	case interface{ Unwrap() error }:
+		e.wrapped = []error{u.Unwrap()}
+	case interface{ Unwrap() []error }:
+		e.wrapped = u.Unwrap()
+	}
+	return e
 }
 
 // Peers resolves the current value of a sibling attribute a constraint

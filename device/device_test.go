@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -180,7 +178,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		levelcontroldef.AttrMinLevel: uint8(1),
 		levelcontroldef.AttrMaxLevel: uint8(254),
 	} {
-		if !lc.Underlying().(*spec.Server).Serves(attr) {
+		if !slices.Contains(lc.Underlying().(contract.ClusterAttributeLister).MatterAttributes(), attr) {
 			t.Errorf("attribute 0x%04X not served", attr)
 		}
 		if v, _ := lc.Underlying().MatterRead(attr); v != want {
@@ -230,11 +228,11 @@ func TestElementAlterationsApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lc := serverAs[*spec.Server](d, levelcontroldef.ClusterID)
-	if v, _ := lc.Value(levelcontroldef.AttrMinLevel); v != uint8(1) {
+	lc := d.Server(levelcontroldef.ClusterID)
+	if v, _ := lc.MatterRead(levelcontroldef.AttrMinLevel); v != uint8(1) {
 		t.Errorf("MinLevel %v (%T)", v, v)
 	}
-	if v, _ := lc.Value(levelcontroldef.AttrMaxLevel); v != uint8(254) {
+	if v, _ := lc.MatterRead(levelcontroldef.AttrMaxLevel); v != uint8(254) {
 		t.Errorf("MaxLevel %v", v)
 	}
 	// A mandated element the feature selection disallows is refused.
@@ -256,12 +254,12 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 	}
 	var got [][]uint32
 	stop := d.OnChanged(onoffdef.ClusterID, func(ids []uint32) { got = append(got, ids) })
-	d.OnOff().Underlying().(*onoff.Server).Set(true)
+	_ = d.OnOff().Set(onoffdef.Patch{OnOff: new(true)})
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{onoffdef.AttrOnOff}) {
 		t.Errorf("notified %v", got)
 	}
 	stop()
-	d.OnOff().Underlying().(*onoff.Server).Set(false)
+	_ = d.OnOff().Set(onoffdef.Patch{OnOff: new(false)})
 	if len(got) != 1 {
 		t.Error("notified after unsubscribe")
 	}

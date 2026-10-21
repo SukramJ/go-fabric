@@ -239,6 +239,11 @@ var ErrClosureControlMalformed = errors.New("wire: ClosureControl command malfor
 // carry conformance "O.a+": each is optional, but at least one must be
 // present. A request carrying none is malformed, which
 // [DecodeClosureMoveTo] reports rather than silently treating as a no-op.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/closurecontrol.MoveToRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveToRequest struct {
 	// Position is field 0. Nil when the request omitted it.
 	Position *ClosureTargetPosition
@@ -261,6 +266,12 @@ const (
 // the three optional fields: the "O.a+" conformance makes at least one
 // mandatory, and a request that asks for nothing is a controller bug
 // worth reporting rather than an expensive no-op.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/closurecontrol.MoveToRequest; a
+// server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeClosureMoveTo(payload []byte) (MoveToRequest, error) {
 	var req MoveToRequest
 	if err := walkContext(payload, ErrClosureControlMalformed, func(tag uint32, el tlv.Element) {

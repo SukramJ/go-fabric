@@ -59,15 +59,15 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleRegisterClient(func(context.Context, RegisterClientRequest) (RegisterClientResponse, error) {
 		return RegisterClientResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRegisterClient: a command the server does not accept was registered")
 	}
-	if err := s.HandleUnregisterClient(func(context.Context, UnregisterClientRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUnregisterClient(func(context.Context, UnregisterClientRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUnregisterClient: a command the server does not accept was registered")
 	}
 	if err := s.HandleStayActiveRequest(func(context.Context, StayActiveRequestRequest) (StayActiveResponse, error) {
 		return StayActiveResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleStayActiveRequest: a command the server does not accept was registered")
 	}
 }

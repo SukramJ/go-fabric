@@ -501,8 +501,8 @@ func openWindowParams(fields any) (OpenWindowParams, bool) {
 	return OpenWindowParams{}, false
 }
 
-// Typed error values that implement [im.StatusCodeError] so the
-// dispatcher's type-assert path takes priority over the string heuristic.
+// Typed error values that implement [im.StatusCodeError]: the dispatcher
+// maps them to their status by type.
 // Mirrors matter.js AdministratorCommissioningServer.ts
 // StatusResponseError usage.
 

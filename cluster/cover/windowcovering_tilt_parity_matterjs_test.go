@@ -307,8 +307,8 @@ func TestTilt_GoToTiltPercentageAcceptsEveryPayloadShape(t *testing.T) {
 	for i, req := range []any{
 		wcdef.GoToTiltPercentageRequest{TiltPercent100thsValue: 100},
 		&wcdef.GoToTiltPercentageRequest{TiltPercent100thsValue: 200},
-		clusterwire.GoToTiltPercentageRequest{TiltPercent100thsValue: 300},
-		&clusterwire.GoToTiltPercentageRequest{TiltPercent100thsValue: 400},
+		clusterwire.GoToTiltPercentageRequest{TiltPercent100thsValue: 300},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		&clusterwire.GoToTiltPercentageRequest{TiltPercent100thsValue: 400}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		map[uint8]any{0: uint64(500)},
 		uint16(600),
 	} {
@@ -320,7 +320,7 @@ func TestTilt_GoToTiltPercentageAcceptsEveryPayloadShape(t *testing.T) {
 			t.Errorf("shape %d: tilt target %v, want %d", i, v, want)
 		}
 	}
-	for _, req := range []any{(*wcdef.GoToTiltPercentageRequest)(nil), (*clusterwire.GoToTiltPercentageRequest)(nil)} {
+	for _, req := range []any{(*wcdef.GoToTiltPercentageRequest)(nil), (*clusterwire.GoToTiltPercentageRequest)(nil)} { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if _, err := srv.MatterInvoke(ctx, wcdef.CmdGoToTiltPercentage, req); err == nil {
 			t.Errorf("%T accepted", req)
 		}

@@ -152,24 +152,24 @@ An identifier on its way out is marked, kept working, and only then removed.
    release in which their code still compiles and the warning is already
    visible.
 
-Currently deprecated, each with its replacement — all marked when the time
-port `clock` landed (`[Unreleased]` in the changelog), removable in
-`v0.10.0` at the earliest:
+Currently deprecated, each with its replacement and the release its removal
+becomes permissible in:
 
-| Deprecated | Replacement |
-| --- | --- |
-| `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock`, `btp.Options.Clock` | `btp.Options.TimeSource` (a `clock.Clock`), `clock.System` |
-| `cluster/onoff.Clock`, `onoff.Config.Clock` | `onoff.Config.TimeSource` |
-| `cluster/core.OtaClock`, `core.OTARequestorConfig.Clock` | `core.OTARequestorConfig.TimeSource` |
-| `cluster/core.OTAProviderConfig.Now` | `core.OTAProviderConfig.Clock` |
-| `cluster/core.CommissionerControlConfig.Now` | `core.CommissionerControlConfig.Clock` |
-| `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` |
-| `cluster/closure.DimensionConfig.Now` | `closure.DimensionConfig.Clock` |
-| `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each |
-| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
-| `controller/ca.Config.Now` | `ca.Config.Clock` |
-| `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error |
-| `cluster/wire.GenericSwitch`, `wire.NewGenericSwitch` (marked by brief BK) | `cluster/switch` (`switchserver.New`), which the MomentarySwitch materialiser builds |
+| Deprecated | Replacement | Removable in |
+| --- | --- | --- |
+| `transport/btp.Clock`, `btp.Timer`, `btp.SystemClock`, `btp.Options.Clock` | `btp.Options.TimeSource` (a `clock.Clock`), `clock.System` | `v0.10.0` |
+| `cluster/onoff.Clock`, `onoff.Config.Clock` | `onoff.Config.TimeSource` | `v0.10.0` |
+| `cluster/core.OtaClock`, `core.OTARequestorConfig.Clock` | `core.OTARequestorConfig.TimeSource` | `v0.10.0` |
+| `cluster/core.OTAProviderConfig.Now` | `core.OTAProviderConfig.Clock` | `v0.10.0` |
+| `cluster/core.CommissionerControlConfig.Now` | `core.CommissionerControlConfig.Clock` | `v0.10.0` |
+| `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` | `v0.10.0` |
+| `cluster/closure.DimensionConfig.Now` | `closure.DimensionConfig.Clock` | `v0.10.0` |
+| `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each | `v0.10.0` |
+| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) | `v0.10.0` |
+| `controller/ca.Config.Now` | `ca.Config.Clock` | `v0.10.0` |
+| `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error | `v0.10.0` |
+| `cluster/wire.GenericSwitch`, `wire.NewGenericSwitch` (marked by brief BK) | `cluster/switch` (`switchserver.New`), which the MomentarySwitch materialiser builds | `v0.10.0` |
+| `cluster/wire.MoveToHueRequest`, `MoveHueRequest`, `StepHueRequest`, `MoveToSaturationRequest`, `MoveSaturationRequest`, `StepSaturationRequest`, `MoveToHueAndSaturationRequest`, `MoveToColorTemperatureRequest`, `GoToLiftPercentageRequest`, `GoToTiltPercentageRequest`, `SetpointRaiseLowerRequest`, `MoveToRequest`, `ChangeToModeRequest`, and the `Decode…` functions producing them (marked by brief BX1) | the generated request of the cluster, `cluster/spec/<cluster>.<Command>Request` (`colorcontrol`, `windowcovering`, `thermostat`, `closurecontrol`, the mode derivation), which the bridge decodes and every module server takes | `v0.12.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

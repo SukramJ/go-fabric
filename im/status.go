@@ -12,9 +12,9 @@ import (
 
 // StatusCodeError is the optional interface cluster-server errors
 // implement when they carry a well-typed Matter IM status code.
-// The dispatcher type-asserts against this interface FIRST in
-// [writeErrorStatus] / [invokeErrorStatus]; the string-heuristic
-// fallback is used only for errors that do not implement it.
+// The dispatcher (endpoint/dispatcher.go classifyError) maps an error
+// that implements it to its status; any other error answers FAILURE —
+// the dispatcher reads no status out of an error's text.
 //
 // Pattern: define a package-private sentinel type that wraps an
 // error string and returns its status code, then export an

@@ -107,7 +107,7 @@ func newSwitchPair(t *testing.T, multi bool) *switchPair {
 // emit emits a switch event on the device.
 func (sp *switchPair) emit(t *testing.T, event uint32, payload any) {
 	t.Helper()
-	if err := sp.sw.Switch().Underlying().(*spec.Server).Emit(sp.ep, event, payload); err != nil {
+	if err := spec.EmitOn(sp.sw.Switch().Underlying(), sp.ep, event, payload); err != nil {
 		t.Fatal(err)
 	}
 }

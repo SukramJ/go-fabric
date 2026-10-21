@@ -56,10 +56,10 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSetTarget(func(context.Context, SetTargetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSetTarget(func(context.Context, SetTargetRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSetTarget: a command the server does not accept was registered")
 	}
-	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStep(func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStep: a command the server does not accept was registered")
 	}
 }

@@ -54,13 +54,13 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleRequestCommissioningApproval(func(context.Context, RequestCommissioningApprovalRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRequestCommissioningApproval(func(context.Context, RequestCommissioningApprovalRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRequestCommissioningApproval: a command the server does not accept was registered")
 	}
 	if err := s.HandleCommissionNode(func(context.Context, CommissionNodeRequest) (ReverseOpenCommissioningWindowResponse, error) {
 		return ReverseOpenCommissioningWindowResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleCommissionNode: a command the server does not accept was registered")
 	}
 	_ = s.EmitCommissioningRequestResult(0, CommissioningRequestResultEvent{}) // not in the empty definition's EventList: refused
 }

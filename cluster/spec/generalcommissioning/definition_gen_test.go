@@ -62,22 +62,22 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleArmFailSafe(func(context.Context, ArmFailSafeRequest) (ArmFailSafeResponse, error) {
 		return ArmFailSafeResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleArmFailSafe: a command the server does not accept was registered")
 	}
 	if err := s.HandleSetRegulatoryConfig(func(context.Context, SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error) {
 		return SetRegulatoryConfigResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSetRegulatoryConfig: a command the server does not accept was registered")
 	}
 	if err := s.HandleCommissioningComplete(func(context.Context, CommissioningCompleteRequest) (CommissioningCompleteResponse, error) {
 		return CommissioningCompleteResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleCommissioningComplete: a command the server does not accept was registered")
 	}
 	if err := s.HandleSetTcAcknowledgements(func(context.Context, SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error) {
 		return SetTcAcknowledgementsResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleSetTcAcknowledgements: a command the server does not accept was registered")
 	}
 }

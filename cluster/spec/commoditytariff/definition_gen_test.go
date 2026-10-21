@@ -69,12 +69,12 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleGetTariffComponent(func(context.Context, GetTariffComponentRequest) (GetTariffComponentResponse, error) {
 		return GetTariffComponentResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetTariffComponent: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetDayEntry(func(context.Context, GetDayEntryRequest) (GetDayEntryResponse, error) {
 		return GetDayEntryResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetDayEntry: a command the server does not accept was registered")
 	}
 }

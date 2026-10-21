@@ -151,9 +151,10 @@ func TestTypedOnWrite(t *testing.T) {
 	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.Is(err, refusal) {
 		t.Fatalf("a vetoed write: %v", err)
 	}
+	// A plain veto carries no status: the dispatcher answers FAILURE.
 	var sce im.StatusCodeError
-	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure {
-		t.Errorf("a plain veto answers %v", err)
+	if err := s.Underlying().MatterWrite(ctx, levelcontroldef.AttrOnLevel, uint64(160)); errors.As(err, &sce) {
+		t.Errorf("a plain veto carries status %v", sce.MatterStatusCode())
 	}
 	if got := s.Get(); got.OnLevel != nil {
 		t.Errorf("a vetoed write stored %d", *got.OnLevel)

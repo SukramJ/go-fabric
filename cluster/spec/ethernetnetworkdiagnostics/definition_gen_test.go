@@ -51,7 +51,7 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleResetCounts: a command the server does not accept was registered")
 	}
 }

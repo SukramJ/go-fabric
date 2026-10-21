@@ -59,20 +59,20 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleJoinGroup(func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleJoinGroup(func(context.Context, JoinGroupRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleJoinGroup: a command the server does not accept was registered")
 	}
-	if err := s.HandleLeaveGroup(func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLeaveGroup(func(context.Context, LeaveGroupRequest) (LeaveGroupResponse, error) { return LeaveGroupResponse{}, nil }); err == nil {
+		t.Error("HandleLeaveGroup: a command the server does not accept was registered")
 	}
-	if err := s.HandleUpdateGroupKey(func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleUpdateGroupKey(func(context.Context, UpdateGroupKeyRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleUpdateGroupKey: a command the server does not accept was registered")
 	}
-	if err := s.HandleConfigureAuxiliaryAcl(func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleConfigureAuxiliaryAcl(func(context.Context, ConfigureAuxiliaryAclRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleConfigureAuxiliaryAcl: a command the server does not accept was registered")
 	}
-	if err := s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleGroupcastTesting: a command the server does not accept was registered")
 	}
 	_ = s.EmitGroupcastTesting(0, GroupcastTestingEvent{}) // not in the empty definition's EventList: refused
 }

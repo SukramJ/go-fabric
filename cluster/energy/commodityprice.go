@@ -85,6 +85,9 @@ type CommodityPriceConfig struct {
 // PriceChange event are chip's.
 type CommodityPriceServer struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (typed.go).
+	spec.SelfHeld
 
 	srv *spec.Server
 
@@ -139,7 +142,7 @@ func NewCommodityPrice(cfg CommodityPriceConfig) (*CommodityPriceServer, error) 
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	return s, nil
 }
 
@@ -372,5 +375,5 @@ func (s *CommodityPriceServer) MatterWrite(ctx context.Context, attrID uint32, v
 
 // MatterInvoke dispatches the two detailed requests.
 func (s *CommodityPriceServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields) // a host's handler first ([spec.SelfHeld.Handle])
 }

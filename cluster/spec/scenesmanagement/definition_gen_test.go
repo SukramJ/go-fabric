@@ -70,34 +70,34 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleAddScene(func(context.Context, AddSceneRequest) (AddSceneResponse, error) { return AddSceneResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleAddScene(func(context.Context, AddSceneRequest) (AddSceneResponse, error) { return AddSceneResponse{}, nil }); err == nil {
+		t.Error("HandleAddScene: a command the server does not accept was registered")
 	}
-	if err := s.HandleViewScene(func(context.Context, ViewSceneRequest) (ViewSceneResponse, error) { return ViewSceneResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleViewScene(func(context.Context, ViewSceneRequest) (ViewSceneResponse, error) { return ViewSceneResponse{}, nil }); err == nil {
+		t.Error("HandleViewScene: a command the server does not accept was registered")
 	}
 	if err := s.HandleRemoveScene(func(context.Context, RemoveSceneRequest) (RemoveSceneResponse, error) {
 		return RemoveSceneResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRemoveScene: a command the server does not accept was registered")
 	}
 	if err := s.HandleRemoveAllScenes(func(context.Context, RemoveAllScenesRequest) (RemoveAllScenesResponse, error) {
 		return RemoveAllScenesResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRemoveAllScenes: a command the server does not accept was registered")
 	}
-	if err := s.HandleStoreScene(func(context.Context, StoreSceneRequest) (StoreSceneResponse, error) { return StoreSceneResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStoreScene(func(context.Context, StoreSceneRequest) (StoreSceneResponse, error) { return StoreSceneResponse{}, nil }); err == nil {
+		t.Error("HandleStoreScene: a command the server does not accept was registered")
 	}
-	if err := s.HandleRecallScene(func(context.Context, RecallSceneRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRecallScene(func(context.Context, RecallSceneRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRecallScene: a command the server does not accept was registered")
 	}
 	if err := s.HandleGetSceneMembership(func(context.Context, GetSceneMembershipRequest) (GetSceneMembershipResponse, error) {
 		return GetSceneMembershipResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetSceneMembership: a command the server does not accept was registered")
 	}
-	if err := s.HandleCopyScene(func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCopyScene(func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil }); err == nil {
+		t.Error("HandleCopyScene: a command the server does not accept was registered")
 	}
 }

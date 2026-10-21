@@ -80,10 +80,12 @@ type coupling struct {
 	colorTemperature bool
 }
 
-// initTransitions sets up the engine. matter.js
+// initEngine sets up the engine; manage makes its transitions gradual
+// (matter.js managedTransitionTimeHandling — [Config.Transitions] always
+// manages, [New] as its configuration says). matter.js
 // LevelControlServer #initializeTransitions: CurrentLevel between MinLevel
 // and MaxLevel, RemainingTime reported by hand.
-func (s *Server) initTransitions(cfg Transitions) {
+func (s *Server) initEngine(cfg Transitions, manage bool) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
 	s.quiet = &cluster.Quieter{Report: func() {
 		if !s.quiescing.Load() {
@@ -91,7 +93,7 @@ func (s *Server) initTransitions(cfg Transitions) {
 		}
 	}, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
-		Manage:       true,
+		Manage:       manage,
 		StepInterval: cfg.StepInterval,
 		Clock:        cfg.Clock,
 		Properties: map[string]transition.Property{

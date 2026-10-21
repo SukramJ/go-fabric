@@ -129,6 +129,9 @@ type Server struct {
 	beforeWrite func(ctx context.Context, attrID uint32, value any) error
 	values      map[uint32]any
 	handlers    map[uint32]CommandHandler
+	// own are the handlers construction was given ([ServerConfig.Handlers]),
+	// which [Server.Handle] with a nil handler restores.
+	own map[uint32]CommandHandler
 	// stubs are the accepted commands construction found unimplemented
 	// ([ServerConfig.Unimplemented]); one is listed once it has a handler.
 	stubs   []uint32
@@ -186,6 +189,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 			s.handlers[id] = fn
 		}
 	}
+	s.own = maps.Clone(s.handlers)
 	for _, id := range inst.accepted {
 		switch {
 		case s.handlers[id] != nil:
@@ -305,7 +309,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	s.mu.Unlock()
 	if veto != nil {
 		if err := veto(ctx, attrID, v); err != nil {
-			return vetoed(err)
+			// As given: its IM status when it carries one, FAILURE
+			// otherwise (the dispatcher reads no status from the text).
+			return err
 		}
 	}
 	if s.sink != nil {
@@ -360,14 +366,24 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 // constraint — the checks of [Instance.CheckValue], list length and list
 // entries and struct fields included — and returns it in its stored form.
 func (s *Server) check(attrID uint32, value any) (any, error) {
-	if !s.Serves(attrID) {
-		return nil, fmt.Errorf("%w: %s attribute 0x%04X", ErrNotServed, s.def.Name, attrID)
+	return s.CheckSet(attrID, value, s.peers)
+}
+
+// CheckSet checks a value the device sets for attrID — not a controller's
+// write: the attribute is served ([ErrNotServed] otherwise) and the value
+// fits its type and constraint ([ErrInvalidValue]), whatever its access —
+// and returns it in its stored form (nil for null, the Go type of the
+// attribute's width). It is the check [Server.Set] applies, for a
+// self-held server's [AttributeSetter].
+func (i *Instance) CheckSet(attrID uint32, value any, peers Peers) (any, error) {
+	if !i.Serves(attrID) {
+		return nil, fmt.Errorf("%w: %s attribute 0x%04X", ErrNotServed, i.def.Name, attrID)
 	}
-	v, err := s.CheckValue(attrID, value, s.peers)
+	v, err := i.CheckValue(attrID, value, peers)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
-	return stored(s.def.Attribute(attrID).Type, v), nil
+	return stored(i.def.Attribute(attrID).Type, v), nil
 }
 
 // defaultValue is the attribute's model default in its stored form: what
@@ -426,14 +442,24 @@ func (s *Server) store(values map[uint32]any) {
 	s.Notify(changed...)
 }
 
-// Handle registers fn for the request command cmdID. A command the
-// instance does not accept is never dispatched, registered or not. A
-// mandatory command's handler belongs in [ServerConfig.Handlers]:
+// Handle implements [CommandRegistrar]: fn handles the request command
+// cmdID, replacing the handler construction was given
+// ([ServerConfig.Handlers]) or implementing an unimplemented stub; nil
+// restores the handler construction was given (none for a stub). A
+// command the instance does not accept is refused with [ErrNotAccepted].
+// A mandatory command's handler belongs in [ServerConfig.Handlers]:
 // construction refuses a server without it ([ErrMissingHandler]).
-func (s *Server) Handle(cmdID uint32, fn CommandHandler) {
+func (s *Server) Handle(cmdID uint32, fn CommandHandler) error {
+	if !s.Instance.Accepts(cmdID) {
+		return fmt.Errorf("%w: %s command 0x%02X", ErrNotAccepted, s.def.Name, cmdID)
+	}
 	s.mu.Lock()
+	if fn == nil {
+		fn = s.own[cmdID]
+	}
 	s.handlers[cmdID] = fn
 	s.mu.Unlock()
+	return nil
 }
 
 // Handles reports whether an accepted command has a handler.

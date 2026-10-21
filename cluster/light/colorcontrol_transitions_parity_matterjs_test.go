@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -131,7 +132,7 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)
 		rate := uint64((370 - 153) / 20)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 153}); err != nil {
+		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 153}); err != nil {
 			t.Fatal(err)
 		}
 		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(1, rate, 153, 370)); err != nil {
@@ -242,7 +243,7 @@ func TestColorTemperatureReportsQuietly(t *testing.T) {
 		srv, r, _ := managedCT(true)
 		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
 		ctSleep(time.Second)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
+		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(20 * time.Second)
@@ -257,9 +258,9 @@ func TestColorTemperatureReportsQuietly(t *testing.T) {
 		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
 		ctSleep(time.Second)
 		r.reset()
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370 / 2, TransitionTime: 100})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370 / 2, TransitionTime: 100})
 		ctSleep(5 * time.Second)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 150})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 150})
 		ctSleep(20 * time.Second)
 		if _, times := r.snapshot(); len(times) != 3 || times[0] < 95 || times[0] > 100 || times[1] < 145 || times[1] > 150 || times[2] != 0 {
 			t.Errorf("RemainingTime reports %v, want [~100 ~150 0]", times)
@@ -274,7 +275,7 @@ func TestColorTemperatureReportsQuietly(t *testing.T) {
 func TestStopMoveStepReportsZero(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, r, _ := managedCT(true)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
+		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(2 * time.Second)
@@ -297,11 +298,11 @@ func TestStopMoveStepReportsZero(t *testing.T) {
 func TestColorControlExecuteIfOff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, o := managedCT(false)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
 		if m := currentMireds(t, srv); m != 250 {
 			t.Errorf("an off device took MoveToColorTemperature: %d", m)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300, OptionsMask: 1, OptionsOverride: 1})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300, OptionsMask: 1, OptionsOverride: 1})
 		if m := currentMireds(t, srv); m != 300 {
 			t.Errorf("ExecuteIfOff override: %d, want 300", m)
 		}
@@ -380,7 +381,7 @@ func TestColorTransitionWriterAndQuiesce(t *testing.T) {
 		srv, r, _ := managedCT(true)
 		w := &stepWriter{}
 		srv.SetWriter(w)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 350, TransitionTime: 100})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 350, TransitionTime: 100})
 		ctSleep(time.Second)
 		w.mu.Lock()
 		steps := len(w.values)
@@ -397,7 +398,7 @@ func TestColorTransitionWriterAndQuiesce(t *testing.T) {
 		if _, times := r.snapshot(); !slices.Equal(times, []uint16{100}) {
 			t.Errorf("RemainingTime reports %v, want [100]", times)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, wire.MoveToColorTemperatureRequest{ColorTemperatureMireds: 160, TransitionTime: 100})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 160, TransitionTime: 100})
 		w.mu.Lock()
 		w.err = errors.New("lamp gone")
 		w.mu.Unlock()

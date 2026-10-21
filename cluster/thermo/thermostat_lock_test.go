@@ -126,7 +126,7 @@ func TestSinkSynchronousRaiseLowerEcho(t *testing.T) {
 	}
 	within(t, "SetpointRaiseLower", func() {
 		if _, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower,
-			clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeBoth, Amount: 3}); err != nil {
+			tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: 3}); err != nil {
 			t.Errorf("invoke: %v", err)
 		}
 	})

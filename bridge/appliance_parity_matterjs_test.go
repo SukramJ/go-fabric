@@ -18,6 +18,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -185,8 +189,8 @@ func TestModeBasePayloadsMatchMatterJS(t *testing.T) {
 					NewMode uint8 `json:"newMode"`
 				}
 				mustUnmarshal(t, f.Fixture, &fx)
-				got, ok := decodeCommandFields(t, f.Cluster, clusterwire.ModeBaseCmdChangeToMode, f.BytesHex).(clusterwire.ChangeToModeRequest)
-				if !ok || got.NewMode != fx.NewMode {
+				got := decodeCommandFields(t, f.Cluster, clusterwire.ModeBaseCmdChangeToMode, f.BytesHex)
+				if mode, ok := newModeOf(got); !ok || mode != fx.NewMode {
 					t.Fatalf("decoded %+v, want NewMode %d", got, fx.NewMode)
 				}
 			case "commands/ChangeToModeResponse":
@@ -223,5 +227,22 @@ func TestModeBasePayloadsMatchMatterJS(t *testing.T) {
 				t.Fatalf("unhandled fixture %s %s", f.Kind, f.Element)
 			}
 		})
+	}
+}
+
+// newModeOf is NewMode of one of the four mode clusters' generated
+// ChangeToMode requests.
+func newModeOf(fields any) (uint8, bool) {
+	switch r := fields.(type) {
+	case laundrywashermode.ChangeToModeRequest:
+		return r.NewMode, true
+	case rvcrunmode.ChangeToModeRequest:
+		return r.NewMode, true
+	case rvccleanmode.ChangeToModeRequest:
+		return r.NewMode, true
+	case dishwashermode.ChangeToModeRequest:
+		return r.NewMode, true
+	default:
+		return 0, false
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 )
@@ -161,7 +162,7 @@ func invokeSetpointRaiseLower(t *testing.T, srv *thermo.ThermostatServer, mode u
 	_, err := srv.MatterInvoke(
 		context.Background(),
 		0x00,
-		clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
 	)
 	if err != nil {
 		t.Fatalf("SetpointRaiseLower(mode=%d, amount=%d): %v", mode, amount, err)

@@ -266,11 +266,11 @@ opt-in `Validate()`, which the Sigma/PASE decoders do not call.
 defensive code: it is load-bearing controller interop. Google Home's
 brightness slider omits the mandatory-but-nullable TransitionTime field
 ENTIRELY (absent context tag, not TLV Null) in LevelControl MoveToLevel /
-MoveToLevelWithOnOff / Step, so the lenient tag-walking decoders
-(`bridge/fields_reader.go`
-`decodeMoveToLevelRequest`; `cluster/wire/levelcontrol.go`
-`DecodeMoveToLevel` / `DecodeStep`) must keep decoding that shape to
-`TransitionTime == nil`. matter.js HEAD itself decodes an absent struct
+MoveToLevelWithOnOff / Step, so the bridge's generated LevelControl
+decoder fills the omitted field with its fallback, null
+(`bridge/fields_definition.go` `requestFallbacks`, BD-Matter-LevelControl-LenientDecoders),
+and `cluster/wire/levelcontrol.go` `DecodeMoveToLevel` / `DecodeStep` keep
+decoding that shape to `TransitionTime == nil`. matter.js HEAD itself decodes an absent struct
 member leniently (`packages/types/src/tlv/TlvObject.ts:205`
 `decodeTlvInternalValue` leaves it unset); the strict mandatory-field
 rejection (`ValidationMandatoryFieldMissingError`, `TlvObject.ts:258`)
@@ -287,7 +287,8 @@ The wire shape is pinned by regression tests:
 `TestDecodeMoveToLevelOmitsTransitionTime`,
 `TestDecodeStepOmitsTransitionTime` (cluster/wire),
 `TestDecodeMoveToLevelRequest_AbsentTransitionTime`,
-`TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime`
+`TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime`,
+`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime`
 (bridge). Any future strict-validation refactor MUST keep tolerating
 absent LevelControl TransitionTime tags or it silently breaks Google Home
 dimming. Sigma/PASE container/tag strictness remains a fuzz/robustness
@@ -450,22 +451,6 @@ need, so `light.ColorControlServer` converts with `XYToHSV` (the port of
 `TestXYToHueSaturationConvertsTheColour` (`cluster/light`), which fails on
 matter.js's call. Upstream matter.js issue candidate: call `xyToHsv`
 there. Retire this entry when matter.js does.
-
-### BD-Matter-ColorControl-LegacyDecoders — four ColorControl requests keep their hand-written decoders
-
-matter.js decodes every request against its schema and answers a missing
-mandatory field with INVALID_COMMAND (`CommandInvokeResponse.ts`,
-`ValidationMandatoryFieldMissingError`). The module decodes every
-ColorControl request through the generated definition
-(`cluster/spec/colorcontrol`, ADR 0013) — except MoveToHue,
-MoveToSaturation, MoveToHueAndSaturation and MoveToColorTemperature, which
-keep the bridge's hand-written decoders (`bridge/fields_reader.go`) and
-arrive as the `cluster/wire` structs host ColorControl servers were
-written against. Those four check each field's width (CONSTRAINT_ERROR) and
-`light.ColorControlServer` checks its constraint, but a missing field
-reads as 0 instead of failing the command. Retire when the four move to
-the generated decoders in a release that announces the changed field type
-to host servers.
 
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
@@ -2164,7 +2149,7 @@ only — after the definition's checks, before the `Sink` and the store —
 and never for the host's own `Set`; an error carrying an IM status
 answers the attribute with it, any other error answers that attribute
 with FAILURE and leaves the request's other writes to their own result
-(`cluster/spec/typed.go` `vetoed`). Reasoning: the host's own `Set` is
+(`endpoint/dispatcher.go` `classifyError`). Reasoning: the host's own `Set` is
 the host's decision and needs no veto by the host, and a per-attribute
 status is the write response's own unit, where matter.js's message-level
 FAILURE is the fall-through of an uncaught error, not a choice (phase 20b,
@@ -2845,25 +2830,28 @@ The code itself is in Git history.
 |---|---|---|
 | `cluster/core/power_source.go` | PowerSource (0x002F) cluster server, core-package variant | Duplicate of the production `measurement.PowerSourceServer` (mounted via the measurement cluster factory). Schema parity for PowerSource is held by the measurement package's parity tests. Removed in the 2026-07-04 wiring audit, while the stack still lived in OpenCCU-Loom. |
 
-### BD-Matter-LevelControl-LenientDecoders — LevelControl requests stay off the generated decoder
+### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
 
-The module decodes LevelControl requests leniently although the generated
-LevelControl definition (`cluster/spec/levelcontrol`, ADR 0013) is linked
-wherever `cluster/levelcontrol` is: MoveToLevel and MoveToLevelWithOnOff
-through the bridge's hand-written `decodeMoveToLevelRequest`, Move, Step,
-Stop and their WithOnOff forms through the generic tag map
-(`bridge/fields_reader.go`, case 0x0008). matter.js validates every request
-against its schema and answers a missing mandatory field with
-INVALID_COMMAND (`CommandInvokeResponse.ts`); Google Home omits the
-mandatory-but-nullable TransitionTime entirely (the permissive
-command-field decoding above), and the generated decoder would refuse its
-Step. `levelcontrol.Server` reads an absent nullable field as null and an
-absent OptionsMask / OptionsOverride as 0, as it did. The same holds for
-FanControl Step, which keeps `decodeFanStepRequest` because a `Stepper`
-host receives its `cluster/wire.FanStepRequest`. Pinned by
-`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime`. Retire
-when the generated decoders can be told which absent fields a controller
-in the field omits.
+The bridge decodes every LevelControl request through the generated
+definition (`cluster/spec/levelcontrol`, ADR 0013; since brief BX1 the
+definition decodes first, gate 1 G1-2), but a mandatory field that is
+absent from the payload decodes as its fallback instead of failing:
+TransitionTime (MoveToLevel, Step and their WithOnOff forms) and Rate
+(Move, MoveWithOnOff) as null, OptionsMask and OptionsOverride (all eight)
+as 0 (`bridge/fields_definition.go` `requestFallbacks`). matter.js has the
+mechanism — a mandatory `TlvField` may carry a fallback that populates the
+field "when devices omit" it (`packages/types/src/tlv/TlvObject.ts:233-245`,
+`:393-398`) — but declares none for LevelControl, so it validates the
+request and answers a missing mandatory field with INVALID_COMMAND
+(`CommandInvokeResponse.ts`, `ValidationMandatoryFieldMissingError`).
+Google Home omits the mandatory-but-nullable TransitionTime entirely (the
+permissive command-field decoding above), and the strict decoder would
+refuse its MoveToLevel and Step. `levelcontrol.Server` reads the fallbacks
+as matter.js reads a null TransitionTime and zero options. A missing Level,
+MoveMode, StepMode or StepSize still answers INVALID_COMMAND. Pinned by
+`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime` and
+`TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime`. Retire
+when the controllers in the field send the mandatory fields.
 
 ### BD-Matter-AdminCommissioning-OpenWindowParams — OpenCommissioningWindow keeps its hand-written decoder
 

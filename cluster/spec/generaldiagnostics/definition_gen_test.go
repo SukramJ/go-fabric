@@ -63,18 +63,18 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleTestEventTrigger(func(context.Context, TestEventTriggerRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleTestEventTrigger(func(context.Context, TestEventTriggerRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleTestEventTrigger: a command the server does not accept was registered")
 	}
 	if err := s.HandleTimeSnapshot(func(context.Context, TimeSnapshotRequest) (TimeSnapshotResponse, error) {
 		return TimeSnapshotResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleTimeSnapshot: a command the server does not accept was registered")
 	}
 	if err := s.HandlePayloadTestRequest(func(context.Context, PayloadTestRequestRequest) (PayloadTestResponse, error) {
 		return PayloadTestResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandlePayloadTestRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitHardwareFaultChange(0, HardwareFaultChangeEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitRadioFaultChange(0, RadioFaultChangeEvent{})       // not in the empty definition's EventList: refused

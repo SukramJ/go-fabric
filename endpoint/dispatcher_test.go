@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -582,10 +583,11 @@ func TestWrite_Success(t *testing.T) {
 	}
 }
 
-// TestWrite_ReadOnlyMapsToUnsupportedWrite verifies that a "read-only" error maps to StatusUnsupportedWrite.
+// TestWrite_ReadOnlyMapsToUnsupportedWrite verifies that a typed
+// UNSUPPORTED_WRITE error answers StatusUnsupportedWrite.
 func TestWrite_ReadOnlyMapsToUnsupportedWrite(t *testing.T) {
 	t.Parallel()
-	srv := &fakeServerFull{id: 0x0006, writeErr: errors.New("foo: read-only error")}
+	srv := &fakeServerFull{id: 0x0006, writeErr: spec.Errorf(im.StatusUnsupportedWrite, "foo: read-only error")}
 	d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
 	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x0001), im.AttributeValue{Value: uint8(1)})
 	if len(results) != 1 {
@@ -596,10 +598,11 @@ func TestWrite_ReadOnlyMapsToUnsupportedWrite(t *testing.T) {
 	}
 }
 
-// TestWrite_UnknownAttributeMaps verifies that an "unknown attribute" error maps to StatusUnsupportedAttribute.
+// TestWrite_UnknownAttributeMaps verifies that a typed
+// UNSUPPORTED_ATTRIBUTE error answers StatusUnsupportedAttribute.
 func TestWrite_UnknownAttributeMaps(t *testing.T) {
 	t.Parallel()
-	srv := &fakeServerFull{id: 0x0006, writeErr: errors.New("unknown attribute 0xFEED")}
+	srv := &fakeServerFull{id: 0x0006, writeErr: spec.Errorf(im.StatusUnsupportedAttribute, "unknown attribute 0xFEED")}
 	d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
 	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0xFEED), im.AttributeValue{Value: uint8(0)})
 	if len(results) != 1 {
@@ -610,10 +613,11 @@ func TestWrite_UnknownAttributeMaps(t *testing.T) {
 	}
 }
 
-// TestWrite_ConstraintMaps verifies that a "constraint" error maps to StatusConstraintError.
+// TestWrite_ConstraintMaps verifies that a typed CONSTRAINT_ERROR error
+// answers StatusConstraintError.
 func TestWrite_ConstraintMaps(t *testing.T) {
 	t.Parallel()
-	srv := &fakeServerFull{id: 0x0006, writeErr: errors.New("constraint violation: too small")}
+	srv := &fakeServerFull{id: 0x0006, writeErr: spec.Errorf(im.StatusConstraintError, "constraint violation: too small")}
 	d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
 	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x0010), im.AttributeValue{Value: uint8(0)})
 	if len(results) != 1 {
@@ -661,22 +665,28 @@ func TestInvoke_SuccessAndUnknownCommand(t *testing.T) {
 			wantStatus: im.StatusSuccess,
 		},
 		{
-			name:       "unknown command substring",
+			name:       "unknown command typed",
+			invokeResp: nil,
+			invokeErr:  im.UnsupportedCommandf("unknown command 0xFE"),
+			wantStatus: im.StatusUnsupportedCommand,
+		},
+		{
+			name:       "unknown command wording alone",
 			invokeResp: nil,
 			invokeErr:  errors.New("unknown command 0xFE"),
-			wantStatus: im.StatusUnsupportedCommand,
+			wantStatus: im.StatusFailure,
 		},
 		{
-			name:       "no commands on cluster",
+			name:       "constraint error typed",
 			invokeResp: nil,
-			invokeErr:  errors.New("no commands on this cluster"),
-			wantStatus: im.StatusUnsupportedCommand,
+			invokeErr:  spec.Errorf(im.StatusConstraintError, "constraint: value out of range"),
+			wantStatus: im.StatusConstraintError,
 		},
 		{
-			name:       "constraint error",
+			name:       "constraint wording alone",
 			invokeResp: nil,
 			invokeErr:  errors.New("constraint: value out of range"),
-			wantStatus: im.StatusConstraintError,
+			wantStatus: im.StatusFailure,
 		},
 		{
 			name:       "generic failure",
@@ -876,20 +886,32 @@ func TestWrite_IsNull(t *testing.T) {
 	}
 }
 
-// TestWriteErrorStatus_ResourceExhausted_StringHeuristic verifies that a plain
-// string error containing "resource exhausted" maps to StatusResourceExhausted.
-func TestWriteErrorStatus_ResourceExhausted_StringHeuristic(t *testing.T) {
+// TestWriteErrorStatus_WordingIsNoStatus verifies that the dispatcher reads
+// no status out of an error's text: a plain error whose message names a
+// status answers FAILURE, the same error typed answers its status (ADR
+// 0026 principle 8; the text fallback is gone).
+func TestWriteErrorStatus_WordingIsNoStatus(t *testing.T) {
 	t.Parallel()
-	// Use a plain error (not a StatusCodeError) so the string-heuristic branch runs.
-	err := errors.New("resource exhausted: ACL entries full")
-	srv := &fakeServerFull{id: 0x0006, writeErr: err}
-	d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
-	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x0001), im.AttributeValue{Value: uint8(0)})
-	if len(results) != 1 {
-		t.Fatalf("want 1 result, got %d", len(results))
-	}
-	if results[0].Status != im.StatusResourceExhausted {
-		t.Errorf("status = %v, want StatusResourceExhausted (string heuristic)", results[0].Status)
+	for _, tc := range []struct {
+		err  error
+		want im.StatusCode
+	}{
+		{errors.New("resource exhausted: ACL entries full"), im.StatusFailure},
+		{errors.New("foo: read-only error"), im.StatusFailure},
+		{errors.New("unknown attribute 0xFEED"), im.StatusFailure},
+		{errors.New("constraint violation: too small"), im.StatusFailure},
+		{spec.Errorf(im.StatusResourceExhausted, "resource exhausted: ACL entries full"), im.StatusResourceExhausted},
+		{fmt.Errorf("wrapped: %w", spec.Errorf(im.StatusResourceExhausted, "ACL entries full")), im.StatusResourceExhausted},
+	} {
+		srv := &fakeServerFull{id: 0x0006, writeErr: tc.err}
+		d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
+		results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x0001), im.AttributeValue{Value: uint8(0)})
+		if len(results) != 1 {
+			t.Fatalf("want 1 result, got %d", len(results))
+		}
+		if results[0].Status != tc.want {
+			t.Errorf("%q: status = %v, want %v", tc.err, results[0].Status, tc.want)
+		}
 	}
 }
 
@@ -908,13 +930,13 @@ func TestInvokeErrorStatus_Nil(t *testing.T) {
 	}
 }
 
-// TestInvokeErrorStatus_InvalidCommandArgument verifies that an error containing
-// "invalid command argument" maps to StatusInvalidCommand.
+// TestInvokeErrorStatus_InvalidCommandArgument verifies that a typed
+// INVALID_COMMAND error answers StatusInvalidCommand.
 func TestInvokeErrorStatus_InvalidCommandArgument(t *testing.T) {
 	t.Parallel()
 	srv := &fakeServerFull{
 		id:        0x0006,
-		invokeErr: errors.New("invalid command argument: key_set_id must not be 0"),
+		invokeErr: spec.Errorf(im.StatusInvalidCommand, "invalid command argument: key_set_id must not be 0"),
 	}
 	d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))
 	r := d.Invoke(context.Background(), concreteCmdPath(2, 0x0006, 0x00), nil)
@@ -1476,8 +1498,7 @@ func TestInvokeUnsupportedCommandMapsTo0x81(t *testing.T) {
 	for name, err := range map[string]error{
 		"typed sentinel":     im.ErrUnsupportedCommand,
 		"typed with message": im.UnsupportedCommandf("matter: Identify command 0x%02X not supported", 0x01),
-		"legacy string form": errors.New("matter: unknown command 0x01"),
-		"legacy no-commands": errors.New("measurement: cluster has no commands"),
+		"typed status error": spec.Errorf(im.StatusUnsupportedCommand, "measurement: cluster has no commands"),
 	} {
 		srv := &fakeServerFull{id: 0x0003, invokeErr: err}
 		d := NewTopologyDispatcher(makeTopology(makeEndpointFull(2, srv)))

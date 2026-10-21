@@ -155,7 +155,7 @@ func TestChangeToModeAcceptsGeneratedRequests(t *testing.T) {
 		{modebase.NewDishwasherMode, dishModes, dishwashermode.ChangeToModeRequest{NewMode: 1}},
 		{modebase.NewRvcRunMode, runModes, rvcrunmode.ChangeToModeRequest{NewMode: 1}},
 		{modebase.NewRvcCleanMode, cleanModes, rvccleanmode.ChangeToModeRequest{NewMode: 2}},
-		{modebase.NewOvenMode, ovenModes, clusterwire.ChangeToModeRequest{NewMode: 1}},
+		{modebase.NewOvenMode, ovenModes, ovenmode.ChangeToModeRequest{NewMode: 1}},
 	} {
 		c := &changer{}
 		srv, err := tc.build(modebase.Config{Changer: c, SupportedModes: tc.modes, CurrentMode: tc.modes[0].Mode})
@@ -186,7 +186,7 @@ func TestMicrowaveOvenModeAcceptsNoCommand(t *testing.T) {
 		t.Errorf("command lists %v / %v", srv.MatterAcceptedCommands(), srv.MatterGeneratedCommands())
 	}
 	var sce im.StatusCodeError
-	for _, req := range []any{microwaveovenmode.ChangeToModeRequest{NewMode: 1}, clusterwire.ChangeToModeRequest{NewMode: 1}} {
+	for _, req := range []any{microwaveovenmode.ChangeToModeRequest{NewMode: 1}, clusterwire.ChangeToModeRequest{NewMode: 1}} { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, req); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusUnsupportedCommand {
 			t.Errorf("%T: %v", req, err)
 		}

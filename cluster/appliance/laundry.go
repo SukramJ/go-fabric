@@ -76,6 +76,9 @@ type WasherConfig struct {
 // LaundryWasherControls.
 type WasherServer struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (laundry_typed.go).
+	spec.SelfHeld
 
 	srv      *spec.Server
 	speeds   []string
@@ -107,6 +110,9 @@ type DryerConfig struct {
 // DryerServer implements [contract.ClusterServer] for LaundryDryerControls.
 type DryerServer struct {
 	*spec.Instance
+	// SelfHeld is the typed server's command handlers, event path and
+	// write veto over srv (laundry_typed.go).
+	spec.SelfHeld
 
 	srv      *spec.Server
 	levels   []DrynessLevel
@@ -133,7 +139,7 @@ func NewLaundryWasherControls(cfg WasherConfig) (*WasherServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("laundrywashercontrols: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	values := map[uint32]any{}
 	if s.HasFeature("SPIN") {
 		values[lwc.AttrSpinSpeeds] = slices.Clone(s.speeds)
@@ -230,7 +236,7 @@ func (s *WasherServer) MatterWrite(ctx context.Context, attrID uint32, value any
 
 // MatterInvoke answers every command: the cluster has none.
 func (s *WasherServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
 
 // SpinSpeedCurrent returns the current spin speed index; nil for null or
@@ -282,7 +288,7 @@ func NewLaundryDryerControls(cfg DryerConfig) (*DryerServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("laundrydryercontrols: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	var level any
 	if cfg.SelectedDrynessLevel != nil {
 		level = *cfg.SelectedDrynessLevel
@@ -349,7 +355,7 @@ func (s *DryerServer) MatterWrite(ctx context.Context, attrID uint32, value any)
 
 // MatterInvoke answers every command: the cluster has none.
 func (s *DryerServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
 
 // SelectedDrynessLevel returns the selected level; nil for null.

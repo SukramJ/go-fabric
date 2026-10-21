@@ -54,8 +54,8 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleResetWatermarks(func(context.Context, ResetWatermarksRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleResetWatermarks(func(context.Context, ResetWatermarksRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleResetWatermarks: a command the server does not accept was registered")
 	}
 	_ = s.EmitSoftwareFault(0, SoftwareFaultEvent{}) // not in the empty definition's EventList: refused
 }

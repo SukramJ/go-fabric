@@ -16,9 +16,9 @@ import (
 // A command's fields reach the server in one of three shapes: the
 // generated request struct the bridge decodes through the ColorControl
 // definition (cluster/spec/colorcontrol, with matter.js's TlvSchema checks
-// and statuses), the hand-written cluster/wire structs a caller in this
-// module builds (the ScenesManagement recall), or the generic tag map an
-// in-process caller hands over. Every shape is normalised to the generated
+// and statuses) — by value or by pointer, the primary form — the generic
+// tag map an in-process caller hands over, or, until their removal in
+// v0.12.0, the deprecated cluster/wire structs. Every shape is normalised to the generated
 // struct, and its values are checked against the field constraints and
 // enums of color-control.element.ts — CONSTRAINT_ERROR, as matter.js's
 // ValueValidator answers a request field out of range — so a shape that
@@ -151,7 +151,7 @@ func firstErr(errs ...error) error {
 func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 	r, err := requestOf(fields, "MoveToHue",
 		func(v any) (ccdef.MoveToHueRequest, bool) {
-			w, ok := v.(wire.MoveToHueRequest)
+			w, ok := v.(wire.MoveToHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveToHueRequest{
 				Hue: w.Hue, Direction: ccdef.DirectionEnum(w.Direction), TransitionTime: w.TransitionTime,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
@@ -176,7 +176,7 @@ func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 	r, err := requestOf(fields, "MoveHue",
 		func(v any) (ccdef.MoveHueRequest, bool) {
-			w, ok := v.(wire.MoveHueRequest)
+			w, ok := v.(wire.MoveHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveHueRequest{
 				MoveMode: ccdef.MoveModeEnum(w.MoveMode), Rate: w.Rate,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
@@ -196,7 +196,7 @@ func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 	r, err := requestOf(fields, "StepHue",
 		func(v any) (ccdef.StepHueRequest, bool) {
-			w, ok := v.(wire.StepHueRequest)
+			w, ok := v.(wire.StepHueRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.StepHueRequest{
 				StepMode: ccdef.StepModeEnum(w.StepMode), StepSize: w.StepSize,
 				TransitionTime: uint8(min(w.TransitionTime, math.MaxUint8)), //nolint:gosec // bounded by MaxUint8
@@ -218,7 +218,7 @@ func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToSaturation",
 		func(v any) (ccdef.MoveToSaturationRequest, bool) {
-			w, ok := v.(wire.MoveToSaturationRequest)
+			w, ok := v.(wire.MoveToSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveToSaturationRequest{
 				Saturation: w.Saturation, TransitionTime: w.TransitionTime,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
@@ -241,7 +241,7 @@ func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveSaturation",
 		func(v any) (ccdef.MoveSaturationRequest, bool) {
-			w, ok := v.(wire.MoveSaturationRequest)
+			w, ok := v.(wire.MoveSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveSaturationRequest{
 				MoveMode: ccdef.MoveModeEnum(w.MoveMode), Rate: w.Rate,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
@@ -261,7 +261,7 @@ func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 	r, err := requestOf(fields, "StepSaturation",
 		func(v any) (ccdef.StepSaturationRequest, bool) {
-			w, ok := v.(wire.StepSaturationRequest)
+			w, ok := v.(wire.StepSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.StepSaturationRequest{
 				StepMode: ccdef.StepModeEnum(w.StepMode), StepSize: w.StepSize,
 				TransitionTime: uint8(min(w.TransitionTime, math.MaxUint8)), //nolint:gosec // bounded by MaxUint8
@@ -283,7 +283,7 @@ func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 func moveToHueAndSaturationFields(fields any) (ccdef.MoveToHueAndSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToHueAndSaturation",
 		func(v any) (ccdef.MoveToHueAndSaturationRequest, bool) {
-			w, ok := v.(wire.MoveToHueAndSaturationRequest)
+			w, ok := v.(wire.MoveToHueAndSaturationRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveToHueAndSaturationRequest{
 				Hue: w.Hue, Saturation: w.Saturation, TransitionTime: w.TransitionTime,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
@@ -344,7 +344,7 @@ func stepColorFields(fields any) (ccdef.StepColorRequest, error) {
 func moveToColorTemperatureFields(fields any) (ccdef.MoveToColorTemperatureRequest, error) {
 	r, err := requestOf(fields, "MoveToColorTemperature",
 		func(v any) (ccdef.MoveToColorTemperatureRequest, bool) {
-			w, ok := v.(wire.MoveToColorTemperatureRequest)
+			w, ok := v.(wire.MoveToColorTemperatureRequest) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 			return ccdef.MoveToColorTemperatureRequest{
 				ColorTemperatureMireds: w.ColorTemperatureMireds, TransitionTime: w.TransitionTime,
 				OptionsMask: ccdef.OptionsBitmap(w.OptionsMask), OptionsOverride: ccdef.OptionsBitmap(w.OptionsOverride),
