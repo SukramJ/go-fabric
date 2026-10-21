@@ -239,15 +239,9 @@ type AirflowDirectionSetter interface {
 // entirely. How a step maps onto the speed-oriented attributes "is
 // implementation specific" (resource :214-215); a host with its own
 // idea implements Stepper, and one without gets the server's default
-// (see [Server.MatterInvoke]).
-//
-// Deprecated: a host port takes the generated request — implement
-// fancontroldef.Stepper (Step over fancontroldef.StepRequest) and pass it
-// as [Config].Stepper with [Config].Port, or declare both
-// (fancontroldef.Declare). May be removed in v0.12.0.
-type Stepper interface {
-	Step(ctx context.Context, req clusterwire.FanStepRequest) error
-}
+// (see [Server.MatterInvoke]). It takes the generated request
+// (fancontroldef.StepRequest), what fancontroldef.Declare's Stepper is.
+type Stepper = fandef.Stepper
 
 // Config carries the construction parameters for [Server].
 type Config struct {
@@ -682,7 +676,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		return nil, err
 	}
 	if stepper, ok := s.src.(Stepper); ok {
-		if err := stepper.Step(ctx, req); err != nil {
+		if err := stepper.Step(ctx, stepRequestOf(req)); err != nil {
 			return nil, fmt.Errorf("fan: Step: %w", err)
 		}
 		s.tracker().Bump()

@@ -137,8 +137,8 @@ func TestDeclareOverTheWire(t *testing.T) {
 	}
 }
 
-// TestDeclareOnAnyServer: a declaration's hooks go on a host's own server
-// (WithServer) as on the kit's, and an empty declaration of an assembler
+// TestDeclareOnAnyServer: a declaration's hooks go on the host's own server
+// (HostServer) as on the kit's, and an empty declaration of an assembler
 // cluster the type allows opts the endpoint in, as WithOptional does.
 func TestDeclareOnAnyServer(t *testing.T) {
 	t.Parallel()
@@ -148,8 +148,8 @@ func TestDeclareOnAnyServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	var handled bool
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("host")}, device.WithServer(srv),
-		onoffdef.Declare{HandleOn: func(context.Context, onoffdef.OnRequest) (struct{}, error) { handled = true; return struct{}{}, nil }})
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("host")},
+		onoffdef.Declare{HostServer: srv, HandleOn: func(context.Context, onoffdef.OnRequest) (struct{}, error) { handled = true; return struct{}{}, nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,6 +178,13 @@ func TestDeclareRefusals(t *testing.T) {
 	}
 	if _, err := device.NewOnOffLight(opts, wcdef.Declare{}); !errors.Is(err, device.ErrConfiguration) {
 		t.Errorf("WindowCovering on a light: %v, want ErrConfiguration", err)
+	}
+	host, _ := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(onoffdef.FeatureLighting)}, spec.ServerConfig{Unimplemented: true})
+	if _, err := device.NewOnOffLight(opts, onoffdef.Declare{HostServer: host, Sink: &relay{}}); !errors.Is(err, device.ErrConfiguration) {
+		t.Errorf("a port beside a HostServer: %v, want ErrConfiguration", err)
+	}
+	if _, err := device.NewOnOffLight(opts, onoffdef.Declare{HostServer: host, Initial: onoffdef.Patch{OnOff: new(true)}}); !errors.Is(err, device.ErrConfiguration) {
+		t.Errorf("Initial beside a HostServer: %v, want ErrConfiguration", err)
 	}
 	if _, err := device.NewOnOffLight(opts, onoffdef.Declare{
 		HandleOffWithEffect: func(context.Context, onoffdef.OffWithEffectRequest) (struct{}, error) { return struct{}{}, nil },

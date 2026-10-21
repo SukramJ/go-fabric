@@ -101,26 +101,21 @@ func (q *queue) run(done chan struct{}) {
 }
 
 // deviceClock is the time source of the servers a device builds: the
-// clock the host set ([Options].Clock), else the node's once the device is
-// added, else [clock.System]. A timer keeps the clock it was armed on.
+// node's once the device is added, [clock.System] before. A timer keeps
+// the clock it was armed on.
 type deviceClock struct {
-	// mu guards host and node.
+	// mu guards node.
 	mu   sync.Mutex
-	host clock.Clock // Options.Clock
 	node clock.Clock
 }
 
 func (c *deviceClock) get() clock.Clock {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	switch {
-	case c.host != nil:
-		return c.host
-	case c.node != nil:
+	if c.node != nil {
 		return c.node
-	default:
-		return clock.System{}
 	}
+	return clock.System{}
 }
 
 func (c *deviceClock) setNode(n clock.Clock) {

@@ -35,6 +35,7 @@ import (
 	admincomm "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/chime"
 	"github.com/SukramJ/go-fabric/cluster/spec/groups"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
@@ -304,7 +305,7 @@ func failingLightSpec(key string, fail func() error) endpointSpec {
 		}
 		held.Store(srv)
 		return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key},
-			device.WithServer(&failingOnOff{Server: srv, fail: fail}))
+			onoffdef.Declare{HostServer: &failingOnOff{Server: srv, fail: fail}})
 	}}
 }
 

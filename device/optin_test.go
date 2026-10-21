@@ -89,8 +89,8 @@ func TestOptInRefusals(t *testing.T) {
 	}{
 		"Groups on a type that does not list it": {&TemperatureSensorType, []Option{WithOptional(groupsID)}},
 		"Identify":                               {&AirPurifierType, []Option{WithOptional(0x0003)}},
-		"a host Groups server":                   {&AirPurifierType, []Option{WithOptional(groupsID), WithServer(&hostServer{id: groupsID})}},
-		"initial values for Groups":              {&AirPurifierType, []Option{WithOptional(groupsID), WithInitial(groupsID, map[uint32]any{0: uint8(0)})}},
+		"a host Groups server":                   {&AirPurifierType, []Option{WithOptional(groupsID), withServer(&hostServer{id: groupsID})}},
+		"initial values for Groups":              {&AirPurifierType, []Option{WithOptional(groupsID), withInitial(groupsID, map[uint32]any{0: uint8(0)})}},
 	} {
 		if _, err := New(c.ty, testOptions("r"), c.with...); !errors.Is(err, ErrConfiguration) {
 			t.Errorf("%s: %v, want ErrConfiguration", name, err)

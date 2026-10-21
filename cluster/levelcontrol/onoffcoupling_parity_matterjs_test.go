@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 func TestParityMatterJS_OnOffCouplingTest(t *testing.T) {
@@ -29,7 +30,7 @@ func TestParityMatterJS_OnOffCouplingTest(t *testing.T) {
 		// coupledLight() (OnOffCouplingTest.ts:134-145): off, level 1,
 		// OnLevel 100.
 		l := newNodeLight(t, nodeLightOptions{level: 1, on: false, onLevel: u8(100)})
-		l.invoke(t, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 50})
+		l.invoke(t, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 50})
 		// The level is moved once: not a second time, to OnLevel.
 		lv, on := l.lamp.state()
 		if !on || lv != 50 {

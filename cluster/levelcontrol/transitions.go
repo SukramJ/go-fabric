@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/wire"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/transition"
@@ -137,7 +139,7 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 	ctx := context.Background()
 	for _, c := range changes {
 		zero := uint16(0)
-		if err := s.src.MoveToLevel(ctx, MoveToLevelRequest{
+		if err := s.src.MoveToLevel(ctx, wire.MoveToLevelRequest{
 			Level: uint8(c.Value), TransitionTime: &zero, //nolint:gosec // the engine keeps the value between MinLevel and MaxLevel
 			OptionsMask: OptionExecuteIfOff, OptionsOverride: OptionExecuteIfOff,
 		}); err != nil {
@@ -275,7 +277,7 @@ func (s *Server) currentLevel() (uint8, error) {
 // TransitionTime (none for a null or zero TransitionTime — no
 // OnOffTransitionTime is served), and the plain command gated by
 // ExecuteIfOff.
-func (s *Server) runMoveToLevel(ctx context.Context, req MoveToLevelRequest, withOnOff bool) error {
+func (s *Server) runMoveToLevel(ctx context.Context, req wire.MoveToLevelRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -295,7 +297,7 @@ func (s *Server) runMoveToLevel(ctx context.Context, req MoveToLevelRequest, wit
 // bound in the direction of MoveMode at Rate per second, at once for a
 // null Rate (no DefaultMoveRate is served). The zero Rate was refused
 // before.
-func (s *Server) runMove(ctx context.Context, req MoveRequest, withOnOff bool) error {
+func (s *Server) runMove(ctx context.Context, req wire.MoveRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -317,7 +319,7 @@ func (s *Server) runMove(ctx context.Context, req MoveRequest, withOnOff bool) e
 // runStep is matter.js step / stepWithOnOff and stepLogic: StepSize from
 // the current level, over TransitionTime (at once for a null one, or a
 // zero one, whose rate is infinite).
-func (s *Server) runStep(ctx context.Context, req StepRequest, withOnOff bool) error {
+func (s *Server) runStep(ctx context.Context, req wire.StepRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -343,7 +345,7 @@ func (s *Server) runStep(ctx context.Context, req StepRequest, withOnOff bool) e
 // runStop is matter.js stop / stopWithOnOff and stopLogic: the transition
 // ends where it is and RemainingTime reports 0. Only the plain Stop is
 // gated by ExecuteIfOff.
-func (s *Server) runStop(req StopRequest, withOnOff bool) error {
+func (s *Server) runStop(req wire.StopRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	if !withOnOff && !s.executes(s.effectiveOptions(req.OptionsMask, req.OptionsOverride)) {

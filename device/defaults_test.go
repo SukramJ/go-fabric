@@ -51,19 +51,19 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x001E, func() (*Device, error) { return New(&OnOffLightSwitchType, testOptions("bind")) }, (*core.Binding)(nil)},
 		{0x0750, func() (*Device, error) { return New(&BridgedNodeType, testOptions("eco"), WithOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
 		{0x003B, func() (*Device, error) {
-			return New(&GenericSwitchType, testOptions("sw"), WithFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
+			return New(&GenericSwitchType, testOptions("sw"), withFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
 		}, (*switchserver.Server)(nil)},
 		{0x0101, func() (*Device, error) {
-			return New(&DoorLockType, testOptions("dl"), WithFeatures(0x0101, uint32(lockdef.FeatureUnbolting)))
+			return New(&DoorLockType, testOptions("dl"), withFeatures(0x0101, uint32(lockdef.FeatureUnbolting)))
 		}, (*lock.DoorLockServer)(nil)},
 		{0x0102, func() (*Device, error) {
-			return New(&WindowCoveringType, testOptions("wc"), WithFeatures(0x0102, cover.ServedFeatureMap))
+			return New(&WindowCoveringType, testOptions("wc"), withFeatures(0x0102, cover.ServedFeatureMap))
 		}, (*cover.WindowCoveringServer)(nil)},
 		{0x0201, func() (*Device, error) {
-			return New(&ThermostatType, testOptions("th"), WithFeatures(0x0201, thermo.ThermostatFeatureHEAT))
+			return New(&ThermostatType, testOptions("th"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT))
 		}, (*thermo.ThermostatServer)(nil)},
 		{0x0053, func() (*Device, error) {
-			return New(&LaundryWasherType, testOptions("lw"), WithOptional(0x0053), WithFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
+			return New(&LaundryWasherType, testOptions("lw"), WithOptional(0x0053), withFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
 		}, (*appliance.WasherServer)(nil)},
 		{0x0057, optIn(&RefrigeratorType, 0x0057), (*alarmbase.Server)(nil)},
 		{0x005D, optIn(&DishwasherType, 0x005D), (*alarmbase.Server)(nil)},
@@ -74,11 +74,11 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x0099, func() (*Device, error) { return New(&EnergyEvseType, testOptions("evse")) }, (*energy.EvseServer)(nil)},
 		{0x00A0, optIn(&ElectricalEnergyTariffType, 0x00A0), (*energy.GridConditionsServer)(nil)},
 		{0x0204, func() (*Device, error) {
-			return New(&ThermostatType, testOptions("tui"), WithFeatures(0x0201, thermo.ThermostatFeatureHEAT), WithOptional(0x0204))
+			return New(&ThermostatType, testOptions("tui"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), WithOptional(0x0204))
 		}, (*thermo.ThermostatUIServer)(nil)},
 		{0x0B07, func() (*Device, error) {
-			return New(&ElectricalMeterType, testOptions("meter"), WithOptional(0x0B07), WithFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
-				WithFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
+			return New(&ElectricalMeterType, testOptions("meter"), WithOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
+				withFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
 		}, (*energy.CommodityMeteringServer)(nil)},
 	}
 	covered := map[uint32]bool{}
@@ -127,7 +127,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 // (brief BU).
 func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *testing.T) {
 	t.Parallel()
-	wc, err := New(&WindowCoveringType, testOptions("wc"), WithFeatures(0x0102, uint32(wcdef.FeatureLift)))
+	wc, err := New(&WindowCoveringType, testOptions("wc"), withFeatures(0x0102, uint32(wcdef.FeatureLift)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *te
 // DimmableLightDevice's LevelControlServer and OnOffServer do.
 func TestDimmableLightCouplesItsServers(t *testing.T) {
 	t.Parallel()
-	d, err := NewDimmableLight(testOptions("dim"), WithInitial(0x0008, map[uint32]any{0x0011: uint8(80)}))
+	d, err := NewDimmableLight(testOptions("dim"), withInitial(0x0008, map[uint32]any{0x0011: uint8(80)}))
 	if err != nil {
 		t.Fatal(err)
 	}

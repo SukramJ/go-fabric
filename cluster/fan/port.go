@@ -85,8 +85,14 @@ func (s portSource) SetAirflowDirection(ctx context.Context, dir AirflowDirectio
 	return s.p.ApplyFanSettings(ctx, fandef.Patch{AirflowDirection: &dir})
 }
 
-// Step implements [Stepper] in the generated request.
-func (s portStepper) Step(ctx context.Context, req clusterwire.FanStepRequest) error {
+// Step implements [Stepper].
+func (s portStepper) Step(ctx context.Context, req fandef.StepRequest) error {
+	return s.step.Step(ctx, req)
+}
+
+// stepRequestOf is the decoded Step as the generated request a [Stepper]
+// takes.
+func stepRequestOf(req clusterwire.FanStepRequest) fandef.StepRequest {
 	wrap, lowestOff := req.Wrap, req.LowestOff
-	return s.step.Step(ctx, fandef.StepRequest{Direction: fandef.StepDirectionEnum(req.Direction), Wrap: &wrap, LowestOff: &lowestOff})
+	return fandef.StepRequest{Direction: fandef.StepDirectionEnum(req.Direction), Wrap: &wrap, LowestOff: &lowestOff}
 }

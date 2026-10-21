@@ -124,15 +124,26 @@ layer never does.
 - `Reachable` is a probe for the device's reachability; nil means always
   reachable.
 
-Options passed after `Options` change what the device serves:
+Declarations passed after `Options` change what the device serves. A
+cluster is declared with `<cluster>def.Declare` of its generated package
+(`github.com/SukramJ/go-fabric/cluster/spec/<cluster>`, imported as
+`<cluster>def`), the one form for everything about it:
+
+| `Declare` field | Effect |
+| --- | --- |
+| `Initial` | initial state over the device type's defaults; an optional attribute with a value is served |
+| `Features` | the cluster's feature selection (zero is the device type's) |
+| `OnWrite` | a veto on a controller's write |
+| `Handle<Command>` | your handler in place of the server's own (an optional command is then accepted) |
+| a host port (`Sink`, `LevelSource`, `Mover`, …) | the device the kit's server drives |
+| `HostServer` | your own server for the cluster, replacing the kit's |
+
+The device's other options:
 
 | Option | Effect |
 | --- | --- |
-| `WithServer(srv)` | your own server for a cluster, replacing the default |
-| `WithOptional(id)` | mounts an optional cluster (Groups and ScenesManagement are then the assembler's) |
-| `WithFeatures(id, bits)` | the features of a cluster's default server |
-| `WithElements(id, opts)` | optional attributes, commands and events of a default server |
-| `WithInitial(id, values)` | initial attribute values of a default server |
+| `WithOptional(id)` | mounts an optional cluster (Groups and ScenesManagement are then the assembler's); `<cluster>def.Declare{}` does the same |
+| `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one) |
 | `WithMeasurement(src)` | a sensor's measurement clusters from your live reading |
 | `WithChangeNotifier(n)` | tells the bridge your model changed state its servers read |
 | `WithClientClusters(ids...)` | client clusters beyond the mandatory ones |
@@ -143,17 +154,16 @@ A device's state moves both ways, and the two directions use different
 calls:
 
 - **Controller to device.** `Device.OnChanged(clusterID, fn)` calls `fn`
-  with the attribute ids that changed, and the typed
-  `light.OnOff().OnChanged(fn)` with the new state. The quickstart uses it
-  to log the light's new state. Both fire for every change of the
-  attribute — a controller's command or write and your own `Set` alike;
-  they do not tell the two apart. The controller-only hooks are
-  `light.OnOff().HandleOn(fn)` (your handler replaces the server's own
-  handling of the command) and `light.OnOff().OnWrite(fn)` (a veto on a
-  controller's write). To refuse a command, for example when the physical
-  lamp did not switch, give the light your own `onoff.Server` with a
-  `Sink` (`onoff.Config.Sink` through `WithServer`). An error from the
-  sink answers FAILURE and stores nothing.
+  with the change — the attribute ids and its origin — and the typed
+  `light.OnOff().OnChanged(fn)` with the new state and the change. The
+  quickstart uses it to log the light's new state. Both fire for every
+  change; `change.Origin` tells your own `Set` (`contract.OriginHostSet`)
+  from a controller's write and a command. The controller-only hooks are
+  the declaration's `HandleOn` (your handler replaces the server's own
+  handling of the command) and `OnWrite` (a veto on a controller's write).
+  To refuse a command, for example when the physical lamp did not switch,
+  declare the light's switch: `onoffdef.Declare{Sink: relay}`. An error
+  from the sink answers FAILURE and stores nothing.
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
   `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored

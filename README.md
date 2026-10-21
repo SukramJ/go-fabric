@@ -169,9 +169,6 @@ becomes permissible in:
 | `controller/ca.Config.Now` | `ca.Config.Clock` | `v0.10.0` |
 | `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error | `v0.10.0` |
 | `cluster/wire.GenericSwitch`, `wire.NewGenericSwitch` (marked by brief BK) | `cluster/switch` (`switchserver.New`), which the MomentarySwitch materialiser builds | `v0.10.0` |
-| `device.WithFeatures`, `WithInitial`, `WithElements` (marked by brief BU) | the cluster's declaration, `<cluster>def.Declare{Features: …, Initial: …}` (an optional attribute served by its value, an optional command by its handler) | `v0.12.0` |
-| `device.Options.Clock` (marked by brief BU) | none: a device takes the node's clock when the Aggregator adds it | `v0.12.0` |
-| `cluster/levelcontrol.LevelSource`, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest`, `cluster/fan.Stepper` (marked by brief BU) | the ports in the generated requests: `levelcontroldef.LevelSource` (`levelcontrol.Config.Port`), `fancontroldef.Stepper` (`fan.Config.Stepper`), or the cluster's `Declare` | `v0.12.0` |
 | `cluster/wire.MoveToHueRequest`, `MoveHueRequest`, `StepHueRequest`, `MoveToSaturationRequest`, `MoveSaturationRequest`, `StepSaturationRequest`, `MoveToHueAndSaturationRequest`, `MoveToColorTemperatureRequest`, `GoToLiftPercentageRequest`, `GoToTiltPercentageRequest`, `SetpointRaiseLowerRequest`, `MoveToRequest`, `ChangeToModeRequest`, and the `Decode…` functions producing them (marked by brief BX1) | the generated request of the cluster, `cluster/spec/<cluster>.<Command>Request` (`colorcontrol`, `windowcovering`, `thermostat`, `closurecontrol`, the mode derivation), which the bridge decodes and every module server takes | `v0.12.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and

@@ -6,7 +6,9 @@ package device
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -45,16 +47,6 @@ type Options struct {
 	// NodeLabel is a NodeLabel a controller wrote in an earlier run and
 	// the host persisted ([endpoint.Spec.NodeLabel]).
 	NodeLabel string
-	// Clock is the time source of the servers the device builds itself —
-	// the OnOff server's OnTime / OffWaitTime countdown
-	// (onoff.Config.TimeSource); nil is the node's clock once the device
-	// is added, [clock.System] before. A server the host supplies
-	// (WithServer) keeps its own.
-	//
-	// Deprecated: leave it nil — a device takes the node's clock
-	// (node.Config.Clock) when it is added. A clock set here still wins
-	// over the node's. May be removed in v0.12.0.
-	Clock clock.Clock
 }
 
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
@@ -88,13 +80,14 @@ type Declaration interface {
 // Option is the kit's own [Declaration], what the With… functions return.
 type Option = Declaration
 
-// clusterOption is a per-cluster option of the kit's own: a declaration
-// that mounts the cluster when mount is set, and a WithServer(nil) when
-// nilServer is.
+// clusterOption is a per-cluster option of the kit's own ([WithOptional],
+// [WithServer]): a declaration that mounts the cluster when mount is set;
+// undeclared marks a WithServer, which takes only a cluster without a
+// generated declaration.
 type clusterOption struct {
-	decl      spec.ClusterDeclaration
-	mount     bool
-	nilServer bool
+	decl       spec.ClusterDeclaration
+	mount      bool
+	undeclared bool
 }
 
 func (o clusterOption) ClusterID() uint32                           { return o.decl.Cluster }
@@ -111,7 +104,7 @@ type settings struct {
 	features map[uint32]uint32
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer
-	// serverOrder is the order WithServer named the clusters in; a host
+	// serverOrder is the order the host's servers were declared in; a host
 	// server for a cluster the type does not list is mounted in it.
 	serverOrder []uint32
 	notifier    contract.ChangeNotifier
@@ -121,7 +114,6 @@ type settings struct {
 	measurementSet bool
 	initial        map[uint32]map[uint32]any
 	elements       map[uint32]spec.Options
-	nilSrv         bool
 	// clients are the client clusters [WithClientClusters] declared, in
 	// call order.
 	clients []uint32
@@ -157,9 +149,14 @@ func (s *settings) declare(d Declaration) error {
 		o(s)
 		return nil
 	case clusterOption:
-		if o.nilServer {
-			s.nilSrv = true
-			return nil
+		if o.undeclared {
+			if o.decl.Server == nil {
+				return fmt.Errorf("%w: WithServer(nil)", ErrConfiguration)
+			}
+			if def := spec.Lookup(o.decl.Cluster); def != nil {
+				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …}",
+					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
+			}
 		}
 		s.merge(o.decl, o.mount)
 		return nil
@@ -175,8 +172,11 @@ func (s *settings) declare(d Declaration) error {
 	s.typed[id] = true
 	if len(decl.Initial) == 0 {
 		// An empty Initial states nothing: the declaration's hooks may
-		// go on a host's server (WithServer).
+		// go on the host's server (HostServer).
 		decl.Initial = nil
+	}
+	if decl.Server != nil && hasPorts(decl.Ports) {
+		return fmt.Errorf("%w: cluster 0x%04X: a host port and a HostServer, the port is the kit's server's", ErrConfiguration, id)
 	}
 	// An optional attribute the declaration gives a value is served, and
 	// an optional command it has a handler for accepted
@@ -186,8 +186,26 @@ func (s *settings) declare(d Declaration) error {
 	implied.Attributes = append(implied.Attributes, slices.Sorted(maps.Keys(decl.Initial))...)
 	s.implied[id] = implied
 	decl.Elements = spec.Options{}
-	s.merge(decl, true)
+	// The host's server is mounted as such; the kit's is mounted by the
+	// declaration.
+	s.merge(decl, decl.Server == nil)
 	return nil
+}
+
+// hasPorts reports whether a typed declaration carries a host port: a
+// non-nil interface field other than its HostServer.
+func hasPorts(typed any) bool {
+	rv := reflect.ValueOf(typed)
+	if rv.Kind() != reflect.Struct {
+		return false
+	}
+	for i := range rv.NumField() {
+		f := rv.Type().Field(i)
+		if f.Type.Kind() == reflect.Interface && f.Name != "HostServer" && !rv.Field(i).IsNil() {
+			return true
+		}
+	}
+	return false
 }
 
 // merge folds one cluster declaration into the settings.
@@ -232,19 +250,6 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 	}
 }
 
-// WithFeatures selects the FeatureMap of a cluster's default server, as
-// `OnOffServer.with("Lighting")` does in matter.js. The selection must
-// pass the cluster's feature conformance ([spec.CheckFeatures]) and
-// include every feature the device type mandates. It also mounts an
-// optional cluster of the type, as matter.js's `Device.with(Server.with(…))`
-// does (accepted by the owner, 2026-10-11).
-//
-// Deprecated: declare the cluster with its Features —
-// `<cluster>def.Declare{Features: …}`. May be removed in v0.12.0.
-func WithFeatures(clusterID, features uint32) Option {
-	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Features: features, HasFeatures: true}, mount: true}
-}
-
 // WithOptional mounts an optional cluster of the device type with its
 // default server — matter.js's `Device.with(LevelControlServer)` for a
 // cluster in `server.optional` (src/devices/on-off-light.ts:111, 126-131).
@@ -258,22 +263,19 @@ func WithOptional(clusterID uint32) Option {
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID}, mount: true}
 }
 
-// WithServer supplies the host's own server for a cluster, in place of the
-// default — as a matter.js host replaces a behavior with its own
-// implementation. It mounts an optional cluster too. A cluster the device
-// type does not list is mounted as well, after the type's clusters and in
-// the order of the WithServer calls: matter.js's MutableEndpoint.with adds
-// any behavior to the type's (packages/node/src/endpoint/type/
-// MutableEndpoint.ts:95-110, SupportedBehaviors.extend), and leaves the
-// judgement to device-type validation — a FixedLabel on a light, say, or
-// the EcosystemInformation BridgedNode allows on the bridged endpoint.
-// The clusters the endpoint assembler mounts stay refused. A cluster's
-// declaration (OnWrite, Handle…) applies to the host's server too.
+// WithServer mounts the host's own server for a cluster without a
+// generated package — a manufacturer-specific cluster, which the device
+// type does not list — after the type's clusters, in the order of the
+// calls: matter.js's MutableEndpoint.with adds any behavior to the type's
+// (packages/node/src/endpoint/type/MutableEndpoint.ts:95-110,
+// SupportedBehaviors.extend). A cluster with a generated package is
+// declared, its own server as the declaration's HostServer
+// (<cluster>def.Declare{HostServer: srv}); WithServer refuses it.
 func WithServer(srv contract.ClusterServer) Option {
 	if srv == nil {
-		return clusterOption{nilServer: true}
+		return clusterOption{undeclared: true}
 	}
-	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}}
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}, undeclared: true}
 }
 
 // WithChangeNotifier makes the device's endpoint source a
@@ -317,21 +319,6 @@ func WithMeasurement(m contract.MeasurementSource) Option {
 	})
 }
 
-// WithElements serves optional attributes, accepts optional commands and
-// emits optional events of a cluster's default server beyond the ones the
-// device type mandates: opts.Attributes, opts.Commands and opts.Events
-// feed the default server's [spec.Options]; opts.Features must be zero —
-// the feature selection is [WithFeatures]'s. It mounts an optional cluster
-// too. Calls for one cluster accumulate.
-//
-// Deprecated: declare the cluster — `<cluster>def.Declare` serves an
-// optional attribute its Initial gives a value and accepts an optional
-// command it has a handler for, as matter.js supports an element with a
-// value or an implementation. May be removed in v0.12.0.
-func WithElements(clusterID uint32, opts spec.Options) Option {
-	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Elements: opts}, mount: true}
-}
-
 // WithClientClusters declares client clusters on the endpoint beyond the
 // ones its device type mandates — matter.js's
 // `MutableEndpoint.withClientClusters` (packages/node/src/endpoint/type/
@@ -343,20 +330,4 @@ func WithElements(clusterID uint32, opts spec.Options) Option {
 // assembler then mounts where the type does not ([endpoint.Spec.ClientClusters]).
 func WithClientClusters(clusterIDs ...uint32) Option {
 	return deviceOption(func(s *settings) { s.clients = append(s.clients, clusterIDs...) })
-}
-
-// WithInitial sets initial attribute values of a cluster's default server
-// (attribute id → value), over the defaults the device type states —
-// matter.js's initial state keyed by behavior id
-// (endpoint/Endpoint.ts:1385-1438).
-//
-// Deprecated: declare the cluster with its Initial patch —
-// `<cluster>def.Declare{Initial: <cluster>def.Patch{…}}`. May be removed
-// in v0.12.0.
-func WithInitial(clusterID uint32, values map[uint32]any) Option {
-	initial := maps.Clone(values)
-	if initial == nil {
-		initial = map[uint32]any{} // stated, if empty: refused beside a host's server, as before
-	}
-	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Initial: initial}}
 }

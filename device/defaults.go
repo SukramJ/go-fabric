@@ -107,7 +107,7 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotSer
 // OtaSoftwareUpdateRequestor has none: its server needs the node's
 // connector to reach a provider (node/ota.go), so a device that mounts it —
 // OtaRequestor — answers [ErrNoDefaultServer] and the host supplies it
-// with [WithServer].
+// as the cluster's declared HostServer.
 var selfHeldDefaults = map[uint32]serverFactory{
 	onoffdef.ClusterID:      newOnOffServer,                // OnOff: cluster/onoff, matter.js OnOffServer.ts.
 	lvldef.ClusterID:        newLevelControlServer,         // LevelControl: cluster/levelcontrol.New, matter.js LevelControlServer.ts.
@@ -176,7 +176,7 @@ func newBindingServer(defaultBuild) (contract.ClusterServer, error) {
 // (packages/node/src/behaviors/ecosystem-information/
 // EcosystemInformationServer.ts:14, no server logic; both attributes are
 // lists). A host whose bridged device belongs to an ecosystem supplies its
-// own server over its directory with [WithServer].
+// own server over its directory as the declared HostServer.
 func newEcosystemInformationServer(defaultBuild) (contract.ClusterServer, error) {
 	return core.NewEcosystemInformation(emptyEcosystem{}), nil
 }
@@ -194,7 +194,7 @@ func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLoca
 // newOnOffServer is the module's OnOff server ([onoff.New]). A device of
 // this layer sits under the Aggregator, so StartUpOnOff is not applied
 // (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
-// Its countdown runs on the device's clock ([Options].Clock).
+// Its countdown runs on the device's clock, the node's once it is added.
 // A declared Sink (onoffdef.Declare) switches the device.
 func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := onoff.Config{
@@ -347,7 +347,7 @@ func (p onOffPort) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubsc
 
 // applyInitial sets the initial values on a self-held default through its
 // [spec.AttributeSetter] — the device type's defaults and the host's
-// [WithInitial] — as a matter.js endpoint starts its behaviors' state with
+// declaration's Initial — as a matter.js endpoint starts its behaviors' state with
 // them.
 func applyInitial(name string, srv contract.ClusterServer, initial map[uint32]any) error {
 	if len(initial) == 0 {

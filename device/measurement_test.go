@@ -89,7 +89,7 @@ func TestWithMeasurementComposesWithTheDevicesOwnServers(t *testing.T) {
 	t.Parallel()
 	src := &reading{class: contract.MeasurementFlow, value: 3}
 	host := &hostServer{id: 0xFFF1_FC00}
-	d, err := NewFlowSensor(testOptions("f"), WithMeasurement(src), WithServer(host))
+	d, err := NewFlowSensor(testOptions("f"), WithMeasurement(src), withServer(host))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +109,8 @@ func TestWithMeasurementRefusals(t *testing.T) {
 	for name, with := range map[string][]Option{
 		"nil":                {WithMeasurement(nil)},
 		"no cluster":         {WithMeasurement(&reading{class: contract.MeasurementNone})},
-		"server for it":      {WithMeasurement(src), WithServer(&hostServer{id: measurement.ClusterTemperatureMeasurement})},
-		"initial for it":     {WithMeasurement(src), WithInitial(measurement.ClusterTemperatureMeasurement, map[uint32]any{0: int16(1)})},
+		"server for it":      {WithMeasurement(src), withServer(&hostServer{id: measurement.ClusterTemperatureMeasurement})},
+		"initial for it":     {WithMeasurement(src), withInitial(measurement.ClusterTemperatureMeasurement, map[uint32]any{0: int16(1)})},
 		"opting it in again": {WithMeasurement(src), WithOptional(measurement.ClusterTemperatureMeasurement)},
 	} {
 		if _, err := NewTemperatureSensor(testOptions("r"), with...); !errors.Is(err, ErrConfiguration) {

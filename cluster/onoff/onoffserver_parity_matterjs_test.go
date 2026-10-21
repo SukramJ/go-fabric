@@ -22,7 +22,6 @@ package onoff_test
 import (
 	"context"
 	"errors"
-	"maps"
 	"sync"
 	"testing"
 	"time"
@@ -51,13 +50,14 @@ type mockLight struct {
 	srv  *onoff.Server
 }
 
-func setupLight(t *testing.T, initial map[uint32]any) *mockLight {
+func setupLight(t *testing.T, initial onoffdef.Patch) *mockLight {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	values := map[uint32]any{onoff.AttrOnOff: false}
-	maps.Copy(values, initial)
+	if initial.OnOff == nil {
+		initial.OnOff = new(false)
+	}
 	l, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light"},
-		device.WithInitial(onoff.ClusterID, values)) //nolint:staticcheck // the parity case states matter.js's untyped initial state
+		onoffdef.Declare{Initial: initial})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestParityMatterJS_OnOffServerTest(t *testing.T) {
 // the observation before the next toggle.
 func testAsyncObservers(t *testing.T) {
 	// MockServerNode.createOnline's part 1 is an OnOffLight.
-	m := setupLight(t, nil)
+	m := setupLight(t, onoffdef.Patch{})
 	var mu sync.Mutex
 	var observed []bool
 	var pending sync.WaitGroup
@@ -260,7 +260,7 @@ func testOffOnlyCommands(t *testing.T) {
 // (OnOffServerTest.ts:54-301).
 func testOnWithTimedOff(t *testing.T) {
 	t.Run("holds OnTime indefinitely when set to 0xFFFF", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		// OffWaitTime is non-zero so a naive timer-start gate would still
 		// arm the timer.
 		m.onWithTimedOff(t, holdTime, 10)
@@ -272,7 +272,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("holds OffWaitTime indefinitely when set to 0xFFFF", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 5, holdTime)
 		m.invoke(t, onoff.CmdOff, nil)
 		m.want(t, false, skip, holdTime)
@@ -281,7 +281,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("runs the delayed-off countdown after a held device is turned off", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, holdTime, 50)
 		m.want(t, true, skip, 50)
 		// An explicit off enters the delayed-off guard period and counts
@@ -293,7 +293,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("stops a running timed-on timer when raised to 0xFFFF (no leaked wakeup)", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 5, 10)
 		m.wantTimers(t, true, false)
 		// Raising OnTime to the hold value stops the timer.
@@ -303,7 +303,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("stops the timed-on timer if OnTime is written to 0xFFFF while it runs", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 5, 10)
 		m.wantTimers(t, true, false)
 		m.write(t, onoff.AttrOnTime, holdTime)
@@ -313,7 +313,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("stops the delayed-off timer if OffWaitTime is written to 0xFFFF while it runs", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 5, 20)
 		m.invoke(t, onoff.CmdOff, nil)
 		m.wantTimers(t, false, true)
@@ -324,7 +324,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("decrements OnTime to auto-off when not 0xFFFF", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 3, 0)
 		m.want(t, true, skip, skip)
 		m.resolve(t, "off again", func() bool { return !m.srv.OnOff() })
@@ -334,7 +334,7 @@ func testOnWithTimedOff(t *testing.T) {
 	t.Run("stays off and only lowers OffWaitTime when OffWaitTime>0 and off", func(t *testing.T) {
 		// Off with OffWaitTime > 0 and no delayed-off timer running (as if
 		// written directly).
-		m := setupLight(t, map[uint32]any{onoff.AttrOffWaitTime: uint16(100)})
+		m := setupLight(t, onoffdef.Patch{OffWaitTime: new(uint16(100))})
 		m.onWithTimedOff(t, 5, 50)
 		// Spec: keep OFF, OffWaitTime the minimum of current and requested.
 		m.want(t, false, skip, 50)
@@ -344,7 +344,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("does not start a countdown when OffWaitTime is written while plain off", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		// Spec §1.5.6.5: a write of OffWaitTime from a plain off state does
 		// not start a countdown.
 		m.write(t, onoff.AttrOffWaitTime, 30)
@@ -354,7 +354,7 @@ func testOnWithTimedOff(t *testing.T) {
 	})
 
 	t.Run("stays on and stops the timer when OnTime is written to 0 during a countdown", func(t *testing.T) {
-		m := setupLight(t, nil)
+		m := setupLight(t, onoffdef.Patch{})
 		m.onWithTimedOff(t, 5, 0)
 		m.wantTimers(t, true, false)
 		// Writing OnTime to 0 ends the timed-on phase but leaves the device

@@ -11,6 +11,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -45,15 +47,15 @@ type fakeHost struct {
 	notify func()
 }
 
-func (h *fakeHost) CurrentLevel() (uint8, bool) { return h.level, h.levelKnown }
-func (h *fakeHost) Options() uint8              { return h.options }
-func (h *fakeHost) OnLevel() (uint8, bool)      { return h.onLevel, h.onKnown }
+func (h *fakeHost) CurrentLevel() (uint8, bool)   { return h.level, h.levelKnown }
+func (h *fakeHost) Options() lvldef.OptionsBitmap { return lvldef.OptionsBitmap(h.options) }
+func (h *fakeHost) OnLevel() (uint8, bool)        { return h.onLevel, h.onKnown }
 
-func (h *fakeHost) SetOptions(_ context.Context, options uint8) error {
+func (h *fakeHost) SetOptions(_ context.Context, options lvldef.OptionsBitmap) error {
 	if h.setErr != nil {
 		return h.setErr
 	}
-	h.optionSets = append(h.optionSets, options)
+	h.optionSets = append(h.optionSets, uint8(options))
 	return nil
 }
 
@@ -71,39 +73,39 @@ func (h *fakeHost) record(name string, req any) error {
 		return h.refuse
 	}
 	h.calls = append(h.calls, name)
-	h.payloads = append(h.payloads, req)
+	h.payloads = append(h.payloads, levelcontrol.WireOf(req))
 	return nil
 }
 
-func (h *fakeHost) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (h *fakeHost) MoveToLevel(_ context.Context, req lvldef.MoveToLevelRequest) error {
 	return h.record("MoveToLevel", req)
 }
 
-func (h *fakeHost) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (h *fakeHost) MoveToLevelWithOnOff(_ context.Context, req lvldef.MoveToLevelWithOnOffRequest) error {
 	return h.record("MoveToLevelWithOnOff", req)
 }
 
-func (h *fakeHost) Move(_ context.Context, req levelcontrol.MoveRequest) error {
+func (h *fakeHost) Move(_ context.Context, req lvldef.MoveRequest) error {
 	return h.record("Move", req)
 }
 
-func (h *fakeHost) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
+func (h *fakeHost) MoveWithOnOff(_ context.Context, req lvldef.MoveWithOnOffRequest) error {
 	return h.record("MoveWithOnOff", req)
 }
 
-func (h *fakeHost) Step(_ context.Context, req levelcontrol.StepRequest) error {
+func (h *fakeHost) Step(_ context.Context, req lvldef.StepRequest) error {
 	return h.record("Step", req)
 }
 
-func (h *fakeHost) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
+func (h *fakeHost) StepWithOnOff(_ context.Context, req lvldef.StepWithOnOffRequest) error {
 	return h.record("StepWithOnOff", req)
 }
 
-func (h *fakeHost) Stop(_ context.Context, req levelcontrol.StopRequest) error {
+func (h *fakeHost) Stop(_ context.Context, req lvldef.StopRequest) error {
 	return h.record("Stop", req)
 }
 
-func (h *fakeHost) StopWithOnOff(_ context.Context, req levelcontrol.StopRequest) error {
+func (h *fakeHost) StopWithOnOff(_ context.Context, req lvldef.StopWithOnOffRequest) error {
 	return h.record("StopWithOnOff", req)
 }
 
@@ -269,13 +271,13 @@ func TestEveryCommandReachesThePort(t *testing.T) {
 		{
 			name:   "MoveToLevel via the bridge's typed decoder",
 			cmdID:  levelcontrol.CmdMoveToLevel,
-			fields: levelcontrol.MoveToLevelRequest{Level: 40},
+			fields: wire.MoveToLevelRequest{Level: 40},
 			want:   "MoveToLevel",
 		},
 		{
 			name:   "MoveToLevelWithOnOff via the bridge's typed decoder",
 			cmdID:  levelcontrol.CmdMoveToLevelWithOnOff,
-			fields: levelcontrol.MoveToLevelRequest{Level: 40},
+			fields: wire.MoveToLevelRequest{Level: 40},
 			want:   "MoveToLevelWithOnOff",
 		},
 		{
@@ -299,7 +301,7 @@ func TestEveryCommandReachesThePort(t *testing.T) {
 		{
 			name:   "StepWithOnOff via the typed request",
 			cmdID:  levelcontrol.CmdStepWithOnOff,
-			fields: levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 5},
+			fields: wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 5},
 			want:   "StepWithOnOff",
 		},
 		{
@@ -311,7 +313,7 @@ func TestEveryCommandReachesThePort(t *testing.T) {
 		{
 			name:   "StopWithOnOff via the typed request",
 			cmdID:  levelcontrol.CmdStopWithOnOff,
-			fields: levelcontrol.StopRequest{},
+			fields: wire.StopRequest{},
 			want:   "StopWithOnOff",
 		},
 	}
@@ -361,7 +363,7 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
-				req, ok := got.(levelcontrol.MoveToLevelRequest)
+				req, ok := got.(wire.MoveToLevelRequest)
 				if !ok {
 					t.Fatalf("port saw %T, want MoveToLevelRequest", got)
 				}
@@ -379,7 +381,7 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
-				req, ok := got.(levelcontrol.MoveRequest)
+				req, ok := got.(wire.MoveRequest)
 				if !ok {
 					t.Fatalf("port saw %T, want MoveRequest", got)
 				}
@@ -398,7 +400,7 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
-				req, ok := got.(levelcontrol.StepRequest)
+				req, ok := got.(wire.StepRequest)
 				if !ok {
 					t.Fatalf("port saw %T, want StepRequest", got)
 				}
@@ -416,7 +418,7 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
-				req, ok := got.(levelcontrol.StopRequest)
+				req, ok := got.(wire.StopRequest)
 				if !ok {
 					t.Fatalf("port saw %T, want StopRequest", got)
 				}
@@ -456,22 +458,22 @@ func TestHostRefusalIsNotSuccess(t *testing.T) {
 		cmdID  uint32
 		fields any
 	}{
-		{name: "MoveToLevel", cmdID: levelcontrol.CmdMoveToLevel, fields: levelcontrol.MoveToLevelRequest{Level: 1}},
-		{name: "Move", cmdID: levelcontrol.CmdMove, fields: levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp}},
-		{name: "Step", cmdID: levelcontrol.CmdStep, fields: levelcontrol.StepRequest{StepSize: 1}},
-		{name: "Stop", cmdID: levelcontrol.CmdStop, fields: levelcontrol.StopRequest{}},
+		{name: "MoveToLevel", cmdID: levelcontrol.CmdMoveToLevel, fields: wire.MoveToLevelRequest{Level: 1}},
+		{name: "Move", cmdID: levelcontrol.CmdMove, fields: wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp}},
+		{name: "Step", cmdID: levelcontrol.CmdStep, fields: wire.StepRequest{StepSize: 1}},
+		{name: "Stop", cmdID: levelcontrol.CmdStop, fields: wire.StopRequest{}},
 		{
 			name:   "MoveToLevelWithOnOff",
 			cmdID:  levelcontrol.CmdMoveToLevelWithOnOff,
-			fields: levelcontrol.MoveToLevelRequest{Level: 1},
+			fields: wire.MoveToLevelRequest{Level: 1},
 		},
 		{
 			name:   "MoveWithOnOff",
 			cmdID:  levelcontrol.CmdMoveWithOnOff,
-			fields: levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp},
+			fields: wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp},
 		},
-		{name: "StepWithOnOff", cmdID: levelcontrol.CmdStepWithOnOff, fields: levelcontrol.StepRequest{StepSize: 1}},
-		{name: "StopWithOnOff", cmdID: levelcontrol.CmdStopWithOnOff, fields: levelcontrol.StopRequest{}},
+		{name: "StepWithOnOff", cmdID: levelcontrol.CmdStepWithOnOff, fields: wire.StepRequest{StepSize: 1}},
+		{name: "StopWithOnOff", cmdID: levelcontrol.CmdStopWithOnOff, fields: wire.StopRequest{}},
 	}
 
 	for _, tc := range tests {
@@ -503,7 +505,7 @@ func TestNoHostPortIsNotSuccess(t *testing.T) {
 
 	srv := levelcontrol.NewServer(levelcontrol.Config{})
 	if _, err := srv.MatterInvoke(
-		context.Background(), levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 1},
+		context.Background(), levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1},
 	); err == nil {
 		t.Error("MoveToLevel reported Success with no host port")
 	}
@@ -628,19 +630,19 @@ func TestRejectedPayloadsCarryTheRightStatus(t *testing.T) {
 		{
 			name:   "Level above the max-254 constraint",
 			cmdID:  levelcontrol.CmdMoveToLevel,
-			fields: levelcontrol.MoveToLevelRequest{Level: 255},
+			fields: wire.MoveToLevelRequest{Level: 255},
 			want:   im.StatusConstraintError,
 		},
 		{
 			name:   "MoveMode outside MoveModeEnum",
 			cmdID:  levelcontrol.CmdMove,
-			fields: levelcontrol.MoveRequest{MoveMode: 7},
+			fields: wire.MoveRequest{MoveMode: 7},
 			want:   im.StatusConstraintError,
 		},
 		{
 			name:   "StepMode outside StepModeEnum",
 			cmdID:  levelcontrol.CmdStepWithOnOff,
-			fields: levelcontrol.StepRequest{StepMode: 9},
+			fields: wire.StepRequest{StepMode: 9},
 			want:   im.StatusConstraintError,
 		},
 		{

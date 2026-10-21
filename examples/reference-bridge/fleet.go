@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
@@ -114,7 +116,7 @@ func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
 	}
 	dev, err := device.NewOnOffLight(opts,
 		onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}},
-		device.WithServer(fixedLabel))
+		fixedlabeldef.Declare{HostServer: fixedLabel})
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +678,7 @@ type dimmer struct {
 // Compile-time assertions.
 var (
 	_ contract.ChangeNotifier  = (*dimmer)(nil)
-	_ levelcontrol.LevelSource = (*dimmer)(nil) //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
+	_ levelcontrol.LevelSource = (*dimmer)(nil)
 )
 
 // newDemoSpeaker returns a speaker that is off, at the given volume.
@@ -794,10 +796,10 @@ func (s *dimmer) CurrentLevel() (uint8, bool) {
 }
 
 // Options implements [levelcontrol.LevelSource].
-func (s *dimmer) Options() uint8 {
+func (s *dimmer) Options() levelcontroldef.OptionsBitmap {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.options
+	return levelcontroldef.OptionsBitmap(s.options)
 }
 
 // OnLevel implements [levelcontrol.LevelSource].
@@ -812,9 +814,9 @@ func (s *dimmer) OnLevel() (uint8, bool) {
 
 // SetOptions implements [levelcontrol.LevelSource]. The server has already
 // refused a bitmap carrying a bit the advertised FeatureMap does not cover.
-func (s *dimmer) SetOptions(_ context.Context, options uint8) error {
+func (s *dimmer) SetOptions(_ context.Context, options levelcontroldef.OptionsBitmap) error {
 	s.mu.Lock()
-	s.options = options
+	s.options = uint8(options)
 	s.mu.Unlock()
 	slog.Info(s.kind+".options", slog.String("device", s.name), slog.Int("options", int(options)))
 	return nil
@@ -836,8 +838,8 @@ func (s *dimmer) SetOnLevel(_ context.Context, level *uint8) error {
 }
 
 // MoveToLevel implements [levelcontrol.LevelSource].
-func (s *dimmer) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
-	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+func (s *dimmer) MoveToLevel(_ context.Context, req levelcontroldef.MoveToLevelRequest) error {
+	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
 		return nil
 	}
 	s.applyLevel(req.Level, false)
@@ -845,30 +847,30 @@ func (s *dimmer) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequ
 }
 
 // MoveToLevelWithOnOff implements [levelcontrol.LevelSource].
-func (s *dimmer) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
+func (s *dimmer) MoveToLevelWithOnOff(_ context.Context, req levelcontroldef.MoveToLevelWithOnOffRequest) error {
 	s.applyLevel(req.Level, true)
 	return nil
 }
 
 // Move implements [levelcontrol.LevelSource]. With no travel time the move
 // arrives at the end of its direction inside the command.
-func (s *dimmer) Move(_ context.Context, req levelcontrol.MoveRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
-	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+func (s *dimmer) Move(_ context.Context, req levelcontroldef.MoveRequest) error {
+	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
 		return nil
 	}
-	s.applyLevel(s.moveTarget(req.MoveMode), false)
+	s.applyLevel(s.moveTarget(uint8(req.MoveMode)), false)
 	return nil
 }
 
 // MoveWithOnOff implements [levelcontrol.LevelSource].
-func (s *dimmer) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
-	s.applyLevel(s.moveTarget(req.MoveMode), true)
+func (s *dimmer) MoveWithOnOff(_ context.Context, req levelcontroldef.MoveWithOnOffRequest) error {
+	s.applyLevel(s.moveTarget(uint8(req.MoveMode)), true)
 	return nil
 }
 
 // Step implements [levelcontrol.LevelSource].
-func (s *dimmer) Step(_ context.Context, req levelcontrol.StepRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
-	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+func (s *dimmer) Step(_ context.Context, req levelcontroldef.StepRequest) error {
+	if !s.executes(uint8(req.OptionsMask), uint8(req.OptionsOverride)) {
 		return nil
 	}
 	s.applyLevel(s.steppedLevel(req), false)
@@ -876,17 +878,19 @@ func (s *dimmer) Step(_ context.Context, req levelcontrol.StepRequest) error { /
 }
 
 // StepWithOnOff implements [levelcontrol.LevelSource].
-func (s *dimmer) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
-	s.applyLevel(s.steppedLevel(req), true)
+func (s *dimmer) StepWithOnOff(_ context.Context, req levelcontroldef.StepWithOnOffRequest) error {
+	s.applyLevel(s.steppedLevel(levelcontroldef.StepRequest(req)), true)
 	return nil
 }
 
 // Stop implements [levelcontrol.LevelSource]. See the type doc: this model
 // never has a move in flight to halt.
-func (s *dimmer) Stop(context.Context, levelcontrol.StopRequest) error { return nil } //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
+func (s *dimmer) Stop(context.Context, levelcontroldef.StopRequest) error { return nil }
 
 // StopWithOnOff implements [levelcontrol.LevelSource].
-func (s *dimmer) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil } //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
+func (s *dimmer) StopWithOnOff(context.Context, levelcontroldef.StopWithOnOffRequest) error {
+	return nil
+}
 
 // reportFromDevice applies a volume the speaker moved to by itself — its own
 // front-panel dial. Like the same method on the other two devices it stands
@@ -909,7 +913,7 @@ func (s *dimmer) executes(mask, override uint8) bool {
 	if s.isOn() {
 		return true
 	}
-	return levelcontrol.EffectiveOptions(s.Options(), mask, override)&levelcontrol.OptionExecuteIfOff != 0
+	return levelcontrol.EffectiveOptions(uint8(s.Options()), mask, override)&levelcontrol.OptionExecuteIfOff != 0
 }
 
 // applyLevel moves the speaker to level. withOnOff drives the on/off state
@@ -939,11 +943,11 @@ func (s *dimmer) applyLevel(level uint8, withOnOff bool) {
 
 // steppedLevel resolves a Step command against the current level, clamped to
 // the cluster's own bounds.
-func (s *dimmer) steppedLevel(req levelcontrol.StepRequest) uint8 { //nolint:staticcheck // the reference bridge moves to levelcontroldef.LevelSource with the declaration (brief BU-b)
+func (s *dimmer) steppedLevel(req levelcontroldef.StepRequest) uint8 {
 	s.mu.Lock()
 	current := s.level
 	s.mu.Unlock()
-	if req.StepMode == levelcontrol.StepModeUp {
+	if uint8(req.StepMode) == levelcontrol.StepModeUp {
 		if uint16(current)+uint16(req.StepSize) > uint16(levelcontrol.LevelMax) {
 			return levelcontrol.LevelMax
 		}
@@ -1102,7 +1106,7 @@ func part(key string, conditions ...string) device.Options {
 func serve(servers []contract.ClusterServer, with ...device.Option) []device.Option {
 	out := make([]device.Option, 0, len(servers)+len(with))
 	for _, srv := range servers {
-		out = append(out, device.WithServer(srv))
+		out = append(out, hosted(srv))
 	}
 	return append(out, with...)
 }

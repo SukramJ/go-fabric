@@ -47,17 +47,17 @@ func TestFeatureSelection(t *testing.T) {
 	t.Parallel()
 	opts := testOptions("lamp")
 	// Leaving out the mandated Lighting feature is refused, naming it.
-	_, err := NewDimmableLight(opts, WithFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureDeadFrontBehavior)))
+	_, err := NewDimmableLight(opts, withFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureDeadFrontBehavior)))
 	if !errors.Is(err, ErrConfiguration) || !strings.Contains(err.Error(), "OnOff feature LT") {
 		t.Errorf("selection without LT: %v", err)
 	}
 	// A selection the cluster's conformance forbids is refused.
-	_, err = NewDimmableLight(opts, WithFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureLighting|onoffdef.FeatureOffOnly)))
+	_, err = NewDimmableLight(opts, withFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureLighting|onoffdef.FeatureOffOnly)))
 	if !errors.Is(err, spec.ErrFeatureSelection) {
 		t.Errorf("LT|OFFONLY: %v", err)
 	}
 	// A legal superset is accepted and served.
-	d, err := NewDimmableLight(opts, WithFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior)))
+	d, err := NewDimmableLight(opts, withFeatures(onoffdef.ClusterID, uint32(onoffdef.FeatureLighting|onoffdef.FeatureDeadFrontBehavior)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestFeatureSelection(t *testing.T) {
 		t.Errorf("LevelControl FeatureMap %v", v)
 	}
 	// A mandatory-with-extension cluster takes the host's selection.
-	if _, err := NewSmokeCoAlarm(testOptions("alarm"), WithFeatures(0x005C, 1)); err != nil {
+	if _, err := NewSmokeCoAlarm(testOptions("alarm"), withFeatures(0x005C, 1)); err != nil {
 		t.Errorf("SmokeCoAlarm with SMOKE: %v", err)
 	}
 }
@@ -83,7 +83,7 @@ func TestFeatureSelection(t *testing.T) {
 func TestWithServerReplacesTheDefault(t *testing.T) {
 	t.Parallel()
 	own := &hostServer{id: onoffdef.ClusterID}
-	d, err := NewDimmableLight(testOptions("lamp"), WithServer(own))
+	d, err := NewDimmableLight(testOptions("lamp"), withServer(own))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestWithServerReplacesTheDefault(t *testing.T) {
 	}
 	// An optional cluster the host supplies is mounted.
 	lc := &hostServer{id: levelcontroldef.ClusterID}
-	l, err := NewOnOffLight(testOptions("l"), WithServer(lc))
+	l, err := NewOnOffLight(testOptions("l"), withServer(lc))
 	if err != nil || l.Server(levelcontroldef.ClusterID) != lc {
 		t.Errorf("optional host LevelControl: %v", err)
 	}
@@ -125,11 +125,12 @@ func TestOptionsRefused(t *testing.T) {
 		"nil type":         {nil, opts, nil, "no device type"},
 		"no key":           {&OnOffLightType, Options{}, nil, "needs a StableKey"},
 		"nil server":       {&OnOffLightType, opts, []Option{WithServer(nil)}, "WithServer(nil)"},
+		"declared cluster": {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 6})}, "declare it, onoffdef.Declare{HostServer"},
 		"foreign cluster":  {&OnOffLightType, opts, []Option{WithOptional(0x0201)}, "no server cluster requirement for cluster 0x0201"},
-		"assembler's":      {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 0x0003})}, "mounts Identify (0x0003) itself"},
-		"features of host": {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 6}), WithFeatures(6, 1)}, "WithFeatures for cluster 0x0006"},
-		"initial of host":  {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 6}), WithInitial(6, nil)}, "WithInitial for cluster 0x0006"},
-		"bad initial":      {&OnOffLightType, opts, []Option{WithInitial(6, map[uint32]any{0: uint8(7)})}, "OnOff"},
+		"assembler's":      {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 0x0003})}, "mounts Identify (0x0003) itself"},
+		"features of host": {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withFeatures(6, 1)}, "Features for cluster 0x0006"},
+		"initial of host":  {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withInitial(6, nil)}, "Initial for cluster 0x0006"},
+		"bad initial":      {&OnOffLightType, opts, []Option{withInitial(6, map[uint32]any{0: uint8(7)})}, "OnOff"},
 		"no definition":    {&RootNodeType, opts, nil, "no generated definition"},
 	} {
 		_, err := New(tc.ty, tc.opts, tc.with...)
@@ -157,7 +158,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 		t.Fatal("LevelControl mounted by default")
 	}
 	d, err = NewOnOffLight(testOptions("l"), WithOptional(levelcontroldef.ClusterID),
-		WithInitial(levelcontroldef.ClusterID, map[uint32]any{levelcontroldef.AttrCurrentLevel: uint8(42)}))
+		withInitial(levelcontroldef.ClusterID, map[uint32]any{levelcontroldef.AttrCurrentLevel: uint8(42)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +266,7 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 	}
 	// A ChangeNotifier server reports every attribute it reports.
 	own := &hostServer{id: onoffdef.ClusterID}
-	h, err := NewOnOffLight(testOptions("h"), WithServer(own))
+	h, err := NewOnOffLight(testOptions("h"), withServer(own))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,7 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 func TestParts(t *testing.T) {
 	t.Parallel()
 	light, _ := NewOnOffLight(testOptions("light"))
-	ps, err := NewPowerSource(testOptions("ps"), WithFeatures(0x002F, 1))
+	ps, err := NewPowerSource(testOptions("ps"), withFeatures(0x002F, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +293,7 @@ func TestParts(t *testing.T) {
 	if err := light.AddPart(ps.Device); !errors.Is(err, ErrComposition) {
 		t.Errorf("OnOffLight took a PowerSource part: %v", err)
 	}
-	alarm, err := NewSmokeCoAlarm(testOptions("alarm"), WithFeatures(0x005C, 1))
+	alarm, err := NewSmokeCoAlarm(testOptions("alarm"), withFeatures(0x005C, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +469,7 @@ func descriptorClientList(t *testing.T, topo *endpoint.Topology, d *Device) []ui
 // clients declares none.
 func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {
 	t.Parallel()
-	ota, err := NewOtaRequestor(testOptions("ota"), WithServer(&hostServer{id: 0x002A}))
+	ota, err := NewOtaRequestor(testOptions("ota"), withServer(&hostServer{id: 0x002A}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,9 +511,9 @@ func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
 // cluster, are refused.
 func TestWithElements(t *testing.T) {
 	t.Parallel()
-	el := WithElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrVoltage}})
+	el := withElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrVoltage}})
 	d, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology), acPower, el,
-		WithElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrActiveCurrent}}))
+		withElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrActiveCurrent}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -521,11 +522,11 @@ func TestWithElements(t *testing.T) {
 		t.Error("the elements opted in are not served")
 	}
 	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
-		WithElements(epmdef.ClusterID, spec.Options{Features: 2})); !errors.Is(err, ErrConfiguration) {
+		withElements(epmdef.ClusterID, spec.Options{Features: 2})); !errors.Is(err, ErrConfiguration) {
 		t.Errorf("features through WithElements: %v", err)
 	}
 	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
-		WithServer(&hostServer{id: epmdef.ClusterID}), el); !errors.Is(err, ErrConfiguration) {
+		withServer(&hostServer{id: epmdef.ClusterID}), el); !errors.Is(err, ErrConfiguration) {
 		t.Errorf("WithElements with a host server: %v", err)
 	}
 }

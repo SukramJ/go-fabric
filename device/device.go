@@ -26,7 +26,8 @@ var (
 	// not allow.
 	ErrConfiguration = errors.New("device: configuration refused")
 	// ErrNoDefaultServer: a cluster the device mounts that has no default
-	// server here; the host supplies one with [WithServer].
+	// server here; the host supplies one as the cluster's declared
+	// HostServer (<cluster>def.Declare).
 	ErrNoDefaultServer = errors.New("device: no default server")
 	// ErrComposition: a part the device type does not compose.
 	ErrComposition = errors.New("device: composition refused")
@@ -117,11 +118,8 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
 		}
 	}
-	clk := &deviceClock{host: opts.Clock}
+	clk := &deviceClock{}
 	s.clock = clk
-	if s.nilSrv {
-		return nil, fmt.Errorf("%w: %s: WithServer(nil)", ErrConfiguration, t.Name)
-	}
 	measured, err := measuredClusters(t, s)
 	if err != nil {
 		return nil, err
@@ -238,7 +236,7 @@ func measuredClusters(t *Type, s *settings) (map[uint32]bool, error) {
 }
 
 // checkOptedClusters refuses an option for a cluster the device type does
-// not allow as a server — a host server ([WithServer]) excepted — or one
+// not allow as a server — a host's server (a declared HostServer) excepted — or one
 // the assembler mounts itself, measured clusters included.
 func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
@@ -254,7 +252,7 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	for id, o := range s.elements {
 		ids = append(ids, id)
 		if o.Features != 0 {
-			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X states features; select them with WithFeatures", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: elements for cluster 0x%04X state features; select them as the declaration's Features", ErrConfiguration, t.Name, id)
 		}
 	}
 	slices.Sort(ids)
@@ -271,13 +269,13 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	}
 	for id := range s.servers {
 		if _, ok := s.features[id]; ok {
-			return fmt.Errorf("%w: %s: WithFeatures for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: Features for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := s.elements[id]; ok {
-			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: elements for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := s.initial[id]; ok {
-			return fmt.Errorf("%w: %s: WithInitial for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: Initial for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 	}
 	return nil
@@ -322,7 +320,7 @@ func onlyHostServer(s *settings, id uint32) bool {
 func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uint32) contract.ClusterServer) (contract.ClusterServer, error) {
 	def := r.Definition
 	if def == nil {
-		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it: supply its server with WithServer",
+		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it",
 			ErrNoDefaultServer, t.Name, r.Name, r.ID, r.Conformance)
 	}
 	// The default selection is the device type's mandated features and the
@@ -341,7 +339,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// RequirementGenerator.ts:188-199, EndpointFile.ts:144-158: a
 		// cluster whose mandated features are no legal selection is not
 		// mounted by default; the application must choose its features.
-		return nil, fmt.Errorf("%w: %s %s needs a feature selection (WithFeatures): %w", ErrConfiguration, t.Name, r.Name, err)
+		return nil, fmt.Errorf("%w: %s %s needs a feature selection (the declaration's Features): %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	opts := spec.Options{Features: features}
 	for _, extra := range []spec.Options{s.elements[r.ID], s.implied[r.ID]} {
@@ -405,7 +403,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	srv, err := spec.NewServer(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
-		return nil, fmt.Errorf("%w: %s %s: %w: supply its server with WithServer", ErrNoDefaultServer, t.Name, r.Name, err)
+		return nil, fmt.Errorf("%w: %s %s: %w: supply its server as the declaration's HostServer", ErrNoDefaultServer, t.Name, r.Name, err)
 	case err != nil:
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}

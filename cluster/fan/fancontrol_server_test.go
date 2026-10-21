@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -100,11 +101,11 @@ type stepper struct {
 	err   error
 }
 
-func (s *stepper) Step(_ context.Context, req clusterwire.FanStepRequest) error {
+func (s *stepper) Step(_ context.Context, req fandef.StepRequest) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.steps = append(s.steps, req)
+	s.steps = append(s.steps, clusterwire.FanStepRequest{Direction: uint8(req.Direction), Wrap: req.Wrap != nil && *req.Wrap, LowestOff: req.LowestOff != nil && *req.LowestOff})
 	return nil
 }
 

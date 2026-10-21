@@ -140,7 +140,7 @@ func portCases() (cases []struct {
 			mk := func(l string, m uint8, tag uint16) whmdef.ModeOptionStruct {
 				return whmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []whmdef.ModeTagStruct{{Value: whmdef.ModeTag(tag)}}}
 			}
-			return New(&WaterHeaterType, testOptions("whm"), WithFeatures(0x0201, 1), whmdef.Declare{
+			return New(&WaterHeaterType, testOptions("whm"), withFeatures(0x0201, 1), whmdef.Declare{
 				ModeChanger: ch,
 				Initial:     whmdef.Patch{SupportedModes: modes(mk, modebase.WaterHeaterTagManual, modebase.WaterHeaterTagOff)},
 			})

@@ -7,8 +7,8 @@ import "github.com/SukramJ/go-fabric/contract"
 
 // ClusterDeclaration is one cluster's declaration on a device in the form
 // the device kit applies it: what a generated <cluster>def.Declare states,
-// untyped, and what the kit's per-cluster options (device.WithFeatures,
-// WithInitial, WithElements, WithServer) state. The kit merges the
+// untyped, and what the kit's per-cluster option (device.WithOptional)
+// states. The kit merges the
 // declarations of one cluster into one; it is the kit's form, not one a
 // host writes.
 //

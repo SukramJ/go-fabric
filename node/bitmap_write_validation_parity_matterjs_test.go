@@ -55,7 +55,7 @@ func TestBitmapWriteValidationParity(t *testing.T) {
 			t.Parallel()
 			site := quietSite(t)
 			wc, err := device.NewWindowCovering(device.Options{StableKey: endpoint.StringKey("cover:1"), Name: "cover"},
-				device.WithServer(cover.NewWindowCoveringServer(c.cfg)))
+				wcdef.Declare{HostServer: cover.NewWindowCoveringServer(c.cfg)})
 			if err != nil {
 				t.Fatal(err)
 			}

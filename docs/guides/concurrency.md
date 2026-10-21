@@ -42,7 +42,7 @@ and the cluster timers only when it calls `Advance`. `AfterFunc` callbacks
 run in their own goroutine on either clock. The node's assembler hands the
 same clock to the Identify server of every bridged endpoint
 (`endpoint.Config.Clock`) and to the Aggregator's; a device the host builds
-with the device layer takes it as `device.Options.Clock`.
+with the device layer takes it when the Aggregator adds the device.
 
 [`fabrictest`](https://github.com/SukramJ/go-fabric/tree/main/fabrictest)
 runs whole nodes and the module's controller on one `clocktest.Fake` and an

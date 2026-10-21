@@ -34,7 +34,7 @@ func TestTypedAccessors(t *testing.T) {
 	}
 
 	host := struct{ contract.ClusterServer }{d.Server(levelcontroldef.ClusterID)}
-	d, err = NewDimmableLight(testOptions("typed-host"), WithServer(host))
+	d, err = NewDimmableLight(testOptions("typed-host"), withServer(host))
 	if err != nil {
 		t.Fatal(err)
 	}

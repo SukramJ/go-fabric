@@ -33,6 +33,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	sadef "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
 	devicelayer "github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -63,7 +64,7 @@ func createNode(t *testing.T, cfg servicearea.Config) error {
 	}
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	rvc, err := devicelayer.NewRoboticVacuumCleaner(devicelayer.Options{StableKey: endpoint.StringKey("rvc:1"), Name: "rvc"},
-		devicelayer.WithServer(srv))
+		sadef.Declare{HostServer: srv})
 	if err != nil {
 		t.Fatal(err)
 	}

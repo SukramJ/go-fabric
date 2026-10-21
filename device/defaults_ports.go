@@ -84,11 +84,11 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 }
 
 // newLevelControlPortServer is the module's LevelControl server on the
-// declared LevelSource ([levelcontrol.NewServer] with Config.Port), with
+// declared LevelSource ([levelcontrol.NewServer] with Config.Source), with
 // the Lighting feature of the selection and the declaration's Transitions.
 func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.ClusterServer, error) {
 	cfg := levelcontrol.Config{
-		Port: d.LevelSource, DataVersion: b.cfg.DataVersion,
+		Source: d.LevelSource, DataVersion: b.cfg.DataVersion,
 		Lighting: b.opts.Features&uint32(lvldef.FeatureLighting) != 0,
 	}
 	if d.Transitions {
