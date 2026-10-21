@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -321,7 +322,9 @@ func scalarClass(k reflect.Kind) int {
 // convert turns a stored value into a value of the generated type t: a
 // width integer into its enum or bitmap type, a list entry by entry, nil
 // into a nil pointer or slice or a null [Nullable], a value into a
-// pointer to it. false when v does not fit t.
+// pointer to it, and a struct of another type — a self-held server's
+// cluster/wire struct — field by field by name ([convertStruct]). false
+// when v does not fit t.
 func convert(v any, t reflect.Type) (reflect.Value, bool) {
 	if v == nil {
 		switch {
@@ -388,7 +391,43 @@ func convert(v any, t reflect.Type) (reflect.Value, bool) {
 		return src.Convert(t), true
 	case t.Kind() == reflect.Struct && src.Type().ConvertibleTo(t):
 		return src.Convert(t), true
+	case t.Kind() == reflect.Struct && src.Kind() == reflect.Struct:
+		return convertStruct(src, t)
 	default:
 		return reflect.Value{}, false
 	}
+}
+
+// convertStruct fills a t from the struct src field by field: each
+// exported field of t takes the field of src with its name, converted —
+// the name compared without case, as the generated types spell an id
+// "Id" where cluster/wire spells it "ID". A
+// field src does not have stays zero; an optional field (a pointer in t)
+// whose value in src is the zero value of a plain type stays nil, as a
+// wire struct leaves out an empty optional field. false when no field
+// matches or a matching one does not fit.
+func convertStruct(src reflect.Value, t reflect.Type) (reflect.Value, bool) {
+	out := reflect.New(t).Elem()
+	matched := false
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		sf, ok := src.Type().FieldByNameFunc(func(n string) bool { return strings.EqualFold(n, f.Name) })
+		if !ok || !sf.IsExported() {
+			continue
+		}
+		sv := src.FieldByIndex(sf.Index)
+		matched = true
+		if f.Type.Kind() == reflect.Pointer && sv.Kind() != reflect.Pointer && sv.IsZero() {
+			continue
+		}
+		c, ok := convert(sv.Interface(), f.Type)
+		if !ok {
+			return reflect.Value{}, false
+		}
+		out.Field(i).Set(c)
+	}
+	return out, matched
 }

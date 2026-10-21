@@ -339,6 +339,14 @@ func (g *generator) serverTest(w *writer) {
 		w.p("\tif decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != %d || decl.Attach(srv) == nil {", len(cmds))
 		w.p("\t\tt.Error(\"Declare: every handler accepted by the empty definition\")")
 		w.p("\t}")
+		w.p("\tif decl := (Declare{Commands: []uint32{%s}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {", cmds[0].cmdID)
+		w.p("\t\tt.Error(\"Declare: an optional command not among the elements\")")
+		w.p("\t}")
+	}
+	if evs := g.hullEvents(); len(evs) > 0 {
+		w.p("\tif decl := (Declare{Events: []uint32{%s}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {", evs[0].eventID)
+		w.p("\t\tt.Error(\"Declare: an optional event not among the elements\")")
+		w.p("\t}")
 	}
 	w.p("}")
 }

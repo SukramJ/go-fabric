@@ -164,6 +164,9 @@ type Declare struct {
 	// Initial is the state the server starts with, over the device
 	// type's defaults; an optional attribute it sets is served.
 	Initial Patch
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -184,6 +187,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	return decl
 }
 

@@ -209,7 +209,25 @@ var devicePorts = map[string]portSet{
 	}}},
 }
 
+// operationalCommands is the port of the three OperationalState
+// derivations: the one engine in cluster/opstate serves them, each with its
+// own generated ErrorStateStruct.
+var operationalCommands = portSet{ports: []portDecl{{
+	name: "CommandHandler",
+	doc: []string{
+		"CommandHandler performs a command the kit's server accepted and",
+		"checked against the state (cluster/opstate): it moves",
+		"OperationalState through the device's typed Set and returns the",
+		"ErrorStateStruct the response reports, the zero value for",
+		"NoError; an error answers FAILURE.",
+	},
+	methods: []string{"HandleOperationalCommand(ctx context.Context, cmdID uint32) (ErrorStateStruct, error)"},
+}}}
+
 func init() {
+	devicePorts["OperationalState"] = operationalCommands
+	devicePorts["RvcOperationalState"] = operationalCommands
+	devicePorts["OvenCavityOperationalState"] = operationalCommands
 	for name, ps := range devicePorts {
 		ports[name] = ps
 	}

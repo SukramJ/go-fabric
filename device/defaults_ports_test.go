@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
+	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	demmdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
@@ -17,9 +18,12 @@ import (
 	evsemdef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
 	ovenmdef "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
 	rtccdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
 	rvccdef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
+	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	rvcrdef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	whmdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
 )
@@ -40,6 +44,25 @@ type fakeModes struct{ changed []uint8 }
 func (f *fakeModes) ChangeToMode(_ context.Context, mode uint8) (status uint8, text string, err error) {
 	f.changed = append(f.changed, mode)
 	return 0, "", nil
+}
+
+// fakeOps is an OperationalState derivation's CommandHandler answering
+// NoError with its generated ErrorStateStruct E.
+type fakeOps[E any] struct{ cmds []uint32 }
+
+func (f *fakeOps[E]) HandleOperationalCommand(_ context.Context, cmdID uint32) (E, error) {
+	f.cmds = append(f.cmds, cmdID)
+	var e E
+	return e, nil
+}
+
+// opStates is an OperationalStateList of a derivation with the given ids.
+func opStates[S any](mk func(id uint8) S, ids ...uint8) *[]S {
+	out := make([]S, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, mk(id))
+	}
+	return &out
 }
 
 // modeOf builds one SupportedModes entry of a derivation with one tag.
@@ -71,6 +94,36 @@ func portCases() (cases []struct {
 		{fandef.ClusterID, func() (*Device, error) {
 			return New(&FanType, testOptions("fan"), fandef.Declare{StateSource: &fakeFan{}})
 		}, (*fan.Server)(nil)},
+		{opdef.ClusterID, func() (*Device, error) {
+			mk := func(id uint8) opdef.OperationalStateStruct {
+				return opdef.OperationalStateStruct{OperationalStateId: opdef.OperationalStateEnum(id)}
+			}
+			return New(&LaundryWasherType, testOptions("ops"), opdef.Declare{
+				CommandHandler: &fakeOps[opdef.ErrorStateStruct]{},
+				Commands:       []uint32{opdef.CmdPause, opdef.CmdResume},
+				Initial:        opdef.Patch{OperationalStateList: opStates(mk, 0, 1, 2, 3)},
+			})
+		}, (*opstate.Server)(nil)},
+		{rvcopdef.ClusterID, func() (*Device, error) {
+			mk := func(id uint8) rvcopdef.OperationalStateStruct {
+				return rvcopdef.OperationalStateStruct{OperationalStateId: rvcopdef.OperationalStateEnum(id)}
+			}
+			return New(&RoboticVacuumCleanerType, testOptions("rvcops"), rvcopdef.Declare{
+				CommandHandler: &fakeOps[rvcopdef.ErrorStateStruct]{},
+				Initial:        rvcopdef.Patch{OperationalStateList: opStates(mk, 0, 1, 2, 3, 0x40, 0x41, 0x42)},
+			})
+		}, (*opstate.Server)(nil)},
+		{ovendef.ClusterID, func() (*Device, error) {
+			mk := func(id uint8) ovendef.OperationalStateStruct {
+				return ovendef.OperationalStateStruct{OperationalStateId: ovendef.OperationalStateEnum(id)}
+			}
+			opts := testOptions("ovenops")
+			opts.Conditions = []string{"Heater"}
+			return New(&TemperatureControlledCabinetType, opts, ovendef.Declare{
+				CommandHandler: &fakeOps[ovendef.ErrorStateStruct]{},
+				Initial:        ovendef.Patch{OperationalStateList: opStates(mk, 0, 1, 3)},
+			})
+		}, (*opstate.Server)(nil)},
 		{lwmdef.ClusterID, func() (*Device, error) {
 			mk := func(l string, m uint8, tag uint16) lwmdef.ModeOptionStruct {
 				return lwmdef.ModeOptionStruct{Label: l, Mode: m, ModeTags: []lwmdef.ModeTagStruct{{Value: lwmdef.ModeTag(tag)}}}

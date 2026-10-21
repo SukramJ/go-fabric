@@ -133,6 +133,15 @@ func (s *Server) EmitOperationCompletion(endpoint uint16, data OperationCompleti
 	return spec.EmitOn(s.Underlying(), endpoint, EventOperationCompletion, data)
 }
 
+// CommandHandler performs a command the kit's server accepted and
+// checked against the state (cluster/opstate): it moves
+// OperationalState through the device's typed Set and returns the
+// ErrorStateStruct the response reports, the zero value for
+// NoError; an error answers FAILURE.
+type CommandHandler interface {
+	HandleOperationalCommand(ctx context.Context, cmdID uint32) (ErrorStateStruct, error)
+}
+
 // Declare is the declaration of the OvenCavityOperationalState cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -142,6 +151,13 @@ type Declare struct {
 	// Initial is the state the server starts with, over the device
 	// type's defaults; an optional attribute it sets is served.
 	Initial Patch
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -157,6 +173,8 @@ type Declare struct {
 	// HandleResume handles the Resume command in place of the server
 	// (Server.HandleResume), inline; an optional command it handles is accepted.
 	HandleResume func(ctx context.Context, req ResumeRequest) (OperationalCommandResponse, error)
+	// CommandHandler is the host port the kit's server runs on ([CommandHandler]).
+	CommandHandler CommandHandler
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -174,6 +192,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandlePause != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdPause)
 		decl.Attach = d.attach

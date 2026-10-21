@@ -92,4 +92,10 @@ func TestTypedServer(t *testing.T) {
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 3 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
 	}
+	if decl := (Declare{Commands: []uint32{CmdGetSetupPin}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventLoggedOut}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
+	}
 }

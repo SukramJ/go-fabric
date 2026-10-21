@@ -99,4 +99,7 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ StateSource = d.StateSource
+	if decl := (Declare{Events: []uint32{EventSupplyVoltageLow}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
+	}
 }

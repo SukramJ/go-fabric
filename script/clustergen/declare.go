@@ -211,6 +211,17 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 		w.p("\t// Features is the FeatureMap selection; zero is the device type's.")
 		w.p("\tFeatures Feature")
 	}
+	if len(cmds) > 0 {
+		w.p("\t// Commands are optional commands the server accepts beyond the")
+		w.p("\t// ones the selection mandates: the kit's server carries them out")
+		w.p("\t// (through its port), a Handle field below handles one in its place.")
+		w.p("\tCommands []uint32")
+	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\t// Events are optional events the server emits beyond the ones the")
+		w.p("\t// selection mandates (Server.Emit<Event>).")
+		w.p("\tEvents []uint32")
+	}
 	w.p("\t// OnWrite vetoes a controller's write before it is stored")
 	w.p("\t// (Server.OnWrite); it runs inline.")
 	w.p("\tOnWrite func(ctx context.Context, next State, attrID uint32) error")
@@ -247,6 +258,12 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	w.p("\t}")
 	if len(c.Features) > 0 {
 		w.p("\tdecl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0")
+	}
+	if len(cmds) > 0 {
+		w.p("\tdecl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)")
+	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\tdecl.Elements.Events = append(decl.Elements.Events, d.Events...)")
 	}
 	if transitionClusters[c.Name] {
 		w.p("\tdecl.Transitions = d.Transitions")

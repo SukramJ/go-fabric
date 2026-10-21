@@ -110,6 +110,10 @@ type Declare struct {
 	// Initial is the state the server starts with, over the device
 	// type's defaults; an optional attribute it sets is served.
 	Initial Patch
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -139,6 +143,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleQueryImage != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdQueryImage)
 		decl.Attach = d.attach

@@ -65,6 +65,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -439,6 +440,12 @@ type Server struct {
 	states   []StateEntry
 	countOn  bool
 	quiet    *cluster.Quieter
+	hooks    spec.HostHandlers
+	veto     spec.WriteVeto
+	// cause is the contract.Origin of the changes made while a command's
+	// handler runs (OriginCommand), zero outside one: the handler moves
+	// the state through the host setters, which take no context.
+	cause atomic.Uint32
 
 	// mu guards countdown, currentPhase, emitter, endpoint, opError, phases and state.
 	mu           sync.Mutex
@@ -644,13 +651,20 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
-// changed advances the DataVersion and reports attrs.
+// changed advances the DataVersion and reports attrs: a change made
+// while a command's handler runs is the command's, any other the host's —
+// every attribute moves through a host setter, none through a
+// controller's write.
 func (s *Server) changed(attrs ...uint32) {
 	if len(attrs) == 0 {
 		return
 	}
+	origin := contract.OriginHostSet
+	if c := s.cause.Load(); c != 0 {
+		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
 	s.tracker().Bump()
-	s.Notify(attrs...)
+	s.NotifyFrom(origin, attrs...)
 }
 
 // MatterClusterID returns 0x0060, 0x0061 or 0x0048.
@@ -741,11 +755,15 @@ func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error 
 // that finds the device in its target state already answers NoError and
 // "take[s] no further action" (operational-state.resource.ts: Pause :176,
 // Stop :213, Start :241, Resume :266; rvc-operational-state.resource.ts
-// GoHome); every other one is the handler's.
-func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, error) {
+// GoHome); every other one is the handler's. A host handler registered
+// with [Server.Handle] takes the command instead.
+func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	cmd, ok := commandFor(cmdID)
 	if !ok || s.commands&cmd == 0 {
 		return nil, im.UnsupportedCommandf("opstate: command 0x%02X is not supported", cmdID)
+	}
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
 	}
 	s.mu.Lock()
 	st := s.state
@@ -767,7 +785,9 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, er
 	if verdict != ErrorNoError || st == target {
 		return response(ErrorState{ID: verdict}), nil
 	}
+	s.cause.Store(uint32(contract.OriginCommand))
 	reply, err := s.handler.HandleOperationalCommand(ctx, cmd)
+	s.cause.Store(0)
 	if err != nil {
 		return nil, fmt.Errorf("opstate: command 0x%02X: %w", cmdID, err)
 	}
