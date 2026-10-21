@@ -50,6 +50,21 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CookTime:          new(uint32),
+		MaxCookTime:       new(uint32),
+		PowerSetting:      new(uint8),
+		MinPower:          new(uint8),
+		MaxPower:          new(uint8),
+		PowerStep:         new(uint8),
+		SupportedWatts:    new([]uint16),
+		SelectedWattIndex: new(uint8),
+		WattRating:        new(uint16),
+	}
+	values := full.AttributeValues()
+	if len(values) != 9 {
+		t.Errorf("a patch of every field sets %d values, want 9", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -72,6 +87,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Oven = d.Oven
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -79,5 +95,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleAddMoreTime = func(context.Context, AddMoreTimeRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSetCookingParameters}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

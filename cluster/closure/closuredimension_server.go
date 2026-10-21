@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -114,14 +115,7 @@ const positionQuietInterval = 5 * time.Second
 // DimensionHandler carries out the commands on the device. It is called
 // after the server's checks and before TargetState changes; an error
 // answers FAILURE and leaves TargetState as it was.
-type DimensionHandler interface {
-	// SetTarget receives the request's fields as chip's delegate does:
-	// Position after the LimitRange clamp and the Resolution rounding,
-	// Latch and Speed as sent.
-	SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAuto) error
-	// Step receives the request's fields as sent.
-	Step(ctx context.Context, direction StepDirection, numberOfSteps uint16, speed *ThreeLevelAuto) error
-}
+type DimensionHandler = cd.DimensionHandler
 
 // DimensionConfig carries the construction parameters.
 type DimensionConfig struct {
@@ -170,6 +164,10 @@ var (
 type DimensionServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
+	hooks spec.Hooks
+	// cause is the contract.Origin of the changes a command makes
+	// (OriginCommand), zero outside one.
+	cause atomic.Uint32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -207,6 +205,7 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	s := &DimensionServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
+	s.hooks.Init(inst)
 	if err := s.checkFixed(); err != nil {
 		return nil, err
 	}
@@ -355,9 +354,31 @@ func (s *DimensionServer) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
+// changed advances the data version and reports attrIDs: a change a
+// command makes is the command's, any other the device's own report.
 func (s *DimensionServer) changed(attrIDs ...uint32) {
+	origin := contract.OriginHostSet
+	if c := s.cause.Load(); c != 0 {
+		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
 	s.tracker().Bump()
-	s.Notify(attrIDs...)
+	s.NotifyFrom(origin, attrIDs...)
+}
+
+// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
+func (s *DimensionServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return s.hooks.Handle(cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]: ClosureDimension defines no
+// event, so every one is [spec.ErrNotEmitted].
+func (s *DimensionServer) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.hooks.Emit(endpoint, eventID, data)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]).
+func (s *DimensionServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.hooks.SetBeforeWrite(fn)
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -430,9 +451,12 @@ func stateValue(p *DimensionState) any {
 
 // MatterWrite refuses every write: every attribute is read-only, and the
 // definition answers each with its status.
-func (s *DimensionServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := s.ValidateWrite(attrID, value, nil)
-	return err
+func (s *DimensionServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
+	}
+	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
 // MatterInvoke carries out SetTarget and Step; both answer with a status
@@ -441,6 +465,11 @@ func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("closure: command 0x%02X is not supported", cmdID)
 	}
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
+	s.cause.Store(uint32(contract.OriginCommand))
+	defer s.cause.Store(0)
 	if cmdID == cd.CmdSetTarget {
 		req, ok := dimRequest[cd.SetTargetRequest](fields)
 		if !ok {

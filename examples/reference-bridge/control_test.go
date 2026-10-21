@@ -14,10 +14,13 @@ import (
 	"testing/synctest"
 	"time"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // TestAppPipeCommandsReachTheDevices drives every app-pipe command the
@@ -60,13 +63,13 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 	if got := strings.Count(out, "apppipe.error"); got != 2 {
 		t.Errorf("%d commands refused, want 2 (the unknown name and the malformed line)\n%s", got, out)
 	}
-	if v, _ := f.humidity.MatterFloatValue(); v != 61.5 {
+	if v := f.humidity.reading(); v != 61.5 {
 		t.Errorf("humidity = %v", v)
 	}
-	if on, _ := f.contact.MatterBoolValue(); on {
+	if f.contact.state() {
 		t.Error("contact still closed")
 	}
-	if st := f.smoke.SmokeCOState(); !st.Unmounted || !st.Inoperative || !st.TestInProgress {
+	if st := f.smoke.SmokeCOState(); !st.Unmounted || st.ExpressedState != smokedef.ExpressedStateInoperative || !st.TestInProgress {
 		t.Errorf("smoke alarm after SetUnmounted and LongPress = %+v, want unmounted, inoperative and testing", st)
 	}
 	if !f.lock.IsJammed() {
@@ -87,25 +90,25 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 	f, _ := startFleetBridge(t)
 	cases := []struct {
 		trigger uint64
-		check   func(alarm.State) bool
+		check   func(smokedef.State) bool
 	}{
-		{triggerForceSmokeCritical, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmCritical }},
-		{triggerClearSmoke, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmNormal }},
-		{triggerForceCOWarning, func(s alarm.State) bool { return s.COState == alarm.AlarmWarning }},
-		{triggerForceLowBatteryCrit, func(s alarm.State) bool { return s.BatteryAlert == alarm.AlarmCritical }},
-		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.Muted }},
-		{triggerClearSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		{triggerForceSmokeCritical, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmCritical }},
+		{triggerClearSmoke, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmNormal }},
+		{triggerForceCOWarning, func(s smokedef.State) bool { return s.CoState == alarm.AlarmWarning }},
+		{triggerForceLowBatteryCrit, func(s smokedef.State) bool { return s.BatteryAlert == alarm.AlarmCritical }},
+		{triggerForceSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.Muted }},
+		{triggerClearSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.NotMuted }},
 		// A critical alarm cannot be muted (TC-SMOKECO-2.5 step 55).
-		{triggerForceSmokeCritical, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmCritical }},
-		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
-		{triggerClearSmoke, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmNormal }},
-		{triggerForceMalfunction, func(s alarm.State) bool { return s.HardwareFaultAlert }},
-		{triggerForceEndOfLife, func(s alarm.State) bool { return s.EndOfServiceAlert == alarm.EndOfServiceExpired }},
-		{triggerForceContaminationHigh, func(s alarm.State) bool { return s.ContaminationState == alarm.ContaminationCritical }},
-		{triggerForceSensitivityLow, func(s alarm.State) bool { return s.SmokeSensitivityLevel == alarm.SensitivityLow }},
-		{triggerForceUnmounted, func(s alarm.State) bool { return s.Unmounted }},
+		{triggerForceSmokeCritical, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmCritical }},
+		{triggerForceSilence, func(s smokedef.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		{triggerClearSmoke, func(s smokedef.State) bool { return s.SmokeState == alarm.AlarmNormal }},
+		{triggerForceMalfunction, func(s smokedef.State) bool { return s.HardwareFaultAlert }},
+		{triggerForceEndOfLife, func(s smokedef.State) bool { return s.EndOfServiceAlert == alarm.EndOfServiceExpired }},
+		{triggerForceContaminationHigh, func(s smokedef.State) bool { return s.ContaminationState == alarm.ContaminationCritical }},
+		{triggerForceSensitivityLow, func(s smokedef.State) bool { return s.SmokeSensitivityLevel == alarm.SensitivityLow }},
+		{triggerForceUnmounted, func(s smokedef.State) bool { return s.Unmounted }},
 		// The endpoint bits CHIP clears (clearEndpointInEventTrigger).
-		{triggerForceSmokeInterconnect | 0x0000_0009_0000_0000, func(s alarm.State) bool { return s.InterconnectSmokeAlarm == alarm.AlarmWarning }},
+		{triggerForceSmokeInterconnect | 0x0000_0009_0000_0000, func(s smokedef.State) bool { return s.InterconnectSmokeAlarm == alarm.AlarmWarning }},
 	}
 	for _, tc := range cases {
 		if err := f.testEventTrigger(context.Background(), tc.trigger); err != nil {
@@ -124,7 +127,7 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 	if err := f.testEventTrigger(context.Background(), 0x1234); err == nil {
 		t.Error("an unknown trigger was accepted")
 	}
-	if err := f.washer.reportError(opstate.ErrorUnableToStartOrResume); err != nil {
+	if err := f.washer.reportError(opdef.ErrorStateUnableToStartOrResume); err != nil {
 		t.Errorf("washer error: %v", err)
 	}
 }
@@ -139,15 +142,15 @@ func TestWasherFaultBlocksStart(t *testing.T) {
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Generic", Operation: "OnFault", Param: &one}); err != nil {
 		t.Fatalf("OnFault 2: %v", err)
 	}
-	got, err := f.washer.HandleOperationalCommand(context.Background(), opstate.CommandStart)
-	if err != nil || got.ID != opstate.ErrorUnableToStartOrResume {
+	got, err := f.washer.HandleOperationalCommand(context.Background(), opdef.CmdStart)
+	if err != nil || got.ErrorStateId != opdef.ErrorStateUnableToStartOrResume {
 		t.Fatalf("Start after a fault = %+v, %v; want UnableToStartOrResume", got, err)
 	}
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Generic", Operation: "OnFault", Param: &zero}); err != nil {
 		t.Fatalf("OnFault 0: %v", err)
 	}
-	got, err = f.washer.HandleOperationalCommand(context.Background(), opstate.CommandStart)
-	if err != nil || got.ID != opstate.ErrorNoError {
+	got, err = f.washer.HandleOperationalCommand(context.Background(), opdef.CmdStart)
+	if err != nil || got.ErrorStateId != opdef.ErrorStateNoError {
 		t.Fatalf("Start after the fault cleared = %+v, %v; want NoError", got, err)
 	}
 	f.washer.stopCountdown()
@@ -178,43 +181,45 @@ func TestSmokeSelfTestEndsOnItsOwn(t *testing.T) {
 func TestWasherStopReportsTheCycleTimes(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := newDemoWasher("cycle")
-		w.build()
+		if _, err := w.device(bridged("washer", w.name)); err != nil {
+			t.Fatal(err)
+		}
 		events := &eventCapture{}
-		w.ops.SetMatterEventEmitter(events)
+		w.ops.Underlying().(contract.EventReceiver).SetMatterEventEmitter(events)
 		ctx := context.Background()
-		if got, err := w.HandleOperationalCommand(ctx, opstate.CommandStart); err != nil || got.ID != opstate.ErrorNoError {
+		if got, err := w.HandleOperationalCommand(ctx, opdef.CmdStart); err != nil || got.ErrorStateId != opdef.ErrorStateNoError {
 			t.Fatalf("Start = %+v, %v", got, err)
 		}
 		time.Sleep(washCycleSeconds*time.Second + time.Second)
 		synctest.Wait()
-		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateRunning) {
+		if v := w.ops.Get().OperationalState; v != opdef.OperationalStateRunning {
 			t.Errorf("OperationalState after the countdown = %v, want still Running", v)
 		}
 		// A pause of 10 s counts into the total and into PausedTime.
-		if _, err := w.HandleOperationalCommand(ctx, opstate.CommandPause); err != nil {
+		if _, err := w.HandleOperationalCommand(ctx, opdef.CmdPause); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(10 * time.Second)
-		if _, err := w.HandleOperationalCommand(ctx, opstate.CommandResume); err != nil {
+		if _, err := w.HandleOperationalCommand(ctx, opdef.CmdResume); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := w.HandleOperationalCommand(ctx, opstate.CommandStop); err != nil || got.ID != opstate.ErrorNoError {
+		if got, err := w.HandleOperationalCommand(ctx, opdef.CmdStop); err != nil || got.ErrorStateId != opdef.ErrorStateNoError {
 			t.Fatalf("Stop = %+v, %v", got, err)
 		}
-		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateStopped) {
+		if v := w.ops.Get().OperationalState; v != opdef.OperationalStateStopped {
 			t.Errorf("OperationalState after Stop = %v, want Stopped", v)
 		}
-		var done *clusterwire.OperationCompletionEvent
+		var done *opdef.OperationCompletionEvent
 		for _, e := range events.all() {
-			if ev, ok := e.(clusterwire.OperationCompletionEvent); ok {
+			if ev, ok := e.(opdef.OperationCompletionEvent); ok {
 				done = &ev
 			}
 		}
 		if done == nil || done.TotalOperationalTime == nil || done.PausedTime == nil {
 			t.Fatalf("OperationCompletion = %+v, want one with both times", done)
 		}
-		if got := done.TotalOperationalTime.Seconds; got != washCycleSeconds+11 || done.PausedTime.Seconds != 10 {
-			t.Errorf("OperationCompletion times = %d total / %d paused, want %d / 10", got, done.PausedTime.Seconds, washCycleSeconds+11)
+		if got := done.TotalOperationalTime.Value; got != washCycleSeconds+11 || done.PausedTime.Value != 10 {
+			t.Errorf("OperationCompletion times = %d total / %d paused, want %d / 10", got, done.PausedTime.Value, washCycleSeconds+11)
 		}
 	})
 }
@@ -242,7 +247,12 @@ func (c *eventCapture) all() []any {
 // BUSY (TC-SMOKECO-2.2 steps 9-10).
 func TestSmokeTestButtonIsIgnoredWhileAlarming(t *testing.T) {
 	a := newDemoSmokeAlarm("busy")
-	a.update(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })
+	d, err := device.NewSmokeCoAlarm(bridged("smoke", a.name), a.declaration())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.bind(d)
+	a.update(func(s *smokedef.State) { s.SmokeState = alarm.AlarmWarning })
 	if err := a.pressTestButton(context.Background()); err != nil {
 		t.Fatalf("press while alarming: %v", err)
 	}
@@ -260,16 +270,16 @@ func TestSmokeTestButtonIsIgnoredWhileAlarming(t *testing.T) {
 func TestOvenPipeDrivesTheCavity(t *testing.T) {
 	f, _ := startFleetBridge(t)
 	cavity := f.oven.cavity
-	cavity.build()
-	state := func() opstate.State {
-		raw, _ := cavity.ops.MatterRead(opstate.AttrOperationalState)
-		st, _ := raw.(uint8)
-		return opstate.State(st)
-	}
+	state := func() ovendef.OperationalStateEnum { return cavity.server().Get().OperationalState }
 	for _, step := range []struct {
 		op   string
-		want opstate.State
-	}{{"Start", opstate.StateRunning}, {"Pause", opstate.StatePaused}, {"Resume", opstate.StateRunning}, {"Stop", opstate.StateStopped}} {
+		want ovendef.OperationalStateEnum
+	}{
+		{"Start", ovendef.OperationalStateRunning},
+		{"Pause", ovendef.OperationalStatePaused},
+		{"Resume", ovendef.OperationalStateRunning},
+		{"Stop", ovendef.OperationalStateStopped},
+	} {
 		if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: step.op}); err != nil {
 			t.Fatalf("%s: %v", step.op, err)
 		}
@@ -277,30 +287,29 @@ func TestOvenPipeDrivesTheCavity(t *testing.T) {
 			t.Fatalf("after %s: OperationalState = %d, want %d", step.op, got, step.want)
 		}
 	}
-	fault := uint8(opstate.ErrorUnableToStartOrResume)
+	fault := uint8(ovendef.ErrorStateUnableToStartOrResume)
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "OnFault", Param: &fault}); err != nil {
 		t.Fatalf("OnFault: %v", err)
 	}
-	if got := state(); got != opstate.StateError {
+	if got := state(); got != ovendef.OperationalStateError {
 		t.Fatalf("after OnFault: OperationalState = %d, want Error", got)
 	}
-	raw, _ := cavity.ops.MatterRead(opstate.AttrOperationalError)
-	if e, ok := raw.(clusterwire.ErrorStateStruct); !ok || e.ErrorStateID != uint8(opstate.ErrorUnableToStartOrResume) {
-		t.Fatalf("OperationalError = %#v, want UnableToStartOrResume", raw)
+	if e := cavity.server().Get().OperationalError; e.ErrorStateId != ovendef.ErrorStateUnableToStartOrResume {
+		t.Fatalf("OperationalError = %#v, want UnableToStartOrResume", e)
 	}
 	// Start while the fault stands is UnableToStartOrResume, as CHIP's oven
 	// delegate answers (HandleStartStateCallback :139-146; TC-OVENOPSTATE-2.2
 	// step 17); clearing it with OnFault 0 lets Start through.
-	got, err := cycle{name: cavity.name, ops: func() *opstate.Server { return cavity.ops }}.HandleOperationalCommand(context.Background(), opstate.CommandStart)
-	if err != nil || got.ID != opstate.ErrorUnableToStartOrResume {
+	got, err := cavity.cycle().handle(ovendef.CmdStart)
+	if err != nil || got != uint8(ovendef.ErrorStateUnableToStartOrResume) {
 		t.Fatalf("Start under a fault = %+v, %v; want UnableToStartOrResume", got, err)
 	}
-	zero := uint8(opstate.ErrorNoError)
+	zero := uint8(ovendef.ErrorStateNoError)
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "OnFault", Param: &zero}); err != nil {
 		t.Fatalf("OnFault 0: %v", err)
 	}
-	got, err = cycle{name: cavity.name, ops: func() *opstate.Server { return cavity.ops }}.HandleOperationalCommand(context.Background(), opstate.CommandStart)
-	if err != nil || got.ID != opstate.ErrorNoError {
+	got, err = cavity.cycle().handle(ovendef.CmdStart)
+	if err != nil || got != uint8(ovendef.ErrorStateNoError) {
 		t.Fatalf("Start after the fault cleared = %+v, %v; want NoError", got, err)
 	}
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "Bake"}); !errors.Is(err, errUnknownPipeCommand) {

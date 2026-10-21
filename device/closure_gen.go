@@ -18,9 +18,12 @@ const (
 	ClosureRevision uint16 = 1
 )
 
-// ClosureType is the Closure device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/closure.ts.
-var ClosureType = Type{
+// ClosureType is the Closure device type, matter.js's packages/node/src/devices/closure.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#closure.
+var ClosureType = typeClosure
+
+// typeClosure holds [ClosureType]'s cluster requirements.
+var typeClosure = Type{
 	ID: ClosureID, Name: "Closure", Revision: ClosureRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -57,10 +60,7 @@ func NewClosure(opts Options, decls ...Declaration) (*Closure, error) {
 	return &Closure{d}, nil
 }
 
-// ClosureControl returns the typed ClosureControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ClosureControl is the device's typed ClosureControl server; the type mandates it.
 func (d *Closure) ClosureControl() *closurecontroldef.Server {
 	return closurecontroldef.WrapOn(d.Server(0x0104), d.queue)
 }

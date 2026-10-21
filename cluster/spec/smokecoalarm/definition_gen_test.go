@@ -60,6 +60,26 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		ExpressedState:         new(ExpressedStateEnum),
+		SmokeState:             new(AlarmStateEnum),
+		CoState:                new(AlarmStateEnum),
+		BatteryAlert:           new(AlarmStateEnum),
+		DeviceMuted:            new(MuteStateEnum),
+		TestInProgress:         new(bool),
+		HardwareFaultAlert:     new(bool),
+		EndOfServiceAlert:      new(EndOfServiceEnum),
+		InterconnectSmokeAlarm: new(AlarmStateEnum),
+		InterconnectCoAlarm:    new(AlarmStateEnum),
+		ContaminationState:     new(ContaminationStateEnum),
+		SmokeSensitivityLevel:  new(SensitivityEnum),
+		ExpiryDate:             new(uint32),
+		Unmounted:              new(bool),
+	}
+	values := full.AttributeValues()
+	if len(values) != 14 {
+		t.Errorf("a patch of every field sets %d values, want 14", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -90,11 +110,18 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ StateSource = d.StateSource
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
 	all.HandleSelfTestRequest = func(context.Context, SelfTestRequestRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 1 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSelfTestRequest}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventSmokeAlarm}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

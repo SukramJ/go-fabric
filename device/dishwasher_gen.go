@@ -21,9 +21,12 @@ const (
 	DishwasherRevision uint16 = 2
 )
 
-// DishwasherType is the Dishwasher device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/dishwasher.ts.
-var DishwasherType = Type{
+// DishwasherType is the Dishwasher device type, matter.js's packages/node/src/devices/dishwasher.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#dishwasher.
+var DishwasherType = typeDishwasher
+
+// typeDishwasher holds [DishwasherType]'s cluster requirements.
+var typeDishwasher = Type{
 	ID: DishwasherID, Name: "Dishwasher", Revision: DishwasherRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -73,40 +76,25 @@ func NewDishwasher(opts Options, decls ...Declaration) (*Dishwasher, error) {
 	return &Dishwasher{d}, nil
 }
 
-// OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OperationalState is the device's typed OperationalState server; the type mandates it.
 func (d *Dishwasher) OperationalState() *operationalstatedef.Server {
 	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OnOff is the device's typed OnOff server, nil until a declaration mounts it.
 func (d *Dishwasher) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureControl is the device's typed TemperatureControl server, nil until a declaration mounts it.
 func (d *Dishwasher) TemperatureControl() *temperaturecontroldef.Server {
 	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
-// DishwasherMode returns the typed DishwasherMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// DishwasherMode is the device's typed DishwasherMode server, nil until a declaration mounts it.
 func (d *Dishwasher) DishwasherMode() *dishwashermodedef.Server {
 	return dishwashermodedef.WrapOn(d.Server(0x0059), d.queue)
 }
 
-// DishwasherAlarm returns the typed DishwasherAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// DishwasherAlarm is the device's typed DishwasherAlarm server, nil until a declaration mounts it.
 func (d *Dishwasher) DishwasherAlarm() *dishwasheralarmdef.Server {
 	return dishwasheralarmdef.WrapOn(d.Server(0x005D), d.queue)
 }

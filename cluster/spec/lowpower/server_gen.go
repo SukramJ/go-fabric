@@ -25,6 +25,14 @@ type State struct {
 type Patch struct {
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	return v
+}
+
 // Server is the typed LowPower server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -89,6 +97,12 @@ func (s *Server) HandleSleep(fn func(ctx context.Context, req SleepRequest) (str
 	return spec.HandleOn(s.Underlying(), CmdSleep, fn)
 }
 
+// LowPower carries out Sleep, status only: it puts the device into
+// its low-power mode (cluster/media).
+type LowPower interface {
+	Sleep(ctx context.Context) error
+}
+
 // Declare is the declaration of the LowPower cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -98,12 +112,18 @@ type Declare struct {
 	// Initial is the state the server starts with, over the device
 	// type's defaults; an optional attribute it sets is served.
 	Initial Patch
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
 	// HandleSleep handles the Sleep command in place of the server
 	// (Server.HandleSleep), inline; an optional command it handles is accepted.
 	HandleSleep func(ctx context.Context, req SleepRequest) (struct{}, error)
+	// LowPower is the host port the kit's server runs on ([LowPower]).
+	LowPower LowPower
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -121,6 +141,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSleep != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSleep)
 		decl.Attach = d.attach

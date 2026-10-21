@@ -17,9 +17,12 @@ const (
 	PressureSensorRevision uint16 = 3
 )
 
-// PressureSensorType is the PressureSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/pressure-sensor.ts.
-var PressureSensorType = Type{
+// PressureSensorType is the PressureSensor device type, matter.js's packages/node/src/devices/pressure-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#pressuresensor.
+var PressureSensorType = typePressureSensor
+
+// typePressureSensor holds [PressureSensorType]'s cluster requirements.
+var typePressureSensor = Type{
 	ID: PressureSensorID, Name: "PressureSensor", Revision: PressureSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewPressureSensor(opts Options, decls ...Declaration) (*PressureSensor, err
 	return &PressureSensor{d}, nil
 }
 
-// PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// PressureMeasurement is the device's typed PressureMeasurement server; the type mandates it.
 func (d *PressureSensor) PressureMeasurement() *pressuremeasurementdef.Server {
 	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }

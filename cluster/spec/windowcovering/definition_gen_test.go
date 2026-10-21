@@ -53,6 +53,27 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Type:                             new(TypeEnum),
+		NumberOfActuationsLift:           new(uint16),
+		NumberOfActuationsTilt:           new(uint16),
+		ConfigStatus:                     new(ConfigStatusBitmap),
+		CurrentPositionLiftPercentage:    new(uint8),
+		CurrentPositionTiltPercentage:    new(uint8),
+		OperationalStatus:                new(OperationalStatusBitmap),
+		TargetPositionLiftPercent100ths:  new(uint16),
+		TargetPositionTiltPercent100ths:  new(uint16),
+		EndProductType:                   new(EndProductTypeEnum),
+		CurrentPositionLiftPercent100ths: new(uint16),
+		CurrentPositionTiltPercent100ths: new(uint16),
+		Mode:                             new(ModeBitmap),
+		SafetyStatus:                     new(SafetyStatusBitmap),
+		Null:                             []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 15 {
+		t.Errorf("a patch of every field sets %d values, want 15", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -95,5 +116,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleGoToTiltPercentage = func(context.Context, GoToTiltPercentageRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 5 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdUpOrOpen}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

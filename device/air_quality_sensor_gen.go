@@ -29,9 +29,12 @@ const (
 	AirQualitySensorRevision uint16 = 1
 )
 
-// AirQualitySensorType is the AirQualitySensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/air-quality-sensor.ts.
-var AirQualitySensorType = Type{
+// AirQualitySensorType is the AirQualitySensor device type, matter.js's packages/node/src/devices/air-quality-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#airqualitysensor.
+var AirQualitySensorType = typeAirQualitySensor
+
+// typeAirQualitySensor holds [AirQualitySensorType]'s cluster requirements.
+var typeAirQualitySensor = Type{
 	ID: AirQualitySensorID, Name: "AirQualitySensor", Revision: AirQualitySensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -110,106 +113,67 @@ func NewAirQualitySensor(opts Options, decls ...Declaration) (*AirQualitySensor,
 	return &AirQualitySensor{d}, nil
 }
 
-// AirQuality returns the typed AirQuality server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// AirQuality is the device's typed AirQuality server; the type mandates it.
 func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
 	return airqualitydef.WrapOn(d.Server(0x005B), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RelativeHumidityMeasurement is the device's typed RelativeHumidityMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
 	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }
 
-// CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CarbonMonoxideConcentrationMeasurement is the device's typed CarbonMonoxideConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
 	return carbonmonoxideconcentrationmeasurementdef.WrapOn(d.Server(0x040C), d.queue)
 }
 
-// CarbonDioxideConcentrationMeasurement returns the typed CarbonDioxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CarbonDioxideConcentrationMeasurement is the device's typed CarbonDioxideConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxideconcentrationmeasurementdef.Server {
 	return carbondioxideconcentrationmeasurementdef.WrapOn(d.Server(0x040D), d.queue)
 }
 
-// NitrogenDioxideConcentrationMeasurement returns the typed NitrogenDioxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// NitrogenDioxideConcentrationMeasurement is the device's typed NitrogenDioxideConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendioxideconcentrationmeasurementdef.Server {
 	return nitrogendioxideconcentrationmeasurementdef.WrapOn(d.Server(0x0413), d.queue)
 }
 
-// OzoneConcentrationMeasurement returns the typed OzoneConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OzoneConcentrationMeasurement is the device's typed OzoneConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationmeasurementdef.Server {
 	return ozoneconcentrationmeasurementdef.WrapOn(d.Server(0x0415), d.queue)
 }
 
-// Pm25ConcentrationMeasurement returns the typed Pm25ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// Pm25ConcentrationMeasurement is the device's typed Pm25ConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeasurementdef.Server {
 	return pm25concentrationmeasurementdef.WrapOn(d.Server(0x042A), d.queue)
 }
 
-// FormaldehydeConcentrationMeasurement returns the typed FormaldehydeConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FormaldehydeConcentrationMeasurement is the device's typed FormaldehydeConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydeconcentrationmeasurementdef.Server {
 	return formaldehydeconcentrationmeasurementdef.WrapOn(d.Server(0x042B), d.queue)
 }
 
-// Pm1ConcentrationMeasurement returns the typed Pm1ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// Pm1ConcentrationMeasurement is the device's typed Pm1ConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasurementdef.Server {
 	return pm1concentrationmeasurementdef.WrapOn(d.Server(0x042C), d.queue)
 }
 
-// Pm10ConcentrationMeasurement returns the typed Pm10ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// Pm10ConcentrationMeasurement is the device's typed Pm10ConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeasurementdef.Server {
 	return pm10concentrationmeasurementdef.WrapOn(d.Server(0x042D), d.queue)
 }
 
-// TotalVolatileOrganicCompoundsConcentrationMeasurement returns the typed TotalVolatileOrganicCompoundsConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TotalVolatileOrganicCompoundsConcentrationMeasurement is the device's typed TotalVolatileOrganicCompoundsConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *totalvolatileorganiccompoundsconcentrationmeasurementdef.Server {
 	return totalvolatileorganiccompoundsconcentrationmeasurementdef.WrapOn(d.Server(0x042E), d.queue)
 }
 
-// RadonConcentrationMeasurement returns the typed RadonConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RadonConcentrationMeasurement is the device's typed RadonConcentrationMeasurement server, nil until a declaration mounts it.
 func (d *AirQualitySensor) RadonConcentrationMeasurement() *radonconcentrationmeasurementdef.Server {
 	return radonconcentrationmeasurementdef.WrapOn(d.Server(0x042F), d.queue)
 }

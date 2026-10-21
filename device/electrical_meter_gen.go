@@ -18,9 +18,12 @@ const (
 	ElectricalMeterRevision uint16 = 1
 )
 
-// ElectricalMeterType is the ElectricalMeter device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/electrical-meter.ts.
-var ElectricalMeterType = Type{
+// ElectricalMeterType is the ElectricalMeter device type, matter.js's packages/node/src/devices/electrical-meter.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalmeter.
+var ElectricalMeterType = typeElectricalMeter
+
+// typeElectricalMeter holds [ElectricalMeterType]'s cluster requirements.
+var typeElectricalMeter = Type{
 	ID: ElectricalMeterID, Name: "ElectricalMeter", Revision: ElectricalMeterRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "ElectricalEnergyTariff",
@@ -56,26 +59,17 @@ func NewElectricalMeter(opts Options, decls ...Declaration) (*ElectricalMeter, e
 	return &ElectricalMeter{d}, nil
 }
 
-// ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ElectricalPowerMeasurement is the device's typed ElectricalPowerMeasurement server; the type mandates it.
 func (d *ElectricalMeter) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
 	return electricalpowermeasurementdef.WrapOn(d.Server(0x0090), d.queue)
 }
 
-// ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ElectricalEnergyMeasurement is the device's typed ElectricalEnergyMeasurement server; the type mandates it.
 func (d *ElectricalMeter) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
 	return electricalenergymeasurementdef.WrapOn(d.Server(0x0091), d.queue)
 }
 
-// CommodityMetering returns the typed CommodityMetering server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CommodityMetering is the device's typed CommodityMetering server, nil until a declaration mounts it.
 func (d *ElectricalMeter) CommodityMetering() *commoditymeteringdef.Server {
 	return commoditymeteringdef.WrapOn(d.Server(0x0B07), d.queue)
 }

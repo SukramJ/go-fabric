@@ -72,8 +72,9 @@ func schemaNullable(t *testing.T) map[uint32]map[uint32]bool {
 // TestEnergyMarketWireShapes from the energy-market clusters to the fleet.
 func TestFleetWireShapes(t *testing.T) {
 	// The mechanism, on the defect class it exists for: a plain slice of
-	// generated structs is not encoded, its spec.List is
-	// (cluster/energy/commodity_wire.go).
+	// generated structs is not encoded, its spec.List is — the form a typed
+	// Patch stores (Patch.AttributeValues) and cluster/energy's servers
+	// hand out (commodity_wire.go).
 	if writerEncodes([]ct.DayEntryStruct{}) || !writerEncodes(spec.List[ct.DayEntryStruct]{}) {
 		t.Fatal("writerEncodes misjudges a plain slice / spec.List of generated structs")
 	}

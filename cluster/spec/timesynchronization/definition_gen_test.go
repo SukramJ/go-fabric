@@ -65,6 +65,32 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		UtcTime:              new(uint64),
+		Granularity:          new(GranularityEnum),
+		TimeSource:           new(TimeSourceEnum),
+		TrustedTimeSource:    new(TrustedTimeSourceStruct),
+		DefaultNtp:           new(string),
+		TimeZone:             new([]TimeZoneStruct),
+		DstOffset:            new([]DSTOffsetStruct),
+		LocalTime:            new(uint64),
+		TimeZoneDatabase:     new(TimeZoneDatabaseEnum),
+		NtpServerAvailable:   new(bool),
+		TimeZoneListMaxSize:  new(uint8),
+		DstOffsetListMaxSize: new(uint8),
+		SupportsDnsResolve:   new(bool),
+		Null:                 []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 14 {
+		t.Errorf("a patch of every field sets %d values, want 14", len(values))
+	}
+	if _, ok := values[AttrTimeZone].(spec.List[TimeZoneStruct]); !ok {
+		t.Errorf("TimeZone is stored as %T, want its spec.List", values[AttrTimeZone])
+	}
+	if _, ok := values[AttrDstOffset].(spec.List[DSTOffsetStruct]); !ok {
+		t.Errorf("DstOffset is stored as %T, want its spec.List", values[AttrDstOffset])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -115,5 +141,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleSetDefaultNtp = func(context.Context, SetDefaultNtpRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 5 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSetUtcTime}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventDstTableEmpty}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

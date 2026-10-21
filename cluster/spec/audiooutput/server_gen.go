@@ -29,6 +29,20 @@ type Patch struct {
 	CurrentOutput *uint8              `matter:"0x0001"` // attribute 0x0001
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.OutputList != nil {
+		v[AttrOutputList] = spec.List[OutputInfoStruct](*p.OutputList)
+	}
+	if p.CurrentOutput != nil {
+		v[AttrCurrentOutput] = *p.CurrentOutput
+	}
+	return v
+}
+
 // Server is the typed AudioOutput server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -99,6 +113,19 @@ func (s *Server) HandleRenameOutput(fn func(ctx context.Context, req RenameOutpu
 	return spec.HandleOn(s.Underlying(), CmdRenameOutput, fn)
 }
 
+// OutputRenamer is an Outputs that takes RenameOutput; NameUpdates
+// (NU) requires it.
+type OutputRenamer interface {
+	RenameOutput(ctx context.Context, st *State, req RenameOutputRequest) error
+}
+
+// Outputs carries out SelectOutput, status only, making the output
+// current in st; a port that also implements OutputRenamer takes
+// RenameOutput (cluster/media).
+type Outputs interface {
+	SelectOutput(ctx context.Context, st *State, req SelectOutputRequest) error
+}
+
 // Declare is the declaration of the AudioOutput cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -110,6 +137,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -119,6 +150,8 @@ type Declare struct {
 	// HandleRenameOutput handles the RenameOutput command in place of the server
 	// (Server.HandleRenameOutput), inline; an optional command it handles is accepted.
 	HandleRenameOutput func(ctx context.Context, req RenameOutputRequest) (struct{}, error)
+	// Outputs is the host port the kit's server runs on ([Outputs]).
+	Outputs Outputs
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -137,6 +170,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSelectOutput != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSelectOutput)
 		decl.Attach = d.attach

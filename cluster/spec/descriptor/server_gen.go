@@ -37,6 +37,32 @@ type Patch struct {
 	EndpointUniqueId *string             `matter:"0x0005"` // attribute 0x0005
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.DeviceTypeList != nil {
+		v[AttrDeviceTypeList] = spec.List[DeviceTypeStruct](*p.DeviceTypeList)
+	}
+	if p.ServerList != nil {
+		v[AttrServerList] = *p.ServerList
+	}
+	if p.ClientList != nil {
+		v[AttrClientList] = *p.ClientList
+	}
+	if p.PartsList != nil {
+		v[AttrPartsList] = *p.PartsList
+	}
+	if p.TagList != nil {
+		v[AttrTagList] = spec.List[Semtag](*p.TagList)
+	}
+	if p.EndpointUniqueId != nil {
+		v[AttrEndpointUniqueId] = *p.EndpointUniqueId
+	}
+	return v
+}
+
 // Server is the typed Descriptor server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

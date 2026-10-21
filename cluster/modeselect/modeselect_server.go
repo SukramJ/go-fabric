@@ -142,28 +142,7 @@ type ChangeToModeRequest = msdef.ChangeToModeRequest
 // the cluster contract carries no priority, so a host whose command
 // queue ranks by urgency names the value it wants inside ChangeToMode,
 // where the device vocabulary is already in scope.
-type ModeSource interface {
-	// ModeDescription reports what this cluster instance selects
-	// between, in readable text — a coffee machine's "Milk" as against
-	// its "Sugar" instance.
-	ModeDescription() string
-	// ModeNamespace reports the StandardNamespace, and whether there is
-	// one. present=false encodes as null: no standard namespace, and so
-	// no standard semantic tags in this instance.
-	ModeNamespace() (namespace uint8, present bool)
-	// SupportedModes reports the selectable modes. Each entry needs a
-	// distinct Mode value. The model bounds the list to
-	// [SupportedModesMaxEntries] entries, each Label to [LabelMaxBytes]
-	// UTF-8 bytes and each SemanticTags to [SemanticTagsMaxEntries]
-	// entries; the server returns the list as given and the generated
-	// codec writes it, so staying within them is the host's part.
-	SupportedModes() []ModeOptionStruct
-	// CurrentMode reports the mode the device is in.
-	CurrentMode() uint8
-	// ChangeToMode applies a mode the server has already checked against
-	// SupportedModes.
-	ChangeToMode(ctx context.Context, newMode uint8) error
-}
+type ModeSource = msdef.ModeSource
 
 // Config carries the construction parameters for [Server].
 type Config struct {
@@ -182,7 +161,8 @@ type Config struct {
 // Server implements [contract.ClusterServer] for the Matter ModeSelect
 // cluster (0x0050).
 type Server struct {
-	src ModeSource
+	src   ModeSource
+	hooks spec.Hooks
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
@@ -198,7 +178,44 @@ var (
 )
 
 // NewServer constructs a ModeSelect server over cfg.Source.
-func NewServer(cfg Config) *Server { return &Server{src: cfg.Source, ext: cfg.DataVersion} }
+func NewServer(cfg Config) *Server {
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
+	s.hooks.Init(instance)
+	return s
+}
+
+// SetAttributes implements [spec.AttributeSetter]: every attribute is the
+// ModeSource's — the host changes the mode there and tells the bridge
+// through the source's contract.ChangeNotifier ([spec.ErrNotHeld]).
+func (*Server) SetAttributes(values map[uint32]any) error {
+	for id := range values {
+		return fmt.Errorf("%w: modeselect: attribute 0x%04X is the ModeSource's", spec.ErrNotHeld, id)
+	}
+	return nil
+}
+
+// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.hooks.Handle(cmdID, fn) }
+
+// Emit implements [spec.EventEmitting]: ModeSelect defines no event, so
+// every one is [spec.ErrNotEmitted].
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.hooks.Emit(endpoint, eventID, data)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]); the
+// served attributes are read-only, so no write reaches it.
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.hooks.SetBeforeWrite(fn)
+}
+
+// The typed server's optional interfaces.
+var (
+	_ spec.AttributeSetter   = (*Server)(nil)
+	_ spec.CommandRegistrar  = (*Server)(nil)
+	_ spec.EventEmitting     = (*Server)(nil)
+	_ spec.BeforeWriteSetter = (*Server)(nil)
+)
 
 // tracker returns the active DataVersion counter — the host's when it
 // supplied one, the embedded one otherwise.
@@ -337,6 +354,9 @@ func (*Server) MatterWrite(_ context.Context, attrID uint32, value any) error {
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
 	if cmdID != CmdChangeToMode {
 		return nil, im.UnsupportedCommandf("modeselect: unknown command 0x%02X", cmdID)
+	}
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
 	}
 	req, err := changeToModeRequest(fields)
 	if err != nil {

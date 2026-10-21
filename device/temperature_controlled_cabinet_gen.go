@@ -21,9 +21,12 @@ const (
 	TemperatureControlledCabinetRevision uint16 = 6
 )
 
-// TemperatureControlledCabinetType is the TemperatureControlledCabinet device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/temperature-controlled-cabinet.ts.
-var TemperatureControlledCabinetType = Type{
+// TemperatureControlledCabinetType is the TemperatureControlledCabinet device type, matter.js's packages/node/src/devices/temperature-controlled-cabinet.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#temperaturecontrolledcabinet.
+var TemperatureControlledCabinetType = typeTemperatureControlledCabinet
+
+// typeTemperatureControlledCabinet holds [TemperatureControlledCabinetType]'s cluster requirements.
+var typeTemperatureControlledCabinet = Type{
 	ID: TemperatureControlledCabinetID, Name: "TemperatureControlledCabinet", Revision: TemperatureControlledCabinetRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Conditions: []string{"Cooler", "Heater"},
@@ -74,50 +77,32 @@ func NewTemperatureControlledCabinet(opts Options, decls ...Declaration) (*Tempe
 	return &TemperatureControlledCabinet{d}, nil
 }
 
-// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// TemperatureControl is the device's typed TemperatureControl server; the type mandates it.
 func (d *TemperatureControlledCabinet) TemperatureControl() *temperaturecontroldef.Server {
 	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *TemperatureControlledCabinet) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RefrigeratorAndTemperatureControlledCabinetMode is the device's typed RefrigeratorAndTemperatureControlledCabinetMode server, nil until a declaration mounts it.
 func (d *TemperatureControlledCabinet) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
 	return refrigeratorandtemperaturecontrolledcabinetmodedef.WrapOn(d.Server(0x0052), d.queue)
 }
 
-// OvenMode returns the typed OvenMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OvenMode is the device's typed OvenMode server, nil until a declaration mounts it.
 func (d *TemperatureControlledCabinet) OvenMode() *ovenmodedef.Server {
 	return ovenmodedef.WrapOn(d.Server(0x0049), d.queue)
 }
 
-// OvenCavityOperationalState returns the typed OvenCavityOperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OvenCavityOperationalState is the device's typed OvenCavityOperationalState server, nil until a declaration mounts it.
 func (d *TemperatureControlledCabinet) OvenCavityOperationalState() *ovencavityoperationalstatedef.Server {
 	return ovencavityoperationalstatedef.WrapOn(d.Server(0x0048), d.queue)
 }
 
-// TemperatureAlarm returns the typed TemperatureAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureAlarm is the device's typed TemperatureAlarm server, nil until a declaration mounts it.
 func (d *TemperatureControlledCabinet) TemperatureAlarm() *temperaturealarmdef.Server {
 	return temperaturealarmdef.WrapOn(d.Server(0x0064), d.queue)
 }

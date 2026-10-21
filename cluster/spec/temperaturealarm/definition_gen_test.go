@@ -52,6 +52,22 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Mask:                              new(AlarmBitmap),
+		Latch:                             new(AlarmBitmap),
+		State:                             new(AlarmBitmap),
+		Supported:                         new(AlarmBitmap),
+		CriticalOverTemperatureThreshold:  new(int16),
+		MajorOverTemperatureThreshold:     new(int16),
+		MinorOverTemperatureThreshold:     new(int16),
+		MinorUnderTemperatureThreshold:    new(int16),
+		MajorUnderTemperatureThreshold:    new(int16),
+		CriticalUnderTemperatureThreshold: new(int16),
+	}
+	values := full.AttributeValues()
+	if len(values) != 10 {
+		t.Errorf("a patch of every field sets %d values, want 10", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -78,6 +94,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Delegate = d.Delegate
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -86,5 +103,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleSetTemperatureAlarmThresholds = func(context.Context, SetTemperatureAlarmThresholdsRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 3 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdReset}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventNotify}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

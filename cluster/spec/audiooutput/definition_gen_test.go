@@ -52,6 +52,17 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		OutputList:    new([]OutputInfoStruct),
+		CurrentOutput: new(uint8),
+	}
+	values := full.AttributeValues()
+	if len(values) != 2 {
+		t.Errorf("a patch of every field sets %d values, want 2", len(values))
+	}
+	if _, ok := values[AttrOutputList].(spec.List[OutputInfoStruct]); !ok {
+		t.Errorf("OutputList is stored as %T, want its spec.List", values[AttrOutputList])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -74,6 +85,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Outputs = d.Outputs
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -81,5 +93,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleRenameOutput = func(context.Context, RenameOutputRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSelectOutput}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

@@ -6,13 +6,13 @@ package device
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -45,10 +45,6 @@ type Device struct {
 	// source is what Spec hands the assembler: the device itself, or the
 	// device with the host's change notifier ([WithChangeNotifier]).
 	source contract.EndpointSource
-	// measurement is the host's live reading ([WithMeasurement]) and
-	// measured the clusters the assembler materialises from it.
-	measurement contract.MeasurementSource
-	measured    map[uint32]bool
 	// optIn are the assembler's optional clusters the host opted into
 	// (the Groups or ScenesManagement declaration).
 	optIn []uint32
@@ -113,6 +109,9 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
 	s := newSettings()
+	if opts.StableKey != nil {
+		s.key = opts.StableKey.String()
+	}
 	for _, decl := range decls {
 		if err := s.declare(decl); err != nil {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
@@ -120,15 +119,11 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	}
 	clk := &deviceClock{}
 	s.clock = clk
-	measured, err := measuredClusters(t, s)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkOptedClusters(t, s, measured); err != nil {
+	if err := checkOptedClusters(t, s); err != nil {
 		return nil, err
 	}
 	d := &Device{
-		typ: t, opts: opts, measurement: s.measurement, measured: measured, clients: slices.Clone(s.clients),
+		typ: t, opts: opts, clients: slices.Clone(s.clients),
 		clock: clk, queue: newQueue(),
 	}
 	d.reachable.Store(true)
@@ -149,7 +144,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	sibling := func(id uint32) contract.ClusterServer { return built[id] }
 	for _, i := range buildOrder(t.Servers) {
 		r := &t.Servers[i]
-		if _, ok := assemblerMounted[r.ID]; ok || measured[r.ID] {
+		if _, ok := assemblerMounted[r.ID]; ok {
 			continue
 		}
 		srv, ok := s.servers[r.ID]
@@ -211,34 +206,10 @@ func (n *notifyingSource) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	return n.notifier.OnMatterValueChanged(cb)
 }
 
-// measuredClusters are the clusters the host's measurement source
-// ([WithMeasurement]) materialises — the assembler's for this device. The
-// materialiser runs once here, with no endpoint id, to learn the set; the
-// assembler runs it again on every dispatch with the endpoint's
-// (endpoint/materialize.go ClusterServers).
-func measuredClusters(t *Type, s *settings) (map[uint32]bool, error) {
-	if !s.measurementSet {
-		return nil, nil
-	}
-	if s.measurement == nil {
-		return nil, fmt.Errorf("%w: %s: WithMeasurement(nil)", ErrConfiguration, t.Name)
-	}
-	class := s.measurement.MatterMeasurementClass()
-	servers := measurement.FromMeasurementClass(class, s.measurement, contract.MeasurementContext{})
-	if len(servers) == 0 {
-		return nil, fmt.Errorf("%w: %s: the measurement source (class %d) materialises no cluster", ErrConfiguration, t.Name, class)
-	}
-	out := make(map[uint32]bool, len(servers))
-	for _, srv := range servers {
-		out[srv.MatterClusterID()] = true
-	}
-	return out, nil
-}
-
 // checkOptedClusters refuses an option for a cluster the device type does
-// not allow as a server — a host's server (a declared HostServer) excepted — or one
-// the assembler mounts itself, measured clusters included.
-func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
+// not allow as a server — a host's server (a declared HostServer)
+// excepted — or one the assembler mounts itself.
+func checkOptedClusters(t *Type, s *settings) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
 	for id := range s.optional {
 		ids = append(ids, id)
@@ -259,9 +230,6 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	for _, id := range slices.Compact(ids) {
 		if name, ok := assemblerMounted[id]; ok && (!optInMounted[id] || !onlyOptIn(s, id)) {
 			return fmt.Errorf("%w: %s: the endpoint assembler mounts %s (0x%04X) itself", ErrConfiguration, t.Name, name, id)
-		}
-		if measured[id] {
-			return fmt.Errorf("%w: %s: cluster 0x%04X is served from the measurement source (WithMeasurement)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := t.Server(id); !ok && !onlyHostServer(s, id) {
 			return fmt.Errorf("%w: %s has no server cluster requirement for cluster 0x%04X", ErrConfiguration, t.Name, id)
@@ -379,7 +347,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
-			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: t.ID,
+			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: t.ID, key: s.key,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
 		})
 		if err == nil {
@@ -391,11 +359,20 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		switch {
 		case err == nil:
 			return srv, nil
-		case !errors.Is(err, errSelectionNotServed):
+		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
+		case s.declared[r.ID] && (hasPorts(s.ports[r.ID]) || !errors.Is(err, errNoPort)):
+			// The host declared the cluster — a port, or features the
+			// kit's server takes without one — and so asked for the
+			// self-held server.
+			return nil, fmt.Errorf("%s %s: %w", t.Name, r.Name, err)
 		}
-		// A selection the self-held server does not serve keeps the
-		// generated server.
+		// The device type's default selection the self-held server does
+		// not serve keeps the generated server (by_design
+		// BD-Matter-SelfHeldDefault-SelectionNotServed).
+		Logger.Info("device.default_server.generated",
+			slog.String("device_type", t.Name), slog.String("cluster", r.Name),
+			slog.String("features", fmt.Sprintf("0x%X", opts.Features)), slog.String("reason", err.Error()))
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
@@ -463,8 +440,7 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 func (d *Device) Type() *Type { return d.typ }
 
 // Server returns the device's server for clusterID, or nil when it mounts
-// none — a cluster served from the measurement source ([WithMeasurement])
-// included, whose servers the assembler builds per dispatch.
+// none.
 func (d *Device) Server(clusterID uint32) contract.ClusterServer {
 	for _, srv := range d.servers {
 		if srv.MatterClusterID() == clusterID {
@@ -587,7 +563,6 @@ func (d *Device) Spec() endpoint.Spec {
 		ChannelAddress:   d.opts.ChannelAddress,
 		Availability:     d.available,
 		Source:           d.source,
-		Measurement:      d.measurement,
 		NodeLabel:        label,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),

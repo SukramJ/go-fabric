@@ -20,9 +20,12 @@ const (
 	RoboticVacuumCleanerRevision uint16 = 4
 )
 
-// RoboticVacuumCleanerType is the RoboticVacuumCleaner device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/robotic-vacuum-cleaner.ts.
-var RoboticVacuumCleanerType = Type{
+// RoboticVacuumCleanerType is the RoboticVacuumCleaner device type, matter.js's packages/node/src/devices/robotic-vacuum-cleaner.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#roboticvacuumcleaner.
+var RoboticVacuumCleanerType = typeRoboticVacuumCleaner
+
+// typeRoboticVacuumCleaner holds [RoboticVacuumCleanerType]'s cluster requirements.
+var typeRoboticVacuumCleaner = Type{
 	ID: RoboticVacuumCleanerID, Name: "RoboticVacuumCleaner", Revision: RoboticVacuumCleanerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -69,34 +72,22 @@ func NewRoboticVacuumCleaner(opts Options, decls ...Declaration) (*RoboticVacuum
 	return &RoboticVacuumCleaner{d}, nil
 }
 
-// RvcRunMode returns the typed RvcRunMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// RvcRunMode is the device's typed RvcRunMode server; the type mandates it.
 func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
 	return rvcrunmodedef.WrapOn(d.Server(0x0054), d.queue)
 }
 
-// RvcOperationalState returns the typed RvcOperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// RvcOperationalState is the device's typed RvcOperationalState server; the type mandates it.
 func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
 	return rvcoperationalstatedef.WrapOn(d.Server(0x0061), d.queue)
 }
 
-// RvcCleanMode returns the typed RvcCleanMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// RvcCleanMode is the device's typed RvcCleanMode server, nil until a declaration mounts it.
 func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
 	return rvccleanmodedef.WrapOn(d.Server(0x0055), d.queue)
 }
 
-// ServiceArea returns the typed ServiceArea server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ServiceArea is the device's typed ServiceArea server, nil until a declaration mounts it.
 func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
 	return serviceareadef.WrapOn(d.Server(0x0150), d.queue)
 }

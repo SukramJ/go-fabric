@@ -138,13 +138,20 @@ cluster is declared with `<cluster>def.Declare` of its generated package
 | a host port (`Sink`, `LevelSource`, `Mover`, …) | the device the kit's server drives |
 | `HostServer` | your own server for the cluster, replacing the kit's |
 
+Declaring an optional cluster of the device type mounts it, even an empty
+`<cluster>def.Declare{}`; Groups and ScenesManagement are then the
+assembler's. A sensor's measurement cluster is declared the same way —
+`temperaturemeasurementdef.Declare{Initial: …}` — and your reading reaches
+it through the accessor's `Set`. Which clusters each device type mandates,
+with the features and attribute constraints it requires, is listed in the
+[device-type reference](../reference/device-types.md); `go doc
+github.com/SukramJ/go-fabric/device` lists every typed cluster package.
+
 The device's other options:
 
 | Option | Effect |
 | --- | --- |
-| `<cluster>def.Declare{}` | mounts an optional cluster of the device type (Groups and ScenesManagement are then the assembler's) |
-| `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one) |
-| `WithMeasurement(src)` | a sensor's measurement clusters from your live reading |
+| `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one); a cluster with a package takes its `Declare` |
 | `WithChangeNotifier(n)` | tells the bridge your model changed state its servers read |
 | `WithClientClusters(ids...)` | client clusters beyond the mandatory ones |
 
@@ -155,22 +162,26 @@ calls:
 
 - **Controller to device.** `Device.OnChanged(clusterID, fn)` calls `fn`
   with the change — the attribute ids and its origin — and the typed
-  `light.OnOff().OnChanged(fn)` with the new state and the change. The
-  quickstart uses it to log the light's new state. Both fire for every
-  change; `change.Origin` tells your own `Set` (`contract.OriginHostSet`)
-  from a controller's write and a command. The controller-only hooks are
-  the declaration's `HandleOn` (your handler replaces the server's own
-  handling of the command) and `OnWrite` (a veto on a controller's write).
-  To refuse a command, for example when the physical lamp did not switch,
-  declare the light's switch: `onoffdef.Declare{Sink: relay}`. An error
-  from the sink answers FAILURE and stores nothing.
+  `light.OnOff().OnChanged(fn)` with the new state and the change.
+  `OnChangedAsync` is the same, run on the device's own goroutine instead
+  of the caller's. The quickstart uses `OnChanged` to log the light's new
+  state. Both fire for every change, whoever made it; `change.Origin`
+  tells your own `Set` (`contract.OriginHostSet`) from a controller's
+  attribute write (`OriginControllerWrite`) and a command
+  (`OriginCommand`). Only a controller reaches the declaration's three
+  hooks: `OnWrite`, a veto on a controller's write; `Handle<Command>`
+  (`HandleOn`, `HandleToggle`, …), your handler in place of the server's
+  own; and a host port, the device the server drives. To refuse a command,
+  for example when the physical lamp did not switch, declare the light's
+  switch: `onoffdef.Declare{Sink: relay}`. An error from the sink answers
+  FAILURE and stores nothing.
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
   `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored
   and reported to subscribers, and the sink is not called. `Set` is safe
   from any goroutine, including from inside the sink.
 
-*Source: `device/doc.go:4-27`, `device/defaults.go`, `device/options.go:18-43`, `device/options.go:91-215`, `device/device.go`, `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
+*Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `WithChangeNotifier`, `WithClientClusters`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 
 ## The Aggregator
 
@@ -190,7 +201,17 @@ whose model loads asynchronously calls `MarkComplete` after the load. If it
 is called too early, the endpoint numbers of devices not yet loaded are
 garbage-collected at boot, and every controller sees those devices as new.
 
-*Source: `node/aggregator.go:40-132`, `examples/reference-bridge/main.go:328-332`.*
+Once a device is added, it has a lifecycle of its own:
+`Device.SetReachable(ctx, false)` reports it unreachable (the bridged
+device's Reachable attribute and its ReachableChanged event),
+`Device.Rename(ctx, name)` changes the NodeLabel a controller sees, and
+`Device.EndpointNumber` returns the endpoint the node gave it.
+`Node.Topology()` is what the node serves: the Aggregator's endpoint and
+every bridged device with its key, endpoint, device type, name and
+reachability. The [host's view](../guides/host-view.md) walks through a
+program that uses each.
+
+*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
 
 ## Commissioning
 
@@ -268,8 +289,14 @@ of which is something a product would also decide:
   This is the host's `OtaApplier`.
 - **An Actions server** on the Aggregator, root FixedLabels and two
   locales.
-- **A fleet of simulated devices**, one per surface the module serves. The
-  blind's position is persisted in the settings table.
+- **A fleet of simulated devices**, one per surface the module serves,
+  each built from its clusters' declarations (`<cluster>def.Declare`): the
+  initial state, the features, and the ports the simulated device
+  implements — a valve's `StateSource`, a washer's `CommandHandler`, a
+  lock's `AuthStore` on the node's store. The one cluster still mounted
+  as a `HostServer` is the charger's EnergyEvse, whose delegate is not a
+  declared port yet. The blind's position is persisted in the settings
+  table.
 - **Testing-only flags** for certification runs: the app pipe, the
   TestEventTrigger key, the OTA provider and its ledger check, the
   simulated Wi-Fi link and the media devices. None of these belongs in a

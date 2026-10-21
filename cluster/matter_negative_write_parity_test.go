@@ -29,6 +29,8 @@ import (
 	"errors"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -38,6 +40,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	dishdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
@@ -111,9 +114,9 @@ func newWindowCoveringServer() *cover.WindowCoveringServer {
 
 // smokeAlarmSource is a SmokeCoAlarm host that accepts every sensitivity
 // write and remembers the level.
-type smokeAlarmSource struct{ st alarm.State }
+type smokeAlarmSource struct{ st smokedef.State }
 
-func (s *smokeAlarmSource) SmokeCOState() alarm.State { return s.st }
+func (s *smokeAlarmSource) SmokeCOState() smokedef.State { return s.st }
 
 func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
 	s.st.SmokeSensitivityLevel = level
@@ -122,7 +125,7 @@ func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level ala
 
 func newSmokeAlarmServer() *alarm.Server {
 	srv, err := alarm.NewServer(alarm.Config{
-		Source:   &smokeAlarmSource{st: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
+		Source:   &smokeAlarmSource{st: smokedef.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
 		Features: alarm.FeatureSmokeAlarm,
 		Optional: alarm.OptionalSmokeSensitivityLevel,
 	})
@@ -133,25 +136,23 @@ func newSmokeAlarmServer() *alarm.Server {
 }
 
 // fanSource is a FanControl host that accepts every change.
-type fanSource struct{ st fan.State }
+type fanSource struct{ st fandef.State }
 
-func (f *fanSource) FanState() fan.State { return f.st }
+func (f *fanSource) FanState() fandef.State { return f.st }
 
-func (f *fanSource) ApplyFanSettings(_ context.Context, s fan.Settings) error {
-	if s.FanMode != nil {
-		f.st.FanMode = *s.FanMode
+func (f *fanSource) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
+	if p.FanMode != nil {
+		f.st.FanMode = *p.FanMode
 	}
-	if p := s.PercentSetting; p != nil && !p.Null {
-		f.st.PercentSetting = &p.Value
+	if p.PercentSetting != nil {
+		f.st.PercentSetting = p.PercentSetting
 	}
-	if v := s.SpeedSetting; v != nil && !v.Null {
-		f.st.SpeedSetting = &v.Value
+	if p.SpeedSetting != nil {
+		f.st.SpeedSetting = p.SpeedSetting
 	}
-	return nil
-}
-
-func (f *fanSource) SetRockSetting(_ context.Context, r fan.RockBitmap) error {
-	f.st.RockSetting = r
+	if p.RockSetting != nil {
+		f.st.RockSetting = *p.RockSetting
+	}
 	return nil
 }
 

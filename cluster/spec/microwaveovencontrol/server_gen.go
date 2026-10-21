@@ -43,6 +43,41 @@ type Patch struct {
 	WattRating        *uint16   `matter:"0x0008"` // attribute 0x0008
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CookTime != nil {
+		v[AttrCookTime] = *p.CookTime
+	}
+	if p.MaxCookTime != nil {
+		v[AttrMaxCookTime] = *p.MaxCookTime
+	}
+	if p.PowerSetting != nil {
+		v[AttrPowerSetting] = *p.PowerSetting
+	}
+	if p.MinPower != nil {
+		v[AttrMinPower] = *p.MinPower
+	}
+	if p.MaxPower != nil {
+		v[AttrMaxPower] = *p.MaxPower
+	}
+	if p.PowerStep != nil {
+		v[AttrPowerStep] = *p.PowerStep
+	}
+	if p.SupportedWatts != nil {
+		v[AttrSupportedWatts] = *p.SupportedWatts
+	}
+	if p.SelectedWattIndex != nil {
+		v[AttrSelectedWattIndex] = *p.SelectedWattIndex
+	}
+	if p.WattRating != nil {
+		v[AttrWattRating] = *p.WattRating
+	}
+	return v
+}
+
 // Server is the typed MicrowaveOvenControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -113,6 +148,27 @@ func (s *Server) HandleAddMoreTime(fn func(ctx context.Context, req AddMoreTimeR
 	return spec.HandleOn(s.Underlying(), CmdAddMoreTime, fn)
 }
 
+// Oven is the oven behind the kit's MicrowaveOvenControl server:
+// the first four answer from the endpoint's OperationalState and
+// MicrowaveOvenMode, the last two carry out a command; an error
+// wrapping an IM status answers it, any other FAILURE
+// (cluster/appliance).
+type Oven interface {
+	// OperationalState is the endpoint's current OperationalState.
+	OperationalState() uint8
+	// NormalMode is the MicrowaveOvenMode mode tagged Normal.
+	NormalMode() (uint8, bool)
+	// SupportedMode reports whether mode is a MicrowaveOvenMode mode.
+	SupportedMode(mode uint8) bool
+	// StartSupported reports whether OperationalState accepts Start.
+	StartSupported() bool
+	// SetCookingParameters applies checked parameters: exactly one
+	// of power (PWRNUM) and wattIndex (WATTS) is set.
+	SetCookingParameters(ctx context.Context, mode uint8, cookTime uint32, start bool, power, wattIndex *uint8) error
+	// ModifyCookTime applies AddMoreTime's new CookTime.
+	ModifyCookTime(ctx context.Context, cookTime uint32) error
+}
+
 // Declare is the declaration of the MicrowaveOvenControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -124,6 +180,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -133,6 +193,8 @@ type Declare struct {
 	// HandleAddMoreTime handles the AddMoreTime command in place of the server
 	// (Server.HandleAddMoreTime), inline; an optional command it handles is accepted.
 	HandleAddMoreTime func(ctx context.Context, req AddMoreTimeRequest) (struct{}, error)
+	// Oven is the host port the kit's server runs on ([Oven]).
+	Oven Oven
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -151,6 +213,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSetCookingParameters != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetCookingParameters)
 		decl.Attach = d.attach

@@ -131,6 +131,173 @@ type Patch struct {
 	Null                            []uint32                 // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentHue != nil {
+		v[AttrCurrentHue] = *p.CurrentHue
+	}
+	if p.CurrentSaturation != nil {
+		v[AttrCurrentSaturation] = *p.CurrentSaturation
+	}
+	if p.RemainingTime != nil {
+		v[AttrRemainingTime] = *p.RemainingTime
+	}
+	if p.CurrentX != nil {
+		v[AttrCurrentX] = *p.CurrentX
+	}
+	if p.CurrentY != nil {
+		v[AttrCurrentY] = *p.CurrentY
+	}
+	if p.DriftCompensation != nil {
+		v[AttrDriftCompensation] = *p.DriftCompensation
+	}
+	if p.CompensationText != nil {
+		v[AttrCompensationText] = *p.CompensationText
+	}
+	if p.ColorTemperatureMireds != nil {
+		v[AttrColorTemperatureMireds] = *p.ColorTemperatureMireds
+	}
+	if p.ColorMode != nil {
+		v[AttrColorMode] = *p.ColorMode
+	}
+	if p.Options != nil {
+		v[AttrOptions] = *p.Options
+	}
+	if p.NumberOfPrimaries != nil {
+		v[AttrNumberOfPrimaries] = *p.NumberOfPrimaries
+	}
+	if p.Primary1X != nil {
+		v[AttrPrimary1X] = *p.Primary1X
+	}
+	if p.Primary1Y != nil {
+		v[AttrPrimary1Y] = *p.Primary1Y
+	}
+	if p.Primary1Intensity != nil {
+		v[AttrPrimary1Intensity] = *p.Primary1Intensity
+	}
+	if p.Primary2X != nil {
+		v[AttrPrimary2X] = *p.Primary2X
+	}
+	if p.Primary2Y != nil {
+		v[AttrPrimary2Y] = *p.Primary2Y
+	}
+	if p.Primary2Intensity != nil {
+		v[AttrPrimary2Intensity] = *p.Primary2Intensity
+	}
+	if p.Primary3X != nil {
+		v[AttrPrimary3X] = *p.Primary3X
+	}
+	if p.Primary3Y != nil {
+		v[AttrPrimary3Y] = *p.Primary3Y
+	}
+	if p.Primary3Intensity != nil {
+		v[AttrPrimary3Intensity] = *p.Primary3Intensity
+	}
+	if p.Primary4X != nil {
+		v[AttrPrimary4X] = *p.Primary4X
+	}
+	if p.Primary4Y != nil {
+		v[AttrPrimary4Y] = *p.Primary4Y
+	}
+	if p.Primary4Intensity != nil {
+		v[AttrPrimary4Intensity] = *p.Primary4Intensity
+	}
+	if p.Primary5X != nil {
+		v[AttrPrimary5X] = *p.Primary5X
+	}
+	if p.Primary5Y != nil {
+		v[AttrPrimary5Y] = *p.Primary5Y
+	}
+	if p.Primary5Intensity != nil {
+		v[AttrPrimary5Intensity] = *p.Primary5Intensity
+	}
+	if p.Primary6X != nil {
+		v[AttrPrimary6X] = *p.Primary6X
+	}
+	if p.Primary6Y != nil {
+		v[AttrPrimary6Y] = *p.Primary6Y
+	}
+	if p.Primary6Intensity != nil {
+		v[AttrPrimary6Intensity] = *p.Primary6Intensity
+	}
+	if p.WhitePointX != nil {
+		v[AttrWhitePointX] = *p.WhitePointX
+	}
+	if p.WhitePointY != nil {
+		v[AttrWhitePointY] = *p.WhitePointY
+	}
+	if p.ColorPointRx != nil {
+		v[AttrColorPointRx] = *p.ColorPointRx
+	}
+	if p.ColorPointRy != nil {
+		v[AttrColorPointRy] = *p.ColorPointRy
+	}
+	if p.ColorPointRIntensity != nil {
+		v[AttrColorPointRIntensity] = *p.ColorPointRIntensity
+	}
+	if p.ColorPointGx != nil {
+		v[AttrColorPointGx] = *p.ColorPointGx
+	}
+	if p.ColorPointGy != nil {
+		v[AttrColorPointGy] = *p.ColorPointGy
+	}
+	if p.ColorPointGIntensity != nil {
+		v[AttrColorPointGIntensity] = *p.ColorPointGIntensity
+	}
+	if p.ColorPointBx != nil {
+		v[AttrColorPointBx] = *p.ColorPointBx
+	}
+	if p.ColorPointBy != nil {
+		v[AttrColorPointBy] = *p.ColorPointBy
+	}
+	if p.ColorPointBIntensity != nil {
+		v[AttrColorPointBIntensity] = *p.ColorPointBIntensity
+	}
+	if p.EnhancedCurrentHue != nil {
+		v[AttrEnhancedCurrentHue] = *p.EnhancedCurrentHue
+	}
+	if p.EnhancedColorMode != nil {
+		v[AttrEnhancedColorMode] = *p.EnhancedColorMode
+	}
+	if p.ColorLoopActive != nil {
+		v[AttrColorLoopActive] = *p.ColorLoopActive
+	}
+	if p.ColorLoopDirection != nil {
+		v[AttrColorLoopDirection] = *p.ColorLoopDirection
+	}
+	if p.ColorLoopTime != nil {
+		v[AttrColorLoopTime] = *p.ColorLoopTime
+	}
+	if p.ColorLoopStartEnhancedHue != nil {
+		v[AttrColorLoopStartEnhancedHue] = *p.ColorLoopStartEnhancedHue
+	}
+	if p.ColorLoopStoredEnhancedHue != nil {
+		v[AttrColorLoopStoredEnhancedHue] = *p.ColorLoopStoredEnhancedHue
+	}
+	if p.ColorCapabilities != nil {
+		v[AttrColorCapabilities] = *p.ColorCapabilities
+	}
+	if p.ColorTempPhysicalMinMireds != nil {
+		v[AttrColorTempPhysicalMinMireds] = *p.ColorTempPhysicalMinMireds
+	}
+	if p.ColorTempPhysicalMaxMireds != nil {
+		v[AttrColorTempPhysicalMaxMireds] = *p.ColorTempPhysicalMaxMireds
+	}
+	if p.CoupleColorTempToLevelMinMireds != nil {
+		v[AttrCoupleColorTempToLevelMinMireds] = *p.CoupleColorTempToLevelMinMireds
+	}
+	if p.StartUpColorTemperatureMireds != nil {
+		v[AttrStartUpColorTemperatureMireds] = *p.StartUpColorTemperatureMireds
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed ColorControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -303,6 +470,33 @@ func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req Ste
 	return spec.HandleOn(s.Underlying(), CmdStepColorTemperature, fn)
 }
 
+// Color is a colour in the attributes' Matter units: Mode says which
+// fields describe it — X / Y (CurrentX, CurrentY), Hue / Saturation
+// (CurrentHue, CurrentSaturation), EnhancedHue / Saturation, or
+// ColorTemperatureMireds; the others keep the last value of their mode.
+type Color struct {
+	Mode                   EnhancedColorModeEnum
+	X, Y                   uint16
+	Hue                    uint8
+	EnhancedHue            uint16
+	Saturation             uint8
+	ColorTemperatureMireds uint16
+}
+
+// ColorTemperatureWriter drives the device's colour temperature
+// (mireds) whenever the kit's ColorControl server changes it; an
+// error refuses the change (cluster/light ColorTemperatureWriter).
+type ColorTemperatureWriter interface {
+	SetColorTemperatureMireds(ctx context.Context, mireds uint16) error
+}
+
+// ColorWriter drives the device with the whole colour whenever the
+// kit's ColorControl server changes it (not on a colour mode
+// switch); an error refuses the change (cluster/light ColorWriter).
+type ColorWriter interface {
+	SetColor(ctx context.Context, c Color) error
+}
+
 // Declare is the declaration of the ColorControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -314,6 +508,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -377,6 +575,10 @@ type Declare struct {
 	// HandleStepColorTemperature handles the StepColorTemperature command in place of the server
 	// (Server.HandleStepColorTemperature), inline; an optional command it handles is accepted.
 	HandleStepColorTemperature func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)
+	// ColorTemperatureWriter is the host port the kit's server runs on ([ColorTemperatureWriter]).
+	ColorTemperatureWriter ColorTemperatureWriter
+	// ColorWriter is the host port the kit's server runs on ([ColorWriter]).
+	ColorWriter ColorWriter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -395,6 +597,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Transitions = d.Transitions
 	if d.HandleMoveToHue != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToHue)

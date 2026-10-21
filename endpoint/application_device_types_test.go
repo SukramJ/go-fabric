@@ -8,12 +8,15 @@ import (
 	"slices"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/schema"
@@ -132,13 +135,13 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 // smokeReading is a host smoke/CO alarm's state port.
 type smokeReading struct{}
 
-func (smokeReading) SmokeCOState() alarm.State { return alarm.State{} }
+func (smokeReading) SmokeCOState() smokedef.State { return smokedef.State{} }
 
 // fanReading is a host fan's port.
 type fanReading struct{}
 
-func (fanReading) FanState() fan.State                                  { return fan.State{} }
-func (fanReading) ApplyFanSettings(context.Context, fan.Settings) error { return nil }
+func (fanReading) FanState() fandef.State                               { return fandef.State{} }
+func (fanReading) ApplyFanSettings(context.Context, fandef.Patch) error { return nil }
 
 func fanServer(dt uint16) contract.ClusterServer {
 	srv, err := fan.NewServer(fan.Config{Source: fanReading{}, Sequence: fan.SequenceOffLowMedHigh, DeviceType: dt})

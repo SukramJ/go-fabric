@@ -51,6 +51,19 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		LocalGenerationAvailable: new(bool),
+		CurrentConditions:        new(ElectricalGridConditionsStruct),
+		ForecastConditions:       new([]ElectricalGridConditionsStruct),
+		Null:                     []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 4 {
+		t.Errorf("a patch of every field sets %d values, want 4", len(values))
+	}
+	if _, ok := values[AttrForecastConditions].(spec.List[ElectricalGridConditionsStruct]); !ok {
+		t.Errorf("ForecastConditions is stored as %T, want its spec.List", values[AttrForecastConditions])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -67,5 +80,8 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	if decl := (Declare{Events: []uint32{EventCurrentConditionsChanged}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

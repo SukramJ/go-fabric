@@ -18,7 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -129,21 +132,7 @@ const (
 // overwritten by what the command itself records after it: the command
 // wins the overlap, as for the other servers with a host port (by_design
 // BD-Matter-HostPort-OutsideTheSetterLock).
-type DemManager interface {
-	// ApproxEnergyDuringSession is the PowerAdjustEnd event's EnergyUse,
-	// in mWh (DelegateImpl.cpp:322-329).
-	ApproxEnergyDuringSession() int64
-	PowerAdjust(ctx context.Context, powerMw int64, durationS uint32, cause AdjustmentCause) error
-	PowerAdjustCompleted() error
-	CancelPowerAdjust(cause DemCause) error
-	StartTimeAdjust(ctx context.Context, requestedStartTime uint32, cause AdjustmentCause) error
-	Pause(ctx context.Context, durationS uint32, cause AdjustmentCause) error
-	PauseCompleted() error
-	CancelPause(cause DemCause) error
-	CancelRequest(ctx context.Context) error
-	ModifyForecast(ctx context.Context, forecastID uint32, adjustments []SlotAdjustment, cause AdjustmentCause) error
-	RequestConstraintBasedForecast(ctx context.Context, constraints []ForecastConstraint, cause AdjustmentCause) error
-}
+type DemManager = dem.DemManager
 
 // NopDemManager is DEMManufacturerDelegate's defaults: every hook
 // succeeds and does nothing, and the session used no energy.
@@ -224,6 +213,7 @@ var ErrNoDemManager = errors.New("energy: DeviceEnergyManagement needs an DemMan
 // here is chip's cluster checks and its shared delegate's state machine.
 type DeviceEnergyManagementServer struct {
 	*spec.Instance
+	spec.SelfHeld
 
 	srv     *spec.Server
 	manager DemManager
@@ -244,6 +234,10 @@ type DeviceEnergyManagementServer struct {
 	powerAdjustTimer      clock.Timer
 	pauseInProgress       bool
 	pauseTimer            clock.Timer
+	// cause is the contract.Origin of the changes a command makes
+	// (OriginCommand), zero outside one: the device's own changes, the
+	// timers' expiries included, are the host's.
+	cause atomic.Uint32
 }
 
 // Compile-time assertions.
@@ -277,11 +271,14 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 		dem.CmdRequestConstraintBasedForecast: s.requestConstraintBasedForecast,
 		dem.CmdCancelRequest:                  s.cancelRequest,
 	}
+	for id, fn := range handlers {
+		handlers[id] = s.command(fn)
+	}
 	srv, err := spec.NewServer(dem.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	s.now = s.clock.Now
 	values := map[uint32]any{
 		dem.AttrEsaType:        cfg.EsaType,
@@ -452,7 +449,11 @@ func (s *DeviceEnergyManagementServer) set(attrID uint32, v any) error {
 }
 
 func (s *DeviceEnergyManagementServer) setLocked(attrID uint32, v any) error {
-	if err := s.srv.Set(attrID, v); err != nil {
+	origin := contract.OriginHostSet
+	if c := s.cause.Load(); c != 0 {
+		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
+	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{attrID: v}); err != nil {
 		return fmt.Errorf("energy: DeviceEnergyManagement: %w", err)
 	}
 	return nil
@@ -1112,7 +1113,54 @@ func (s *DeviceEnergyManagementServer) MatterWrite(ctx context.Context, attrID u
 	return s.srv.MatterWrite(ctx, attrID, value)
 }
 
-// MatterInvoke dispatches the eight requests.
+// MatterInvoke dispatches the eight requests: the host's handler where it
+// registered one ([spec.SelfHeld]), the server's own otherwise.
 func (s *DeviceEnergyManagementServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	return s.srv.MatterInvoke(ctx, cmdID, fields)
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
+}
+
+// command runs fn as a command: the changes it makes report
+// [contract.OriginCommand].
+func (s *DeviceEnergyManagementServer) command(fn spec.CommandHandler) spec.CommandHandler {
+	return func(ctx context.Context, fields any) (any, error) {
+		s.cause.Store(uint32(contract.OriginCommand))
+		defer s.cause.Store(0)
+		return fn(ctx, fields)
+	}
+}
+
+// SetAttributes implements [spec.AttributeSetter]: the device's own
+// change, all or nothing — every value is checked against the definition
+// before any is applied — through the setters: EsaState
+// ([DeviceEnergyManagementServer.SetEsaState]), AbsMinPower and
+// AbsMaxPower, PowerAdjustmentCapability and Forecast (nil for null), and
+// OptOutState ([DeviceEnergyManagementServer.SetOptOutState], which
+// cancels what it opts out of). EsaType and EsaCanGenerate are the
+// configuration's ([spec.ErrNotHeld]).
+func (s *DeviceEnergyManagementServer) SetAttributes(values map[uint32]any) error {
+	var apply []func() error
+	for _, id := range slices.Sorted(maps.Keys(values)) {
+		v, err := s.CheckSet(id, values[id], nil)
+		if err != nil {
+			return err
+		}
+		switch id {
+		case dem.AttrEsaState:
+			n, _ := v.(uint8)
+			apply = append(apply, func() error { return s.SetEsaState(EsaState(n)) })
+		case dem.AttrAbsMinPower, dem.AttrAbsMaxPower, dem.AttrPowerAdjustmentCapability, dem.AttrForecast:
+			apply = append(apply, func() error { return s.set(id, v) })
+		case dem.AttrOptOutState:
+			n, _ := v.(uint8)
+			apply = append(apply, func() error { return s.SetOptOutState(OptOutState(n)) })
+		default:
+			return fmt.Errorf("%w: energy: DeviceEnergyManagement attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
+		}
+	}
+	for _, fn := range apply {
+		if err := fn(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

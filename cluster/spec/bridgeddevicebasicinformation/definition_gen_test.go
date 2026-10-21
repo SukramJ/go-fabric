@@ -58,6 +58,36 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		DataModelRevision:     new(uint16),
+		VendorName:            new(string),
+		VendorId:              new(uint16),
+		ProductName:           new(string),
+		ProductId:             new(uint16),
+		NodeLabel:             new(string),
+		Location:              new(string),
+		HardwareVersion:       new(uint16),
+		HardwareVersionString: new(string),
+		SoftwareVersion:       new(uint32),
+		SoftwareVersionString: new(string),
+		ManufacturingDate:     new(string),
+		PartNumber:            new(string),
+		ProductUrl:            new(string),
+		ProductLabel:          new(string),
+		SerialNumber:          new(string),
+		LocalConfigDisabled:   new(bool),
+		Reachable:             new(bool),
+		UniqueId:              new(string),
+		CapabilityMinima:      new(CapabilityMinimaStruct),
+		ProductAppearance:     new(ProductAppearanceStruct),
+		SpecificationVersion:  new(uint32),
+		MaxPathsPerInvoke:     new(uint16),
+		ConfigurationVersion:  new(uint32),
+	}
+	values := full.AttributeValues()
+	if len(values) != 24 {
+		t.Errorf("a patch of every field sets %d values, want 24", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -88,5 +118,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleKeepActive = func(context.Context, KeepActiveRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 1 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdKeepActive}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventStartUp}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

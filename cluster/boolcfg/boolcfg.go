@@ -94,19 +94,7 @@ const (
 // false (BooleanStateConfigurationCluster.cpp:160, :194, :206, :329, :423).
 // The device-side setters ([Server.SetAlarmsActive] and the rest) are the
 // host's own changes and do not call it.
-type Delegate interface {
-	// CurrentSensitivityLevelChanged: a controller wrote
-	// CurrentSensitivityLevel (quality N — the host persists it).
-	CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error
-	// AlarmsEnabledChanged: EnableDisableAlarm changed AlarmsEnabled
-	// (quality N — the host persists it).
-	AlarmsEnabledChanged(ctx context.Context, enabled AlarmMode) error
-	// AlarmsActiveChanged: EnableDisableAlarm disabled an active alarm.
-	AlarmsActiveChanged(ctx context.Context, active AlarmMode) error
-	// AlarmsSuppressedChanged: SuppressAlarm suppressed an alarm, or
-	// EnableDisableAlarm disabled a suppressed one.
-	AlarmsSuppressedChanged(ctx context.Context, suppressed AlarmMode) error
-}
+type Delegate = def.Delegate
 
 // Config carries the construction parameters.
 type Config struct {

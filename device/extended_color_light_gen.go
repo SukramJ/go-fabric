@@ -21,9 +21,12 @@ const (
 	ExtendedColorLightRevision uint16 = 5
 )
 
-// ExtendedColorLightType is the ExtendedColorLight device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/extended-color-light.ts.
-var ExtendedColorLightType = Type{
+// ExtendedColorLightType is the ExtendedColorLight device type, matter.js's packages/node/src/devices/extended-color-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#extendedcolorlight.
+var ExtendedColorLightType = typeExtendedColorLight
+
+// typeExtendedColorLight holds [ExtendedColorLightType]'s cluster requirements.
+var typeExtendedColorLight = Type{
 	ID: ExtendedColorLightID, Name: "ExtendedColorLight", Revision: ExtendedColorLightRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "ColorTemperatureLight",
@@ -97,26 +100,17 @@ func NewExtendedColorLight(opts Options, decls ...Declaration) (*ExtendedColorLi
 	return &ExtendedColorLight{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *ExtendedColorLight) OnOff() *onoffdef.Server {
 	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *ExtendedColorLight) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
-// ColorControl returns the typed ColorControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ColorControl is the device's typed ColorControl server; the type mandates it.
 func (d *ExtendedColorLight) ColorControl() *colorcontroldef.Server {
 	return colorcontroldef.WrapOn(d.Server(0x0300), d.queue)
 }

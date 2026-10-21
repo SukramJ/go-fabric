@@ -18,28 +18,71 @@ import (
 )
 
 // device is a host fan. ApplyFanSettings applies the resolved settings
-// the way a device with a simple mode mapping would.
+// the way a device with a simple mode mapping would; applied records each
+// Patch in the settings shape the assertions read.
 type device struct {
 	mu       sync.Mutex
-	st       fan.State
-	applied  []fan.Settings
+	st       fandef.State
+	applied  []fanSettings
 	rock     []fan.RockBitmap
 	wind     []fan.WindBitmap
 	dirs     []fan.AirflowDirection
 	applyErr error
 }
 
-func (d *device) FanState() fan.State {
+// fanSetting is a resolved PercentSetting or SpeedSetting: a value or null.
+type fanSetting struct {
+	Null  bool
+	Value uint8
+}
+
+// fanSettings is what one write or Step resolved to.
+type fanSettings struct {
+	FanMode        *fan.FanMode
+	PercentSetting *fanSetting
+	SpeedSetting   *fanSetting
+}
+
+func (d *device) FanState() fandef.State {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.st
 }
 
-func (d *device) ApplyFanSettings(_ context.Context, s fan.Settings) error {
+func settingOf(v *uint8, attr uint32, null []uint32) *fanSetting {
+	switch {
+	case slices.Contains(null, attr):
+		return &fanSetting{Null: true}
+	case v != nil:
+		return &fanSetting{Value: *v}
+	default:
+		return nil
+	}
+}
+
+func (d *device) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.applyErr != nil {
 		return d.applyErr
+	}
+	switch {
+	case p.RockSetting != nil:
+		d.rock = append(d.rock, *p.RockSetting)
+		d.st.RockSetting = *p.RockSetting
+		return nil
+	case p.WindSetting != nil:
+		d.wind = append(d.wind, *p.WindSetting)
+		d.st.WindSetting = *p.WindSetting
+		return nil
+	case p.AirflowDirection != nil:
+		d.dirs = append(d.dirs, *p.AirflowDirection)
+		d.st.AirflowDirection = *p.AirflowDirection
+		return nil
+	}
+	s := fanSettings{
+		FanMode: p.FanMode, PercentSetting: settingOf(p.PercentSetting, fandef.AttrPercentSetting, p.Null),
+		SpeedSetting: settingOf(p.SpeedSetting, fandef.AttrSpeedSetting, p.Null),
 	}
 	d.applied = append(d.applied, s)
 	if s.FanMode != nil {
@@ -54,7 +97,7 @@ func (d *device) ApplyFanSettings(_ context.Context, s fan.Settings) error {
 	return nil
 }
 
-func settingPtr(s fan.Setting) *uint8 {
+func settingPtr(s fanSetting) *uint8 {
 	if s.Null {
 		return nil
 	}
@@ -62,36 +105,18 @@ func settingPtr(s fan.Setting) *uint8 {
 	return &v
 }
 
-func (d *device) SetRockSetting(_ context.Context, r fan.RockBitmap) error {
-	d.rock = append(d.rock, r)
-	d.st.RockSetting = r
-	return nil
-}
-
-func (d *device) SetWindSetting(_ context.Context, w fan.WindBitmap) error {
-	d.wind = append(d.wind, w)
-	d.st.WindSetting = w
-	return nil
-}
-
-func (d *device) SetAirflowDirection(_ context.Context, a fan.AirflowDirection) error {
-	d.dirs = append(d.dirs, a)
-	d.st.AirflowDirection = a
-	return nil
-}
-
-func (d *device) last() fan.Settings {
+func (d *device) last() fanSettings {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.applied[len(d.applied)-1]
 }
 
-// plainDevice has only the mandatory port.
+// plainDevice is the port without a stepper of its own.
 type plainDevice struct{ d *device }
 
-func (p plainDevice) FanState() fan.State { return p.d.FanState() }
-func (p plainDevice) ApplyFanSettings(ctx context.Context, s fan.Settings) error {
-	return p.d.ApplyFanSettings(ctx, s)
+func (p plainDevice) FanState() fandef.State { return p.d.FanState() }
+func (p plainDevice) ApplyFanSettings(ctx context.Context, patch fandef.Patch) error {
+	return p.d.ApplyFanSettings(ctx, patch)
 }
 
 // stepper takes Step over.
@@ -161,10 +186,7 @@ func TestNewServerEnforcesConformanceAndConstraints(t *testing.T) {
 		{"SPD SpeedMax 101", fan.Config{Source: d, Features: fan.FeatureMultiSpeed, SpeedMax: 101}, fan.ErrSpeedMax},
 		{"RCK without support", fan.Config{Source: d, Features: fan.FeatureRocking}, fan.ErrRockSupport},
 		{"RCK with unknown bit", fan.Config{Source: d, Features: fan.FeatureRocking, RockSupport: 1 << 3}, fan.ErrRockSupport},
-		{"RCK without setter", fan.Config{Source: plainDevice{d}, Features: fan.FeatureRocking, RockSupport: fan.RockRound}, fan.ErrRockSupport},
 		{"WND without support", fan.Config{Source: d, Features: fan.FeatureWind}, fan.ErrWindSupport},
-		{"WND without setter", fan.Config{Source: plainDevice{d}, Features: fan.FeatureWind, WindSupport: fan.WindSleep}, fan.ErrWindSupport},
-		{"DIR without setter", fan.Config{Source: plainDevice{d}, Features: fan.FeatureAirflowDirection}, fan.ErrAirflowDirection},
 		{"ExtractorHood with RCK", fan.Config{Source: d, DeviceType: fan.DeviceTypeExtractorHood, Features: fan.FeatureRocking, RockSupport: fan.RockRound}, fan.ErrDeviceTypeFeature},
 		{"ExtractorHood with DIR", fan.Config{Source: d, DeviceType: fan.DeviceTypeExtractorHood, Features: fan.FeatureAirflowDirection}, fan.ErrDeviceTypeFeature},
 	}
@@ -214,7 +236,7 @@ func TestAttributeSurfaceFollowsFeatures(t *testing.T) {
 
 func TestReadsProjectAndClampTheHostState(t *testing.T) {
 	t.Parallel()
-	d := &device{st: fan.State{
+	d := &device{st: fandef.State{
 		FanMode: fan.FanModeMedium, PercentSetting: u8(150), PercentCurrent: 120,
 		SpeedSetting: u8(42), SpeedCurrent: 7, RockSetting: fan.RockLeftRight | fan.RockRound,
 		WindSetting: fan.WindNatural | fan.WindSleep, AirflowDirection: fan.AirflowReverse,
@@ -261,7 +283,7 @@ func TestFanModeWriteCouplesPercentAndSpeed(t *testing.T) {
 	if err := srv.MatterWrite(ctx, fan.AttrFanMode, uint64(fan.FanModeOff)); err != nil {
 		t.Fatal(err)
 	}
-	if s := d.last(); *s.FanMode != fan.FanModeOff || *s.PercentSetting != (fan.Setting{}) || *s.SpeedSetting != (fan.Setting{}) {
+	if s := d.last(); *s.FanMode != fan.FanModeOff || *s.PercentSetting != (fanSetting{}) || *s.SpeedSetting != (fanSetting{}) {
 		t.Errorf("Off resolved to %+v, want percent 0 / speed 0", s)
 	}
 	if err := srv.MatterWrite(ctx, fan.AttrFanMode, uint64(fan.FanModeAuto)); err != nil {
@@ -503,7 +525,7 @@ func TestDefaultStepAlongSpeed(t *testing.T) {
 		{"off without LowestOff starts at 1", u8(0), 0, step(fan.StepIncrease, false, false), 2},
 	}
 	for _, c := range cases {
-		d := &device{st: fan.State{SpeedSetting: c.from, SpeedCurrent: c.cur}}
+		d := &device{st: fandef.State{SpeedSetting: c.from, SpeedCurrent: c.cur}}
 		srv := newFull(t, d)
 		if _, err := srv.MatterInvoke(ctx, fan.CmdStep, c.req); err != nil {
 			t.Fatalf("%s: %v", c.name, err)
@@ -545,7 +567,7 @@ func TestDefaultStepAlongModes(t *testing.T) {
 		if c.seq == fan.SequenceOffLowMedHighAuto {
 			features |= fan.FeatureAuto
 		}
-		d := &device{st: fan.State{FanMode: c.from}}
+		d := &device{st: fandef.State{FanMode: c.from}}
 		srv := newBasic(t, d, c.seq, features)
 		if _, err := srv.MatterInvoke(ctx, fan.CmdStep, c.req); err != nil {
 			t.Fatalf("%s: %v", c.name, err)
@@ -561,7 +583,7 @@ func TestStepPayloadsAndStepper(t *testing.T) {
 	ctx := context.Background()
 	d := &device{}
 	st := &stepper{plainDevice: plainDevice{d}}
-	srv, err := fan.NewServer(fan.Config{Source: st, Features: fan.FeatureStep, Sequence: fan.SequenceOffHigh})
+	srv, err := fan.NewServer(fan.Config{Source: st, Stepper: st, Features: fan.FeatureStep, Sequence: fan.SequenceOffHigh})
 	if err != nil {
 		t.Fatal(err)
 	}

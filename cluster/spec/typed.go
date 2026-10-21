@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -99,10 +100,21 @@ func fieldsOf(t reflect.Type) []typedField {
 	return out
 }
 
-// PatchValues returns the attribute values a generated Patch sets, for
-// [Server.SetAttributes]: each non-nil field's value, and nil for every id
-// its Null field lists. The patch is the struct or a pointer to it.
+// PatchValuer is a generated Patch: AttributeValues returns the
+// attributes it sets in their stored form, generated per cluster
+// (script/clustergen), so a list of a structure is its [List].
+type PatchValuer interface {
+	AttributeValues() map[uint32]any
+}
+
+// PatchValues returns the attribute values a patch sets, for
+// [Server.SetAttributes]: a generated Patch's own [PatchValuer] form;
+// for another struct (or a pointer to one) with `matter` tags, each
+// non-nil field's value, and nil for every id its Null field lists.
 func PatchValues(patch any) map[uint32]any {
+	if pv, ok := patch.(PatchValuer); ok {
+		return pv.AttributeValues()
+	}
 	rv := reflect.Indirect(reflect.ValueOf(patch))
 	out := map[uint32]any{}
 	if rv.Kind() != reflect.Struct {
@@ -318,10 +330,17 @@ func scalarClass(k reflect.Kind) int {
 	}
 }
 
+// Convert is the conversion the typed form reads every field through
+// ([StateOf]): v as a value of type t ([convert]). The device kit fills a
+// server's configuration from a declaration's Initial with it.
+func Convert(v any, t reflect.Type) (reflect.Value, bool) { return convert(v, t) }
+
 // convert turns a stored value into a value of the generated type t: a
 // width integer into its enum or bitmap type, a list entry by entry, nil
 // into a nil pointer or slice or a null [Nullable], a value into a
-// pointer to it. false when v does not fit t.
+// pointer to it, and a struct of another type — a self-held server's
+// cluster/wire struct — field by field by name ([convertStruct]). false
+// when v does not fit t.
 func convert(v any, t reflect.Type) (reflect.Value, bool) {
 	if v == nil {
 		switch {
@@ -388,7 +407,43 @@ func convert(v any, t reflect.Type) (reflect.Value, bool) {
 		return src.Convert(t), true
 	case t.Kind() == reflect.Struct && src.Type().ConvertibleTo(t):
 		return src.Convert(t), true
+	case t.Kind() == reflect.Struct && src.Kind() == reflect.Struct:
+		return convertStruct(src, t)
 	default:
 		return reflect.Value{}, false
 	}
+}
+
+// convertStruct fills a t from the struct src field by field: each
+// exported field of t takes the field of src with its name, converted —
+// the name compared without case, as the generated types spell an id
+// "Id" where cluster/wire spells it "ID". A
+// field src does not have stays zero; an optional field (a pointer in t)
+// whose value in src is the zero value of a plain type stays nil, as a
+// wire struct leaves out an empty optional field. false when no field
+// matches or a matching one does not fit.
+func convertStruct(src reflect.Value, t reflect.Type) (reflect.Value, bool) {
+	out := reflect.New(t).Elem()
+	matched := false
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		sf, ok := src.Type().FieldByNameFunc(func(n string) bool { return strings.EqualFold(n, f.Name) })
+		if !ok || !sf.IsExported() {
+			continue
+		}
+		sv := src.FieldByIndex(sf.Index)
+		matched = true
+		if f.Type.Kind() == reflect.Pointer && sv.Kind() != reflect.Pointer && sv.IsZero() {
+			continue
+		}
+		c, ok := convert(sv.Interface(), f.Type)
+		if !ok {
+			return reflect.Value{}, false
+		}
+		out.Field(i).Set(c)
+	}
+	return out, matched
 }

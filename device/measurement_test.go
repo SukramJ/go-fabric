@@ -4,23 +4,12 @@
 package device
 
 import (
-	"errors"
-	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
+	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
-
-// reading is a host's live temperature reading.
-type reading struct {
-	class contract.MeasurementClass
-	value float64
-}
-
-func (r reading) MatterMeasurementClass() contract.MeasurementClass { return r.class }
-func (r reading) MatterFloatValue() (float64, bool)                 { return r.value, true }
 
 // clusterIDs are the cluster ids of servers, in order.
 func clusterIDs(servers []contract.ClusterServer) []uint32 {
@@ -31,90 +20,48 @@ func clusterIDs(servers []contract.ClusterServer) []uint32 {
 	return out
 }
 
-// TestWithMeasurement: the measurement cluster a TemperatureSensor
-// mandates is served from the host's reading by the assembler
-// (endpoint.Spec.Measurement), not by a default server of the device; the
-// endpoint conforms to its device type and reads the live value.
-func TestWithMeasurement(t *testing.T) {
+// TestAMeasurementIsDeclaredAndSet: a sensor's measurement cluster is
+// declared like any other cluster, and the host's reading reaches it
+// through the typed Set — matter.js's host setting the measurement
+// behavior's state, which its Datasource reports
+// (packages/node/src/behavior/state/managed/Datasource.ts:261-264). The
+// endpoint conforms to its device type and reads the value the host set,
+// with the host's origin.
+func TestAMeasurementIsDeclaredAndSet(t *testing.T) {
 	t.Parallel()
-	src := &reading{class: contract.MeasurementTemperature, value: 21.5}
-	d, err := NewTemperatureSensor(testOptions("t"), WithMeasurement(src))
+	lo, hi := int16(-4000), int16(12500)
+	d, err := NewTemperatureSensor(testOptions("t"), tmdef.Declare{
+		Initial: tmdef.Patch{MinMeasuredValue: &lo, MaxMeasuredValue: &hi},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.TemperatureMeasurement() != nil || d.Server(measurement.ClusterTemperatureMeasurement) != nil {
-		t.Error("the device mounts a server for the measured cluster")
+	temp := d.TemperatureMeasurement()
+	var origin contract.Origin
+	temp.OnChanged(func(_ tmdef.State, c contract.Change) { origin = c.Origin })
+	reading := int16(2150)
+	if err := temp.Set(tmdef.Patch{MeasuredValue: &reading}); err != nil {
+		t.Fatal(err)
 	}
-	if len(d.Servers()) != 0 {
-		t.Errorf("device servers %v, want none", clusterIDs(d.Servers()))
-	}
-	s := d.Spec()
-	if s.Measurement != src || s.Source == nil {
-		t.Fatalf("Spec Measurement %v, Source %v", s.Measurement, s.Source)
+	if origin != contract.OriginHostSet {
+		t.Errorf("the reading reported %v, want OriginHostSet", origin)
 	}
 	topo := assemble(t, d.Device)
 	ep := bridgedEndpoint(t, topo)
-	ids := clusterIDs(endpoint.ClusterServers(ep))
-	if !slices.Contains(ids, measurement.ClusterTemperatureMeasurement) {
-		t.Fatalf("assembled clusters %v lack TemperatureMeasurement", ids)
-	}
 	for _, v := range endpoint.ValidateDeviceTypes(topo) {
 		if v.Endpoint == ep.ID {
 			t.Errorf("device-type violation: %v", v)
 		}
 	}
 	for _, srv := range endpoint.ClusterServers(ep) {
-		if srv.MatterClusterID() != measurement.ClusterTemperatureMeasurement {
+		if srv.MatterClusterID() != tmdef.ClusterID {
 			continue
 		}
-		if v, _ := srv.MatterRead(0x0000); v != int16(2150) {
+		if v, _ := srv.MatterRead(tmdef.AttrMeasuredValue); v != int16(2150) {
 			t.Errorf("MeasuredValue %v (%T), want 2150", v, v)
 		}
-	}
-
-	// Without the option the type is unchanged: a default server.
-	plain, err := NewTemperatureSensor(testOptions("p"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if plain.TemperatureMeasurement() == nil || plain.Spec().Measurement != nil {
-		t.Error("a TemperatureSensor without WithMeasurement changed")
-	}
-}
-
-// TestWithMeasurementComposesWithTheDevicesOwnServers: a device with
-// clusters of its own keeps them ahead of the measured ones
-// (endpoint/materialize.go ClusterServers: Source, then Measurement).
-func TestWithMeasurementComposesWithTheDevicesOwnServers(t *testing.T) {
-	t.Parallel()
-	src := &reading{class: contract.MeasurementFlow, value: 3}
-	host := &hostServer{id: 0xFFF1_FC00}
-	d, err := NewFlowSensor(testOptions("f"), WithMeasurement(src), withServer(host))
-	if err != nil {
-		t.Fatal(err)
-	}
-	topo := assemble(t, d.Device)
-	ids := clusterIDs(endpoint.ClusterServers(bridgedEndpoint(t, topo)))
-	hostAt, flowAt := slices.Index(ids, host.id), slices.Index(ids, measurement.ClusterFlowMeasurement)
-	if hostAt < 0 || flowAt < 0 || hostAt > flowAt {
-		t.Errorf("assembled clusters %v: the host server must precede FlowMeasurement", ids)
-	}
-}
-
-// TestWithMeasurementRefusals: nil, a source of no materialisable shape,
-// and an option for a measured cluster.
-func TestWithMeasurementRefusals(t *testing.T) {
-	t.Parallel()
-	src := &reading{class: contract.MeasurementTemperature, value: 1}
-	for name, with := range map[string][]Option{
-		"nil":                {WithMeasurement(nil)},
-		"no cluster":         {WithMeasurement(&reading{class: contract.MeasurementNone})},
-		"server for it":      {WithMeasurement(src), withServer(&hostServer{id: measurement.ClusterTemperatureMeasurement})},
-		"initial for it":     {WithMeasurement(src), withInitial(measurement.ClusterTemperatureMeasurement, map[uint32]any{0: int16(1)})},
-		"opting it in again": {WithMeasurement(src), withOptional(measurement.ClusterTemperatureMeasurement)},
-	} {
-		if _, err := NewTemperatureSensor(testOptions("r"), with...); !errors.Is(err, ErrConfiguration) {
-			t.Errorf("%s: %v, want ErrConfiguration", name, err)
+		if v, _ := srv.MatterRead(tmdef.AttrMinMeasuredValue); v != lo {
+			t.Errorf("MinMeasuredValue %v, want %d", v, lo)
 		}
 	}
 }

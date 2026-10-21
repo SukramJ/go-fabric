@@ -91,6 +91,113 @@ type Patch struct {
 	Null                        []uint32                  // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Status != nil {
+		v[AttrStatus] = *p.Status
+	}
+	if p.Order != nil {
+		v[AttrOrder] = *p.Order
+	}
+	if p.Description != nil {
+		v[AttrDescription] = *p.Description
+	}
+	if p.WiredAssessedInputVoltage != nil {
+		v[AttrWiredAssessedInputVoltage] = *p.WiredAssessedInputVoltage
+	}
+	if p.WiredAssessedInputFrequency != nil {
+		v[AttrWiredAssessedInputFrequency] = *p.WiredAssessedInputFrequency
+	}
+	if p.WiredCurrentType != nil {
+		v[AttrWiredCurrentType] = *p.WiredCurrentType
+	}
+	if p.WiredAssessedCurrent != nil {
+		v[AttrWiredAssessedCurrent] = *p.WiredAssessedCurrent
+	}
+	if p.WiredNominalVoltage != nil {
+		v[AttrWiredNominalVoltage] = *p.WiredNominalVoltage
+	}
+	if p.WiredMaximumCurrent != nil {
+		v[AttrWiredMaximumCurrent] = *p.WiredMaximumCurrent
+	}
+	if p.WiredPresent != nil {
+		v[AttrWiredPresent] = *p.WiredPresent
+	}
+	if p.ActiveWiredFaults != nil {
+		v[AttrActiveWiredFaults] = *p.ActiveWiredFaults
+	}
+	if p.BatVoltage != nil {
+		v[AttrBatVoltage] = *p.BatVoltage
+	}
+	if p.BatPercentRemaining != nil {
+		v[AttrBatPercentRemaining] = *p.BatPercentRemaining
+	}
+	if p.BatTimeRemaining != nil {
+		v[AttrBatTimeRemaining] = *p.BatTimeRemaining
+	}
+	if p.BatChargeLevel != nil {
+		v[AttrBatChargeLevel] = *p.BatChargeLevel
+	}
+	if p.BatReplacementNeeded != nil {
+		v[AttrBatReplacementNeeded] = *p.BatReplacementNeeded
+	}
+	if p.BatReplaceability != nil {
+		v[AttrBatReplaceability] = *p.BatReplaceability
+	}
+	if p.BatPresent != nil {
+		v[AttrBatPresent] = *p.BatPresent
+	}
+	if p.ActiveBatFaults != nil {
+		v[AttrActiveBatFaults] = *p.ActiveBatFaults
+	}
+	if p.BatReplacementDescription != nil {
+		v[AttrBatReplacementDescription] = *p.BatReplacementDescription
+	}
+	if p.BatCommonDesignation != nil {
+		v[AttrBatCommonDesignation] = *p.BatCommonDesignation
+	}
+	if p.BatAnsiDesignation != nil {
+		v[AttrBatAnsiDesignation] = *p.BatAnsiDesignation
+	}
+	if p.BatIecDesignation != nil {
+		v[AttrBatIecDesignation] = *p.BatIecDesignation
+	}
+	if p.BatApprovedChemistry != nil {
+		v[AttrBatApprovedChemistry] = *p.BatApprovedChemistry
+	}
+	if p.BatCapacity != nil {
+		v[AttrBatCapacity] = *p.BatCapacity
+	}
+	if p.BatQuantity != nil {
+		v[AttrBatQuantity] = *p.BatQuantity
+	}
+	if p.BatChargeState != nil {
+		v[AttrBatChargeState] = *p.BatChargeState
+	}
+	if p.BatTimeToFullCharge != nil {
+		v[AttrBatTimeToFullCharge] = *p.BatTimeToFullCharge
+	}
+	if p.BatFunctionalWhileCharging != nil {
+		v[AttrBatFunctionalWhileCharging] = *p.BatFunctionalWhileCharging
+	}
+	if p.BatChargingCurrent != nil {
+		v[AttrBatChargingCurrent] = *p.BatChargingCurrent
+	}
+	if p.ActiveBatChargeFaults != nil {
+		v[AttrActiveBatChargeFaults] = *p.ActiveBatChargeFaults
+	}
+	if p.EndpointList != nil {
+		v[AttrEndpointList] = *p.EndpointList
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed PowerSource server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -178,6 +285,9 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -199,6 +309,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	return decl
 }
 

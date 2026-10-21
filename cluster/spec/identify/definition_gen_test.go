@@ -50,6 +50,14 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		IdentifyTime: new(uint16),
+		IdentifyType: new(IdentifyTypeEnum),
+	}
+	values := full.AttributeValues()
+	if len(values) != 2 {
+		t.Errorf("a patch of every field sets %d values, want 2", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -79,5 +87,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleTriggerEffect = func(context.Context, TriggerEffectRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdIdentify}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

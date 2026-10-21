@@ -57,6 +57,16 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		MaxMembershipCount: new(uint16),
+		MaxMcastAddrCount:  new(uint16),
+		UsedMcastAddrCount: new(uint16),
+		FabricUnderTest:    new(uint8),
+	}
+	values := full.AttributeValues()
+	if len(values) != 4 {
+		t.Errorf("a patch of every field sets %d values, want 4", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -99,5 +109,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleGroupcastTesting = func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 5 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdJoinGroup}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventGroupcastTesting}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

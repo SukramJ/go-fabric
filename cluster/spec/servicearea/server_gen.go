@@ -39,6 +39,35 @@ type Patch struct {
 	Null             []uint32          // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.SupportedAreas != nil {
+		v[AttrSupportedAreas] = spec.List[AreaStruct](*p.SupportedAreas)
+	}
+	if p.SupportedMaps != nil {
+		v[AttrSupportedMaps] = spec.List[MapStruct](*p.SupportedMaps)
+	}
+	if p.SelectedAreas != nil {
+		v[AttrSelectedAreas] = *p.SelectedAreas
+	}
+	if p.CurrentArea != nil {
+		v[AttrCurrentArea] = *p.CurrentArea
+	}
+	if p.EstimatedEndTime != nil {
+		v[AttrEstimatedEndTime] = *p.EstimatedEndTime
+	}
+	if p.Progress != nil {
+		v[AttrProgress] = spec.List[ProgressStruct](*p.Progress)
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed ServiceArea server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -109,6 +138,21 @@ func (s *Server) HandleSkipArea(fn func(ctx context.Context, req SkipAreaRequest
 	return spec.HandleOn(s.Underlying(), CmdSkipArea, fn)
 }
 
+// Selector decides a SelectAreas request whose areas are all
+// supported (areas without duplicates): a non-Success status is
+// answered as is and changes nothing, an error answers FAILURE
+// (cluster/servicearea).
+type Selector interface {
+	SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)
+}
+
+// Skipper carries out SkipArea for a selected area and updates
+// Progress itself; without one SkipArea is not accepted
+// (cluster/servicearea).
+type Skipper interface {
+	SkipArea(ctx context.Context, area uint32) (SkipAreaStatus, string, error)
+}
+
 // Declare is the declaration of the ServiceArea cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -120,6 +164,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -129,6 +177,10 @@ type Declare struct {
 	// HandleSkipArea handles the SkipArea command in place of the server
 	// (Server.HandleSkipArea), inline; an optional command it handles is accepted.
 	HandleSkipArea func(ctx context.Context, req SkipAreaRequest) (SkipAreaResponse, error)
+	// Selector is the host port the kit's server runs on ([Selector]).
+	Selector Selector
+	// Skipper is the host port the kit's server runs on ([Skipper]).
+	Skipper Skipper
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -147,6 +199,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSelectAreas != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSelectAreas)
 		decl.Attach = d.attach

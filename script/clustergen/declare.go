@@ -19,9 +19,28 @@ import "strings"
 // packages/node/src/behavior/cluster/ValidatedElements.ts:251-252 and
 // :270-278 (attributes), :301-318 (commands).
 
-// transitionClusters are the clusters whose servers run their commands as
-// transitions over time when the declaration asks (ADR 0014).
-var transitionClusters = map[string]bool{"LevelControl": true, "ColorControl": true}
+// transitionClusters are the clusters whose servers run their commands
+// over time when the declaration asks, with the doc of the Declare field:
+// LevelControl and ColorControl as transitions (ADR 0014), WindowCovering
+// as a travelling movement.
+var transitionClusters = map[string][]string{
+	"LevelControl": transitionDoc,
+	"ColorControl": transitionDoc,
+	"WindowCovering": {
+		"Transitions makes a movement travel: the kit's server moves the",
+		"axis in six steps, OperationalStatus Opening or Closing until it",
+		"arrives — matter.js's CHIP test node (TestWindowCoveringServer.ts,",
+		"six 950 ms steps); false moves at once. A Mover moves the device",
+		"instead, and excludes it.",
+	},
+}
+
+// transitionDoc is the Transitions field's doc of LevelControl and
+// ColorControl.
+var transitionDoc = []string{
+	"Transitions runs the commands as transitions over their",
+	"TransitionTime (ADR 0014); false applies the target at once.",
+}
 
 // portDecl is one host port a declaration carries: an interface declared
 // in the cluster's package, in the generated request and state types, and
@@ -37,6 +56,9 @@ type portDecl struct {
 type portSet struct {
 	ports []portDecl
 	types []string
+	// imports are the packages the ports name beyond the generated ones
+	// (a store's record type).
+	imports []string
 }
 
 // modeChanger is the port of every ModeBase derivation that accepts
@@ -126,7 +148,21 @@ var ports = map[string]portSet{
 			"IsLocked() (locked, observed bool)",
 			"LockInvoke(ctx context.Context, cmdID uint32) error",
 		},
-	}}},
+	}, {
+		name: "AuthStore",
+		doc: []string{
+			"AuthStore persists the lock's users, credentials and schedules",
+			"under the device's StableKey, and its credential key; the node's",
+			"store (node.Node.Store) is one. Without one they stay in memory",
+			"(cluster/lock AuthStore).",
+		},
+		methods: []string{
+			"GetSetting(ctx context.Context, key string) (value string, ok bool, err error)",
+			"SetSetting(ctx context.Context, key, value string) error",
+			"LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth store.DoorLockAuth, saved bool, err error)",
+			"SaveDoorLockAuth(ctx context.Context, endpointKey string, auth store.DoorLockAuth) error",
+		},
+	}}, imports: []string{"github.com/SukramJ/go-fabric/store"}},
 	"WindowCovering": {ports: []portDecl{{
 		name: "Mover",
 		doc: []string{
@@ -153,6 +189,18 @@ var ports = map[string]portSet{
 			methods: []string{
 				"SetSystemMode(ctx context.Context, mode uint8) error",
 				"SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error",
+			},
+		}, {
+			name: "PresetStore",
+			doc: []string{
+				"PresetStore persists the presets (their TLV encoding) and the",
+				"active handle (nil for null); Load reports ok false when nothing",
+				"was saved, and the kit's server starts with the declaration's",
+				"Presets (cluster/thermo PresetStore).",
+			},
+			methods: []string{
+				"LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error)",
+				"SavePresets(ctx context.Context, presets, activeHandle []byte) error",
 			},
 		}},
 		types: []string{
@@ -211,12 +259,24 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 		w.p("\t// Features is the FeatureMap selection; zero is the device type's.")
 		w.p("\tFeatures Feature")
 	}
+	if len(cmds) > 0 {
+		w.p("\t// Commands are optional commands the server accepts beyond the")
+		w.p("\t// ones the selection mandates: the kit's server carries them out")
+		w.p("\t// (through its port), a Handle field below handles one in its place.")
+		w.p("\tCommands []uint32")
+	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\t// Events are optional events the server emits beyond the ones the")
+		w.p("\t// selection mandates (Server.Emit<Event>).")
+		w.p("\tEvents []uint32")
+	}
 	w.p("\t// OnWrite vetoes a controller's write before it is stored")
 	w.p("\t// (Server.OnWrite); it runs inline.")
 	w.p("\tOnWrite func(ctx context.Context, next State, attrID uint32) error")
-	if transitionClusters[c.Name] {
-		w.p("\t// Transitions runs the commands as transitions over their")
-		w.p("\t// TransitionTime (ADR 0014); false applies the target at once.")
+	if doc, ok := transitionClusters[c.Name]; ok {
+		for _, line := range doc {
+			w.p("\t// %s", line)
+		}
 		w.p("\tTransitions bool")
 	}
 	for _, hc := range cmds {
@@ -248,7 +308,13 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	if len(c.Features) > 0 {
 		w.p("\tdecl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0")
 	}
-	if transitionClusters[c.Name] {
+	if len(cmds) > 0 {
+		w.p("\tdecl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)")
+	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\tdecl.Elements.Events = append(decl.Elements.Events, d.Events...)")
+	}
+	if _, ok := transitionClusters[c.Name]; ok {
 		w.p("\tdecl.Transitions = d.Transitions")
 	}
 	for _, hc := range cmds {

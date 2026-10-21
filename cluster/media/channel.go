@@ -12,17 +12,13 @@ import (
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
 )
 
-// ChannelState is the Channel attribute state (channel.element.ts:30-41).
-// ChannelList (ChannelList feature, CL) defaults to the empty list (:31);
-// Lineup (LineupInfo, LI) and CurrentChannel (optional) are nullable and
-// read as null while nil.
-type ChannelState struct {
-	ChannelList    []channeldef.ChannelInfoStruct
-	Lineup         *channeldef.LineupInfoStruct
-	CurrentChannel *channeldef.ChannelInfoStruct
-}
+// ChannelState is the Channel attribute state (channel.element.ts:30-41),
+// the cluster's generated State. ChannelList (ChannelList feature, CL)
+// defaults to the empty list (:31); Lineup (LineupInfo, LI) and
+// CurrentChannel (optional) are nullable and read as null while nil.
+type ChannelState = channeldef.State
 
-func (st ChannelState) values() map[uint32]any {
+func channelValues(st ChannelState) map[uint32]any {
 	list := st.ChannelList
 	if list == nil {
 		list = []channeldef.ChannelInfoStruct{} // the element's default, :31
@@ -34,34 +30,26 @@ func (st ChannelState) values() map[uint32]any {
 	}
 }
 
-func (st ChannelState) clone() ChannelState {
+func cloneChannel(st ChannelState) ChannelState {
 	st.ChannelList = slices.Clone(st.ChannelList)
 	return st
 }
 
-// Channels is the Channel host port. ChangeChannelByNumber and SkipChannel
-// are mandatory (:57-69), status only; ChangeChannel (CL | LI, :43-55)
-// answers ChangeChannelResponse. The port tunes and makes the channel
-// current in st. A port that also implements [ChannelGuide] takes the
-// ElectronicGuide commands, and [ChannelRecorder] RecordProgram's.
-type Channels interface {
-	ChangeChannel(ctx context.Context, st *ChannelState, req channeldef.ChangeChannelRequest) (channeldef.ChangeChannelResponse, error)
-	ChangeChannelByNumber(ctx context.Context, st *ChannelState, req channeldef.ChangeChannelByNumberRequest) error
-	SkipChannel(ctx context.Context, st *ChannelState, req channeldef.SkipChannelRequest) error
-}
+// Channels is the Channel host port (the generated [channeldef.Channels],
+// the declaration's Channels). ChangeChannelByNumber and SkipChannel are
+// mandatory (:57-69), status only; ChangeChannel (CL | LI, :43-55) answers
+// ChangeChannelResponse. The port tunes and makes the channel current in
+// st. A port that also implements [ChannelGuide] takes the ElectronicGuide
+// commands, and [ChannelRecorder] RecordProgram's.
+type Channels = channeldef.Channels
 
 // ChannelGuide is GetProgramGuide, required with ElectronicGuide (EG,
 // :71-98).
-type ChannelGuide interface {
-	GetProgramGuide(ctx context.Context, st *ChannelState, req channeldef.GetProgramGuideRequest) (channeldef.ProgramGuideResponse, error)
-}
+type ChannelGuide = channeldef.ChannelGuide
 
 // ChannelRecorder is RecordProgram and CancelRecordProgram, required with
 // RecordProgram and ElectronicGuide (RP & EG, :100-126); status only.
-type ChannelRecorder interface {
-	RecordProgram(ctx context.Context, st *ChannelState, req channeldef.RecordProgramRequest) error
-	CancelRecordProgram(ctx context.Context, st *ChannelState, req channeldef.CancelRecordProgramRequest) error
-}
+type ChannelRecorder = channeldef.ChannelRecorder
 
 // ChannelsConfig carries the construction parameters of a Channel server.
 type ChannelsConfig struct {
@@ -124,8 +112,11 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, ChannelState.values, ChannelState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, channelValues, cloneChannel, storeState[ChannelState]); err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *ChannelsServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }

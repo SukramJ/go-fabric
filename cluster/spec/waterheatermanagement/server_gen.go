@@ -37,6 +37,32 @@ type Patch struct {
 	BoostState            *BoostStateEnum              `matter:"0x0005"` // attribute 0x0005
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.HeaterTypes != nil {
+		v[AttrHeaterTypes] = *p.HeaterTypes
+	}
+	if p.HeatDemand != nil {
+		v[AttrHeatDemand] = *p.HeatDemand
+	}
+	if p.TankVolume != nil {
+		v[AttrTankVolume] = *p.TankVolume
+	}
+	if p.EstimatedHeatRequired != nil {
+		v[AttrEstimatedHeatRequired] = *p.EstimatedHeatRequired
+	}
+	if p.TankPercentage != nil {
+		v[AttrTankPercentage] = *p.TankPercentage
+	}
+	if p.BoostState != nil {
+		v[AttrBoostState] = *p.BoostState
+	}
+	return v
+}
+
 // Server is the typed WaterHeaterManagement server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -119,6 +145,13 @@ func (s *Server) EmitBoostEnded(endpoint uint16, data BoostEndedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBoostEnded, data)
 }
 
+// Booster starts and cancels a boost the kit's server admitted;
+// the device ends it through the server (cluster/energy).
+type Booster interface {
+	Boost(ctx context.Context, info WaterHeaterBoostInfoStruct) error
+	CancelBoost(ctx context.Context) error
+}
+
 // Declare is the declaration of the WaterHeaterManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -130,6 +163,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -139,6 +179,8 @@ type Declare struct {
 	// HandleCancelBoost handles the CancelBoost command in place of the server
 	// (Server.HandleCancelBoost), inline; an optional command it handles is accepted.
 	HandleCancelBoost func(ctx context.Context, req CancelBoostRequest) (struct{}, error)
+	// Booster is the host port the kit's server runs on ([Booster]).
+	Booster Booster
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -157,6 +199,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleBoost != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdBoost)
 		decl.Attach = d.attach

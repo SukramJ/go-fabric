@@ -73,6 +73,86 @@ type Patch struct {
 	Null                     []uint32         // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.State != nil {
+		v[AttrState] = *p.State
+	}
+	if p.SupplyState != nil {
+		v[AttrSupplyState] = *p.SupplyState
+	}
+	if p.FaultState != nil {
+		v[AttrFaultState] = *p.FaultState
+	}
+	if p.ChargingEnabledUntil != nil {
+		v[AttrChargingEnabledUntil] = *p.ChargingEnabledUntil
+	}
+	if p.DischargingEnabledUntil != nil {
+		v[AttrDischargingEnabledUntil] = *p.DischargingEnabledUntil
+	}
+	if p.CircuitCapacity != nil {
+		v[AttrCircuitCapacity] = *p.CircuitCapacity
+	}
+	if p.MinimumChargeCurrent != nil {
+		v[AttrMinimumChargeCurrent] = *p.MinimumChargeCurrent
+	}
+	if p.MaximumChargeCurrent != nil {
+		v[AttrMaximumChargeCurrent] = *p.MaximumChargeCurrent
+	}
+	if p.MaximumDischargeCurrent != nil {
+		v[AttrMaximumDischargeCurrent] = *p.MaximumDischargeCurrent
+	}
+	if p.UserMaximumChargeCurrent != nil {
+		v[AttrUserMaximumChargeCurrent] = *p.UserMaximumChargeCurrent
+	}
+	if p.RandomizationDelayWindow != nil {
+		v[AttrRandomizationDelayWindow] = *p.RandomizationDelayWindow
+	}
+	if p.NextChargeStartTime != nil {
+		v[AttrNextChargeStartTime] = *p.NextChargeStartTime
+	}
+	if p.NextChargeTargetTime != nil {
+		v[AttrNextChargeTargetTime] = *p.NextChargeTargetTime
+	}
+	if p.NextChargeRequiredEnergy != nil {
+		v[AttrNextChargeRequiredEnergy] = *p.NextChargeRequiredEnergy
+	}
+	if p.NextChargeTargetSoC != nil {
+		v[AttrNextChargeTargetSoC] = *p.NextChargeTargetSoC
+	}
+	if p.ApproximateEvEfficiency != nil {
+		v[AttrApproximateEvEfficiency] = *p.ApproximateEvEfficiency
+	}
+	if p.StateOfCharge != nil {
+		v[AttrStateOfCharge] = *p.StateOfCharge
+	}
+	if p.BatteryCapacity != nil {
+		v[AttrBatteryCapacity] = *p.BatteryCapacity
+	}
+	if p.VehicleId != nil {
+		v[AttrVehicleId] = *p.VehicleId
+	}
+	if p.SessionId != nil {
+		v[AttrSessionId] = *p.SessionId
+	}
+	if p.SessionDuration != nil {
+		v[AttrSessionDuration] = *p.SessionDuration
+	}
+	if p.SessionEnergyCharged != nil {
+		v[AttrSessionEnergyCharged] = *p.SessionEnergyCharged
+	}
+	if p.SessionEnergyDischarged != nil {
+		v[AttrSessionEnergyDischarged] = *p.SessionEnergyDischarged
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed EnergyEvse server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -220,6 +300,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -262,6 +349,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleDisable != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdDisable)
 		decl.Attach = d.attach

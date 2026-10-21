@@ -52,6 +52,24 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		DeviceTypeList:   new([]DeviceTypeStruct),
+		ServerList:       new([]uint32),
+		ClientList:       new([]uint32),
+		PartsList:        new([]uint16),
+		TagList:          new([]Semtag),
+		EndpointUniqueId: new(string),
+	}
+	values := full.AttributeValues()
+	if len(values) != 6 {
+		t.Errorf("a patch of every field sets %d values, want 6", len(values))
+	}
+	if _, ok := values[AttrDeviceTypeList].(spec.List[DeviceTypeStruct]); !ok {
+		t.Errorf("DeviceTypeList is stored as %T, want its spec.List", values[AttrDeviceTypeList])
+	}
+	if _, ok := values[AttrTagList].(spec.List[Semtag]); !ok {
+		t.Errorf("TagList is stored as %T, want its spec.List", values[AttrTagList])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

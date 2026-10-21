@@ -18,9 +18,12 @@ const (
 	SecondaryNetworkInterfaceRevision uint16 = 1
 )
 
-// SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/secondary-network-interface.ts.
-var SecondaryNetworkInterfaceType = Type{
+// SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, matter.js's packages/node/src/endpoints/secondary-network-interface.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#secondarynetworkinterface.
+var SecondaryNetworkInterfaceType = typeSecondaryNetworkInterface
+
+// typeSecondaryNetworkInterface holds [SecondaryNetworkInterfaceType]'s cluster requirements.
+var typeSecondaryNetworkInterface = Type{
 	ID: SecondaryNetworkInterfaceID, Name: "SecondaryNetworkInterface", Revision: SecondaryNetworkInterfaceRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -57,26 +60,17 @@ func NewSecondaryNetworkInterface(opts Options, decls ...Declaration) (*Secondar
 	return &SecondaryNetworkInterface{d}, nil
 }
 
-// NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// NetworkCommissioning is the device's typed NetworkCommissioning server; the type mandates it.
 func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
 	return networkcommissioningdef.WrapOn(d.Server(0x0031), d.queue)
 }
 
-// WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// WiFiNetworkDiagnostics is the device's typed WiFiNetworkDiagnostics server, nil until a declaration mounts it.
 func (d *SecondaryNetworkInterface) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
 	return wifinetworkdiagnosticsdef.WrapOn(d.Server(0x0036), d.queue)
 }
 
-// EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// EthernetNetworkDiagnostics is the device's typed EthernetNetworkDiagnostics server, nil until a declaration mounts it.
 func (d *SecondaryNetworkInterface) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
 	return ethernetnetworkdiagnosticsdef.WrapOn(d.Server(0x0037), d.queue)
 }

@@ -126,22 +126,17 @@ const (
 	StateTransitioning = valvedef.ValveStateTransitioning
 )
 
-// OpenRequest is the cluster-native payload of the Open command
+// OpenRequest is the Open command's payload in the generated type
 // (element :59-63).
 //
-// Presence and null are distinct and both are carried: an absent
-// OpenDuration field means "use DefaultOpenDuration" while a present
-// null means "stay open until something closes me" (resource :46-52 vs
-// :213-218). Collapsing the two into one nil pointer would silently turn
-// an indefinite opening into the default one.
-type OpenRequest struct {
-	// HasOpenDuration reports whether the command carried the
-	// OpenDuration field at all.
-	HasOpenDuration bool
-	// OpenDuration is the field's value in seconds, or nil when the
-	// field was present and null.
-	OpenDuration *uint32
-}
+// Presence and null are distinct and both are carried: a nil
+// OpenDuration (the field absent) means "use DefaultOpenDuration" while a
+// present null (OpenDuration.Null) means "stay open until something
+// closes me" (resource :46-52 vs :213-218). Collapsing the two would
+// silently turn an indefinite opening into the default one. TargetLevel
+// needs the Level feature this server does not advertise, so the source
+// never sees one.
+type OpenRequest = valvedef.OpenRequest
 
 // StateSource is the host port this server reads and drives. The host
 // implements it over whatever actually owns the valve; nothing in this
@@ -157,25 +152,9 @@ type OpenRequest struct {
 // perform: the cluster contract carries no priority, so a host whose
 // command queue ranks by urgency names the value it wants inside its
 // own implementation, where the device vocabulary is in scope.
-type StateSource interface {
-	// CurrentState reports the valve's observed state.
-	CurrentState() (state State, known bool)
-	// TargetState reports the state the valve is moving towards.
-	TargetState() (state State, known bool)
-	// OpenDuration reports the duration of the current opening, in seconds.
-	OpenDuration() (seconds uint32, known bool)
-	// RemainingDuration reports the time left before the valve closes.
-	RemainingDuration() (seconds uint32, known bool)
-	// DefaultOpenDuration reports the configured default open duration.
-	DefaultOpenDuration() (seconds uint32, known bool)
-	// SetDefaultOpenDuration persists a new default; seconds is nil for
-	// a null write, which clears the default.
-	SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error
-	// Open drives the valve to its open position.
-	Open(ctx context.Context, req OpenRequest) error
-	// Close drives the valve to its closed position.
-	Close(ctx context.Context) error
-}
+//
+// It is the generated port (valveconfigurationandcontroldef.StateSource).
+type StateSource = valvedef.StateSource
 
 // Config carries the construction parameters for [Server].
 type Config struct {
@@ -188,6 +167,10 @@ type Config struct {
 	// version survives server reconstruction; when nil an embedded
 	// tracker is used.
 	DataVersion *cluster.DataVersionTracker
+	// Events are the optional events the server declares
+	// (ValveStateChanged, ValveFault), which the host emits through the
+	// typed server's Emit.
+	Events []uint32
 }
 
 // Server implements [contract.ClusterServer] for
@@ -196,6 +179,8 @@ type Server struct {
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
 	src      StateSource
+	inst     *spec.Instance // the definition with Config.Events
+	hooks    spec.Hooks
 }
 
 // Compile-time assertions.
@@ -208,8 +193,21 @@ var (
 
 // NewServer constructs a [Server] over the host port in cfg.
 func NewServer(cfg Config) *Server {
-	return &Server{src: cfg.Source, ext: cfg.DataVersion}
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion, inst: instance}
+	if len(cfg.Events) > 0 {
+		// An event id outside the definition leaves the EventList empty,
+		// as without Events.
+		if inst, err := spec.New(valvedef.Definition, spec.Options{Features: featureMapNone, Events: cfg.Events}); err == nil {
+			s.inst = inst
+		}
+	}
+	s.hooks.Init(s.inst)
+	return s
 }
+
+// MatterEvents implements [contract.ClusterEventLister]: the optional
+// events Config.Events declares.
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // tracker returns the active DataVersion counter — the host's when it
 // supplied one, the embedded one otherwise.
@@ -297,6 +295,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+		return err
+	}
 	var seconds *uint32
 	if n, ok := v.(uint64); ok {
 		sec := uint32(n) //nolint:gosec // a nullable uint32 per ValidateWrite
@@ -320,6 +321,9 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // nothing in the port says a refusal came from a valve fault, and
 // claiming one would put a diagnosis on the wire that was never measured.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	switch cmdID {
 	case CmdOpen:
 		req, err := openRequestFrom(fields)
@@ -350,28 +354,20 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 
 // openRequestFrom normalises the payload the bridge hands over. The
 // bridge decodes the request through the generated definition into a
-// [valvedef.OpenRequest], with matter.js's field checks (OpenDuration "min
+// [OpenRequest], with matter.js's field checks (OpenDuration "min
 // 1", TargetLevel "1 to 100"); an in-process caller may hand over the
-// tag-keyed map, a host that decodes the command itself [OpenRequest]
-// directly, and a parameterless Open arrives as nil.
+// tag-keyed map, and a parameterless Open arrives as nil.
 func openRequestFrom(fields any) (OpenRequest, error) {
 	switch v := fields.(type) {
 	case nil:
 		return OpenRequest{}, nil
-	case valvedef.OpenRequest:
-		return openRequestFromGenerated(v)
-	case *valvedef.OpenRequest:
-		if v == nil {
-			return OpenRequest{}, nil
-		}
-		return openRequestFromGenerated(*v)
 	case OpenRequest:
-		return v, nil
+		return openRequestFromGenerated(v)
 	case *OpenRequest:
 		if v == nil {
 			return OpenRequest{}, nil
 		}
-		return *v, nil
+		return openRequestFromGenerated(*v)
 	case map[uint8]any:
 		return openRequestFromTagMap(v)
 	default:
@@ -381,21 +377,13 @@ func openRequestFrom(fields any) (OpenRequest, error) {
 	}
 }
 
-// openRequestFromGenerated carries the decoded request over to the host's
-// [OpenRequest], keeping an absent OpenDuration apart from a null one.
-func openRequestFromGenerated(r valvedef.OpenRequest) (OpenRequest, error) {
+// openRequestFromGenerated refuses a decoded request that carries
+// TargetLevel; an absent OpenDuration stays apart from a null one.
+func openRequestFromGenerated(r OpenRequest) (OpenRequest, error) {
 	if r.TargetLevel != nil {
 		return OpenRequest{}, errTargetLevel
 	}
-	if r.OpenDuration == nil {
-		return OpenRequest{}, nil
-	}
-	req := OpenRequest{HasOpenDuration: true}
-	if !r.OpenDuration.Null {
-		seconds := r.OpenDuration.Value
-		req.OpenDuration = &seconds
-	}
-	return req, nil
+	return r, nil
 }
 
 // errTargetLevel refuses an Open that carries TargetLevel: it is
@@ -420,8 +408,8 @@ func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 	if !present {
 		return req, nil
 	}
-	req.HasOpenDuration = true
 	if raw == nil {
+		req.OpenDuration = &spec.Nullable[uint32]{Null: true}
 		return req, nil
 	}
 	seconds, ok := asUint32(raw)
@@ -432,7 +420,7 @@ func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 		// constraint "min 1" (element :61).
 		return req, constraintError{"valve: Open OpenDuration violates constraint min 1"}
 	}
-	req.OpenDuration = &seconds
+	req.OpenDuration = &spec.Nullable[uint32]{Value: seconds}
 	return req, nil
 }
 
@@ -513,3 +501,20 @@ func (constraintError) MatterStatusCode() im.StatusCode { return im.StatusConstr
 
 // Compile-time assertion for the typed status carrier.
 var _ im.StatusCodeError = constraintError{}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// StateSource's: a change the host reports there moves the server's data
+// version, then cb runs — the bridge hears a pull server's change through
+// it. A StateSource that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.tracker().Bump()
+		if cb != nil {
+			cb()
+		}
+	})
+}

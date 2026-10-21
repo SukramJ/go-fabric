@@ -18,9 +18,12 @@ const (
 	AggregatorRevision uint16 = 2
 )
 
-// AggregatorType is the Aggregator device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/aggregator.ts.
-var AggregatorType = Type{
+// AggregatorType is the Aggregator device type, matter.js's packages/node/src/endpoints/aggregator.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#aggregator.
+var AggregatorType = typeAggregator
+
+// typeAggregator holds [AggregatorType]'s cluster requirements.
+var typeAggregator = Type{
 	ID: AggregatorID, Name: "Aggregator", Revision: AggregatorRevision,
 	Classification: "simple", Composition: schema.CompositionFullFamily,
 	Conditions: []string{"FabricSynchronization"},
@@ -54,18 +57,12 @@ func NewAggregator(opts Options, decls ...Declaration) (*Aggregator, error) {
 	return &Aggregator{d}, nil
 }
 
-// Actions returns the typed Actions server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// Actions is the device's typed Actions server, nil until a declaration mounts it.
 func (d *Aggregator) Actions() *actionsdef.Server {
 	return actionsdef.WrapOn(d.Server(0x0025), d.queue)
 }
 
-// CommissionerControl returns the typed CommissionerControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CommissionerControl is the device's typed CommissionerControl server, nil until a declaration mounts it.
 func (d *Aggregator) CommissionerControl() *commissionercontroldef.Server {
 	return commissionercontroldef.WrapOn(d.Server(0x0751), d.queue)
 }

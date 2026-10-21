@@ -17,9 +17,12 @@ const (
 	ClosurePanelRevision uint16 = 1
 )
 
-// ClosurePanelType is the ClosurePanel device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/closure-panel.ts.
-var ClosurePanelType = Type{
+// ClosurePanelType is the ClosurePanel device type, matter.js's packages/node/src/devices/closure-panel.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#closurepanel.
+var ClosurePanelType = typeClosurePanel
+
+// typeClosurePanel holds [ClosurePanelType]'s cluster requirements.
+var typeClosurePanel = Type{
 	ID: ClosurePanelID, Name: "ClosurePanel", Revision: ClosurePanelRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -51,10 +54,7 @@ func NewClosurePanel(opts Options, decls ...Declaration) (*ClosurePanel, error) 
 	return &ClosurePanel{d}, nil
 }
 
-// ClosureDimension returns the typed ClosureDimension server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ClosureDimension is the device's typed ClosureDimension server; the type mandates it.
 func (d *ClosurePanel) ClosureDimension() *closuredimensiondef.Server {
 	return closuredimensiondef.WrapOn(d.Server(0x0105), d.queue)
 }

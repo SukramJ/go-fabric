@@ -52,6 +52,20 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentSensitivityLevel:    new(uint8),
+		SupportedSensitivityLevels: new(uint8),
+		DefaultSensitivityLevel:    new(uint8),
+		AlarmsActive:               new(AlarmModeBitmap),
+		AlarmsSuppressed:           new(AlarmModeBitmap),
+		AlarmsEnabled:              new(AlarmModeBitmap),
+		AlarmsSupported:            new(AlarmModeBitmap),
+		SensorFault:                new(SensorFaultBitmap),
+	}
+	values := full.AttributeValues()
+	if len(values) != 8 {
+		t.Errorf("a patch of every field sets %d values, want 8", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -76,6 +90,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Delegate = d.Delegate
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -83,5 +98,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleEnableDisableAlarm = func(context.Context, EnableDisableAlarmRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSuppressAlarm}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventAlarmsStateChanged}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

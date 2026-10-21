@@ -183,15 +183,15 @@ func TestParityMatterJS_SmokeCoAlarmEventPriorities(t *testing.T) {
 	srv := newFull(t, d)
 	rec := &recorder{}
 	srv.SetMatterEventEmitter(rec)
-	d.set(func(s *alarm.State) {
-		*s = alarm.State{
-			SmokeState: alarm.AlarmWarning, COState: alarm.AlarmWarning, BatteryAlert: alarm.AlarmWarning,
+	d.set(func(s *sdef.State) {
+		*s = sdef.State{
+			SmokeState: alarm.AlarmWarning, CoState: alarm.AlarmWarning, BatteryAlert: alarm.AlarmWarning,
 			DeviceMuted: alarm.Muted, HardwareFaultAlert: true, EndOfServiceAlert: alarm.EndOfServiceExpired,
-			InterconnectSmokeAlarm: alarm.AlarmWarning, InterconnectCOAlarm: alarm.AlarmWarning, TestInProgress: true,
+			InterconnectSmokeAlarm: alarm.AlarmWarning, InterconnectCoAlarm: alarm.AlarmWarning, TestInProgress: true,
 		}
 	})
 	srv.Refresh()
-	d.set(func(s *alarm.State) { *s = alarm.State{} })
+	d.set(func(s *sdef.State) { *s = sdef.State{} })
 	srv.Refresh()
 	seen := map[uint32]bool{}
 	for _, e := range rec.take() {

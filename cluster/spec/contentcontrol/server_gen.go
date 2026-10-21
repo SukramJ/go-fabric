@@ -47,6 +47,47 @@ type Patch struct {
 	BlockContentTimeWindow          *[]TimeWindowStruct   `matter:"0x000A"` // attribute 0x000A
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Enabled != nil {
+		v[AttrEnabled] = *p.Enabled
+	}
+	if p.OnDemandRatings != nil {
+		v[AttrOnDemandRatings] = spec.List[RatingNameStruct](*p.OnDemandRatings)
+	}
+	if p.OnDemandRatingThreshold != nil {
+		v[AttrOnDemandRatingThreshold] = *p.OnDemandRatingThreshold
+	}
+	if p.ScheduledContentRatings != nil {
+		v[AttrScheduledContentRatings] = spec.List[RatingNameStruct](*p.ScheduledContentRatings)
+	}
+	if p.ScheduledContentRatingThreshold != nil {
+		v[AttrScheduledContentRatingThreshold] = *p.ScheduledContentRatingThreshold
+	}
+	if p.ScreenDailyTime != nil {
+		v[AttrScreenDailyTime] = *p.ScreenDailyTime
+	}
+	if p.RemainingScreenTime != nil {
+		v[AttrRemainingScreenTime] = *p.RemainingScreenTime
+	}
+	if p.BlockUnrated != nil {
+		v[AttrBlockUnrated] = *p.BlockUnrated
+	}
+	if p.BlockChannelList != nil {
+		v[AttrBlockChannelList] = spec.List[BlockChannelStruct](*p.BlockChannelList)
+	}
+	if p.BlockApplicationList != nil {
+		v[AttrBlockApplicationList] = spec.List[AppInfoStruct](*p.BlockApplicationList)
+	}
+	if p.BlockContentTimeWindow != nil {
+		v[AttrBlockContentTimeWindow] = spec.List[TimeWindowStruct](*p.BlockContentTimeWindow)
+	}
+	return v
+}
+
 // Server is the typed ContentControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -224,6 +265,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -293,6 +341,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleUpdatePin != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdUpdatePin)
 		decl.Attach = d.attach

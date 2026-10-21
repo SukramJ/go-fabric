@@ -13,12 +13,14 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	demmdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
 	dwmdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
 	evsemdef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	ovenmdef "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
 	rtccdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
 	rvccdef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
@@ -65,7 +67,7 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("fancontrol: %w", errNoPort))
 	}
 	cfg := fan.Config{
-		Port: d.StateSource, Stepper: d.Stepper,
+		Source: d.StateSource, Stepper: d.Stepper,
 		Features: fan.Feature(b.opts.Features), DeviceType: b.deviceType, DataVersion: b.cfg.DataVersion,
 	}
 	if v, ok := consume8(b.initial, fandef.AttrFanModeSequence); ok {
@@ -86,13 +88,25 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // newLevelControlPortServer is the module's LevelControl server on the
 // declared LevelSource ([levelcontrol.NewServer] with Config.Source), with
 // the Lighting feature of the selection and the declaration's Transitions.
+// A transition couples to the endpoint's OnOff and ColorControl as the
+// held server does: a "with On/Off" command switches the OnOff server,
+// and the colour temperature follows the level (CoupleColorTempToLevel).
 func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.ClusterServer, error) {
 	cfg := levelcontrol.Config{
 		Source: d.LevelSource, DataVersion: b.cfg.DataVersion,
-		Lighting: b.opts.Features&uint32(lvldef.FeatureLighting) != 0,
+		Features: b.opts.Features, HasFeatures: true,
 	}
 	if d.Transitions {
-		cfg.Transitions = &levelcontrol.Transitions{Clock: b.clock}
+		t := &levelcontrol.Transitions{Clock: b.clock}
+		// Coupled to OnOff under OO only (matter.js LevelControlServer.ts
+		// :141, :558 `this.features.onOff && …`), as the held server is.
+		if srv := b.sibling(onoffdef.ClusterID); srv != nil && b.opts.Features&levelcontrol.FeatureOnOff != 0 {
+			t.OnOff = onOffOf(srv)
+		}
+		if ct, ok := b.sibling(ccdef.ClusterID).(levelcontrol.ColorTemperatureCoupling); ok {
+			t.ColorTemperature = ct
+		}
+		cfg.Transitions = t
 	}
 	return levelcontrol.NewServer(cfg), nil
 }

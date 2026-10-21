@@ -29,6 +29,20 @@ type Patch struct {
 	IdentifyType *IdentifyTypeEnum `matter:"0x0001"` // attribute 0x0001
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.IdentifyTime != nil {
+		v[AttrIdentifyTime] = *p.IdentifyTime
+	}
+	if p.IdentifyType != nil {
+		v[AttrIdentifyType] = *p.IdentifyType
+	}
+	return v
+}
+
 // Server is the typed Identify server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -108,6 +122,10 @@ type Declare struct {
 	// Initial is the state the server starts with, over the device
 	// type's defaults; an optional attribute it sets is served.
 	Initial Patch
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -134,6 +152,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleIdentify != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdIdentify)
 		decl.Attach = d.attach

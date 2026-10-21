@@ -18,9 +18,12 @@ const (
 	TemperatureSensorRevision uint16 = 3
 )
 
-// TemperatureSensorType is the TemperatureSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/temperature-sensor.ts.
-var TemperatureSensorType = Type{
+// TemperatureSensorType is the TemperatureSensor device type, matter.js's packages/node/src/devices/temperature-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#temperaturesensor.
+var TemperatureSensorType = typeTemperatureSensor
+
+// typeTemperatureSensor holds [TemperatureSensorType]'s cluster requirements.
+var typeTemperatureSensor = Type{
 	ID: TemperatureSensorID, Name: "TemperatureSensor", Revision: TemperatureSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -58,18 +61,12 @@ func NewTemperatureSensor(opts Options, decls ...Declaration) (*TemperatureSenso
 	return &TemperatureSensor{d}, nil
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server; the type mandates it.
 func (d *TemperatureSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
-// ThermostatUserInterfaceConfiguration returns the typed ThermostatUserInterfaceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ThermostatUserInterfaceConfiguration is the device's typed ThermostatUserInterfaceConfiguration server, nil until a declaration mounts it.
 func (d *TemperatureSensor) ThermostatUserInterfaceConfiguration() *thermostatuserinterfaceconfigurationdef.Server {
 	return thermostatuserinterfaceconfigurationdef.WrapOn(d.Server(0x0204), d.queue)
 }

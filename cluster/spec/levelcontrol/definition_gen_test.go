@@ -57,6 +57,27 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentLevel:        new(uint8),
+		RemainingTime:       new(uint16),
+		MinLevel:            new(uint8),
+		MaxLevel:            new(uint8),
+		CurrentFrequency:    new(uint16),
+		MinFrequency:        new(uint16),
+		MaxFrequency:        new(uint16),
+		Options:             new(OptionsBitmap),
+		OnOffTransitionTime: new(uint16),
+		OnLevel:             new(uint8),
+		OnTransitionTime:    new(uint16),
+		OffTransitionTime:   new(uint16),
+		DefaultMoveRate:     new(uint8),
+		StartUpCurrentLevel: new(uint8),
+		Null:                []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 15 {
+		t.Errorf("a patch of every field sets %d values, want 15", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -115,5 +136,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleMoveToClosestFrequency = func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 9 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdMoveToLevel}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

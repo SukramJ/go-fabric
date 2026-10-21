@@ -16,9 +16,12 @@ const (
 	DoorLockControllerRevision uint16 = 4
 )
 
-// DoorLockControllerType is the DoorLockController device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/door-lock-controller.ts.
-var DoorLockControllerType = Type{
+// DoorLockControllerType is the DoorLockController device type, matter.js's packages/node/src/devices/door-lock-controller.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#doorlockcontroller.
+var DoorLockControllerType = typeDoorLockController
+
+// typeDoorLockController holds [DoorLockControllerType]'s cluster requirements.
+var typeDoorLockController = Type{
 	ID: DoorLockControllerID, Name: "DoorLockController", Revision: DoorLockControllerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -57,10 +60,7 @@ func NewDoorLockController(opts Options, decls ...Declaration) (*DoorLockControl
 	return &DoorLockController{d}, nil
 }
 
-// Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Binding is the device's typed Binding server; the type mandates it.
 func (d *DoorLockController) Binding() *bindingdef.Server {
 	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

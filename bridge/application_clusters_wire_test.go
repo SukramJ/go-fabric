@@ -15,8 +15,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
+
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
 
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
 	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
@@ -160,11 +163,11 @@ func (h *secureHarness) readEvents(endpointID uint16, cluster uint32) []struct {
 // smokeDevice is a host smoke/CO alarm.
 type smokeDevice struct {
 	mu        sync.Mutex
-	st        matteralarm.State
+	st        smokedef.State
 	selfTests int
 }
 
-func (d *smokeDevice) SmokeCOState() matteralarm.State {
+func (d *smokeDevice) SmokeCOState() smokedef.State {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.st
@@ -187,7 +190,7 @@ func (d *smokeDevice) SetSmokeSensitivityLevel(_ context.Context, level matteral
 
 func TestSmokeCoAlarmOverTheWire(t *testing.T) {
 	t.Parallel()
-	dev := &smokeDevice{st: matteralarm.State{SmokeSensitivityLevel: matteralarm.SensitivityStandard}}
+	dev := &smokeDevice{st: smokedef.State{SmokeSensitivityLevel: matteralarm.SensitivityStandard}}
 	srv, err := matteralarm.NewServer(matteralarm.Config{
 		Source:   dev,
 		Features: matteralarm.FeatureSmokeAlarm | matteralarm.FeatureCOAlarm,
@@ -288,36 +291,36 @@ func TestApplicationValueWriterEncodesEventPayloads(t *testing.T) {
 // fanDevice is a host fan with a 0..4 speed range.
 type fanDevice struct {
 	mu      sync.Mutex
-	st      matterfan.State
-	applied []matterfan.Settings
+	st      fandef.State
+	applied []fandef.Patch
 }
 
-func (d *fanDevice) FanState() matterfan.State {
+func (d *fanDevice) FanState() fandef.State {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.st
 }
 
-func (d *fanDevice) ApplyFanSettings(_ context.Context, s matterfan.Settings) error {
+func (d *fanDevice) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.applied = append(d.applied, s)
-	if s.FanMode != nil {
-		d.st.FanMode = *s.FanMode
+	d.applied = append(d.applied, p)
+	if p.FanMode != nil {
+		d.st.FanMode = *p.FanMode
 	}
-	if p := s.PercentSetting; p != nil {
+	switch {
+	case slices.Contains(p.Null, fandef.AttrPercentSetting):
 		d.st.PercentSetting = nil
-		if !p.Null {
-			v := p.Value
-			d.st.PercentSetting = &v
-		}
+	case p.PercentSetting != nil:
+		v := *p.PercentSetting
+		d.st.PercentSetting = &v
 	}
-	if v := s.SpeedSetting; v != nil {
+	switch {
+	case slices.Contains(p.Null, fandef.AttrSpeedSetting):
 		d.st.SpeedSetting = nil
-		if !v.Null {
-			n := v.Value
-			d.st.SpeedSetting = &n
-		}
+	case p.SpeedSetting != nil:
+		v := *p.SpeedSetting
+		d.st.SpeedSetting = &v
 	}
 	return nil
 }

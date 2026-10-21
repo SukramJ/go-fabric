@@ -19,7 +19,7 @@ import (
 func noSiblings(uint32) contract.ClusterServer { return nil }
 
 // TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe: every factory
-// answers a selection its server does not serve with errSelectionNotServed,
+// answers a selection its server does not serve with ErrSelectionNotServed,
 // so the cluster keeps the generated server.
 func TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe(t *testing.T) {
 	t.Parallel()
@@ -37,8 +37,8 @@ func TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe(t *testing.T) {
 	}
 	for _, tc := range cases {
 		_, err := selfHeldDefaults[tc.cluster](defaultBuild{opts: tc.opts, sibling: noSiblings})
-		if !errors.Is(err, errSelectionNotServed) {
-			t.Errorf("%s: %v, want errSelectionNotServed", tc.name, err)
+		if !errors.Is(err, ErrSelectionNotServed) {
+			t.Errorf("%s: %v, want ErrSelectionNotServed", tc.name, err)
 		}
 	}
 }
@@ -123,7 +123,7 @@ func TestCheckSelection(t *testing.T) {
 		"command":   {Features: 1, Commands: []uint32{9}},
 		"event":     {Features: 1, Events: []uint32{9}},
 	} {
-		if err := checkSelection("X", srv, opts); !errors.Is(err, errSelectionNotServed) {
+		if err := checkSelection("X", srv, opts); !errors.Is(err, ErrSelectionNotServed) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

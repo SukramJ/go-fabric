@@ -55,6 +55,59 @@ type Patch struct {
 	Null                []uint32       // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentLevel != nil {
+		v[AttrCurrentLevel] = *p.CurrentLevel
+	}
+	if p.RemainingTime != nil {
+		v[AttrRemainingTime] = *p.RemainingTime
+	}
+	if p.MinLevel != nil {
+		v[AttrMinLevel] = *p.MinLevel
+	}
+	if p.MaxLevel != nil {
+		v[AttrMaxLevel] = *p.MaxLevel
+	}
+	if p.CurrentFrequency != nil {
+		v[AttrCurrentFrequency] = *p.CurrentFrequency
+	}
+	if p.MinFrequency != nil {
+		v[AttrMinFrequency] = *p.MinFrequency
+	}
+	if p.MaxFrequency != nil {
+		v[AttrMaxFrequency] = *p.MaxFrequency
+	}
+	if p.Options != nil {
+		v[AttrOptions] = *p.Options
+	}
+	if p.OnOffTransitionTime != nil {
+		v[AttrOnOffTransitionTime] = *p.OnOffTransitionTime
+	}
+	if p.OnLevel != nil {
+		v[AttrOnLevel] = *p.OnLevel
+	}
+	if p.OnTransitionTime != nil {
+		v[AttrOnTransitionTime] = *p.OnTransitionTime
+	}
+	if p.OffTransitionTime != nil {
+		v[AttrOffTransitionTime] = *p.OffTransitionTime
+	}
+	if p.DefaultMoveRate != nil {
+		v[AttrDefaultMoveRate] = *p.DefaultMoveRate
+	}
+	if p.StartUpCurrentLevel != nil {
+		v[AttrStartUpCurrentLevel] = *p.StartUpCurrentLevel
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed LevelControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -198,6 +251,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -251,6 +308,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Transitions = d.Transitions
 	if d.HandleMoveToLevel != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToLevel)

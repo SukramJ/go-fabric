@@ -51,6 +51,23 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		EnergyBalances:                 new([]BalanceStruct),
+		CurrentEnergyBalance:           new(uint8),
+		EnergyPriorities:               new([]EnergyPriorityEnum),
+		LowPowerModeSensitivities:      new([]BalanceStruct),
+		CurrentLowPowerModeSensitivity: new(uint8),
+	}
+	values := full.AttributeValues()
+	if len(values) != 5 {
+		t.Errorf("a patch of every field sets %d values, want 5", len(values))
+	}
+	if _, ok := values[AttrEnergyBalances].(spec.List[BalanceStruct]); !ok {
+		t.Errorf("EnergyBalances is stored as %T, want its spec.List", values[AttrEnergyBalances])
+	}
+	if _, ok := values[AttrLowPowerModeSensitivities].(spec.List[BalanceStruct]); !ok {
+		t.Errorf("LowPowerModeSensitivities is stored as %T, want its spec.List", values[AttrLowPowerModeSensitivities])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)

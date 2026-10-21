@@ -29,6 +29,20 @@ type Patch struct {
 	SupportedStreamingProtocols *SupportedProtocolsBitmap `matter:"0x0001"` // attribute 0x0001
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.AcceptHeader != nil {
+		v[AttrAcceptHeader] = *p.AcceptHeader
+	}
+	if p.SupportedStreamingProtocols != nil {
+		v[AttrSupportedStreamingProtocols] = *p.SupportedStreamingProtocols
+	}
+	return v
+}
+
 // Server is the typed ContentLauncher server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -99,6 +113,15 @@ func (s *Server) HandleLaunchUrl(fn func(ctx context.Context, req LaunchUrlReque
 	return spec.HandleOn(s.Underlying(), CmdLaunchUrl, fn)
 }
 
+// ContentLauncher carries out LaunchContent (ContentSearch, CS) and
+// LaunchURL (UrlPlayback, UP), each answered by LauncherResponse; a
+// command whose feature the selection leaves out is not accepted
+// (cluster/media).
+type ContentLauncher interface {
+	LaunchContent(ctx context.Context, st *State, req LaunchContentRequest) (LauncherResponse, error)
+	LaunchURL(ctx context.Context, st *State, req LaunchUrlRequest) (LauncherResponse, error)
+}
+
 // Declare is the declaration of the ContentLauncher cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -110,6 +133,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -119,6 +146,8 @@ type Declare struct {
 	// HandleLaunchUrl handles the LaunchUrl command in place of the server
 	// (Server.HandleLaunchUrl), inline; an optional command it handles is accepted.
 	HandleLaunchUrl func(ctx context.Context, req LaunchUrlRequest) (LauncherResponse, error)
+	// ContentLauncher is the host port the kit's server runs on ([ContentLauncher]).
+	ContentLauncher ContentLauncher
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -137,6 +166,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleLaunchContent != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdLaunchContent)
 		decl.Attach = d.attach

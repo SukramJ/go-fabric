@@ -200,11 +200,13 @@ func TestEvseChargingSchedule(t *testing.T) {
 func TestDemTriggers(t *testing.T) {
 	t.Parallel()
 	e := newDemoEvse("test charger")
-	e.build()
-	d := e.dem.srv
-	defer d.Close()
+	if _, err := e.device(bridged("evse", e.name)); err != nil {
+		t.Fatal(err)
+	}
+	d := e.dem.server()
+	defer d.Underlying().(*energy.DeviceEnergyManagementServer).Close()
 	invoke := func(cmd uint32, fields any) error {
-		_, err := d.MatterInvoke(context.Background(), cmd, fields)
+		_, err := d.Underlying().MatterInvoke(context.Background(), cmd, fields)
 		return err
 	}
 	fire(t, e, triggerDemPowerAdjustment)
@@ -212,18 +214,18 @@ func TestDemTriggers(t *testing.T) {
 		t.Errorf("PowerAdjustRequest: %v", err)
 	}
 	fire(t, e, triggerDemUserOptOutLocalOptimization)
-	if d.EsaState() != energy.EsaStateOnline {
-		t.Errorf("ESAState %d after the local opt-out", d.EsaState())
+	if st := d.Get().EsaState; st != energy.EsaStateOnline {
+		t.Errorf("ESAState %d after the local opt-out", st)
 	}
 	fire(t, e, triggerDemUserOptOutGridOptimization)
-	if d.OptOutState() != energy.OptOutAll {
-		t.Errorf("OptOutState %d", d.OptOutState())
+	if st := d.Get().OptOutState; st != energy.OptOutAll {
+		t.Errorf("OptOutState %d", st)
 	}
 	fire(t, e, triggerDemUserOptOutClearAll)
 	fire(t, e, triggerDemPowerAdjustmentClear)
 
 	fire(t, e, triggerDemPausable)
-	if f := d.Forecast(); f == nil || len(f.Slots) != 2 || *f.Slots[1].MinPauseDuration != 2 {
+	if f := d.Get().Forecast; f == nil || len(f.Slots) != 2 || *f.Slots[1].MinPauseDuration != 2 {
 		t.Fatalf("pausable forecast %+v", f)
 	}
 	if err := invoke(demdef.CmdPauseRequest, demdef.PauseRequestRequest{Duration: 20, Cause: demdef.AdjustmentCauseLocalOptimization}); err != nil {
@@ -233,13 +235,13 @@ func TestDemTriggers(t *testing.T) {
 		t.Errorf("ResumeRequest: %v", err)
 	}
 	fire(t, e, triggerDemPausableNextSlot)
-	if f := d.Forecast(); f.ActiveSlotNumber.Value != 1 {
+	if f := d.Get().Forecast; f.ActiveSlotNumber.Value != 1 {
 		t.Errorf("ActiveSlotNumber %v", f.ActiveSlotNumber)
 	}
 	fire(t, e, triggerDemPausableClear)
 
 	fire(t, e, triggerDemForecastAdjustment)
-	f := d.Forecast()
+	f := d.Get().Forecast
 	power := int64(1000)
 	if err := invoke(demdef.CmdModifyForecastRequest, demdef.ModifyForecastRequestRequest{
 		ForecastId: f.ForecastId, SlotAdjustments: []energy.SlotAdjustment{{SlotIndex: 0, NominalPower: &power, Duration: 180}},
@@ -251,7 +253,7 @@ func TestDemTriggers(t *testing.T) {
 	fire(t, e, triggerDemForecastAdjustmentClear)
 
 	fire(t, e, triggerDemStartTimeAdjustment)
-	f = d.Forecast()
+	f = d.Get().Forecast
 	if f.EarliestStartTime == nil || f.EarliestStartTime.Value != f.StartTime-60 || *f.LatestEndTime != f.EndTime+60 {
 		t.Errorf("start-time forecast %+v", f)
 	}
@@ -264,30 +266,30 @@ func TestDemTriggers(t *testing.T) {
 	fire(t, e, triggerDemStartTimeAdjustmentClear)
 
 	fire(t, e, triggerDemConstraintBasedAdjustment)
-	if f := d.Forecast(); len(f.Slots) != 4 {
+	if f := d.Get().Forecast; len(f.Slots) != 4 {
 		t.Errorf("constraint forecast has %d slots", len(f.Slots))
 	}
 	fire(t, e, triggerDemConstraintBasedAdjustmentClear)
 	fire(t, e, triggerDemForecast)
 	fire(t, e, triggerDemForecastClear)
-	if f := d.Forecast(); f == nil || len(f.Slots) != 0 || !f.ActiveSlotNumber.Null {
+	if f := d.Get().Forecast; f == nil || len(f.Slots) != 0 || !f.ActiveSlotNumber.Null {
 		t.Errorf("cleared forecast %+v", f)
 	}
 	fire(t, e, triggerDemPowerRangeAdjustment)
-	if d.AbsMinPower() != 1000000 {
-		t.Errorf("AbsMinPower %d", d.AbsMinPower())
+	if p := d.Get().AbsMinPower; p != 1000000 {
+		t.Errorf("AbsMinPower %d", p)
 	}
 	fire(t, e, triggerDemPowerRangeAdjustmentClear)
-	if d.AbsMinPower() != 1200000 {
-		t.Errorf("AbsMinPower %d after clear", d.AbsMinPower())
+	if p := d.Get().AbsMinPower; p != 1200000 {
+		t.Errorf("AbsMinPower %d after clear", p)
 	}
 	if e.testEventTrigger(0x0098_0000_0000_00FF) {
 		t.Error("an unknown DEM trigger was handled")
 	}
-	if status, _, err := e.dem.ChangeToMode(context.Background(), demModeAllOptimization); err != nil || status != modebase.StatusSuccess {
+	if status, _, err := e.dem.ChangeToMode(context.Background(), demModeAllOptimization); err != nil || status != uint8(modebase.StatusSuccess) {
 		t.Errorf("DEM ChangeToMode %v %v", status, err)
 	}
-	if status, _, err := e.ChangeToMode(context.Background(), evseModeSolarCharging); err != nil || status != modebase.StatusSuccess {
+	if status, _, err := e.ChangeToMode(context.Background(), evseModeSolarCharging); err != nil || status != uint8(modebase.StatusSuccess) {
 		t.Errorf("EVSE ChangeToMode %v %v", status, err)
 	}
 }

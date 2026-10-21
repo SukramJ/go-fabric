@@ -49,6 +49,50 @@ type Patch struct {
 	Null                 []uint32                // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentState != nil {
+		v[AttrCurrentState] = *p.CurrentState
+	}
+	if p.StartTime != nil {
+		v[AttrStartTime] = *p.StartTime
+	}
+	if p.Duration != nil {
+		v[AttrDuration] = *p.Duration
+	}
+	if p.SampledPosition != nil {
+		v[AttrSampledPosition] = *p.SampledPosition
+	}
+	if p.PlaybackSpeed != nil {
+		v[AttrPlaybackSpeed] = *p.PlaybackSpeed
+	}
+	if p.SeekRangeEnd != nil {
+		v[AttrSeekRangeEnd] = *p.SeekRangeEnd
+	}
+	if p.SeekRangeStart != nil {
+		v[AttrSeekRangeStart] = *p.SeekRangeStart
+	}
+	if p.ActiveAudioTrack != nil {
+		v[AttrActiveAudioTrack] = *p.ActiveAudioTrack
+	}
+	if p.AvailableAudioTracks != nil {
+		v[AttrAvailableAudioTracks] = spec.List[TrackStruct](*p.AvailableAudioTracks)
+	}
+	if p.ActiveTextTrack != nil {
+		v[AttrActiveTextTrack] = *p.ActiveTextTrack
+	}
+	if p.AvailableTextTracks != nil {
+		v[AttrAvailableTextTracks] = spec.List[TrackStruct](*p.AvailableTextTracks)
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed MediaPlayback server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -197,6 +241,66 @@ func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error
 	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
 }
 
+// PlaybackStartOver is a Playback that takes StartOver.
+type PlaybackStartOver interface {
+	StartOver(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackPrevious is a Playback that takes Previous.
+type PlaybackPrevious interface {
+	Previous(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackNext is a Playback that takes Next.
+type PlaybackNext interface {
+	Next(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackVariableSpeed is a Playback that takes Rewind and
+// FastForward; VariableSpeed (VS) requires it.
+type PlaybackVariableSpeed interface {
+	Rewind(ctx context.Context, st *State, req RewindRequest) (PlaybackResponse, error)
+	FastForward(ctx context.Context, st *State, req FastForwardRequest) (PlaybackResponse, error)
+}
+
+// PlaybackSkip is a Playback that takes SkipForward and SkipBackward.
+type PlaybackSkip interface {
+	SkipForward(ctx context.Context, st *State, req SkipForwardRequest) (PlaybackResponse, error)
+	SkipBackward(ctx context.Context, st *State, req SkipBackwardRequest) (PlaybackResponse, error)
+}
+
+// PlaybackSeek is a Playback that takes Seek; AdvancedSeek (AS)
+// requires it.
+type PlaybackSeek interface {
+	Seek(ctx context.Context, st *State, req SeekRequest) (PlaybackResponse, error)
+}
+
+// PlaybackAudioTracks is a Playback that takes ActivateAudioTrack
+// (status only); AudioTracks (AT) requires it.
+type PlaybackAudioTracks interface {
+	ActivateAudioTrack(ctx context.Context, st *State, req ActivateAudioTrackRequest) error
+}
+
+// PlaybackTextTracks is a Playback that takes ActivateTextTrack and
+// DeactivateTextTrack (status only); TextTracks (TT) requires it.
+type PlaybackTextTracks interface {
+	ActivateTextTrack(ctx context.Context, st *State, req ActivateTextTrackRequest) error
+	DeactivateTextTrack(ctx context.Context, st *State) error
+}
+
+// Playback is the transport behind the kit's MediaPlayback server: the
+// three mandatory commands, each answering a PlaybackResponse; st is
+// the state the attributes report, changed to what the command did.
+// A port that also implements PlaybackStartOver, PlaybackPrevious,
+// PlaybackNext, PlaybackVariableSpeed, PlaybackSkip, PlaybackSeek,
+// PlaybackAudioTracks or PlaybackTextTracks takes those commands
+// (cluster/media).
+type Playback interface {
+	Play(ctx context.Context, st *State) (PlaybackResponse, error)
+	Pause(ctx context.Context, st *State) (PlaybackResponse, error)
+	Stop(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
 // Declare is the declaration of the MediaPlayback cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -208,6 +312,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -253,6 +364,8 @@ type Declare struct {
 	// HandleDeactivateTextTrack handles the DeactivateTextTrack command in place of the server
 	// (Server.HandleDeactivateTextTrack), inline; an optional command it handles is accepted.
 	HandleDeactivateTextTrack func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)
+	// Playback is the host port the kit's server runs on ([Playback]).
+	Playback Playback
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -271,6 +384,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandlePlay != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdPlay)
 		decl.Attach = d.attach

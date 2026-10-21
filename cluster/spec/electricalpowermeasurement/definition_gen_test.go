@@ -55,6 +55,44 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		PowerMode:                new(PowerModeEnum),
+		NumberOfMeasurementTypes: new(uint8),
+		Accuracy:                 new([]MeasurementAccuracyStruct),
+		Ranges:                   new([]MeasurementRangeStruct),
+		Voltage:                  new(int64),
+		ActiveCurrent:            new(int64),
+		ReactiveCurrent:          new(int64),
+		ApparentCurrent:          new(int64),
+		ActivePower:              new(int64),
+		ReactivePower:            new(int64),
+		ApparentPower:            new(int64),
+		RmsVoltage:               new(int64),
+		RmsCurrent:               new(int64),
+		RmsPower:                 new(int64),
+		Frequency:                new(int64),
+		HarmonicCurrents:         new([]HarmonicMeasurementStruct),
+		HarmonicPhases:           new([]HarmonicMeasurementStruct),
+		PowerFactor:              new(int64),
+		NeutralCurrent:           new(int64),
+		Null:                     []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 20 {
+		t.Errorf("a patch of every field sets %d values, want 20", len(values))
+	}
+	if _, ok := values[AttrAccuracy].(spec.List[MeasurementAccuracyStruct]); !ok {
+		t.Errorf("Accuracy is stored as %T, want its spec.List", values[AttrAccuracy])
+	}
+	if _, ok := values[AttrRanges].(spec.List[MeasurementRangeStruct]); !ok {
+		t.Errorf("Ranges is stored as %T, want its spec.List", values[AttrRanges])
+	}
+	if _, ok := values[AttrHarmonicCurrents].(spec.List[HarmonicMeasurementStruct]); !ok {
+		t.Errorf("HarmonicCurrents is stored as %T, want its spec.List", values[AttrHarmonicCurrents])
+	}
+	if _, ok := values[AttrHarmonicPhases].(spec.List[HarmonicMeasurementStruct]); !ok {
+		t.Errorf("HarmonicPhases is stored as %T, want its spec.List", values[AttrHarmonicPhases])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -71,5 +109,8 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	if decl := (Declare{Events: []uint32{EventMeasurementPeriodRanges}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

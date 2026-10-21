@@ -58,6 +58,26 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		Breadcrumb:                   new(uint64),
+		BasicCommissioningInfo:       new(BasicCommissioningInfo),
+		RegulatoryConfig:             new(RegulatoryLocationTypeEnum),
+		LocationCapability:           new(RegulatoryLocationTypeEnum),
+		SupportsConcurrentConnection: new(bool),
+		TcAcceptedVersion:            new(uint16),
+		TcMinRequiredVersion:         new(uint16),
+		TcAcknowledgements:           new(uint16),
+		TcAcknowledgementsRequired:   new(bool),
+		TcUpdateDeadline:             new(uint32),
+		RecoveryIdentifier:           new([]byte),
+		NetworkRecoveryReason:        new(NetworkRecoveryReasonEnum),
+		IsCommissioningWithoutPower:  new(bool),
+		Null:                         []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 14 {
+		t.Errorf("a patch of every field sets %d values, want 14", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -111,5 +131,8 @@ func TestTypedServer(t *testing.T) {
 	}
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 4 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdArmFailSafe}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

@@ -35,6 +35,29 @@ type Patch struct {
 	Null           []uint32            // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.SupportedModes != nil {
+		v[AttrSupportedModes] = spec.List[ModeOptionStruct](*p.SupportedModes)
+	}
+	if p.CurrentMode != nil {
+		v[AttrCurrentMode] = *p.CurrentMode
+	}
+	if p.StartUpMode != nil {
+		v[AttrStartUpMode] = *p.StartUpMode
+	}
+	if p.OnMode != nil {
+		v[AttrOnMode] = *p.OnMode
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed WaterHeaterMode server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -119,6 +142,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -145,6 +172,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleChangeToMode != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdChangeToMode)
 		decl.Attach = d.attach

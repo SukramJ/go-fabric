@@ -17,9 +17,12 @@ const (
 	HumiditySensorRevision uint16 = 3
 )
 
-// HumiditySensorType is the HumiditySensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/humidity-sensor.ts.
-var HumiditySensorType = Type{
+// HumiditySensorType is the HumiditySensor device type, matter.js's packages/node/src/devices/humidity-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#humiditysensor.
+var HumiditySensorType = typeHumiditySensor
+
+// typeHumiditySensor holds [HumiditySensorType]'s cluster requirements.
+var typeHumiditySensor = Type{
 	ID: HumiditySensorID, Name: "HumiditySensor", Revision: HumiditySensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewHumiditySensor(opts Options, decls ...Declaration) (*HumiditySensor, err
 	return &HumiditySensor{d}, nil
 }
 
-// RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// RelativeHumidityMeasurement is the device's typed RelativeHumidityMeasurement server; the type mandates it.
 func (d *HumiditySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
 	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }

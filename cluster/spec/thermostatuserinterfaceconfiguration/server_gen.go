@@ -31,6 +31,23 @@ type Patch struct {
 	ScheduleProgrammingVisibility *ScheduleProgrammingVisibilityEnum `matter:"0x0002"` // attribute 0x0002
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.TemperatureDisplayMode != nil {
+		v[AttrTemperatureDisplayMode] = *p.TemperatureDisplayMode
+	}
+	if p.KeypadLockout != nil {
+		v[AttrKeypadLockout] = *p.KeypadLockout
+	}
+	if p.ScheduleProgrammingVisibility != nil {
+		v[AttrScheduleProgrammingVisibility] = *p.ScheduleProgrammingVisibility
+	}
+	return v
+}
+
 // Server is the typed ThermostatUserInterfaceConfiguration server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -89,6 +106,14 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// SettingStore persists KeypadLockout under the device's StableKey;
+// the node's store (node.Node.Store) is one. Without one it stays in
+// memory (cluster/thermo SettingStore).
+type SettingStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
 // Declare is the declaration of the ThermostatUserInterfaceConfiguration cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -101,6 +126,8 @@ type Declare struct {
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// SettingStore is the host port the kit's server runs on ([SettingStore]).
+	SettingStore SettingStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

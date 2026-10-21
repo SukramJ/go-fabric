@@ -59,6 +59,14 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		AcceptHeader:                new([]string),
+		SupportedStreamingProtocols: new(SupportedProtocolsBitmap),
+	}
+	values := full.AttributeValues()
+	if len(values) != 2 {
+		t.Errorf("a patch of every field sets %d values, want 2", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -81,6 +89,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ ContentLauncher = d.ContentLauncher
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -88,5 +97,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleLaunchUrl = func(context.Context, LaunchUrlRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdLaunchContent}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

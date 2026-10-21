@@ -41,6 +41,38 @@ type Patch struct {
 	SensorFault                *SensorFaultBitmap `matter:"0x0007"` // attribute 0x0007
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.CurrentSensitivityLevel != nil {
+		v[AttrCurrentSensitivityLevel] = *p.CurrentSensitivityLevel
+	}
+	if p.SupportedSensitivityLevels != nil {
+		v[AttrSupportedSensitivityLevels] = *p.SupportedSensitivityLevels
+	}
+	if p.DefaultSensitivityLevel != nil {
+		v[AttrDefaultSensitivityLevel] = *p.DefaultSensitivityLevel
+	}
+	if p.AlarmsActive != nil {
+		v[AttrAlarmsActive] = *p.AlarmsActive
+	}
+	if p.AlarmsSuppressed != nil {
+		v[AttrAlarmsSuppressed] = *p.AlarmsSuppressed
+	}
+	if p.AlarmsEnabled != nil {
+		v[AttrAlarmsEnabled] = *p.AlarmsEnabled
+	}
+	if p.AlarmsSupported != nil {
+		v[AttrAlarmsSupported] = *p.AlarmsSupported
+	}
+	if p.SensorFault != nil {
+		v[AttrSensorFault] = *p.SensorFault
+	}
+	return v
+}
+
 // Server is the typed BooleanStateConfiguration server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -123,6 +155,17 @@ func (s *Server) EmitSensorFault(endpoint uint16, data SensorFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data)
 }
 
+// Delegate is told what a controller changed — CurrentSensitivityLevel
+// (quality N, the host persists it), and what EnableDisableAlarm and
+// SuppressAlarm did; an error answers FAILURE (cluster/boolcfg
+// Delegate).
+type Delegate interface {
+	CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error
+	AlarmsEnabledChanged(ctx context.Context, enabled AlarmModeBitmap) error
+	AlarmsActiveChanged(ctx context.Context, active AlarmModeBitmap) error
+	AlarmsSuppressedChanged(ctx context.Context, suppressed AlarmModeBitmap) error
+}
+
 // Declare is the declaration of the BooleanStateConfiguration cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -134,6 +177,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -143,6 +193,8 @@ type Declare struct {
 	// HandleEnableDisableAlarm handles the EnableDisableAlarm command in place of the server
 	// (Server.HandleEnableDisableAlarm), inline; an optional command it handles is accepted.
 	HandleEnableDisableAlarm func(ctx context.Context, req EnableDisableAlarmRequest) (struct{}, error)
+	// Delegate is the host port the kit's server runs on ([Delegate]).
+	Delegate Delegate
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -161,6 +213,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleSuppressAlarm != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSuppressAlarm)
 		decl.Attach = d.attach

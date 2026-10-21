@@ -60,6 +60,33 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		HumanActivityDetected:       new(bool),
+		ObjectIdentified:            new(bool),
+		AudioContextDetected:        new(bool),
+		AmbientContextType:          new([]AmbientContextTypeStruct),
+		AmbientContextTypeSupported: new([]Semtag),
+		ObjectCountThresholdReached: new(bool),
+		ObjectCountConfig:           new(ObjectCountConfigStruct),
+		ObjectCount:                 new(uint16),
+		SimultaneousDetectionLimit:  new(uint8),
+		HoldTime:                    new(uint16),
+		HoldTimeLimits:              new(HoldTimeLimitsStruct),
+		PredictedActivity:           new([]PredictedActivityStruct),
+	}
+	values := full.AttributeValues()
+	if len(values) != 12 {
+		t.Errorf("a patch of every field sets %d values, want 12", len(values))
+	}
+	if _, ok := values[AttrAmbientContextType].(spec.List[AmbientContextTypeStruct]); !ok {
+		t.Errorf("AmbientContextType is stored as %T, want its spec.List", values[AttrAmbientContextType])
+	}
+	if _, ok := values[AttrAmbientContextTypeSupported].(spec.List[Semtag]); !ok {
+		t.Errorf("AmbientContextTypeSupported is stored as %T, want its spec.List", values[AttrAmbientContextTypeSupported])
+	}
+	if _, ok := values[AttrPredictedActivity].(spec.List[PredictedActivityStruct]); !ok {
+		t.Errorf("PredictedActivity is stored as %T, want its spec.List", values[AttrPredictedActivity])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -77,5 +104,8 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	if decl := (Declare{Events: []uint32{EventAmbientContextDetectStarted}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

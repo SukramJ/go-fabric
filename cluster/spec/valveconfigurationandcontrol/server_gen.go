@@ -49,6 +49,50 @@ type Patch struct {
 	Null                []uint32          // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.OpenDuration != nil {
+		v[AttrOpenDuration] = *p.OpenDuration
+	}
+	if p.DefaultOpenDuration != nil {
+		v[AttrDefaultOpenDuration] = *p.DefaultOpenDuration
+	}
+	if p.AutoCloseTime != nil {
+		v[AttrAutoCloseTime] = *p.AutoCloseTime
+	}
+	if p.RemainingDuration != nil {
+		v[AttrRemainingDuration] = *p.RemainingDuration
+	}
+	if p.CurrentState != nil {
+		v[AttrCurrentState] = *p.CurrentState
+	}
+	if p.TargetState != nil {
+		v[AttrTargetState] = *p.TargetState
+	}
+	if p.CurrentLevel != nil {
+		v[AttrCurrentLevel] = *p.CurrentLevel
+	}
+	if p.TargetLevel != nil {
+		v[AttrTargetLevel] = *p.TargetLevel
+	}
+	if p.DefaultOpenLevel != nil {
+		v[AttrDefaultOpenLevel] = *p.DefaultOpenLevel
+	}
+	if p.ValveFault != nil {
+		v[AttrValveFault] = *p.ValveFault
+	}
+	if p.LevelStep != nil {
+		v[AttrLevelStep] = *p.LevelStep
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed ValveConfigurationAndControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -131,6 +175,30 @@ func (s *Server) EmitValveFault(endpoint uint16, data ValveFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventValveFault, data)
 }
 
+// StateSource is the valve: the readers report its state, known
+// false for null (quality X), and the command methods drive it
+// after the kit's checks (cluster/valve).
+type StateSource interface {
+	// CurrentState reports the valve's observed state.
+	CurrentState() (state ValveStateEnum, known bool)
+	// TargetState reports the state the valve is moving towards.
+	TargetState() (state ValveStateEnum, known bool)
+	// OpenDuration reports the duration of the current opening, in seconds.
+	OpenDuration() (seconds uint32, known bool)
+	// RemainingDuration reports the time left before the valve closes.
+	RemainingDuration() (seconds uint32, known bool)
+	// DefaultOpenDuration reports the configured default open duration.
+	DefaultOpenDuration() (seconds uint32, known bool)
+	// SetDefaultOpenDuration persists a new default; nil for a null
+	// write, which clears it.
+	SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error
+	// Open drives the valve open: an absent OpenDuration means
+	// DefaultOpenDuration, a null one stays open until closed.
+	Open(ctx context.Context, req OpenRequest) error
+	// Close drives the valve closed.
+	Close(ctx context.Context) error
+}
+
 // Declare is the declaration of the ValveConfigurationAndControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -142,6 +210,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -151,6 +226,8 @@ type Declare struct {
 	// HandleClose handles the Close command in place of the server
 	// (Server.HandleClose), inline; an optional command it handles is accepted.
 	HandleClose func(ctx context.Context, req CloseRequest) (struct{}, error)
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -169,6 +246,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleOpen != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdOpen)
 		decl.Attach = d.attach

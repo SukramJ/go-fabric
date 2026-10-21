@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/lock"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -189,7 +190,8 @@ func TestServer_UnknownAttributeMatchesSiblingServers(t *testing.T) {
 // Open is not answered by the cluster server, it is forwarded.
 func TestServer_OpenReachesPort(t *testing.T) {
 	t.Parallel()
-	sixty := uint32(60)
+	sixty := &spec.Nullable[uint32]{Value: 60}
+	null := &spec.Nullable[uint32]{Null: true}
 
 	cases := []struct {
 		name   string
@@ -200,17 +202,17 @@ func TestServer_OpenReachesPort(t *testing.T) {
 		{
 			"OpenDuration from the wire",
 			map[uint8]any{0: uint64(60)},
-			valve.OpenRequest{HasOpenDuration: true, OpenDuration: &sixty},
+			valve.OpenRequest{OpenDuration: sixty},
 		},
 		{
 			"explicit null OpenDuration stays distinct from absence",
 			map[uint8]any{0: nil},
-			valve.OpenRequest{HasOpenDuration: true},
+			valve.OpenRequest{OpenDuration: null},
 		},
 		{
 			"typed request from a host-side decoder",
-			valve.OpenRequest{HasOpenDuration: true, OpenDuration: &sixty},
-			valve.OpenRequest{HasOpenDuration: true, OpenDuration: &sixty},
+			valve.OpenRequest{OpenDuration: sixty},
+			valve.OpenRequest{OpenDuration: sixty},
 		},
 	}
 	for _, tc := range cases {
@@ -230,16 +232,13 @@ func TestServer_OpenReachesPort(t *testing.T) {
 				t.Fatalf("host saw %d Open calls, want 1", len(host.openCalls))
 			}
 			got := host.openCalls[0]
-			if got.HasOpenDuration != tc.want.HasOpenDuration {
-				t.Fatalf("HasOpenDuration = %v, want %v", got.HasOpenDuration, tc.want.HasOpenDuration)
-			}
 			switch {
 			case tc.want.OpenDuration == nil && got.OpenDuration != nil:
-				t.Fatalf("OpenDuration = %d, want nil", *got.OpenDuration)
+				t.Fatalf("OpenDuration = %+v, want absent", *got.OpenDuration)
 			case tc.want.OpenDuration != nil && got.OpenDuration == nil:
-				t.Fatalf("OpenDuration = nil, want %d", *tc.want.OpenDuration)
+				t.Fatalf("OpenDuration absent, want %+v", *tc.want.OpenDuration)
 			case tc.want.OpenDuration != nil && *got.OpenDuration != *tc.want.OpenDuration:
-				t.Fatalf("OpenDuration = %d, want %d", *got.OpenDuration, *tc.want.OpenDuration)
+				t.Fatalf("OpenDuration = %+v, want %+v", *got.OpenDuration, *tc.want.OpenDuration)
 			}
 		})
 	}

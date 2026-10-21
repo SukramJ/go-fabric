@@ -15,10 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/cluster/pump"
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
+	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 )
 
 // Out-of-band test control, the two ways CHIP's own example apps take it:
@@ -156,7 +159,12 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		// An unmounted alarm cannot detect: it expresses Inoperative until it
 		// is mounted again (TC-SMOKECO-2.7 step 8).
 		unmounted := *cmd.Unmounted != 0
-		f.smoke.update(func(s *alarm.State) { s.Unmounted, s.Inoperative = unmounted, unmounted })
+		f.smoke.update(func(s *smokedef.State) {
+			s.Unmounted, s.ExpressedState = unmounted, smokedef.ExpressedStateNormal
+			if unmounted {
+				s.ExpressedState = smokedef.ExpressedStateInoperative
+			}
+		})
 		return nil
 	case "SimulateConfigurationVersionChange":
 		// CHIP's name (TC-BRBINFO-3.2): the bridged devices' functionality
@@ -210,9 +218,9 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		}
 		return f.vacuumArea.reset()
 	case "ChargerFound", "Charging":
-		return f.vacuum.reportState(opstate.StateCharging)
+		return f.vacuum.reportState(rvcopdef.OperationalStateCharging)
 	case "Charged":
-		return f.vacuum.reportState(opstate.StateDocked)
+		return f.vacuum.reportState(rvcopdef.OperationalStateDocked)
 
 	// --- this daemon's own fleet ---
 	case "OperationCompletion":
@@ -234,15 +242,15 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		f.lock.reportJam(cmd.Jammed)
 		return nil
 	case "PumpEvent":
-		ev, ok := map[string]uint32{"DryRunning": pump.EventDryRunning, "PumpBlocked": pump.EventPumpBlocked}[cmd.Event]
+		ev, ok := map[string]uint32{"DryRunning": pumpdef.EventDryRunning, "PumpBlocked": pumpdef.EventPumpBlocked}[cmd.Event]
 		if !ok {
 			return fmt.Errorf("PumpEvent %q is not DryRunning or PumpBlocked", cmd.Event)
 		}
 		return f.pump.reportEvent(ev)
 	case "SetValveState":
-		st := valve.StateClosed
+		st := valvedef.ValveStateClosed
 		if cmd.Value != 0 {
-			st = valve.StateOpen
+			st = valvedef.ValveStateOpen
 		}
 		f.valve.reportFromDevice(st)
 		return nil
@@ -290,25 +298,24 @@ func (f *fleet) washerOperation(cmd pipeCommand) error {
 		return fmt.Errorf("OperationalStateChange for device %q: only Generic (the washer)", cmd.Device)
 	}
 	w := f.washer
-	w.build()
 	switch cmd.Operation {
 	case "Start", "Resume":
-		return w.ops.SetOperationalState(opstate.StateRunning)
+		return w.reportState(opdef.OperationalStateRunning)
 	case "Pause":
-		return w.ops.SetOperationalState(opstate.StatePaused)
+		return w.reportState(opdef.OperationalStatePaused)
 	case "Stop":
-		return w.ops.SetOperationalState(opstate.StateStopped)
+		return w.reportState(opdef.OperationalStateStopped)
 	case "OnFault":
 		if cmd.Param == nil {
 			return errors.New("OnFault needs Param (an ErrorStateEnum value)")
 		}
-		if err := w.reportError(opstate.ErrorID(*cmd.Param)); err != nil {
+		if err := w.reportError(opdef.ErrorStateEnum(*cmd.Param)); err != nil {
 			return err
 		}
-		if opstate.ErrorID(*cmd.Param) == opstate.ErrorNoError {
+		if opdef.ErrorStateEnum(*cmd.Param) == opdef.ErrorStateNoError {
 			// Clearing the fault resumes the cycle (matter.js
 			// AllClustersTestInstance.ts OnFault 0).
-			return w.ops.SetOperationalState(opstate.StateRunning)
+			return w.reportState(opdef.OperationalStateRunning)
 		}
 		return nil
 	}
@@ -327,39 +334,38 @@ func (f *fleet) washerOperation(cmd pipeCommand) error {
 // (OperationalStateCluster.cpp:108-127).
 func (f *fleet) ovenOperation(cmd pipeCommand) error {
 	c := f.oven.cavity
-	c.build()
 	switch cmd.Operation {
 	case "Start", "Resume":
-		return c.ops.SetOperationalState(opstate.StateRunning)
+		return c.setState(ovendef.OperationalStateRunning)
 	case "Pause":
-		return c.ops.SetOperationalState(opstate.StatePaused)
+		return c.setState(ovendef.OperationalStatePaused)
 	case "Stop":
-		return c.ops.SetOperationalState(opstate.StateStopped)
+		return c.setState(ovendef.OperationalStateStopped)
 	case "OnFault":
-		id := opstate.ErrorUnableToCompleteOperation
+		id := ovendef.ErrorStateUnableToCompleteOperation
 		if cmd.Param != nil {
-			id = opstate.ErrorID(*cmd.Param)
+			id = ovendef.ErrorStateEnum(*cmd.Param)
 		}
-		return c.ops.SetOperationalError(opstate.ErrorState{ID: id})
+		return c.setError(id)
 	}
 	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
 }
 
 // rvcErrors maps the rvc-app's ErrorEvent names to ErrorStateEnum values
 // (CHIP examples/rvc-app, RvcAppCommandDelegate).
-var rvcErrors = map[string]opstate.ErrorID{
-	"NoError":                   opstate.ErrorNoError,
-	"UnableToStartOrResume":     opstate.ErrorUnableToStartOrResume,
-	"UnableToCompleteOperation": opstate.ErrorUnableToCompleteOperation,
-	"CommandInvalidInState":     opstate.ErrorCommandInvalidInState,
-	"FailedToFindChargingDock":  opstate.ErrorFailedToFindChargingDock,
-	"Stuck":                     opstate.ErrorStuck,
-	"DustBinMissing":            opstate.ErrorDustBinMissing,
-	"DustBinFull":               opstate.ErrorDustBinFull,
-	"WaterTankEmpty":            opstate.ErrorWaterTankEmpty,
-	"WaterTankMissing":          opstate.ErrorWaterTankMissing,
-	"WaterTankLidOpen":          opstate.ErrorWaterTankLidOpen,
-	"MopCleaningPadMissing":     opstate.ErrorMopCleaningPadMissing,
+var rvcErrors = map[string]rvcopdef.ErrorStateEnum{
+	"NoError":                   rvcopdef.ErrorStateNoError,
+	"UnableToStartOrResume":     rvcopdef.ErrorStateUnableToStartOrResume,
+	"UnableToCompleteOperation": rvcopdef.ErrorStateUnableToCompleteOperation,
+	"CommandInvalidInState":     rvcopdef.ErrorStateCommandInvalidInState,
+	"FailedToFindChargingDock":  rvcopdef.ErrorStateFailedToFindChargingDock,
+	"Stuck":                     rvcopdef.ErrorStateStuck,
+	"DustBinMissing":            rvcopdef.ErrorStateDustBinMissing,
+	"DustBinFull":               rvcopdef.ErrorStateDustBinFull,
+	"WaterTankEmpty":            rvcopdef.ErrorStateWaterTankEmpty,
+	"WaterTankMissing":          rvcopdef.ErrorStateWaterTankMissing,
+	"WaterTankLidOpen":          rvcopdef.ErrorStateWaterTankLidOpen,
+	"MopCleaningPadMissing":     rvcopdef.ErrorStateMopCleaningPadMissing,
 }
 
 // --- TestEventTrigger --------------------------------------------------------
@@ -404,7 +410,7 @@ const (
 // handler. It mirrors what CHIP's smoke-co-alarm app does for each trigger
 // (HandleSmokeCOTestEventTrigger): set one condition, or clear it.
 func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //nolint:gocyclo,cyclop,funlen // a flat dispatch table: one case per trigger
-	set := func(change func(*alarm.State)) error {
+	set := func(change func(*smokedef.State)) error {
 		f.smoke.update(change)
 		return nil
 	}
@@ -424,65 +430,65 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	}
 	switch trigger & smokeTriggerMask {
 	case triggerForceSmokeWarning:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.SmokeState = smokedef.AlarmStateWarning })
 	case triggerForceSmokeCritical:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.SmokeState = smokedef.AlarmStateCritical })
 	case triggerClearSmoke:
-		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.SmokeState = smokedef.AlarmStateNormal })
 	case triggerForceCOWarning:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.CoState = smokedef.AlarmStateWarning })
 	case triggerForceCOCritical:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.CoState = smokedef.AlarmStateCritical })
 	case triggerClearCO:
-		return set(func(s *alarm.State) { s.COState = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.CoState = smokedef.AlarmStateNormal })
 	case triggerForceSmokeInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectSmokeAlarm = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.InterconnectSmokeAlarm = smokedef.AlarmStateWarning })
 	case triggerClearSmokeInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectSmokeAlarm = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.InterconnectSmokeAlarm = smokedef.AlarmStateNormal })
 	case triggerForceCOInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectCOAlarm = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.InterconnectCoAlarm = smokedef.AlarmStateWarning })
 	case triggerClearCOInterconnect:
-		return set(func(s *alarm.State) { s.InterconnectCOAlarm = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.InterconnectCoAlarm = smokedef.AlarmStateNormal })
 	case triggerForceMalfunction:
-		return set(func(s *alarm.State) { s.HardwareFaultAlert = true })
+		return set(func(s *smokedef.State) { s.HardwareFaultAlert = true })
 	case triggerClearMalfunction:
-		return set(func(s *alarm.State) { s.HardwareFaultAlert = false })
+		return set(func(s *smokedef.State) { s.HardwareFaultAlert = false })
 	case triggerForceLowBatteryWarning:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmWarning })
+		return set(func(s *smokedef.State) { s.BatteryAlert = smokedef.AlarmStateWarning })
 	case triggerForceLowBatteryCrit:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmCritical })
+		return set(func(s *smokedef.State) { s.BatteryAlert = smokedef.AlarmStateCritical })
 	case triggerClearBatteryLevelLow:
-		return set(func(s *alarm.State) { s.BatteryAlert = alarm.AlarmNormal })
+		return set(func(s *smokedef.State) { s.BatteryAlert = smokedef.AlarmStateNormal })
 	case triggerForceContaminationHigh:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationCritical })
+		return set(func(s *smokedef.State) { s.ContaminationState = smokedef.ContaminationStateCritical })
 	case triggerForceContaminationLow:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationLow })
+		return set(func(s *smokedef.State) { s.ContaminationState = smokedef.ContaminationStateLow })
 	case triggerClearContamination:
-		return set(func(s *alarm.State) { s.ContaminationState = alarm.ContaminationNormal })
+		return set(func(s *smokedef.State) { s.ContaminationState = smokedef.ContaminationStateNormal })
 	case triggerForceSensitivityHigh:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityHigh })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = smokedef.SensitivityHigh })
 	case triggerForceSensitivityLow:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityLow })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = smokedef.SensitivityLow })
 	case triggerClearSensitivity:
-		return set(func(s *alarm.State) { s.SmokeSensitivityLevel = alarm.SensitivityStandard })
+		return set(func(s *smokedef.State) { s.SmokeSensitivityLevel = smokedef.SensitivityStandard })
 	case triggerForceEndOfLife:
-		return set(func(s *alarm.State) { s.EndOfServiceAlert = alarm.EndOfServiceExpired })
+		return set(func(s *smokedef.State) { s.EndOfServiceAlert = smokedef.EndOfServiceExpired })
 	case triggerClearEndOfLife:
-		return set(func(s *alarm.State) { s.EndOfServiceAlert = alarm.EndOfServiceNormal })
+		return set(func(s *smokedef.State) { s.EndOfServiceAlert = smokedef.EndOfServiceNormal })
 	case triggerForceSilence:
 		// A critical alarm cannot be muted (the SmokeCoAlarm "mute" rule
 		// CHIP's smoke-co-alarm app applies; TC-SMOKECO-2.5 step 55).
-		return set(func(s *alarm.State) {
-			if s.SmokeState != alarm.AlarmCritical && s.COState != alarm.AlarmCritical {
-				s.DeviceMuted = alarm.Muted
+		return set(func(s *smokedef.State) {
+			if s.SmokeState != smokedef.AlarmStateCritical && s.CoState != smokedef.AlarmStateCritical {
+				s.DeviceMuted = smokedef.MuteStateMuted
 			}
 		})
 	case triggerClearSilence:
-		return set(func(s *alarm.State) { s.DeviceMuted = alarm.NotMuted })
+		return set(func(s *smokedef.State) { s.DeviceMuted = smokedef.MuteStateNotMuted })
 	case triggerForceUnmounted:
-		return set(func(s *alarm.State) { s.Unmounted = true })
+		return set(func(s *smokedef.State) { s.Unmounted = true })
 	case triggerClearUnmounted:
-		return set(func(s *alarm.State) { s.Unmounted = false })
+		return set(func(s *smokedef.State) { s.Unmounted = false })
 	}
 	return fmt.Errorf("test event trigger 0x%016X is not one this daemon implements", trigger)
 }

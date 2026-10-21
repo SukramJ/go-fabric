@@ -18,9 +18,12 @@ const (
 	WaterValveRevision uint16 = 1
 )
 
-// WaterValveType is the WaterValve device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/water-valve.ts.
-var WaterValveType = Type{
+// WaterValveType is the WaterValve device type, matter.js's packages/node/src/devices/water-valve.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#watervalve.
+var WaterValveType = typeWaterValve
+
+// typeWaterValve holds [WaterValveType]'s cluster requirements.
+var typeWaterValve = Type{
 	ID: WaterValveID, Name: "WaterValve", Revision: WaterValveRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -60,18 +63,12 @@ func NewWaterValve(opts Options, decls ...Declaration) (*WaterValve, error) {
 	return &WaterValve{d}, nil
 }
 
-// ValveConfigurationAndControl returns the typed ValveConfigurationAndControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ValveConfigurationAndControl is the device's typed ValveConfigurationAndControl server; the type mandates it.
 func (d *WaterValve) ValveConfigurationAndControl() *valveconfigurationandcontroldef.Server {
 	return valveconfigurationandcontroldef.WrapOn(d.Server(0x0081), d.queue)
 }
 
-// FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// FlowMeasurement is the device's typed FlowMeasurement server, nil until a declaration mounts it.
 func (d *WaterValve) FlowMeasurement() *flowmeasurementdef.Server {
 	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

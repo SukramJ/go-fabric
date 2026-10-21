@@ -65,6 +65,37 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		MaxPressure:            new(int16),
+		MaxSpeed:               new(uint16),
+		MaxFlow:                new(uint16),
+		MinConstPressure:       new(int16),
+		MaxConstPressure:       new(int16),
+		MinCompPressure:        new(int16),
+		MaxCompPressure:        new(int16),
+		MinConstSpeed:          new(uint16),
+		MaxConstSpeed:          new(uint16),
+		MinConstFlow:           new(uint16),
+		MaxConstFlow:           new(uint16),
+		MinConstTemp:           new(int16),
+		MaxConstTemp:           new(int16),
+		PumpStatus:             new(PumpStatusBitmap),
+		EffectiveOperationMode: new(OperationModeEnum),
+		EffectiveControlMode:   new(ControlModeEnum),
+		Capacity:               new(int16),
+		Speed:                  new(uint16),
+		LifetimeRunningHours:   new(uint32),
+		Power:                  new(uint32),
+		LifetimeEnergyConsumed: new(uint32),
+		OperationMode:          new(OperationModeEnum),
+		ControlMode:            new(ControlModeEnum),
+		AlarmMask:              new(uint16),
+		Null:                   []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 25 {
+		t.Errorf("a patch of every field sets %d values, want 25", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -97,5 +128,9 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
+	}
+	var _ StateSource = d.StateSource
+	if decl := (Declare{Events: []uint32{EventSupplyVoltageLow}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

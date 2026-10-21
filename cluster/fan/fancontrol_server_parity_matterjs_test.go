@@ -13,6 +13,7 @@ import (
 	"slices"
 	"testing"
 
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -32,7 +33,7 @@ func TestFanControlServerParityMatterJS(t *testing.T) {
 	t.Run("accepts local mode tags", func(t *testing.T) {
 		t.Parallel()
 		half := uint8(50)
-		host := &device{st: fan.State{FanMode: fan.FanModeOn, PercentSetting: &half, PercentCurrent: 50}}
+		host := &device{st: fandef.State{FanMode: fan.FanModeOn, PercentSetting: &half, PercentCurrent: 50}}
 		srv, err := fan.NewServer(fan.Config{Source: host, Sequence: fan.SequenceOffLowMedHigh})
 		if err != nil {
 			t.Fatalf("building the server: %v", err)

@@ -4,9 +4,13 @@
 package device
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/alarmbase"
@@ -26,6 +30,7 @@ import (
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	lwcdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
@@ -82,7 +87,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 		}, (*energy.CommodityMeteringServer)(nil)},
 	}
 	covered := map[uint32]bool{}
-	for _, tc := range slices.Concat(cases, portCases()) {
+	for _, tc := range slices.Concat(cases, portCases(), declaredCases(), mediaCases()) {
 		t.Run(fmt.Sprintf("0x%04X", tc.cluster), func(t *testing.T) {
 			t.Parallel()
 			d, err := tc.build()
@@ -119,20 +124,17 @@ func TestSelfHeldDefaults(t *testing.T) {
 	}
 }
 
-// TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe:
-// WindowCovering's default selection (Lift without PositionAware) is a
-// selection its self-held server does not serve, so the cluster keeps the
-// generated server, as before; a DoorLock without features mounts the
-// self-held lock since lock.New reads the empty selection as none
-// (brief BU).
-func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *testing.T) {
+// TestADeclaredSelectionTheServerDoesNotServeIsRefused: a host that
+// declares a cluster's features asked for the self-held server, so a
+// selection it does not serve (WindowCovering's Lift without
+// PositionAware) fails the construction with ErrSelectionNotServed and the
+// server's reason; a DoorLock without features mounts the self-held lock
+// since lock.New reads the empty selection as none (brief BU).
+func TestADeclaredSelectionTheServerDoesNotServeIsRefused(t *testing.T) {
 	t.Parallel()
-	wc, err := New(&WindowCoveringType, testOptions("wc"), withFeatures(0x0102, uint32(wcdef.FeatureLift)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := wc.Server(0x0102).(*spec.Server); !ok {
-		t.Errorf("WindowCovering Lift mounts %T, want the generated server", wc.Server(0x0102))
+	_, err := New(&WindowCoveringType, testOptions("wc"), wcdef.Declare{Features: wcdef.FeatureLift})
+	if !errors.Is(err, ErrSelectionNotServed) || !strings.Contains(err.Error(), "cover:") {
+		t.Errorf("WindowCovering Lift alone: %v, want ErrSelectionNotServed with the server's reason", err)
 	}
 	dl, err := New(&DoorLockType, testOptions("dl"))
 	if err != nil {
@@ -140,6 +142,31 @@ func TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe(t *te
 	}
 	if _, ok := dl.Server(0x0101).(*lock.DoorLockServer); !ok {
 		t.Errorf("DoorLock without features mounts %T, want the self-held lock", dl.Server(0x0101))
+	}
+}
+
+// TestADefaultSelectionKeepsTheGeneratedServer: the device type's default
+// selection the self-held server does not serve — a Pump with the feature
+// its type needs and no StateSource, so the kit's server is not asked
+// for — keeps the generated server (by_design
+// BD-Matter-SelfHeldDefault-SelectionNotServed), and the kit logs one Info
+// line naming the cluster, the selection and the reason.
+func TestADefaultSelectionKeepsTheGeneratedServer(t *testing.T) { //nolint:paralleltest // swaps the package Logger
+	var logs bytes.Buffer
+	saved := Logger
+	Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	t.Cleanup(func() { Logger = saved })
+	d, err := New(&PumpType, testOptions("pump"), pumpdef.Declare{Features: pumpdef.FeatureConstantSpeed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := d.Server(pumpdef.ClusterID).(*spec.Server); !ok {
+		t.Errorf("a Pump without its port mounts %T, want the generated server", d.Server(pumpdef.ClusterID))
+	}
+	out := logs.String()
+	if !strings.Contains(out, "device.default_server.generated") || !strings.Contains(out, "cluster=PumpConfigurationAndControl") ||
+		!strings.Contains(out, "features=") || !strings.Contains(out, "reason=") {
+		t.Errorf("log %q, want one device.default_server.generated line with cluster, features and reason", out)
 	}
 }
 

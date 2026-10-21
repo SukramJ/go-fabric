@@ -67,6 +67,65 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		CurrentHue:                      new(uint8),
+		CurrentSaturation:               new(uint8),
+		RemainingTime:                   new(uint16),
+		CurrentX:                        new(uint16),
+		CurrentY:                        new(uint16),
+		DriftCompensation:               new(DriftCompensationEnum),
+		CompensationText:                new(string),
+		ColorTemperatureMireds:          new(uint16),
+		ColorMode:                       new(ColorModeEnum),
+		Options:                         new(OptionsBitmap),
+		NumberOfPrimaries:               new(uint8),
+		Primary1X:                       new(uint16),
+		Primary1Y:                       new(uint16),
+		Primary1Intensity:               new(uint8),
+		Primary2X:                       new(uint16),
+		Primary2Y:                       new(uint16),
+		Primary2Intensity:               new(uint8),
+		Primary3X:                       new(uint16),
+		Primary3Y:                       new(uint16),
+		Primary3Intensity:               new(uint8),
+		Primary4X:                       new(uint16),
+		Primary4Y:                       new(uint16),
+		Primary4Intensity:               new(uint8),
+		Primary5X:                       new(uint16),
+		Primary5Y:                       new(uint16),
+		Primary5Intensity:               new(uint8),
+		Primary6X:                       new(uint16),
+		Primary6Y:                       new(uint16),
+		Primary6Intensity:               new(uint8),
+		WhitePointX:                     new(uint16),
+		WhitePointY:                     new(uint16),
+		ColorPointRx:                    new(uint16),
+		ColorPointRy:                    new(uint16),
+		ColorPointRIntensity:            new(uint8),
+		ColorPointGx:                    new(uint16),
+		ColorPointGy:                    new(uint16),
+		ColorPointGIntensity:            new(uint8),
+		ColorPointBx:                    new(uint16),
+		ColorPointBy:                    new(uint16),
+		ColorPointBIntensity:            new(uint8),
+		EnhancedCurrentHue:              new(uint16),
+		EnhancedColorMode:               new(EnhancedColorModeEnum),
+		ColorLoopActive:                 new(uint8),
+		ColorLoopDirection:              new(ColorLoopDirectionEnum),
+		ColorLoopTime:                   new(uint16),
+		ColorLoopStartEnhancedHue:       new(uint16),
+		ColorLoopStoredEnhancedHue:      new(uint16),
+		ColorCapabilities:               new(ColorCapabilitiesBitmap),
+		ColorTempPhysicalMinMireds:      new(uint16),
+		ColorTempPhysicalMaxMireds:      new(uint16),
+		CoupleColorTempToLevelMinMireds: new(uint16),
+		StartUpColorTemperatureMireds:   new(uint16),
+		Null:                            []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 53 {
+		t.Errorf("a patch of every field sets %d values, want 53", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -140,6 +199,8 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ ColorTemperatureWriter = d.ColorTemperatureWriter
+	var _ ColorWriter = d.ColorWriter
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -164,5 +225,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleStepColorTemperature = func(context.Context, StepColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 19 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdMoveToHue}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

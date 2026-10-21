@@ -19,9 +19,12 @@ const (
 	WaterHeaterRevision uint16 = 1
 )
 
-// WaterHeaterType is the WaterHeater device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/water-heater.ts.
-var WaterHeaterType = Type{
+// WaterHeaterType is the WaterHeater device type, matter.js's packages/node/src/devices/water-heater.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#waterheater.
+var WaterHeaterType = typeWaterHeater
+
+// typeWaterHeater holds [WaterHeaterType]'s cluster requirements.
+var typeWaterHeater = Type{
 	ID: WaterHeaterID, Name: "WaterHeater", Revision: WaterHeaterRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -62,26 +65,17 @@ func NewWaterHeater(opts Options, decls ...Declaration) (*WaterHeater, error) {
 	return &WaterHeater{d}, nil
 }
 
-// WaterHeaterManagement returns the typed WaterHeaterManagement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// WaterHeaterManagement is the device's typed WaterHeaterManagement server; the type mandates it.
 func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
 	return waterheatermanagementdef.WrapOn(d.Server(0x0094), d.queue)
 }
 
-// WaterHeaterMode returns the typed WaterHeaterMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// WaterHeaterMode is the device's typed WaterHeaterMode server; the type mandates it.
 func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
 	return waterheatermodedef.WrapOn(d.Server(0x009E), d.queue)
 }
 
-// Thermostat returns the typed Thermostat server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Thermostat is the device's typed Thermostat server; the type mandates it.
 func (d *WaterHeater) Thermostat() *thermostatdef.Server {
 	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
 }

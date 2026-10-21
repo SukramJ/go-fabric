@@ -6,36 +6,22 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
 )
 
 // PlaybackState is the MediaPlayback attribute state (matter.js
-// media-playback.element.ts:32-82): the transport the attributes report.
-// A nil pointer or list of a nullable attribute reads as null; an attribute
-// the feature selection does not serve is ignored.
-type PlaybackState struct {
-	// CurrentState (M).
-	CurrentState mpdef.PlaybackStateEnum
-	// StartTime, Duration, SampledPosition, PlaybackSpeed, SeekRangeEnd and
-	// SeekRangeStart: AdvancedSeek (AS).
-	StartTime       *uint64
-	Duration        *uint64
-	SampledPosition *mpdef.PlaybackPositionStruct
-	PlaybackSpeed   float32
-	SeekRangeEnd    *uint64
-	SeekRangeStart  *uint64
-	// ActiveAudioTrack and AvailableAudioTracks: AudioTracks (AT).
-	ActiveAudioTrack     *mpdef.TrackStruct
-	AvailableAudioTracks []mpdef.TrackStruct
-	// ActiveTextTrack and AvailableTextTracks: TextTracks (TT).
-	ActiveTextTrack     *mpdef.TrackStruct
-	AvailableTextTracks []mpdef.TrackStruct
-}
+// media-playback.element.ts:32-82), the cluster's generated State: the
+// transport the attributes report. CurrentState is mandatory; StartTime,
+// Duration, SampledPosition, PlaybackSpeed, SeekRangeEnd and SeekRangeStart
+// are AdvancedSeek's (AS), the audio tracks AudioTracks' (AT), the text
+// tracks TextTracks' (TT). A nil pointer of a nullable attribute — a list
+// too — reads as null; an attribute the feature selection does not serve is
+// ignored.
+type PlaybackState = mpdef.State
 
-func (st PlaybackState) values() map[uint32]any {
+func playbackValues(st PlaybackState) map[uint32]any {
 	return map[uint32]any{
 		mpdef.AttrCurrentState:         st.CurrentState,
 		mpdef.AttrStartTime:            nullOr(st.StartTime),
@@ -51,76 +37,46 @@ func (st PlaybackState) values() map[uint32]any {
 	}
 }
 
-func (st PlaybackState) clone() PlaybackState {
-	st.AvailableAudioTracks = slices.Clone(st.AvailableAudioTracks)
-	st.AvailableTextTracks = slices.Clone(st.AvailableTextTracks)
+func clonePlayback(st PlaybackState) PlaybackState {
+	st.AvailableAudioTracks = cloneList(st.AvailableAudioTracks)
+	st.AvailableTextTracks = cloneList(st.AvailableTextTracks)
 	return st
 }
 
-// nullListOr is l as a generated list, or nil (null) when l is nil.
-func nullListOr[T spec.Encodable](l []T) any {
-	if l == nil {
-		return nil
-	}
-	return spec.List[T](l)
-}
-
-// Playback is the MediaPlayback host port: the three mandatory transport
-// commands (media-playback.element.ts:96-98), each answering a
+// Playback is the MediaPlayback host port (the generated
+// [mpdef.Playback], the declaration's Playback): the three mandatory
+// transport commands (media-playback.element.ts:96-98), each answering a
 // PlaybackResponse (:115-122). st is the state the attributes report; the
 // port changes it to what the command did. The optional commands are the
 // further interfaces below, accepted when the port implements them.
-type Playback interface {
-	Play(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-	Pause(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-	Stop(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-}
+type Playback = mpdef.Playback
 
 // PlaybackStartOver is StartOver (optional, :99).
-type PlaybackStartOver interface {
-	StartOver(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-}
+type PlaybackStartOver = mpdef.PlaybackStartOver
 
 // PlaybackPrevious is Previous (optional, :100).
-type PlaybackPrevious interface {
-	Previous(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-}
+type PlaybackPrevious = mpdef.PlaybackPrevious
 
 // PlaybackNext is Next (optional, :101).
-type PlaybackNext interface {
-	Next(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
-}
+type PlaybackNext = mpdef.PlaybackNext
 
 // PlaybackVariableSpeed is Rewind and FastForward, required with
 // VariableSpeed (VS, :102-114).
-type PlaybackVariableSpeed interface {
-	Rewind(ctx context.Context, st *PlaybackState, req mpdef.RewindRequest) (mpdef.PlaybackResponse, error)
-	FastForward(ctx context.Context, st *PlaybackState, req mpdef.FastForwardRequest) (mpdef.PlaybackResponse, error)
-}
+type PlaybackVariableSpeed = mpdef.PlaybackVariableSpeed
 
 // PlaybackSkip is SkipForward and SkipBackward (optional, :123-135).
-type PlaybackSkip interface {
-	SkipForward(ctx context.Context, st *PlaybackState, req mpdef.SkipForwardRequest) (mpdef.PlaybackResponse, error)
-	SkipBackward(ctx context.Context, st *PlaybackState, req mpdef.SkipBackwardRequest) (mpdef.PlaybackResponse, error)
-}
+type PlaybackSkip = mpdef.PlaybackSkip
 
 // PlaybackSeek is Seek, required with AdvancedSeek (AS, :136-140).
-type PlaybackSeek interface {
-	Seek(ctx context.Context, st *PlaybackState, req mpdef.SeekRequest) (mpdef.PlaybackResponse, error)
-}
+type PlaybackSeek = mpdef.PlaybackSeek
 
 // PlaybackAudioTracks is ActivateAudioTrack, required with AudioTracks
 // (AT, :141-149); status only.
-type PlaybackAudioTracks interface {
-	ActivateAudioTrack(ctx context.Context, st *PlaybackState, req mpdef.ActivateAudioTrackRequest) error
-}
+type PlaybackAudioTracks = mpdef.PlaybackAudioTracks
 
 // PlaybackTextTracks is ActivateTextTrack and DeactivateTextTrack,
 // required with TextTracks (TT, :150-158); status only.
-type PlaybackTextTracks interface {
-	ActivateTextTrack(ctx context.Context, st *PlaybackState, req mpdef.ActivateTextTrackRequest) error
-	DeactivateTextTrack(ctx context.Context, st *PlaybackState) error
-}
+type PlaybackTextTracks = mpdef.PlaybackTextTracks
 
 // PlaybackConfig carries the construction parameters of a MediaPlayback
 // server.
@@ -235,7 +191,7 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, PlaybackState.values, PlaybackState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, playbackValues, clonePlayback, storeState[PlaybackState]); err != nil {
 		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -243,6 +199,9 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *PlaybackServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }
 
 // EmitStateChanged emits StateChanged (event 0x00, info; :83-95), which the
 // server emits when cfg.Events lists it.

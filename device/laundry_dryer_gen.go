@@ -21,9 +21,12 @@ const (
 	LaundryDryerRevision uint16 = 2
 )
 
-// LaundryDryerType is the LaundryDryer device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/laundry-dryer.ts.
-var LaundryDryerType = Type{
+// LaundryDryerType is the LaundryDryer device type, matter.js's packages/node/src/devices/laundry-dryer.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#laundrydryer.
+var LaundryDryerType = typeLaundryDryer
+
+// typeLaundryDryer holds [LaundryDryerType]'s cluster requirements.
+var typeLaundryDryer = Type{
 	ID: LaundryDryerID, Name: "LaundryDryer", Revision: LaundryDryerRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -73,40 +76,25 @@ func NewLaundryDryer(opts Options, decls ...Declaration) (*LaundryDryer, error) 
 	return &LaundryDryer{d}, nil
 }
 
-// OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OperationalState is the device's typed OperationalState server; the type mandates it.
 func (d *LaundryDryer) OperationalState() *operationalstatedef.Server {
 	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
-// LaundryWasherMode returns the typed LaundryWasherMode server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// LaundryWasherMode is the device's typed LaundryWasherMode server, nil until a declaration mounts it.
 func (d *LaundryDryer) LaundryWasherMode() *laundrywashermodedef.Server {
 	return laundrywashermodedef.WrapOn(d.Server(0x0051), d.queue)
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OnOff is the device's typed OnOff server, nil until a declaration mounts it.
 func (d *LaundryDryer) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// LaundryDryerControls returns the typed LaundryDryerControls server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// LaundryDryerControls is the device's typed LaundryDryerControls server, nil until a declaration mounts it.
 func (d *LaundryDryer) LaundryDryerControls() *laundrydryercontrolsdef.Server {
 	return laundrydryercontrolsdef.WrapOn(d.Server(0x004A), d.queue)
 }
 
-// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureControl is the device's typed TemperatureControl server, nil until a declaration mounts it.
 func (d *LaundryDryer) TemperatureControl() *temperaturecontroldef.Server {
 	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }

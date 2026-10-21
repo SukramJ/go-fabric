@@ -16,9 +16,12 @@ const (
 	VideoRemoteControlRevision uint16 = 2
 )
 
-// VideoRemoteControlType is the VideoRemoteControl device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/video-remote-control.ts.
-var VideoRemoteControlType = Type{
+// VideoRemoteControlType is the VideoRemoteControl device type, matter.js's packages/node/src/devices/video-remote-control.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#videoremotecontrol.
+var VideoRemoteControlType = typeVideoRemoteControl
+
+// typeVideoRemoteControl holds [VideoRemoteControlType]'s cluster requirements.
+var typeVideoRemoteControl = Type{
 	ID: VideoRemoteControlID, Name: "VideoRemoteControl", Revision: VideoRemoteControlRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -92,10 +95,7 @@ func NewVideoRemoteControl(opts Options, decls ...Declaration) (*VideoRemoteCont
 	return &VideoRemoteControl{d}, nil
 }
 
-// Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Binding is the device's typed Binding server; the type mandates it.
 func (d *VideoRemoteControl) Binding() *bindingdef.Server {
 	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
 }

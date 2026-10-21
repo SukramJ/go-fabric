@@ -16,9 +16,12 @@ const (
 	MeterReferencePointRevision uint16 = 1
 )
 
-// MeterReferencePointType is the MeterReferencePoint device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/meter-reference-point.ts.
-var MeterReferencePointType = Type{
+// MeterReferencePointType is the MeterReferencePoint device type, matter.js's packages/node/src/devices/meter-reference-point.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#meterreferencepoint.
+var MeterReferencePointType = typeMeterReferencePoint
+
+// typeMeterReferencePoint holds [MeterReferencePointType]'s cluster requirements.
+var typeMeterReferencePoint = Type{
 	ID: MeterReferencePointID, Name: "MeterReferencePoint", Revision: MeterReferencePointRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Conditions: []string{"ElectricalEnergy"},

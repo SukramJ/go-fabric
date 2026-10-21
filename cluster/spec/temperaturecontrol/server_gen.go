@@ -37,6 +37,32 @@ type Patch struct {
 	SupportedTemperatureLevels *[]string `matter:"0x0005"` // attribute 0x0005
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.TemperatureSetpoint != nil {
+		v[AttrTemperatureSetpoint] = *p.TemperatureSetpoint
+	}
+	if p.MinTemperature != nil {
+		v[AttrMinTemperature] = *p.MinTemperature
+	}
+	if p.MaxTemperature != nil {
+		v[AttrMaxTemperature] = *p.MaxTemperature
+	}
+	if p.Step != nil {
+		v[AttrStep] = *p.Step
+	}
+	if p.SelectedTemperatureLevel != nil {
+		v[AttrSelectedTemperatureLevel] = *p.SelectedTemperatureLevel
+	}
+	if p.SupportedTemperatureLevels != nil {
+		v[AttrSupportedTemperatureLevels] = *p.SupportedTemperatureLevels
+	}
+	return v
+}
+
 // Server is the typed TemperatureControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -101,6 +127,15 @@ func (s *Server) HandleSetTemperature(fn func(ctx context.Context, req SetTemper
 	return spec.HandleOn(s.Underlying(), CmdSetTemperature, fn)
 }
 
+// TemperatureSetter applies a SetTemperature the kit's server
+// checked: target (TN, 0.01 °C) or level (TL, an index into
+// SupportedTemperatureLevels). Nil error stores it; an error
+// answers FAILURE, or INVALID_IN_STATE when it wraps
+// thermo.ErrTemperatureRefused (cluster/thermo).
+type TemperatureSetter interface {
+	SetTemperature(ctx context.Context, target *int16, level *uint8) error
+}
+
 // Declare is the declaration of the TemperatureControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -112,12 +147,18 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
 	// HandleSetTemperature handles the SetTemperature command in place of the server
 	// (Server.HandleSetTemperature), inline; an optional command it handles is accepted.
 	HandleSetTemperature func(ctx context.Context, req SetTemperatureRequest) (struct{}, error)
+	// TemperatureSetter is the host port the kit's server runs on ([TemperatureSetter]).
+	TemperatureSetter TemperatureSetter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -136,6 +177,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSetTemperature != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetTemperature)
 		decl.Attach = d.attach

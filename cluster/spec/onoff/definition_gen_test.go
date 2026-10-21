@@ -54,6 +54,18 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		OnOff:              new(bool),
+		GlobalSceneControl: new(bool),
+		OnTime:             new(uint16),
+		OffWaitTime:        new(uint16),
+		StartUpOnOff:       new(StartUpOnOffEnum),
+		Null:               []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 6 {
+		t.Errorf("a patch of every field sets %d values, want 6", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -100,5 +112,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleOnWithTimedOff = func(context.Context, OnWithTimedOffRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 6 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdOff}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

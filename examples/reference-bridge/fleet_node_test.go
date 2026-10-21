@@ -24,8 +24,8 @@ import (
 // SetSimulatedSoilMoisture (null included), and refuses a command naming
 // another endpoint.
 func TestSoilSensorEndpoint(t *testing.T) {
-	f, br := startFleetBridge(t)
-	ep := mountedEndpoint(t, br, "demo-soil-1")
+	f, n := startFleetNode(t)
+	ep := mountedEndpoint(t, n.Bridge(), "demo-soil-1")
 	if ep.DeviceType != contract.MeasurementClassDeviceType(contract.MeasurementSoilMoisture) || ep.DeviceType != 0x0045 {
 		t.Fatalf("soil endpoint device type = 0x%04X, want SoilSensor 0x0045", ep.DeviceType)
 	}
@@ -37,7 +37,7 @@ func TestSoilSensorEndpoint(t *testing.T) {
 		t.Errorf("initial SoilMoistureMeasuredValue = %v, want the minimum 0", v)
 	}
 
-	attachNodeProviders(br, nil, f)
+	attachNodeProviders(n.Topology, nil, f)
 	hundred := uint8(100)
 	if err := f.setSimulatedSoilMoisture(ep.ID, &hundred); err != nil {
 		t.Fatal(err)
@@ -61,21 +61,22 @@ func TestSoilSensorEndpoint(t *testing.T) {
 // Actions lists the desk lamp, and the air quality sensor carries
 // EcosystemInformation.
 func TestNodeClustersOnRootAndAggregator(t *testing.T) {
-	f, br := startFleetBridge(t)
+	f, n := startFleetNode(t)
+	br := n.Bridge()
 	pscfg, err := mattercore.NewPowerSourceConfiguration(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attachNodeProviders(br, pscfg, f)
+	attachNodeProviders(n.Topology, pscfg, f)
 
-	power, ok := endpointByKey(br, evsePowerKey)
+	power, ok := endpointByKey(n.Topology(), evsePowerKey)
 	if !ok {
 		t.Fatal("the EV charger's PowerSource part has no endpoint")
 	}
 	if v, _ := pscfg.MatterRead(pscfgdef.AttrSources); !slices.Equal(v.([]uint16), []uint16{power}) {
 		t.Errorf("Sources = %v, want [%d]", v, power)
 	}
-	if _, ok := endpointByKey(br, "demo:none:1"); ok {
+	if _, ok := endpointByKey(n.Topology(), "demo:none:1"); ok {
 		t.Error("an unknown key resolved")
 	}
 

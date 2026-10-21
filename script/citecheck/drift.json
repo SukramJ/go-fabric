@@ -1262,7 +1262,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 314,
+    "line": 315,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "occupiedHeatingSetpoint",
@@ -1271,7 +1271,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 328,
+    "line": 329,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1280,7 +1280,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 646,
+    "line": 647,
     "citation": "thermostat-cluster.element.ts:511",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1289,7 +1289,7 @@
   },
   {
     "file": "cluster/media/playback.go",
-    "line": 69,
+    "line": 48,
     "citation": "media-playback.element.ts:96-98",
     "resolved": "packages/model/src/standard/elements/media-playback.element.ts",
     "identifier": "MediaPlayback",
@@ -1796,7 +1796,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 497,
+    "line": 473,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",

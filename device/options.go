@@ -52,6 +52,10 @@ type Options struct {
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).
 type SourceKey = endpoint.SourceKey
 
+// StringKey is the [SourceKey] of a host whose device identity is one
+// string ([endpoint.StringKey]).
+type StringKey = endpoint.StringKey
+
 // AvailabilityProbe is the type of [Options].Reachable
 // ([endpoint.AvailabilityProbe]).
 type AvailabilityProbe = endpoint.AvailabilityProbe
@@ -62,8 +66,7 @@ type AvailabilityProbe = endpoint.AvailabilityProbe
 // cluster packages (cluster/spec/<cluster>, imported as <cluster>def), the
 // one form of a cluster's initial state, feature selection, write veto,
 // command handlers and host ports — or one of the kit's own options
-// ([WithServer], [WithChangeNotifier], [WithMeasurement],
-// [WithClientClusters]). It is the
+// ([WithServer], [WithChangeNotifier], [WithClientClusters]). It is the
 // Go form of what matter.js states on an endpoint type and its behaviors
 // (`Endpoint.with(…)`, the behaviors' initial state, a behavior subclass
 // overriding a command; packages/node/src/devices/on-off-light.ts:103-135,
@@ -101,6 +104,8 @@ func (deviceOption) ClusterDeclaration() spec.ClusterDeclaration { return spec.C
 
 // settings is what the declarations of one New call collected.
 type settings struct {
+	// key is the device's StableKey ([defaultBuild] key).
+	key      string
 	features map[uint32]uint32
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer
@@ -108,12 +113,8 @@ type settings struct {
 	// server for a cluster the type does not list is mounted in it.
 	serverOrder []uint32
 	notifier    contract.ChangeNotifier
-	// measurement is the host's live reading ([WithMeasurement]);
-	// measurementSet tells a WithMeasurement(nil) from no call.
-	measurement    contract.MeasurementSource
-	measurementSet bool
-	initial        map[uint32]map[uint32]any
-	elements       map[uint32]spec.Options
+	initial     map[uint32]map[uint32]any
+	elements    map[uint32]spec.Options
 	// clients are the client clusters [WithClientClusters] declared, in
 	// call order.
 	clients []uint32
@@ -127,6 +128,9 @@ type settings struct {
 	attach      map[uint32][]func(contract.ClusterServer) error
 	ports       map[uint32]any
 	transitions map[uint32]bool
+	// declared are the clusters whose declaration carries a port or a
+	// feature selection: their self-held server is asked for.
+	declared map[uint32]bool
 }
 
 func newSettings() *settings {
@@ -135,7 +139,7 @@ func newSettings() *settings {
 		servers: map[uint32]contract.ClusterServer{}, initial: map[uint32]map[uint32]any{},
 		elements: map[uint32]spec.Options{}, typed: map[uint32]bool{}, implied: map[uint32]spec.Options{},
 		attach: map[uint32][]func(contract.ClusterServer) error{}, ports: map[uint32]any{},
-		transitions: map[uint32]bool{},
+		transitions: map[uint32]bool{}, declared: map[uint32]bool{},
 	}
 }
 
@@ -216,6 +220,10 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 	}
 	if decl.HasFeatures {
 		s.features[id] = decl.Features
+		s.declared[id] = true
+	}
+	if hasPorts(decl.Ports) {
+		s.declared[id] = true
 	}
 	if decl.Initial != nil {
 		m := s.initial[id]
@@ -268,7 +276,7 @@ func WithServer(srv contract.ClusterServer) Option {
 // WithChangeNotifier makes the device's endpoint source a
 // [contract.ChangeNotifier] that fires whenever n fires: the host-model
 // relay, the host's own model telling the bridge that state its servers
-// read through a host port (valve.StateSource, modeselect.ModeSource, …)
+// read through a host port (the valve's or ModeSelect's declared source, …)
 // has moved, so the endpoint's reportable attributes are reported. It is
 // the Go form of a matter.js host setting behavior state from its own
 // device events, whose Datasource then reports the change
@@ -280,30 +288,6 @@ func WithServer(srv contract.ClusterServer) Option {
 // source without one.
 func WithChangeNotifier(n contract.ChangeNotifier) Option {
 	return deviceOption(func(s *settings) { s.notifier = n })
-}
-
-// WithMeasurement serves the device's measurement clusters from the host's
-// live reading m: the endpoint assembler materialises them from m's
-// measurement class ([endpoint.Spec.Measurement], cluster/measurement
-// FromMeasurementClass) on every dispatch, exactly as for a measurement
-// endpoint the host hands over as an [endpoint.Spec], and the bridge
-// subscribes to m when it is a [contract.ChangeNotifier] and wires a
-// GenericSwitch's presses to it. The clusters m's class materialises are
-// then the assembler's for this device, as Descriptor is: New mounts no
-// default server for them, refuses every other option for them, and
-// [Device.Server] and the typed accessors answer nil for them. A device
-// without the option is unchanged.
-//
-// It is the Go form of a matter.js host setting a measurement behavior's
-// state from its own reading, which the behavior's Datasource then reports
-// (packages/node/src/behavior/state/managed/Datasource.ts:261-264
-// `onChange`, :776-796). New refuses a nil m and a class that materialises
-// no cluster from m. A later call replaces an earlier one.
-func WithMeasurement(m contract.MeasurementSource) Option {
-	return deviceOption(func(s *settings) {
-		s.measurement = m
-		s.measurementSet = true
-	})
 }
 
 // WithClientClusters declares client clusters on the endpoint beyond the

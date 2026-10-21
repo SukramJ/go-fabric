@@ -19,9 +19,12 @@ const (
 	ElectricalEnergyTariffRevision uint16 = 1
 )
 
-// ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/electrical-energy-tariff.ts.
-var ElectricalEnergyTariffType = Type{
+// ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, matter.js's packages/node/src/devices/electrical-energy-tariff.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalenergytariff.
+var ElectricalEnergyTariffType = typeElectricalEnergyTariff
+
+// typeElectricalEnergyTariff holds [ElectricalEnergyTariffType]'s cluster requirements.
+var typeElectricalEnergyTariff = Type{
 	ID: ElectricalEnergyTariffID, Name: "ElectricalEnergyTariff", Revision: ElectricalEnergyTariffRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Conditions: []string{"ActiveTariff"},
@@ -61,26 +64,17 @@ func NewElectricalEnergyTariff(opts Options, decls ...Declaration) (*ElectricalE
 	return &ElectricalEnergyTariff{d}, nil
 }
 
-// CommodityPrice returns the typed CommodityPrice server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CommodityPrice is the device's typed CommodityPrice server, nil until a declaration mounts it.
 func (d *ElectricalEnergyTariff) CommodityPrice() *commoditypricedef.Server {
 	return commoditypricedef.WrapOn(d.Server(0x0095), d.queue)
 }
 
-// ElectricalGridConditions returns the typed ElectricalGridConditions server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ElectricalGridConditions is the device's typed ElectricalGridConditions server, nil until a declaration mounts it.
 func (d *ElectricalEnergyTariff) ElectricalGridConditions() *electricalgridconditionsdef.Server {
 	return electricalgridconditionsdef.WrapOn(d.Server(0x00A0), d.queue)
 }
 
-// CommodityTariff returns the typed CommodityTariff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// CommodityTariff is the device's typed CommodityTariff server, nil until a declaration mounts it.
 func (d *ElectricalEnergyTariff) CommodityTariff() *commoditytariffdef.Server {
 	return commoditytariffdef.WrapOn(d.Server(0x0700), d.queue)
 }

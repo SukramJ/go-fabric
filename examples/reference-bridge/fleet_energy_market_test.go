@@ -145,8 +145,17 @@ func fireMarket(t *testing.T, f *fleet, trigger uint64) {
 	}
 }
 
-func marketFleet() *fleet {
-	return &fleet{energyTariff: newDemoEnergyTariff("test tariff"), electricalMeter: newDemoElectricalMeter("test meter")}
+// marketFleet is a fleet of the two energy-market devices, built.
+func marketFleet(t *testing.T) *fleet {
+	t.Helper()
+	f := &fleet{energyTariff: newDemoEnergyTariff("test tariff"), electricalMeter: newDemoElectricalMeter("test meter")}
+	if _, err := f.energyTariff.device(bridged("tariff", f.energyTariff.name)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)); err != nil {
+		t.Fatal(err)
+	}
+	return f
 }
 
 // TestTariffTriggers replays TC_SETRF_2_2.py and TC_SETRF_2_3.py's
@@ -154,10 +163,8 @@ func marketFleet() *fleet {
 // attributes value set, GetTariffComponent and GetDayEntry, the 4-hour
 // and the 24-hour time shift, clear.
 func TestTariffTriggers(t *testing.T) { //nolint:funlen // two runs of one sequence
-	f := marketFleet()
-	f.energyTariff.build()
-	defer f.energyTariff.poll.Stop()
-	srv := f.energyTariff.tariff
+	f := marketFleet(t)
+	srv := f.energyTariff.tariff.Underlying()
 	read := func(attr uint32) any {
 		v, _ := srv.MatterRead(attr)
 		return v
@@ -212,32 +219,41 @@ func TestTariffTriggers(t *testing.T) { //nolint:funlen // two runs of one seque
 	if !f.energyTariff.clock.enabled {
 		t.Error("the 4-hour shift left the test clock off")
 	}
-	f.energyTariff.pollTariff()
+	if err := srv.(*energy.CommodityTariffServer).SyncTime(); err != nil {
+		t.Error(err)
+	}
 }
 
 // TestMeteringTriggers replays TC_COMMTR_3_1.py's sequence: after the
 // first AttributesValueUpdate every attribute differs from its starting
 // null; Clear nulls them all; the next update changes them again.
 func TestMeteringTriggers(t *testing.T) {
-	f := marketFleet()
-	f.electricalMeter.build()
+	f := marketFleet(t)
 	s := f.electricalMeter.metering
-	fireMarket(t, f, triggerMeteringAttributesUpdate)
-	if s.MaximumMeteredQuantities() == nil || *s.MaximumMeteredQuantities() != 2 || len(s.MeteredQuantity()) != 2 ||
-		s.MeteredQuantityTimestamp() == nil || s.TariffUnit() == nil || *s.TariffUnit() != commtr.TariffUnitKVAh {
-		t.Fatalf("first update: max %v quantities %v unit %v", s.MaximumMeteredQuantities(), s.MeteredQuantity(), s.TariffUnit())
+	quantities := func(st commtr.State) []commtr.MeteredQuantityStruct {
+		if st.MeteredQuantity == nil {
+			return nil
+		}
+		return *st.MeteredQuantity
 	}
 	fireMarket(t, f, triggerMeteringAttributesUpdate)
-	if *s.TariffUnit() != commtr.TariffUnitKWh || len(s.MeteredQuantity()) != 3 || !reflect.DeepEqual(s.MeteredQuantity()[2].TariffComponentIds, []uint32{2031, 2032}) {
-		t.Errorf("second update: unit %v quantities %v", s.TariffUnit(), s.MeteredQuantity())
+	st := s.Get()
+	if st.MaximumMeteredQuantities == nil || *st.MaximumMeteredQuantities != 2 || len(quantities(st)) != 2 ||
+		st.MeteredQuantityTimestamp == nil || st.TariffUnit == nil || *st.TariffUnit != commtr.TariffUnitKVAh {
+		t.Fatalf("first update: %+v", st)
+	}
+	fireMarket(t, f, triggerMeteringAttributesUpdate)
+	st = s.Get()
+	if *st.TariffUnit != commtr.TariffUnitKWh || len(quantities(st)) != 3 || !reflect.DeepEqual(quantities(st)[2].TariffComponentIds, []uint32{2031, 2032}) {
+		t.Errorf("second update: %+v", st)
 	}
 	fireMarket(t, f, triggerMeteringAttributesClear)
-	if s.MaximumMeteredQuantities() != nil || s.MeteredQuantity() != nil || s.MeteredQuantityTimestamp() != nil || s.TariffUnit() != nil {
-		t.Error("the clear left a value")
+	if st = s.Get(); st.MaximumMeteredQuantities != nil || st.MeteredQuantity != nil || st.MeteredQuantityTimestamp != nil || st.TariffUnit != nil {
+		t.Errorf("the clear left a value: %+v", st)
 	}
 	fireMarket(t, f, triggerMeteringAttributesUpdate)
-	if s.TariffUnit() == nil || *s.TariffUnit() != commtr.TariffUnitKVAh {
-		t.Errorf("update after the clear: unit %v", s.TariffUnit())
+	if st = s.Get(); st.TariffUnit == nil || *st.TariffUnit != commtr.TariffUnitKVAh {
+		t.Errorf("update after the clear: unit %v", st.TariffUnit)
 	}
 	if f.energyMarketTestEventTrigger(0x0b07_0000_0000_0009) {
 		t.Error("an unknown metering trigger was handled")
@@ -247,24 +263,24 @@ func TestMeteringTriggers(t *testing.T) {
 // TestPriceAndGridTriggers fires the CommodityPrice and
 // ElectricalGridConditions triggers.
 func TestPriceAndGridTriggers(t *testing.T) {
-	f := marketFleet()
-	f.energyTariff.build()
-	defer f.energyTariff.poll.Stop()
+	f := marketFleet(t)
 	d := f.energyTariff
 	fireMarket(t, f, triggerPriceUpdate)
-	if p := d.price.CurrentPrice(); p == nil || *p.Price != 15916 || len(*p.Components) != 2 {
+	// The attribute carries no Description and no Components; a
+	// GetDetailedPriceRequest asks for them (cluster/energy).
+	if p := d.price.Get().CurrentPrice; p == nil || p.Price == nil || *p.Price != 15916 || p.Components != nil {
 		t.Errorf("CurrentPrice %+v", p)
 	}
 	fireMarket(t, f, triggerPriceForecastUpdate|0x0000_0001_0000_0000) // endpoint bits are cleared
-	if v, _ := d.price.MatterRead(cp.AttrPriceForecast); len(v.(spec.List[energy.CommodityPrice])) != 56 {
+	if v, _ := d.price.Underlying().MatterRead(cp.AttrPriceForecast); len(v.(spec.List[energy.CommodityPrice])) != 56 {
 		t.Errorf("PriceForecast %d entries", len(v.(spec.List[energy.CommodityPrice])))
 	}
 	fireMarket(t, f, triggerGridCurrentConditions)
-	if v, _ := d.grid.MatterRead(egc.AttrCurrentConditions); v.(energy.GridConditions).GridCarbonIntensity != 230 {
+	if v, _ := d.grid.Underlying().MatterRead(egc.AttrCurrentConditions); v.(energy.GridConditions).GridCarbonIntensity != 230 {
 		t.Errorf("CurrentConditions %v", v)
 	}
 	fireMarket(t, f, triggerGridForecastConditions)
-	if v, _ := d.grid.MatterRead(egc.AttrForecastConditions); len(v.(spec.List[energy.GridConditions])) != 48 {
+	if v, _ := d.grid.Underlying().MatterRead(egc.AttrForecastConditions); len(v.(spec.List[energy.GridConditions])) != 48 {
 		t.Errorf("ForecastConditions %v", v)
 	}
 	for amount, want := range map[int64]string{5000: "Low", 15000: "Medium", 30000: "High"} {

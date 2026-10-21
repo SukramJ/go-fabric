@@ -60,6 +60,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
@@ -129,17 +130,13 @@ const (
 // areas are all supported (matter.js's assertSelectServiceArea extension
 // point). areas is the request without duplicates. A non-Success status
 // is answered as is and changes nothing; an error answers FAILURE.
-type Selector interface {
-	SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)
-}
+type Selector = sa.Selector
 
 // Skipper carries out SkipArea for an area that is selected (matter.js's
 // assertSkipServiceArea passed). It moves the device on and updates the
 // Progress itself ([Server.SetProgress]); a non-Success status is
 // answered as is, an error answers FAILURE.
-type Skipper interface {
-	SkipArea(ctx context.Context, area uint32) (SkipAreaStatus, string, error)
-}
+type Skipper = sa.Skipper
 
 // Config carries the construction parameters.
 type Config struct {
@@ -189,6 +186,10 @@ var (
 type Server struct {
 	*spec.Instance
 	cluster.AttributeChanges
+	hooks spec.Hooks
+	// cause is the contract.Origin of the changes a command makes
+	// (OriginCommand), zero outside one.
+	cause atomic.Uint32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -250,6 +251,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("servicearea: %w", err)
 	}
 	s := &Server{Instance: inst, ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
+	s.hooks.Init(inst)
 	s.quiet = &cluster.Quieter{Report: func() { s.changed(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
 	if len(cfg.SupportedMaps) > 0 && !s.Serves(sa.AttrSupportedMaps) {
 		return nil, fmt.Errorf("%w: SupportedMaps without MAPS", ErrConfig)
@@ -462,10 +464,15 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
-// changed bumps the data version and reports attrIDs.
+// changed bumps the data version and reports attrIDs: a change a command
+// makes is the command's, any other the device's own.
 func (s *Server) changed(attrIDs ...uint32) {
+	origin := contract.OriginHostSet
+	if c := s.cause.Load(); c != 0 {
+		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
 	s.tracker().Bump()
-	s.Notify(attrIDs...)
+	s.NotifyFrom(origin, attrIDs...)
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -520,16 +527,25 @@ func nullable(p *uint32) any {
 
 // MatterWrite refuses every write: every attribute is read-only, and the
 // definition answers each with its status.
-func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := s.ValidateWrite(attrID, value, nil)
-	return err
+func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
+	}
+	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
-// MatterInvoke carries out SelectAreas and SkipArea.
+// MatterInvoke carries out SelectAreas and SkipArea; a host handler
+// registered with [Server.Handle] takes the command instead.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("servicearea: command 0x%02X is not supported", cmdID)
 	}
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
+	s.cause.Store(uint32(contract.OriginCommand))
+	defer s.cause.Store(0)
 	if cmdID == sa.CmdSelectAreas {
 		req, ok := request[sa.SelectAreasRequest](fields)
 		if !ok {

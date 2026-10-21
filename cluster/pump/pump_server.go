@@ -193,6 +193,21 @@ var optionalAttributes = []struct {
 	}},
 }
 
+// OptionalFor is the Optional set that serves attrIDs: an optional
+// attribute among them sets its bit (any one of the automatic limits sets
+// OptionalAutomaticLimits), every other id is ignored.
+func OptionalFor(attrIDs []uint32) Optional {
+	var o Optional
+	for _, a := range optionalAttributes {
+		for _, id := range a.attrs {
+			if slices.Contains(attrIDs, id) {
+				o |= a.opt
+			}
+		}
+	}
+	return o
+}
+
 // Limits are the fixed (quality F), nullable limit attributes; nil is
 // null, "if the value is invalid" (resource :35-133).
 type Limits struct {
@@ -211,49 +226,29 @@ type Limits struct {
 	MaxConstTemp     *int16
 }
 
-// State is one observation of the host's pump. Pointer fields are the
-// nullable attributes; nil is null.
-type State struct {
-	PumpStatus             Status
-	EffectiveOperationMode OperationMode
-	EffectiveControlMode   ControlMode
-	// Capacity is in 0.005 % units of the effective maximum setpoint.
-	Capacity *int16
-	// Speed is in RPM.
-	Speed *uint16
-	// LifetimeRunningHours is a uint24 count of hours.
-	LifetimeRunningHours *uint32
-	// Power is a uint24 in watts.
-	Power *uint32
-	// LifetimeEnergyConsumed is in kWh.
-	LifetimeEnergyConsumed *uint32
-	OperationMode          OperationMode
-	ControlMode            ControlMode
-}
+// State is one observation of the host's pump, in the generated type
+// (pumpconfigurationandcontroldef.State). Pointer fields are the nullable
+// attributes; nil is null. Capacity is in 0.005 % units of the effective
+// maximum setpoint, Speed in RPM, LifetimeRunningHours a uint24 count of
+// hours, Power a uint24 in watts, LifetimeEnergyConsumed in kWh. The
+// server reads the operational fields; the limits and AlarmMask are the
+// configuration's ([Limits]) and are not read from here.
+type State = pumpdef.State
 
 // StateSource is the host port: the live state, and the one mandatory
-// writable attribute.
-type StateSource interface {
-	PumpState() State
-	SetOperationMode(ctx context.Context, mode OperationMode) error
-}
+// writable attribute (pumpconfigurationandcontroldef.StateSource).
+type StateSource = pumpdef.StateSource
 
 // ControlModeSetter applies a ControlMode write.
-type ControlModeSetter interface {
-	SetControlMode(ctx context.Context, mode ControlMode) error
-}
+type ControlModeSetter = pumpdef.ControlModeSetter
 
 // RunningHoursSetter applies a LifetimeRunningHours write (reset after
 // maintenance, resource :215-216); hours is nil for null.
-type RunningHoursSetter interface {
-	SetLifetimeRunningHours(ctx context.Context, hours *uint32) error
-}
+type RunningHoursSetter = pumpdef.RunningHoursSetter
 
 // EnergyConsumedSetter applies a LifetimeEnergyConsumed write; kWh is
 // nil for null.
-type EnergyConsumedSetter interface {
-	SetLifetimeEnergyConsumed(ctx context.Context, kWh *uint32) error
-}
+type EnergyConsumedSetter = pumpdef.EnergyConsumedSetter
 
 // Config carries the construction parameters for [Server].
 type Config struct {
@@ -637,4 +632,21 @@ func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
 		emitter.MatterEmitEvent(endpoint, ClusterID, eventID, clusterwire.FieldlessEvent{}, s.inst.EventPriority(eventID))
 	}
 	return nil
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// StateSource's: a change the host reports there moves the server's data
+// version, then cb runs — the bridge hears a pull server's change through
+// it. A StateSource that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.tracker().Bump()
+		if cb != nil {
+			cb()
+		}
+	})
 }

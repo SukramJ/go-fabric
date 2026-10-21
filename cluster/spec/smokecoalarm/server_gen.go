@@ -53,6 +53,56 @@ type Patch struct {
 	Unmounted              *bool                   `matter:"0x000D"` // attribute 0x000D
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.ExpressedState != nil {
+		v[AttrExpressedState] = *p.ExpressedState
+	}
+	if p.SmokeState != nil {
+		v[AttrSmokeState] = *p.SmokeState
+	}
+	if p.CoState != nil {
+		v[AttrCoState] = *p.CoState
+	}
+	if p.BatteryAlert != nil {
+		v[AttrBatteryAlert] = *p.BatteryAlert
+	}
+	if p.DeviceMuted != nil {
+		v[AttrDeviceMuted] = *p.DeviceMuted
+	}
+	if p.TestInProgress != nil {
+		v[AttrTestInProgress] = *p.TestInProgress
+	}
+	if p.HardwareFaultAlert != nil {
+		v[AttrHardwareFaultAlert] = *p.HardwareFaultAlert
+	}
+	if p.EndOfServiceAlert != nil {
+		v[AttrEndOfServiceAlert] = *p.EndOfServiceAlert
+	}
+	if p.InterconnectSmokeAlarm != nil {
+		v[AttrInterconnectSmokeAlarm] = *p.InterconnectSmokeAlarm
+	}
+	if p.InterconnectCoAlarm != nil {
+		v[AttrInterconnectCoAlarm] = *p.InterconnectCoAlarm
+	}
+	if p.ContaminationState != nil {
+		v[AttrContaminationState] = *p.ContaminationState
+	}
+	if p.SmokeSensitivityLevel != nil {
+		v[AttrSmokeSensitivityLevel] = *p.SmokeSensitivityLevel
+	}
+	if p.ExpiryDate != nil {
+		v[AttrExpiryDate] = *p.ExpiryDate
+	}
+	if p.Unmounted != nil {
+		v[AttrUnmounted] = *p.Unmounted
+	}
+	return v
+}
+
 // Server is the typed SmokeCoAlarm server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -183,6 +233,30 @@ func (s *Server) EmitAllClear(endpoint uint16, data AllClearEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data)
 }
 
+// SelfTester is a StateSource that runs the self-test: SelfTest starts
+// it and returns; the source then reports TestInProgress until it ends.
+type SelfTester interface {
+	SelfTest(ctx context.Context) error
+}
+
+// SensitivitySetter is a StateSource that takes a controller's
+// SmokeSensitivityLevel write.
+type SensitivitySetter interface {
+	SetSmokeSensitivityLevel(ctx context.Context, level SensitivityEnum) error
+}
+
+// StateSource is the alarm: SmokeCOState reports its state, read on
+// every attribute read; the kit's server derives ExpressedState from
+// it by the priority order — an ExpressedState of Inoperative is the
+// host's "the sensor cannot detect" — and emits the events of each
+// change when the source, a contract.ChangeNotifier, reports one. A
+// source that also implements SelfTester takes SelfTestRequest, one
+// that implements SensitivitySetter the SmokeSensitivityLevel write
+// (cluster/alarm).
+type StateSource interface {
+	SmokeCOState() State
+}
+
 // Declare is the declaration of the SmokeCoAlarm cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -194,12 +268,21 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
 	// HandleSelfTestRequest handles the SelfTestRequest command in place of the server
 	// (Server.HandleSelfTestRequest), inline; an optional command it handles is accepted.
 	HandleSelfTestRequest func(ctx context.Context, req SelfTestRequestRequest) (struct{}, error)
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -218,6 +301,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleSelfTestRequest != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSelfTestRequest)
 		decl.Attach = d.attach

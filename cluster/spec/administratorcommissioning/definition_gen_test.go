@@ -51,6 +51,16 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		WindowStatus:     new(CommissioningWindowStatusEnum),
+		AdminFabricIndex: new(uint8),
+		AdminVendorId:    new(uint16),
+		Null:             []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 4 {
+		t.Errorf("a patch of every field sets %d values, want 4", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -84,5 +94,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleRevokeCommissioning = func(context.Context, RevokeCommissioningRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 3 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdOpenCommissioningWindow}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

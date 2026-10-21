@@ -20,9 +20,12 @@ const (
 	OnOffLightRevision uint16 = 4
 )
 
-// OnOffLightType is the OnOffLight device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/on-off-light.ts.
-var OnOffLightType = Type{
+// OnOffLightType is the OnOffLight device type, matter.js's packages/node/src/devices/on-off-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#onofflight.
+var OnOffLightType = typeOnOffLight
+
+// typeOnOffLight holds [OnOffLightType]'s cluster requirements.
+var typeOnOffLight = Type{
 	ID: OnOffLightID, Name: "OnOffLight", Revision: OnOffLightRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -85,16 +88,10 @@ func NewOnOffLight(opts Options, decls ...Declaration) (*OnOffLight, error) {
 	return &OnOffLight{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *OnOffLight) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// LevelControl is the device's typed LevelControl server, nil until a declaration mounts it.
 func (d *OnOffLight) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

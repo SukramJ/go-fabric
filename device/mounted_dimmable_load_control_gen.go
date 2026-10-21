@@ -20,9 +20,12 @@ const (
 	MountedDimmableLoadControlRevision uint16 = 3
 )
 
-// MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/mounted-dimmable-load-control.ts.
-var MountedDimmableLoadControlType = Type{
+// MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, matter.js's packages/node/src/devices/mounted-dimmable-load-control.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#mounteddimmableloadcontrol.
+var MountedDimmableLoadControlType = typeMountedDimmableLoadControl
+
+// typeMountedDimmableLoadControl holds [MountedDimmableLoadControlType]'s cluster requirements.
+var typeMountedDimmableLoadControl = Type{
 	ID: MountedDimmableLoadControlID, Name: "MountedDimmableLoadControl", Revision: MountedDimmableLoadControlRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "DimmablePlugInUnit",
@@ -87,18 +90,12 @@ func NewMountedDimmableLoadControl(opts Options, decls ...Declaration) (*Mounted
 	return &MountedDimmableLoadControl{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *MountedDimmableLoadControl) OnOff() *onoffdef.Server {
 	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *MountedDimmableLoadControl) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
@@ -20,20 +22,20 @@ import (
 // device is a host alarm: its state, and the two capabilities.
 type device struct {
 	mu          sync.Mutex
-	st          alarm.State
+	st          smokedef.State
 	selfTests   int
 	selfTestErr error
 	setErr      error
 	written     []alarm.Sensitivity
 }
 
-func (d *device) SmokeCOState() alarm.State {
+func (d *device) SmokeCOState() smokedef.State {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.st
 }
 
-func (d *device) set(f func(*alarm.State)) {
+func (d *device) set(f func(*smokedef.State)) {
 	d.mu.Lock()
 	f(&d.st)
 	d.mu.Unlock()
@@ -62,9 +64,9 @@ func (d *device) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensiti
 }
 
 // readOnlyDevice reports state but can neither test nor be written.
-type readOnlyDevice struct{ st alarm.State }
+type readOnlyDevice struct{ st smokedef.State }
 
-func (r readOnlyDevice) SmokeCOState() alarm.State { return r.st }
+func (r readOnlyDevice) SmokeCOState() smokedef.State { return r.st }
 
 // emitted is one recorded event.
 type emitted struct {
@@ -178,11 +180,11 @@ func TestAttributeListFollowsFeaturesAndOptionals(t *testing.T) {
 
 func TestReadsProjectTheHostState(t *testing.T) {
 	t.Parallel()
-	d := &device{st: alarm.State{
-		SmokeState: alarm.AlarmWarning, COState: alarm.AlarmCritical, BatteryAlert: alarm.AlarmWarning,
+	d := &device{st: smokedef.State{
+		SmokeState: alarm.AlarmWarning, CoState: alarm.AlarmCritical, BatteryAlert: alarm.AlarmWarning,
 		DeviceMuted: alarm.Muted, TestInProgress: true, HardwareFaultAlert: true,
 		EndOfServiceAlert: alarm.EndOfServiceExpired, InterconnectSmokeAlarm: alarm.AlarmCritical,
-		InterconnectCOAlarm: alarm.AlarmWarning, ContaminationState: alarm.ContaminationLow,
+		InterconnectCoAlarm: alarm.AlarmWarning, ContaminationState: alarm.ContaminationLow,
 		SmokeSensitivityLevel: alarm.SensitivityLow, ExpiryDate: 123456, Unmounted: true,
 	}}
 	srv := newFull(t, d)
@@ -253,19 +255,19 @@ func TestExpressedStatePriority(t *testing.T) {
 	srv := newFull(t, d)
 	steps := []struct {
 		name string
-		st   alarm.State
+		st   smokedef.State
 		want alarm.ExpressedState
 	}{
-		{"nothing", alarm.State{}, alarm.ExpressedNormal},
-		{"battery only", alarm.State{BatteryAlert: alarm.AlarmWarning}, alarm.ExpressedBatteryAlert},
-		{"end of service beats battery", alarm.State{BatteryAlert: alarm.AlarmCritical, EndOfServiceAlert: alarm.EndOfServiceExpired}, alarm.ExpressedEndOfService},
-		{"testing beats end of service", alarm.State{EndOfServiceAlert: alarm.EndOfServiceExpired, TestInProgress: true}, alarm.ExpressedTesting},
-		{"hardware fault beats testing", alarm.State{TestInProgress: true, HardwareFaultAlert: true}, alarm.ExpressedHardwareFault},
-		{"interconnect CO beats fault", alarm.State{HardwareFaultAlert: true, InterconnectCOAlarm: alarm.AlarmWarning}, alarm.ExpressedInterconnectCO},
-		{"CO beats interconnect CO", alarm.State{InterconnectCOAlarm: alarm.AlarmWarning, COState: alarm.AlarmWarning}, alarm.ExpressedCOAlarm},
-		{"interconnect smoke beats CO", alarm.State{COState: alarm.AlarmCritical, InterconnectSmokeAlarm: alarm.AlarmWarning}, alarm.ExpressedInterconnectSmoke},
-		{"smoke beats everything", alarm.State{InterconnectSmokeAlarm: alarm.AlarmWarning, SmokeState: alarm.AlarmCritical, BatteryAlert: alarm.AlarmCritical}, alarm.ExpressedSmokeAlarm},
-		{"inoperative is expressed first", alarm.State{SmokeState: alarm.AlarmCritical, Inoperative: true}, alarm.ExpressedInoperative},
+		{"nothing", smokedef.State{}, alarm.ExpressedNormal},
+		{"battery only", smokedef.State{BatteryAlert: alarm.AlarmWarning}, alarm.ExpressedBatteryAlert},
+		{"end of service beats battery", smokedef.State{BatteryAlert: alarm.AlarmCritical, EndOfServiceAlert: alarm.EndOfServiceExpired}, alarm.ExpressedEndOfService},
+		{"testing beats end of service", smokedef.State{EndOfServiceAlert: alarm.EndOfServiceExpired, TestInProgress: true}, alarm.ExpressedTesting},
+		{"hardware fault beats testing", smokedef.State{TestInProgress: true, HardwareFaultAlert: true}, alarm.ExpressedHardwareFault},
+		{"interconnect CO beats fault", smokedef.State{HardwareFaultAlert: true, InterconnectCoAlarm: alarm.AlarmWarning}, alarm.ExpressedInterconnectCO},
+		{"CO beats interconnect CO", smokedef.State{InterconnectCoAlarm: alarm.AlarmWarning, CoState: alarm.AlarmWarning}, alarm.ExpressedCOAlarm},
+		{"interconnect smoke beats CO", smokedef.State{CoState: alarm.AlarmCritical, InterconnectSmokeAlarm: alarm.AlarmWarning}, alarm.ExpressedInterconnectSmoke},
+		{"smoke beats everything", smokedef.State{InterconnectSmokeAlarm: alarm.AlarmWarning, SmokeState: alarm.AlarmCritical, BatteryAlert: alarm.AlarmCritical}, alarm.ExpressedSmokeAlarm},
+		{"inoperative is expressed first", smokedef.State{SmokeState: alarm.AlarmCritical, ExpressedState: smokedef.ExpressedStateInoperative}, alarm.ExpressedInoperative},
 	}
 	for _, s := range steps {
 		if got := srv.ExpressedStateOf(s.st); got != s.want {
@@ -279,7 +281,7 @@ func TestExpressedStatePriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := coOnly.ExpressedStateOf(alarm.State{SmokeState: alarm.AlarmCritical, InterconnectSmokeAlarm: alarm.AlarmCritical}); got != alarm.ExpressedNormal {
+	if got := coOnly.ExpressedStateOf(smokedef.State{SmokeState: alarm.AlarmCritical, InterconnectSmokeAlarm: alarm.AlarmCritical}); got != alarm.ExpressedNormal {
 		t.Errorf("CO-only ExpressedState = %d, want Normal", got)
 	}
 
@@ -291,10 +293,10 @@ func TestExpressedStatePriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := custom.ExpressedStateOf(alarm.State{SmokeState: alarm.AlarmWarning, BatteryAlert: alarm.AlarmWarning}); got != alarm.ExpressedBatteryAlert {
+	if got := custom.ExpressedStateOf(smokedef.State{SmokeState: alarm.AlarmWarning, BatteryAlert: alarm.AlarmWarning}); got != alarm.ExpressedBatteryAlert {
 		t.Errorf("custom order ExpressedState = %d, want BatteryAlert", got)
 	}
-	if got := custom.ExpressedStateOf(alarm.State{HardwareFaultAlert: true}); got != alarm.ExpressedNormal {
+	if got := custom.ExpressedStateOf(smokedef.State{HardwareFaultAlert: true}); got != alarm.ExpressedNormal {
 		t.Errorf("custom order without HardwareFault expresses %d, want Normal", got)
 	}
 }
@@ -354,14 +356,14 @@ func TestSelfTestRequest(t *testing.T) {
 	}
 
 	// Busy while alarming or testing (resource :201-204).
-	for name, st := range map[string]alarm.State{
+	for name, st := range map[string]smokedef.State{
 		"smoke":              {SmokeState: alarm.AlarmWarning},
-		"co":                 {COState: alarm.AlarmCritical},
+		"co":                 {CoState: alarm.AlarmCritical},
 		"testing":            {TestInProgress: true},
 		"interconnect smoke": {InterconnectSmokeAlarm: alarm.AlarmWarning},
-		"interconnect co":    {InterconnectCOAlarm: alarm.AlarmWarning},
+		"interconnect co":    {InterconnectCoAlarm: alarm.AlarmWarning},
 	} {
-		d.set(func(s *alarm.State) { *s = st })
+		d.set(func(s *smokedef.State) { *s = st })
 		if _, err := srv.MatterInvoke(ctx, alarm.CmdSelfTestRequest, nil); statusOf(t, err) != im.StatusBusy {
 			t.Errorf("%s: SelfTestRequest = %v, want Busy", name, err)
 		}
@@ -371,7 +373,7 @@ func TestSelfTestRequest(t *testing.T) {
 	}
 
 	// A battery alert does not block the test.
-	d.set(func(s *alarm.State) { *s = alarm.State{BatteryAlert: alarm.AlarmWarning} })
+	d.set(func(s *smokedef.State) { *s = smokedef.State{BatteryAlert: alarm.AlarmWarning} })
 	srv.Refresh()
 	rec.take()
 	if _, err := srv.MatterInvoke(ctx, alarm.CmdSelfTestRequest, nil); err != nil {
@@ -384,7 +386,7 @@ func TestSelfTestRequest(t *testing.T) {
 		t.Errorf("ExpressedState during the test = %v, want Testing", v)
 	}
 	// The test ends: SelfTestComplete.
-	d.set(func(s *alarm.State) { s.TestInProgress = false })
+	d.set(func(s *smokedef.State) { s.TestInProgress = false })
 	srv.Refresh()
 	if got := ids(rec.take()); !slices.Equal(got, []uint32{alarm.EventSelfTestComplete}) {
 		t.Errorf("events at test end = %v, want SelfTestComplete", got)
@@ -407,7 +409,7 @@ func TestRefreshEmitsTheSpecifiedEvents(t *testing.T) {
 	srv.SetMatterEventEmitter(rec)
 	srv.SetEndpoint(9)
 
-	step := func(name string, change func(*alarm.State), want ...uint32) []emitted {
+	step := func(name string, change func(*smokedef.State), want ...uint32) []emitted {
 		t.Helper()
 		d.set(change)
 		srv.Refresh()
@@ -423,19 +425,19 @@ func TestRefreshEmitsTheSpecifiedEvents(t *testing.T) {
 		return got
 	}
 
-	got := step("smoke warning", func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning }, alarm.EventSmokeAlarm)
+	got := step("smoke warning", func(s *smokedef.State) { s.SmokeState = alarm.AlarmWarning }, alarm.EventSmokeAlarm)
 	if len(got) == 1 && (got[0].data != alarm.AlarmSeverityEvent{AlarmSeverityLevel: alarm.AlarmWarning} || got[0].priority != contract.EventPriorityCritical) {
 		t.Errorf("SmokeAlarm = %+v", got[0])
 	}
-	step("unchanged", func(*alarm.State) {})
-	step("warning to critical", func(s *alarm.State) { s.SmokeState = alarm.AlarmCritical }, alarm.EventSmokeAlarm)
-	step("smoke clears: all clear", func(s *alarm.State) { s.SmokeState = alarm.AlarmNormal }, alarm.EventAllClear)
-	step("co", func(s *alarm.State) { s.COState = alarm.AlarmCritical }, alarm.EventCOAlarm)
-	step("co clears with battery low: no all clear", func(s *alarm.State) {
-		s.COState = alarm.AlarmNormal
+	step("unchanged", func(*smokedef.State) {})
+	step("warning to critical", func(s *smokedef.State) { s.SmokeState = alarm.AlarmCritical }, alarm.EventSmokeAlarm)
+	step("smoke clears: all clear", func(s *smokedef.State) { s.SmokeState = alarm.AlarmNormal }, alarm.EventAllClear)
+	step("co", func(s *smokedef.State) { s.CoState = alarm.AlarmCritical }, alarm.EventCOAlarm)
+	step("co clears with battery low: no all clear", func(s *smokedef.State) {
+		s.CoState = alarm.AlarmNormal
 		s.BatteryAlert = alarm.AlarmWarning
 	}, alarm.EventLowBattery)
-	got = step("hardware fault + end of service", func(s *alarm.State) {
+	got = step("hardware fault + end of service", func(s *smokedef.State) {
 		s.HardwareFaultAlert = true
 		s.EndOfServiceAlert = alarm.EndOfServiceExpired
 	}, alarm.EventHardwareFault, alarm.EventEndOfService)
@@ -444,16 +446,16 @@ func TestRefreshEmitsTheSpecifiedEvents(t *testing.T) {
 			t.Errorf("fieldless event = %+v", e)
 		}
 	}
-	step("muted", func(s *alarm.State) { s.DeviceMuted = alarm.Muted }, alarm.EventAlarmMuted)
-	step("mute ended", func(s *alarm.State) { s.DeviceMuted = alarm.NotMuted }, alarm.EventMuteEnded)
-	step("interconnect smoke", func(s *alarm.State) { s.InterconnectSmokeAlarm = alarm.AlarmWarning }, alarm.EventInterconnectSmokeAlarm)
-	step("interconnect co", func(s *alarm.State) { s.InterconnectCOAlarm = alarm.AlarmCritical }, alarm.EventInterconnectCOAlarm)
-	step("everything clears", func(s *alarm.State) { *s = alarm.State{} }, alarm.EventAllClear)
+	step("muted", func(s *smokedef.State) { s.DeviceMuted = alarm.Muted }, alarm.EventAlarmMuted)
+	step("mute ended", func(s *smokedef.State) { s.DeviceMuted = alarm.NotMuted }, alarm.EventMuteEnded)
+	step("interconnect smoke", func(s *smokedef.State) { s.InterconnectSmokeAlarm = alarm.AlarmWarning }, alarm.EventInterconnectSmokeAlarm)
+	step("interconnect co", func(s *smokedef.State) { s.InterconnectCoAlarm = alarm.AlarmCritical }, alarm.EventInterconnectCOAlarm)
+	step("everything clears", func(s *smokedef.State) { *s = smokedef.State{} }, alarm.EventAllClear)
 }
 
 func TestRefreshWithoutEmitterAdvancesTheBaseline(t *testing.T) {
 	t.Parallel()
-	d := &device{st: alarm.State{SmokeState: alarm.AlarmCritical}}
+	d := &device{st: smokedef.State{SmokeState: alarm.AlarmCritical}}
 	srv := newFull(t, d)
 	srv.Refresh() // nobody listening
 	rec := &recorder{}
@@ -473,10 +475,10 @@ func TestEventsNotServedAreNeverEmitted(t *testing.T) {
 	}
 	rec := &recorder{}
 	srv.SetMatterEventEmitter(rec)
-	d.set(func(s *alarm.State) {
+	d.set(func(s *smokedef.State) {
 		s.SmokeState = alarm.AlarmCritical
 		s.DeviceMuted = alarm.Muted
-		s.InterconnectCOAlarm = alarm.AlarmCritical
+		s.InterconnectCoAlarm = alarm.AlarmCritical
 		s.InterconnectSmokeAlarm = alarm.AlarmCritical
 	})
 	srv.Refresh()

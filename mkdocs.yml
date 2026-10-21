@@ -76,6 +76,7 @@ nav:
   - Home: index.md
   - Getting started:
       - The device side: getting-started/device.md
+      - "A host's view": guides/host-view.md
       - The controller side: getting-started/controller.md
   - Architecture: architecture.md
   - Roadmap: roadmap.md
@@ -116,6 +117,7 @@ nav:
           - "ADR 0024 — BLE commissioning in the controller role": adr/0024-ble-commissioning-in-the-controller.md
           - "ADR 0025 — Design principles of the facade": adr/0025-facade-design-principles.md
           - "ADR 0026 — Architecture principles of the module": adr/0026-architecture-principles.md
+      - Device types: reference/device-types.md
       - matter.js comparison: matterjs-comparison.md
       - Parity contract: matter-parity-contract.md
       - Certifiability: certifiability.md

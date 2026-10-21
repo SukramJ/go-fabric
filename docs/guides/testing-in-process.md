@@ -28,14 +28,14 @@ func TestPlugToggles(t *testing.T) {
 	pair := site.CommissionedPair(fabrictest.PairOptions{
 		Device: fabrictest.Topology{Bridged: []node.Endpoint{plug}},
 	})
-	ep, _ := pair.Device.EndpointOf("plug:1")
+	ep, _ := plug.EndpointNumber()
 	ctx := context.Background()
 
-	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoff.ClusterID, Command: onoff.CmdToggle}
+	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
 	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {
 		t.Fatal(err)
 	}
-	onOff := im.ConcreteAttributePath{Endpoint: ep, Cluster: onoff.ClusterID, Attribute: onoff.AttrOnOff,
+	onOff := im.ConcreteAttributePath{Endpoint: ep, Cluster: onoffdef.ClusterID, Attribute: onoffdef.AttrOnOff,
 		HasEndpoint: true, HasCluster: true, HasAttribute: true}
 	got, err := fabrictest.Read(ctx, pair, onOff)
 	if err != nil || !got.Value.El.Bool {
@@ -68,9 +68,11 @@ host when the test ends.
 `Topology.Configure` edits the node's configuration before `node.New`: a
 passcode, a product name, an OTA requestor. `fabrictest.Endpoint(key,
 deviceType, servers...)` is a bridged endpoint for `Topology.Bridged` that
-serves cluster servers the test built itself — a feature selection or an
-initial state no device-layer constructor offers; `Device.EndpointOf(key)`
-finds its number. Both hosts run the production
+serves cluster servers the test built itself, for a server under test
+outside the device layer; `Device.EndpointOf(key)` finds its number. A
+device-layer device states its feature selection and initial state in its
+declarations (`onoffdef.Declare{…}`) and knows its own number once added
+(`plug.EndpointNumber()`). Both hosts run the production
 code: the device's bridge serves the production `transport/udp.Listener`
 over a socket of the in-memory network, so every datagram it receives,
 answers or initiates takes the path a kernel socket would.

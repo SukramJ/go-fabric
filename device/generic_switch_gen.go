@@ -17,9 +17,12 @@ const (
 	GenericSwitchRevision uint16 = 3
 )
 
-// GenericSwitchType is the GenericSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/generic-switch.ts.
-var GenericSwitchType = Type{
+// GenericSwitchType is the GenericSwitch device type, matter.js's packages/node/src/devices/generic-switch.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#genericswitch.
+var GenericSwitchType = typeGenericSwitch
+
+// typeGenericSwitch holds [GenericSwitchType]'s cluster requirements.
+var typeGenericSwitch = Type{
 	ID: GenericSwitchID, Name: "GenericSwitch", Revision: GenericSwitchRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewGenericSwitch(opts Options, decls ...Declaration) (*GenericSwitch, error
 	return &GenericSwitch{d}, nil
 }
 
-// Switch returns the typed Switch server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// Switch is the device's typed Switch server; the type mandates it.
 func (d *GenericSwitch) Switch() *switchclusterdef.Server {
 	return switchclusterdef.WrapOn(d.Server(0x003B), d.queue)
 }

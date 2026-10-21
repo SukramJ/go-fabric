@@ -45,6 +45,44 @@ type Patch struct {
 	CriticalUnderTemperatureThreshold *int16       `matter:"0x0085"` // attribute 0x0085
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Mask != nil {
+		v[AttrMask] = *p.Mask
+	}
+	if p.Latch != nil {
+		v[AttrLatch] = *p.Latch
+	}
+	if p.State != nil {
+		v[AttrState] = *p.State
+	}
+	if p.Supported != nil {
+		v[AttrSupported] = *p.Supported
+	}
+	if p.CriticalOverTemperatureThreshold != nil {
+		v[AttrCriticalOverTemperatureThreshold] = *p.CriticalOverTemperatureThreshold
+	}
+	if p.MajorOverTemperatureThreshold != nil {
+		v[AttrMajorOverTemperatureThreshold] = *p.MajorOverTemperatureThreshold
+	}
+	if p.MinorOverTemperatureThreshold != nil {
+		v[AttrMinorOverTemperatureThreshold] = *p.MinorOverTemperatureThreshold
+	}
+	if p.MinorUnderTemperatureThreshold != nil {
+		v[AttrMinorUnderTemperatureThreshold] = *p.MinorUnderTemperatureThreshold
+	}
+	if p.MajorUnderTemperatureThreshold != nil {
+		v[AttrMajorUnderTemperatureThreshold] = *p.MajorUnderTemperatureThreshold
+	}
+	if p.CriticalUnderTemperatureThreshold != nil {
+		v[AttrCriticalUnderTemperatureThreshold] = *p.CriticalUnderTemperatureThreshold
+	}
+	return v
+}
+
 // Server is the typed TemperatureAlarm server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -127,6 +165,14 @@ func (s *Server) EmitNotify(endpoint uint16, data NotifyEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNotify, data)
 }
 
+// Delegate is asked before a command changes Mask (ModifyEnabledAlarms)
+// or State (Reset); an error refuses the command and answers FAILURE.
+// Without one every command is accepted (cluster/alarmbase).
+type Delegate interface {
+	ModifyEnabledAlarms(ctx context.Context, mask uint32) error
+	ResetAlarms(ctx context.Context, alarms uint32) error
+}
+
 // Declare is the declaration of the TemperatureAlarm cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -138,6 +184,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -150,6 +203,8 @@ type Declare struct {
 	// HandleSetTemperatureAlarmThresholds handles the SetTemperatureAlarmThresholds command in place of the server
 	// (Server.HandleSetTemperatureAlarmThresholds), inline; an optional command it handles is accepted.
 	HandleSetTemperatureAlarmThresholds func(ctx context.Context, req SetTemperatureAlarmThresholdsRequest) (struct{}, error)
+	// Delegate is the host port the kit's server runs on ([Delegate]).
+	Delegate Delegate
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -168,6 +223,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleReset != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdReset)
 		decl.Attach = d.attach

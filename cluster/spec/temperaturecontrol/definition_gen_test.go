@@ -49,6 +49,18 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		TemperatureSetpoint:        new(int16),
+		MinTemperature:             new(int16),
+		MaxTemperature:             new(int16),
+		Step:                       new(int16),
+		SelectedTemperatureLevel:   new(uint8),
+		SupportedTemperatureLevels: new([]string),
+	}
+	values := full.AttributeValues()
+	if len(values) != 6 {
+		t.Errorf("a patch of every field sets %d values, want 6", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -68,11 +80,15 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ TemperatureSetter = d.TemperatureSetter
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
 	all.HandleSetTemperature = func(context.Context, SetTemperatureRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 1 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSetTemperature}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

@@ -33,6 +33,26 @@ type Patch struct {
 	Null           []uint32             // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.ChannelList != nil {
+		v[AttrChannelList] = spec.List[ChannelInfoStruct](*p.ChannelList)
+	}
+	if p.Lineup != nil {
+		v[AttrLineup] = *p.Lineup
+	}
+	if p.CurrentChannel != nil {
+		v[AttrCurrentChannel] = *p.CurrentChannel
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed Channel server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -127,6 +147,31 @@ func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req Canc
 	return spec.HandleOn(s.Underlying(), CmdCancelRecordProgram, fn)
 }
 
+// ChannelGuide is a Channels that takes GetProgramGuide;
+// ElectronicGuide (EG) requires it.
+type ChannelGuide interface {
+	GetProgramGuide(ctx context.Context, st *State, req GetProgramGuideRequest) (ProgramGuideResponse, error)
+}
+
+// ChannelRecorder is a Channels that takes RecordProgram and
+// CancelRecordProgram (status only); RecordProgram with
+// ElectronicGuide (RP & EG) requires it.
+type ChannelRecorder interface {
+	RecordProgram(ctx context.Context, st *State, req RecordProgramRequest) error
+	CancelRecordProgram(ctx context.Context, st *State, req CancelRecordProgramRequest) error
+}
+
+// Channels tunes: ChangeChannel answers ChangeChannelResponse,
+// ChangeChannelByNumber and SkipChannel are status only; the port
+// makes the channel current in st. A port that also implements
+// ChannelGuide takes the ElectronicGuide commands, ChannelRecorder
+// RecordProgram's (cluster/media).
+type Channels interface {
+	ChangeChannel(ctx context.Context, st *State, req ChangeChannelRequest) (ChangeChannelResponse, error)
+	ChangeChannelByNumber(ctx context.Context, st *State, req ChangeChannelByNumberRequest) error
+	SkipChannel(ctx context.Context, st *State, req SkipChannelRequest) error
+}
+
 // Declare is the declaration of the Channel cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -138,6 +183,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -159,6 +208,8 @@ type Declare struct {
 	// HandleCancelRecordProgram handles the CancelRecordProgram command in place of the server
 	// (Server.HandleCancelRecordProgram), inline; an optional command it handles is accepted.
 	HandleCancelRecordProgram func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)
+	// Channels is the host port the kit's server runs on ([Channels]).
+	Channels Channels
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -177,6 +228,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleChangeChannel != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdChangeChannel)
 		decl.Attach = d.attach

@@ -5,6 +5,7 @@ package media
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -73,7 +74,7 @@ func NewAppBasic(cfg AppBasicConfig) (*AppBasicServer, error) {
 		return nil, fmt.Errorf("media: ApplicationBasic: %w", err)
 	}
 	s := &AppBasicServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, AppBasicState.values, AppBasicState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, AppBasicState.values, AppBasicState.clone, readAppBasic); err != nil {
 		return nil, fmt.Errorf("media: ApplicationBasic: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -81,3 +82,15 @@ func NewAppBasic(cfg AppBasicConfig) (*AppBasicServer, error) {
 	}
 	return s, nil
 }
+
+// readAppBasic is the AppBasicState the store holds: its generated State
+// converted field by field ([spec.Convert]; VendorID is VendorId, the
+// Application the struct it points to).
+func readAppBasic(srv *spec.Server) AppBasicState {
+	c, _ := spec.Convert(spec.StateOf[basicdef.State](srv), reflect.TypeFor[AppBasicState]())
+	st, _ := c.Interface().(AppBasicState)
+	return st
+}
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *AppBasicServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }

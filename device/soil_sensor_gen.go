@@ -18,9 +18,12 @@ const (
 	SoilSensorRevision uint16 = 1
 )
 
-// SoilSensorType is the SoilSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/soil-sensor.ts.
-var SoilSensorType = Type{
+// SoilSensorType is the SoilSensor device type, matter.js's packages/node/src/devices/soil-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#soilsensor.
+var SoilSensorType = typeSoilSensor
+
+// typeSoilSensor holds [SoilSensorType]'s cluster requirements.
+var typeSoilSensor = Type{
 	ID: SoilSensorID, Name: "SoilSensor", Revision: SoilSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -55,18 +58,12 @@ func NewSoilSensor(opts Options, decls ...Declaration) (*SoilSensor, error) {
 	return &SoilSensor{d}, nil
 }
 
-// SoilMeasurement returns the typed SoilMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// SoilMeasurement is the device's typed SoilMeasurement server; the type mandates it.
 func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
 	return soilmeasurementdef.WrapOn(d.Server(0x0430), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *SoilSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

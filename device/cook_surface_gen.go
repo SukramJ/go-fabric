@@ -18,9 +18,12 @@ const (
 	CookSurfaceRevision uint16 = 2
 )
 
-// CookSurfaceType is the CookSurface device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/cook-surface.ts.
-var CookSurfaceType = Type{
+// CookSurfaceType is the CookSurface device type, matter.js's packages/node/src/devices/cook-surface.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#cooksurface.
+var CookSurfaceType = typeCookSurface
+
+// typeCookSurface holds [CookSurfaceType]'s cluster requirements.
+var typeCookSurface = Type{
 	ID: CookSurfaceID, Name: "CookSurface", Revision: CookSurfaceRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -55,24 +58,15 @@ func NewCookSurface(opts Options, decls ...Declaration) (*CookSurface, error) {
 	return &CookSurface{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OnOff is the device's typed OnOff server, nil until a declaration mounts it.
 func (d *CookSurface) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// TemperatureControl returns the typed TemperatureControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureControl is the device's typed TemperatureControl server, nil until a declaration mounts it.
 func (d *CookSurface) TemperatureControl() *temperaturecontroldef.Server {
 	return temperaturecontroldef.WrapOn(d.Server(0x0056), d.queue)
 }
 
-// TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// TemperatureMeasurement is the device's typed TemperatureMeasurement server, nil until a declaration mounts it.
 func (d *CookSurface) TemperatureMeasurement() *temperaturemeasurementdef.Server {
 	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

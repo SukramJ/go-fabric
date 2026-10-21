@@ -18,9 +18,12 @@ const (
 	ElectricalSensorRevision uint16 = 1
 )
 
-// ElectricalSensorType is the ElectricalSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/electrical-sensor.ts.
-var ElectricalSensorType = Type{
+// ElectricalSensorType is the ElectricalSensor device type, matter.js's packages/node/src/endpoints/electrical-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#electricalsensor.
+var ElectricalSensorType = typeElectricalSensor
+
+// typeElectricalSensor holds [ElectricalSensorType]'s cluster requirements.
+var typeElectricalSensor = Type{
 	ID: ElectricalSensorID, Name: "ElectricalSensor", Revision: ElectricalSensorRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -54,26 +57,17 @@ func NewElectricalSensor(opts Options, decls ...Declaration) (*ElectricalSensor,
 	return &ElectricalSensor{d}, nil
 }
 
-// PowerTopology returns the typed PowerTopology server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// PowerTopology is the device's typed PowerTopology server; the type mandates it.
 func (d *ElectricalSensor) PowerTopology() *powertopologydef.Server {
 	return powertopologydef.WrapOn(d.Server(0x009C), d.queue)
 }
 
-// ElectricalPowerMeasurement returns the typed ElectricalPowerMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ElectricalPowerMeasurement is the device's typed ElectricalPowerMeasurement server, nil until a declaration mounts it.
 func (d *ElectricalSensor) ElectricalPowerMeasurement() *electricalpowermeasurementdef.Server {
 	return electricalpowermeasurementdef.WrapOn(d.Server(0x0090), d.queue)
 }
 
-// ElectricalEnergyMeasurement returns the typed ElectricalEnergyMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ElectricalEnergyMeasurement is the device's typed ElectricalEnergyMeasurement server, nil until a declaration mounts it.
 func (d *ElectricalSensor) ElectricalEnergyMeasurement() *electricalenergymeasurementdef.Server {
 	return electricalenergymeasurementdef.WrapOn(d.Server(0x0091), d.queue)
 }

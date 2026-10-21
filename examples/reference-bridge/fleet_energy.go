@@ -5,18 +5,15 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/contract"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	whmgdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
+	whmdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // --- device: a water heater ------------------------------------------------
@@ -73,91 +70,81 @@ const (
 // heats regardless of the mode until its duration ends or — one-shot —
 // its target is reached.
 //
-// One difference: HeaterTypes is fixed ("F") in the module's server, so
+// One difference: HeaterTypes is fixed ("F") in the kit's server, so
 // the tank declares both elements from the start; the app declares one and
 // adds the second in its installation trigger (WaterHeaterManufacturer.cpp
 // :46, :170-171), the one an emergency boost turns on (:101-107).
 type demoWaterHeater struct {
 	name string
 
-	once    sync.Once
-	whm     *energy.WaterHeaterManagementServer
-	modes   *modebase.Server
-	thermo  *thermo.ThermostatServer
-	version struct{ whm, modes cluster.DataVersionTracker }
-
 	mu        sync.Mutex
+	whm       *whmgdef.Server
+	modes     *whmdef.Server
+	thermo    *thermostatdef.Server
 	target    int16 // mTargetWaterTemperature
 	water     int16 // mWaterTemperature
 	boosting  bool  // mBoostState == kActive
-	boost     energy.BoostInfo
+	boost     whmgdef.WaterHeaterBoostInfoStruct
 	reached   bool // mBoostTargetTemperatureReached
 	boostEnds *time.Timer
 }
 
 var (
-	_ energy.Booster       = (*demoWaterHeater)(nil)
-	_ modebase.ModeChanger = (*demoWaterHeater)(nil)
+	_ whmgdef.Booster    = (*demoWaterHeater)(nil)
+	_ whmdef.ModeChanger = (*demoWaterHeater)(nil)
 )
 
 func newDemoWaterHeater(name string) *demoWaterHeater { return &demoWaterHeater{name: name} }
 
-// servers are the cluster servers the device supplies.
-func (w *demoWaterHeater) servers() []contract.ClusterServer {
-	w.build()
-	return []contract.ClusterServer{w.whm, w.modes, w.thermo}
-}
-
-func (w *demoWaterHeater) build() {
-	w.once.Do(func() {
-		// EM and TP, as the app serves them (WaterHeaterMain.cpp:105-106).
-		srv, err := energy.NewWaterHeaterManagement(energy.WaterHeaterConfig{
-			Features:    energy.WaterHeaterFeatureEnergyManagement | energy.WaterHeaterFeatureTankPercent,
-			HeaterTypes: energy.HeatSourceImmersionElement1 | energy.HeatSourceImmersionElement2,
-			Booster:     w,
-			DataVersion: &w.version.whm,
-		})
-		if err != nil {
-			panic(fmt.Sprintf("water heater WaterHeaterManagement: %v", err))
-		}
-		modes, err := modebase.NewWaterHeaterMode(modebase.Config{
-			Changer: w,
-			SupportedModes: []modebase.ModeOption{
-				{Label: "Off", Mode: waterHeaterOff, Tags: []modebase.ModeTag{{Value: modebase.WaterHeaterTagOff}}},
-				{Label: "Manual", Mode: waterHeaterManual, Tags: []modebase.ModeTag{{Value: modebase.WaterHeaterTagManual}}},
-				{Label: "Timed", Mode: waterHeaterTimed, Tags: []modebase.ModeTag{{Value: modebase.WaterHeaterTagTimed}}},
+// device builds the water heater: WaterHeaterManagement with EM and TP, as
+// the app serves them (WaterHeaterMain.cpp:105-106), both immersion
+// elements; the three modes; a heating Thermostat from 30 °C to 80 °C at
+// the target. The tank starts as the app's does: empty readings, nothing
+// reported until a trigger or the host moves the water.
+func (w *demoWaterHeater) device(opts device.Options) (*device.WaterHeater, error) {
+	heaters := whmgdef.WaterHeaterHeatSourceImmersionElement1 | whmgdef.WaterHeaterHeatSourceImmersionElement2
+	mode := func(label string, m uint8, tag whmdef.ModeTag) whmdef.ModeOptionStruct {
+		return whmdef.ModeOptionStruct{Label: label, Mode: m, ModeTags: []whmdef.ModeTagStruct{{Value: tag}}}
+	}
+	modes := []whmdef.ModeOptionStruct{
+		mode("Off", waterHeaterOff, whmdef.ModeTagOff), mode("Manual", waterHeaterManual, whmdef.ModeTagManual),
+		mode("Timed", waterHeaterTimed, whmdef.ModeTagTimed),
+	}
+	off, minHeat, maxHeat, setpoint := waterHeaterOff, int16(3000), int16(8000), waterTargetTemperature
+	d, err := device.NewWaterHeater(opts,
+		whmgdef.Declare{
+			Features: whmgdef.FeatureEnergyManagement | whmgdef.FeatureTankPercent,
+			Booster:  w,
+			Initial:  whmgdef.Patch{HeaterTypes: &heaters},
+		},
+		whmdef.Declare{ModeChanger: w, Initial: whmdef.Patch{SupportedModes: &modes, CurrentMode: &off}},
+		thermostatdef.Declare{
+			Features: thermostatdef.FeatureHeating,
+			Initial: thermostatdef.Patch{
+				AbsMinHeatSetpointLimit: &minHeat, AbsMaxHeatSetpointLimit: &maxHeat, OccupiedHeatingSetpoint: &setpoint,
 			},
-			CurrentMode: waterHeaterOff,
-			DataVersion: &w.version.modes,
 		})
-		if err != nil {
-			panic(fmt.Sprintf("water heater WaterHeaterMode: %v", err))
-		}
-		cfg := thermo.ThermostatConfig{
-			Features:                thermo.ThermostatFeatureHEAT,
-			AbsMinHeatSetpointLimit: 3000,
-			AbsMaxHeatSetpointLimit: 8000,
-			InitialHeatingSetpoint:  waterTargetTemperature,
-		}
-		// The tank starts as the app's does: empty readings, nothing
-		// reported until a trigger or the host moves the water.
-		w.whm, w.modes, w.thermo = srv, modes, thermo.NewThermostatServer(cfg)
-	})
+	if err != nil {
+		return nil, err
+	}
+	w.mu.Lock()
+	w.whm, w.modes, w.thermo = d.WaterHeaterManagement(), d.WaterHeaterMode(), d.Thermostat()
+	w.mu.Unlock()
+	return d, nil
 }
 
-// ChangeToMode implements [modebase.ModeChanger]: every supported mode is
+// ChangeToMode implements [whmdef.ModeChanger]: every supported mode is
 // taken, as the app's mode delegate takes it (water-heater-mode.cpp:39-42).
-func (w *demoWaterHeater) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
+func (w *demoWaterHeater) ChangeToMode(_ context.Context, newMode uint8) (status uint8, text string, err error) {
 	slog.Info("waterheater.mode", slog.String("device", w.name), slog.Int("mode", int(newMode)))
-	return modebase.StatusSuccess, "", nil
+	return uint8(whmdef.ModeChangeStatusSuccess), "", nil
 }
 
-// Boost implements [energy.Booster]: the app's HandleBoost
+// Boost implements [whmgdef.Booster]: the app's HandleBoost
 // (WaterHeaterDelegateImpl.cpp:158-222) — keep the parameters, restart the
 // duration timer, then turn the heat on or off as the boost requires. The
 // server sets BoostState and emits BoostStarted when this returns.
-func (w *demoWaterHeater) Boost(_ context.Context, info energy.BoostInfo) error {
-	w.build() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
+func (w *demoWaterHeater) Boost(_ context.Context, info whmgdef.WaterHeaterBoostInfoStruct) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.boost, w.reached, w.boosting = info, false, true
@@ -168,7 +155,7 @@ func (w *demoWaterHeater) Boost(_ context.Context, info energy.BoostInfo) error 
 	return nil
 }
 
-// CancelBoost implements [energy.Booster]: the app's HandleCancelBoost
+// CancelBoost implements [whmgdef.Booster]: the app's HandleCancelBoost
 // (WaterHeaterDelegateImpl.cpp:270-285) for a running boost — the server
 // does not call it for none.
 func (w *demoWaterHeater) CancelBoost(context.Context) error {
@@ -203,7 +190,8 @@ func (w *demoWaterHeater) stopTimerLocked() {
 }
 
 func (w *demoWaterHeater) endBoostLocked() {
-	if err := w.whm.EndBoost(); err != nil {
+	inactive := whmgdef.BoostStateInactive
+	if err := w.whm.Set(whmgdef.Patch{BoostState: &inactive}); err != nil {
 		slog.Warn("waterheater.boost_end", slog.String("device", w.name), slog.Any("err", err))
 	}
 }
@@ -233,7 +221,7 @@ func (w *demoWaterHeater) reachedTargetLocked() bool {
 	if !w.boosting {
 		return w.water >= w.activeTargetLocked()
 	}
-	tank := w.whm.State().TankPercentage
+	tank := w.whm.Get().TankPercentage
 	switch {
 	case w.reached && w.boost.TargetReheat != nil:
 		return tank >= *w.boost.TargetReheat
@@ -248,8 +236,8 @@ func (w *demoWaterHeater) reachedTargetLocked() bool {
 // DetermineIfChangingHeatingState (WaterHeaterDelegateImpl.cpp:421-509),
 // with TurnHeatingOn / TurnHeatingOff (WaterHeaterManufacturer.cpp:93-127).
 func (w *demoWaterHeater) changeHeatingLocked() {
-	demand := w.whm.State().HeatDemand
-	mode, _ := w.modes.MatterRead(modebase.AttrCurrentMode)
+	demand := w.whm.Get().HeatDemand
+	mode := w.modes.Get().CurrentMode
 	on, off := false, false
 	switch {
 	case !w.reachedTargetLocked():
@@ -267,9 +255,9 @@ func (w *demoWaterHeater) changeHeatingLocked() {
 	}
 	switch {
 	case on:
-		next := energy.HeatSourceImmersionElement1
+		next := whmgdef.WaterHeaterHeatSourceImmersionElement1
 		if w.boost.EmergencyBoost != nil && *w.boost.EmergencyBoost {
-			next |= energy.HeatSourceImmersionElement2
+			next |= whmgdef.WaterHeaterHeatSourceImmersionElement2
 		}
 		w.setDemandLocked(next)
 	case off:
@@ -285,8 +273,8 @@ func (w *demoWaterHeater) changeHeatingLocked() {
 	}
 }
 
-func (w *demoWaterHeater) setDemandLocked(demand energy.HeatSource) {
-	if err := w.whm.SetHeatDemand(demand); err != nil {
+func (w *demoWaterHeater) setDemandLocked(demand whmgdef.WaterHeaterHeatSourceBitmap) {
+	if err := w.whm.Set(whmgdef.Patch{HeatDemand: &demand}); err != nil {
 		slog.Warn("waterheater.demand", slog.String("device", w.name), slog.Any("err", err))
 	}
 }
@@ -311,17 +299,20 @@ func (w *demoWaterHeater) drawOffLocked(percent int32, centi int16) {
 // reportLocked reports the tank percentage and the water temperature, the
 // latter as the thermostat's LocalTemperature.
 func (w *demoWaterHeater) reportLocked() {
-	if err := w.whm.SetTankPercentage(w.tankPercentageLocked()); err != nil {
+	tank := w.tankPercentageLocked()
+	if err := w.whm.Set(whmgdef.Patch{TankPercentage: &tank}); err != nil {
 		slog.Warn("waterheater.tank", slog.String("device", w.name), slog.Any("err", err))
 	}
 	water := w.water
-	w.thermo.SetLocalTemperature(&water)
+	if err := w.thermo.Set(thermostatdef.Patch{LocalTemperature: &water}); err != nil {
+		slog.Warn("waterheater.temperature", slog.String("device", w.name), slog.Any("err", err))
+	}
 }
 
 // setModeLocked is the app's SetWaterHeaterMode (WaterHeaterDelegateImpl.cpp:
 // 511-529).
 func (w *demoWaterHeater) setModeLocked(mode uint8) {
-	if err := w.modes.SetCurrentMode(mode); err != nil {
+	if err := w.modes.Set(whmdef.Patch{CurrentMode: &mode}); err != nil {
 		slog.Warn("waterheater.mode", slog.String("device", w.name), slog.Any("err", err))
 		return
 	}
@@ -333,13 +324,13 @@ func (w *demoWaterHeater) setModeLocked(mode uint8) {
 // (WaterHeaterManufacturer.cpp:160-231, :240-292); false for a trigger
 // that is not one of them.
 func (w *demoWaterHeater) testEventTrigger(trigger uint64) bool {
-	w.build()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	switch trigger & smokeTriggerMask {
 	case triggerWaterHeaterInstallation:
 		// A 100 l tank of water at 20 °C, target 60 °C, mode unchanged.
-		if err := w.whm.SetTankVolume(waterTankVolume); err != nil {
+		volume := waterTankVolume
+		if err := w.whm.Set(whmgdef.Patch{TankVolume: &volume}); err != nil {
 			slog.Warn("waterheater.volume", slog.String("device", w.name), slog.Any("err", err))
 		}
 		w.target = waterTargetTemperature
@@ -378,37 +369,45 @@ func (w *demoWaterHeater) testEventTrigger(trigger uint64) bool {
 type demoMeter struct {
 	name string
 
-	once    sync.Once
-	srv     *spec.Server
-	version cluster.DataVersionTracker
-
-	mu sync.Mutex
+	mu  sync.Mutex
+	srv *mtrid.Server
 	// saved holds the identification before the first test event; nil
 	// when none is pending (the app's mInstance, EventTriggers.cpp:32).
-	saved      map[uint32]any
+	saved      *mtrid.State
 	presetsIdx int
 }
 
 func newDemoMeter(name string) *demoMeter { return &demoMeter{name: name} }
 
-// servers are the cluster servers the device supplies.
-func (m *demoMeter) servers() []contract.ClusterServer {
-	m.build()
-	return []contract.ClusterServer{m.srv}
+// device builds the meter: MeterSerialNumber set, MeterType and
+// PointOfDelivery null.
+func (m *demoMeter) device(opts device.Options) (*device.ElectricalUtilityMeter, error) {
+	serial := "DEMO-0001"
+	d, err := device.NewElectricalUtilityMeter(opts, mtrid.Declare{Initial: mtrid.Patch{
+		MeterSerialNumber: &serial, Null: []uint32{mtrid.AttrMeterType, mtrid.AttrPointOfDelivery},
+	}})
+	if err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	m.srv = d.MeterIdentification()
+	m.mu.Unlock()
+	return d, nil
 }
 
-func (m *demoMeter) build() {
-	m.once.Do(func() {
-		serial := "DEMO-0001"
-		srv, err := energy.NewMeterIdentification(energy.MeterConfig{
-			MeterSerialNumber: &serial,
-			DataVersion:       &m.version,
-		})
-		if err != nil {
-			panic(fmt.Sprintf("meter MeterIdentification: %v", err))
+// identification is the Patch that sets the three identifying attributes
+// to st's (nil to null).
+func identification(st mtrid.State) mtrid.Patch {
+	p := mtrid.Patch{MeterType: st.MeterType, PointOfDelivery: st.PointOfDelivery, MeterSerialNumber: st.MeterSerialNumber}
+	for id, v := range map[uint32]bool{
+		mtrid.AttrMeterType: st.MeterType == nil, mtrid.AttrPointOfDelivery: st.PointOfDelivery == nil,
+		mtrid.AttrMeterSerialNumber: st.MeterSerialNumber == nil,
+	} {
+		if v {
+			p.Null = append(p.Null, id)
 		}
-		m.srv = srv
-	})
+	}
+	return p
 }
 
 // The MeterIdentification test event triggers (connectedhomeip
@@ -426,16 +425,16 @@ const (
 // MeterIdentificationEventTriggers.cpp:55-68), for the attributes this
 // meter serves: ProtocolVersion and PowerThreshold (the PTH feature) are
 // not served, so their preset values have nowhere to go.
-var meterPresets = [2]map[uint32]any{
+var meterPresets = [2]mtrid.State{
 	{
-		mtrid.AttrMeterType:         energy.MeterTypeUtility,
-		mtrid.AttrPointOfDelivery:   "Test delivery point",
-		mtrid.AttrMeterSerialNumber: "TST-123456789",
+		MeterType:         new(mtrid.MeterTypeUtility),
+		PointOfDelivery:   new("Test delivery point"),
+		MeterSerialNumber: new("TST-123456789"),
 	},
 	{
-		mtrid.AttrMeterType:         energy.MeterTypePrivate,
-		mtrid.AttrPointOfDelivery:   "New delivery point",
-		mtrid.AttrMeterSerialNumber: "NEW-987654321",
+		MeterType:         new(mtrid.MeterTypePrivate),
+		PointOfDelivery:   new("New delivery point"),
+		MeterSerialNumber: new("NEW-987654321"),
 	},
 }
 
@@ -451,25 +450,21 @@ var meterPresets = [2]map[uint32]any{
 // (TEMPORARY_RETURN_IGNORED) and reports the trigger handled; so does
 // this. False for a trigger that is not one of them.
 func (m *demoMeter) testEventTrigger(trigger uint64) bool {
-	m.build()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	switch trigger & smokeTriggerMask {
 	case triggerMeterAttributesValueUpdate:
 		if m.saved == nil {
-			m.saved = make(map[uint32]any, len(meterPresets[0]))
-			for id := range meterPresets[0] {
-				v, _ := m.srv.MatterRead(id)
-				m.saved[id] = v
-			}
+			st := m.srv.Get()
+			m.saved = &st
 		}
-		if err := m.srv.SetAttributes(meterPresets[m.presetsIdx]); err != nil {
+		if err := m.srv.Set(identification(meterPresets[m.presetsIdx])); err != nil {
 			slog.Warn("meter.trigger", slog.String("device", m.name), slog.Any("err", err))
 		}
 		m.presetsIdx = 1 - m.presetsIdx
 	case triggerMeterAttributesValueUpdateClear:
 		if m.saved != nil {
-			if err := m.srv.SetAttributes(m.saved); err != nil {
+			if err := m.srv.Set(identification(*m.saved)); err != nil {
 				slog.Warn("meter.trigger", slog.String("device", m.name), slog.Any("err", err))
 			}
 		}

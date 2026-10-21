@@ -68,6 +68,13 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		SceneTableSize: new(uint16),
+	}
+	values := full.AttributeValues()
+	if len(values) != 1 {
+		t.Errorf("a patch of every field sets %d values, want 1", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -133,5 +140,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleCopyScene = func(context.Context, CopySceneRequest) (CopySceneResponse, error) { return CopySceneResponse{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 8 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdAddScene}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

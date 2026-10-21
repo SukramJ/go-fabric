@@ -19,9 +19,12 @@ const (
 	FanRevision uint16 = 5
 )
 
-// FanType is the Fan device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/fan.ts.
-var FanType = Type{
+// FanType is the Fan device type, matter.js's packages/node/src/devices/fan.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#fan.
+var FanType = typeFan
+
+// typeFan holds [FanType]'s cluster requirements.
+var typeFan = Type{
 	ID: FanID, Name: "Fan", Revision: FanRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -61,16 +64,10 @@ func NewFan(opts Options, decls ...Declaration) (*Fan, error) {
 	return &Fan{d}, nil
 }
 
-// FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// FanControl is the device's typed FanControl server; the type mandates it.
 func (d *Fan) FanControl() *fancontroldef.Server {
 	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OnOff is the device's typed OnOff server, nil until a declaration mounts it.
 func (d *Fan) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }

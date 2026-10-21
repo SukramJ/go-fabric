@@ -86,6 +86,7 @@ var ErrIndex = errors.New("energy: index outside its list")
 // EnergyPreferenceCluster.h:57-58, :69-70).
 type PreferenceServer struct {
 	*spec.Instance
+	spec.SelfHeld
 
 	srv     *spec.Server
 	lengths map[uint32]int
@@ -137,8 +138,30 @@ func NewEnergyPreference(cfg PreferenceConfig) (*PreferenceServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s.Instance, s.srv = srv.Instance, srv
+	s.Instance, s.srv, s.SelfHeld = srv.Instance, srv, spec.NewSelfHeld(srv)
 	return s, nil
+}
+
+// SetAttributes implements [spec.AttributeSetter]: the device's own
+// change of CurrentEnergyBalance or CurrentLowPowerModeSensitivity, all or
+// nothing — an index into its list, CONSTRAINT_ERROR otherwise, as a
+// controller's write ([ErrIndex]). The lists are the configuration's
+// ([spec.ErrNotHeld]). No PreferenceChanger is asked.
+func (s *PreferenceServer) SetAttributes(values map[uint32]any) error {
+	for id, v := range values {
+		n, ok := s.lengths[id]
+		if !ok {
+			return fmt.Errorf("%w: energy: EnergyPreference attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
+		}
+		c, err := s.CheckSet(id, v, nil)
+		if err != nil {
+			return err
+		}
+		if index, _ := c.(uint8); int(index) >= n {
+			return fmt.Errorf("%w: attribute 0x%04X index %d, list of %d", ErrIndex, id, index, n)
+		}
+	}
+	return s.srv.SetAttributes(values)
 }
 
 // preferenceSink applies the index rule to a controller's write and tells

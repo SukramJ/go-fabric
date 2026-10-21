@@ -52,6 +52,19 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		ThreadMetrics:            new([]ThreadMetricsStruct),
+		CurrentHeapFree:          new(uint64),
+		CurrentHeapUsed:          new(uint64),
+		CurrentHeapHighWatermark: new(uint64),
+	}
+	values := full.AttributeValues()
+	if len(values) != 4 {
+		t.Errorf("a patch of every field sets %d values, want 4", len(values))
+	}
+	if _, ok := values[AttrThreadMetrics].(spec.List[ThreadMetricsStruct]); !ok {
+		t.Errorf("ThreadMetrics is stored as %T, want its spec.List", values[AttrThreadMetrics])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -78,5 +91,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleResetWatermarks = func(context.Context, ResetWatermarksRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 1 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdResetWatermarks}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventSoftwareFault}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

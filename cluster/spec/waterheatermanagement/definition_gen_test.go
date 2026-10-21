@@ -53,6 +53,18 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		HeaterTypes:           new(WaterHeaterHeatSourceBitmap),
+		HeatDemand:            new(WaterHeaterHeatSourceBitmap),
+		TankVolume:            new(uint16),
+		EstimatedHeatRequired: new(int64),
+		TankPercentage:        new(uint8),
+		BoostState:            new(BoostStateEnum),
+	}
+	values := full.AttributeValues()
+	if len(values) != 6 {
+		t.Errorf("a patch of every field sets %d values, want 6", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -77,6 +89,7 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ Booster = d.Booster
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -84,5 +97,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleCancelBoost = func(context.Context, CancelBoostRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdBoost}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventBoostStarted}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

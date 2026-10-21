@@ -21,9 +21,12 @@ const (
 	ColorTemperatureLightRevision uint16 = 5
 )
 
-// ColorTemperatureLightType is the ColorTemperatureLight device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/color-temperature-light.ts.
-var ColorTemperatureLightType = Type{
+// ColorTemperatureLightType is the ColorTemperatureLight device type, matter.js's packages/node/src/devices/color-temperature-light.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#colortemperaturelight.
+var ColorTemperatureLightType = typeColorTemperatureLight
+
+// typeColorTemperatureLight holds [ColorTemperatureLightType]'s cluster requirements.
+var typeColorTemperatureLight = Type{
 	ID: ColorTemperatureLightID, Name: "ColorTemperatureLight", Revision: ColorTemperatureLightRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Base: "DimmableLight",
@@ -97,26 +100,17 @@ func NewColorTemperatureLight(opts Options, decls ...Declaration) (*ColorTempera
 	return &ColorTemperatureLight{d}, nil
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OnOff is the device's typed OnOff server; the type mandates it.
 func (d *ColorTemperatureLight) OnOff() *onoffdef.Server {
 	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
 }
 
-// LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// LevelControl is the device's typed LevelControl server; the type mandates it.
 func (d *ColorTemperatureLight) LevelControl() *levelcontroldef.Server {
 	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
-// ColorControl returns the typed ColorControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ColorControl is the device's typed ColorControl server; the type mandates it.
 func (d *ColorTemperatureLight) ColorControl() *colorcontroldef.Server {
 	return colorcontroldef.WrapOn(d.Server(0x0300), d.queue)
 }

@@ -16,9 +16,12 @@ const (
 	ModeSelectRevision uint16 = 1
 )
 
-// ModeSelectType is the ModeSelect device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/mode-select.ts.
-var ModeSelectType = Type{
+// ModeSelectType is the ModeSelect device type, matter.js's packages/node/src/devices/mode-select.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#modeselect.
+var ModeSelectType = typeModeSelect
+
+// typeModeSelect holds [ModeSelectType]'s cluster requirements.
+var typeModeSelect = Type{
 	ID: ModeSelectID, Name: "ModeSelect", Revision: ModeSelectRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -44,10 +47,7 @@ func NewModeSelect(opts Options, decls ...Declaration) (*ModeSelect, error) {
 	return &ModeSelect{d}, nil
 }
 
-// ModeSelect returns the typed ModeSelect server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// ModeSelect is the device's typed ModeSelect server; the type mandates it.
 func (d *ModeSelect) ModeSelect() *modeselectdef.Server {
 	return modeselectdef.WrapOn(d.Server(0x0050), d.queue)
 }

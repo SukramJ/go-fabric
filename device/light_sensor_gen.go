@@ -17,9 +17,12 @@ const (
 	LightSensorRevision uint16 = 4
 )
 
-// LightSensorType is the LightSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/light-sensor.ts.
-var LightSensorType = Type{
+// LightSensorType is the LightSensor device type, matter.js's packages/node/src/devices/light-sensor.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#lightsensor.
+var LightSensorType = typeLightSensor
+
+// typeLightSensor holds [LightSensorType]'s cluster requirements.
+var typeLightSensor = Type{
 	ID: LightSensorID, Name: "LightSensor", Revision: LightSensorRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -50,10 +53,7 @@ func NewLightSensor(opts Options, decls ...Declaration) (*LightSensor, error) {
 	return &LightSensor{d}, nil
 }
 
-// IlluminanceMeasurement returns the typed IlluminanceMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// IlluminanceMeasurement is the device's typed IlluminanceMeasurement server; the type mandates it.
 func (d *LightSensor) IlluminanceMeasurement() *illuminancemeasurementdef.Server {
 	return illuminancemeasurementdef.WrapOn(d.Server(0x0400), d.queue)
 }

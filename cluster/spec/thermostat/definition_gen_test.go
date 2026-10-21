@@ -77,6 +77,89 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		LocalTemperature:                       new(int16),
+		OutdoorTemperature:                     new(int16),
+		Occupancy:                              new(OccupancyBitmap),
+		AbsMinHeatSetpointLimit:                new(int16),
+		AbsMaxHeatSetpointLimit:                new(int16),
+		AbsMinCoolSetpointLimit:                new(int16),
+		AbsMaxCoolSetpointLimit:                new(int16),
+		PiCoolingDemand:                        new(uint8),
+		PiHeatingDemand:                        new(uint8),
+		HvacSystemTypeConfiguration:            new(HVACSystemTypeBitmap),
+		LocalTemperatureCalibration:            new(int8),
+		OccupiedCoolingSetpoint:                new(int16),
+		OccupiedHeatingSetpoint:                new(int16),
+		UnoccupiedCoolingSetpoint:              new(int16),
+		UnoccupiedHeatingSetpoint:              new(int16),
+		MinHeatSetpointLimit:                   new(int16),
+		MaxHeatSetpointLimit:                   new(int16),
+		MinCoolSetpointLimit:                   new(int16),
+		MaxCoolSetpointLimit:                   new(int16),
+		MinSetpointDeadBand:                    new(int8),
+		RemoteSensing:                          new(RemoteSensingBitmap),
+		ControlSequenceOfOperation:             new(ControlSequenceOfOperationEnum),
+		SystemMode:                             new(SystemModeEnum),
+		ThermostatRunningMode:                  new(ThermostatRunningModeEnum),
+		TemperatureSetpointHold:                new(TemperatureSetpointHoldEnum),
+		TemperatureSetpointHoldDuration:        new(uint16),
+		ThermostatProgrammingOperationMode:     new(ProgrammingOperationModeBitmap),
+		ThermostatRunningState:                 new(RelayStateBitmap),
+		SetpointChangeSource:                   new(SetpointChangeSourceEnum),
+		SetpointChangeAmount:                   new(int16),
+		SetpointChangeSourceTimestamp:          new(uint32),
+		OccupiedSetback:                        new(uint8),
+		OccupiedSetbackMin:                     new(uint8),
+		OccupiedSetbackMax:                     new(uint8),
+		UnoccupiedSetback:                      new(uint8),
+		UnoccupiedSetbackMin:                   new(uint8),
+		UnoccupiedSetbackMax:                   new(uint8),
+		EmergencyHeatDelta:                     new(uint8),
+		AcType:                                 new(ACTypeEnum),
+		AcCapacity:                             new(uint16),
+		AcRefrigerantType:                      new(ACRefrigerantTypeEnum),
+		AcCompressorType:                       new(ACCompressorTypeEnum),
+		AcErrorCode:                            new(ACErrorCodeBitmap),
+		AcLouverPosition:                       new(ACLouverPositionEnum),
+		AcCoilTemperature:                      new(int16),
+		AcCapacityFormat:                       new(ACCapacityFormatEnum),
+		PresetTypes:                            new([]PresetTypeStruct),
+		ScheduleTypes:                          new([]ScheduleTypeStruct),
+		NumberOfPresets:                        new(uint8),
+		NumberOfSchedules:                      new(uint8),
+		NumberOfScheduleTransitions:            new(uint8),
+		NumberOfScheduleTransitionPerDay:       new(uint8),
+		ActivePresetHandle:                     new([]byte),
+		ActiveScheduleHandle:                   new([]byte),
+		Presets:                                new([]PresetStruct),
+		Schedules:                              new([]ScheduleStruct),
+		SetpointHoldExpiryTimestamp:            new(uint32),
+		MaxThermostatSuggestions:               new(uint8),
+		ThermostatSuggestions:                  new([]ThermostatSuggestionStruct),
+		CurrentThermostatSuggestion:            new(ThermostatSuggestionStruct),
+		ThermostatSuggestionNotFollowingReason: new(ThermostatSuggestionNotFollowingReasonBitmap),
+		Null:                                   []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 62 {
+		t.Errorf("a patch of every field sets %d values, want 62", len(values))
+	}
+	if _, ok := values[AttrPresetTypes].(spec.List[PresetTypeStruct]); !ok {
+		t.Errorf("PresetTypes is stored as %T, want its spec.List", values[AttrPresetTypes])
+	}
+	if _, ok := values[AttrScheduleTypes].(spec.List[ScheduleTypeStruct]); !ok {
+		t.Errorf("ScheduleTypes is stored as %T, want its spec.List", values[AttrScheduleTypes])
+	}
+	if _, ok := values[AttrPresets].(spec.List[PresetStruct]); !ok {
+		t.Errorf("Presets is stored as %T, want its spec.List", values[AttrPresets])
+	}
+	if _, ok := values[AttrSchedules].(spec.List[ScheduleStruct]); !ok {
+		t.Errorf("Schedules is stored as %T, want its spec.List", values[AttrSchedules])
+	}
+	if _, ok := values[AttrThermostatSuggestions].(spec.List[ThermostatSuggestionStruct]); !ok {
+		t.Errorf("ThermostatSuggestions is stored as %T, want its spec.List", values[AttrThermostatSuggestions])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -122,6 +205,7 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	var _ Sink = d.Sink
+	var _ PresetStore = d.PresetStore
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d
@@ -135,5 +219,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleAtomicRequest = func(context.Context, AtomicRequestRequest) (AtomicResponse, error) { return AtomicResponse{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 6 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdSetpointRaiseLower}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventSystemModeChange}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"time"
 )
 
 // State is the typed state of the CommodityTariff cluster: one field per attribute
@@ -63,6 +64,74 @@ type Patch struct {
 	DefaultRandomizationOffset *int16                         `matter:"0x0011"` // attribute 0x0011
 	DefaultRandomizationType   *DayEntryRandomizationTypeEnum `matter:"0x0012"` // attribute 0x0012
 	Null                       []uint32                       // attribute ids set to null
+}
+
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.TariffInfo != nil {
+		v[AttrTariffInfo] = *p.TariffInfo
+	}
+	if p.TariffUnit != nil {
+		v[AttrTariffUnit] = *p.TariffUnit
+	}
+	if p.StartDate != nil {
+		v[AttrStartDate] = *p.StartDate
+	}
+	if p.DayEntries != nil {
+		v[AttrDayEntries] = spec.List[DayEntryStruct](*p.DayEntries)
+	}
+	if p.DayPatterns != nil {
+		v[AttrDayPatterns] = spec.List[DayPatternStruct](*p.DayPatterns)
+	}
+	if p.CalendarPeriods != nil {
+		v[AttrCalendarPeriods] = spec.List[CalendarPeriodStruct](*p.CalendarPeriods)
+	}
+	if p.IndividualDays != nil {
+		v[AttrIndividualDays] = spec.List[DayStruct](*p.IndividualDays)
+	}
+	if p.CurrentDay != nil {
+		v[AttrCurrentDay] = *p.CurrentDay
+	}
+	if p.NextDay != nil {
+		v[AttrNextDay] = *p.NextDay
+	}
+	if p.CurrentDayEntry != nil {
+		v[AttrCurrentDayEntry] = *p.CurrentDayEntry
+	}
+	if p.CurrentDayEntryDate != nil {
+		v[AttrCurrentDayEntryDate] = *p.CurrentDayEntryDate
+	}
+	if p.NextDayEntry != nil {
+		v[AttrNextDayEntry] = *p.NextDayEntry
+	}
+	if p.NextDayEntryDate != nil {
+		v[AttrNextDayEntryDate] = *p.NextDayEntryDate
+	}
+	if p.TariffComponents != nil {
+		v[AttrTariffComponents] = spec.List[TariffComponentStruct](*p.TariffComponents)
+	}
+	if p.TariffPeriods != nil {
+		v[AttrTariffPeriods] = spec.List[TariffPeriodStruct](*p.TariffPeriods)
+	}
+	if p.CurrentTariffComponents != nil {
+		v[AttrCurrentTariffComponents] = spec.List[TariffComponentStruct](*p.CurrentTariffComponents)
+	}
+	if p.NextTariffComponents != nil {
+		v[AttrNextTariffComponents] = spec.List[TariffComponentStruct](*p.NextTariffComponents)
+	}
+	if p.DefaultRandomizationOffset != nil {
+		v[AttrDefaultRandomizationOffset] = *p.DefaultRandomizationOffset
+	}
+	if p.DefaultRandomizationType != nil {
+		v[AttrDefaultRandomizationType] = *p.DefaultRandomizationType
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
 }
 
 // Server is the typed CommodityTariff server over the cluster's server — the
@@ -135,6 +204,17 @@ func (s *Server) HandleGetDayEntry(fn func(ctx context.Context, req GetDayEntryR
 	return spec.HandleOn(s.Underlying(), CmdGetDayEntry, fn)
 }
 
+// TimeSource is the time the kit's CommodityTariff server reads the
+// current day and day entry from, in place of the node's clock — a
+// host that runs the tariff on its own time, as chip's
+// energy-gateway app runs it on its TestTimeManager. A TimeSource
+// that is also a contract.ChangeNotifier makes the server derive
+// the current attributes again whenever it notifies: a clock that
+// jumped (cluster/energy).
+type TimeSource interface {
+	Now() time.Time
+}
+
 // Declare is the declaration of the CommodityTariff cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -146,6 +226,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -155,6 +239,8 @@ type Declare struct {
 	// HandleGetDayEntry handles the GetDayEntry command in place of the server
 	// (Server.HandleGetDayEntry), inline; an optional command it handles is accepted.
 	HandleGetDayEntry func(ctx context.Context, req GetDayEntryRequest) (GetDayEntryResponse, error)
+	// TimeSource is the host port the kit's server runs on ([TimeSource]).
+	TimeSource TimeSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -173,6 +259,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleGetTariffComponent != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetTariffComponent)
 		decl.Attach = d.attach

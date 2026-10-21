@@ -41,6 +41,38 @@ type Patch struct {
 	AllowedVendorList  *[]uint16              `matter:"0x0007"` // attribute 0x0007
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.VendorName != nil {
+		v[AttrVendorName] = *p.VendorName
+	}
+	if p.VendorId != nil {
+		v[AttrVendorId] = *p.VendorId
+	}
+	if p.ApplicationName != nil {
+		v[AttrApplicationName] = *p.ApplicationName
+	}
+	if p.ProductId != nil {
+		v[AttrProductId] = *p.ProductId
+	}
+	if p.Application != nil {
+		v[AttrApplication] = *p.Application
+	}
+	if p.Status != nil {
+		v[AttrStatus] = *p.Status
+	}
+	if p.ApplicationVersion != nil {
+		v[AttrApplicationVersion] = *p.ApplicationVersion
+	}
+	if p.AllowedVendorList != nil {
+		v[AttrAllowedVendorList] = *p.AllowedVendorList
+	}
+	return v
+}
+
 // Server is the typed ApplicationBasic server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

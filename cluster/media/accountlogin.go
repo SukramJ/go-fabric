@@ -11,18 +11,15 @@ import (
 	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 )
 
-// AccountLogin is the AccountLogin host port (account-login.element.ts:
-// 26-49). The three commands are fabric-scoped and timed ("F A T",
-// "F O T"): the dispatcher refuses them outside a timed interaction, and
-// the accessing fabric is on ctx (im.LookupFabricFilter).
-type AccountLogin interface {
-	// GetSetupPIN answers the setup PIN for TempAccountIdentifier (:26-37).
-	GetSetupPIN(ctx context.Context, req logindef.GetSetupPinRequest) (logindef.GetSetupPinResponse, error)
-	// Login logs the account in with the setup PIN (:39-44); status only.
-	Login(ctx context.Context, req logindef.LoginRequest) error
-	// Logout logs the account out (:46-49); status only.
-	Logout(ctx context.Context, req logindef.LogoutRequest) error
-}
+// AccountLogin is the AccountLogin host port (the generated
+// [logindef.AccountLogin], the declaration's AccountLogin;
+// account-login.element.ts:26-49): GetSetupPIN answers the setup PIN for
+// TempAccountIdentifier (:26-37), Login logs the account in with it
+// (:39-44) and Logout out (:46-49), both status only. The three commands
+// are fabric-scoped and timed ("F A T", "F O T"): the dispatcher refuses
+// them outside a timed interaction, and the accessing fabric is on ctx
+// (im.LookupFabricFilter).
+type AccountLogin = logindef.AccountLogin
 
 // AccountLoginConfig carries the construction parameters of an
 // AccountLogin server.

@@ -21,9 +21,12 @@ const (
 	AirPurifierRevision uint16 = 3
 )
 
-// AirPurifierType is the AirPurifier device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/devices/air-purifier.ts.
-var AirPurifierType = Type{
+// AirPurifierType is the AirPurifier device type, matter.js's packages/node/src/devices/air-purifier.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#airpurifier.
+var AirPurifierType = typeAirPurifier
+
+// typeAirPurifier holds [AirPurifierType]'s cluster requirements.
+var typeAirPurifier = Type{
 	ID: AirPurifierID, Name: "AirPurifier", Revision: AirPurifierRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -70,32 +73,20 @@ func NewAirPurifier(opts Options, decls ...Declaration) (*AirPurifier, error) {
 	return &AirPurifier{d}, nil
 }
 
-// FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// FanControl is the device's typed FanControl server; the type mandates it.
 func (d *AirPurifier) FanControl() *fancontroldef.Server {
 	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
 }
 
-// OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// OnOff is the device's typed OnOff server, nil until a declaration mounts it.
 func (d *AirPurifier) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
-// HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// HepaFilterMonitoring is the device's typed HepaFilterMonitoring server, nil until a declaration mounts it.
 func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
 	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
-// ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// It is nil until a declaration mounts the optional cluster.
+// ActivatedCarbonFilterMonitoring is the device's typed ActivatedCarbonFilterMonitoring server, nil until a declaration mounts it.
 func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
 	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

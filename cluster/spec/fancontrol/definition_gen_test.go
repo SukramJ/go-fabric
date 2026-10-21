@@ -49,6 +49,25 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		FanMode:          new(FanModeEnum),
+		FanModeSequence:  new(FanModeSequenceEnum),
+		PercentSetting:   new(uint8),
+		PercentCurrent:   new(uint8),
+		SpeedMax:         new(uint8),
+		SpeedSetting:     new(uint8),
+		SpeedCurrent:     new(uint8),
+		RockSupport:      new(RockBitmap),
+		RockSetting:      new(RockBitmap),
+		WindSupport:      new(WindBitmap),
+		WindSetting:      new(WindBitmap),
+		AirflowDirection: new(AirflowDirectionEnum),
+		Null:             []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 13 {
+		t.Errorf("a patch of every field sets %d values, want 13", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -76,5 +95,8 @@ func TestTypedServer(t *testing.T) {
 	all.HandleStep = func(context.Context, StepRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 1 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdStep}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
 	}
 }

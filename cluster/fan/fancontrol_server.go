@@ -5,11 +5,11 @@
 // mandatory application cluster of the Fan (0x002B), AirPurifier (0x002D)
 // and ExtractorHood (0x007A) device types.
 //
-// The server owns no fan state. The host reports its fan as one [State]
-// snapshot and applies changes through [StateSource.ApplyFanSettings];
+// The server owns no fan state. The host reports its fan as one [fanState]
+// snapshot and applies changes through [source.ApplyFanSettings];
 // the server validates every write against the cluster's constraints and
 // resolves the coupling between FanMode, PercentSetting and SpeedSetting
-// before the host sees it, so a host receives one consistent [Settings]
+// before the host sees it, so a host receives one consistent [settings]
 // per write instead of having to re-derive the rules.
 //
 // What matter.js does, and what this package adds. matter.js
@@ -163,8 +163,8 @@ const (
 	StepDecrease = uint8(fandef.StepDirectionDecrease)
 )
 
-// State is one observation of the host's fan.
-type State struct {
+// fanState is one observation of the host's fan.
+type fanState struct {
 	FanMode FanMode
 	// PercentSetting is nil for null — the value FanMode Auto requires
 	// (resource :82-84).
@@ -178,17 +178,17 @@ type State struct {
 	AirflowDirection AirflowDirection
 }
 
-// Setting is a resolved PercentSetting or SpeedSetting: a value, or the
+// setting is a resolved PercentSetting or SpeedSetting: a value, or the
 // attribute's null.
-type Setting struct {
+type setting struct {
 	Null  bool
 	Value uint8
 }
 
-// Settings is what one FanMode, PercentSetting or SpeedSetting write — or
+// settings is what one FanMode, PercentSetting or SpeedSetting write — or
 // one Step — resolves to under the coupling rules. A nil field is one
 // the rules do not determine: the device's own mapping decides it, and
-// the host reports the outcome in its next [State].
+// the host reports the outcome in its next [fanState].
 //
 //   - FanMode Off   → PercentSetting 0, SpeedSetting 0.
 //   - FanMode Auto  → PercentSetting null, SpeedSetting null
@@ -199,39 +199,46 @@ type Setting struct {
 //     Off when p is 0, nil otherwise.
 //   - SpeedSetting s → PercentSetting floor(s × 100 / SpeedMax); FanMode
 //     Off when s is 0, nil otherwise.
-type Settings struct {
+type settings struct {
 	FanMode        *FanMode
-	PercentSetting *Setting
+	PercentSetting *setting
 	// SpeedSetting is always nil without MultiSpeed.
-	SpeedSetting *Setting
+	SpeedSetting *setting
 }
 
-// StateSource is the host port. FanState is read on every attribute read
+// StateSource is the host port in the generated types
+// (fancontroldef.StateSource): FanState is read on every attribute read
 // and must not block on the device; ApplyFanSettings carries every
-// speed-oriented change to it.
+// change a controller's write or a Step resolved to as a Patch — the
+// fields the coupling rules determine, a null setting in Null, the rock,
+// wind and airflow settings too.
 //
 // A host that cannot honour a change in the fan's current state returns
 // [ErrInvalidInState] (or an error wrapping it): the specification's
 // answer for "the fan is not in a state where this attribute can be
 // changed to the requested value" (resource :53-55, :87-88, :126-128).
-type StateSource interface {
-	FanState() State
-	ApplyFanSettings(ctx context.Context, s Settings) error
+type StateSource = fandef.StateSource
+
+// source is the port the server drives internally (port.go carries a
+// StateSource over to it).
+type source interface {
+	FanState() fanState
+	ApplyFanSettings(ctx context.Context, s settings) error
 }
 
-// RockSetter applies a RockSetting write; required with Rocking.
-type RockSetter interface {
+// rockSetter applies a RockSetting write; required with Rocking.
+type rockSetter interface {
 	SetRockSetting(ctx context.Context, rock RockBitmap) error
 }
 
-// WindSetter applies a WindSetting write; required with Wind.
-type WindSetter interface {
+// windSetter applies a WindSetting write; required with Wind.
+type windSetter interface {
 	SetWindSetting(ctx context.Context, wind WindBitmap) error
 }
 
-// AirflowDirectionSetter applies an AirflowDirection write; required with
+// airflowSetter applies an AirflowDirection write; required with
 // AirflowDirection.
-type AirflowDirectionSetter interface {
+type airflowSetter interface {
 	SetAirflowDirection(ctx context.Context, dir AirflowDirection) error
 }
 
@@ -245,14 +252,13 @@ type Stepper = fandef.Stepper
 
 // Config carries the construction parameters for [Server].
 type Config struct {
-	// Source is the host port; Port in the generated types replaces it.
+	// Source is the fan: its fanState, and a Patch for every setting a
+	// controller's write or a Step resolves to — what fancontroldef.Declare
+	// carries.
 	Source StateSource
-	// Port is the host port in the generated types — the fan's State and
-	// a Patch for every setting, what fancontroldef.Declare carries; set,
-	// it wins over Source. Stepper, with Port, takes the Step command
-	// over.
-	Port     fandef.StateSource
-	Stepper  fandef.Stepper
+	// Stepper takes the Step command over; nil steps by the server's own
+	// rule.
+	Stepper  Stepper
 	Features Feature
 	// Sequence is FanModeSequence (fixed). It must be one of the three
 	// sequences with Auto when FeatureAuto is set and one of the three
@@ -274,13 +280,12 @@ type Config struct {
 
 // Configuration errors.
 var (
-	ErrNoSource          = errors.New("fan: FanControl needs a StateSource")
+	ErrNoSource          = errors.New("fan: FanControl needs a source")
 	ErrUnknownFeature    = errors.New("fan: unknown FeatureMap bits")
 	ErrSequence          = errors.New("fan: FanModeSequence does not match the Auto feature")
 	ErrSpeedMax          = errors.New("fan: MultiSpeed needs SpeedMax 1 to 100")
-	ErrRockSupport       = errors.New("fan: Rocking needs a RockSupport with at least one known bit and a RockSetter")
-	ErrWindSupport       = errors.New("fan: Wind needs a WindSupport with at least one known bit and a WindSetter")
-	ErrAirflowDirection  = errors.New("fan: AirflowDirection needs an AirflowDirectionSetter")
+	ErrRockSupport       = errors.New("fan: Rocking needs a RockSupport with at least one known bit")
+	ErrWindSupport       = errors.New("fan: Wind needs a WindSupport with at least one known bit")
 	ErrDeviceTypeFeature = errors.New("fan: the device type excludes a configured feature")
 )
 
@@ -293,7 +298,7 @@ var ErrInvalidInState error = statusError{im.StatusInvalidInState, "fan: not in 
 type Server struct {
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
-	src      StateSource
+	src      source
 	cfg      Config
 	inst     *spec.Instance
 	host     spec.HostHandlers
@@ -317,9 +322,6 @@ var (
 // NewServer validates cfg against the cluster's conformance and
 // constraints and returns the server.
 func NewServer(cfg Config) (*Server, error) {
-	if cfg.Port != nil {
-		cfg.Source = sourceOf(cfg.Port, cfg.Stepper)
-	}
 	if cfg.Source == nil {
 		return nil, ErrNoSource
 	}
@@ -335,18 +337,13 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, ErrSpeedMax
 	}
 	if cfg.Features&FeatureRocking != 0 {
-		if _, ok := cfg.Source.(RockSetter); !ok || cfg.RockSupport == 0 || uint64(cfg.RockSupport)&^fandef.RockBitmapDef.Defined() != 0 {
+		if cfg.RockSupport == 0 || uint64(cfg.RockSupport)&^fandef.RockBitmapDef.Defined() != 0 {
 			return nil, ErrRockSupport
 		}
 	}
 	if cfg.Features&FeatureWind != 0 {
-		if _, ok := cfg.Source.(WindSetter); !ok || cfg.WindSupport == 0 || uint64(cfg.WindSupport)&^fandef.WindBitmapDef.Defined() != 0 {
+		if cfg.WindSupport == 0 || uint64(cfg.WindSupport)&^fandef.WindBitmapDef.Defined() != 0 {
 			return nil, ErrWindSupport
-		}
-	}
-	if cfg.Features&FeatureAirflowDirection != 0 {
-		if _, ok := cfg.Source.(AirflowDirectionSetter); !ok {
-			return nil, ErrAirflowDirection
 		}
 	}
 	if cfg.DeviceType == DeviceTypeExtractorHood && cfg.Features&(FeatureRocking|FeatureWind|FeatureAirflowDirection) != 0 {
@@ -355,7 +352,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Without declared optionals the feature check above is the only
 	// refusal New can make.
 	inst, _ := spec.New(fandef.Definition, spec.Options{Features: uint32(cfg.Features)})
-	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
+	return &Server{src: sourceOf(cfg.Source, cfg.Stepper), ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
 }
 
 // Revision returns the cluster revision of the generated definition.
@@ -488,7 +485,7 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) err
 	case AttrWindSetting:
 		return s.writeWindSetting(ctx, WindBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
 	default: // AttrAirflowDirection, the last writable attribute
-		setter, _ := s.src.(AirflowDirectionSetter)                                  // guaranteed by NewServer
+		setter, _ := s.src.(airflowSetter)                                           // guaranteed by NewServer
 		if err := setter.SetAirflowDirection(ctx, AirflowDirection(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
 			return fmt.Errorf("fan: AirflowDirection write: %w", err)
 		}
@@ -554,18 +551,18 @@ func (s *Server) resolveFanMode(value any) (FanMode, error) {
 }
 
 // fanModeSettings is what a FanMode resolves to.
-func (s *Server) fanModeSettings(m FanMode) Settings {
-	out := Settings{FanMode: &m}
+func (s *Server) fanModeSettings(m FanMode) settings {
+	out := settings{FanMode: &m}
 	switch m {
 	case FanModeOff:
-		out.PercentSetting = &Setting{Value: 0}
+		out.PercentSetting = &setting{Value: 0}
 		if s.has(FeatureMultiSpeed) {
-			out.SpeedSetting = &Setting{Value: 0}
+			out.SpeedSetting = &setting{Value: 0}
 		}
 	case FanModeAuto:
-		out.PercentSetting = &Setting{Null: true}
+		out.PercentSetting = &setting{Null: true}
 		if s.has(FeatureMultiSpeed) {
-			out.SpeedSetting = &Setting{Null: true}
+			out.SpeedSetting = &setting{Null: true}
 		}
 	case FanModeLow, FanModeMedium, FanModeHigh, FanModeOn, FanModeSmart:
 		// The percentage a speed mode means is the manufacturer's: both
@@ -580,15 +577,15 @@ func (s *Server) fanModeSettings(m FanMode) Settings {
 // (ApplyPercentSettingChanged: `(mSpeedMax * percent + 99) / 100`, Off at
 // 0) at the harness pin; the FanMode of a non-zero percentage stays the
 // device's (:136-166 is connectedhomeip's own 33/66 split).
-func (s *Server) percentSettings(p uint8) Settings {
-	out := Settings{PercentSetting: &Setting{Value: p}}
+func (s *Server) percentSettings(p uint8) settings {
+	out := settings{PercentSetting: &setting{Value: p}}
 	if p == 0 {
 		off := FanModeOff
 		out.FanMode = &off
 	}
 	if s.has(FeatureMultiSpeed) {
 		speed := uint8((uint16(s.cfg.SpeedMax)*uint16(p) + 99) / 100) //nolint:gosec // p ≤ 100 and SpeedMax ≤ 100: at most SpeedMax
-		out.SpeedSetting = &Setting{Value: speed}
+		out.SpeedSetting = &setting{Value: speed}
 	}
 	return out
 }
@@ -597,9 +594,9 @@ func (s *Server) percentSettings(p uint8) Settings {
 // floor(v × 100 / SpeedMax); FanMode Off at 0. Mirrors connectedhomeip
 // FanControlCluster.cpp:203-228 (ApplySpeedSettingChanged:
 // `(speedSetting * 100) / mSpeedMax`, Off at 0) at the harness pin.
-func (s *Server) speedSettings(v uint8) Settings {
+func (s *Server) speedSettings(v uint8) settings {
 	percent := uint8(uint16(v) * 100 / uint16(s.cfg.SpeedMax)) //nolint:gosec // v ≤ SpeedMax: at most 100
-	out := Settings{PercentSetting: &Setting{Value: percent}, SpeedSetting: &Setting{Value: v}}
+	out := settings{PercentSetting: &setting{Value: percent}, SpeedSetting: &setting{Value: v}}
 	if v == 0 {
 		off := FanModeOff
 		out.FanMode = &off
@@ -607,7 +604,7 @@ func (s *Server) speedSettings(v uint8) Settings {
 	return out
 }
 
-func (s *Server) apply(ctx context.Context, what string, set Settings) error {
+func (s *Server) apply(ctx context.Context, what string, set settings) error {
 	if err := s.src.ApplyFanSettings(ctx, set); err != nil {
 		return fmt.Errorf("fan: %s: %w", what, err)
 	}
@@ -635,7 +632,7 @@ func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) error {
 	if rock&^s.cfg.RockSupport != 0 {
 		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting 0x%02X outside RockSupport 0x%02X", rock, s.cfg.RockSupport)}
 	}
-	setter, _ := s.src.(RockSetter) // guaranteed by NewServer
+	setter, _ := s.src.(rockSetter) // guaranteed by NewServer
 	if err := setter.SetRockSetting(ctx, rock); err != nil {
 		return fmt.Errorf("fan: RockSetting write: %w", err)
 	}
@@ -647,7 +644,7 @@ func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) error {
 	if wind&^s.cfg.WindSupport != 0 {
 		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting 0x%02X outside WindSupport 0x%02X", wind, s.cfg.WindSupport)}
 	}
-	setter, _ := s.src.(WindSetter) // guaranteed by NewServer
+	setter, _ := s.src.(windSetter) // guaranteed by NewServer
 	if err := setter.SetWindSetting(ctx, wind); err != nil {
 		return fmt.Errorf("fan: WindSetting write: %w", err)
 	}
@@ -683,7 +680,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		return nil, nil
 	}
 	st := s.src.FanState()
-	var set Settings
+	var set settings
 	if s.has(FeatureMultiSpeed) {
 		current := st.SpeedCurrent
 		if st.SpeedSetting != nil {
@@ -847,7 +844,7 @@ func storedForm(v any) any {
 // against the attributes' types and constraints first, all or nothing;
 // none is then the server's to set: FanMode, PercentSetting,
 // PercentCurrent, SpeedSetting, SpeedCurrent, RockSetting, WindSetting and
-// AirflowDirection are the [StateSource]'s — the host reports a change
+// AirflowDirection are the [source]'s — the host reports a change
 // through it — and FanModeSequence, SpeedMax, RockSupport and WindSupport
 // are fixed by the [Config]. Each refuses with [spec.ErrNotHeld]; an
 // empty map changes nothing.
@@ -859,7 +856,7 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	if len(ids) > 0 {
-		return fmt.Errorf("%w: fan: attribute 0x%04X is the StateSource's or the Config's", spec.ErrNotHeld, ids[0])
+		return fmt.Errorf("%w: fan: attribute 0x%04X is the source's or the Config's", spec.ErrNotHeld, ids[0])
 	}
 	return nil
 }
@@ -883,7 +880,7 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) { s.events
 
 // SetBeforeWrite implements [spec.BeforeWriteSetter]: fn vetoes a
 // controller's write after the definition's (and FanMode's) checks and
-// before it reaches the [StateSource], with the value in its stored form
+// before it reaches the [source], with the value in its stored form
 // (a uint8, nil for null; FanMode as the resolved [FanMode]).
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	s.veto.Set(fn)
@@ -899,3 +896,20 @@ func (e statusError) Error() string                   { return e.msg }
 func (e statusError) MatterStatusCode() im.StatusCode { return e.status }
 
 var _ im.StatusCodeError = statusError{}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// source's: a change the host reports there moves the server's data
+// version, then cb runs — the bridge hears a pull server's change through
+// it. A source that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.cfg.Source.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.tracker().Bump()
+		if cb != nil {
+			cb()
+		}
+	})
+}

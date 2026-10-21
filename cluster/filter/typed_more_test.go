@@ -5,6 +5,7 @@ package filter_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/filter"
@@ -59,6 +60,9 @@ func TestTypedReplacementProductList(t *testing.T) {
 	if err := srv.SetAttributes(map[uint32]any{hepa.AttrReplacementProductList: stored}); err != nil {
 		t.Errorf("the stored list: %v", err)
 	}
+	if err := srv.SetAttributes(map[uint32]any{hepa.AttrReplacementProductList: slices.Clone(products)}); err != nil {
+		t.Errorf("the stored list as a plain slice: %v", err)
+	}
 	other := []hepa.ReplacementProductStruct{{ProductIdentifierType: hepa.ProductIdentifierTypeUpc, ProductIdentifierValue: "000000000000"}}
 	if err := hepa.Wrap(srv).Set(hepa.Patch{ReplacementProductList: &other}); !errors.Is(err, spec.ErrNotHeld) {
 		t.Errorf("another list: %v", err)
@@ -77,6 +81,10 @@ func TestTypedReplacementProductList(t *testing.T) {
 	}
 	if err := carbon.Wrap(carbonSrv).Set(carbon.Patch{ReplacementProductList: &same}); err != nil {
 		t.Errorf("ActivatedCarbon's own list: %v", err)
+	}
+	// The plain slice a host's untyped Set hands over is the same list.
+	if err := carbonSrv.SetAttributes(map[uint32]any{carbon.AttrReplacementProductList: same}); err != nil {
+		t.Errorf("ActivatedCarbon's own list as a plain slice: %v", err)
 	}
 }
 

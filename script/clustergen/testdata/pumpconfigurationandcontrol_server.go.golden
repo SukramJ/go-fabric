@@ -75,6 +75,89 @@ type Patch struct {
 	Null                   []uint32           // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MaxPressure != nil {
+		v[AttrMaxPressure] = *p.MaxPressure
+	}
+	if p.MaxSpeed != nil {
+		v[AttrMaxSpeed] = *p.MaxSpeed
+	}
+	if p.MaxFlow != nil {
+		v[AttrMaxFlow] = *p.MaxFlow
+	}
+	if p.MinConstPressure != nil {
+		v[AttrMinConstPressure] = *p.MinConstPressure
+	}
+	if p.MaxConstPressure != nil {
+		v[AttrMaxConstPressure] = *p.MaxConstPressure
+	}
+	if p.MinCompPressure != nil {
+		v[AttrMinCompPressure] = *p.MinCompPressure
+	}
+	if p.MaxCompPressure != nil {
+		v[AttrMaxCompPressure] = *p.MaxCompPressure
+	}
+	if p.MinConstSpeed != nil {
+		v[AttrMinConstSpeed] = *p.MinConstSpeed
+	}
+	if p.MaxConstSpeed != nil {
+		v[AttrMaxConstSpeed] = *p.MaxConstSpeed
+	}
+	if p.MinConstFlow != nil {
+		v[AttrMinConstFlow] = *p.MinConstFlow
+	}
+	if p.MaxConstFlow != nil {
+		v[AttrMaxConstFlow] = *p.MaxConstFlow
+	}
+	if p.MinConstTemp != nil {
+		v[AttrMinConstTemp] = *p.MinConstTemp
+	}
+	if p.MaxConstTemp != nil {
+		v[AttrMaxConstTemp] = *p.MaxConstTemp
+	}
+	if p.PumpStatus != nil {
+		v[AttrPumpStatus] = *p.PumpStatus
+	}
+	if p.EffectiveOperationMode != nil {
+		v[AttrEffectiveOperationMode] = *p.EffectiveOperationMode
+	}
+	if p.EffectiveControlMode != nil {
+		v[AttrEffectiveControlMode] = *p.EffectiveControlMode
+	}
+	if p.Capacity != nil {
+		v[AttrCapacity] = *p.Capacity
+	}
+	if p.Speed != nil {
+		v[AttrSpeed] = *p.Speed
+	}
+	if p.LifetimeRunningHours != nil {
+		v[AttrLifetimeRunningHours] = *p.LifetimeRunningHours
+	}
+	if p.Power != nil {
+		v[AttrPower] = *p.Power
+	}
+	if p.LifetimeEnergyConsumed != nil {
+		v[AttrLifetimeEnergyConsumed] = *p.LifetimeEnergyConsumed
+	}
+	if p.OperationMode != nil {
+		v[AttrOperationMode] = *p.OperationMode
+	}
+	if p.ControlMode != nil {
+		v[AttrControlMode] = *p.ControlMode
+	}
+	if p.AlarmMask != nil {
+		v[AttrAlarmMask] = *p.AlarmMask
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed PumpConfigurationAndControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and
@@ -235,6 +318,35 @@ func (s *Server) EmitTurbineOperation(endpoint uint16, data TurbineOperationEven
 	return spec.EmitOn(s.Underlying(), endpoint, EventTurbineOperation, data)
 }
 
+// ControlModeSetter is a StateSource that takes a controller's
+// ControlMode write; the optional ControlMode attribute needs it.
+type ControlModeSetter interface {
+	SetControlMode(ctx context.Context, mode ControlModeEnum) error
+}
+
+// RunningHoursSetter is a StateSource that takes a controller's
+// LifetimeRunningHours write (nil for null).
+type RunningHoursSetter interface {
+	SetLifetimeRunningHours(ctx context.Context, hours *uint32) error
+}
+
+// EnergyConsumedSetter is a StateSource that takes a controller's
+// LifetimeEnergyConsumed write (nil for null).
+type EnergyConsumedSetter interface {
+	SetLifetimeEnergyConsumed(ctx context.Context, kWh *uint32) error
+}
+
+// StateSource is the pump: PumpState reports its state (the
+// limits come from the declaration's Initial, not from here),
+// SetOperationMode applies a controller's OperationMode write. A
+// source that also implements ControlModeSetter,
+// RunningHoursSetter or EnergyConsumedSetter takes those writes
+// (cluster/pump).
+type StateSource interface {
+	PumpState() State
+	SetOperationMode(ctx context.Context, mode OperationModeEnum) error
+}
+
 // Declare is the declaration of the PumpConfigurationAndControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -246,9 +358,14 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -267,6 +384,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	return decl
 }
 

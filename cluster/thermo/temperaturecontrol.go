@@ -70,9 +70,7 @@ const (
 // [ErrTemperatureRefused] — the device cannot accept the change now —
 // answers INVALID_IN_STATE; any other error answers FAILURE. Either way
 // nothing changes.
-type TemperatureSetter interface {
-	SetTemperature(ctx context.Context, target *int16, level *uint8) error
-}
+type TemperatureSetter = tc.TemperatureSetter
 
 // TemperatureControlConfig carries the construction parameters.
 type TemperatureControlConfig struct {
@@ -121,6 +119,7 @@ var ErrTemperatureRefused = errors.New("thermo: the device cannot accept the cha
 type TemperatureControlServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
+	hooks spec.Hooks
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -154,6 +153,7 @@ func NewTemperatureControl(cfg TemperatureControlConfig) (*TemperatureControlSer
 		return nil, fmt.Errorf("thermo: %w", err)
 	}
 	s := &TemperatureControlServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
+	s.hooks.Init(inst)
 	s.cfg.SupportedTemperatureLevels = slices.Clone(cfg.SupportedTemperatureLevels)
 	if err := s.checkConfig(); err != nil {
 		return nil, err
@@ -261,9 +261,12 @@ func (s *TemperatureControlServer) MatterRead(attrID uint32) (any, bool) {
 
 // MatterWrite refuses every write: every attribute is read-only, and the
 // definition answers each with its status.
-func (s *TemperatureControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	_, err := s.ValidateWrite(attrID, value, nil)
-	return err
+func (s *TemperatureControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
+	}
+	return s.hooks.CheckWrite(ctx, attrID, v)
 }
 
 // MatterInvoke carries out SetTemperature: the request is checked against
@@ -272,6 +275,9 @@ func (s *TemperatureControlServer) MatterWrite(_ context.Context, attrID uint32,
 func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("thermo: command 0x%02X is not supported", cmdID)
+	}
+	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
 	}
 	req, ok := spec.RequestOf[tc.SetTemperatureRequest](fields)
 	if !ok {

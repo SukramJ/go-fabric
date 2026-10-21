@@ -85,7 +85,7 @@ const (
 // ColorMode is the EnhancedColorModeEnum: the colour mode the light is in.
 // ColorMode (0x0008) reads the same value, with the enhanced hue mode read
 // as hue and saturation.
-type ColorMode uint8
+type ColorMode = ccdef.EnhancedColorModeEnum
 
 // EnhancedColorModeEnum values (color-control.element.ts).
 const (
@@ -185,9 +185,7 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 // performs: the cluster contract carries no priority, so a host whose
 // command queue ranks by urgency names the value it wants inside
 // SetColorTemperatureMireds.
-type ColorTemperatureWriter interface {
-	SetColorTemperatureMireds(ctx context.Context, mireds uint16) error
-}
+type ColorTemperatureWriter = ccdef.ColorTemperatureWriter
 
 // Color is the colour state of a [ColorControlServer], in the attributes'
 // Matter units. Mode says which fields describe the colour the light
@@ -196,20 +194,7 @@ type ColorTemperatureWriter interface {
 // temperature in the CT mode. The other fields keep the last value of
 // their mode. [HSVToXY], [XYToHSV], [MiredsToXY] and the rest convert
 // between them as the server does when it switches mode.
-type Color struct {
-	Mode ColorMode
-	// X and Y are CurrentX / CurrentY: CIE 1931 x and y times 65536
-	// (0..65279).
-	X, Y uint16
-	// Hue is CurrentHue (0..254 for 0..360°), EnhancedHue
-	// EnhancedCurrentHue (0..65535 for 0..360°).
-	Hue         uint8
-	EnhancedHue uint16
-	// Saturation is CurrentSaturation (0..254 for 0..100 %).
-	Saturation uint8
-	// ColorTemperatureMireds is ColorTemperatureMireds.
-	ColorTemperatureMireds uint16
-}
+type Color = ccdef.Color
 
 // ColorWriter is the optional sink a [ColorControlServer] drives with the
 // whole colour whenever it changes: a command that applies at once, each
@@ -220,9 +205,7 @@ type Color struct {
 // every colour temperature. Errors behave as for the
 // ColorTemperatureWriter: the change is refused and the attributes keep
 // their value.
-type ColorWriter interface {
-	SetColor(ctx context.Context, c Color) error
-}
+type ColorWriter = ccdef.ColorWriter
 
 // colorState is the server's colour state (matter.js ColorControlServer
 // State, the attributes the commands change).

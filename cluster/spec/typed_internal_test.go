@@ -18,6 +18,21 @@ type typedPair struct{ A uint8 }
 
 type typedPairAlias struct{ A uint8 }
 
+// typedWire is a self-held server's wire struct of typedState's attribute:
+// plain fields where the generated type has an enum and optional pointers.
+type typedWire struct {
+	ID     uint8
+	Label  string
+	Detail string
+	Extra  bool
+}
+
+type typedState struct {
+	Id     typedEnum //nolint:revive // the generated types spell an id "Id"
+	Label  *string
+	Detail *string
+}
+
 // TestTypedConvert covers each shape a generated State field takes, from
 // each stored form a value arrives in.
 func TestTypedConvert(t *testing.T) {
@@ -55,6 +70,14 @@ func TestTypedConvert(t *testing.T) {
 		{"struct", typedPairAlias{A: 1}, typedPair{}, typedPair{A: 1}, true},
 		{"list of structs", List[typedPair]{{A: 2}}, []typedPair(nil), []typedPair{{A: 2}}, true},
 		{"struct mismatch", struct{ B string }{}, typedPair{}, nil, false},
+		{
+			"wire struct by field name",
+			typedWire{ID: 3, Label: "x", Extra: true},
+			typedState{},
+			typedState{Id: 3, Label: ptrTo("x")},
+			true,
+		},
+		{"wire struct field misfit", struct{ ID string }{"x"}, typedState{}, nil, false},
 	}
 	for _, c := range cases {
 		got, ok := convert(c.v, reflect.TypeOf(c.to))

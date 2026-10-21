@@ -5,47 +5,45 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	hepaspec "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	acfdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	epdef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
+	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
+	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // --- device: a ceiling fan -------------------------------------------------
 
 // demoFan is a ceiling fan with ten speeds, an Auto mode and the Step
-// command. The FanControl server owns the coupling rules between FanMode,
-// PercentSetting and SpeedSetting; the device decides only what the rules
-// leave to the manufacturer — which percentage Low, Medium and High mean —
-// and reports where it ended up.
+// command. The kit's FanControl server owns the coupling rules between
+// FanMode, PercentSetting and SpeedSetting; the device decides only what
+// the rules leave to the manufacturer — which percentage Low, Medium and
+// High mean — and reports where it ended up.
 //
 // The fan has no spin-up time: the current values follow the settings
 // inside the write.
 type demoFan struct {
 	name string
 	notifier
-	version cluster.DataVersionTracker
 
 	mu    sync.Mutex
-	state fan.State
+	state fandef.State
 }
 
 var (
 	_ contract.ChangeNotifier = (*demoFan)(nil)
-	_ fan.StateSource         = (*demoFan)(nil)
+	_ fandef.StateSource      = (*demoFan)(nil)
 )
 
 // fanSpeedMax is SpeedMax: ten speeds, so one speed is ten percent.
@@ -53,29 +51,25 @@ const fanSpeedMax uint8 = 10
 
 func newDemoFan(name string) *demoFan {
 	zero := uint8(0)
-	return &demoFan{name: name, state: fan.State{
-		FanMode: fan.FanModeOff, PercentSetting: &zero, SpeedSetting: &zero,
+	return &demoFan{name: name, state: fandef.State{
+		FanMode: fandef.FanModeOff, PercentSetting: &zero, SpeedSetting: &zero,
 	}}
 }
 
-// servers are the cluster servers the device supplies.
-func (f *demoFan) servers() []contract.ClusterServer {
-	srv, err := fan.NewServer(fan.Config{
-		Source:      f,
-		Features:    fan.FeatureMultiSpeed | fan.FeatureAuto | fan.FeatureStep,
-		Sequence:    fan.SequenceOffLowMedHighAuto,
-		SpeedMax:    fanSpeedMax,
-		DeviceType:  fan.DeviceTypeFan,
-		DataVersion: &f.version,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("fan FanControl: %v", err))
+// declaration declares the fan's FanControl: MultiSpeed, Auto and Step,
+// the Off/Low/Med/High/Auto sequence, ten speeds, the fan as the kit's
+// server's StateSource.
+func (f *demoFan) declaration() device.Declaration {
+	sequence, speeds := fandef.FanModeSequenceOffLowMedHighAuto, fanSpeedMax
+	return fandef.Declare{
+		Features:    fandef.FeatureMultiSpeed | fandef.FeatureAuto | fandef.FeatureStep,
+		StateSource: f,
+		Initial:     fandef.Patch{FanModeSequence: &sequence, SpeedMax: &speeds},
 	}
-	return []contract.ClusterServer{srv}
 }
 
-// FanState implements [fan.StateSource].
-func (f *demoFan) FanState() fan.State {
+// FanState implements [fandef.StateSource].
+func (f *demoFan) FanState() fandef.State {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	st := f.state
@@ -85,14 +79,14 @@ func (f *demoFan) FanState() fan.State {
 }
 
 // fanModePercent is this fan's own meaning of the three named speeds.
-var fanModePercent = map[fan.FanMode]uint8{
-	fan.FanModeLow: 30, fan.FanModeMedium: 60, fan.FanModeHigh: 100,
+var fanModePercent = map[fandef.FanModeEnum]uint8{
+	fandef.FanModeLow: 30, fandef.FanModeMedium: 60, fandef.FanModeHigh: 100,
 }
 
-// ApplyFanSettings implements [fan.StateSource]. A nil field is one the
+// ApplyFanSettings implements [fandef.StateSource]. A nil field is one the
 // cluster's rules leave to the device; the device fills it from its own
 // mapping and reports the outcome through FanState.
-func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
+func (f *demoFan) ApplyFanSettings(_ context.Context, s fandef.Patch) error {
 	f.mu.Lock()
 	st := &f.state
 	if s.FanMode != nil {
@@ -103,12 +97,8 @@ func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
 			st.SpeedSetting = &speed
 		}
 	}
-	if s.PercentSetting != nil {
-		st.PercentSetting = settingPtr(*s.PercentSetting)
-	}
-	if s.SpeedSetting != nil {
-		st.SpeedSetting = settingPtr(*s.SpeedSetting)
-	}
+	st.PercentSetting = settingOf(st.PercentSetting, s.PercentSetting, fandef.AttrPercentSetting, s.Null)
+	st.SpeedSetting = settingOf(st.SpeedSetting, s.SpeedSetting, fandef.AttrSpeedSetting, s.Null)
 	// A percentage or speed with no mode decided by the rules lands on the
 	// named speed the device associates with it.
 	if s.FanMode == nil && st.PercentSetting != nil && *st.PercentSetting > 0 {
@@ -127,26 +117,32 @@ func (f *demoFan) ApplyFanSettings(_ context.Context, s fan.Settings) error {
 	return nil
 }
 
-func settingPtr(s fan.Setting) *uint8 {
-	if s.Null {
+// settingOf is the setting after a patch: null when the patch names the
+// attribute in Null, the patched value when it sets one, else unchanged.
+func settingOf(cur, v *uint8, attr uint32, null []uint32) *uint8 {
+	switch {
+	case slices.Contains(null, attr):
 		return nil
+	case v != nil:
+		out := *v
+		return &out
+	default:
+		return cur
 	}
-	v := s.Value
-	return &v
 }
 
 func percentToSpeed(p uint8) uint8 {
 	return uint8(min((uint16(p)*uint16(fanSpeedMax)+99)/100, uint16(fanSpeedMax))) //nolint:gosec // bounded by fanSpeedMax, a uint8
 }
 
-func percentToMode(p uint8) fan.FanMode {
+func percentToMode(p uint8) fandef.FanModeEnum {
 	switch {
 	case p <= 33:
-		return fan.FanModeLow
+		return fandef.FanModeLow
 	case p <= 66:
-		return fan.FanModeMedium
+		return fandef.FanModeMedium
 	default:
-		return fan.FanModeHigh
+		return fandef.FanModeHigh
 	}
 }
 
@@ -160,21 +156,21 @@ func copyUint8(v *uint8) *uint8 {
 
 // --- device: a thermostat ----------------------------------------------------
 
-// demoThermostat is a heating/cooling thermostat. The module's Thermostat
-// server holds its setpoints itself (cluster/thermo is a conformance
-// reference that drives no device); this endpoint puts it in front of a real
-// controller. The room temperature is the one thing the device reports, via
-// the control hook.
+// demoThermostat is a heating/cooling thermostat. The device kit's
+// Thermostat server holds its setpoints itself (cluster/thermo is a
+// conformance reference that drives no device); this endpoint puts it in
+// front of a real controller. The room temperature is the one thing the
+// device reports, via the control hook.
 //
 // It also serves EnergyPreference with the EnergyBalance feature, which the
 // Thermostat device type offers as optional (parity/schema.json): three
 // balances from efficient to comfortable, and the two priorities they
 // trade between.
 //
-// Its display settings are a
-// ThermostatUserInterfaceConfiguration, the optional cluster the Thermostat
-// device type offers (thermostat.element.ts), with matter.js's defaults;
-// KeypadLockout persists in the daemon's settings.
+// Its display settings are a ThermostatUserInterfaceConfiguration, the
+// optional cluster the Thermostat device type offers (thermostat.element.ts),
+// with matter.js's defaults; KeypadLockout persists in the daemon's
+// settings.
 //
 // It serves Presets (PRES) in the shape of matter.js's CHIP test
 // thermostat (support/chip-testing/src/AllClustersTestInstance.ts:1058-1103
@@ -187,100 +183,92 @@ func copyUint8(v *uint8) *uint8 {
 // step 13. No Occupancy: the endpoint has no occupancy sensor.
 type demoThermostat struct {
 	name string
-	once sync.Once
-	srv  *thermo.ThermostatServer
-	pref *energy.PreferenceServer
-	ui   *thermo.ThermostatUIServer
 
 	// presets and settings are the daemon's store (attachStore); nil keeps
 	// the presets and KeypadLockout in memory.
-	presets  thermo.PresetStore
-	settings thermo.SettingStore
+	presets  thermostatdef.PresetStore
+	settings tuidef.SettingStore
+
+	mu  sync.Mutex
+	srv *thermostatdef.Server
 }
 
-// thermostatStoreKey names the thermostat's rows in the daemon's store: its
-// device address.
+// thermostatStoreKey names the thermostat's presets in the daemon's store:
+// its device address.
 const thermostatStoreKey = "demo-thermostat-1"
 
-// attachStore persists the thermostat's presets and KeypadLockout in st.
-// Call it before the thermostat's servers are built (fleet.endpoints).
-func (t *demoThermostat) attachStore(st *store.Store) {
-	t.presets = st.ThermostatPresets(thermostatStoreKey)
-	t.settings = st
+// attachStore persists the thermostat's presets and KeypadLockout in the
+// daemon's store. Call it before the thermostat's device is built
+// (fleet.endpoints).
+func (t *demoThermostat) attachStore(presets thermostatdef.PresetStore, settings tuidef.SettingStore) {
+	t.presets, t.settings = presets, settings
 }
-
-var _ energy.PreferenceChanger = (*demoThermostat)(nil)
 
 func newDemoThermostat(name string) *demoThermostat { return &demoThermostat{name: name} }
 
-// servers are the cluster servers the device supplies. The server
-// holds the setpoints, so the same instance serves every reassembly.
-func (t *demoThermostat) servers() []contract.ClusterServer {
-	t.build()
-	return []contract.ClusterServer{t.srv, t.pref, t.ui}
-}
-
-func (t *demoThermostat) build() {
-	t.once.Do(func() {
-		cfg := thermo.DefaultThermostatConfig()
-		cfg.Features = thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL | thermo.ThermostatFeaturePRES
-		cfg.NumberOfPresets = 5
-		names := thermostatdef.PresetTypeFeaturesAutomatic | thermostatdef.PresetTypeFeaturesSupportsNames
-		cfg.PresetTypes = []thermo.PresetType{
-			{PresetScenario: thermostatdef.PresetScenarioUserDefined, NumberOfPresets: 1, PresetTypeFeatures: names},
-			{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1, PresetTypeFeatures: names},
-			{PresetScenario: thermostatdef.PresetScenarioUnoccupied, NumberOfPresets: 1, PresetTypeFeatures: names},
-		}
-		cool, heat := int16(2600), int16(2000)
-		cfg.Presets = []thermo.Preset{
-			{
-				PresetHandle: spec.ValueOf([]byte("UserDef")), PresetScenario: thermostatdef.PresetScenarioUserDefined,
-				Name: &spec.Nullable[string]{Value: "UD"}, CoolingSetpoint: &cool, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(false),
+// device builds the Thermostat with its EnergyPreference and
+// ThermostatUserInterfaceConfiguration.
+func (t *demoThermostat) device(opts device.Options) (*device.Thermostat, error) {
+	names := thermostatdef.PresetTypeFeaturesAutomatic | thermostatdef.PresetTypeFeaturesSupportsNames
+	presetTypes := []thermostatdef.PresetTypeStruct{
+		{PresetScenario: thermostatdef.PresetScenarioUserDefined, NumberOfPresets: 1, PresetTypeFeatures: names},
+		{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1, PresetTypeFeatures: names},
+		{PresetScenario: thermostatdef.PresetScenarioUnoccupied, NumberOfPresets: 1, PresetTypeFeatures: names},
+	}
+	cool, heat := int16(2600), int16(2000)
+	presets := []thermostatdef.PresetStruct{
+		{
+			PresetHandle: spec.ValueOf([]byte("UserDef")), PresetScenario: thermostatdef.PresetScenarioUserDefined,
+			Name: &spec.Nullable[string]{Value: "UD"}, CoolingSetpoint: &cool, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(false),
+		},
+		{
+			PresetHandle: spec.ValueOf([]byte("TestOcc")), PresetScenario: thermostatdef.PresetScenarioOccupied,
+			Name: &spec.Nullable[string]{Value: "Occ"}, CoolingSetpoint: &cool, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(true),
+		},
+	}
+	count, room := uint8(5), int16(2150)
+	efficient, comfort := "Efficient", "Comfort"
+	balances := []epdef.BalanceStruct{{Step: 0, Label: &efficient}, {Step: 50}, {Step: 100, Label: &comfort}}
+	priorities := []epdef.EnergyPriorityEnum{epdef.EnergyPriorityEfficiency, epdef.EnergyPriorityComfort}
+	balance := uint8(1)
+	d, err := device.NewThermostat(opts,
+		thermostatdef.Declare{
+			Features:    thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeaturePresets,
+			PresetStore: t.presets,
+			Initial: thermostatdef.Patch{
+				NumberOfPresets: &count, PresetTypes: &presetTypes, Presets: &presets, LocalTemperature: &room,
 			},
-			{
-				PresetHandle: spec.ValueOf([]byte("TestOcc")), PresetScenario: thermostatdef.PresetScenarioOccupied,
-				Name: &spec.Nullable[string]{Value: "Occ"}, CoolingSetpoint: &cool, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(true),
+		},
+		epdef.Declare{
+			Features: epdef.FeatureEnergyBalance,
+			Initial:  epdef.Patch{EnergyBalances: &balances, EnergyPriorities: &priorities, CurrentEnergyBalance: &balance},
+			// The thermostat takes every balance the server lets through.
+			OnWrite: func(_ context.Context, next epdef.State, attrID uint32) error {
+				slog.Info("thermostat.preference", slog.String("device", t.name), slog.Int("attribute", int(attrID)),
+					slog.Int("index", int(next.CurrentEnergyBalance)))
+				return nil
 			},
-		}
-		cfg.PresetStore = t.presets
-		t.srv = thermo.NewThermostatServer(cfg)
-		room := int16(2150)
-		t.srv.SetLocalTemperature(&room)
-		efficient, comfort := "Efficient", "Comfort"
-		pref, err := energy.NewEnergyPreference(energy.PreferenceConfig{
-			Features: energy.PreferenceFeatureEnergyBalance,
-			EnergyBalances: []energy.Balance{
-				{Step: 0, Label: &efficient}, {Step: 50}, {Step: 100, Label: &comfort},
-			},
-			EnergyPriorities:     []energy.Priority{energy.PriorityEfficiency, energy.PriorityComfort},
-			CurrentEnergyBalance: 1,
-			Changer:              t,
-		})
-		if err != nil {
-			panic(fmt.Sprintf("thermostat EnergyPreference: %v", err))
-		}
-		t.pref = pref
-		ui, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{
-			Settings: t.settings, SettingKey: thermostatStoreKey + ".keypad_lockout",
-		})
-		if err != nil {
-			panic(fmt.Sprintf("thermostat ThermostatUserInterfaceConfiguration: %v", err))
-		}
-		t.ui = ui
-	})
-}
-
-// ChangePreference implements [energy.PreferenceChanger]: the thermostat
-// takes every balance the server has let through.
-func (t *demoThermostat) ChangePreference(_ context.Context, attrID uint32, index uint8) error {
-	slog.Info("thermostat.preference", slog.String("device", t.name), slog.Int("attribute", int(attrID)), slog.Int("index", int(index)))
-	return nil
+		},
+		tuidef.Declare{SettingStore: t.settings})
+	if err != nil {
+		return nil, err
+	}
+	t.mu.Lock()
+	t.srv = d.Thermostat()
+	t.mu.Unlock()
+	return d, nil
 }
 
 // reportTemperature is the device's room sensor reporting, in 0.01 °C.
 func (t *demoThermostat) reportTemperature(centi int16) {
-	t.build()
-	t.srv.SetLocalTemperature(&centi)
+	t.mu.Lock()
+	srv := t.srv
+	t.mu.Unlock()
+	if srv != nil {
+		if err := srv.Set(thermostatdef.Patch{LocalTemperature: &centi}); err != nil {
+			slog.Warn("thermostat.temperature", slog.String("device", t.name), slog.Any("err", err))
+		}
+	}
 	slog.Info("thermostat.temperature", slog.String("device", t.name), slog.Int("centi_celsius", int(centi)))
 }
 
@@ -289,64 +277,59 @@ func (t *demoThermostat) reportTemperature(centi int16) {
 // demoPump is a circulation pump: OnOff powers it (Pump mandates OnOff),
 // PumpConfigurationAndControl reports and sets how it runs, and a
 // FlowMeasurement on the same endpoint reports what it moves — one of the
-// optional servers the Pump device type lists.
+// optional clusters the Pump device type lists.
 type demoPump struct {
 	name string
 	notifier
-	version cluster.DataVersionTracker
-	flow    *demoReading
+	flow *demoReading
 
 	mu   sync.Mutex
 	on   bool
-	mode pump.OperationMode
-
-	srvMu sync.Mutex
-	srv   *pump.Server
+	mode pumpdef.OperationModeEnum
+	dev  *device.Pump
 }
 
 var (
 	_ contract.ChangeNotifier = (*demoPump)(nil)
-	_ pump.StateSource        = (*demoPump)(nil)
+	_ pumpdef.StateSource     = (*demoPump)(nil)
 )
 
 func newDemoPump(name string) *demoPump {
-	return &demoPump{name: name, flow: newDemoReading(name+" flow", contract.MeasurementFlow, 1.5)}
+	return &demoPump{name: name, flow: newDemoReading(name+" flow", 1.5)}
 }
 
-// servers are the cluster servers the device supplies.
-func (p *demoPump) servers() []contract.ClusterServer {
+// declarations declare the pump's clusters: PumpConfigurationAndControl
+// at constant speed with PumpStatus, its limits and the two fault events,
+// the pump as the kit's server's StateSource; and the flow it moves.
+func (p *demoPump) declarations() []device.Option {
 	maxPressure, maxSpeed, maxFlow := int16(3000), uint16(3200), uint16(60)
 	minSpeed, maxConstSpeed := uint16(500), uint16(3200)
-	srv, err := pump.NewServer(pump.Config{
-		Source:   p,
-		Features: pump.FeatureConstantSpeed,
-		Optional: pump.OptionalPumpStatus,
-		Limits: pump.Limits{
-			MaxPressure: &maxPressure, MaxSpeed: &maxSpeed, MaxFlow: &maxFlow,
-			MinConstSpeed: &minSpeed, MaxConstSpeed: &maxConstSpeed,
+	var status pumpdef.PumpStatusBitmap
+	return []device.Option{
+		pumpdef.Declare{
+			Features:    pumpdef.FeatureConstantSpeed,
+			StateSource: p,
+			Events:      []uint32{pumpdef.EventDryRunning, pumpdef.EventPumpBlocked},
+			Initial: pumpdef.Patch{
+				MaxPressure: &maxPressure, MaxSpeed: &maxSpeed, MaxFlow: &maxFlow,
+				MinConstSpeed: &minSpeed, MaxConstSpeed: &maxConstSpeed,
+				PumpStatus: &status, // served (OptionalPumpStatus); the source reports it
+			},
 		},
-		Events:      []uint32{pump.EventDryRunning, pump.EventPumpBlocked},
-		DataVersion: &p.version,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("pump PumpConfigurationAndControl: %v", err))
-	}
-	p.srvMu.Lock()
-	p.srv = srv
-	p.srvMu.Unlock()
-	return []contract.ClusterServer{
-		srv,
-		measurement.NewFlowServer(p.flow),
+		p.flow.flowDeclaration(),
 	}
 }
 
 // device builds the pump: Pump with the device layer's default OnOff
 // server, which the pump follows through the device's OnChanged hook.
 func (p *demoPump) device(opts device.Options) (*device.Pump, error) {
-	dev, err := device.NewPump(opts, serve(p.servers(), device.WithChangeNotifier(p))...)
+	dev, err := device.NewPump(opts, append(p.declarations(), device.WithChangeNotifier(p))...)
 	if err != nil {
 		return nil, err
 	}
+	p.mu.Lock()
+	p.dev = dev
+	p.mu.Unlock()
 	followOnOff(dev.Device, dev.OnOff(), func(on bool) {
 		p.setOn(on)
 		slog.Info("pump.set", slog.String("device", p.name), slog.Bool("on", on))
@@ -354,27 +337,27 @@ func (p *demoPump) device(opts device.Options) (*device.Pump, error) {
 	return dev, nil
 }
 
-// PumpState implements [pump.StateSource].
-func (p *demoPump) PumpState() pump.State {
+// PumpState implements [pumpdef.StateSource].
+func (p *demoPump) PumpState() pumpdef.State {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	var speed uint16
 	if p.on {
-		speed = map[pump.OperationMode]uint16{
-			pump.OperationNormal: 2000, pump.OperationMinimum: 500, pump.OperationMaximum: 3200,
+		speed = map[pumpdef.OperationModeEnum]uint16{
+			pumpdef.OperationModeNormal: 2000, pumpdef.OperationModeMinimum: 500, pumpdef.OperationModeMaximum: 3200,
 		}[p.mode]
 	}
-	return pump.State{
+	return pumpdef.State{
 		EffectiveOperationMode: p.mode,
-		EffectiveControlMode:   pump.ControlConstantSpeed,
+		EffectiveControlMode:   pumpdef.ControlModeConstantSpeed,
 		Speed:                  &speed,
 		OperationMode:          p.mode,
-		ControlMode:            pump.ControlConstantSpeed,
+		ControlMode:            pumpdef.ControlModeConstantSpeed,
 	}
 }
 
-// SetOperationMode implements [pump.StateSource].
-func (p *demoPump) SetOperationMode(_ context.Context, mode pump.OperationMode) error {
+// SetOperationMode implements [pumpdef.StateSource].
+func (p *demoPump) SetOperationMode(_ context.Context, mode pumpdef.OperationModeEnum) error {
 	p.mu.Lock()
 	p.mode = mode
 	p.mu.Unlock()
@@ -392,14 +375,26 @@ func (p *demoPump) setOn(on bool) {
 
 // reportEvent is the pump raising one of its declared fault events.
 func (p *demoPump) reportEvent(event uint32) error {
-	p.srvMu.Lock()
-	srv := p.srv
-	p.srvMu.Unlock()
-	if srv == nil {
+	p.mu.Lock()
+	dev := p.dev
+	p.mu.Unlock()
+	if dev == nil {
+		return fmt.Errorf("pump %s is not built yet", p.name)
+	}
+	endpoint, ok := dev.EndpointNumber()
+	if !ok {
 		return fmt.Errorf("pump %s is not mounted yet", p.name)
 	}
 	slog.Info("pump.event", slog.String("device", p.name), slog.Int("event", int(event)))
-	return srv.Emit(srv.Endpoint(), event, nil)
+	srv := dev.PumpConfigurationAndControl()
+	switch event {
+	case pumpdef.EventDryRunning:
+		return srv.EmitDryRunning(endpoint, pumpdef.DryRunningEvent{})
+	case pumpdef.EventPumpBlocked:
+		return srv.EmitPumpBlocked(endpoint, pumpdef.PumpBlockedEvent{})
+	default:
+		return errors.New("the pump declares no such event")
+	}
 }
 
 // --- device: an air purifier -------------------------------------------------
@@ -416,54 +411,42 @@ func (p *demoPump) reportEvent(event uint32) error {
 // filter (ResetCondition) brings it back to 100 % and Ok.
 type demoAirPurifier struct {
 	*demoFan
-	hepa   *filter.Server
-	carbon *filter.Server
 }
 
 func newDemoAirPurifier(name string) *demoAirPurifier {
-	p := &demoAirPurifier{demoFan: newDemoFan(name)}
-	products := []filter.ReplacementProduct{{ProductIdentifierType: hepaspec.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
-	optional := filter.OptionalInPlaceIndicator | filter.OptionalLastChangedTime | filter.OptionalResetCondition
-	var err error
-	p.hepa, err = filter.NewHepaFilterMonitoring(filter.Config{
-		Features:             filter.FeatureCondition | filter.FeatureWarning | filter.FeatureReplacementProductList,
-		Optional:             optional,
-		DegradationDirection: hepaspec.DegradationDirectionDown,
-		ReplacementProducts:  products,
-		Initial:              filter.State{Condition: 20, ChangeIndication: filter.ChangeIndicationWarning, InPlaceIndicator: true},
-		Resetter:             filterReset{name: name + " HEPA filter"},
-	})
-	if err != nil {
-		panic(fmt.Sprintf("air purifier HEPA filter: %v", err))
-	}
-	p.carbon, err = filter.NewActivatedCarbonFilterMonitoring(filter.Config{
-		Features:             filter.FeatureCondition | filter.FeatureReplacementProductList,
-		Optional:             optional,
-		DegradationDirection: hepaspec.DegradationDirectionDown,
-		ReplacementProducts:  products,
-		Initial:              filter.State{Condition: 20, ChangeIndication: filter.ChangeIndicationCritical, InPlaceIndicator: true},
-		Resetter:             filterReset{name: name + " carbon filter"},
-	})
-	if err != nil {
-		panic(fmt.Sprintf("air purifier carbon filter: %v", err))
-	}
-	return p
+	return &demoAirPurifier{demoFan: newDemoFan(name)}
 }
 
-// servers are the cluster servers the device supplies.
-func (p *demoAirPurifier) servers() []contract.ClusterServer {
-	srv, err := fan.NewServer(fan.Config{
-		Source:      p.demoFan,
-		Features:    fan.FeatureMultiSpeed | fan.FeatureAuto | fan.FeatureStep,
-		Sequence:    fan.SequenceOffLowMedHighAuto,
-		SpeedMax:    fanSpeedMax,
-		DeviceType:  fan.DeviceTypeAirPurifier,
-		DataVersion: &p.version,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("air purifier FanControl: %v", err))
+// declarations declare the purifier's fan and its two filters.
+func (p *demoAirPurifier) declarations() []device.Option {
+	condition, inPlace := uint8(20), true
+	hepaDown, carbonDown := hepadef.DegradationDirectionDown, acfdef.DegradationDirectionDown
+	hepaWarning, carbonCritical := hepadef.ChangeIndicationWarning, acfdef.ChangeIndicationCritical
+	hepaProducts := []hepadef.ReplacementProductStruct{{ProductIdentifierType: hepadef.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
+	carbonProducts := []acfdef.ReplacementProductStruct{{ProductIdentifierType: acfdef.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
+	return []device.Option{
+		p.declaration(),
+		hepadef.Declare{
+			Features: hepadef.FeatureCondition | hepadef.FeatureWarning | hepadef.FeatureReplacementProductList,
+			Commands: []uint32{hepadef.CmdResetCondition},
+			Resetter: filterReset{name: p.name + " HEPA filter"},
+			Initial: hepadef.Patch{
+				Condition: &condition, DegradationDirection: &hepaDown, ChangeIndication: &hepaWarning,
+				InPlaceIndicator: &inPlace, ReplacementProductList: &hepaProducts,
+				Null: []uint32{hepadef.AttrLastChangedTime},
+			},
+		},
+		acfdef.Declare{
+			Features: acfdef.FeatureCondition | acfdef.FeatureReplacementProductList,
+			Commands: []uint32{acfdef.CmdResetCondition},
+			Resetter: filterReset{name: p.name + " carbon filter"},
+			Initial: acfdef.Patch{
+				Condition: &condition, DegradationDirection: &carbonDown, ChangeIndication: &carbonCritical,
+				InPlaceIndicator: &inPlace, ReplacementProductList: &carbonProducts,
+				Null: []uint32{acfdef.AttrLastChangedTime},
+			},
+		},
 	}
-	return []contract.ClusterServer{srv, p.hepa, p.carbon}
 }
 
 // filterReset is the purifier's side of ResetCondition: a new filter is in.

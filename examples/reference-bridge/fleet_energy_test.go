@@ -22,6 +22,16 @@ type heaterStep struct {
 	percent int // TankPercentage; -1 skips the check
 }
 
+// builtHeater is a water heater with its device built.
+func builtHeater(t *testing.T) *demoWaterHeater {
+	t.Helper()
+	w := newDemoWaterHeater("test heater")
+	if _, err := w.device(bridged("waterheater", w.name)); err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
 func trigger(code uint64) func(*testing.T, *demoWaterHeater) {
 	return func(t *testing.T, w *demoWaterHeater) {
 		t.Helper()
@@ -34,7 +44,7 @@ func trigger(code uint64) func(*testing.T, *demoWaterHeater) {
 func invoke(cmd uint32, fields any) func(*testing.T, *demoWaterHeater) {
 	return func(t *testing.T, w *demoWaterHeater) {
 		t.Helper()
-		if _, err := w.whm.MatterInvoke(context.Background(), cmd, fields); err != nil {
+		if _, err := w.whm.Underlying().MatterInvoke(context.Background(), cmd, fields); err != nil {
 			t.Fatalf("invoke 0x%02X: %v", cmd, err)
 		}
 	}
@@ -48,10 +58,10 @@ func replay(t *testing.T, w *demoWaterHeater, steps []heaterStep) {
 	t.Helper()
 	for _, s := range steps {
 		s.do(t, w)
-		st := w.whm.State()
-		if (st.HeatDemand != 0) != s.demand || w.whm.BoostState() != s.boost || (s.percent >= 0 && int(st.TankPercentage) != s.percent) {
+		st := w.whm.Get()
+		if (st.HeatDemand != 0) != s.demand || st.BoostState != s.boost || (s.percent >= 0 && int(st.TankPercentage) != s.percent) {
 			t.Errorf("step %s: demand 0x%02X, boost %d, tank %d%%; want demand %v, boost %d, tank %d%%",
-				s.step, st.HeatDemand, w.whm.BoostState(), st.TankPercentage, s.demand, s.boost, s.percent)
+				s.step, st.HeatDemand, st.BoostState, st.TankPercentage, s.demand, s.boost, s.percent)
 		}
 	}
 }
@@ -62,8 +72,7 @@ func replay(t *testing.T, w *demoWaterHeater, steps []heaterStep) {
 // TargetReheat boost that resumes heating only below its reheat level.
 func TestWaterHeaterTankPercentSequence(t *testing.T) {
 	t.Parallel()
-	w := newDemoWaterHeater("test heater")
-	w.build()
+	w := builtHeater(t)
 	hundred, reheat := uint8(100), uint8(65)
 	active, inactive := energy.BoostStateActive, energy.BoostStateInactive
 	replay(t, w, []heaterStep{
@@ -92,8 +101,7 @@ func TestWaterHeaterTankPercentSequence(t *testing.T) {
 func TestWaterHeaterModeAndBoostSequence(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		w := newDemoWaterHeater("test heater")
-		w.build()
+		w := builtHeater(t)
 		yes := true
 		active, inactive := energy.BoostStateActive, energy.BoostStateInactive
 		replay(t, w, []heaterStep{

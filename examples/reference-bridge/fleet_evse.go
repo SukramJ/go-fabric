@@ -10,16 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
+	demmdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
 	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/contract"
+	evsemdef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
+	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
 )
 
 // --- device: an EV charger ---------------------------------------------------
@@ -128,34 +127,29 @@ type evseTriggerSave struct {
 	hwBasic, hwPluggedIn, hwDemand                       energy.EvseState
 }
 
-// demoEvse is the charger.
+// demoEvse is the charger. Its EnergyEvse is the module's state machine
+// with the app as its host (energy.EvseHost), mounted as the declaration's
+// HostServer: the cluster's delegate model is not in the declarations yet
+// (concept v6, gate 2). The mode cluster, the DeviceEnergyManagement part,
+// the PowerSource and the ElectricalSensor are declared.
 type demoEvse struct {
 	name string
 	now  func() time.Time
 
 	once     sync.Once
 	evse     *energy.EvseServer
-	modes    *modebase.Server
 	dem      *demoDem
-	power    *wiredPowerSource
-	meter    *evseMeter
-	version  struct{ evse, modes cluster.DataVersionTracker }
+	power    *device.PowerSource
 	saved    evseTriggerSave
 	triggers sync.Mutex
 }
 
 var (
 	_ energy.EvseHost      = (*demoEvse)(nil)
-	_ modebase.ModeChanger = (*demoEvse)(nil)
+	_ evsemdef.ModeChanger = (*demoEvse)(nil)
 )
 
 func newDemoEvse(name string) *demoEvse { return &demoEvse{name: name, now: time.Now} }
-
-// servers are the cluster servers the device supplies.
-func (e *demoEvse) servers() []contract.ClusterServer {
-	e.build()
-	return []contract.ClusterServer{e.evse, e.modes}
-}
 
 func (e *demoEvse) build() {
 	e.once.Do(func() {
@@ -169,55 +163,61 @@ func (e *demoEvse) build() {
 			StartDiagnostics: true,
 			Host:             e,
 			Clock:            nowClock{now: e.now},
-			DataVersion:      &e.version.evse,
 		})
 		if err != nil {
 			panic(fmt.Sprintf("evse EnergyEvse: %v", err))
 		}
-		// The app's four modes; the zap file sets no CurrentMode, the
-		// first is taken.
-		modes, err := modebase.NewEnergyEvseMode(modebase.Config{
-			Changer: e,
-			SupportedModes: []modebase.ModeOption{
-				{Label: "Manual", Mode: evseModeManual, Tags: []modebase.ModeTag{{Value: modebase.EvseTagManual}}},
-				{Label: "Auto-scheduled", Mode: evseModeTimeOfUse, Tags: []modebase.ModeTag{{Value: modebase.EvseTagTimeOfUse}}},
-				{Label: "Solar", Mode: evseModeSolarCharging, Tags: []modebase.ModeTag{{Value: modebase.EvseTagSolarCharging}}},
-				{Label: "Auto-scheduled with Solar charging", Mode: evseModeTimeOfUseAndSolarCharging, Tags: []modebase.ModeTag{
-					{Value: modebase.EvseTagTimeOfUse}, {Value: modebase.EvseTagSolarCharging},
-				}},
-			},
-			CurrentMode: evseModeManual,
-			DataVersion: &e.version.modes,
-		})
-		if err != nil {
-			panic(fmt.Sprintf("evse EnergyEvseMode: %v", err))
-		}
-		e.evse, e.modes = srv, modes
-		e.dem = newDemoDem(e.name, e.now)
-		e.power = newWiredPowerSource()
-		e.meter = &evseMeter{}
+		e.evse = srv
+		e.dem = newDemoDem(e.name, demFeatures)
 	})
 }
 
+// nowClock is a [clock.Clock] whose Now is the charger's own reading; its
+// timers run on the system clock.
+type nowClock struct {
+	clock.System
+	now func() time.Time
+}
+
+// Now is the charger's reading.
+func (c nowClock) Now() time.Time { return c.now() }
+
 // device builds the charger with its parts: PowerSource,
 // DeviceEnergyManagement (stating ControllableEsa, so
-// DeviceEnergyManagementMode is mounted) and the ElectricalSensor, whose
-// clusters the assembler materialises from the meter reading.
-func (e *demoEvse) device(opts device.Options) (node.Endpoint, error) {
+// DeviceEnergyManagementMode is mounted) and the ElectricalSensor. The
+// app's four EnergyEvseMode modes; the zap file sets no CurrentMode, the
+// first is taken.
+func (e *demoEvse) device(opts device.Options) (*device.EnergyEvse, error) {
 	e.build()
-	charger, err := device.NewEnergyEvse(opts, serve(e.servers())...)
+	mode := func(label string, m uint8, tags ...evsemdef.ModeTag) evsemdef.ModeOptionStruct {
+		o := evsemdef.ModeOptionStruct{Label: label, Mode: m}
+		for _, t := range tags {
+			o.ModeTags = append(o.ModeTags, evsemdef.ModeTagStruct{Value: t})
+		}
+		return o
+	}
+	modes := []evsemdef.ModeOptionStruct{
+		mode("Manual", evseModeManual, evsemdef.ModeTagManual),
+		mode("Auto-scheduled", evseModeTimeOfUse, evsemdef.ModeTagTimeOfUse),
+		mode("Solar", evseModeSolarCharging, evsemdef.ModeTagSolarCharging),
+		mode("Auto-scheduled with Solar charging", evseModeTimeOfUseAndSolarCharging, evsemdef.ModeTagTimeOfUse, evsemdef.ModeTagSolarCharging),
+	}
+	current := evseModeManual
+	charger, err := device.NewEnergyEvse(opts,
+		evse.Declare{HostServer: e.evse},
+		evsemdef.Declare{ModeChanger: e, Initial: evsemdef.Patch{SupportedModes: &modes, CurrentMode: &current}})
 	if err != nil {
 		return nil, err
 	}
-	power, err := device.NewPowerSource(part("demo:evse:power"), serve(e.power.servers())...)
+	power, err := device.NewPowerSource(part("demo:evse:power"), wiredPowerSource())
 	if err != nil {
 		return nil, err
 	}
-	esa, err := device.NewDeviceEnergyManagement(part("demo:evse:dem", conditionControllableEsa), serve(e.dem.servers())...)
+	esa, err := e.dem.device(part("demo:evse:dem", conditionControllableEsa))
 	if err != nil {
 		return nil, err
 	}
-	meter, err := device.NewElectricalSensor(part("demo:evse:meter"), measured(e.meter))
+	meter, err := device.NewElectricalSensor(part("demo:evse:meter"), electricalSensorDeclarations()...)
 	if err != nil {
 		return nil, err
 	}
@@ -226,14 +226,15 @@ func (e *demoEvse) device(opts device.Options) (node.Endpoint, error) {
 			return nil, err
 		}
 	}
+	e.power = power
 	return charger, nil
 }
 
-// ChangeToMode implements [modebase.ModeChanger]: every supported mode is
+// ChangeToMode implements [evsemdef.ModeChanger]: every supported mode is
 // taken (energy-evse-mode.cpp:37-40).
-func (e *demoEvse) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
+func (e *demoEvse) ChangeToMode(_ context.Context, newMode uint8) (status uint8, text string, err error) {
 	slog.Info("evse.mode", slog.String("device", e.name), slog.Int("mode", int(newMode)))
-	return modebase.StatusSuccess, "", nil
+	return uint8(evsemdef.ModeChangeStatusSuccess), "", nil
 }
 
 // EvseEnergyMeter implements [energy.EvseHost]: the app's meter readings
@@ -438,85 +439,129 @@ func (e *demoEvse) testEventTrigger(trigger uint64) bool { //nolint:funlen // a 
 
 // --- the charger's DeviceEnergyManagement part ---------------------------------
 
-// demoDem is the charger's DeviceEnergyManagement endpoint: the cluster
-// with the app's default features and its mode cluster. The app's
-// manufacturer hooks do nothing (EVSEManufacturerImpl.cpp:533-588) and
-// report 300 mWh used (:528-531).
-type demoDem struct {
-	energy.NopDemManager
+// demFeatures are PA, PFR, STA, PAU, FA and CON: the app's default feature
+// map (examples/evse-app/linux/main.cpp:60-62).
+const demFeatures = dem.FeaturePowerAdjustment | dem.FeaturePowerForecastReporting | dem.FeatureStartTimeAdjustment |
+	dem.FeaturePausable | dem.FeatureForecastAdjustment | dem.FeatureConstraintBasedAdjustment
 
-	name    string
-	srv     *energy.DeviceEnergyManagementServer
-	modes   *modebase.Server
-	version struct{ dem, modes cluster.DataVersionTracker }
+// demoDem is a DeviceEnergyManagement endpoint: the cluster with the
+// app's features and its mode cluster. The app's manufacturer hooks do
+// nothing (EVSEManufacturerImpl.cpp:533-588) and report 300 mWh used
+// (:528-531).
+type demoDem struct {
+	name     string
+	features dem.Feature
+
+	mu  sync.Mutex
+	srv *dem.Server
 
 	// The trigger file's statics (DEMTestEventTriggers.cpp:30-49).
-	slots    [10]energy.ForecastSlot
-	forecast energy.Forecast
+	slots    [10]dem.SlotStruct
+	forecast dem.ForecastStruct
 	savedMin int64
 	savedMax int64
 	saved    bool
 }
 
 var (
-	_ energy.DemManager    = (*demoDem)(nil)
-	_ modebase.ModeChanger = (*demoDem)(nil)
+	_ dem.DemManager      = (*demoDem)(nil)
+	_ demmdef.ModeChanger = (*demoDem)(nil)
 )
 
-func newDemoDem(name string, now func() time.Time) *demoDem {
-	d := &demoDem{name: name}
-	// PA, PFR, STA, PAU, FA and CON: the app's default feature map
-	// (examples/evse-app/linux/main.cpp:60-62). ESAState Online, ESAType
-	// EVSE, 1.2 kW to 7.6 kW (EVSEManufacturerImpl.cpp:73-78).
-	srv, err := energy.NewDeviceEnergyManagement(energy.DeviceEnergyConfig{
-		Features: energy.DemFeaturePowerAdjustment | energy.DemFeaturePowerForecastReporting | energy.DemFeatureStartTimeAdjustment |
-			energy.DemFeaturePausable | energy.DemFeatureForecastAdjustment | energy.DemFeatureConstraintBasedAdjustment,
-		EsaType: dem.ESATypeEvse, EsaState: energy.EsaStateOnline,
-		AbsMinPower: 1200000, AbsMaxPower: 7600000,
-		Manager: d, Clock: nowClock{now: now}, DataVersion: &d.version.dem,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("evse DeviceEnergyManagement: %v", err))
-	}
-	modes, err := modebase.NewDeviceEnergyManagementMode(modebase.Config{
-		Changer: d,
-		SupportedModes: []modebase.ModeOption{
-			{Label: "No energy management (forecast only)", Mode: demModeNoOptimization, Tags: []modebase.ModeTag{{Value: modebase.DemTagNoOptimization}}},
-			{Label: "Device optimizes (no local or grid control)", Mode: demModeDeviceOnlyOptimization, Tags: []modebase.ModeTag{{Value: modebase.DemTagDeviceOptimization}}},
-			{Label: "Optimized within building", Mode: demModeDeviceAndLocalOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagLocalOptimization}, {Value: modebase.DemTagDeviceOptimization},
-			}},
-			{Label: "Optimized for grid", Mode: demModeDeviceAndGridOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagDeviceOptimization}, {Value: modebase.DemTagGridOptimization},
-			}},
-			{Label: "Optimized for grid and building", Mode: demModeAllOptimization, Tags: []modebase.ModeTag{
-				{Value: modebase.DemTagLocalOptimization}, {Value: modebase.DemTagDeviceOptimization}, {Value: modebase.DemTagGridOptimization},
-			}},
-		},
-		CurrentMode: demModeNoOptimization,
-		DataVersion: &d.version.modes,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("evse DeviceEnergyManagementMode: %v", err))
-	}
-	d.srv, d.modes = srv, modes
-	return d
+func newDemoDem(name string, features dem.Feature) *demoDem {
+	return &demoDem{name: name, features: features}
 }
 
-// servers are the cluster servers the device supplies.
-func (d *demoDem) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{d.srv, d.modes}
+// device builds the DeviceEnergyManagement endpoint: ESAState Online,
+// ESAType EVSE, 1.2 kW to 7.6 kW (EVSEManufacturerImpl.cpp:73-78), and the
+// five modes of device-energy-management-modes.h, starting without
+// optimisation.
+func (d *demoDem) device(opts device.Options) (*device.DeviceEnergyManagement, error) {
+	esaType, state, minPower, maxPower := dem.ESATypeEvse, dem.ESAStateOnline, int64(1200000), int64(7600000)
+	mode := func(label string, m uint8, tags ...demmdef.ModeTag) demmdef.ModeOptionStruct {
+		o := demmdef.ModeOptionStruct{Label: label, Mode: m}
+		for _, t := range tags {
+			o.ModeTags = append(o.ModeTags, demmdef.ModeTagStruct{Value: t})
+		}
+		return o
+	}
+	modes := []demmdef.ModeOptionStruct{
+		mode("No energy management (forecast only)", demModeNoOptimization, demmdef.ModeTagNoOptimization),
+		mode("Device optimizes (no local or grid control)", demModeDeviceOnlyOptimization, demmdef.ModeTagDeviceOptimization),
+		mode("Optimized within building", demModeDeviceAndLocalOptimization, demmdef.ModeTagLocalOptimization, demmdef.ModeTagDeviceOptimization),
+		mode("Optimized for grid", demModeDeviceAndGridOptimization, demmdef.ModeTagDeviceOptimization, demmdef.ModeTagGridOptimization),
+		mode("Optimized for grid and building", demModeAllOptimization,
+			demmdef.ModeTagLocalOptimization, demmdef.ModeTagDeviceOptimization, demmdef.ModeTagGridOptimization),
+	}
+	current := demModeNoOptimization
+	dev, err := device.NewDeviceEnergyManagement(opts,
+		dem.Declare{Features: d.features, DemManager: d, Initial: dem.Patch{
+			EsaType: &esaType, EsaState: &state, AbsMinPower: &minPower, AbsMaxPower: &maxPower,
+		}},
+		demmdef.Declare{ModeChanger: d, Initial: demmdef.Patch{SupportedModes: &modes, CurrentMode: &current}})
+	if err != nil {
+		return nil, err
+	}
+	d.mu.Lock()
+	d.srv = dem.WrapOn(dev.Server(dem.ClusterID), nil)
+	d.mu.Unlock()
+	return dev, nil
 }
 
-// ApproxEnergyDuringSession implements [energy.DemManager]
+// server is the built cluster server; nil before device.
+func (d *demoDem) server() *dem.Server {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.srv
+}
+
+// ApproxEnergyDuringSession implements [dem.DemManager]
 // (EVSEManufacturerImpl.cpp:528-531).
 func (d *demoDem) ApproxEnergyDuringSession() int64 { return 300 }
 
-// ChangeToMode implements [modebase.ModeChanger]: every supported mode is
+// PowerAdjust implements [dem.DemManager]: the app's hook does nothing.
+func (d *demoDem) PowerAdjust(context.Context, int64, uint32, dem.AdjustmentCauseEnum) error {
+	return nil
+}
+
+// PowerAdjustCompleted implements [dem.DemManager].
+func (d *demoDem) PowerAdjustCompleted() error { return nil }
+
+// CancelPowerAdjust implements [dem.DemManager].
+func (d *demoDem) CancelPowerAdjust(dem.CauseEnum) error { return nil }
+
+// StartTimeAdjust implements [dem.DemManager].
+func (d *demoDem) StartTimeAdjust(context.Context, uint32, dem.AdjustmentCauseEnum) error {
+	return nil
+}
+
+// Pause implements [dem.DemManager].
+func (d *demoDem) Pause(context.Context, uint32, dem.AdjustmentCauseEnum) error { return nil }
+
+// PauseCompleted implements [dem.DemManager].
+func (d *demoDem) PauseCompleted() error { return nil }
+
+// CancelPause implements [dem.DemManager].
+func (d *demoDem) CancelPause(dem.CauseEnum) error { return nil }
+
+// CancelRequest implements [dem.DemManager].
+func (d *demoDem) CancelRequest(context.Context) error { return nil }
+
+// ModifyForecast implements [dem.DemManager].
+func (d *demoDem) ModifyForecast(context.Context, uint32, []dem.SlotAdjustmentStruct, dem.AdjustmentCauseEnum) error {
+	return nil
+}
+
+// RequestConstraintBasedForecast implements [dem.DemManager].
+func (d *demoDem) RequestConstraintBasedForecast(context.Context, []dem.ConstraintsStruct, dem.AdjustmentCauseEnum) error {
+	return nil
+}
+
+// ChangeToMode implements [demmdef.ModeChanger]: every supported mode is
 // taken (device-energy-management-mode.cpp:46-50).
-func (d *demoDem) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
+func (d *demoDem) ChangeToMode(_ context.Context, newMode uint8) (status uint8, text string, err error) {
 	slog.Info("evse.dem.mode", slog.String("device", d.name), slog.Int("mode", int(newMode)))
-	return modebase.StatusSuccess, "", nil
+	return uint8(demmdef.ModeChangeStatusSuccess), "", nil
 }
 
 func matterEpochNow() uint32 { return uint32(time.Now().Unix() - 946684800) } //nolint:gosec // a clock after 2000
@@ -531,7 +576,7 @@ func (d *demoDem) configureForecast(numSlots int) {
 	f := &d.forecast
 	f.StartTime, f.EarliestStartTime, f.EndTime, f.LatestEndTime = now+60, &earliest, now*3, &latest
 	f.IsPausable, f.ActiveSlotNumber = true, spec.ValueOf(uint16(0))
-	pfr, sfr := d.srv.HasFeature("PFR"), d.srv.HasFeature("SFR")
+	pfr, sfr := d.features&dem.FeaturePowerForecastReporting != 0, d.features&dem.FeatureStateForecastReporting != 0
 	s0 := &d.slots[0]
 	s0.MinDuration, s0.MaxDuration, s0.DefaultDuration, s0.ElapsedSlotTime, s0.RemainingSlotTime = 10, 20, 15, 0, 0
 	s0.SlotIsPausable, s0.MinPauseDuration, s0.MaxPauseDuration = ptr(true), ptr(uint32(10)), ptr(uint32(60))
@@ -560,22 +605,22 @@ func (d *demoDem) configureForecast(numSlots int) {
 			s.ManufacturerEsaState = ptr(*p.ManufacturerEsaState + 1)
 		}
 	}
-	f.Slots = append([]energy.ForecastSlot(nil), d.slots[:numSlots]...)
+	f.Slots = append([]dem.SlotStruct(nil), d.slots[:numSlots]...)
 	d.setForecast(f)
 }
 
 func ptr[T any](v T) *T { return &v }
 
-func (d *demoDem) setForecast(f *energy.Forecast) {
-	if err := d.srv.SetForecast(f); err != nil {
+func (d *demoDem) setForecast(f *dem.ForecastStruct) {
+	if err := d.srv.Set(dem.Patch{Forecast: f}); err != nil {
 		slog.Warn("evse.dem.forecast", slog.String("device", d.name), slog.Any("err", err))
 	}
 }
 
 // current is GetDEMDelegate()->GetForecast().Value(), copied into the
 // trigger file's static; a null forecast leaves the static as it was.
-func (d *demoDem) current() *energy.Forecast {
-	if f := d.srv.Forecast(); f != nil {
+func (d *demoDem) current() *dem.ForecastStruct {
+	if f := d.srv.Get().Forecast; f != nil {
 		d.forecast = *f
 	}
 	return &d.forecast
@@ -584,17 +629,17 @@ func (d *demoDem) current() *energy.Forecast {
 // setCapability is SetTestEventTrigger_PowerAdjustment and _ClearForecast
 // (DEMTestEventTriggers.cpp:137-177).
 func (d *demoDem) setCapability(minPower, maxPower int64, minDuration, maxDuration uint32) {
-	c := &energy.PowerAdjustCapability{
-		PowerAdjustCapability: spec.ValueOf([]energy.PowerAdjustRange{{MinPower: minPower, MaxPower: maxPower, MinDuration: minDuration, MaxDuration: maxDuration}}),
+	c := &dem.PowerAdjustCapabilityStruct{
+		PowerAdjustCapability: spec.ValueOf([]dem.PowerAdjustStruct{{MinPower: minPower, MaxPower: maxPower, MinDuration: minDuration, MaxDuration: maxDuration}}),
 		Cause:                 dem.PowerAdjustReasonNoAdjustment,
 	}
-	if err := d.srv.SetPowerAdjustmentCapability(c); err != nil {
+	if err := d.srv.Set(dem.Patch{PowerAdjustmentCapability: c}); err != nil {
 		slog.Warn("evse.dem.capability", slog.String("device", d.name), slog.Any("err", err))
 	}
 }
 
-func (d *demoDem) optOut(state energy.OptOutState) {
-	if err := d.srv.SetOptOutState(state); err != nil {
+func (d *demoDem) optOut(state dem.OptOutStateEnum) {
+	if err := d.srv.Set(dem.Patch{OptOutState: &state}); err != nil {
 		slog.Warn("evse.dem.optout", slog.String("device", d.name), slog.Any("err", err))
 	}
 }
@@ -602,6 +647,9 @@ func (d *demoDem) optOut(state energy.OptOutState) {
 // testEventTrigger is HandleDeviceEnergyManagementTestEventTrigger
 // (DEMTestEventTriggers.cpp:366-463).
 func (d *demoDem) testEventTrigger(trigger uint64) bool { //nolint:funlen // a flat dispatch table: one case per trigger
+	if d.server() == nil {
+		return false
+	}
 	switch trigger {
 	case triggerDemPowerAdjustment: // :137-155: 5 kW to 30 kW, 10 s to 60 s
 		d.setCapability(5000*1000, 30000*1000, 10, 60)
@@ -609,11 +657,11 @@ func (d *demoDem) testEventTrigger(trigger uint64) bool { //nolint:funlen // a f
 		triggerDemConstraintBasedAdjustmentClear: // :157-177
 		d.setCapability(0, 0, 0, 0)
 	case triggerDemUserOptOutLocalOptimization: // :382-385
-		d.optOut(energy.OptOutLocal)
+		d.optOut(dem.OptOutStateLocalOptOut)
 	case triggerDemUserOptOutGridOptimization: // :386-389
-		d.optOut(energy.OptOutGrid)
+		d.optOut(dem.OptOutStateGridOptOut)
 	case triggerDemUserOptOutClearAll: // :390-393
-		d.optOut(energy.OptOutNone)
+		d.optOut(dem.OptOutStateNoOptOut)
 	case triggerDemStartTimeAdjustment: // :179-208
 		d.configureForecast(2)
 		f := d.current()
@@ -642,7 +690,7 @@ func (d *demoDem) testEventTrigger(trigger uint64) bool { //nolint:funlen // a f
 		s0 := &d.slots[0]
 		s0.MinPowerAdjustment, s0.MaxPowerAdjustment = ptr(int64(20)), ptr(int64(2000))
 		s0.MinDurationAdjustment, s0.MaxDurationAdjustment = ptr(uint32(120)), ptr(uint32(240))
-		f.Slots = append([]energy.ForecastSlot(nil), d.slots[:2]...)
+		f.Slots = append([]dem.SlotStruct(nil), d.slots[:2]...)
 		d.setForecast(f)
 	case triggerDemForecastAdjustmentNextSlot: // :277-283
 		f := d.current()
@@ -654,14 +702,14 @@ func (d *demoDem) testEventTrigger(trigger uint64) bool { //nolint:funlen // a f
 		d.configureForecast(4)
 	case triggerDemPowerRangeAdjustment: // :290-329: AbsMinPower 1 kW, AbsMaxPower 7.6 kW
 		if !d.saved {
-			d.savedMin, d.savedMax, d.saved = d.srv.AbsMinPower(), d.srv.AbsMaxPower(), true
+			st := d.srv.Get()
+			d.savedMin, d.savedMax, d.saved = st.AbsMinPower, st.AbsMaxPower, true
 		}
-		_ = d.srv.SetAbsMinPower(1000000)
-		_ = d.srv.SetAbsMaxPower(7600000)
+		minPower, maxPower := int64(1000000), int64(7600000)
+		_ = d.srv.Set(dem.Patch{AbsMinPower: &minPower, AbsMaxPower: &maxPower})
 	case triggerDemPowerRangeAdjustmentClear: // :331-364
 		if d.saved {
-			_ = d.srv.SetAbsMinPower(d.savedMin)
-			_ = d.srv.SetAbsMaxPower(d.savedMax)
+			_ = d.srv.Set(dem.Patch{AbsMinPower: &d.savedMin, AbsMaxPower: &d.savedMax})
 			d.saved = false
 		}
 	default:
@@ -675,62 +723,13 @@ func (d *demoDem) testEventTrigger(trigger uint64) bool { //nolint:funlen // a f
 // wiredPowerSource is the charger's mains supply, as the app sets it
 // (EVSEManufacturerImpl.cpp:444-468): WIRED, Active, "Primary Mains
 // Power", AC at 230 V and 32 A. Order is the zap file's empty default, 0.
-// EndpointList names the endpoint the server is mounted on, as this
-// module's battery PowerSource does (cluster/measurement PowerSourceServer).
-type wiredPowerSource struct {
-	*spec.Server
-	version cluster.DataVersionTracker
+// EndpointList names the part's own endpoint once the node has numbered
+// it (powerSourceEndpointList), as the batteries' do.
+func wiredPowerSource() device.Declaration {
+	status, order, description := psdef.PowerSourceStatusActive, uint8(0), "Primary Mains Power"
+	current, voltage, maximum := psdef.WiredCurrentTypeAc, uint32(230000), uint32(32000)
+	return psdef.Declare{Features: psdef.FeatureWired, Initial: psdef.Patch{
+		Status: &status, Order: &order, Description: &description, WiredCurrentType: &current,
+		WiredNominalVoltage: &voltage, WiredMaximumCurrent: &maximum, EndpointList: &[]uint16{},
+	}}
 }
-
-func newWiredPowerSource() *wiredPowerSource {
-	p := &wiredPowerSource{}
-	srv, err := spec.NewServer(powersource.Definition, spec.Options{
-		Features:   uint32(powersource.FeatureWired),
-		Attributes: []uint32{powersource.AttrWiredNominalVoltage, powersource.AttrWiredMaximumCurrent},
-	}, spec.ServerConfig{DataVersion: &p.version, Initial: map[uint32]any{
-		powersource.AttrStatus:              powersource.PowerSourceStatusActive,
-		powersource.AttrOrder:               uint8(0),
-		powersource.AttrDescription:         "Primary Mains Power",
-		powersource.AttrWiredCurrentType:    powersource.WiredCurrentTypeAc,
-		powersource.AttrWiredNominalVoltage: uint32(230000),
-		powersource.AttrWiredMaximumCurrent: uint32(32000),
-		powersource.AttrEndpointList:        []uint16{},
-	}})
-	if err != nil {
-		panic(fmt.Sprintf("evse PowerSource: %v", err))
-	}
-	p.Server = srv
-	return p
-}
-
-// servers are the cluster servers the device supplies.
-func (p *wiredPowerSource) servers() []contract.ClusterServer {
-	return []contract.ClusterServer{p}
-}
-
-// SetEndpoint stamps EndpointList; the bridge calls it at reassembly.
-func (p *wiredPowerSource) SetEndpoint(ep uint16) {
-	if err := p.Set(powersource.AttrEndpointList, []uint16{ep}); err != nil {
-		slog.Warn("evse.powersource", slog.Any("err", err))
-	}
-}
-
-// evseMeter is the charger's ElectricalSensor: the app's readings come
-// from its energy-reporting triggers (FakeReadings), which this daemon
-// does not answer, so every reading is unobserved — null — and the energy
-// counter is declared, which mounts ElectricalEnergyMeasurement as
-// EnergyEvse requires.
-type evseMeter struct{}
-
-var _ contract.ElectricalReadings = evseMeter{}
-
-func (evseMeter) MatterMeasurementClass() contract.MeasurementClass {
-	return contract.MeasurementElectrical
-}
-func (evseMeter) MatterFloatValue() (float64, bool) { return 0, false }
-func (evseMeter) ActivePower() (float64, bool)      { return 0, false }
-func (evseMeter) Voltage() (float64, bool)          { return 0, false }
-func (evseMeter) Current() (float64, bool)          { return 0, false }
-func (evseMeter) Frequency() (float64, bool)        { return 0, false }
-func (evseMeter) Energy() (float64, bool)           { return 0, false }
-func (evseMeter) HasEnergy() bool                   { return true }

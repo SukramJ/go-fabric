@@ -16,9 +16,12 @@ const (
 	OtaProviderRevision uint16 = 1
 )
 
-// OtaProviderType is the OtaProvider device type, from the matter.js model at 862ad75 (Matter 1.6.1):
-// what matter.js generates into packages/node/src/endpoints/ota-provider.ts.
-var OtaProviderType = Type{
+// OtaProviderType is the OtaProvider device type, matter.js's packages/node/src/endpoints/ota-provider.ts;
+// its cluster requirements are listed in docs/reference/device-types.md#otaprovider.
+var OtaProviderType = typeOtaProvider
+
+// typeOtaProvider holds [OtaProviderType]'s cluster requirements.
+var typeOtaProvider = Type{
 	ID: OtaProviderID, Name: "OtaProvider", Revision: OtaProviderRevision,
 	Classification: "utility", Composition: schema.CompositionTree,
 	Servers: []ClusterRequirement{
@@ -49,10 +52,7 @@ func NewOtaProvider(opts Options, decls ...Declaration) (*OtaProvider, error) {
 	return &OtaProvider{d}, nil
 }
 
-// OtaSoftwareUpdateProvider returns the typed OtaSoftwareUpdateProvider server over the one the device mounts,
-// whatever its type (Underlying returns it); its OnChangedAsync runs on
-// the device's goroutine.
-// The device type mandates the cluster.
+// OtaSoftwareUpdateProvider is the device's typed OtaSoftwareUpdateProvider server; the type mandates it.
 func (d *OtaProvider) OtaSoftwareUpdateProvider() *otasoftwareupdateproviderdef.Server {
 	return otasoftwareupdateproviderdef.WrapOn(d.Server(0x0029), d.queue)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // State is the typed state of the DoorLock cluster: one field per attribute
@@ -118,6 +119,152 @@ type Patch struct {
 	NumberOfAliroCredentialIssuerKeysSupported         *uint16                         `matter:"0x0087"` // attribute 0x0087
 	NumberOfAliroEndpointKeysSupported                 *uint16                         `matter:"0x0088"` // attribute 0x0088
 	Null                                               []uint32                        // attribute ids set to null
+}
+
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.LockState != nil {
+		v[AttrLockState] = *p.LockState
+	}
+	if p.LockType != nil {
+		v[AttrLockType] = *p.LockType
+	}
+	if p.ActuatorEnabled != nil {
+		v[AttrActuatorEnabled] = *p.ActuatorEnabled
+	}
+	if p.DoorState != nil {
+		v[AttrDoorState] = *p.DoorState
+	}
+	if p.DoorOpenEvents != nil {
+		v[AttrDoorOpenEvents] = *p.DoorOpenEvents
+	}
+	if p.DoorClosedEvents != nil {
+		v[AttrDoorClosedEvents] = *p.DoorClosedEvents
+	}
+	if p.OpenPeriod != nil {
+		v[AttrOpenPeriod] = *p.OpenPeriod
+	}
+	if p.NumberOfTotalUsersSupported != nil {
+		v[AttrNumberOfTotalUsersSupported] = *p.NumberOfTotalUsersSupported
+	}
+	if p.NumberOfPinUsersSupported != nil {
+		v[AttrNumberOfPinUsersSupported] = *p.NumberOfPinUsersSupported
+	}
+	if p.NumberOfRfidUsersSupported != nil {
+		v[AttrNumberOfRfidUsersSupported] = *p.NumberOfRfidUsersSupported
+	}
+	if p.NumberOfWeekDaySchedulesSupportedPerUser != nil {
+		v[AttrNumberOfWeekDaySchedulesSupportedPerUser] = *p.NumberOfWeekDaySchedulesSupportedPerUser
+	}
+	if p.NumberOfYearDaySchedulesSupportedPerUser != nil {
+		v[AttrNumberOfYearDaySchedulesSupportedPerUser] = *p.NumberOfYearDaySchedulesSupportedPerUser
+	}
+	if p.NumberOfHolidaySchedulesSupported != nil {
+		v[AttrNumberOfHolidaySchedulesSupported] = *p.NumberOfHolidaySchedulesSupported
+	}
+	if p.MaxPinCodeLength != nil {
+		v[AttrMaxPinCodeLength] = *p.MaxPinCodeLength
+	}
+	if p.MinPinCodeLength != nil {
+		v[AttrMinPinCodeLength] = *p.MinPinCodeLength
+	}
+	if p.MaxRfidCodeLength != nil {
+		v[AttrMaxRfidCodeLength] = *p.MaxRfidCodeLength
+	}
+	if p.MinRfidCodeLength != nil {
+		v[AttrMinRfidCodeLength] = *p.MinRfidCodeLength
+	}
+	if p.CredentialRulesSupport != nil {
+		v[AttrCredentialRulesSupport] = *p.CredentialRulesSupport
+	}
+	if p.NumberOfCredentialsSupportedPerUser != nil {
+		v[AttrNumberOfCredentialsSupportedPerUser] = *p.NumberOfCredentialsSupportedPerUser
+	}
+	if p.Language != nil {
+		v[AttrLanguage] = *p.Language
+	}
+	if p.LedSettings != nil {
+		v[AttrLedSettings] = *p.LedSettings
+	}
+	if p.AutoRelockTime != nil {
+		v[AttrAutoRelockTime] = *p.AutoRelockTime
+	}
+	if p.SoundVolume != nil {
+		v[AttrSoundVolume] = *p.SoundVolume
+	}
+	if p.OperatingMode != nil {
+		v[AttrOperatingMode] = *p.OperatingMode
+	}
+	if p.SupportedOperatingModes != nil {
+		v[AttrSupportedOperatingModes] = *p.SupportedOperatingModes
+	}
+	if p.DefaultConfigurationRegister != nil {
+		v[AttrDefaultConfigurationRegister] = *p.DefaultConfigurationRegister
+	}
+	if p.EnableLocalProgramming != nil {
+		v[AttrEnableLocalProgramming] = *p.EnableLocalProgramming
+	}
+	if p.EnableOneTouchLocking != nil {
+		v[AttrEnableOneTouchLocking] = *p.EnableOneTouchLocking
+	}
+	if p.EnableInsideStatusLed != nil {
+		v[AttrEnableInsideStatusLed] = *p.EnableInsideStatusLed
+	}
+	if p.EnablePrivacyModeButton != nil {
+		v[AttrEnablePrivacyModeButton] = *p.EnablePrivacyModeButton
+	}
+	if p.LocalProgrammingFeatures != nil {
+		v[AttrLocalProgrammingFeatures] = *p.LocalProgrammingFeatures
+	}
+	if p.WrongCodeEntryLimit != nil {
+		v[AttrWrongCodeEntryLimit] = *p.WrongCodeEntryLimit
+	}
+	if p.UserCodeTemporaryDisableTime != nil {
+		v[AttrUserCodeTemporaryDisableTime] = *p.UserCodeTemporaryDisableTime
+	}
+	if p.SendPinOverTheAir != nil {
+		v[AttrSendPinOverTheAir] = *p.SendPinOverTheAir
+	}
+	if p.RequirePinForRemoteOperation != nil {
+		v[AttrRequirePinForRemoteOperation] = *p.RequirePinForRemoteOperation
+	}
+	if p.ExpiringUserTimeout != nil {
+		v[AttrExpiringUserTimeout] = *p.ExpiringUserTimeout
+	}
+	if p.AliroReaderVerificationKey != nil {
+		v[AttrAliroReaderVerificationKey] = *p.AliroReaderVerificationKey
+	}
+	if p.AliroReaderGroupIdentifier != nil {
+		v[AttrAliroReaderGroupIdentifier] = *p.AliroReaderGroupIdentifier
+	}
+	if p.AliroReaderGroupSubIdentifier != nil {
+		v[AttrAliroReaderGroupSubIdentifier] = *p.AliroReaderGroupSubIdentifier
+	}
+	if p.AliroExpeditedTransactionSupportedProtocolVersions != nil {
+		v[AttrAliroExpeditedTransactionSupportedProtocolVersions] = *p.AliroExpeditedTransactionSupportedProtocolVersions
+	}
+	if p.AliroGroupResolvingKey != nil {
+		v[AttrAliroGroupResolvingKey] = *p.AliroGroupResolvingKey
+	}
+	if p.AliroSupportedBleuwbProtocolVersions != nil {
+		v[AttrAliroSupportedBleuwbProtocolVersions] = *p.AliroSupportedBleuwbProtocolVersions
+	}
+	if p.AliroBleAdvertisingVersion != nil {
+		v[AttrAliroBleAdvertisingVersion] = *p.AliroBleAdvertisingVersion
+	}
+	if p.NumberOfAliroCredentialIssuerKeysSupported != nil {
+		v[AttrNumberOfAliroCredentialIssuerKeysSupported] = *p.NumberOfAliroCredentialIssuerKeysSupported
+	}
+	if p.NumberOfAliroEndpointKeysSupported != nil {
+		v[AttrNumberOfAliroEndpointKeysSupported] = *p.NumberOfAliroEndpointKeysSupported
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
 }
 
 // Server is the typed DoorLock server over the cluster's server — the
@@ -350,6 +497,17 @@ type StateSource interface {
 	LockInvoke(ctx context.Context, cmdID uint32) error
 }
 
+// AuthStore persists the lock's users, credentials and schedules
+// under the device's StableKey, and its credential key; the node's
+// store (node.Node.Store) is one. Without one they stay in memory
+// (cluster/lock AuthStore).
+type AuthStore interface {
+	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
+	SetSetting(ctx context.Context, key, value string) error
+	LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth store.DoorLockAuth, saved bool, err error)
+	SaveDoorLockAuth(ctx context.Context, endpointKey string, auth store.DoorLockAuth) error
+}
+
 // Declare is the declaration of the DoorLock cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -361,6 +519,13 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// Commands are optional commands the server accepts beyond the
+	// ones the selection mandates: the kit's server carries them out
+	// (through its port), a Handle field below handles one in its place.
+	Commands []uint32
+	// Events are optional events the server emits beyond the ones the
+	// selection mandates (Server.Emit<Event>).
+	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
@@ -432,6 +597,8 @@ type Declare struct {
 	HandleClearAliroReaderConfig func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)
 	// StateSource is the host port the kit's server runs on ([StateSource]).
 	StateSource StateSource
+	// AuthStore is the host port the kit's server runs on ([AuthStore]).
+	AuthStore AuthStore
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
@@ -450,6 +617,8 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 		decl.Attach = d.attach
 	}
 	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
+	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleLockDoor != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdLockDoor)
 		decl.Attach = d.attach

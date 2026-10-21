@@ -64,6 +64,36 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		State:                    new(StateEnum),
+		SupplyState:              new(SupplyStateEnum),
+		FaultState:               new(FaultStateEnum),
+		ChargingEnabledUntil:     new(uint32),
+		DischargingEnabledUntil:  new(uint32),
+		CircuitCapacity:          new(int64),
+		MinimumChargeCurrent:     new(int64),
+		MaximumChargeCurrent:     new(int64),
+		MaximumDischargeCurrent:  new(int64),
+		UserMaximumChargeCurrent: new(int64),
+		RandomizationDelayWindow: new(uint32),
+		NextChargeStartTime:      new(uint32),
+		NextChargeTargetTime:     new(uint32),
+		NextChargeRequiredEnergy: new(int64),
+		NextChargeTargetSoC:      new(uint8),
+		ApproximateEvEfficiency:  new(uint16),
+		StateOfCharge:            new(uint8),
+		BatteryCapacity:          new(int64),
+		VehicleId:                new(string),
+		SessionId:                new(uint32),
+		SessionDuration:          new(uint32),
+		SessionEnergyCharged:     new(int64),
+		SessionEnergyDischarged:  new(int64),
+		Null:                     []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 24 {
+		t.Errorf("a patch of every field sets %d values, want 24", len(values))
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -119,5 +149,11 @@ func TestTypedServer(t *testing.T) {
 	all.HandleClearTargets = func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 7 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdDisable}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventEvConnected}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

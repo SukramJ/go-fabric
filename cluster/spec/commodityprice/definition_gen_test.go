@@ -57,6 +57,20 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
+	full := Patch{
+		TariffUnit:    new(TariffUnitEnum),
+		Currency:      new(Currency),
+		CurrentPrice:  new(CommodityPriceStruct),
+		PriceForecast: new([]CommodityPriceStruct),
+		Null:          []uint32{0xFFFFFFFF},
+	}
+	values := full.AttributeValues()
+	if len(values) != 5 {
+		t.Errorf("a patch of every field sets %d values, want 5", len(values))
+	}
+	if _, ok := values[AttrPriceForecast].(spec.List[CommodityPriceStruct]); !ok {
+		t.Errorf("PriceForecast is stored as %T, want its spec.List", values[AttrPriceForecast])
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
 		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
@@ -95,5 +109,11 @@ func TestTypedServer(t *testing.T) {
 	}
 	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 2 || decl.Attach(srv) == nil {
 		t.Error("Declare: every handler accepted by the empty definition")
+	}
+	if decl := (Declare{Commands: []uint32{CmdGetDetailedPriceRequest}}).ClusterDeclaration(); len(decl.Elements.Commands) != 1 {
+		t.Error("Declare: an optional command not among the elements")
+	}
+	if decl := (Declare{Events: []uint32{EventPriceChange}}).ClusterDeclaration(); len(decl.Elements.Events) != 1 {
+		t.Error("Declare: an optional event not among the elements")
 	}
 }

@@ -11,11 +11,10 @@ import (
 	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 )
 
-// LowPower is the LowPower host port: Sleep (low-power.element.ts:19,
-// status only) puts the device into its low-power mode.
-type LowPower interface {
-	Sleep(ctx context.Context) error
-}
+// LowPower is the LowPower host port (the generated [lowpowerdef.LowPower],
+// the declaration's LowPower): Sleep (low-power.element.ts:19, status
+// only) puts the device into its low-power mode.
+type LowPower = lowpowerdef.LowPower
 
 // LowPowerConfig carries the construction parameters of a LowPower server.
 type LowPowerConfig struct {

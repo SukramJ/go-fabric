@@ -31,6 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
+	bcdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -123,7 +124,8 @@ func TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint(t *testing.
 			after:         uint8(boolcfg.AlarmVisual),
 			change: func(t *testing.T) {
 				t.Helper()
-				if err := f.contact.config.SetAlarmsActive(boolcfg.AlarmVisual); err != nil {
+				visual := boolcfg.AlarmVisual
+				if err := f.contact.config.Set(bcdef.Patch{AlarmsActive: &visual}); err != nil {
 					t.Fatalf("SetAlarmsActive: %v", err)
 				}
 			},
@@ -210,6 +212,10 @@ func startFleetNode(t *testing.T) (*fleet, *node.Node) {
 	t.Cleanup(cancel)
 	if err := n.Start(ctx); err != nil {
 		t.Fatalf("node.Start: %v", err)
+	}
+	// As main does once the node has numbered the parts.
+	if err := f.numberPowerSources(); err != nil {
+		t.Fatalf("numberPowerSources: %v", err)
 	}
 	return f, n
 }
@@ -379,15 +385,11 @@ func TestAirQualitySensorMountsEveryConcentrationCluster(t *testing.T) {
 }
 
 // TestButtonPressWiringThroughTheDeviceLayer: the button is a
-// device.NewGenericSwitch with device.WithMeasurement, and the bridge still
-// hands its reading the Switch server's position input (bridge/bridge.go
-// reads endpoint.Spec.Measurement), so a press lands.
+// device.NewGenericSwitch on its declaration, and a press reaches the
+// kit's Switch server through its typed interface.
 func TestButtonPressWiringThroughTheDeviceLayer(t *testing.T) {
 	f, br := startFleetBridge(t)
-	ep := mountedEndpoint(t, br, "demo-button-1")
-	if ep.Measurement != f.button {
-		t.Fatalf("button endpoint %d carries Measurement %T, want the button", ep.ID, ep.Measurement)
-	}
+	mountedEndpoint(t, br, "demo-button-1")
 	if err := f.button.simulateMultiPress(1, 1, 0, 0); err != nil {
 		t.Fatalf("the button has no Switch position input wired: a press reaches no controller (%v)", err)
 	}
