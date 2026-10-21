@@ -3,10 +3,6 @@
 
 package wire
 
-import (
-	"errors"
-)
-
 // ColorControlClusterID is the Matter cluster ID for ColorControl.
 const ColorControlClusterID uint32 = 0x0300
 
@@ -60,10 +56,6 @@ const (
 	ColorHueDirUp       uint8 = 2
 	ColorHueDirDown     uint8 = 3
 )
-
-// ErrColorControlMalformed is returned for malformed ColorControl
-// command payloads.
-var ErrColorControlMalformed = errors.New("wire: ColorControl command malformed")
 
 // ColorMoveMode values per Matter §3.2.7.5 / §3.2.7.8.
 const (

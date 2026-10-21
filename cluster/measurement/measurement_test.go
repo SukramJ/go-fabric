@@ -2362,12 +2362,10 @@ func (r richSwitch) MatterSwitchMultiPressMax() uint8    { return r.multiPressMa
 func (r richSwitch) MatterSwitchActionSwitch() bool      { return r.action }
 func (r richSwitch) MatterSwitchCurrentPosition() uint8  { return r.current }
 
-// stated is what a source states through the two optional capabilities.
-func stated(m wire.GenericSwitchMultiPressSource, a wire.GenericSwitchActionSource) (uint8, bool) {
-	return m.MatterSwitchMultiPressMax(), a.MatterSwitchActionSwitch()
+// stated is what a source states through the three optional capabilities.
+func stated(m wire.GenericSwitchMultiPressSource, a wire.GenericSwitchActionSource, p wire.GenericSwitchPositionSource) (multiPressMax uint8, action bool, current uint8) {
+	return m.MatterSwitchMultiPressMax(), a.MatterSwitchActionSwitch(), p.MatterSwitchCurrentPosition()
 }
-
-var _ wire.GenericSwitchPositionSource = richSwitch{}
 
 // TestMomentarySwitchFeaturesFollowTheSource: the FeatureMap is what the
 // source states — MSR or AS, MSL, MSM with MultiPressMax 2 or more and
@@ -2391,8 +2389,8 @@ func TestMomentarySwitchFeaturesFollowTheSource(t *testing.T) {
 		{"start out of range", richSwitch{positions: 2, current: 5}, 0x06, 2, nil, 0},
 	} {
 		if r, ok := tc.src.(richSwitch); ok {
-			if m, a := stated(r, r); m != r.multiPressMax || a != r.action {
-				t.Fatalf("%s: the source states %d / %v", tc.name, m, a)
+			if m, a, p := stated(r, r, r); m != r.multiPressMax || a != r.action || p != r.current {
+				t.Fatalf("%s: the source states %d / %v / %d", tc.name, m, a, p)
 			}
 		}
 		got := measurement.FromMeasurementClass(contract.MeasurementMomentarySwitch, tc.src, contract.MeasurementContext{EndpointID: 3})

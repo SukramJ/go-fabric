@@ -3,10 +3,6 @@
 
 package wire
 
-import (
-	"errors"
-)
-
 // Thermostat command IDs per Matter §4.3.9.
 const (
 	ThermostatCmdSetpointRaiseLower  uint32 = 0x00
@@ -21,7 +17,3 @@ const (
 	ThermostatSetpointModeCool uint8 = 1
 	ThermostatSetpointModeBoth uint8 = 2
 )
-
-// ErrThermostatMalformed is returned for malformed Thermostat command
-// payloads.
-var ErrThermostatMalformed = errors.New("wire: Thermostat command malformed")

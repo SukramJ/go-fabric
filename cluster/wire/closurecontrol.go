@@ -231,10 +231,3 @@ const (
 // ErrClosureControlMalformed is returned for malformed ClosureControl
 // command payloads.
 var ErrClosureControlMalformed = errors.New("wire: ClosureControl command malformed")
-
-// MoveTo field tags.
-const (
-	closureMoveToFieldPosition uint32 = 0
-	closureMoveToFieldLatch    uint32 = 1
-	closureMoveToFieldSpeed    uint32 = 2
-)

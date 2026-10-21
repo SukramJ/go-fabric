@@ -217,7 +217,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 353,
+    "line": 297,
     "citation": "PaseServer.ts:155-157",
     "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
     "identifier": "SessionParameters",
@@ -226,7 +226,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 936,
+    "line": 880,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -857,7 +857,7 @@
   },
   {
     "file": "cluster/closure/closurecontrol_payload_shapes_test.go",
-    "line": 143,
+    "line": 145,
     "citation": "closure-control.element.ts:80-81",
     "resolved": "packages/model/src/standard/elements/closure-control.element.ts",
     "identifier": "MotionLatching",
@@ -1091,7 +1091,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 631,
+    "line": 621,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
@@ -1145,7 +1145,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
-    "line": 362,
+    "line": 364,
     "citation": "window-covering-cluster.element.ts:72",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "GoToLiftPercentage",
@@ -1154,7 +1154,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_payload_shapes_test.go",
-    "line": 114,
+    "line": 116,
     "citation": "window-covering-cluster.element.ts:71",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "LiftPercent100thsValue",
@@ -1163,7 +1163,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_payload_shapes_test.go",
-    "line": 199,
+    "line": 201,
     "citation": "window-covering-cluster.element.ts:71",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "CurrentPositionLiftPercentage",
@@ -1307,7 +1307,7 @@
   },
   {
     "file": "cluster/onoff/server.go",
-    "line": 633,
+    "line": 618,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1343,7 +1343,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_parity_test.go",
-    "line": 198,
+    "line": 200,
     "citation": "packages/model/src/standard/elements/thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1352,7 +1352,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_parity_test.go",
-    "line": 276,
+    "line": 278,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1370,7 +1370,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_payload_shapes_test.go",
-    "line": 128,
+    "line": 130,
     "citation": "thermostat-cluster.element.ts:509-513",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1379,7 +1379,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_payload_shapes_test.go",
-    "line": 375,
+    "line": 377,
     "citation": "thermostat-cluster.element.ts:517-521",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "ControlSequenceOfOperationEnum",
@@ -1489,7 +1489,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 612,
+    "line": 595,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",

@@ -18,10 +18,6 @@ import (
 const (
 	matterClusterGenericSwitch = swdef.ClusterID
 
-	matterAttrSwitchNumberOfPositions = swdef.AttrNumberOfPositions
-	matterAttrSwitchCurrentPosition   = swdef.AttrCurrentPosition
-	matterAttrSwitchMultiPressMax     = swdef.AttrMultiPressMax
-
 	// MatterEventSwitchLatched fires when a latching switch flips
 	// position (LS feature).
 	MatterEventSwitchLatched = swdef.EventSwitchLatched

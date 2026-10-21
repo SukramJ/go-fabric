@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6153,
+  "entry_points": 6083,
   "entry_packages": [
     ".",
     "bdx",
@@ -201,7 +201,6 @@
     "parity",
     "schema",
     "script/archcheck",
-    "script/bx4-forward",
     "script/citecheck",
     "script/clustergen",
     "script/coverfloor",
@@ -228,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14431,
-    "reachable": 9993,
-    "whitelisted": 4433,
+    "total_exported": 14184,
+    "reachable": 9947,
+    "whitelisted": 4232,
     "unreachable": 5
   },
   "by_package": [
@@ -291,7 +290,7 @@
       "package": "secure/mattercert",
       "identifier": "ErrExpired",
       "file": "secure/mattercert/verify.go",
-      "line": 68,
+      "line": 60,
       "kind": "var"
     },
     {
@@ -3945,17 +3944,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestPaseAdapterLegacyTripletSettersStillWork",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/pase_session_params_test.go",
-      "line": 71
-    },
-    {
-      "package": "bridge",
       "identifier": "TestPaseAdapter_AbsentMRPParamsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_mrp_params_test.go",
-      "line": 78
+      "line": 79
     },
     {
       "package": "bridge",
@@ -3976,14 +3968,14 @@
       "identifier": "TestPaseAdapter_DecodesInitiatorMRPParams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_mrp_params_test.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "bridge",
       "identifier": "TestPaseAdapter_EmitsResponderMRPParams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_mrp_params_test.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "bridge",
@@ -8519,21 +8511,21 @@
       "identifier": "ChangeToModeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 159
+      "line": 126
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeOptionStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 155
+      "line": 122
     },
     {
       "package": "cluster/modeselect",
       "identifier": "SemanticTagStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 147
+      "line": 114
     },
     {
       "package": "cluster/onoff",
@@ -18200,28 +18192,28 @@
       "identifier": "SwitchInitialPressEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/wire/genericswitch.go",
-      "line": 246
+      "line": 103
     },
     {
       "package": "cluster/wire",
       "identifier": "SwitchLongPressEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/wire/genericswitch.go",
-      "line": 249
+      "line": 106
     },
     {
       "package": "cluster/wire",
       "identifier": "SwitchLongReleaseEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/wire/genericswitch.go",
-      "line": 255
+      "line": 112
     },
     {
       "package": "cluster/wire",
       "identifier": "SwitchShortReleaseEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/wire/genericswitch.go",
-      "line": 252
+      "line": 109
     },
     {
       "package": "cluster/wire",
@@ -18390,13 +18382,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/pqcattestationcertificates_parity_matterjs_test.go",
       "line": 189
-    },
-    {
-      "package": "controller/ble",
-      "identifier": "ErrScannerClosed",
-      "reason": "deprecated: kept for the deprecation window; nothing returns it",
-      "file": "controller/ble/scanner.go",
-      "line": 53
     },
     {
       "package": "controller/ble",
@@ -20100,1364 +20085,6 @@
       "line": 174
     },
     {
-      "package": "controller/discovery",
-      "identifier": "Address",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 19
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "AddressAdded",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 42
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "AddressChange",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 20
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "AddressChangeKind",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 21
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "AddressDeleted",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 43
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "AnyCommissionable",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 68
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByDeviceType",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 69
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByInstanceID",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 70
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByLongDiscriminator",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 71
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByProduct",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 72
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByShortDiscriminator",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 73
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByVendor",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 74
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ByVendorProduct",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 75
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Changes",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 22
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "CommissioningRetryInterval",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 44
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "CompareDesirability",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 76
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "DefaultEvictionDelay",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 45
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "DefaultMinTTL",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 46
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "DefaultRetries",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 61
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "DefaultTTLGraceFactor",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 47
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Device",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 23
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Discovery",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 24
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ErrClosed",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 62
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Identifier",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 25
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Name",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 26
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Names",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 27
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "NewNames",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 77
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "NewScanner",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 78
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "NewService",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 79
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Open",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 80
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "OperationalQName",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 81
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Parameters",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 28
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ParseTXTData",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 82
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "ParseTxtDecimal",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 83
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "PreferenceIPv4",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 48
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "PreferenceIPv6",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 49
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "PreferenceIPv6LinkLocal",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 50
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "PreferenceIPv6ULA",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 51
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Record",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 29
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Retries",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 30
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Scanner",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 31
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "SelectionPreference",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 84
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Service",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 32
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Solicitation",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 33
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Solicitor",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 34
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "Status",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 35
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "SupportedTransports",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 36
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TXTData",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/discovery/forward.go",
-      "line": 37
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TypeA",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 52
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TypeAAAA",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 53
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TypePTR",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 54
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TypeSRV",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 55
-    },
-    {
-      "package": "controller/discovery",
-      "identifier": "TypeTXT",
-      "reason": "BX4 forward of client/discovery; tests reach it there",
-      "file": "controller/discovery/forward.go",
-      "line": 56
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "CheckStatusReport",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 74
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Clock",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 19
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Config",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 20
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Conn",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 21
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "DecodeStatusReport",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 75
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "DefaultExpectedProcessingTime",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 45
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "DefaultLocalParameters",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 76
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrExchangeClosed",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 61
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrFlow",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 62
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrNetwork",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 63
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrNoSessionID",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 64
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrRetransmissionLimit",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 65
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrSessionClosed",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 66
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrTransient",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 67
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ErrUnexpectedMessage",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 68
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Exchange",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 22
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackActiveInterval",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 46
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackActiveThreshold",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 47
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackDataModelRevision",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 48
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackIdleInterval",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 49
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackInteractionModelRevision",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 50
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "FallbackMaxPathsPerInvoke",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 51
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Intervals",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 23
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "IntervalsOf",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 77
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Manager",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 24
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "MaxConcurrentExchangesPerSession",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 52
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "MaxPayloadSize",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 53
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "MaxPeerResponseTime",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 78
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "MaxTransmissions",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 54
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Message",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 25
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "NewManager",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 79
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Options",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 26
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Overlay",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 80
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "PeerAddress",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 27
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "PeerInitiatedCloseError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 28
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "PeerMessageMissingError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 29
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "PeerParameters",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 81
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "PeerUnresponsiveError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 30
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ProtocolHandler",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 31
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ReceiveOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 32
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "ReliableMaxPeerResponseTime",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 82
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "RetransmissionInterval",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 83
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "SecureSessionConfig",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 33
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "SendOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 34
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Session",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 35
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "StandaloneAckTimeout",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 55
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "StatusReport",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 36
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "StatusReportError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 37
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "SystemClock",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 38
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "Timer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 39
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "UnexpectedMessageError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/exchange/forward.go",
-      "line": 40
-    },
-    {
-      "package": "controller/exchange",
-      "identifier": "UnsecuredSessionID",
-      "reason": "BX4 forward of client/exchange; tests reach it there",
-      "file": "controller/exchange/forward.go",
-      "line": 56
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "CASE",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 48
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "CASEOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 19
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "CASEServer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 20
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "CASEServerConfig",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 21
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "DefaultNormalProcessingTime",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 34
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "DefaultPasscodeID",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 35
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "ErrPasscodeMismatch",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 41
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "ErrUnexpectedData",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 42
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "ExpectedCryptoProcessingTime",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 36
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "Fabric",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 22
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "FabricList",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 23
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "FabricResolver",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 24
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "MemoryResumptionStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 25
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "NewCASEServer",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 49
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "PASE",
-      "reason": "BX4 forward of client/handshake; tests reach it there",
-      "file": "controller/handshake/forward.go",
-      "line": 50
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "PASEOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 26
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "PeerAddress",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 27
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "ResumptionRecord",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 28
-    },
-    {
-      "package": "controller/handshake",
-      "identifier": "ResumptionStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/handshake/forward.go",
-      "line": 29
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "AttributeData",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 19
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "AttributeStatus",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 20
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Bind",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 70
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Config",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 21
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultMinIntervalFloor",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 45
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultMinimumResponseTimeoutWithFailsafe",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 46
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultReadPathsSupported",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 47
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultSubscribePathsSupported",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 48
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultSustainRetries",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 57
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "DefaultTimedRequestTimeout",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 49
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrMalformedRequest",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 58
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrNoResponse",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 59
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrNoSession",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 60
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrNoSubscriptions",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 61
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrRequestTooLarge",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 62
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrUncommissioned",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 63
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ErrUnexpectedMessage",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 64
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "EventData",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 22
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "EventStatus",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 23
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ExchangeOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 24
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ForPeer",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 71
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Interaction",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 25
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Interval",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 72
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "InvokeOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 26
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ListChunked",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 73
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "New",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 74
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "NewSubscriptions",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 75
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "NoSubscription",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 50
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "PeerProvider",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 76
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Provider",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 27
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Raw",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 77
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "ReadRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 28
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Report",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 29
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Result",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 30
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "RetrySchedule",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 31
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "SessionProvider",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 78
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "StatusError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 32
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "SubscribeRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 33
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Subscription",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 34
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "SubscriptionMaxIntervalPublisherLimit",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 51
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "SubscriptionProcessingTime",
-      "reason": "BX4 forward of client/interaction; tests reach it there",
-      "file": "controller/interaction/forward.go",
-      "line": 52
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "Subscriptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 35
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "SubscriptionsConfig",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 36
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "WriteOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 37
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "WriteRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 38
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "WriteStatus",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 39
-    },
-    {
-      "package": "controller/interaction",
-      "identifier": "WriteStatuses",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/interaction/forward.go",
-      "line": 40
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ConnectOptions",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 19
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Context",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 20
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "DefaultTiming",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 52
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Descriptor",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 21
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ErrClosed",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 45
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ErrNotConnectable",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 46
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ErrorHandler",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 22
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "KickRestartCooldown",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 23
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "MemoryResumptionStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 24
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "MemoryStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 25
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Merge",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 53
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "NewSet",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 54
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Observer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 26
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Peer",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 27
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ProbeCooldown",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 28
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ReachabilityReason",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 29
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ReasonAddressChange",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 39
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ReasonSessionSuspect",
-      "reason": "BX4 forward of client/peer; tests reach it there",
-      "file": "controller/peer/forward.go",
-      "line": 40
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "ResumptionStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 30
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Set",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 31
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Store",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 32
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "Timing",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 33
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "UnreachableError",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "controller/peer/forward.go",
-      "line": 34
-    },
-    {
       "package": "controller/thread",
       "identifier": "TestBasicTlvCodecEncode",
       "reason": "auto-whitelist:pattern=test-file",
@@ -21890,6 +20517,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/measurement_test.go",
       "line": 106
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithOptionalTakesOnlyAClusterWithoutAPackage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_options_test.go",
+      "line": 131
     },
     {
       "package": "device",
@@ -27461,21 +26095,21 @@
       "identifier": "TestCheckValidityAcceptsOrdinaryBounds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/verify_validity_internal_test.go",
-      "line": 62
+      "line": 64
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCheckValidityRejectsAWrappingNotAfter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/verify_validity_internal_test.go",
-      "line": 47
+      "line": 49
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestCheckValidityRejectsAWrappingNotBefore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/verify_validity_internal_test.go",
-      "line": 23
+      "line": 25
     },
     {
       "package": "secure/mattercert",
@@ -30433,13 +29067,6 @@
     },
     {
       "package": "transport/btp",
-      "identifier": "TestDeprecatedSystemClockFires",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/btp/helpers_test.go",
-      "line": 101
-    },
-    {
-      "package": "transport/btp",
       "identifier": "TestSessionIdleTimeoutClosesCentral",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/conn_test.go",
@@ -30755,38 +29382,31 @@
     },
     {
       "package": "transport/mrp",
-      "identifier": "TestAckOfUnknownReturnsFalse",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/mrp/mrp_test.go",
-      "line": 163
-    },
-    {
-      "package": "transport/mrp",
       "identifier": "TestCounterConcurrentAdvance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 58
+      "line": 55
     },
     {
       "package": "transport/mrp",
       "identifier": "TestCounterMonotonic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 18
+      "line": 15
     },
     {
       "package": "transport/mrp",
       "identifier": "TestCounterPeekDoesNotAdvance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 43
+      "line": 40
     },
     {
       "package": "transport/mrp",
       "identifier": "TestCounterWrap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 32
+      "line": 29
     },
     {
       "package": "transport/mrp",
@@ -30814,7 +29434,7 @@
       "identifier": "TestNoRolloverWindowRejectsStale",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 121
+      "line": 118
     },
     {
       "package": "transport/mrp",
@@ -30835,7 +29455,7 @@
       "identifier": "TestNoRolloverWindowResetsOnBigJump",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 131
+      "line": 128
     },
     {
       "package": "transport/mrp",
@@ -30867,34 +29487,6 @@
     },
     {
       "package": "transport/mrp",
-      "identifier": "TestTickAbandonsAfterMaxRetransmissions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/mrp/mrp_test.go",
-      "line": 206
-    },
-    {
-      "package": "transport/mrp",
-      "identifier": "TestTickRetransmitsAfterBackoff",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/mrp/mrp_test.go",
-      "line": 172
-    },
-    {
-      "package": "transport/mrp",
-      "identifier": "TestTickSendErrorPropagates",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/mrp/mrp_test.go",
-      "line": 232
-    },
-    {
-      "package": "transport/mrp",
-      "identifier": "TestTrackThenAckRemovesEntry",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "transport/mrp/mrp_test.go",
-      "line": 148
-    },
-    {
-      "package": "transport/mrp",
       "identifier": "TestUsesMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/reliable_test.go",
@@ -30905,21 +29497,21 @@
       "identifier": "TestWindowAcceptsAdvancing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 95
+      "line": 92
     },
     {
       "package": "transport/mrp",
       "identifier": "TestWindowAcceptsBackInWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 106
+      "line": 103
     },
     {
       "package": "transport/mrp",
       "identifier": "TestWindowAcceptsFreshAndRejectsDuplicate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
-      "line": 84
+      "line": 81
     },
     {
       "package": "transport/mrp",
