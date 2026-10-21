@@ -9,12 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 	"sort"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
@@ -390,40 +388,14 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 			debugReplyError(b.logger, "encode_initial_report", src, err)
 			return err
 		}
-		// chip-strict pre-flight: optional TLV strict validation of the
-		// encoded chunk before it hits the wire. chip TLVReader.cpp:806-839
-		// drops the whole IM message when any of the strict tag /
-		// container rules fire — Apple's MTRDevice surfaces the failure
-		// as a silent "could not find cached attribute values for
-		// attribute" log breadcrumb. Gated on the same dump env var so
-		// the cost stays in diagnose mode.
-		if dumpSubscribeEnabled() {
-			if vErr := tlv.Validate(body); vErr != nil {
-				b.logger.Warn("matter.tx.im.subscribe.chunk_strict_violation",
-					slog.Int("chunk", i),
-					slog.String("err", vErr.Error()))
-			}
-		}
-		// Diagnose hook: structured log line + optional disk dump for
-		// every Subscribe-initial chunk so the TLV tree can be
-		// post-mortemed against the Matter spec / matter.js reference
-		// output. Apple's MTRDevice has been seen logging "last
-		// report: (null)" while MRP-acking every chunk, which points
-		// at an IM-decoder rejection of this exact byte stream. The
-		// disk dump is gated on the GOFABRIC_DUMP_SUBSCRIBE
-		// env var so production deployments do not fill /tmp; the log
-		// line is always emitted at debug level. Dump path is scoped
-		// per-subscription so a later Sub does not overwrite the first
-		// Pair's chunks (the ones Apple validates topology against).
+		// Diagnose hook: one debug line per Subscribe-initial chunk. A byte
+		// dump of the chunk belongs in a test, not in the library.
 		b.logger.Debug("matter.tx.im.subscribe.chunk",
 			slog.Int("subscription_id", int(subID)),
 			slog.Int("chunk", i),
 			slog.Int("chunk_count", len(chunks)),
 			slog.Int("bytes", len(body)),
 			slog.Bool("final", i == len(chunks)-1))
-		if dumpSubscribeEnabled() {
-			_ = os.WriteFile(fmt.Sprintf("/tmp/subscribe-init-sub%d-chunk%d.bin", subID, i), body, 0o600)
-		}
 
 		// Arm the per-exchange StatusResponse waiter BEFORE the send
 		// to avoid a missed-wakeup race: Apple can reply faster than
@@ -650,11 +622,3 @@ func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.Eve
 
 // clusterRevisionAttributeID is the global ClusterRevision attribute.
 const clusterRevisionAttributeID = 0xFFFD
-
-// dumpSubscribeEnabled reports whether the subscribe disk dump is on:
-// GOFABRIC_DUMP_SUBSCRIBE, or the deprecated
-// OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE (read until the deprecation window
-// ends).
-func dumpSubscribeEnabled() bool {
-	return os.Getenv("GOFABRIC_DUMP_SUBSCRIBE") != "" || os.Getenv("OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE") != ""
-}

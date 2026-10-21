@@ -1566,8 +1566,9 @@ func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 // value is a host measurement, so the change is observed here, where the
 // host's notification arrives.
 type booleanStateEvents struct {
-	b    *Bridge
-	ep   *endpointpkg.Endpoint
+	b  *Bridge
+	ep *endpointpkg.Endpoint
+	// mu guards last.
 	mu   sync.Mutex
 	last *bool
 }
@@ -1619,6 +1620,7 @@ func (e *booleanStateEvents) check() {
 // pathValues remembers the last value of each path a change notifier
 // covers, so a notification reports only the paths that moved.
 type pathValues struct {
+	// mu guards last.
 	mu    sync.Mutex
 	ep    *endpointpkg.Endpoint
 	paths []im.ConcreteAttributePath

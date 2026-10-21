@@ -53,6 +53,7 @@ type StoredCluster struct {
 
 // MemoryStore is a [Store] in memory. The zero value is ready.
 type MemoryStore struct {
+	// mu guards nodes.
 	mu    sync.Mutex
 	nodes map[string]map[uint16]map[uint32]*StoredCluster
 }

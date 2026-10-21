@@ -36,6 +36,7 @@ type Peer struct {
 	cancel  context.CancelFunc
 	workers sync.WaitGroup
 
+	// mu guards closed, desc, saving, sessions and workers.
 	mu                    sync.Mutex
 	desc                  Descriptor
 	sessions              []*exchange.Session

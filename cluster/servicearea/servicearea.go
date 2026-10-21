@@ -196,6 +196,7 @@ type Server struct {
 	skipper  Skipper
 	quiet    *cluster.Quieter
 
+	// mu guards areas, current, endTime, maps, progress and selected.
 	mu       sync.Mutex
 	areas    []Area
 	maps     []Map

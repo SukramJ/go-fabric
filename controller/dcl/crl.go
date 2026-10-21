@@ -93,10 +93,10 @@ func derDecodeRec(data []byte) (derNode, []byte, error) {
 	if length&0x80 != 0 {
 		ll := length & 0x7f
 		if ll == 0 {
-			return derNode{}, nil, errors.New("DER forbids the indefinite-length encoding")
+			return derNode{}, nil, errors.New("dcl: DER forbids the indefinite-length encoding")
 		}
 		if ll > derMaxLengthBytes {
-			return derNode{}, nil, errors.New("DER length exceeds the maximum")
+			return derNode{}, nil, errors.New("dcl: DER length exceeds the maximum")
 		}
 		if len(rest) < ll {
 			return derNode{}, nil, errDERTruncated

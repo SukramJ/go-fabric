@@ -19,6 +19,7 @@ import (
 type ListeningMeter struct {
 	clock exchange.Clock
 
+	// mu guards running, since and total.
 	mu      sync.Mutex
 	since   time.Time
 	running bool

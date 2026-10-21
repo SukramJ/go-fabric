@@ -56,7 +56,7 @@ var InitialDataVersion = func() uint32 {
 		// DataVersion fallback (Apple-cache regression). Panic
 		// surfaces the configuration problem at start-up rather than
 		// silently degrading.
-		panic("matter: crypto/rand.Read failed: " + err.Error())
+		panic("contract: crypto/rand.Read failed: " + err.Error())
 	}
 	v := binary.BigEndian.Uint32(b[:])
 	if v == 0 {

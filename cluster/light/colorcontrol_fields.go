@@ -44,7 +44,7 @@ func requestOf[T any](fields any, name string, legacy func(any) (T, bool), fromM
 		}
 	}
 	var zero T
-	return zero, colorControlInvalidCommandErr(fmt.Sprintf("colorcontrol: %s carried %T", name, fields))
+	return zero, colorControlInvalidCommandErr(fmt.Sprintf("light: %s carried %T", name, fields))
 }
 
 // tagUint reads an unsigned field of the generic tag map the bridge hands
@@ -114,7 +114,7 @@ const (
 // checkMax refuses a field above its constraint.
 func checkMax(cmd, field string, v, limit uint64) error {
 	if v > limit {
-		return colorControlConstraintErr(fmt.Sprintf("colorcontrol: %s %s %d exceeds %d", cmd, field, v, limit))
+		return colorControlConstraintErr(fmt.Sprintf("light: %s %s %d exceeds %d", cmd, field, v, limit))
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ func checkMax(cmd, field string, v, limit uint64) error {
 // checkEnum refuses a value the enum does not define.
 func checkEnum[T ~uint8](cmd, field string, v T, defined ...T) error {
 	if !slices.Contains(defined, v) {
-		return colorControlConstraintErr(fmt.Sprintf("colorcontrol: %s %s %d is not defined", cmd, field, v))
+		return colorControlConstraintErr(fmt.Sprintf("light: %s %s %d is not defined", cmd, field, v))
 	}
 	return nil
 }

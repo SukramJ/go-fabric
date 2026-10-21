@@ -66,6 +66,7 @@ type dataCounter struct {
 	st     CounterStore
 	logger *slog.Logger
 
+	// mu guards reserved and value.
 	mu       sync.Mutex
 	value    uint64 // the last value handed out (MessageCounter.messageCounter)
 	reserved uint64 // the persisted high mark (#reserved)

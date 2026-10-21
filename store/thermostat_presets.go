@@ -21,7 +21,7 @@ SELECT presets, active_preset_handle FROM matter_thermostat_presets WHERE endpoi
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, nil, false, nil
 	case err != nil:
-		return nil, nil, false, fmt.Errorf("matter store: load thermostat presets: %w", err)
+		return nil, nil, false, fmt.Errorf("store: load thermostat presets: %w", err)
 	}
 	if presets == nil {
 		presets = []byte{}
@@ -47,7 +47,7 @@ ON CONFLICT(endpoint_key) DO UPDATE SET
     presets = excluded.presets,
     active_preset_handle = excluded.active_preset_handle,
     updated_at = excluded.updated_at`, endpointKey, presets, active); err != nil {
-		return fmt.Errorf("matter store: save thermostat presets: %w", err)
+		return fmt.Errorf("store: save thermostat presets: %w", err)
 	}
 	return nil
 }

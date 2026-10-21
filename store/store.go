@@ -25,13 +25,13 @@ func New(db *sql.DB) *Store {
 // Sentinel errors. Callers use [errors.Is] to detect them.
 var (
 	// ErrFabricNotFound is returned when a fabric_index lookup misses.
-	ErrFabricNotFound = errors.New("matter store: fabric not found")
+	ErrFabricNotFound = errors.New("store: fabric not found")
 	// ErrFabricExhausted is returned when [Store.AddFabric] runs out
 	// of free fabric_index slots (1..254 are all taken).
-	ErrFabricExhausted = errors.New("matter store: fabric index exhausted")
+	ErrFabricExhausted = errors.New("store: fabric index exhausted")
 	// ErrIdentityNotFound is returned when [Store.GetIdentity] misses.
-	ErrIdentityNotFound = errors.New("matter store: identity not found")
+	ErrIdentityNotFound = errors.New("store: identity not found")
 	// ErrGroupKeySetNotFound is returned when a (fabric, group_key_set_id)
 	// lookup misses.
-	ErrGroupKeySetNotFound = errors.New("matter store: group key set not found")
+	ErrGroupKeySetNotFound = errors.New("store: group key set not found")
 )

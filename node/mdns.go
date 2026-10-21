@@ -46,6 +46,7 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 		return mdns.NewNoop()
 	}
 	zc := mdns.NewZeroconf()
+	zc.SetLogger(n.logger)
 	zc.HostName = m.HostName
 	responder, err := mdns.NewSubtypeResponder(n.logger)
 	if err != nil {

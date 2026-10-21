@@ -45,6 +45,7 @@ type OTAProvider struct {
 	storage *otaImageStorage
 	logger  *slog.Logger
 
+	// mu guards consents and inProgress.
 	mu sync.Mutex
 	// inProgress is internal.inProgressDetails (OP:633-636), keyed by the
 	// requestor and the update token.

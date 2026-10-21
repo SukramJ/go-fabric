@@ -80,7 +80,7 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	if cfg.open != nil {
 		l, err = cfg.open()
 	} else {
-		l, err = udp.New(udp.Config{LocalAddr: listen, PreferIPv4: n.cfg.Network.PreferIPv4})
+		l, err = udp.New(udp.Config{LocalAddr: listen, PreferIPv4: n.cfg.Network.PreferIPv4, Logger: n.logger})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("node: client socket: %w", err)

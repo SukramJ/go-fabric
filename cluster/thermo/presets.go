@@ -35,7 +35,7 @@ type PresetType = tdef.PresetTypeStruct
 // ErrPresets reports a ThermostatConfig whose presets the server refuses:
 // a NumberOfPresets or PresetTypes outside their constraints, configured
 // presets the write rules refuse, or a [PresetStore] that fails to load.
-var ErrPresets = errors.New("thermostat: preset configuration refused")
+var ErrPresets = errors.New("thermo: preset configuration refused")
 
 // presetHandleLength is the length of a handle the server issues —
 // matter.js `entropy.randomBytes(16)` (ThermostatServer.ts:1526).
@@ -66,11 +66,11 @@ func EncodePresets(presets []Preset) []byte {
 func DecodePresets(b []byte) ([]Preset, error) {
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
 	if err != nil {
-		return nil, fmt.Errorf("thermostat: decode presets: %w", err)
+		return nil, fmt.Errorf("thermo: decode presets: %w", err)
 	}
 	v, err := tdef.Definition.Attribute(tdef.AttrPresets).Decode(n)
 	if err != nil {
-		return nil, fmt.Errorf("thermostat: decode presets: %w", err)
+		return nil, fmt.Errorf("thermo: decode presets: %w", err)
 	}
 	list, _ := v.(spec.List[Preset])
 	return []Preset(list), nil
@@ -123,7 +123,7 @@ func presetsValue(v any) ([]Preset, error) {
 	case []Preset:
 		return x, nil
 	}
-	return nil, spec.Errorf(im.StatusConstraintError, "thermostat: Presets value %T is not a list of PresetStruct", v)
+	return nil, spec.Errorf(im.StatusConstraintError, "thermo: Presets value %T is not a list of PresetStruct", v)
 }
 
 // handleKey is a handle's map key (matter.js Bytes.toHex).
@@ -293,7 +293,7 @@ func normalizePresetCommit(presets, old []Preset, seeding bool, issued map[strin
 		if p.PresetHandle.Null {
 			h := make([]byte, presetHandleLength)
 			if _, err := rand.Read(h); err != nil {
-				return fmt.Errorf("thermostat: issue a preset handle: %w", err)
+				return fmt.Errorf("thermo: issue a preset handle: %w", err)
 			}
 			p.PresetHandle = spec.ValueOf(h)
 			issued[handleKey(h)] = true
@@ -341,7 +341,7 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 		return nil
 	}
 	if err := s.presetStore.SavePresets(ctx, EncodePresets(presets), bytes.Clone(active)); err != nil {
-		return fmt.Errorf("thermostat: save presets: %w", err)
+		return fmt.Errorf("thermo: save presets: %w", err)
 	}
 	return nil
 }
@@ -395,7 +395,7 @@ func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) e
 // refusal, with its IM status. presets is not modified.
 func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) error {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: Presets needs the Presets feature")
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: Presets needs the Presets feature")
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -422,7 +422,7 @@ func (s *ThermostatServer) ActivePresetHandle() []byte {
 // nothing else; it is saved and announced.
 func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []byte) error {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: ActivePresetHandle needs the Presets feature")
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: ActivePresetHandle needs the Presets feature")
 	}
 	if handle != nil {
 		if _, err := s.inst.CheckValue(tdef.AttrActivePresetHandle, handle, nil); err != nil {
@@ -473,7 +473,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	presets := s.presets
 	s.mu.Unlock()
 	if err := s.savePresets(ctx, presets, nil); err != nil {
-		slog.Default().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
+		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.Notify(tdef.AttrActivePresetHandle)
 }
@@ -489,7 +489,7 @@ func presetRequest(fields any) (tdef.SetActivePresetRequestRequest, error) {
 			return *v, nil
 		}
 	}
-	return tdef.SetActivePresetRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermostat: SetActivePresetRequest carried %T", fields)
+	return tdef.SetActivePresetRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermo: SetActivePresetRequest carried %T", fields)
 }
 
 // handleSetActivePresetRequest is matter.js setActivePresetRequest
@@ -528,7 +528,7 @@ func (s *ThermostatServer) handleSetActivePresetRequest(ctx context.Context, fie
 	if !req.PresetHandle.Null {
 		handle = bytes.Clone(req.PresetHandle.Value)
 	}
-	slog.Default().Info("matter.thermostat.active_preset", slog.String("preset_handle", handleKey(handle)))
+	s.logger().Info("matter.thermostat.active_preset", slog.String("preset_handle", handleKey(handle)))
 
 	if preset != nil {
 		next := st
@@ -607,7 +607,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 	if active != nil && !slices.ContainsFunc(presets, func(p Preset) bool {
 		return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, active)
 	}) {
-		slog.Default().Warn("matter.thermostat.active_preset_cleared",
+		s.logger().Warn("matter.thermostat.active_preset_cleared",
 			slog.String("active_preset_handle", handleKey(active)), slog.String("reason", "matches no preset, reporting no active preset"))
 		active, cleared = nil, true
 	}

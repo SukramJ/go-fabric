@@ -781,7 +781,7 @@ func dacKeyOf(der []byte) (*ecdsa.PublicKey, error) {
 	}
 	k, ok := c.PublicKey.(*ecdsa.PublicKey)
 	if !ok || k.Curve != elliptic.P256() {
-		return nil, errors.New("DAC public key must be EC P-256")
+		return nil, errors.New("commissioner: DAC public key must be EC P-256")
 	}
 	return k, nil
 }

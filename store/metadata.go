@@ -24,10 +24,10 @@ func getNextFabricIndexFromMetadata(ctx context.Context, tx *sql.Tx) (uint8, err
 		if errors.Is(err, sql.ErrNoRows) {
 			return 1, nil
 		}
-		return 0, fmt.Errorf("matter store: read next_fabric_index: %w", err)
+		return 0, fmt.Errorf("store: read next_fabric_index: %w", err)
 	}
 	if v < 1 || v > 254 {
-		return 0, fmt.Errorf("matter store: next_fabric_index out of range: %d", v)
+		return 0, fmt.Errorf("store: next_fabric_index out of range: %d", v)
 	}
 	return uint8(v), nil //nolint:gosec // bounded by range check above; see #20
 }

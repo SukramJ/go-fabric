@@ -37,6 +37,7 @@ type Subscriptions struct {
 	log           *slog.Logger
 	reportStarted func(s *exchange.Session)
 
+	// mu guards active, blocked, drained, peers and timer.
 	mu       sync.Mutex
 	active   map[*Subscription]struct{}
 	peers    map[exchange.PeerAddress]map[uint32]*Subscription
@@ -279,6 +280,7 @@ type Subscription struct {
 	// closed is the registry's callback (CI:1058, :1101).
 	closed func()
 
+	// mu guards isClosed.
 	mu                  sync.Mutex
 	id                  uint32
 	maxInterval         uint16

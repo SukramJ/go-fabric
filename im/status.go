@@ -122,7 +122,7 @@ func (unsupportedCommandError) Is(target error) bool {
 
 // ErrUnsupportedCommand is the sentinel [UnsupportedCommandf] values
 // match under errors.Is. Matter §10.6.7.4 UnsupportedCommand (0x81).
-var ErrUnsupportedCommand StatusCodeError = unsupportedCommandError{"matter: unsupported command"}
+var ErrUnsupportedCommand StatusCodeError = unsupportedCommandError{"im: unsupported command"}
 
 // UnsupportedCommandf builds an error that carries the message verbatim
 // and maps to [StatusUnsupportedCommand]. Use it in the default branch

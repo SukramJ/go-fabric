@@ -63,6 +63,7 @@ type caseFabric struct {
 // which Apple Home does within seconds of a pair, and which then signs
 // Sigma2 under the wrong fabric's NOC for every reconnect of the first.
 type caseIdentities struct {
+	// mu guards byIdx and latest.
 	mu     sync.RWMutex
 	byIdx  map[uint8]*caseFabric
 	latest *caseFabric
@@ -740,7 +741,7 @@ type rejectingVerifier struct{}
 
 // VerifyAndExtractPubKey implements [sigma.PeerVerifier].
 func (rejectingVerifier) VerifyAndExtractPubKey(_, _ []byte) (*ecdsa.PublicKey, error) {
-	return nil, errors.New("no fabric installed yet: commission the bridge before opening a CASE session")
+	return nil, errors.New("node: no fabric installed yet: commission the bridge before opening a CASE session")
 }
 
 // operationalResolver is the mDNS resolver of the node's CASE initiator,

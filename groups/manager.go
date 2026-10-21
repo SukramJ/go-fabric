@@ -118,6 +118,7 @@ type Manager struct {
 	st     Store
 	logger *slog.Logger
 
+	// mu guards allLoaded, fabrics and maxGroups.
 	mu        sync.RWMutex
 	maxGroups int
 	fabrics   map[uint8]*fabricGroups
@@ -129,6 +130,7 @@ type Manager struct {
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
 
+	// observersMu guards observers and tableObservers.
 	observersMu        sync.Mutex
 	observers          []func()
 	tableObservers     []func(fabricIndex uint8)

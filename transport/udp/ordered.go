@@ -52,6 +52,7 @@ type orderedDispatch struct {
 	key     func(buf []byte) (uint32, bool)
 	handler OrderedHandler
 
+	// mu guards pending and queues.
 	mu     sync.Mutex
 	queues map[uint32]*orderedQueue
 	// pending counts the datagrams of every stream that are queued or

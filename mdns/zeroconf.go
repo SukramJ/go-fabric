@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grandcat/zeroconf"
@@ -61,8 +62,11 @@ import (
 // changes. Which host interfaces contribute A/AAAA records is likewise
 // decided here, by [Zeroconf.InterfaceFilter].
 type Zeroconf struct {
+	// log is the advertiser's logger, set by [Zeroconf.SetLogger].
+	log atomic.Pointer[slog.Logger]
 	// clock paces the subtype re-announcement and the re-announce loop.
-	clock   clockvar.Var
+	clock clockvar.Var
+	// mu guards closed, items, loopTrigger, published, responder, servers and subFQDNs.
 	mu      sync.RWMutex
 	servers map[string]*zeroconf.Server
 	items   map[string]Service
@@ -634,7 +638,7 @@ func (z *Zeroconf) StartReannounceLoop(ctx context.Context, interval time.Durati
 	z.mu.Lock()
 	if running := z.loopTrigger; running != nil {
 		z.mu.Unlock()
-		slog.Default().Info("mdns.reannounce.loop_already_running",
+		z.logger().Info("mdns.reannounce.loop_already_running",
 			slog.Duration("interval", interval),
 			slog.String("hint", "the running loop is kept; the node facade starts one itself"))
 		return func() {}, running
@@ -757,4 +761,16 @@ func (z *Zeroconf) Close() error {
 	}
 	z.closed = true
 	return err
+}
+
+// SetLogger sets the logger the advertiser's diagnostics go to; nil is
+// slog.Default(). It is safe to call at any time.
+func (z *Zeroconf) SetLogger(l *slog.Logger) { z.log.Store(l) }
+
+// logger is the Zeroconf's logger, slog.Default() until SetLogger gives it one.
+func (z *Zeroconf) logger() *slog.Logger {
+	if l := z.log.Load(); l != nil {
+		return l
+	}
+	return slog.Default()
 }

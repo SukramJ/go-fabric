@@ -31,7 +31,7 @@ var ErrTruncated = errors.New("btp: packet truncated")
 
 // ErrInvalidAdvertisement is matter.js's BleError("Invalid BLE
 // advertisement data") (packages/protocol/src/codec/BtpCodec.ts:318-347).
-var ErrInvalidAdvertisement = errors.New("Invalid BLE advertisement data") //nolint:staticcheck,revive // matter.js's message, verbatim
+var ErrInvalidAdvertisement = errors.New("btp: Invalid BLE advertisement data") //nolint:staticcheck,revive // matter.js's message, verbatim
 
 // Header bits of a data packet and the handshake's management opcode.
 // Mirrors matter.js BtpCodec.ts:53-69 (BtpHeaderBits, BtpOpcode,

@@ -74,6 +74,7 @@ type SubtypeResponder struct {
 	lifecycleMu sync.Mutex
 	closed      bool
 
+	// mu guards mappings.
 	mu sync.RWMutex
 	// mappings is a lower-cased qname (`_l3840._sub._matterc._udp.local.`)
 	// → primary instance FQDN
@@ -676,7 +677,7 @@ func joinMcast4() (*ipv4.PacketConn, error) {
 	}
 	if joined == 0 {
 		_ = pc.Close()
-		return nil, errors.New("no multicast interface accepted IPv4 join")
+		return nil, errors.New("mdns: no multicast interface accepted IPv4 join")
 	}
 	if primaryIface != nil {
 		_ = pc.SetMulticastInterface(primaryIface)
@@ -712,7 +713,7 @@ func joinMcast6() (*ipv6.PacketConn, error) {
 	}
 	if joined == 0 {
 		_ = pc.Close()
-		return nil, errors.New("no multicast interface accepted IPv6 join")
+		return nil, errors.New("mdns: no multicast interface accepted IPv6 join")
 	}
 	if primaryIface != nil {
 		_ = pc.SetMulticastInterface(primaryIface)

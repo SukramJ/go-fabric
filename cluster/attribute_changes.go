@@ -17,6 +17,7 @@ import (
 // and call [AttributeChanges.Notify] with the attributes that moved; the
 // zero value is ready to use.
 type AttributeChanges struct {
+	// mu guards listeners and next.
 	mu        sync.Mutex
 	next      int
 	listeners map[int]func([]uint32)
@@ -102,6 +103,7 @@ type Quieter struct {
 	// Deprecated: set Clock; AfterFunc may be removed in v0.10.0.
 	AfterFunc func(d time.Duration, f func()) *time.Timer
 
+	// mu guards gen, lastEmit, pending and timer.
 	mu       sync.Mutex
 	lastEmit time.Time
 	pending  bool

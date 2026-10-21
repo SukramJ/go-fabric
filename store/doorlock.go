@@ -133,7 +133,7 @@ SELECT user_index, user_name, user_unique_id, user_status, user_type, credential
        credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at
 FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpointKey)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: load door lock users: %w", err)
+		return nil, fmt.Errorf("store: load door lock users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []DoorLockUser
@@ -146,7 +146,7 @@ FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpoint
 		)
 		if err := rows.Scan(&u.UserIndex, &u.UserName, &unique, &u.UserStatus, &u.UserType, &u.CredentialRule,
 			&creds, &u.CreatorFabricIndex, &u.LastModifiedFabricIndex, &expires); err != nil {
-			return nil, fmt.Errorf("matter store: load door lock users: %w", err)
+			return nil, fmt.Errorf("store: load door lock users: %w", err)
 		}
 		if unique.Valid {
 			v := uint32(unique.Int64) //nolint:gosec // written from a uint32
@@ -157,12 +157,12 @@ FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpoint
 			u.ExpiringUserExpiresAt = &v
 		}
 		if err := json.Unmarshal([]byte(creds), &u.Credentials); err != nil {
-			return nil, fmt.Errorf("matter store: door lock user %d credentials: %w", u.UserIndex, err)
+			return nil, fmt.Errorf("store: door lock user %d credentials: %w", u.UserIndex, err)
 		}
 		out = append(out, u)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: load door lock users: %w", err)
+		return nil, fmt.Errorf("store: load door lock users: %w", err)
 	}
 	return out, nil
 }
@@ -172,19 +172,19 @@ func (s *Store) loadDoorLockCredentials(ctx context.Context, endpointKey string)
 SELECT credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index
 FROM matter_doorlock_credentials WHERE endpoint_key = ? ORDER BY credential_type, credential_index`, endpointKey)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: load door lock credentials: %w", err)
+		return nil, fmt.Errorf("store: load door lock credentials: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []DoorLockCredential
 	for rows.Next() {
 		var c DoorLockCredential
 		if err := rows.Scan(&c.Type, &c.Index, &c.Data, &c.CreatorFabricIndex, &c.LastModifiedFabricIndex); err != nil {
-			return nil, fmt.Errorf("matter store: load door lock credentials: %w", err)
+			return nil, fmt.Errorf("store: load door lock credentials: %w", err)
 		}
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: load door lock credentials: %w", err)
+		return nil, fmt.Errorf("store: load door lock credentials: %w", err)
 	}
 	return out, nil
 }
@@ -195,7 +195,7 @@ SELECT kind, schedule_index, user_index, days_mask, start_hour, start_minute, en
        local_start_time, local_end_time, operating_mode
 FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index, schedule_index`, endpointKey)
 	if err != nil {
-		return fmt.Errorf("matter store: load door lock schedules: %w", err)
+		return fmt.Errorf("store: load door lock schedules: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
@@ -206,7 +206,7 @@ FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index,
 			start, end                            uint32
 		)
 		if err := rows.Scan(&kind, &index, &user, &daysMask, &sh, &sm, &eh, &em, &start, &end, &mode); err != nil {
-			return fmt.Errorf("matter store: load door lock schedules: %w", err)
+			return fmt.Errorf("store: load door lock schedules: %w", err)
 		}
 		switch kind {
 		case doorLockWeekDay:
@@ -225,7 +225,7 @@ FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index,
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("matter store: load door lock schedules: %w", err)
+		return fmt.Errorf("store: load door lock schedules: %w", err)
 	}
 	return nil
 }
@@ -235,18 +235,18 @@ FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index,
 func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth DoorLockAuth) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("matter store: save door lock: begin: %w", err)
+		return fmt.Errorf("store: save door lock: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, table := range []string{"matter_doorlock_users", "matter_doorlock_credentials", "matter_doorlock_schedules"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE endpoint_key = ?`, endpointKey); err != nil { //nolint:gosec // table is one of the three constants above
-			return fmt.Errorf("matter store: save door lock: clear %s: %w", table, err)
+			return fmt.Errorf("store: save door lock: clear %s: %w", table, err)
 		}
 	}
 	for _, u := range auth.Users {
 		creds, err := json.Marshal(nonNilRefs(u.Credentials))
 		if err != nil {
-			return fmt.Errorf("matter store: save door lock user %d: %w", u.UserIndex, err)
+			return fmt.Errorf("store: save door lock user %d: %w", u.UserIndex, err)
 		}
 		var unique, expires any
 		if u.UserUniqueID != nil {
@@ -262,7 +262,7 @@ INSERT INTO matter_doorlock_users
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			endpointKey, u.UserIndex, u.UserName, unique, u.UserStatus, u.UserType, u.CredentialRule,
 			string(creds), u.CreatorFabricIndex, u.LastModifiedFabricIndex, expires); err != nil {
-			return fmt.Errorf("matter store: save door lock user %d: %w", u.UserIndex, err)
+			return fmt.Errorf("store: save door lock user %d: %w", u.UserIndex, err)
 		}
 	}
 	for _, c := range auth.Credentials {
@@ -271,7 +271,7 @@ INSERT INTO matter_doorlock_credentials
     (endpoint_key, credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index)
 VALUES (?, ?, ?, ?, ?, ?)`,
 			endpointKey, c.Type, c.Index, c.Data, c.CreatorFabricIndex, c.LastModifiedFabricIndex); err != nil {
-			return fmt.Errorf("matter store: save door lock credential %d/%d: %w", c.Type, c.Index, err)
+			return fmt.Errorf("store: save door lock credential %d/%d: %w", c.Type, c.Index, err)
 		}
 	}
 	const insertSchedule = `
@@ -282,28 +282,28 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for _, w := range auth.WeekDaySchedules {
 		if _, err := tx.ExecContext(ctx, insertSchedule, endpointKey, doorLockWeekDay, w.WeekDayIndex, w.UserIndex,
 			w.DaysMask, w.StartHour, w.StartMinute, w.EndHour, w.EndMinute, 0, 0, 0); err != nil {
-			return fmt.Errorf("matter store: save door lock week day schedule %d: %w", w.WeekDayIndex, err)
+			return fmt.Errorf("store: save door lock week day schedule %d: %w", w.WeekDayIndex, err)
 		}
 	}
 	for _, y := range auth.YearDaySchedules {
 		if _, err := tx.ExecContext(ctx, insertSchedule, endpointKey, doorLockYearDay, y.YearDayIndex, y.UserIndex,
 			0, 0, 0, 0, 0, y.LocalStartTime, y.LocalEndTime, 0); err != nil {
-			return fmt.Errorf("matter store: save door lock year day schedule %d: %w", y.YearDayIndex, err)
+			return fmt.Errorf("store: save door lock year day schedule %d: %w", y.YearDayIndex, err)
 		}
 	}
 	for _, h := range auth.HolidaySchedules {
 		if _, err := tx.ExecContext(ctx, insertSchedule, endpointKey, doorLockHoliday, h.HolidayIndex, 0,
 			0, 0, 0, 0, 0, h.LocalStartTime, h.LocalEndTime, h.OperatingMode); err != nil {
-			return fmt.Errorf("matter store: save door lock holiday schedule %d: %w", h.HolidayIndex, err)
+			return fmt.Errorf("store: save door lock holiday schedule %d: %w", h.HolidayIndex, err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO matter_settings (key, value) VALUES (?, '1')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, settingDoorLockSaved+endpointKey); err != nil {
-		return fmt.Errorf("matter store: save door lock: mark saved: %w", err)
+		return fmt.Errorf("store: save door lock: mark saved: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("matter store: save door lock: commit: %w", err)
+		return fmt.Errorf("store: save door lock: commit: %w", err)
 	}
 	return nil
 }

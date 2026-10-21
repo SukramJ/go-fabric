@@ -375,8 +375,9 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 			// every persisted row until a model-complete snapshot vouches
 			// for the fleet.
 			a.logger.Debug(
-				"matter endpoint gc skipped: model incomplete",
+				"endpoint.gc_skipped",
 				slog.String("scope", snap.Scope),
+				slog.String("reason", "model incomplete"),
 			)
 			continue
 		}
@@ -392,7 +393,7 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 				return fmt.Errorf("endpoint: gc remove: %w", err)
 			}
 			a.logger.Debug(
-				"matter endpoint gc",
+				"endpoint.gc",
 				slog.String("scope", snap.Scope),
 				slog.String("source", rec.Key.String()),
 				slog.Int("endpoint_id", int(rec.EndpointID)),

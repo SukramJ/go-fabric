@@ -34,11 +34,13 @@ type Binding struct {
 	// writeMu serialises the list's changes with their persistence, so the
 	// saves land in the order the changes commit; mu guards the list for
 	// readers, which a save never blocks.
-	writeMu  sync.Mutex
+	writeMu sync.Mutex
+	// mu guards bindings.
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
 
+	// obsMu guards observers.
 	obsMu     sync.Mutex
 	observers []*bindingObserver
 }
@@ -160,7 +162,7 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 		var err error
 		if stored, err = cfg.Load(); err != nil {
 			b.writeMu.Unlock()
-			return fmt.Errorf("matter: Binding restore: %w", err)
+			return fmt.Errorf("core: Binding restore: %w", err)
 		}
 	}
 	b.save = cfg.Save
@@ -252,11 +254,11 @@ func (b *Binding) Entries() []TargetStruct {
 func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != bindingAttrBinding {
 		_, err := bindingInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("matter: Binding has no writable attribute 0x%04X", attrID), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: Binding has no writable attribute 0x%04X", attrID), status: err}
 	}
 	_, fabric, request := im.LookupFabricFilter(ctx)
 	if request && fabric == 0 {
-		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "matter: Binding is fabric-scoped; the session has no fabric"}
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding is fabric-scoped; the session has no fabric"}
 	}
 	list, err := bindingWriteList(value, fabric, request)
 	if err != nil {
@@ -285,7 +287,7 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if b.save != nil {
 		if err := b.save(slices.Clone(after)); err != nil {
 			b.writeMu.Unlock()
-			return fmt.Errorf("matter: Binding persist: %w", err)
+			return fmt.Errorf("core: Binding persist: %w", err)
 		}
 	}
 	b.mu.Lock()
@@ -368,13 +370,13 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 		return out, nil
 	default:
 		_, err := bindingInst.ValidateWrite(bindingAttrBinding, value, nil)
-		return nil, refusedWrite{sentinel: fmt.Errorf("matter: Binding write expected []TargetStruct, got %T", value), status: err}
+		return nil, refusedWrite{sentinel: fmt.Errorf("core: Binding write expected []TargetStruct, got %T", value), status: err}
 	}
 }
 
 // errBindingWriteRefused is the sentinel of a written value the definition
 // refused.
-var errBindingWriteRefused = errors.New("matter: Binding write refused")
+var errBindingWriteRefused = errors.New("core: Binding write refused")
 
 // bindingStatusError is a Binding refusal with the IM status matter.js
 // answers.
@@ -478,7 +480,7 @@ func diffBindings(before, after []TargetStruct) []bindingDiff {
 
 // MatterInvoke always rejects — Binding has no commands.
 func (b *Binding) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: Binding has no commands (got 0x%02X)", cmdID)
+	return nil, im.UnsupportedCommandf("core: Binding has no commands (got 0x%02X)", cmdID)
 }
 
 // MatterReportable lists the subscribe-able attributes.

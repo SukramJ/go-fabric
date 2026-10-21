@@ -3,6 +3,7 @@
 # drops it at the root, which is never meant to be committed.
 /bin/
 /reference-bridge
+/reference-controller
 *.test
 *.out
 

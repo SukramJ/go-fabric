@@ -360,6 +360,7 @@ func (s *Scanner) armCleanup() {
 
 // deliveryQueue hands devices from the loop to a search's goroutine.
 type deliveryQueue struct {
+	// mu guards items.
 	mu     sync.Mutex
 	items  []Device
 	signal chan struct{}

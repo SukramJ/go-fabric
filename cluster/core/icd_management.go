@@ -84,14 +84,14 @@ func (i *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 // are read-only on the bridge.
 func (i *ICDManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := icdInst.ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("matter: ICDManagement attribute 0x%04X is read-only", attrID), status: err}
+	return refusedWrite{sentinel: fmt.Errorf("core: ICDManagement attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterInvoke implements [contract.ClusterServer]. ICD
 // commands (RegisterClient / UnregisterClient / StayActiveRequest)
 // all require feature flags we don't advertise.
 func (i *ICDManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: ICDManagement command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: ICDManagement command 0x%02X not supported", cmdID)
 }
 
 // MatterReportable lists subscribe-able attributes.

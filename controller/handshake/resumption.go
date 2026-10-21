@@ -65,6 +65,7 @@ type ResumptionStore interface {
 // MemoryResumptionStore is a [ResumptionStore] in memory. The zero value
 // is ready to use; it is safe for concurrent use.
 type MemoryResumptionStore struct {
+	// mu guards records.
 	mu      sync.Mutex
 	records map[PeerAddress]ResumptionRecord
 }

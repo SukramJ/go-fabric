@@ -364,7 +364,7 @@ func (d *DiagnosticLogs) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite always rejects — DiagnosticLogs has no writable attributes.
 func (d *DiagnosticLogs) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := diaglogsInst.ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("matter: DiagnosticLogs is read-only (got attr 0x%04X)", attrID), status: err}
+	return refusedWrite{sentinel: fmt.Errorf("core: DiagnosticLogs is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
 // diaglogsInst is the definition bound to what the server serves: no
@@ -377,7 +377,7 @@ type diagLogsError struct {
 	msg  string
 }
 
-func (e diagLogsError) Error() string                   { return "matter: DiagnosticLogs: " + e.msg }
+func (e diagLogsError) Error() string                   { return "core: DiagnosticLogs: " + e.msg }
 func (e diagLogsError) MatterStatusCode() im.StatusCode { return e.code }
 
 // MatterInvoke implements RetrieveLogsRequest (DLC:181-210): an intent or
@@ -386,7 +386,7 @@ func (e diagLogsError) MatterStatusCode() im.StatusCode { return e.code }
 // transfer (:205).
 func (d *DiagnosticLogs) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if cmdID != diaglogsCmdRetrieveLogsRequest {
-		return nil, im.UnsupportedCommandf("matter: DiagnosticLogs command 0x%02X not supported", cmdID)
+		return nil, im.UnsupportedCommandf("core: DiagnosticLogs command 0x%02X not supported", cmdID)
 	}
 	req := decodeRetrieveLogsRequest(fields)
 	if req.Intent > diaglogsdef.IntentCrashLogs || req.RequestedProtocol > diaglogsdef.TransferProtocolBdx {

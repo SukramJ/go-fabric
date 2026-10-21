@@ -129,7 +129,7 @@ func (t *TimeSynchronization) MatterWrite(_ context.Context, attrID uint32, valu
 		_, err := timeSyncInst.ValidateWrite(attrID, value, nil)
 		return err
 	}
-	return timeSyncReadOnlyErr{fmt.Sprintf("matter: TimeSynchronization attribute 0x%04X is read-only", attrID)}
+	return timeSyncReadOnlyErr{fmt.Sprintf("core: TimeSynchronization attribute 0x%04X is read-only", attrID)}
 }
 
 // timeSyncReadOnlyErr answers a write UNSUPPORTED_WRITE, as the comment
@@ -162,7 +162,7 @@ func (t *TimeSynchronization) MatterInvoke(_ context.Context, cmdID uint32, _ an
 		// time-coordinator.
 		return nil, nil
 	}
-	return nil, im.UnsupportedCommandf("matter: TimeSynchronization command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: TimeSynchronization command 0x%02X not supported", cmdID)
 }
 
 // MatterReportable lists subscribe-able attributes.

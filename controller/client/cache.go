@@ -138,6 +138,7 @@ type persister struct {
 	// image is the node's lock, which guards the caches.
 	image sync.Locker
 
+	// mu guards dirty, flushing, stopped and timer.
 	mu      sync.Mutex
 	dirty   []*cache
 	timer   exchange.Timer

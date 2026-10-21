@@ -96,6 +96,7 @@ type CASEServer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	// mu guards closed and wg.
 	mu     sync.Mutex
 	closed bool
 	wg     sync.WaitGroup

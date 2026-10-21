@@ -91,7 +91,7 @@ const defaultSupportedOperatingModes = lockdef.OperatingModesAlwaysSet | lockdef
 
 // ErrConfig reports a configuration the cluster's model, or matter.js's
 // initialize, refuses.
-var ErrConfig = errors.New("doorlock: configuration outside the cluster's model")
+var ErrConfig = errors.New("lock: configuration outside the cluster's model")
 
 // LockOperationEvent is the cluster-native payload for the DoorLock
 // LockOperation event (id 0x02, priority critical) per Matter §5.2.10.3
@@ -110,7 +110,7 @@ type LockOperationEvent struct {
 	SourceNode        *uint64
 }
 
-var errUnknownCommand = errors.New("doorlock: unknown command")
+var errUnknownCommand = errors.New("lock: unknown command")
 
 // StateSource is the read-side interface a model-layer lock DP must
 // satisfy so DoorLockServer can project its Matter attribute surface.
@@ -203,7 +203,7 @@ func (e *LockOperationFailedError) Error() string {
 	if e.Message != "" {
 		return e.Message
 	}
-	return fmt.Sprintf("doorlock: lock operation failed: operation error %d", uint8(e.Reason))
+	return fmt.Sprintf("lock: lock operation failed: operation error %d", uint8(e.Reason))
 }
 
 // DoorLockConfig holds the construction parameters for [New]. The zero
@@ -550,7 +550,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	if s.auth != nil {
 		saved, ok, err := s.auth.LoadDoorLockAuth(ctx, s.authKey)
 		if err != nil {
-			return fmt.Errorf("doorlock: load records: %w", err)
+			return fmt.Errorf("lock: load records: %w", err)
 		}
 		if ok {
 			s.data = saved
@@ -561,7 +561,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	for i := range data.Credentials {
 		enc, err := s.cipher.Encrypt(data.Credentials[i].Data)
 		if err != nil {
-			return fmt.Errorf("doorlock: encrypt an initial credential: %w", err)
+			return fmt.Errorf("lock: encrypt an initial credential: %w", err)
 		}
 		data.Credentials[i].Data = enc
 	}
@@ -576,7 +576,7 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	if s.auth != nil {
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
-			return nil, fmt.Errorf("doorlock: read the credential key: %w", err)
+			return nil, fmt.Errorf("lock: read the credential key: %w", err)
 		}
 		if ok {
 			key, err := hex.DecodeString(v)
@@ -588,11 +588,11 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	}
 	key := make([]byte, credentialKeySize)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("doorlock: generate the credential key: %w", err)
+		return nil, fmt.Errorf("lock: generate the credential key: %w", err)
 	}
 	if s.auth != nil {
 		if err := s.auth.SetSetting(ctx, store.SettingDoorLockCredentialKey, hex.EncodeToString(key)); err != nil {
-			return nil, fmt.Errorf("doorlock: store the credential key: %w", err)
+			return nil, fmt.Errorf("lock: store the credential key: %w", err)
 		}
 	}
 	return key, nil
@@ -667,7 +667,7 @@ func (s *DoorLockServer) MatterWriteAttribute(_ context.Context, attrID uint32, 
 	}
 	m, _ := value.(uint8)
 	if !modeSupported(s.supportedModes, lockdef.OperatingModeEnum(m)) {
-		return spec.Errorf(im.StatusConstraintError, "doorlock: %s", unsupportedOperatingMode(lockdef.OperatingModeEnum(m)))
+		return spec.Errorf(im.StatusConstraintError, "lock: %s", unsupportedOperatingMode(lockdef.OperatingModeEnum(m)))
 	}
 	return nil
 }
@@ -818,7 +818,7 @@ func lockRequest(fields any) (pinCode *[]byte, timeout *uint16, err error) {
 	case *lockdef.UnlockWithTimeoutRequest:
 		pinCode, timeout = r.PinCode, &r.Timeout
 	default:
-		return nil, nil, spec.Errorf(im.StatusInvalidCommand, "doorlock: lock command fields %T", fields)
+		return nil, nil, spec.Errorf(im.StatusInvalidCommand, "lock: lock command fields %T", fields)
 	}
 	return pinCode, timeout, nil
 }
@@ -847,7 +847,7 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 	// Events of a lock operation name the requesting fabric; without one
 	// the hardware must not move (:1016-1022).
 	if _, fabricIndex := im.FabricFilterFromContext(ctx); fabricIndex == 0 {
-		return spec.Errorf(im.StatusUnsupportedAccess, "doorlock: lock commands need the fabric of a remote requester")
+		return spec.Errorf(im.StatusUnsupportedAccess, "lock: lock commands need the fabric of a remote requester")
 	}
 	// UnboltDoor retracts the bolt without pulling the latch: the lock ends
 	// up Unlocked and reports an Unlock (§ 5.2.10.25, § 5.2.11.3;
@@ -878,7 +878,7 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 		if errors.As(err, &sc) {
 			return err
 		}
-		return spec.Errorf(im.StatusFailure, "doorlock: lock hardware failed to %s: %v", actuation, err)
+		return spec.Errorf(im.StatusFailure, "lock: lock hardware failed to %s: %v", actuation, err)
 	}
 
 	if err := s.setActuated(locking); err != nil {
@@ -1030,10 +1030,10 @@ func (s *DoorLockServer) authorizeLocked(ctx context.Context, opType lockdef.Loc
 	mode := s.operatingMode()
 	if mode == lockdef.OperatingModePrivacy || mode == lockdef.OperatingModeNoRemoteLockUnlock {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorUnspecified, anonymous)
-		return anonymous, spec.Errorf(im.StatusFailure, "doorlock: remote lock operations are disabled in operating mode %d", mode)
+		return anonymous, spec.Errorf(im.StatusFailure, "lock: remote lock operations are disabled in operating mode %d", mode)
 	}
 	if s.isLockedOutLocked() {
-		return anonymous, spec.Errorf(im.StatusFailure, "doorlock: lock operations are ignored during the wrong code lockout")
+		return anonymous, spec.Errorf(im.StatusFailure, "lock: lock operations are ignored during the wrong code lockout")
 	}
 	if pinCode == nil {
 		if s.requirePin() {
@@ -1064,20 +1064,20 @@ func (s *DoorLockServer) authorizeUserLocked(ctx context.Context, opType lockdef
 	}
 	if status == lockdef.UserStatusOccupiedDisabled || expired {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorDisabledUserDenied, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: user %d is disabled", user.UserIndex)
+		return spec.Errorf(im.StatusFailure, "lock: user %d is disabled", user.UserIndex)
 	}
 	userType := lockdef.UserTypeEnum(user.UserType)
 	if !IsAccessGranted(userType, user.UserIndex, s.data.WeekDaySchedules, s.data.YearDaySchedules, LocalInstantOf(s.clock.Now().In(s.loc))) {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorRestricted, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: access denied by schedule")
+		return spec.Errorf(im.StatusFailure, "lock: access denied by schedule")
 	}
 	if userType == lockdef.UserTypeExpiringUser && !s.Serves(lockdef.AttrExpiringUserTimeout) {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorRestricted, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: an ExpiringUser cannot be granted access without ExpiringUserTimeout")
+		return spec.Errorf(im.StatusFailure, "lock: an ExpiringUser cannot be granted access without ExpiringUserTimeout")
 	}
 	if userType == lockdef.UserTypeNonAccessUser {
 		s.emitLockOperationLocked(ctx, lockdef.LockOperationTypeNonAccessUserEvent, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: a NonAccessUser cannot operate the lock")
+		return spec.Errorf(im.StatusFailure, "lock: a NonAccessUser cannot operate the lock")
 	}
 	return nil
 }
@@ -1144,7 +1144,7 @@ func (s *DoorLockServer) refuseWrongCodeLocked(ctx context.Context, opType lockd
 		}
 	}
 	s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorInvalidCredential, anonymous)
-	return spec.Errorf(im.StatusFailure, "doorlock: %s", message)
+	return spec.Errorf(im.StatusFailure, "lock: %s", message)
 }
 
 // isLockedOutLocked mirrors matter.js DoorLockServer.ts:1192-1195. The
@@ -1341,7 +1341,7 @@ func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 			s.data = before
 			s.mu.Unlock()
 			s.emit(events)
-			return spec.Errorf(im.StatusFailure, "doorlock: save records: %v", perr)
+			return spec.Errorf(im.StatusFailure, "lock: save records: %v", perr)
 		}
 	}
 	s.emit(events)

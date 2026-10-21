@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"slices"
 
@@ -92,6 +93,7 @@ func (r *RootClusters) Servers() []contract.ClusterServer { return slices.Clone(
 // rootDeps is what buildRoot needs from the node under construction.
 type rootDeps struct {
 	cfg               *Config
+	logger            *slog.Logger
 	bootReason        uint8
 	st                *store.Store
 	groups            *groups.Manager
@@ -126,6 +128,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		UniqueID:           bi.UniqueID,
 		CapabilityMinima:   cfg.CapabilityMinima,
 		MaxPathsPerInvoke:  cfg.MaxPathsPerInvoke,
+		Logger:             d.logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
@@ -140,6 +143,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
 	}
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
+	r.GeneralDiagnostics.SetLogger(d.logger)
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)

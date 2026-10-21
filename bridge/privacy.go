@@ -64,32 +64,32 @@ func (b *Bridge) maybeUnmaskPrivacy(buf []byte) error {
 	}
 	sessionID := binary.LittleEndian.Uint16(buf[1:3])
 	if sessionID == 0 {
-		return errors.New("privacy: P bit set on SessionID=0 (PASE) — spec violation")
+		return errors.New("bridge: P bit set on SessionID=0 (PASE) — spec violation")
 	}
 	if message.SessionType(secFlags&secFlagSessionTypeBits) != message.SessionGroup {
-		return errors.New("privacy: P bit set on a unicast message — dropped (privacy is defined for group messages only)")
+		return errors.New("bridge: P bit set on a unicast message — dropped (privacy is defined for group messages only)")
 	}
 
 	b.mu.RLock()
 	lookup := b.sessions
 	b.mu.RUnlock()
 	if lookup == nil {
-		return errors.New("privacy: no session lookup wired")
+		return errors.New("bridge: no session lookup wired")
 	}
 	sess, ok := lookup.Lookup(sessionID)
 	if !ok {
-		return fmt.Errorf("privacy: session %d not found", sessionID)
+		return fmt.Errorf("bridge: session %d not found", sessionID)
 	}
 	privacyKey, err := sess.PeerPrivacyKey()
 	if err != nil {
-		return fmt.Errorf("privacy: derive peer key: %w", err)
+		return fmt.Errorf("bridge: derive peer key: %w", err)
 	}
 
 	// MIC is the last 16 bytes of the datagram (AES-CCM-128 default
 	// tag size). Need at least 4 + 16 bytes total to compute the
 	// mask + have something to mask.
 	if len(buf) < 4+privacyMICSuffix {
-		return fmt.Errorf("privacy: datagram too short (%d bytes) for MIC tail", len(buf))
+		return fmt.Errorf("bridge: datagram too short (%d bytes) for MIC tail", len(buf))
 	}
 	mic := buf[len(buf)-16:] // 16-byte MIC; the nonce uses its last 11 bytes
 
@@ -102,7 +102,7 @@ func (b *Bridge) maybeUnmaskPrivacy(buf []byte) error {
 	protected := buf[4:hdrEnd]
 	mask, err := channel.PrivacyKeystream(privacyKey, sessionID, mic, len(protected))
 	if err != nil {
-		return fmt.Errorf("privacy: mask derive: %w", err)
+		return fmt.Errorf("bridge: mask derive: %w", err)
 	}
 	return channel.ApplyPrivacyMask(mask, protected)
 }

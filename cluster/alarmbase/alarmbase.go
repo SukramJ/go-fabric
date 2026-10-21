@@ -196,7 +196,8 @@ type Server struct {
 
 	// op serialises the read-modify-write of Mask and State and the Notify
 	// that reports it.
-	op       sync.Mutex
+	op sync.Mutex
+	// mu guards endpoint.
 	mu       sync.Mutex
 	endpoint uint16
 }

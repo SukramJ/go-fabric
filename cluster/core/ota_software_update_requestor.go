@@ -449,7 +449,7 @@ type otaStatusError struct {
 	msg  string
 }
 
-func (e otaStatusError) Error() string                   { return "matter: OtaSoftwareUpdateRequestor: " + e.msg }
+func (e otaStatusError) Error() string                   { return "core: OtaSoftwareUpdateRequestor: " + e.msg }
 func (e otaStatusError) MatterStatusCode() im.StatusCode { return e.code }
 
 // MatterWrite implements [contract.ClusterServer]. Only DefaultOTAProviders
@@ -458,7 +458,7 @@ func (e otaStatusError) MatterStatusCode() im.StatusCode { return e.code }
 func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != otadef.AttrDefaultOtaProviders {
 		_, err := r.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("matter: OtaSoftwareUpdateRequestor attribute 0x%04X is not writable", attrID), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: OtaSoftwareUpdateRequestor attribute 0x%04X is not writable", attrID), status: err}
 	}
 	_, fabric := im.FabricFilterFromContext(ctx)
 	if fabric == 0 {
@@ -537,7 +537,7 @@ func (r *OTASoftwareUpdateRequestor) handleUpdatedDefaultOtaProviders(ctx contex
 // MatterInvoke implements [contract.ClusterServer]: AnnounceOTAProvider.
 func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if cmdID != otadef.CmdAnnounceOtaProvider || !r.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("matter: OtaSoftwareUpdateRequestor command 0x%02X not supported", cmdID)
+		return nil, im.UnsupportedCommandf("core: OtaSoftwareUpdateRequestor command 0x%02X not supported", cmdID)
 	}
 	req, ok := fields.(otadef.AnnounceOtaProviderRequest)
 	if !ok {

@@ -104,6 +104,7 @@ type Node struct {
 	cancel        context.CancelFunc
 	keeperWG      sync.WaitGroup
 
+	// mu guards cfg, keeperWG, ownedDB, st, started and stopped.
 	mu      sync.Mutex
 	started bool
 	stopped bool
@@ -265,7 +266,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// replaced in place).
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
 	n.root, err = buildRoot(ctx, rootDeps{
-		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
+		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
 	})

@@ -120,7 +120,7 @@ func init() {
 // init-time dependency surface minimal.
 func hexToBytes(s string) ([]byte, error) {
 	if len(s)%2 != 0 {
-		return nil, errors.New("hex: odd length")
+		return nil, errors.New("spake2: hex: odd length")
 	}
 	out := make([]byte, len(s)/2)
 	for i := 0; i < len(s); i += 2 {

@@ -69,6 +69,7 @@ type Listener struct {
 
 	recoveredPanics atomic.Uint64
 
+	// mu guards closed and conns.
 	mu     sync.Mutex
 	conns  map[*Conn]struct{}
 	closed bool

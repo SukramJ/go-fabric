@@ -36,7 +36,7 @@ ON CONFLICT(fabric_index, group_id) DO UPDATE SET
     mcast_addr_policy = excluded.mcast_addr_policy,
     has_auxiliary_acl = excluded.has_auxiliary_acl`,
 		g.FabricIndex, g.GroupID, g.McastAddrPolicy, aux); err != nil {
-		return fmt.Errorf("matter store: upsert groupcast group: %w", err)
+		return fmt.Errorf("store: upsert groupcast group: %w", err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (s *Store) RemoveGroupcastGroup(ctx context.Context, fabricIndex uint8, gro
 	if _, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_groupcast_groups WHERE fabric_index = ? AND group_id = ?`,
 		fabricIndex, groupID); err != nil {
-		return fmt.Errorf("matter store: remove groupcast group: %w", err)
+		return fmt.Errorf("store: remove groupcast group: %w", err)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ SELECT fabric_index, group_id, mcast_addr_policy, has_auxiliary_acl
 FROM matter_groupcast_groups WHERE fabric_index = ?
 ORDER BY group_id ASC`, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list groupcast groups: %w", err)
+		return nil, fmt.Errorf("store: list groupcast groups: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -70,13 +70,13 @@ ORDER BY group_id ASC`, fabricIndex)
 			aux int
 		)
 		if err := rows.Scan(&g.FabricIndex, &g.GroupID, &g.McastAddrPolicy, &aux); err != nil {
-			return nil, fmt.Errorf("matter store: list groupcast groups: scan: %w", err)
+			return nil, fmt.Errorf("store: list groupcast groups: scan: %w", err)
 		}
 		g.HasAuxiliaryACL = aux != 0
 		out = append(out, g)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list groupcast groups: rows: %w", err)
+		return nil, fmt.Errorf("store: list groupcast groups: rows: %w", err)
 	}
 	return out, nil
 }

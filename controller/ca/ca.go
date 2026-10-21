@@ -100,6 +100,7 @@ type Store interface {
 // MemoryStore is a [Store] and a [FabricStore] in memory. The zero value is empty and ready to
 // use; it is safe for concurrent use.
 type MemoryStore struct {
+	// mu guards saves and stored.
 	mu     sync.Mutex
 	stored *Stored
 	fabric *FabricRecord

@@ -25,6 +25,7 @@ type ConnServer struct {
 	b    *bridge.Bridge
 	conn transport.Conn
 
+	// mu guards done, prev and wg.
 	mu   sync.Mutex
 	prev chan struct{}
 	done bool

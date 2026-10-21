@@ -801,6 +801,7 @@ type CommissioningWindowOpener struct {
 	vendorID      uint16
 	productID     uint16
 
+	// mu guards ephemeral.
 	mu        sync.Mutex
 	ephemeral EphemeralProvider
 }

@@ -301,6 +301,7 @@ type stateful[S any] struct {
 	// value.
 	clone func(S) S
 
+	// mu guards clone, srv, state and values.
 	mu    sync.Mutex
 	state S
 }
@@ -370,6 +371,7 @@ type dataVersion = *cluster.DataVersionTracker
 // events stamps the endpoint a server's events are addressed to; the
 // bridge calls SetEndpoint when it mounts the server.
 type events struct {
+	// epMu guards ep.
 	epMu sync.Mutex
 	ep   uint16
 }

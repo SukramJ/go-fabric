@@ -31,10 +31,10 @@ var (
 	// but no [PaseHandler] is wired. The bridge still drops the
 	// datagram with a debug log so PASE traffic during pre-commissioner
 	// boot does not flood the warn channel.
-	ErrPaseHandlerMissing = errors.New("securechannel: PASE handler not wired")
+	ErrPaseHandlerMissing = errors.New("bridge: PASE handler not wired")
 	// ErrCaseHandlerMissing is returned when a CASE (Sigma) opcode
 	// arrives but no [CaseHandler] is wired.
-	ErrCaseHandlerMissing = errors.New("securechannel: CASE handler not wired")
+	ErrCaseHandlerMissing = errors.New("bridge: CASE handler not wired")
 )
 
 // PaseHandler is the inbound PASE port — the Spake2+ verifier the

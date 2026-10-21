@@ -45,7 +45,7 @@ func (s *Store) LoadDiagnostics(ctx context.Context) (DiagnosticsRecord, error) 
 		updatedAt   int64
 	)
 	if err := row.Scan(&rebootCount, &baseHours, &updatedAt); err != nil {
-		return DiagnosticsRecord{}, fmt.Errorf("matter store: load diagnostics: %w", err)
+		return DiagnosticsRecord{}, fmt.Errorf("store: load diagnostics: %w", err)
 	}
 	return DiagnosticsRecord{
 		RebootCount:          rebootCount,
@@ -66,7 +66,7 @@ func (s *Store) SaveDiagnostics(ctx context.Context, rec DiagnosticsRecord) erro
 		 WHERE id = 1`,
 		rec.RebootCount, rec.BaseOperationalHours, clock.System{}.Now().Unix())
 	if err != nil {
-		return fmt.Errorf("matter store: save diagnostics: %w", err)
+		return fmt.Errorf("store: save diagnostics: %w", err)
 	}
 	return nil
 }

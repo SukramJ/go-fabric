@@ -34,6 +34,7 @@ package thermo
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -77,13 +78,13 @@ const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | Thermosta
 	ThermostatFeatureOCC | ThermostatFeaturePRES
 
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
-var ErrFeatures = errors.New("thermostat: feature selection not served")
+var ErrFeatures = errors.New("thermo: feature selection not served")
 
 // ErrSetpoints reports a ThermostatConfig whose setpoint limits and
 // initial setpoints violate the setpoint rules in a way [New] cannot
 // repair — an absolute minimum above its maximum, or an AUTO deadband the
 // absolute limits leave no room for.
-var ErrSetpoints = errors.New("thermostat: setpoint configuration cannot be fixed")
+var ErrSetpoints = errors.New("thermo: setpoint configuration cannot be fixed")
 
 // Thermostat attribute IDs.
 const (
@@ -180,6 +181,8 @@ type ThermostatConfig struct {
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
 	Sink Sink
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // Sink is the optional host port: told about every SystemMode and
@@ -269,6 +272,8 @@ func DefaultThermostatConfig() ThermostatConfig {
 // HEAT-only attributes are suppressed without HEAT; LocalTemperatureCalibration
 // is only served when LTNE is not set.
 type ThermostatServer struct {
+	// log is the server's logger ([ThermostatConfig.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// op serialises the controller's changes (writes, commands): the
 	// queue, held across the Sink, never taken by the inbound setters. mu
 	// guards the values; the setters take only mu, and it is not held
@@ -358,6 +363,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 
 	s := &ThermostatServer{
+		log:                 cmp.Or(cfg.Logger, slog.Default()),
 		features:            features,
 		inst:                inst,
 		sink:                cfg.Sink,
@@ -411,7 +417,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 	if violation != "" {
 		s.commitSetpoints(st)
-		slog.Default().Warn("matter.thermostat.initial_setpoints_adjusted",
+		s.logger().Warn("matter.thermostat.initial_setpoints_adjusted",
 			slog.String("violation", violation),
 			slog.String("adjusted", adjustedText(adjusted)))
 	}
@@ -456,7 +462,7 @@ func (s *ThermostatServer) initOccupancy(occupied *bool) {
 		return
 	}
 	if occupied == nil {
-		slog.Default().Warn("matter.thermostat.occupancy_unset",
+		s.logger().Warn("matter.thermostat.occupancy_unset",
 			slog.String("reason", "no local OccupancySensing cluster available and externallyMeasuredOccupancy state not set"))
 		return
 	}
@@ -515,7 +521,7 @@ func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 // logged and the stored mode kept.
 func (s *ThermostatServer) SetSystemMode(mode uint8) {
 	if _, err := s.inst.ValidateWrite(thermoAttrSystemMode, mode, nil); err != nil {
-		slog.Default().Warn("matter.thermostat.inbound_system_mode_ignored",
+		s.logger().Warn("matter.thermostat.inbound_system_mode_ignored",
 			slog.Int("system_mode", int(mode)), slog.String("reason", err.Error()))
 		return
 	}
@@ -548,7 +554,7 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 		key, feature, name = spOccupiedHeating, ThermostatFeatureHEAT, "occupied_heating_setpoint"
 	}
 	if s.features&feature == 0 {
-		slog.Default().Warn("matter.thermostat.inbound_setpoint_ignored",
+		s.logger().Warn("matter.thermostat.inbound_setpoint_ignored",
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.String("reason", "feature not served"))
 		return
 	}
@@ -568,12 +574,12 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 	}
 	s.mu.Unlock()
 	if err != nil {
-		slog.Default().Warn("matter.thermostat.inbound_setpoint_ignored",
+		s.logger().Warn("matter.thermostat.inbound_setpoint_ignored",
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.String("reason", err.Error()))
 		return
 	}
 	if n != int(v) {
-		slog.Default().Warn("matter.thermostat.inbound_setpoint_clamped",
+		s.logger().Warn("matter.thermostat.inbound_setpoint_clamped",
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.Int("stored", n),
 			slog.Int("min", lo), slog.Int("max", hi))
 	}
@@ -592,7 +598,7 @@ func sinkError(what string, err error) error {
 	if errors.As(err, &sc) {
 		return err
 	}
-	return spec.Errorf(im.StatusFailure, "thermostat: %s refused: %v", what, err)
+	return spec.Errorf(im.StatusFailure, "thermo: %s refused: %v", what, err)
 }
 
 // MatterRead implements [contract.ClusterServer]. An attribute the
@@ -904,7 +910,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		// The written value passed the same limits before the Sink ran, so
 		// the reconcile fits it on any setpoint the setters can store;
 		// should it not, the state the Sink consented to is stored.
-		slog.Default().Warn("matter.thermostat.sink_reconcile_failed",
+		s.logger().Warn("matter.thermostat.sink_reconcile_failed",
 			slog.Uint64("attribute", uint64(attrID)), slog.Int("value", primary), slog.String("reason", err.Error()))
 		next = st
 	}
@@ -914,7 +920,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		for _, c := range moved {
 			attrs = append(attrs, slog.Int(fmt.Sprintf("0x%04X", c.AttrID), int(c.Value)))
 		}
-		slog.Default().Warn("matter.thermostat.sink_companions_moved", attrs...)
+		s.logger().Warn("matter.thermostat.sink_companions_moved", attrs...)
 	}
 	coupled := withoutAttr(s.commitSetpoints(next), attrID)
 	s.mu.Unlock()
@@ -988,7 +994,7 @@ func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, field
 		defer s.op.Unlock()
 		return s.handleAtomicRequest(ctx, fields)
 	default:
-		return nil, im.UnsupportedCommandf("thermostat: command 0x%02X not supported", cmdID)
+		return nil, im.UnsupportedCommandf("thermo: command 0x%02X not supported", cmdID)
 	}
 }
 
@@ -1029,11 +1035,11 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	switch mode {
 	case uint8(tdef.SetpointRaiseLowerModeHeat):
 		if s.features&ThermostatFeatureHEAT == 0 {
-			return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower mode=Heat requires HEAT feature"}
+			return thermoInvalidCommandErr{"thermo: SetpointRaiseLower mode=Heat requires HEAT feature"}
 		}
 	case wire.ThermostatSetpointModeCool:
 		if s.features&ThermostatFeatureCOOL == 0 {
-			return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower mode=Cool requires COOL feature"}
+			return thermoInvalidCommandErr{"thermo: SetpointRaiseLower mode=Cool requires COOL feature"}
 		}
 	}
 
@@ -1118,7 +1124,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 		if auto && int(occupCool)-int(occupHeat) < deadband {
 			companion := int(occupHeat) + deadband
 			if companion < int(minCool) || companion > int(maxCool) {
-				return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower could not adjust the cooling setpoint to maintain the deadband"}
+				return thermoInvalidCommandErr{"thermo: SetpointRaiseLower could not adjust the cooling setpoint to maintain the deadband"}
 			}
 			occupCool = int16(companion) //nolint:gosec // within [minCool, maxCool], checked above
 		}
@@ -1129,12 +1135,12 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 		if auto && int(occupCool)-int(occupHeat) < deadband {
 			companion := int(occupCool) - deadband
 			if companion < int(minHeat) || companion > int(maxHeat) {
-				return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower could not adjust the heating setpoint to maintain the deadband"}
+				return thermoInvalidCommandErr{"thermo: SetpointRaiseLower could not adjust the heating setpoint to maintain the deadband"}
 			}
 			occupHeat = int16(companion) //nolint:gosec // within [minHeat, maxHeat], checked above
 		}
 	default:
-		return thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower unsupported mode %d", mode)}
+		return thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower unsupported mode %d", mode)}
 	}
 	return s.applyRaiseLower(ctx, unoccupied, prevHeat, prevCool, occupHeat, occupCool)
 }
@@ -1244,7 +1250,7 @@ func (s *ThermostatServer) occupiedLocked() bool {
 // occupied or the unoccupied pair. Without OCC it is logged and ignored.
 func (s *ThermostatServer) SetOccupied(occupied bool) {
 	if s.features&ThermostatFeatureOCC == 0 {
-		slog.Default().Warn("matter.thermostat.inbound_occupancy_ignored", slog.String("reason", "feature not served"))
+		s.logger().Warn("matter.thermostat.inbound_occupancy_ignored", slog.String("reason", "feature not served"))
 		return
 	}
 	s.mu.Lock()
@@ -1265,10 +1271,10 @@ func (s *ThermostatServer) SetOccupied(occupied bool) {
 func (s *ThermostatServer) SetAbsoluteSetpointLimit(attrID uint32, v int16) error {
 	heat := attrID == thermoAttrAbsMinHeatSetpointLimit || attrID == thermoAttrAbsMaxHeatSetpointLimit
 	if !heat && attrID != thermoAttrAbsMinCoolSetpointLimit && attrID != thermoAttrAbsMaxCoolSetpointLimit {
-		return fmt.Errorf("thermostat: 0x%04X is not an absolute setpoint limit", attrID)
+		return fmt.Errorf("thermo: 0x%04X is not an absolute setpoint limit", attrID)
 	}
 	if !s.inst.Serves(attrID) {
-		return spec.Errorf(im.StatusUnsupportedAttribute, "thermostat: attribute 0x%04X is not served", attrID)
+		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: attribute 0x%04X is not served", attrID)
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
@@ -1330,62 +1336,62 @@ func setpointRaiseLowerRequest(fields any) (wire.SetpointRaiseLowerRequest, erro
 		return wire.SetpointRaiseLowerRequest{Mode: uint8(v.Mode), Amount: v.Amount}, nil
 	case *tdef.SetpointRaiseLowerRequest:
 		if v == nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermo: SetpointRaiseLower carried no fields"}
 		}
 		return setpointRaiseLowerRequest(*v)
 	case wire.SetpointRaiseLowerRequest:
 		return v, nil
 	case *wire.SetpointRaiseLowerRequest:
 		if v == nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermo: SetpointRaiseLower carried no fields"}
 		}
 		return *v, nil
 	case []byte:
 		req, err := wire.DecodeSetpointRaiseLower(v)
 		if err != nil {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower: %v", err)}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower: %v", err)}
 		}
 		return req, nil
 	case map[uint8]any:
 		rawMode, ok := v[setpointRaiseLowerFieldMode]
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermo: SetpointRaiseLower is missing the mandatory Mode field"}
 		}
 		mode, ok := cluster.AsUint8(rawMode)
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Mode is %T, want an enum8", rawMode)}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower Mode is %T, want an enum8", rawMode)}
 		}
 		rawAmount, ok := v[setpointRaiseLowerFieldAmount]
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Amount field"}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermo: SetpointRaiseLower is missing the mandatory Amount field"}
 		}
 		amount, ok := cluster.AsInt16(rawAmount)
 		if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Amount %v (%T) is not an int8", rawAmount, rawAmount)}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower Amount %v (%T) is not an int8", rawAmount, rawAmount)}
 		}
 		return wire.SetpointRaiseLowerRequest{Mode: mode, Amount: int8(amount)}, nil
 	case map[string]any:
 		var req wire.SetpointRaiseLowerRequest
 		rawMode, has := v["mode"]
 		if !has {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermo: SetpointRaiseLower is missing the mandatory Mode field"}
 		}
 		mode, ok := cluster.AsUint8(rawMode)
 		if !ok {
-			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower mode is %T, want an enum8", rawMode)}
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower mode is %T, want an enum8", rawMode)}
 		}
 		req.Mode = mode
 		if rawAmount, has := v["amount"]; has {
 			amount, ok := cluster.AsInt16(rawAmount)
 			if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
-				return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower amount %v (%T) is not an int8", rawAmount, rawAmount)}
+				return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower amount %v (%T) is not an int8", rawAmount, rawAmount)}
 			}
 			req.Amount = int8(amount)
 		}
 		return req, nil
 	default:
 		return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{
-			fmt.Sprintf("thermostat: SetpointRaiseLower expected wire.SetpointRaiseLowerRequest, map[uint8]any or []byte, got %T", fields),
+			fmt.Sprintf("thermo: SetpointRaiseLower expected wire.SetpointRaiseLowerRequest, map[uint8]any or []byte, got %T", fields),
 		}
 	}
 }
@@ -1472,3 +1478,12 @@ var (
 	_ im.StatusCodeError              = thermoConstraintErr{}
 	_ im.StatusCodeError              = thermoInvalidCommandErr{}
 )
+
+// logger is the ThermostatServer's logger; a value built without its constructor
+// logs through slog.Default().
+func (s *ThermostatServer) logger() *slog.Logger {
+	if s.log != nil {
+		return s.log
+	}
+	return slog.Default()
+}

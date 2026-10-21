@@ -22,9 +22,9 @@ import (
 // fills Commissioner with controller/commissioner.
 type CommissionerControlConfig struct {
 	// Approver approves requests. Required.
-	Approver mattercore.CommissioningApprover
+	Approver CommissioningApprover
 	// Commissioner commissions an approved client's node. Required.
-	Commissioner mattercore.ReverseCommissioner
+	Commissioner ReverseCommissioner
 	// SupportedDeviceCategories is the attribute; a fabric-synchronising
 	// bridge states FabricSynchronization.
 	SupportedDeviceCategories commctrldef.SupportedDeviceCategoryBitmap

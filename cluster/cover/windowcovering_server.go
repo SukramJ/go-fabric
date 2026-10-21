@@ -26,6 +26,7 @@
 package cover
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -67,17 +68,17 @@ const ServedLiftTiltFeatureMap = ServedFeatureMap | ServedTiltFeatureMap
 
 // ErrFeatureMap reports a Config.FeatureMap other than [ServedFeatureMap],
 // [ServedTiltFeatureMap] or [ServedLiftTiltFeatureMap].
-var ErrFeatureMap = errors.New("windowcovering: FeatureMap names features this server does not serve")
+var ErrFeatureMap = errors.New("cover: FeatureMap names features this server does not serve")
 
 // ErrMoverWithMoveStep reports a [Config] that sets both a Mover and a
 // MoveStep: the device moves, the server does not simulate it.
-var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.MoveStep exclude each other")
+var ErrMoverWithMoveStep = errors.New("cover: Config.Mover and Config.MoveStep exclude each other")
 
 // ErrEnumValue reports a Config.Type or Config.EndProductType the
 // FeatureMap's conformance disallows: a shutter (Shutter, SwingingShutter:
 // "LF & !TL | !LF & TL") that lifts and tilts, a roller shade ("LF & !TL")
 // on a covering that tilts too.
-var ErrEnumValue = errors.New("windowcovering: Type or EndProductType not allowed under the FeatureMap")
+var ErrEnumValue = errors.New("cover: Type or EndProductType not allowed under the FeatureMap")
 
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
@@ -166,6 +167,8 @@ type Config struct {
 	// Clock paces a travelling movement's steps (MoveStep); nil is
 	// [clock.System].
 	Clock clock.Clock
+	// Logger receives the server's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // moveSteps is the number of steps a travelling movement takes
@@ -181,6 +184,8 @@ const moveSteps = 6
 // cluster without a device behind it. With a Mover the commands reach the
 // device.
 type WindowCoveringServer struct {
+	// log is the server's logger ([Config.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// op serialises the commands while a Mover runs, so a command
 	// restoring its target never races another; mu guards the values and
 	// is not held while the Mover runs.
@@ -317,6 +322,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		}
 	}
 	s := &WindowCoveringServer{
+		log:            cmp.Or(cfg.Logger, slog.Default()),
 		inst:           inst,
 		features:       features,
 		wcType:         cfg.Type,
@@ -472,7 +478,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
-			return windowCoveringConstraintErr{fmt.Sprintf("windowcovering: Mode %v exceeds constraint max 15: %v", value, err)}
+			return windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
 		}
 		return err
 	}
@@ -483,7 +489,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 		mode &^= calibration
 	}
 	if mode&calibration != 0 {
-		return windowCoveringConstraintErr{"windowcovering: Mode CalibrationMode: calibration not supported"}
+		return windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -499,7 +505,7 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 // maintenanceErr answers a movement command in MaintenanceMode.
 type maintenanceErr struct{}
 
-func (maintenanceErr) Error() string                   { return "windowcovering: device is in maintenance mode" }
+func (maintenanceErr) Error() string                   { return "cover: device is in maintenance mode" }
 func (maintenanceErr) MatterStatusCode() im.StatusCode { return im.StatusBusy }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
@@ -542,7 +548,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		return command{stop: true}, nil
 	case wire.WindowCoveringCmdGoToLiftPercentage:
 		if s.lift == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "windowcovering: GoToLiftPercentage without the Lift feature")
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToLiftPercentage")
 		if err != nil {
@@ -551,7 +557,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		return command{lift: &pct}, nil
 	case wire.WindowCoveringCmdGoToTiltPercentage:
 		if s.tilt == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "windowcovering: GoToTiltPercentage without the Tilt feature")
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
 		}
 		pct, err := extractPercent100ths(fields, "GoToTiltPercentage")
 		if err != nil {
@@ -559,7 +565,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		}
 		return command{tilt: &pct}, nil
 	default:
-		return command{}, fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
+		return command{}, fmt.Errorf("cover: unknown command 0x%02X", cmdID)
 	}
 }
 
@@ -663,7 +669,7 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 	if errors.As(err, &sc) {
 		return err
 	}
-	return spec.Errorf(im.StatusFailure, "windowcovering: command 0x%02X refused: %v", cmdID, err)
+	return spec.Errorf(im.StatusFailure, "cover: command 0x%02X refused: %v", cmdID, err)
 }
 
 // SetCurrentPosition records the positions the device reports: lift is
@@ -718,7 +724,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 		}
 		v := *in.v
 		if v > 10000 {
-			slog.Default().Warn(clampMsg, slog.Int("value", int(v)), slog.Int("stored", 10000))
+			s.logger().Warn(clampMsg, slog.Int("value", int(v)), slog.Int("stored", 10000))
 			v = 10000
 		}
 		if changed, attrs := store(in.a, v); changed {
@@ -738,7 +744,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 	if status > 63 {
-		slog.Default().Warn("matter.windowcovering.inbound_operational_status_masked",
+		s.logger().Warn("matter.windowcovering.inbound_operational_status_masked",
 			slog.Int("value", int(status)), slog.Int("stored", int(status&63)))
 		status &= 63
 	}
@@ -865,56 +871,65 @@ func extractPercent100ths(fields any, cmd string) (uint16, error) {
 		pct = v.LiftPercent100thsValue
 	case *wcdef.GoToLiftPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
 	case wire.GoToLiftPercentageRequest:
 		pct = v.LiftPercent100thsValue
 	case *wire.GoToLiftPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.LiftPercent100thsValue
 	case wcdef.GoToTiltPercentageRequest:
 		pct = v.TiltPercent100thsValue
 	case *wcdef.GoToTiltPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
 	case wire.GoToTiltPercentageRequest:
 		pct = v.TiltPercent100thsValue
 	case *wire.GoToTiltPercentageRequest:
 		if v == nil {
-			return 0, fmt.Errorf("windowcovering: %s carried no fields", cmd)
+			return 0, fmt.Errorf("cover: %s carried no fields", cmd)
 		}
 		pct = v.TiltPercent100thsValue
 	case map[uint8]any:
 		raw, ok := v[goToPercentageFieldValue]
 		if !ok {
-			return 0, fmt.Errorf("windowcovering: %s missing Percent100thsValue (field 0)", cmd)
+			return 0, fmt.Errorf("cover: %s missing Percent100thsValue (field 0)", cmd)
 		}
 		n, isUint := raw.(uint64)
 		if !isUint || n > math.MaxUint16 {
-			return 0, fmt.Errorf("windowcovering: %s Percent100thsValue %v (%T) is not a uint16", cmd, raw, raw)
+			return 0, fmt.Errorf("cover: %s Percent100thsValue %v (%T) is not a uint16", cmd, raw, raw)
 		}
 		pct = uint16(n)
 	case map[string]any:
 		raw, ok := v["percent"]
 		if !ok {
-			return 0, fmt.Errorf("windowcovering: %s missing percent field", cmd)
+			return 0, fmt.Errorf("cover: %s missing percent field", cmd)
 		}
 		var castOK bool
 		pct, castOK = raw.(uint16)
 		if !castOK {
-			return 0, fmt.Errorf("windowcovering: %s percent expected uint16, got %T", cmd, raw)
+			return 0, fmt.Errorf("cover: %s percent expected uint16, got %T", cmd, raw)
 		}
 	default:
-		return 0, fmt.Errorf("windowcovering: %s expected map[uint8]any, a GoTo…PercentageRequest, uint16 or map[string]any, got %T", cmd, fields)
+		return 0, fmt.Errorf("cover: %s expected map[uint8]any, a GoTo…PercentageRequest, uint16 or map[string]any, got %T", cmd, fields)
 	}
 	// Constraint max 10000 per matter.js window-covering-cluster.element.ts:72, :76.
 	if pct > 10000 {
-		return 0, windowCoveringConstraintErr{fmt.Sprintf("windowcovering: %s value %d exceeds constraint max 10000", cmd, pct)}
+		return 0, windowCoveringConstraintErr{fmt.Sprintf("cover: %s value %d exceeds constraint max 10000", cmd, pct)}
 	}
 	return pct, nil
+}
+
+// logger is the WindowCoveringServer's logger; a value built without its constructor
+// logs through slog.Default().
+func (s *WindowCoveringServer) logger() *slog.Logger {
+	if s.log != nil {
+		return s.log
+	}
+	return slog.Default()
 }

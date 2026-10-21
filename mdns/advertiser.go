@@ -41,6 +41,7 @@ type Advertiser interface {
 // memory. Used by tests and by the daemon during the boot phase
 // before the network stack is up.
 type Noop struct {
+	// mu guards items.
 	mu    sync.RWMutex
 	items map[string]Service
 }

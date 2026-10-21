@@ -44,6 +44,7 @@ type healthProbe struct {
 	onSample func(HealthSample)
 	stop     func()
 
+	// mu guards last and seen.
 	mu   sync.Mutex
 	last HealthSample
 	seen bool
