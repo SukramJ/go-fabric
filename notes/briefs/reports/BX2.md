@@ -187,6 +187,17 @@ Not measured: the packages' race runtime on `main` at the same load, so
 whether BX2's waits lengthened them is open (they waited before for
 nothing; `Stop` now waits for what it started).
 
+### After the review (2026-10-21)
+
+| guard | HEAD | exit | note |
+| --- | --- | --- | --- |
+| `make ci` | bdacb9bc | 0 | build, vet, archcheck, test, lint (within its 5-minute timeout this time), cover-check, bluez-check; load 6–15 |
+| `go test -race -count=1 -timeout=45m ./bridge/... ./node/... ./transport/udp/... ./cluster/lock/... ./cluster/core/...` | bdacb9bc | 0 | 813 s, no `DATA RACE` |
+| `make reachability` | bdacb9bc | 0 | two new test entry points; committed in 43dd9372 |
+| `make reachability-check` | 43dd9372 | 0 | unreached 5 |
+| `make cite-check` (MATTERJS_DIR set) | 43dd9372 | 0 | two drift lines moved, committed in 43dd9372; count unchanged |
+| `make testparity-check` | bdacb9bc | 0 | |
+
 ## Differences to the brief
 
 1. **The restart flake had no second socket.** The brief's two
