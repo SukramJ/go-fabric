@@ -235,7 +235,7 @@ ICDM / ICDB families are green or classified.
 | Phase | Content | Proof |
 | --- | --- | --- |
 | 26 | the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; `WebRtcTransportRequestor` with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …); Thread network diagnostics | `chipdm-check` green; every snapshot device type in a devicegen list |
-| 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty; the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree |
+| 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty; the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree; one spot-check run of the CSA Test Harness (`project-chip/certification-tool`) against the reference daemon, report under `notes/` (owner, 2026-10-21; the harness stays outside the guards, see `docs/certifiability.md`) |
 
 Excluded by decision, restated so they are not re-opened by accident:
 **Joint Fabric** (two stub clusters and no behaviour at the pin; deferred
