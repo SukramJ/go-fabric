@@ -43,7 +43,7 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 		t.Errorf("servers %#04x after a replacing WithServer", got)
 	}
 	for name, with := range map[string][]Option{
-		"opt-in":      {withServer(fixed), WithOptional(0x0040)},
+		"opt-in":      {withServer(fixed), withOptional(0x0040)},
 		"initial":     {withServer(fixed), withInitial(0x0040, map[uint32]any{0: true})},
 		"no server":   {WithOptional(0x0040)},
 		"assembler's": {withServer(&hostServer{id: 0x0039})},
@@ -121,5 +121,20 @@ func TestWithChangeNotifier(t *testing.T) {
 	}
 	if _, ok := alarm.Spec().Parts[0].Source.(contract.ChangeNotifier); ok {
 		t.Error("the part took the owner's notifier")
+	}
+}
+
+// TestWithOptionalTakesOnlyAClusterWithoutAPackage: WithOptional refuses a
+// cluster with a generated package and names its declaration; a cluster
+// without one (ThreadNetworkDiagnostics, optional on RootNode) passes the
+// declaration.
+func TestWithOptionalTakesOnlyAClusterWithoutAPackage(t *testing.T) {
+	t.Parallel()
+	err := newSettings().declare(WithOptional(0x0006))
+	if err == nil || !strings.Contains(err.Error(), "onoffdef.Declare{}") {
+		t.Errorf("WithOptional(OnOff): %v, want a refusal naming onoffdef.Declare{}", err)
+	}
+	if err := newSettings().declare(WithOptional(0x0035)); err != nil {
+		t.Errorf("WithOptional(0x0035): %v", err)
 	}
 }

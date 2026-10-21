@@ -126,7 +126,7 @@ func TestOptionsRefused(t *testing.T) {
 		"no key":           {&OnOffLightType, Options{}, nil, "needs a StableKey"},
 		"nil server":       {&OnOffLightType, opts, []Option{WithServer(nil)}, "WithServer(nil)"},
 		"declared cluster": {&OnOffLightType, opts, []Option{WithServer(&hostServer{id: 6})}, "declare it, onoffdef.Declare{HostServer"},
-		"foreign cluster":  {&OnOffLightType, opts, []Option{WithOptional(0x0201)}, "no server cluster requirement for cluster 0x0201"},
+		"foreign cluster":  {&OnOffLightType, opts, []Option{withOptional(0x0201)}, "no server cluster requirement for cluster 0x0201"},
 		"assembler's":      {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 0x0003})}, "mounts Identify (0x0003) itself"},
 		"features of host": {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withFeatures(6, 1)}, "Features for cluster 0x0006"},
 		"initial of host":  {&OnOffLightType, opts, []Option{withServer(&hostServer{id: 6}), withInitial(6, nil)}, "Initial for cluster 0x0006"},
@@ -157,7 +157,7 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 	if d.LevelControl() != nil {
 		t.Fatal("LevelControl mounted by default")
 	}
-	d, err = NewOnOffLight(testOptions("l"), WithOptional(levelcontroldef.ClusterID),
+	d, err = NewOnOffLight(testOptions("l"), levelcontroldef.Declare{},
 		withInitial(levelcontroldef.ClusterID, map[uint32]any{levelcontroldef.AttrCurrentLevel: uint8(42)}))
 	if err != nil {
 		t.Fatal(err)

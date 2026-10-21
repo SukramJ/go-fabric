@@ -142,7 +142,8 @@ The device's other options:
 
 | Option | Effect |
 | --- | --- |
-| `WithOptional(id)` | mounts an optional cluster (Groups and ScenesManagement are then the assembler's); `<cluster>def.Declare{}` does the same |
+| `<cluster>def.Declare{}` | mounts an optional cluster of the device type (Groups and ScenesManagement are then the assembler's) |
+| `WithOptional(id)` | mounts an optional cluster without a generated package, beside `WithServer`; refuses a cluster with one |
 | `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one) |
 | `WithMeasurement(src)` | a sensor's measurement clusters from your live reading |
 | `WithChangeNotifier(n)` | tells the bridge your model changed state its servers read |

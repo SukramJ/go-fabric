@@ -49,7 +49,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x0008, func() (*Device, error) { return New(&DimmableLightType, testOptions("lvl")) }, (*levelcontrol.Server)(nil)},
 		{0x0300, func() (*Device, error) { return New(&ColorTemperatureLightType, testOptions("cc")) }, (*light.ColorControlServer)(nil)},
 		{0x001E, func() (*Device, error) { return New(&OnOffLightSwitchType, testOptions("bind")) }, (*core.Binding)(nil)},
-		{0x0750, func() (*Device, error) { return New(&BridgedNodeType, testOptions("eco"), WithOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
+		{0x0750, func() (*Device, error) { return New(&BridgedNodeType, testOptions("eco"), withOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
 		{0x003B, func() (*Device, error) {
 			return New(&GenericSwitchType, testOptions("sw"), withFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
 		}, (*switchserver.Server)(nil)},
@@ -63,7 +63,7 @@ func TestSelfHeldDefaults(t *testing.T) {
 			return New(&ThermostatType, testOptions("th"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT))
 		}, (*thermo.ThermostatServer)(nil)},
 		{0x0053, func() (*Device, error) {
-			return New(&LaundryWasherType, testOptions("lw"), WithOptional(0x0053), withFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
+			return New(&LaundryWasherType, testOptions("lw"), withOptional(0x0053), withFeatures(0x0053, uint32(lwcdef.FeatureSpin)))
 		}, (*appliance.WasherServer)(nil)},
 		{0x0057, optIn(&RefrigeratorType, 0x0057), (*alarmbase.Server)(nil)},
 		{0x005D, optIn(&DishwasherType, 0x005D), (*alarmbase.Server)(nil)},
@@ -74,10 +74,10 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x0099, func() (*Device, error) { return New(&EnergyEvseType, testOptions("evse")) }, (*energy.EvseServer)(nil)},
 		{0x00A0, optIn(&ElectricalEnergyTariffType, 0x00A0), (*energy.GridConditionsServer)(nil)},
 		{0x0204, func() (*Device, error) {
-			return New(&ThermostatType, testOptions("tui"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), WithOptional(0x0204))
+			return New(&ThermostatType, testOptions("tui"), withFeatures(0x0201, thermo.ThermostatFeatureHEAT), withOptional(0x0204))
 		}, (*thermo.ThermostatUIServer)(nil)},
 		{0x0B07, func() (*Device, error) {
-			return New(&ElectricalMeterType, testOptions("meter"), WithOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
+			return New(&ElectricalMeterType, testOptions("meter"), withOptional(0x0B07), withFeatures(0x0090, uint32(epmdef.FeatureAlternatingCurrent)),
 				withFeatures(0x0091, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)))
 		}, (*energy.CommodityMeteringServer)(nil)},
 	}
@@ -182,5 +182,5 @@ func levelcontrolMoveWithOnOff(level uint8) levelcontroldef.MoveToLevelWithOnOff
 
 // optIn builds a device of type t with the optional cluster id opted in.
 func optIn(t *Type, id uint32) func() (*Device, error) {
-	return func() (*Device, error) { return New(t, testOptions("opt"), WithOptional(id)) }
+	return func() (*Device, error) { return New(t, testOptions("opt"), withOptional(id)) }
 }
