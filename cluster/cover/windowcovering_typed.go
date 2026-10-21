@@ -97,7 +97,7 @@ func (s *WindowCoveringServer) SetAttributes(values map[uint32]any) error {
 	s.mu.Unlock()
 	if len(report) > 0 {
 		slices.Sort(report)
-		s.changes.Notify(report...)
+		s.changes.NotifyFrom(contract.OriginHostSet, report...)
 	}
 	return nil
 }

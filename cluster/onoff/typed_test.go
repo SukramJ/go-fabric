@@ -41,7 +41,10 @@ func TestTypedOnOffServer(t *testing.T) {
 	ctx := context.Background()
 
 	var changed [][]uint32
-	defer s.OnChanged(func(_ onoffdef.State, ids []uint32) { changed = append(changed, ids) })()
+	defer s.OnChanged(func(_ onoffdef.State, change contract.Change) {
+		ids := change.Attributes
+		changed = append(changed, ids)
+	})()
 	on := true
 	if err := s.Set(onoffdef.Patch{OnOff: &on, OnTime: new(uint16(5))}); err != nil {
 		t.Fatal(err)

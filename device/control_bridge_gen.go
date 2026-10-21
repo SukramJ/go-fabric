@@ -73,9 +73,10 @@ var ControlBridgeType = Type{
 type ControlBridge struct{ *Device }
 
 // NewControlBridge returns a ControlBridge device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewControlBridge(opts Options, with ...Option) (*ControlBridge, error) {
-	d, err := New(&ControlBridgeType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ControlBridgeID (see [New]).
+func NewControlBridge(opts Options, decls ...Declaration) (*ControlBridge, error) {
+	d, err := FromSpec(Spec{Type: ControlBridgeID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +84,9 @@ func NewControlBridge(opts Options, with ...Option) (*ControlBridge, error) {
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *ControlBridge) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *ControlBridge) Binding() *bindingdef.Server {
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
+}

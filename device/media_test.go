@@ -136,8 +136,8 @@ func TestMediaDeviceTypesMountTheMediaServers(t *testing.T) {
 		opts := testOptions("casting")
 		opts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
 		d := built(NewCastingVideoPlayer(opts,
-			WithServer(s.playback), WithServer(s.keypad), WithServer(s.launcher),
-			WithServer(s.apps), WithServer(s.inputs), WithServer(s.outputs)))
+			withServer(s.playback), withServer(s.keypad), withServer(s.launcher),
+			withServer(s.apps), withServer(s.inputs), withServer(s.outputs)))
 		wantServers(t, d.Device, s.playback, s.keypad, s.launcher, s.apps, s.inputs, s.outputs)
 		if _, ok := d.Server(0x0006).(*onoff.Server); !ok {
 			t.Errorf("OnOff %T, want the default onoff.Server", d.Server(0x0006))
@@ -151,7 +151,7 @@ func TestMediaDeviceTypesMountTheMediaServers(t *testing.T) {
 		s := newMediaServers(t)
 		opts := testOptions("casting-bare")
 		opts.Conditions = []string{"ContentAppPlatform"}
-		d := built(NewCastingVideoPlayer(opts, WithServer(s.playback), WithServer(s.keypad), WithServer(s.launcher)))
+		d := built(NewCastingVideoPlayer(opts, withServer(s.playback), withServer(s.keypad), withServer(s.launcher)))
 		if v := violationsOf(assemble(t, d.Device)); len(v) == 0 {
 			t.Error("ContentAppPlatform without ApplicationLauncher: no violation")
 		}
@@ -161,7 +161,7 @@ func TestMediaDeviceTypesMountTheMediaServers(t *testing.T) {
 		s := newMediaServers(t)
 		opts := testOptions("basic")
 		opts.Conditions = []string{"PhysicalInputs"}
-		d := built(NewBasicVideoPlayer(opts, WithServer(s.playback), WithServer(s.keypad), WithServer(s.inputs)))
+		d := built(NewBasicVideoPlayer(opts, withServer(s.playback), withServer(s.keypad), withServer(s.inputs)))
 		wantServers(t, d.Device, s.playback, s.keypad, s.inputs)
 		if v := violationsOf(assemble(t, d.Device)); len(v) != 0 {
 			t.Errorf("violations %v", v)
@@ -178,7 +178,7 @@ func TestMediaDeviceTypesMountTheMediaServers(t *testing.T) {
 		}}))
 		opts := testOptions("app")
 		opts.Conditions = []string{"ObserverClient"}
-		d := built(NewContentApp(opts, WithServer(keypad), WithServer(apps), WithServer(basic), WithClientClusters(0x0510)))
+		d := built(NewContentApp(opts, withServer(keypad), withServer(apps), withServer(basic), WithClientClusters(0x0510)))
 		wantServers(t, d.Device, keypad, apps, basic)
 		if v := violationsOf(assemble(t, d.Device)); len(v) != 0 {
 			t.Errorf("violations %v", v)

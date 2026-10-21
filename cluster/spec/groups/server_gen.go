@@ -7,6 +7,7 @@ package groups
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -35,12 +36,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -51,11 +58,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -102,4 +119,110 @@ func (s *Server) HandleRemoveAllGroups(fn func(ctx context.Context, req RemoveAl
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleAddGroupIfIdentifying(fn func(ctx context.Context, req AddGroupIfIdentifyingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroupIfIdentifying, fn)
+}
+
+// Declare is the declaration of the Groups cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleAddGroup handles the AddGroup command in place of the server
+	// (Server.HandleAddGroup), inline; an optional command it handles is accepted.
+	HandleAddGroup func(ctx context.Context, req AddGroupRequest) (AddGroupResponse, error)
+	// HandleViewGroup handles the ViewGroup command in place of the server
+	// (Server.HandleViewGroup), inline; an optional command it handles is accepted.
+	HandleViewGroup func(ctx context.Context, req ViewGroupRequest) (ViewGroupResponse, error)
+	// HandleGetGroupMembership handles the GetGroupMembership command in place of the server
+	// (Server.HandleGetGroupMembership), inline; an optional command it handles is accepted.
+	HandleGetGroupMembership func(ctx context.Context, req GetGroupMembershipRequest) (GetGroupMembershipResponse, error)
+	// HandleRemoveGroup handles the RemoveGroup command in place of the server
+	// (Server.HandleRemoveGroup), inline; an optional command it handles is accepted.
+	HandleRemoveGroup func(ctx context.Context, req RemoveGroupRequest) (RemoveGroupResponse, error)
+	// HandleRemoveAllGroups handles the RemoveAllGroups command in place of the server
+	// (Server.HandleRemoveAllGroups), inline; an optional command it handles is accepted.
+	HandleRemoveAllGroups func(ctx context.Context, req RemoveAllGroupsRequest) (struct{}, error)
+	// HandleAddGroupIfIdentifying handles the AddGroupIfIdentifying command in place of the server
+	// (Server.HandleAddGroupIfIdentifying), inline; an optional command it handles is accepted.
+	HandleAddGroupIfIdentifying func(ctx context.Context, req AddGroupIfIdentifyingRequest) (struct{}, error)
+	// HostServer is the host's own server for the cluster, mounted in
+	// place of the kit's — also for a cluster the device type does not
+	// list. The hooks above go on it; Initial, Features and the ports are
+	// the kit's server's and are refused beside it.
+	HostServer contract.ClusterServer
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleAddGroup != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddGroup)
+		decl.Attach = d.attach
+	}
+	if d.HandleViewGroup != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdViewGroup)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetGroupMembership != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetGroupMembership)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveGroup != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveGroup)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveAllGroups != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveAllGroups)
+		decl.Attach = d.attach
+	}
+	if d.HandleAddGroupIfIdentifying != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddGroupIfIdentifying)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	var errs []error
+	if d.OnWrite != nil {
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
+	}
+	if d.HandleAddGroup != nil {
+		errs = append(errs, spec.HookError(Name, "HandleAddGroup", s.HandleAddGroup(d.HandleAddGroup)))
+	}
+	if d.HandleViewGroup != nil {
+		errs = append(errs, spec.HookError(Name, "HandleViewGroup", s.HandleViewGroup(d.HandleViewGroup)))
+	}
+	if d.HandleGetGroupMembership != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetGroupMembership", s.HandleGetGroupMembership(d.HandleGetGroupMembership)))
+	}
+	if d.HandleRemoveGroup != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRemoveGroup", s.HandleRemoveGroup(d.HandleRemoveGroup)))
+	}
+	if d.HandleRemoveAllGroups != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRemoveAllGroups", s.HandleRemoveAllGroups(d.HandleRemoveAllGroups)))
+	}
+	if d.HandleAddGroupIfIdentifying != nil {
+		errs = append(errs, spec.HookError(Name, "HandleAddGroupIfIdentifying", s.HandleAddGroupIfIdentifying(d.HandleAddGroupIfIdentifying)))
+	}
+	return errors.Join(errs...)
 }

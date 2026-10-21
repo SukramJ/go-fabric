@@ -38,6 +38,25 @@ repository. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed in v0.10.0: the declaration
+
+The device kit has one form for what a host states about a cluster, its
+declaration `<cluster>def.Declare` (the generated package
+`github.com/SukramJ/go-fabric/cluster/spec/<cluster>`, imported as
+`<cluster>def`); the per-cluster options it replaces are gone, not
+deprecated, while loom is the only consumer.
+
+| Removed | Route |
+| --- | --- |
+| `device.WithFeatures(id, f)` | `<cluster>def.Declare{Features: …}` — `wcdef.Declare{Features: wcdef.FeatureLift \| wcdef.FeaturePositionAwareLift}` |
+| `device.WithInitial(id, map[uint32]any{…})` | `<cluster>def.Declare{Initial: <cluster>def.Patch{…}}` — `onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}}` |
+| `device.WithElements(id, spec.Options{Attributes: …, Commands: …})` | an optional attribute is served by its value in `Initial`, an optional command by its `Handle<Command>` field |
+| `device.WithServer(srv)` (a cluster with a generated package) | `<cluster>def.Declare{HostServer: srv}`; `WithServer` stays for a cluster without one (a manufacturer-specific cluster) and refuses the others |
+| `device.Options.Clock` | none: a device takes `node.Config.Clock` when the Aggregator adds it |
+| `levelcontrol.LevelSource` over `cluster/wire` requests, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest` | `levelcontrol.LevelSource` is `levelcontroldef.LevelSource`, over the generated requests: `MoveToLevel(ctx, req levelcontroldef.MoveToLevelRequest) error`, `MoveToLevelWithOnOff(ctx, req levelcontroldef.MoveToLevelWithOnOffRequest) error`, …, `Options() levelcontroldef.OptionsBitmap`; a nullable field is `spec.Nullable` (`req.TransitionTime.Null`, `.Value`); declared as `levelcontroldef.Declare{LevelSource: …}` |
+| `fan.Stepper` over `wire.FanStepRequest` | `fan.Stepper` is `fancontroldef.Stepper`: `Step(ctx, req fancontroldef.StepRequest) error` |
+| `OnChanged(func(State, []uint32))`, `Device.OnChanged(id, func([]uint32))` | `OnChanged(func(State, contract.Change))`, `Device.OnChanged(id, func(contract.Change))` — `c.Attributes` are the ids, `c.Origin` tells a host `Set` from a controller's write and a command |
+
 ## What a migrating host meets
 
 1. **`Node.Fabrics` is deprecated.** It returns `[]store.FabricRecord`;

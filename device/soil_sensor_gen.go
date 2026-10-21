@@ -45,9 +45,10 @@ var SoilSensorType = Type{
 type SoilSensor struct{ *Device }
 
 // NewSoilSensor returns a SoilSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewSoilSensor(opts Options, with ...Option) (*SoilSensor, error) {
-	d, err := New(&SoilSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type SoilSensorID (see [New]).
+func NewSoilSensor(opts Options, decls ...Declaration) (*SoilSensor, error) {
+	d, err := FromSpec(Spec{Type: SoilSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +56,17 @@ func NewSoilSensor(opts Options, with ...Option) (*SoilSensor, error) {
 }
 
 // SoilMeasurement returns the typed SoilMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *SoilSensor) SoilMeasurement() *soilmeasurementdef.Server {
-	return soilmeasurementdef.Wrap(d.Server(0x0430))
+	return soilmeasurementdef.WrapOn(d.Server(0x0430), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *SoilSensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }

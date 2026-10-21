@@ -239,14 +239,20 @@ type AirflowDirectionSetter interface {
 // entirely. How a step maps onto the speed-oriented attributes "is
 // implementation specific" (resource :214-215); a host with its own
 // idea implements Stepper, and one without gets the server's default
-// (see [Server.MatterInvoke]).
-type Stepper interface {
-	Step(ctx context.Context, req clusterwire.FanStepRequest) error
-}
+// (see [Server.MatterInvoke]). It takes the generated request
+// (fancontroldef.StepRequest), what fancontroldef.Declare's Stepper is.
+type Stepper = fandef.Stepper
 
 // Config carries the construction parameters for [Server].
 type Config struct {
-	Source   StateSource
+	// Source is the host port; Port in the generated types replaces it.
+	Source StateSource
+	// Port is the host port in the generated types — the fan's State and
+	// a Patch for every setting, what fancontroldef.Declare carries; set,
+	// it wins over Source. Stepper, with Port, takes the Step command
+	// over.
+	Port     fandef.StateSource
+	Stepper  fandef.Stepper
 	Features Feature
 	// Sequence is FanModeSequence (fixed). It must be one of the three
 	// sequences with Auto when FeatureAuto is set and one of the three
@@ -311,6 +317,9 @@ var (
 // NewServer validates cfg against the cluster's conformance and
 // constraints and returns the server.
 func NewServer(cfg Config) (*Server, error) {
+	if cfg.Port != nil {
+		cfg.Source = sourceOf(cfg.Port, cfg.Stepper)
+	}
 	if cfg.Source == nil {
 		return nil, ErrNoSource
 	}
@@ -667,7 +676,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		return nil, err
 	}
 	if stepper, ok := s.src.(Stepper); ok {
-		if err := stepper.Step(ctx, req); err != nil {
+		if err := stepper.Step(ctx, stepRequestOf(req)); err != nil {
 			return nil, fmt.Errorf("fan: Step: %w", err)
 		}
 		s.tracker().Bump()

@@ -384,7 +384,7 @@ func (s *MicrowaveServer) setCookingParameters(ctx context.Context, fields any) 
 		return nil, hostError("SetCookingParameters", err)
 	}
 	// On success CookTime becomes the requested one (:312-315).
-	return nil, s.srv.SetAttributes(values)
+	return nil, s.srv.SetAttributesFrom(contract.OriginCommand, values)
 }
 
 // addMoreTime is chip's HandleAddMoreTime

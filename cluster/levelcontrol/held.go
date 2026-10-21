@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/wire"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
@@ -163,7 +165,7 @@ func (h *heldLevel) SetOnLevel(_ context.Context, level *uint8) error {
 
 // MoveToLevel implements [LevelSource]: under the engine, the level it
 // applies — the only command method a held server calls.
-func (h *heldLevel) MoveToLevel(_ context.Context, req MoveToLevelRequest) error {
+func (h *heldLevel) MoveToLevel(_ context.Context, req wire.MoveToLevelRequest) error {
 	h.setLevel(&req.Level)
 	return nil
 }
@@ -171,17 +173,17 @@ func (h *heldLevel) MoveToLevel(_ context.Context, req MoveToLevelRequest) error
 // The other seven command methods are never called: the engine runs the
 // commands and applies each level through MoveToLevel ([LevelSource]).
 
-func (h *heldLevel) MoveToLevelWithOnOff(ctx context.Context, req MoveToLevelRequest) error {
+func (h *heldLevel) MoveToLevelWithOnOff(ctx context.Context, req wire.MoveToLevelRequest) error {
 	return h.MoveToLevel(ctx, req)
 }
-func (*heldLevel) Move(context.Context, MoveRequest) error          { return nil }
-func (*heldLevel) MoveWithOnOff(context.Context, MoveRequest) error { return nil }
-func (*heldLevel) Step(context.Context, StepRequest) error          { return nil }
-func (*heldLevel) StepWithOnOff(context.Context, StepRequest) error { return nil }
-func (*heldLevel) Stop(context.Context, StopRequest) error          { return nil }
-func (*heldLevel) StopWithOnOff(context.Context, StopRequest) error { return nil }
+func (*heldLevel) Move(context.Context, wire.MoveRequest) error          { return nil }
+func (*heldLevel) MoveWithOnOff(context.Context, wire.MoveRequest) error { return nil }
+func (*heldLevel) Step(context.Context, wire.StepRequest) error          { return nil }
+func (*heldLevel) StepWithOnOff(context.Context, wire.StepRequest) error { return nil }
+func (*heldLevel) Stop(context.Context, wire.StopRequest) error          { return nil }
+func (*heldLevel) StopWithOnOff(context.Context, wire.StopRequest) error { return nil }
 
-var _ LevelSource = (*heldLevel)(nil)
+var _ source = (*heldLevel)(nil)
 
 // followOnOff is matter.js initializeOnOff (:253-255): a held server
 // reacts to the On/Off cluster's OnOff turning on with handleOnOffChange
@@ -205,7 +207,7 @@ func (s *Server) followOnOff(n contract.AttributeChangeNotifier) {
 		}
 		if onLevel, known := s.held.OnLevel(); known {
 			s.held.setLevel(&onLevel)
-			s.observeLevel()
+			s.observeLevel(contract.OriginCommand)
 		}
 	})
 }

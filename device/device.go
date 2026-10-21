@@ -6,15 +6,17 @@ package device
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
-
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/internal/deviceseam"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -24,7 +26,8 @@ var (
 	// not allow.
 	ErrConfiguration = errors.New("device: configuration refused")
 	// ErrNoDefaultServer: a cluster the device mounts that has no default
-	// server here; the host supplies one with [WithServer].
+	// server here; the host supplies one as the cluster's declared
+	// HostServer (<cluster>def.Declare).
 	ErrNoDefaultServer = errors.New("device: no default server")
 	// ErrComposition: a part the device type does not compose.
 	ErrComposition = errors.New("device: composition refused")
@@ -52,10 +55,17 @@ type Device struct {
 	// clients are the client clusters the host declared beyond the type's
 	// mandatory ones ([WithClientClusters]).
 	clients []uint32
+	// clock is the time source of the servers the device built; queue
+	// runs the device's asynchronous callbacks; reachable is what
+	// [Device.SetReachable] set.
+	clock     *deviceClock
+	queue     *queue
+	reachable atomic.Bool
 
-	// mu guards parts.
+	// mu guards parts, host and opts.Name / opts.NodeLabel (Rename).
 	mu    sync.Mutex
 	parts []*Device
+	host  deviceseam.Host
 }
 
 // Compile-time assertion.
@@ -87,21 +97,29 @@ var assemblerMounted = map[uint32]string{
 // and names the schema requirement. The rest of device-type conformance is
 // the assembler's ([endpoint.ValidateDeviceTypes], ADR 0016).
 //
+// The declarations name what the host states beyond the type: a cluster's
+// <cluster>def.Declare, or the kit's own options. Every hook a declaration
+// carries (OnWrite, Handle…) is installed on its cluster's server, the
+// kit's or the host's.
+//
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
 // packages/node/src/endpoint/Endpoint.ts:596-637).
-func New(t *Type, opts Options, with ...Option) (*Device, error) {
+func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
 	}
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
-	s := newSettings(with)
-	s.clock = opts.Clock
-	if s.nilSrv {
-		return nil, fmt.Errorf("%w: %s: WithServer(nil)", ErrConfiguration, t.Name)
+	s := newSettings()
+	for _, decl := range decls {
+		if err := s.declare(decl); err != nil {
+			return nil, fmt.Errorf("%s: %w", t.Name, err)
+		}
 	}
+	clk := &deviceClock{}
+	s.clock = clk
 	measured, err := measuredClusters(t, s)
 	if err != nil {
 		return nil, err
@@ -109,7 +127,11 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if err := checkOptedClusters(t, s, measured); err != nil {
 		return nil, err
 	}
-	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured, clients: slices.Clone(s.clients)}
+	d := &Device{
+		typ: t, opts: opts, measurement: s.measurement, measured: measured, clients: slices.Clone(s.clients),
+		clock: clk, queue: newQueue(),
+	}
+	d.reachable.Store(true)
 	for id := range optInMounted {
 		if s.optional[id] {
 			d.optIn = append(d.optIn, id)
@@ -154,7 +176,27 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 			d.servers = append(d.servers, s.servers[id])
 		}
 	}
+	if err := d.attachHooks(s); err != nil {
+		return nil, err
+	}
 	return d, nil
+}
+
+// attachHooks installs every declaration's hooks on its cluster's server,
+// in cluster order.
+func (d *Device) attachHooks(s *settings) error {
+	for _, id := range slices.Sorted(maps.Keys(s.attach)) {
+		srv := d.Server(id)
+		if srv == nil {
+			return fmt.Errorf("%w: %s: cluster 0x%04X is declared but not mounted", ErrConfiguration, d.typ.Name, id)
+		}
+		for _, attach := range s.attach[id] {
+			if err := attach(srv); err != nil {
+				return fmt.Errorf("%w: %s: %w", ErrConfiguration, d.typ.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // notifyingSource is a device whose host model notifies its changes
@@ -194,7 +236,7 @@ func measuredClusters(t *Type, s *settings) (map[uint32]bool, error) {
 }
 
 // checkOptedClusters refuses an option for a cluster the device type does
-// not allow as a server — a host server ([WithServer]) excepted — or one
+// not allow as a server — a host's server (a declared HostServer) excepted — or one
 // the assembler mounts itself, measured clusters included.
 func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
@@ -210,7 +252,7 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	for id, o := range s.elements {
 		ids = append(ids, id)
 		if o.Features != 0 {
-			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X states features; select them with WithFeatures", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: elements for cluster 0x%04X state features; select them as the declaration's Features", ErrConfiguration, t.Name, id)
 		}
 	}
 	slices.Sort(ids)
@@ -227,13 +269,13 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	}
 	for id := range s.servers {
 		if _, ok := s.features[id]; ok {
-			return fmt.Errorf("%w: %s: WithFeatures for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: Features for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := s.elements[id]; ok {
-			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: elements for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := s.initial[id]; ok {
-			return fmt.Errorf("%w: %s: WithInitial for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+			return fmt.Errorf("%w: %s: Initial for cluster 0x%04X, whose server the host supplies (HostServer)", ErrConfiguration, t.Name, id)
 		}
 	}
 	return nil
@@ -278,7 +320,7 @@ func onlyHostServer(s *settings, id uint32) bool {
 func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uint32) contract.ClusterServer) (contract.ClusterServer, error) {
 	def := r.Definition
 	if def == nil {
-		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it: supply its server with WithServer",
+		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it",
 			ErrNoDefaultServer, t.Name, r.Name, r.ID, r.Conformance)
 	}
 	// The default selection is the device type's mandated features and the
@@ -297,10 +339,10 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// RequirementGenerator.ts:188-199, EndpointFile.ts:144-158: a
 		// cluster whose mandated features are no legal selection is not
 		// mounted by default; the application must choose its features.
-		return nil, fmt.Errorf("%w: %s %s needs a feature selection (WithFeatures): %w", ErrConfiguration, t.Name, r.Name, err)
+		return nil, fmt.Errorf("%w: %s %s needs a feature selection (the declaration's Features): %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	opts := spec.Options{Features: features}
-	if extra, ok := s.elements[r.ID]; ok {
+	for _, extra := range []spec.Options{s.elements[r.ID], s.implied[r.ID]} {
 		opts.Attributes = append(opts.Attributes, extra.Attributes...)
 		opts.Commands = append(opts.Commands, extra.Commands...)
 		opts.Events = append(opts.Events, extra.Events...)
@@ -336,7 +378,10 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		initial[id] = v
 	}
 	if factory, held := selfHeldDefaults[r.ID]; held {
-		srv, err := factory(defaultBuild{def: def, opts: opts, clock: s.clock, sibling: sibling})
+		srv, err := factory(defaultBuild{
+			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: t.ID,
+			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
+		})
 		if err == nil {
 			err = checkSelection(r.Name, srv, opts)
 		}
@@ -358,7 +403,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	srv, err := spec.NewServer(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
-		return nil, fmt.Errorf("%w: %s %s: %w: supply its server with WithServer", ErrNoDefaultServer, t.Name, r.Name, err)
+		return nil, fmt.Errorf("%w: %s %s: %w: supply its server as the declaration's HostServer", ErrNoDefaultServer, t.Name, r.Name, err)
 	case err != nil:
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
@@ -462,11 +507,17 @@ func (d *Device) AddPart(p *Device) error {
 			ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
 	}
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if slices.Contains(d.parts, p) {
+		d.mu.Unlock()
 		return nil
 	}
 	d.parts = append(d.parts, p)
+	h := d.host
+	d.mu.Unlock()
+	// A part added to a device the node holds joins its lifecycle.
+	if h != nil {
+		return p.attach(h)
+	}
 	return nil
 }
 
@@ -524,17 +575,20 @@ func (d *Device) Parts() []*Device {
 // [contract.EndpointSource], and its parts, recursively, as
 // [endpoint.Spec.Parts].
 func (d *Device) Spec() endpoint.Spec {
+	d.mu.Lock()
+	name, label := d.opts.Name, d.opts.NodeLabel
+	d.mu.Unlock()
 	s := endpoint.Spec{
 		StableKey:        d.opts.StableKey,
 		DeviceAddress:    d.opts.DeviceAddress,
 		DeviceType:       d.typ.ID,
 		VendorName:       d.opts.Vendor,
-		FriendlyName:     d.opts.Name,
+		FriendlyName:     name,
 		ChannelAddress:   d.opts.ChannelAddress,
-		Availability:     d.opts.Reachable,
+		Availability:     d.available,
 		Source:           d.source,
 		Measurement:      d.measurement,
-		NodeLabel:        d.opts.NodeLabel,
+		NodeLabel:        label,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),
 		OptIn:            slices.Clone(d.optIn),
@@ -564,23 +618,4 @@ func (d *Device) clientClusters() []uint32 {
 		}
 	}
 	return out
-}
-
-// OnChanged calls fn with the ids of the attributes of the device's
-// clusterID server that changed — matter.js's
-// `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:456), delivered
-// through the server's [contract.AttributeChangeNotifier], or through its
-// [contract.ChangeNotifier] with every attribute it reports. It returns
-// the unsubscribe function; a cluster the device does not mount, or whose
-// server notifies nothing, never calls fn.
-func (d *Device) OnChanged(clusterID uint32, fn func(attrIDs []uint32)) (unsubscribe func()) {
-	srv := d.Server(clusterID)
-	switch n := srv.(type) {
-	case contract.AttributeChangeNotifier:
-		return n.OnMatterAttributesChanged(fn)
-	case contract.ChangeNotifier:
-		return n.OnMatterValueChanged(func() { fn(srv.MatterReportable()) })
-	default:
-		return func() {}
-	}
 }

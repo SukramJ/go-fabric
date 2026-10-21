@@ -90,9 +90,10 @@ var PumpType = Type{
 type Pump struct{ *Device }
 
 // NewPump returns a Pump device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewPump(opts Options, with ...Option) (*Pump, error) {
-	d, err := New(&PumpType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type PumpID (see [New]).
+func NewPump(opts Options, decls ...Declaration) (*Pump, error) {
+	d, err := FromSpec(Spec{Type: PumpID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -100,43 +101,47 @@ func NewPump(opts Options, with ...Option) (*Pump, error) {
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *Pump) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // PumpConfigurationAndControl returns the typed PumpConfigurationAndControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *Pump) PumpConfigurationAndControl() *pumpconfigurationandcontroldef.Server {
-	return pumpconfigurationandcontroldef.Wrap(d.Server(0x0200))
+	return pumpconfigurationandcontroldef.WrapOn(d.Server(0x0200), d.queue)
 }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *Pump) LevelControl() *levelcontroldef.Server { return levelcontroldef.Wrap(d.Server(0x0008)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *Pump) LevelControl() *levelcontroldef.Server {
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
+}
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) PressureMeasurement() *pressuremeasurementdef.Server {
-	return pressuremeasurementdef.Wrap(d.Server(0x0403))
+	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Pump) FlowMeasurement() *flowmeasurementdef.Server {
-	return flowmeasurementdef.Wrap(d.Server(0x0404))
+	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

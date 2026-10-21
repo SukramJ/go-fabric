@@ -70,7 +70,8 @@ func TestParityMatterJS_DoorLockClusterRevision(t *testing.T) {
 	}
 
 	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{
-		Source: &stubSource{observed: true},
+		Features: doorlockcluster.FeatureUBOLT,
+		Source:   &stubSource{observed: true},
 	})
 
 	_, revOK := srv.MatterRead(0xFFFD) // ClusterRevision
@@ -93,7 +94,8 @@ func TestParityMatterJS_DoorLockMandatoryAttributes(t *testing.T) {
 	t.Parallel()
 
 	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{
-		Source: &stubSource{locked: true, observed: true},
+		Features: doorlockcluster.FeatureUBOLT,
+		Source:   &stubSource{locked: true, observed: true},
 	})
 
 	attrs := make(map[uint32]bool)
@@ -161,7 +163,7 @@ func TestParityMatterJS_DoorLockLockStateMapping(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			src := tc.src
-			srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: &src})
+			srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: &src})
 			val, ok := srv.MatterRead(wire.DoorLockAttrLockState)
 			if !ok {
 				t.Fatal("MatterRead returned ok=false")
@@ -196,7 +198,7 @@ func TestParityMatterJS_DoorLockCommandDispatch(t *testing.T) {
 		t.Run(t.Name(), func(t *testing.T) {
 			t.Parallel()
 			src := &stubSource{observed: true}
-			srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: src})
+			srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: src})
 			dvBefore := srv.MatterDataVersion()
 
 			_, err := srv.MatterInvoke(im.WithFabricFilter(context.Background(), false, 1), cmdID, nil)
@@ -219,7 +221,8 @@ func TestParityMatterJS_DoorLockAcceptedCommands(t *testing.T) {
 	t.Parallel()
 
 	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{
-		Source: &stubSource{},
+		Features: doorlockcluster.FeatureUBOLT,
+		Source:   &stubSource{},
 	})
 	accepted := make(map[uint32]bool)
 	for _, id := range srv.MatterAcceptedCommands() {
@@ -248,7 +251,7 @@ func TestParityMatterJS_DoorLockAcceptedCommands(t *testing.T) {
 // one is a ConstraintError (TC-DRLK-2.1 steps 24b-24d).
 func TestParityMatterJS_DoorLock_OperatingModeWritable(t *testing.T) {
 	t.Parallel()
-	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: &stubSource{observed: true}})
+	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Features: doorlockcluster.FeatureUBOLT, Source: &stubSource{observed: true}})
 	ctx := context.Background()
 	for _, mode := range []uint8{0, 3} {
 		if err := srv.MatterWrite(ctx, wire.DoorLockAttrOperatingMode, mode); err != nil {

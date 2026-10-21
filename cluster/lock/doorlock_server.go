@@ -78,10 +78,6 @@ const (
 const servedFeatures = FeaturePIN | FeatureRID | FeatureFGP | FeatureWDSCH | FeatureDPS |
 	FeatureCOTA | FeatureUSR | FeatureYDSCH | FeatureHDSCH | FeatureUBOLT
 
-// defaultFeatures is the selection of a [DoorLockConfig] that names none:
-// the module's server before it grew users served Unbolting alone.
-const defaultFeatures = FeatureUBOLT
-
 // defaultSupportedOperatingModes is matter.js's default
 // SupportedOperatingModes, { vacation, privacy, passage, alwaysSet: 2047 }
 // (DoorLockServer.ts:117-119): a set bit marks a mode as NOT supported, so
@@ -221,9 +217,9 @@ type DoorLockConfig struct {
 	// calls. When nil, an embedded tracker is used (prior behaviour).
 	DataVersion *cluster.DataVersionTracker
 
-	// Features is the FeatureMap selection; zero is Unbolting alone, the
-	// former server's selection. A selection that names a feature is the
-	// full matter.js server, which also accepts UnlockWithTimeout.
+	// Features is the FeatureMap selection; zero is none, matter.js's
+	// DoorLockServer without features. The server accepts
+	// UnlockWithTimeout whatever the selection, as matter.js's does.
 	Features Feature
 	// Hardware moves the lock of a server without Source; nil does
 	// nothing (matter.js's default handleLockOperation).
@@ -320,7 +316,6 @@ type DoorLockServer struct {
 	auth     AuthStore
 	authKey  string
 	cipher   Cipher
-	full     bool
 
 	usr, pin, rid, fgp, cota, wdsch, ydsch, hdsch, dps bool
 
@@ -432,10 +427,6 @@ func NewDoorLockServer(cfg DoorLockConfig) *DoorLockServer {
 // again. Mirrors matter.js DoorLockServer.ts:114-180 (initialize).
 func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 	features := cfg.Features
-	full := features != 0
-	if !full {
-		features = defaultFeatures
-	}
 	if features&^servedFeatures != 0 {
 		return nil, fmt.Errorf("%w: features 0x%X are not served", ErrConfig, uint32(features&^servedFeatures))
 	}
@@ -448,7 +439,6 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 		auth:         cfg.Auth,
 		authKey:      cfg.AuthKey,
 		cipher:       cfg.Cipher,
-		full:         full,
 		usr:          features&FeatureUSR != 0,
 		pin:          features&FeaturePIN != 0,
 		rid:          features&FeatureRID != 0,
@@ -489,10 +479,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 		mode = lockdef.OperatingModeNormal
 	}
 
-	opts := spec.Options{Features: uint32(features)}
-	if full {
-		opts.Commands = []uint32{lockdef.CmdUnlockWithTimeout}
-	}
+	opts := spec.Options{Features: uint32(features), Commands: []uint32{lockdef.CmdUnlockWithTimeout}}
 	initial := s.initialAttributes(cfg, mode, supported, &opts)
 	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()}
 	if s.src != nil {
@@ -970,7 +957,7 @@ func (s *DoorLockServer) moveHardware(ctx context.Context, op LockOperation) err
 func (s *DoorLockServer) setActuated(locked bool) error {
 	if s.src != nil {
 		s.tracker.Bump()
-		s.Notify(lockdef.AttrLockState)
+		s.NotifyFrom(contract.OriginCommand, lockdef.AttrLockState)
 		return nil
 	}
 	state := lockdef.LockStateUnlocked

@@ -55,9 +55,10 @@ var BridgedNodeType = Type{
 type BridgedNode struct{ *Device }
 
 // NewBridgedNode returns a BridgedNode device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewBridgedNode(opts Options, with ...Option) (*BridgedNode, error) {
-	d, err := New(&BridgedNodeType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type BridgedNodeID (see [New]).
+func NewBridgedNode(opts Options, decls ...Declaration) (*BridgedNode, error) {
+	d, err := FromSpec(Spec{Type: BridgedNodeID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -65,33 +66,33 @@ func NewBridgedNode(opts Options, with ...Option) (*BridgedNode, error) {
 }
 
 // PowerSourceConfiguration returns the typed PowerSourceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
-	return powersourceconfigurationdef.Wrap(d.Server(0x002E))
+	return powersourceconfigurationdef.WrapOn(d.Server(0x002E), d.queue)
 }
 
 // PowerSource returns the typed PowerSource server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) PowerSource() *powersourcedef.Server {
-	return powersourcedef.Wrap(d.Server(0x002F))
+	return powersourcedef.WrapOn(d.Server(0x002F), d.queue)
 }
 
 // AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
-	return administratorcommissioningdef.Wrap(d.Server(0x003C))
+	return administratorcommissioningdef.WrapOn(d.Server(0x003C), d.queue)
 }
 
 // EcosystemInformation returns the typed EcosystemInformation server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) EcosystemInformation() *ecosysteminformationdef.Server {
-	return ecosysteminformationdef.Wrap(d.Server(0x0750))
+	return ecosysteminformationdef.WrapOn(d.Server(0x0750), d.queue)
 }

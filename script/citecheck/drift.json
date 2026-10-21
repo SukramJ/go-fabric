@@ -280,7 +280,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 197,
+    "line": 198,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -289,7 +289,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 242,
+    "line": 243,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "protocolId",
@@ -1172,7 +1172,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 231,
+    "line": 232,
     "citation": "window-covering-cluster.element.ts:130-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1181,7 +1181,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 754,
+    "line": 755,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1199,7 +1199,7 @@
   },
   {
     "file": "cluster/levelcontrol/levelcontrol_server_test.go",
-    "line": 243,
+    "line": 245,
     "citation": "LevelControlServer.ts:114-120",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "LevelControl",
@@ -1208,7 +1208,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 65,
+    "line": 67,
     "citation": "LevelControlServer.ts:529-550",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "#turnOnForLevel",
@@ -1217,7 +1217,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 278,
+    "line": 280,
     "citation": "LevelControlServer.ts:186-195",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "MoveMode",
@@ -1226,7 +1226,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 478,
+    "line": 480,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "targetValue",
@@ -1235,7 +1235,7 @@
   },
   {
     "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
-    "line": 757,
+    "line": 760,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "preCommit",
@@ -1244,7 +1244,7 @@
   },
   {
     "file": "cluster/light/colorcontrol_set.go",
-    "line": 30,
+    "line": 34,
     "citation": "packages/node/src/behavior/Transitions.ts:455-534",
     "resolved": "packages/node/src/behavior/Transitions.ts",
     "identifier": "RemainingTime",
@@ -1406,7 +1406,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 800,
+    "line": 799,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1416,7 +1416,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1030,
+    "line": 1029,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1425,7 +1425,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1162,
+    "line": 1161,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1435,7 +1435,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1326,
+    "line": 1325,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1796,7 +1796,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 452,
+    "line": 497,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -1841,7 +1841,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 666,
+    "line": 675,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",

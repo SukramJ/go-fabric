@@ -30,6 +30,7 @@ import (
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	griddef "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	washerdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -55,6 +56,16 @@ type defaultBuild struct {
 	cfg     spec.ServerConfig
 	clock   clock.Clock
 	sibling func(clusterID uint32) contract.ClusterServer
+	// deviceType is the device's type id.
+	deviceType uint16
+	// ports is the cluster's typed declaration (<cluster>def.Declare),
+	// nil without one; transitions is its Transitions.
+	ports       any
+	transitions bool
+	// initial are the values the server starts with; a factory deletes
+	// the ones it consumes as configuration, and the rest are set through
+	// the server's SetAttributes.
+	initial map[uint32]any
 }
 
 // serverFactory builds a cluster's default server.
@@ -77,7 +88,8 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotSer
 // other cluster gets the generated [spec.Server], its commands
 // unimplemented until the host registers them; a self-held server that
 // needs a host port to run (a mover, an actuator, a measurement source) is
-// not a default — the host supplies it with [WithServer].
+// a default once the device's declaration carries the port
+// (<cluster>def.Declare), and the generated server until then.
 //
 // A self-held server is the default where it serves the selection the
 // device type and the host make — its FeatureMap and every attribute,
@@ -95,7 +107,7 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotSer
 // OtaSoftwareUpdateRequestor has none: its server needs the node's
 // connector to reach a provider (node/ota.go), so a device that mounts it —
 // OtaRequestor — answers [ErrNoDefaultServer] and the host supplies it
-// with [WithServer].
+// as the cluster's declared HostServer.
 var selfHeldDefaults = map[uint32]serverFactory{
 	onoffdef.ClusterID:      newOnOffServer,                // OnOff: cluster/onoff, matter.js OnOffServer.ts.
 	lvldef.ClusterID:        newLevelControlServer,         // LevelControl: cluster/levelcontrol.New, matter.js LevelControlServer.ts.
@@ -106,6 +118,10 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	thermostatdef.ClusterID: newThermostatServer,           // Thermostat: cluster/thermo, matter.js ThermostatServer.ts.
 	ccdef.ClusterID:         newColorControlServer,         // ColorControl: cluster/light, matter.js ColorControlServer.ts.
 	ecodef.ClusterID:        newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+
+	// The servers that run on a host port the declaration carries
+	// (defaults_ports.go).
+	fandef.ClusterID: newFanControlServer, // FanControl: cluster/fan, matter.js FanControlServer.ts.
 
 	// The appliance, sensor-configuration and energy servers
 	// (defaults_appliance.go).
@@ -160,7 +176,7 @@ func newBindingServer(defaultBuild) (contract.ClusterServer, error) {
 // (packages/node/src/behaviors/ecosystem-information/
 // EcosystemInformationServer.ts:14, no server logic; both attributes are
 // lists). A host whose bridged device belongs to an ecosystem supplies its
-// own server over its directory with [WithServer].
+// own server over its directory as the declared HostServer.
 func newEcosystemInformationServer(defaultBuild) (contract.ClusterServer, error) {
 	return core.NewEcosystemInformation(emptyEcosystem{}), nil
 }
@@ -178,15 +194,20 @@ func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLoca
 // newOnOffServer is the module's OnOff server ([onoff.New]). A device of
 // this layer sits under the Aggregator, so StartUpOnOff is not applied
 // (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
-// Its countdown runs on the device's clock ([Options].Clock).
+// Its countdown runs on the device's clock, the node's once it is added.
+// A declared Sink (onoffdef.Declare) switches the device.
 func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
-	return onoff.New(onoff.Config{
+	cfg := onoff.Config{
 		Features:    onoff.Feature(b.opts.Features),
 		DataVersion: b.cfg.DataVersion,
 		Initial:     b.cfg.Initial,
 		Bridged:     true,
 		TimeSource:  b.clock,
-	})
+	}
+	if d, ok := b.ports.(onoffdef.Declare); ok && d.Sink != nil {
+		cfg.Sink = d.Sink
+	}
+	return onoff.New(cfg)
 }
 
 // newLevelControlServer is the module's LevelControl server that holds its
@@ -196,9 +217,15 @@ func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 // option moves the colour temperature — matter.js LevelControlServer's
 // couplings (LevelControlServer.ts:141-143, :556-617, :658-670). The level
 // changes at once, matter.js's default (managedTransitionTimeHandling
-// false, :782-790).
+// false, :782-790), unless the declaration asks for Transitions. A
+// declared LevelSource (levelcontroldef.Declare) is the device's level:
+// the server drives it instead of holding one.
 func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock}
+	d, _ := b.ports.(lvldef.Declare)
+	if d.LevelSource != nil {
+		return newLevelControlPortServer(b, d)
+	}
+	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
@@ -218,7 +245,7 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // commands apply their target at once, matter.js's default
 // (managedTransitionTimeHandling false).
 func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock}
+	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock, ManageTransitions: b.transitions}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
@@ -229,36 +256,48 @@ func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	return srv, err
 }
 
-// newWindowCoveringServer is the module's WindowCovering server without a
-// mover ([cover.New]): a command moves the covering at once, matter.js's
-// WindowCoveringServer without a handleMovement of its own.
+// newWindowCoveringServer is the module's WindowCovering server
+// ([cover.New]): without a mover a command moves the covering at once,
+// matter.js's WindowCoveringServer without a handleMovement of its own; a
+// declared Mover (windowcoveringdef.Declare) moves the device.
 func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
-	srv, err := cover.New(cover.Config{FeatureMap: b.opts.Features, Clock: b.clock})
+	cfg := cover.Config{FeatureMap: b.opts.Features, Clock: b.clock}
+	if d, ok := b.ports.(wcdef.Declare); ok && d.Mover != nil {
+		cfg.Mover = d.Mover
+	}
+	srv, err := cover.New(cfg)
 	if errors.Is(err, cover.ErrFeatureMap) {
 		return nil, notServed(err)
 	}
 	return srv, err
 }
 
-// newThermostatServer is the module's Thermostat server without a sink
-// ([thermo.New]), at its default limits and setpoints.
+// newThermostatServer is the module's Thermostat server ([thermo.New]),
+// at its default limits and setpoints; a declared Sink
+// (thermostatdef.Declare) is told every change it admits.
 func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
-	srv, err := thermo.New(thermo.ThermostatConfig{Features: b.opts.Features, Clock: b.clock})
+	cfg := thermo.ThermostatConfig{Features: b.opts.Features, Clock: b.clock}
+	if d, ok := b.ports.(thermostatdef.Declare); ok && d.Sink != nil {
+		cfg.Sink = d.Sink
+	}
+	srv, err := thermo.New(cfg)
 	if errors.Is(err, thermo.ErrFeatures) {
 		return nil, notServed(err)
 	}
 	return srv, err
 }
 
-// newDoorLockServer is the module's DoorLock server keeping its own lock
-// state ([lock.New] without a Source or Hardware). An empty selection is
-// not served: [lock.New] reads it as Unbolting, the selection of its
-// configurations before users.
+// newDoorLockServer is the module's DoorLock server ([lock.New]): with a
+// declared StateSource (doorlockdef.Declare) the lock's actuator moves the
+// bolt and reports it, without one the server keeps its own lock state —
+// matter.js's DoorLockServer, whose default handleLockOperation moves
+// nothing. An empty selection is none, as matter.js's.
 func newDoorLockServer(b defaultBuild) (contract.ClusterServer, error) {
-	if b.opts.Features == 0 {
-		return nil, notServed(errors.New("doorlock: an empty feature selection"))
+	cfg := lock.DoorLockConfig{Features: lock.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion, Clock: b.clock}
+	if d, ok := b.ports.(doorlockdef.Declare); ok && d.StateSource != nil {
+		cfg.Source = d.StateSource
 	}
-	srv, err := lock.New(lock.DoorLockConfig{Features: lock.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion, Clock: b.clock})
+	srv, err := lock.New(cfg)
 	if errors.Is(err, lock.ErrConfig) {
 		return nil, notServed(err)
 	}
@@ -308,7 +347,7 @@ func (p onOffPort) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubsc
 
 // applyInitial sets the initial values on a self-held default through its
 // [spec.AttributeSetter] — the device type's defaults and the host's
-// [WithInitial] — as a matter.js endpoint starts its behaviors' state with
+// declaration's Initial — as a matter.js endpoint starts its behaviors' state with
 // them.
 func applyInitial(name string, srv contract.ClusterServer, initial map[uint32]any) error {
 	if len(initial) == 0 {

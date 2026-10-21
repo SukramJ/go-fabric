@@ -40,9 +40,10 @@ var PressureSensorType = Type{
 type PressureSensor struct{ *Device }
 
 // NewPressureSensor returns a PressureSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewPressureSensor(opts Options, with ...Option) (*PressureSensor, error) {
-	d, err := New(&PressureSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type PressureSensorID (see [New]).
+func NewPressureSensor(opts Options, decls ...Declaration) (*PressureSensor, error) {
+	d, err := FromSpec(Spec{Type: PressureSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,9 @@ func NewPressureSensor(opts Options, with ...Option) (*PressureSensor, error) {
 }
 
 // PressureMeasurement returns the typed PressureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *PressureSensor) PressureMeasurement() *pressuremeasurementdef.Server {
-	return pressuremeasurementdef.Wrap(d.Server(0x0403))
+	return pressuremeasurementdef.WrapOn(d.Server(0x0403), d.queue)
 }

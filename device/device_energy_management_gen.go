@@ -45,9 +45,10 @@ var DeviceEnergyManagementType = Type{
 type DeviceEnergyManagement struct{ *Device }
 
 // NewDeviceEnergyManagement returns a DeviceEnergyManagement device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewDeviceEnergyManagement(opts Options, with ...Option) (*DeviceEnergyManagement, error) {
-	d, err := New(&DeviceEnergyManagementType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type DeviceEnergyManagementID (see [New]).
+func NewDeviceEnergyManagement(opts Options, decls ...Declaration) (*DeviceEnergyManagement, error) {
+	d, err := FromSpec(Spec{Type: DeviceEnergyManagementID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +56,17 @@ func NewDeviceEnergyManagement(opts Options, with ...Option) (*DeviceEnergyManag
 }
 
 // DeviceEnergyManagement returns the typed DeviceEnergyManagement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *DeviceEnergyManagement) DeviceEnergyManagement() *deviceenergymanagementdef.Server {
-	return deviceenergymanagementdef.Wrap(d.Server(0x0098))
+	return deviceenergymanagementdef.WrapOn(d.Server(0x0098), d.queue)
 }
 
 // DeviceEnergyManagementMode returns the typed DeviceEnergyManagementMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *DeviceEnergyManagement) DeviceEnergyManagementMode() *deviceenergymanagementmodedef.Server {
-	return deviceenergymanagementmodedef.Wrap(d.Server(0x009F))
+	return deviceenergymanagementmodedef.WrapOn(d.Server(0x009F), d.queue)
 }

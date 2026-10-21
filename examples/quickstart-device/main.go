@@ -20,6 +20,7 @@ import (
 	_ "modernc.org/sqlite" // the host picks the SQLite driver
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/mdns"
@@ -92,8 +93,8 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 	}
 	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light-1"), Name: "Desk lamp"})
 	if err == nil {
-		light.OnChanged(onoff.ClusterID, func(attrs []uint32) {
-			if slices.Contains(attrs, onoff.AttrOnOff) {
+		light.OnChanged(onoff.ClusterID, func(c contract.Change) {
+			if slices.Contains(c.Attributes, onoff.AttrOnOff) {
 				slog.Info("light", slog.Bool("on", light.OnOff().Get().OnOff)) // drive the real lamp here
 			}
 		})

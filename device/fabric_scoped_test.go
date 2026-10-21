@@ -44,7 +44,7 @@ func TestFabricScopedDefaults(t *testing.T) {
 		}
 	}
 
-	if _, err := NewDoorbell(testOptions("b2"), WithInitial(0x001E, map[uint32]any{0: nil})); !errors.Is(err, ErrConfiguration) {
+	if _, err := NewDoorbell(testOptions("b2"), withInitial(0x001E, map[uint32]any{0: nil})); !errors.Is(err, ErrConfiguration) {
 		t.Errorf("initial values for Binding: %v, want ErrConfiguration", err)
 	}
 	if _, err := NewOtaRequestor(testOptions("ota")); !errors.Is(err, ErrNoDefaultServer) {

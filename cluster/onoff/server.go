@@ -357,7 +357,7 @@ func (s *Server) store(st state) {
 		values[AttrOnTime] = st.onTime
 		values[AttrOffWaitTime] = st.offWaitTime
 	}
-	_ = s.srv.SetAttributes(values) // every value is one the model admits
+	_ = s.srv.SetAttributesFrom(contract.OriginCommand, values) // every value is one the model admits
 }
 
 // command wraps one command's logic in the queue and the

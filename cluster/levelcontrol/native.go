@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/wire"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -50,7 +52,7 @@ type NativeRamp interface {
 // speaker's volume — returns nil and keeps its level. Stop and
 // StopWithOnOff are unaffected.
 type NativeMover interface {
-	MoveLevel(ctx context.Context, req MoveRequest, withOnOff bool) error
+	MoveLevel(ctx context.Context, req wire.MoveRequest, withOnOff bool) error
 }
 
 // NativeSwitcher is an optional interface of a [NativeRamp] whose On/Off
@@ -158,8 +160,8 @@ func NewNativeSource(dev NativeRamp, onOff OnOff, cfg NativeConfig) *NativeSourc
 // CurrentLevel implements [LevelSource]: the device's level.
 func (n *NativeSource) CurrentLevel() (uint8, bool) { return n.dev.Level() }
 
-// Options implements [LevelSource].
-func (n *NativeSource) Options() uint8 {
+// optionsWire is the wire form of Options.
+func (n *NativeSource) optionsWire() uint8 {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.options
@@ -175,9 +177,9 @@ func (n *NativeSource) OnLevel() (uint8, bool) {
 	return *n.onLevel, true
 }
 
-// SetOptions implements [LevelSource]: the server has checked the bitmap
+// setOptionsWire is the wire form of SetOptions: the server has checked the bitmap
 // against the FeatureMap; Persist sees it before it takes effect.
-func (n *NativeSource) SetOptions(ctx context.Context, options uint8) error {
+func (n *NativeSource) setOptionsWire(ctx context.Context, options uint8) error {
 	n.wmu.Lock()
 	defer n.wmu.Unlock()
 	n.mu.Lock()
@@ -233,14 +235,14 @@ func (n *NativeSource) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	return func() {}
 }
 
-// MoveToLevel implements [LevelSource]: gated by ExecuteIfOff, the level
+// moveToLevelWire is the wire form of MoveToLevel: gated by ExecuteIfOff, the level
 // cropped to MinLevel..MaxLevel, over TransitionTime. Mirrors matter.js
 // LevelControlServer.ts:263-278 moveToLevel (gate :269-272, crop :274) and
 // moveToLevelLogic :326-342 — the rate (level - current) / TransitionTime
 // * 10 covers any distance in TransitionTime tenths, which is the duration
 // handed to the device; no OnOffTransitionTime is served, so a null
 // TransitionTime is at once.
-func (n *NativeSource) MoveToLevel(ctx context.Context, req MoveToLevelRequest) error {
+func (n *NativeSource) moveToLevelWire(ctx context.Context, req wire.MoveToLevelRequest) error {
 	if !n.allowsExecution(n.effective(req.OptionsMask, req.OptionsOverride)) {
 		return nil
 	}
@@ -248,28 +250,28 @@ func (n *NativeSource) MoveToLevel(ctx context.Context, req MoveToLevelRequest) 
 	return n.ramp(ctx, CropLevel(req.Level, n.minLevel), func(uint8) time.Duration { return d }, false)
 }
 
-// MoveToLevelWithOnOff implements [LevelSource]: as MoveToLevel without
+// moveToLevelWithOnOffWire is the wire form of MoveToLevelWithOnOff: as MoveToLevel without
 // the gate, coupled to On/Off. Mirrors matter.js
 // LevelControlServer.ts:285-300 moveToLevelWithOnOff.
-func (n *NativeSource) MoveToLevelWithOnOff(ctx context.Context, req MoveToLevelRequest) error {
+func (n *NativeSource) moveToLevelWithOnOffWire(ctx context.Context, req wire.MoveToLevelRequest) error {
 	d := TransitionDuration(req.TransitionTime)
 	return n.ramp(ctx, CropLevel(req.Level, n.minLevel), func(uint8) time.Duration { return d }, true)
 }
 
-// Move implements [LevelSource]: gated by ExecuteIfOff, towards MaxLevel or
+// moveWire is the wire form of Move: gated by ExecuteIfOff, towards MaxLevel or
 // MinLevel at Rate per second. Mirrors matter.js LevelControlServer.ts
 // :351-361 move (gate :354-357) and moveLogic :388-405.
-func (n *NativeSource) Move(ctx context.Context, req MoveRequest) error {
+func (n *NativeSource) moveWire(ctx context.Context, req wire.MoveRequest) error {
 	if !n.allowsExecution(n.effective(req.OptionsMask, req.OptionsOverride)) {
 		return nil
 	}
 	return n.move(ctx, req, false)
 }
 
-// MoveWithOnOff implements [LevelSource]: as Move without the gate,
+// moveWithOnOffWire is the wire form of MoveWithOnOff: as Move without the gate,
 // coupled to On/Off. Mirrors matter.js LevelControlServer.ts:370-375
 // moveWithOnOff.
-func (n *NativeSource) MoveWithOnOff(ctx context.Context, req MoveRequest) error {
+func (n *NativeSource) moveWithOnOffWire(ctx context.Context, req wire.MoveRequest) error {
 	return n.move(ctx, req, true)
 }
 
@@ -280,7 +282,7 @@ func (n *NativeSource) MoveWithOnOff(ctx context.Context, req MoveRequest) error
 // LevelControlServer.ts:535-538). A null Rate is at once: matter.js
 // falls back to DefaultMoveRate (:309-311), which this cluster does not
 // serve. A zero Rate was refused by the server (:305-308).
-func (n *NativeSource) move(ctx context.Context, req MoveRequest, withOnOff bool) error {
+func (n *NativeSource) move(ctx context.Context, req wire.MoveRequest, withOnOff bool) error {
 	if m, ok := n.dev.(NativeMover); ok {
 		n.cancelOff()
 		return m.MoveLevel(ctx, req, withOnOff)
@@ -310,21 +312,21 @@ func (n *NativeSource) move(ctx context.Context, req MoveRequest, withOnOff bool
 	}, withOnOff)
 }
 
-// Step implements [LevelSource]: gated by ExecuteIfOff, StepSize from the
+// stepWire is the wire form of Step: gated by ExecuteIfOff, StepSize from the
 // current level, over TransitionTime. Mirrors matter.js
 // LevelControlServer.ts:414-428 step (gate :421-424) and stepLogic
 // :464-479.
-func (n *NativeSource) Step(ctx context.Context, req StepRequest) error {
+func (n *NativeSource) stepWire(ctx context.Context, req wire.StepRequest) error {
 	if !n.allowsExecution(n.effective(req.OptionsMask, req.OptionsOverride)) {
 		return nil
 	}
 	return n.step(ctx, req, false)
 }
 
-// StepWithOnOff implements [LevelSource]: as Step without the gate,
+// stepWithOnOffWire is the wire form of StepWithOnOff: as Step without the gate,
 // coupled to On/Off. Mirrors matter.js LevelControlServer.ts:435-450
 // stepWithOnOff.
-func (n *NativeSource) StepWithOnOff(ctx context.Context, req StepRequest) error {
+func (n *NativeSource) stepWithOnOffWire(ctx context.Context, req wire.StepRequest) error {
 	return n.step(ctx, req, true)
 }
 
@@ -335,7 +337,7 @@ func (n *NativeSource) StepWithOnOff(ctx context.Context, req StepRequest) error
 // covers the distance it has left. A null TransitionTime, a zero one
 // (whose rate is infinite) and a zero StepSize (whose rate is zero) are at
 // once (Transitions.ts:133).
-func (n *NativeSource) step(ctx context.Context, req StepRequest, withOnOff bool) error {
+func (n *NativeSource) step(ctx context.Context, req wire.StepRequest, withOnOff bool) error {
 	current, err := n.currentLevel()
 	if err != nil {
 		return err
@@ -351,20 +353,20 @@ func (n *NativeSource) step(ctx context.Context, req StepRequest, withOnOff bool
 	}, withOnOff)
 }
 
-// Stop implements [LevelSource]: gated by ExecuteIfOff, the ramp halts
+// stopWire is the wire form of Stop: gated by ExecuteIfOff, the ramp halts
 // where it is. Mirrors matter.js LevelControlServer.ts:481-489 stop (gate
 // :482-485) and stopLogic :505-506, which cancels the transition.
-func (n *NativeSource) Stop(ctx context.Context, req StopRequest) error {
+func (n *NativeSource) stopWire(ctx context.Context, req wire.StopRequest) error {
 	if !n.allowsExecution(n.effective(req.OptionsMask, req.OptionsOverride)) {
 		return nil
 	}
 	return n.stop(ctx)
 }
 
-// StopWithOnOff implements [LevelSource]: as Stop, without the gate —
+// stopWithOnOffWire is the wire form of StopWithOnOff: as Stop, without the gate —
 // matter.js LevelControlServer.ts:491-500 stopWithOnOff ("Unlike stop
 // this does not consult the ExecuteIfOff option").
-func (n *NativeSource) StopWithOnOff(ctx context.Context, _ StopRequest) error {
+func (n *NativeSource) stopWithOnOffWire(ctx context.Context, _ wire.StopRequest) error {
 	return n.stop(ctx)
 }
 
@@ -379,7 +381,7 @@ func (n *NativeSource) stop(ctx context.Context) error {
 // effective is [EffectiveOptions] over the stored Options attribute
 // (matter.js LevelControlServer.ts:714-727 #calculateEffectiveOptions).
 func (n *NativeSource) effective(mask, override uint8) uint8 {
-	return EffectiveOptions(n.Options(), mask, override)
+	return EffectiveOptions(n.optionsWire(), mask, override)
 }
 
 // allowsExecution is matter.js LevelControlServer.ts:729-736

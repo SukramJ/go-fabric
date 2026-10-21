@@ -47,9 +47,10 @@ var ClosureControllerType = Type{
 type ClosureController struct{ *Device }
 
 // NewClosureController returns a ClosureController device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewClosureController(opts Options, with ...Option) (*ClosureController, error) {
-	d, err := New(&ClosureControllerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ClosureControllerID (see [New]).
+func NewClosureController(opts Options, decls ...Declaration) (*ClosureController, error) {
+	d, err := FromSpec(Spec{Type: ClosureControllerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +58,9 @@ func NewClosureController(opts Options, with ...Option) (*ClosureController, err
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *ClosureController) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *ClosureController) Binding() *bindingdef.Server {
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
+}

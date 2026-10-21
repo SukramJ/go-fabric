@@ -22,7 +22,7 @@ import (
 func TestPlugToggles(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	plug, err := device.NewOnOffPlugInUnit(device.Options{
-		StableKey: endpoint.StringKey("plug:1"), Name: "plug", Clock: site.Clock(),
+		StableKey: endpoint.StringKey("plug:1"), Name: "plug",
 	})
 	if err != nil {
 		t.Fatal(err)

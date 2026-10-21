@@ -57,9 +57,10 @@ var OnOffLightSwitchType = Type{
 type OnOffLightSwitch struct{ *Device }
 
 // NewOnOffLightSwitch returns a OnOffLightSwitch device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOnOffLightSwitch(opts Options, with ...Option) (*OnOffLightSwitch, error) {
-	d, err := New(&OnOffLightSwitchType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OnOffLightSwitchID (see [New]).
+func NewOnOffLightSwitch(opts Options, decls ...Declaration) (*OnOffLightSwitch, error) {
+	d, err := FromSpec(Spec{Type: OnOffLightSwitchID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +68,9 @@ func NewOnOffLightSwitch(opts Options, with ...Option) (*OnOffLightSwitch, error
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *OnOffLightSwitch) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *OnOffLightSwitch) Binding() *bindingdef.Server {
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
+}

@@ -31,13 +31,14 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
 )
 
 // changeLevelRequest is changeLevel's MoveToLevel (LevelControlServerTest.ts:297-310).
-var changeLevelRequest = levelcontrol.MoveToLevelRequest{Level: 254, TransitionTime: u16(150)}
+var changeLevelRequest = wire.MoveToLevelRequest{Level: 254, TransitionTime: u16(150)}
 
 func TestParityMatterJS_LevelControlServerTest(t *testing.T) {
 	t.Run("stops transition timers when destroyed", testStopsTimersWhenDestroyed)

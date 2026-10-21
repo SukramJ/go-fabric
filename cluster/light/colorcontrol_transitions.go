@@ -11,6 +11,7 @@ import (
 
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/transition"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // The transitionable properties, named as matter.js names them in its
@@ -135,7 +136,7 @@ func (s *ColorControlServer) cropMireds(v float64) float64 {
 // applyChanges is the engine's Apply: the values of one step, or of a
 // transition that applies at once.
 func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
-	return s.update(context.Background(), func(st *colorState) {
+	return s.update(contract.WithOrigin(context.Background(), contract.OriginCommand), func(st *colorState) {
 		for _, c := range changes {
 			st.setProperty(c.Name, c.Value)
 		}
@@ -183,7 +184,7 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 	}
 	s.st = next
 	s.mu.Unlock()
-	s.report(prev, next)
+	s.report(contract.OriginFrom(ctx), prev, next)
 	return nil
 }
 
@@ -202,8 +203,11 @@ func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWrite
 	return nil
 }
 
-// report reports the attributes that differ between prev and next.
-func (s *ColorControlServer) report(prev, next colorState) {
+// report reports the attributes that differ between prev and next, from
+// origin — a quieter report it defers carries the origin of the last
+// change before it.
+func (s *ColorControlServer) report(origin contract.Origin, prev, next colorState) {
+	s.cause.Store(uint32(origin))
 	quiet := func(id uint32, changed bool) {
 		if changed && s.inst.Serves(id) {
 			s.quiet[id].Changed(false, false)
@@ -230,7 +234,7 @@ func (s *ColorControlServer) report(prev, next colorState) {
 	add(ccdef.AttrColorLoopStartEnhancedHue, prev.loopStart != next.loopStart)
 	add(ccdef.AttrColorLoopStoredEnhancedHue, prev.loopStored != next.loopStored)
 	if len(ids) > 0 {
-		s.changes.Notify(ids...)
+		s.changes.NotifyFrom(origin, ids...)
 	}
 }
 

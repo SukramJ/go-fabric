@@ -40,9 +40,10 @@ var DoorLockType = Type{
 type DoorLock struct{ *Device }
 
 // NewDoorLock returns a DoorLock device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewDoorLock(opts Options, with ...Option) (*DoorLock, error) {
-	d, err := New(&DoorLockType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type DoorLockID (see [New]).
+func NewDoorLock(opts Options, decls ...Declaration) (*DoorLock, error) {
+	d, err := FromSpec(Spec{Type: DoorLockID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +51,9 @@ func NewDoorLock(opts Options, with ...Option) (*DoorLock, error) {
 }
 
 // DoorLock returns the typed DoorLock server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *DoorLock) DoorLock() *doorlockdef.Server { return doorlockdef.Wrap(d.Server(0x0101)) }
+func (d *DoorLock) DoorLock() *doorlockdef.Server {
+	return doorlockdef.WrapOn(d.Server(0x0101), d.queue)
+}

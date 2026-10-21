@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func ptrOf[T any](v T) *T { return &v }
@@ -32,7 +33,10 @@ func TestThermostatTypedSetGetOnChanged(t *testing.T) {
 	t.Parallel()
 	s := typedThermostat(t)
 	var changes [][]uint32
-	unsubscribe := s.OnChanged(func(_ tdef.State, changed []uint32) { changes = append(changes, changed) })
+	unsubscribe := s.OnChanged(func(_ tdef.State, change contract.Change) {
+		changed := change.Attributes
+		changes = append(changes, changed)
+	})
 	defer unsubscribe()
 
 	// A heating setpoint 1.00 °C below cooling: the reconcile moves the

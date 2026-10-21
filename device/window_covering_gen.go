@@ -45,9 +45,10 @@ var WindowCoveringType = Type{
 type WindowCovering struct{ *Device }
 
 // NewWindowCovering returns a WindowCovering device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewWindowCovering(opts Options, with ...Option) (*WindowCovering, error) {
-	d, err := New(&WindowCoveringType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type WindowCoveringID (see [New]).
+func NewWindowCovering(opts Options, decls ...Declaration) (*WindowCovering, error) {
+	d, err := FromSpec(Spec{Type: WindowCoveringID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +56,9 @@ func NewWindowCovering(opts Options, with ...Option) (*WindowCovering, error) {
 }
 
 // WindowCovering returns the typed WindowCovering server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WindowCovering) WindowCovering() *windowcoveringdef.Server {
-	return windowcoveringdef.Wrap(d.Server(0x0102))
+	return windowcoveringdef.WrapOn(d.Server(0x0102), d.queue)
 }

@@ -51,9 +51,10 @@ var FanType = Type{
 type Fan struct{ *Device }
 
 // NewFan returns a Fan device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewFan(opts Options, with ...Option) (*Fan, error) {
-	d, err := New(&FanType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type FanID (see [New]).
+func NewFan(opts Options, decls ...Declaration) (*Fan, error) {
+	d, err := FromSpec(Spec{Type: FanID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +62,15 @@ func NewFan(opts Options, with ...Option) (*Fan, error) {
 }
 
 // FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *Fan) FanControl() *fancontroldef.Server { return fancontroldef.Wrap(d.Server(0x0202)) }
+func (d *Fan) FanControl() *fancontroldef.Server {
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
+}
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *Fan) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *Fan) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }

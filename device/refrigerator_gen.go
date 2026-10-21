@@ -48,9 +48,10 @@ var RefrigeratorType = Type{
 type Refrigerator struct{ *Device }
 
 // NewRefrigerator returns a Refrigerator device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewRefrigerator(opts Options, with ...Option) (*Refrigerator, error) {
-	d, err := New(&RefrigeratorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type RefrigeratorID (see [New]).
+func NewRefrigerator(opts Options, decls ...Declaration) (*Refrigerator, error) {
+	d, err := FromSpec(Spec{Type: RefrigeratorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -58,25 +59,25 @@ func NewRefrigerator(opts Options, with ...Option) (*Refrigerator, error) {
 }
 
 // RefrigeratorAndTemperatureControlledCabinetMode returns the typed RefrigeratorAndTemperatureControlledCabinetMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) RefrigeratorAndTemperatureControlledCabinetMode() *refrigeratorandtemperaturecontrolledcabinetmodedef.Server {
-	return refrigeratorandtemperaturecontrolledcabinetmodedef.Wrap(d.Server(0x0052))
+	return refrigeratorandtemperaturecontrolledcabinetmodedef.WrapOn(d.Server(0x0052), d.queue)
 }
 
 // RefrigeratorAlarm returns the typed RefrigeratorAlarm server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) RefrigeratorAlarm() *refrigeratoralarmdef.Server {
-	return refrigeratoralarmdef.Wrap(d.Server(0x0057))
+	return refrigeratoralarmdef.WrapOn(d.Server(0x0057), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *Refrigerator) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

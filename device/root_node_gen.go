@@ -139,9 +139,10 @@ var RootNodeType = Type{
 type RootNode struct{ *Device }
 
 // NewRootNode returns a RootNode device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewRootNode(opts Options, with ...Option) (*RootNode, error) {
-	d, err := New(&RootNodeType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type RootNodeID (see [New]).
+func NewRootNode(opts Options, decls ...Declaration) (*RootNode, error) {
+	d, err := FromSpec(Spec{Type: RootNodeID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -149,123 +150,129 @@ func NewRootNode(opts Options, with ...Option) (*RootNode, error) {
 }
 
 // BasicInformation returns the typed BasicInformation server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) BasicInformation() *basicinformationdef.Server {
-	return basicinformationdef.Wrap(d.Server(0x0028))
+	return basicinformationdef.WrapOn(d.Server(0x0028), d.queue)
 }
 
 // GeneralCommissioning returns the typed GeneralCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) GeneralCommissioning() *generalcommissioningdef.Server {
-	return generalcommissioningdef.Wrap(d.Server(0x0030))
+	return generalcommissioningdef.WrapOn(d.Server(0x0030), d.queue)
 }
 
 // GeneralDiagnostics returns the typed GeneralDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) GeneralDiagnostics() *generaldiagnosticsdef.Server {
-	return generaldiagnosticsdef.Wrap(d.Server(0x0033))
+	return generaldiagnosticsdef.WrapOn(d.Server(0x0033), d.queue)
 }
 
 // AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RootNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
-	return administratorcommissioningdef.Wrap(d.Server(0x003C))
+	return administratorcommissioningdef.WrapOn(d.Server(0x003C), d.queue)
 }
 
 // LocalizationConfiguration returns the typed LocalizationConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) LocalizationConfiguration() *localizationconfigurationdef.Server {
-	return localizationconfigurationdef.Wrap(d.Server(0x002B))
+	return localizationconfigurationdef.WrapOn(d.Server(0x002B), d.queue)
 }
 
 // TimeFormatLocalization returns the typed TimeFormatLocalization server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) TimeFormatLocalization() *timeformatlocalizationdef.Server {
-	return timeformatlocalizationdef.Wrap(d.Server(0x002C))
+	return timeformatlocalizationdef.WrapOn(d.Server(0x002C), d.queue)
 }
 
 // UnitLocalization returns the typed UnitLocalization server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) UnitLocalization() *unitlocalizationdef.Server {
-	return unitlocalizationdef.Wrap(d.Server(0x002D))
+	return unitlocalizationdef.WrapOn(d.Server(0x002D), d.queue)
 }
 
 // PowerSourceConfiguration returns the typed PowerSourceConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
-	return powersourceconfigurationdef.Wrap(d.Server(0x002E))
+	return powersourceconfigurationdef.WrapOn(d.Server(0x002E), d.queue)
 }
 
 // NetworkCommissioning returns the typed NetworkCommissioning server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) NetworkCommissioning() *networkcommissioningdef.Server {
-	return networkcommissioningdef.Wrap(d.Server(0x0031))
+	return networkcommissioningdef.WrapOn(d.Server(0x0031), d.queue)
 }
 
 // DiagnosticLogs returns the typed DiagnosticLogs server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) DiagnosticLogs() *diagnosticlogsdef.Server {
-	return diagnosticlogsdef.Wrap(d.Server(0x0032))
+	return diagnosticlogsdef.WrapOn(d.Server(0x0032), d.queue)
 }
 
 // SoftwareDiagnostics returns the typed SoftwareDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) SoftwareDiagnostics() *softwarediagnosticsdef.Server {
-	return softwarediagnosticsdef.Wrap(d.Server(0x0034))
+	return softwarediagnosticsdef.WrapOn(d.Server(0x0034), d.queue)
 }
 
 // WiFiNetworkDiagnostics returns the typed WiFiNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
-	return wifinetworkdiagnosticsdef.Wrap(d.Server(0x0036))
+	return wifinetworkdiagnosticsdef.WrapOn(d.Server(0x0036), d.queue)
 }
 
 // EthernetNetworkDiagnostics returns the typed EthernetNetworkDiagnostics server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) EthernetNetworkDiagnostics() *ethernetnetworkdiagnosticsdef.Server {
-	return ethernetnetworkdiagnosticsdef.Wrap(d.Server(0x0037))
+	return ethernetnetworkdiagnosticsdef.WrapOn(d.Server(0x0037), d.queue)
 }
 
 // TimeSynchronization returns the typed TimeSynchronization server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) TimeSynchronization() *timesynchronizationdef.Server {
-	return timesynchronizationdef.Wrap(d.Server(0x0038))
+	return timesynchronizationdef.WrapOn(d.Server(0x0038), d.queue)
 }
 
 // IcdManagement returns the typed IcdManagement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RootNode) IcdManagement() *icdmanagementdef.Server {
-	return icdmanagementdef.Wrap(d.Server(0x0046))
+	return icdmanagementdef.WrapOn(d.Server(0x0046), d.queue)
 }
 
 // Groupcast returns the typed Groupcast server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *RootNode) Groupcast() *groupcastdef.Server { return groupcastdef.Wrap(d.Server(0x0065)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *RootNode) Groupcast() *groupcastdef.Server {
+	return groupcastdef.WrapOn(d.Server(0x0065), d.queue)
+}

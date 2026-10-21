@@ -56,6 +56,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -273,7 +274,10 @@ type ColorControlServer struct {
 	// changes and quiet report the attributes the server changes; quiet
 	// holds a quieter per "Q" attribute.
 	changes cluster.AttributeChanges
-	quiet   map[uint32]*cluster.Quieter
+	// cause is the contract.Origin of the last colour change, for the
+	// quieters' reports of it.
+	cause atomic.Uint32
+	quiet map[uint32]*cluster.Quieter
 
 	// mu guards everything below: commands, the transition's steps and
 	// subscription reports reach the server from different goroutines.
@@ -382,7 +386,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
-		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.Notify(id) }, Clock: cfg.Clock}
+		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.NotifyFrom(contract.Origin(s.cause.Load()), id) }, Clock: cfg.Clock} //nolint:gosec // only an Origin is stored
 	}
 	s.engine = transition.New(transition.Config{
 		Manage:       cfg.ManageTransitions,
@@ -402,7 +406,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 			return s.st.property(name)
 		},
 		Apply:                s.applyChanges,
-		RemainingTimeChanged: func() { s.changes.Notify(wire.ColorCtrlAttrRemainingTime) },
+		RemainingTimeChanged: func() { s.changes.NotifyFrom(contract.OriginCommand, wire.ColorCtrlAttrRemainingTime) },
 		Settled: func(name string) {
 			if q := s.quiet[propAttribute[name]]; q != nil {
 				q.EmitNow()

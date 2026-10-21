@@ -48,9 +48,10 @@ var IrrigationSystemType = Type{
 type IrrigationSystem struct{ *Device }
 
 // NewIrrigationSystem returns a IrrigationSystem device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewIrrigationSystem(opts Options, with ...Option) (*IrrigationSystem, error) {
-	d, err := New(&IrrigationSystemType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type IrrigationSystemID (see [New]).
+func NewIrrigationSystem(opts Options, decls ...Declaration) (*IrrigationSystem, error) {
+	d, err := FromSpec(Spec{Type: IrrigationSystemID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -58,17 +59,17 @@ func NewIrrigationSystem(opts Options, with ...Option) (*IrrigationSystem, error
 }
 
 // OperationalState returns the typed OperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *IrrigationSystem) OperationalState() *operationalstatedef.Server {
-	return operationalstatedef.Wrap(d.Server(0x0060))
+	return operationalstatedef.WrapOn(d.Server(0x0060), d.queue)
 }
 
 // FlowMeasurement returns the typed FlowMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *IrrigationSystem) FlowMeasurement() *flowmeasurementdef.Server {
-	return flowmeasurementdef.Wrap(d.Server(0x0404))
+	return flowmeasurementdef.WrapOn(d.Server(0x0404), d.queue)
 }

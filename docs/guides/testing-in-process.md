@@ -20,7 +20,7 @@ default clock is a `clocktest.Fake`, matter.js's `MockTime`.
 func TestPlugToggles(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	plug, err := device.NewOnOffPlugInUnit(device.Options{
-		StableKey: endpoint.StringKey("plug:1"), Name: "plug", Clock: site.Clock(),
+		StableKey: endpoint.StringKey("plug:1"), Name: "plug",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -140,8 +140,8 @@ on it: the device's ACK pump, MRP, subscription intervals, commissioning
 window, persist loop, its cluster servers' timers — including the bridged
 endpoints' and the Aggregator's Identify — and the controller's MRP, peer
 connection, subscription liveness and registry. A device the host builds
-with the device layer joins it through `device.Options.Clock`, as in the
-first test above.
+with the device layer joins it when the node's Aggregator adds it, as in
+the first test above.
 
 The fake moves only when the test moves it, or inside `Site.Run` and
 `Site.Eventually`, which every wire helper and `Commission` use. While the
@@ -174,7 +174,7 @@ the wall clock; the site's answers carry 120 s and 4500 s, longer than a
 test.
 
 *Source: `fabrictest/site.go` (`Run`, `Eventually`, `Settle`, `busy`),
-`node/config.go` (`Config.Clock`), `device/options.go` (`Options.Clock`),
+`node/config.go` (`Config.Clock`), `device/queue.go` (`deviceClock`),
 `endpoint/assembler.go` (`Config.Clock`), `node/root.go`
 (`buildAggregatorClusters`), `client/discovery/names.go` (`newNames`).*
 

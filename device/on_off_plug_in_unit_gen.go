@@ -75,9 +75,10 @@ var OnOffPlugInUnitType = Type{
 type OnOffPlugInUnit struct{ *Device }
 
 // NewOnOffPlugInUnit returns a OnOffPlugInUnit device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOnOffPlugInUnit(opts Options, with ...Option) (*OnOffPlugInUnit, error) {
-	d, err := New(&OnOffPlugInUnitType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OnOffPlugInUnitID (see [New]).
+func NewOnOffPlugInUnit(opts Options, decls ...Declaration) (*OnOffPlugInUnit, error) {
+	d, err := FromSpec(Spec{Type: OnOffPlugInUnitID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +86,15 @@ func NewOnOffPlugInUnit(opts Options, with ...Option) (*OnOffPlugInUnit, error) 
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *OnOffPlugInUnit) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *OnOffPlugInUnit) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *OnOffPlugInUnit) LevelControl() *levelcontroldef.Server {
-	return levelcontroldef.Wrap(d.Server(0x0008))
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

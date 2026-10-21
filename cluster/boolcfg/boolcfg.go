@@ -263,8 +263,8 @@ func (s *Server) served(values map[uint32]any) map[uint32]any {
 // publish stores the served attributes among values; the generated server
 // reports the ones that changed. Every value is one the model admits, so
 // it cannot fail.
-func (s *Server) publish(values map[uint32]any) {
-	_ = s.srv.SetAttributes(s.served(values))
+func (s *Server) publish(origin contract.Origin, values map[uint32]any) {
+	_ = s.srv.SetAttributesFrom(origin, s.served(values))
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -378,7 +378,7 @@ func (s *Server) SetCurrentSensitivityLevel(level uint8) error {
 	s.mu.Lock()
 	s.current = level
 	s.mu.Unlock()
-	s.publish(map[uint32]any{def.AttrCurrentSensitivityLevel: level})
+	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrCurrentSensitivityLevel: level})
 	return nil
 }
 
@@ -409,7 +409,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		s.mu.Lock()
 		s.enabled = alarms
 		s.mu.Unlock()
-		s.publish(map[uint32]any{def.AttrAlarmsEnabled: alarms})
+		s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsEnabled: alarms})
 	}
 
 	disable := ^alarms & allKnownAlarmModes // .cpp:182-185
@@ -424,7 +424,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		s.mu.Lock()
 		s.active = next
 		s.mu.Unlock()
-		s.publish(map[uint32]any{def.AttrAlarmsActive: next})
+		s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsActive: next})
 		event = true
 	}
 	if suppressed&disable != 0 { // .cpp:200-211
@@ -437,7 +437,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		s.mu.Lock()
 		s.suppressed = next
 		s.mu.Unlock()
-		s.publish(map[uint32]any{def.AttrAlarmsSuppressed: next})
+		s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsSuppressed: next})
 		event = true
 	}
 	if event { // .cpp:213-216
@@ -477,7 +477,7 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 	s.mu.Lock()
 	s.suppressed = next
 	s.mu.Unlock()
-	s.publish(map[uint32]any{def.AttrAlarmsSuppressed: next})
+	s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsSuppressed: next})
 	s.alarmsStateChanged()
 	return nil, nil
 }
@@ -508,7 +508,7 @@ func (s *Server) SetAlarmsActive(alarms AlarmMode) error {
 	if same { // .cpp:345
 		return nil
 	}
-	s.publish(map[uint32]any{def.AttrAlarmsActive: alarms})
+	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: alarms})
 	s.alarmsStateChanged()
 	return nil
 }
@@ -533,7 +533,7 @@ func (s *Server) ClearAllAlarms() {
 	}
 	s.active, s.suppressed = 0, 0
 	s.mu.Unlock()
-	s.publish(map[uint32]any{def.AttrAlarmsActive: AlarmMode(0), def.AttrAlarmsSuppressed: AlarmMode(0)})
+	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: AlarmMode(0), def.AttrAlarmsSuppressed: AlarmMode(0)})
 	s.alarmsStateChanged()
 }
 
@@ -549,7 +549,7 @@ func (s *Server) SetSensorFault(fault SensorFault) {
 	if s.Emits(def.EventSensorFault) {
 		_ = s.srv.Emit(endpoint, def.EventSensorFault, def.SensorFaultEvent{SensorFault: fault})
 	}
-	s.publish(map[uint32]any{def.AttrSensorFault: fault})
+	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrSensorFault: fault})
 }
 
 // alarmsStateChanged emits AlarmsStateChanged with the current state

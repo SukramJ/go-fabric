@@ -91,7 +91,8 @@
 // refuses (notes/parity/by_design.md
 // BD-Matter-LevelControl-LenientDecoders); the generated request structs
 // are accepted from an in-process caller and carried over to the
-// cluster/wire structs the [LevelSource] methods take.
+// cluster/wire structs the server's engine drives; a host's [LevelSource]
+// receives the generated requests again (port.go).
 package levelcontrol
 
 import (
@@ -235,25 +236,13 @@ const (
 	LightingLevelMin uint8 = 1
 )
 
-// Command payload types. These are aliases, not copies: the bridge's
-// command-fields reader already decodes MoveToLevel /
-// MoveToLevelWithOnOff into [wire.MoveToLevelRequest]
-// (bridge/fields_reader.go decodeMoveToLevelRequest), and cluster/wire
-// carries the decoders for all four shapes. A second set of structs here
-// would have to be kept in step with those by hand.
-type (
-	// MoveToLevelRequest carries MoveToLevel / MoveToLevelWithOnOff
-	// (element :72-78).
-	MoveToLevelRequest = wire.MoveToLevelRequest
-	// MoveRequest carries Move / MoveWithOnOff (element :80-86).
-	MoveRequest = wire.MoveRequest
-	// StepRequest carries Step / StepWithOnOff (element :88-95).
-	StepRequest = wire.StepRequest
-	// StopRequest carries Stop / StopWithOnOff (element :97-100).
-	StopRequest = wire.StopRequest
-)
+// LevelSource is the narrow host port this server reads and drives, in the
+// generated requests of cluster/spec/levelcontrol — what
+// levelcontroldef.Declare carries. The documentation of its methods
+// follows.
+type LevelSource = lvldef.LevelSource
 
-// LevelSource is the narrow host port this server reads and drives. The
+// source is the LevelSource the server drives, in cluster/wire's requests. The
 // host implements it over whatever actually owns the level; nothing in
 // this package caches or invents a value.
 //
@@ -277,7 +266,11 @@ type (
 // Under [Config.Transitions] the server calls MoveToLevel alone, with
 // TransitionTime 0 and ExecuteIfOff forced, once per level it applies;
 // the other seven command methods are not called.
-type LevelSource interface {
+//
+// The server drives the cluster/wire form internally (source); a host's
+// [LevelSource] — the same methods in the generated requests — reaches it
+// through portSource, the module's [NativeSource] directly.
+type source interface {
 	// CurrentLevel reports the level the device is at.
 	CurrentLevel() (level uint8, known bool)
 	// Options reports the stored OptionsBitmap.
@@ -293,25 +286,25 @@ type LevelSource interface {
 	SetOnLevel(ctx context.Context, level *uint8) error
 
 	// MoveToLevel drives the device to req.Level without touching OnOff.
-	MoveToLevel(ctx context.Context, req MoveToLevelRequest) error
+	MoveToLevel(ctx context.Context, req wire.MoveToLevelRequest) error
 	// MoveToLevelWithOnOff drives the device to req.Level and drives the
 	// endpoint's OnOff state with it.
-	MoveToLevelWithOnOff(ctx context.Context, req MoveToLevelRequest) error
+	MoveToLevelWithOnOff(ctx context.Context, req wire.MoveToLevelRequest) error
 	// Move starts a continuous move without touching OnOff.
-	Move(ctx context.Context, req MoveRequest) error
+	Move(ctx context.Context, req wire.MoveRequest) error
 	// MoveWithOnOff starts a continuous move and drives the endpoint's
 	// OnOff state with it.
-	MoveWithOnOff(ctx context.Context, req MoveRequest) error
+	MoveWithOnOff(ctx context.Context, req wire.MoveRequest) error
 	// Step applies one step without touching OnOff.
-	Step(ctx context.Context, req StepRequest) error
+	Step(ctx context.Context, req wire.StepRequest) error
 	// StepWithOnOff applies one step and drives the endpoint's OnOff
 	// state with it.
-	StepWithOnOff(ctx context.Context, req StepRequest) error
+	StepWithOnOff(ctx context.Context, req wire.StepRequest) error
 	// Stop halts a running move or step without touching OnOff.
-	Stop(ctx context.Context, req StopRequest) error
+	Stop(ctx context.Context, req wire.StopRequest) error
 	// StopWithOnOff halts a running move or step and drives the
 	// endpoint's OnOff state with it.
-	StopWithOnOff(ctx context.Context, req StopRequest) error
+	StopWithOnOff(ctx context.Context, req wire.StopRequest) error
 }
 
 // EffectiveOptions folds a command's OptionsMask and OptionsOverride
@@ -337,8 +330,9 @@ func EffectiveOptions(attribute, mask, override uint8) uint8 {
 
 // Config carries the construction parameters for [Server].
 type Config struct {
-	// Source is the host port. A nil Source makes every attribute read
-	// null and every command fail — the server never pretends to have
+	// Source is the level the server drives: a host's [LevelSource] or the
+	// module's own ([NativeSource]). A nil Source makes every attribute
+	// read null and every command fail — the server never pretends to have
 	// moved a device it cannot reach.
 	Source LevelSource
 	// DataVersion is an optional tracker owned by the host. When non-nil
@@ -365,7 +359,7 @@ type Config struct {
 
 // Server implements [contract.ClusterServer] for LevelControl (0x0008).
 type Server struct {
-	src      LevelSource
+	src      source
 	lighting bool
 	// featureBits is the advertised FeatureMap: OO, and LT with lighting.
 	featureBits uint32
@@ -397,6 +391,9 @@ type Server struct {
 	// quiescing suppresses the quieter's report while MatterQuiesce drops
 	// the one it holds back.
 	quiescing atomic.Bool
+	// levelOrigin is the contract.Origin of the last level change, for the
+	// quieter's report of it.
+	levelOrigin atomic.Uint32
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -435,7 +432,7 @@ func NewServer(cfg Config) *Server {
 	if cfg.Lighting {
 		features |= FeatureLighting
 	}
-	s := newServer(cfg.Source, cfg.DataVersion, features)
+	s := newServer(sourceOf(cfg.Source), cfg.DataVersion, features)
 	if cfg.Transitions != nil {
 		s.initEngine(*cfg.Transitions, true)
 	}
@@ -446,7 +443,7 @@ func NewServer(cfg Config) *Server {
 // optional: every subset is a conformant selection, so the instance has
 // nothing to refuse. MinLevel and MaxLevel are "Rev >= v7, O": served at
 // the revision advertised.
-func newServer(src LevelSource, dv *cluster.DataVersionTracker, features uint32) *Server {
+func newServer(src source, dv *cluster.DataVersionTracker, features uint32) *Server {
 	s := &Server{src: src, ext: dv, lighting: features&FeatureLighting != 0, featureBits: features}
 	s.inst, _ = spec.New(lvldef.Definition, spec.Options{
 		Features:   features,
@@ -664,10 +661,16 @@ func (s *Server) writeOptions(ctx context.Context, options uint8) error {
 	if s.src == nil {
 		return errNoSource("Options write")
 	}
+	before := s.src.Options()
 	if err := s.src.SetOptions(ctx, options); err != nil {
 		return fmt.Errorf("levelcontrol: Options write: %w", err)
 	}
 	s.tracker().Bump()
+	// A change is reported to the server's listeners, as matter.js emits
+	// options$Changed after the write commits (Datasource.ts:1473-1476).
+	if s.src.Options() != before {
+		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOptions)
+	}
 	return nil
 }
 
@@ -677,10 +680,14 @@ func (s *Server) writeOnLevel(ctx context.Context, level *uint8) error {
 	if s.src == nil {
 		return errNoSource("OnLevel write")
 	}
+	before, knownBefore := s.src.OnLevel()
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
 		return fmt.Errorf("levelcontrol: OnLevel write: %w", err)
 	}
 	s.tracker().Bump()
+	if after, known := s.src.OnLevel(); after != before || known != knownBefore {
+		s.changes.NotifyFrom(contract.OriginControllerWrite, AttrOnLevel)
+	}
 	return nil
 }
 
@@ -877,27 +884,27 @@ func checkStepMode(name string, mode uint8) error {
 // 0x0008) and hands every other LevelControl command over as the lenient
 // tag map; the generated request structs (cluster/spec/levelcontrol) an
 // in-process caller builds are carried over to the cluster/wire struct
-// the [LevelSource] takes, and the raw payload goes through
+// the engine drives, and the raw payload goes through
 // [wire.DecodeMoveToLevel].
-func moveToLevelRequestFrom(name string, fields any) (MoveToLevelRequest, error) {
+func moveToLevelRequestFrom(name string, fields any) (wire.MoveToLevelRequest, error) {
 	switch v := generatedValue(fields).(type) {
 	case nil:
-		return MoveToLevelRequest{}, missingFields(name)
-	case MoveToLevelRequest:
+		return wire.MoveToLevelRequest{}, missingFields(name)
+	case wire.MoveToLevelRequest:
 		return v, nil
 	case lvldef.MoveToLevelRequest:
-		return MoveToLevelRequest{
+		return wire.MoveToLevelRequest{
 			Level: v.Level, TransitionTime: nullablePtr(v.TransitionTime),
 			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
 		}, nil
 	case lvldef.MoveToLevelWithOnOffRequest:
-		return MoveToLevelRequest{
+		return wire.MoveToLevelRequest{
 			Level: v.Level, TransitionTime: nullablePtr(v.TransitionTime),
 			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
 		}, nil
-	case *MoveToLevelRequest:
+	case *wire.MoveToLevelRequest:
 		if v == nil {
-			return MoveToLevelRequest{}, missingFields(name)
+			return wire.MoveToLevelRequest{}, missingFields(name)
 		}
 		return *v, nil
 	case []byte:
@@ -909,7 +916,7 @@ func moveToLevelRequestFrom(name string, fields any) (MoveToLevelRequest, error)
 	case map[uint8]any:
 		return moveToLevelFromTagMap(name, v)
 	default:
-		return MoveToLevelRequest{}, unexpectedFields(name, "MoveToLevelRequest", fields)
+		return wire.MoveToLevelRequest{}, unexpectedFields(name, "MoveToLevelRequest", fields)
 	}
 }
 
@@ -949,8 +956,8 @@ func derefOrNil[T any](p *T) any {
 
 // moveToLevelFromTagMap reads the four MoveToLevel fields out of the
 // generic tag map (element :73-77).
-func moveToLevelFromTagMap(name string, m map[uint8]any) (MoveToLevelRequest, error) {
-	var req MoveToLevelRequest
+func moveToLevelFromTagMap(name string, m map[uint8]any) (wire.MoveToLevelRequest, error) {
+	var req wire.MoveToLevelRequest
 	level, err := requiredUint8(name, m, 0, "Level")
 	if err != nil {
 		return req, err
@@ -968,19 +975,19 @@ func moveToLevelFromTagMap(name string, m map[uint8]any) (MoveToLevelRequest, er
 
 // moveRequestFrom mirrors [moveToLevelRequestFrom] for Move /
 // MoveWithOnOff, reusing [wire.DecodeMove] for the raw-payload shape.
-func moveRequestFrom(name string, fields any) (MoveRequest, error) {
+func moveRequestFrom(name string, fields any) (wire.MoveRequest, error) {
 	switch v := generatedValue(fields).(type) {
 	case nil:
-		return MoveRequest{}, missingFields(name)
-	case MoveRequest:
+		return wire.MoveRequest{}, missingFields(name)
+	case wire.MoveRequest:
 		return v, nil
 	case lvldef.MoveRequest:
-		return MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+		return wire.MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
 	case lvldef.MoveWithOnOffRequest:
-		return MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
-	case *MoveRequest:
+		return wire.MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+	case *wire.MoveRequest:
 		if v == nil {
-			return MoveRequest{}, missingFields(name)
+			return wire.MoveRequest{}, missingFields(name)
 		}
 		return *v, nil
 	case []byte:
@@ -992,14 +999,14 @@ func moveRequestFrom(name string, fields any) (MoveRequest, error) {
 	case map[uint8]any:
 		return moveFromTagMap(name, v)
 	default:
-		return MoveRequest{}, unexpectedFields(name, "MoveRequest", fields)
+		return wire.MoveRequest{}, unexpectedFields(name, "MoveRequest", fields)
 	}
 }
 
 // moveFromTagMap reads the four Move fields out of the generic tag map
 // (element :81-85).
-func moveFromTagMap(name string, m map[uint8]any) (MoveRequest, error) {
-	var req MoveRequest
+func moveFromTagMap(name string, m map[uint8]any) (wire.MoveRequest, error) {
+	var req wire.MoveRequest
 	mode, err := requiredUint8(name, m, 0, "MoveMode")
 	if err != nil {
 		return req, err
@@ -1017,25 +1024,25 @@ func moveFromTagMap(name string, m map[uint8]any) (MoveRequest, error) {
 
 // stepRequestFrom mirrors [moveToLevelRequestFrom] for Step /
 // StepWithOnOff, reusing [wire.DecodeStep] for the raw-payload shape.
-func stepRequestFrom(name string, fields any) (StepRequest, error) {
+func stepRequestFrom(name string, fields any) (wire.StepRequest, error) {
 	switch v := generatedValue(fields).(type) {
 	case nil:
-		return StepRequest{}, missingFields(name)
-	case StepRequest:
+		return wire.StepRequest{}, missingFields(name)
+	case wire.StepRequest:
 		return v, nil
 	case lvldef.StepRequest:
-		return StepRequest{
+		return wire.StepRequest{
 			StepMode: uint8(v.StepMode), StepSize: v.StepSize, TransitionTime: nullablePtr(v.TransitionTime),
 			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
 		}, nil
 	case lvldef.StepWithOnOffRequest:
-		return StepRequest{
+		return wire.StepRequest{
 			StepMode: uint8(v.StepMode), StepSize: v.StepSize, TransitionTime: nullablePtr(v.TransitionTime),
 			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
 		}, nil
-	case *StepRequest:
+	case *wire.StepRequest:
 		if v == nil {
-			return StepRequest{}, missingFields(name)
+			return wire.StepRequest{}, missingFields(name)
 		}
 		return *v, nil
 	case []byte:
@@ -1047,14 +1054,14 @@ func stepRequestFrom(name string, fields any) (StepRequest, error) {
 	case map[uint8]any:
 		return stepFromTagMap(name, v)
 	default:
-		return StepRequest{}, unexpectedFields(name, "StepRequest", fields)
+		return wire.StepRequest{}, unexpectedFields(name, "StepRequest", fields)
 	}
 }
 
 // stepFromTagMap reads the five Step fields out of the generic tag map
 // (element :89-94).
-func stepFromTagMap(name string, m map[uint8]any) (StepRequest, error) {
-	var req StepRequest
+func stepFromTagMap(name string, m map[uint8]any) (wire.StepRequest, error) {
+	var req wire.StepRequest
 	mode, err := requiredUint8(name, m, 0, "StepMode")
 	if err != nil {
 		return req, err
@@ -1075,19 +1082,19 @@ func stepFromTagMap(name string, m map[uint8]any) (StepRequest, error) {
 
 // stopRequestFrom mirrors [moveToLevelRequestFrom] for Stop /
 // StopWithOnOff, reusing [wire.DecodeStop] for the raw-payload shape.
-func stopRequestFrom(name string, fields any) (StopRequest, error) {
+func stopRequestFrom(name string, fields any) (wire.StopRequest, error) {
 	switch v := generatedValue(fields).(type) {
 	case nil:
-		return StopRequest{}, missingFields(name)
-	case StopRequest:
+		return wire.StopRequest{}, missingFields(name)
+	case wire.StopRequest:
 		return v, nil
 	case lvldef.StopRequest:
-		return StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+		return wire.StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
 	case lvldef.StopWithOnOffRequest:
-		return StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
-	case *StopRequest:
+		return wire.StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+	case *wire.StopRequest:
 		if v == nil {
-			return StopRequest{}, missingFields(name)
+			return wire.StopRequest{}, missingFields(name)
 		}
 		return *v, nil
 	case []byte:
@@ -1099,14 +1106,14 @@ func stopRequestFrom(name string, fields any) (StopRequest, error) {
 	case map[uint8]any:
 		return stopFromTagMap(name, v)
 	default:
-		return StopRequest{}, unexpectedFields(name, "StopRequest", fields)
+		return wire.StopRequest{}, unexpectedFields(name, "StopRequest", fields)
 	}
 }
 
 // stopFromTagMap reads the two Stop fields out of the generic tag map
 // (element :98-99).
-func stopFromTagMap(name string, m map[uint8]any) (StopRequest, error) {
-	var req StopRequest
+func stopFromTagMap(name string, m map[uint8]any) (wire.StopRequest, error) {
+	var req wire.StopRequest
 	var err error
 	if req.OptionsMask, err = optionalBitmap(name, m, 0, "OptionsMask"); err != nil {
 		return req, err

@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // typedEcoDir is a directory with one device.
@@ -41,7 +42,7 @@ func TestTypedEcosystemInformationServer(t *testing.T) {
 		t.Errorf("an empty patch: %v", err)
 	}
 	var changed [][]uint32
-	unsubscribe := s.OnChanged(func(_ ecodef.State, ids []uint32) { changed = append(changed, ids) })
+	unsubscribe := s.OnChanged(func(_ ecodef.State, change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })
 	defer unsubscribe()
 	e.DirectoryChanged()
 	if len(changed) != 1 || len(changed[0]) != 2 {

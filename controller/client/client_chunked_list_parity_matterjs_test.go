@@ -78,7 +78,7 @@ func channelPair(t *testing.T, o client.CommissionOptions) (*fabrictest.Site, *c
 	if err != nil {
 		t.Fatal(err)
 	}
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1", Clock: site.Clock()}, device.WithServer(ch))
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light:1"}, channeldef.Declare{HostServer: ch})
 	if err != nil {
 		t.Fatal(err)
 	}

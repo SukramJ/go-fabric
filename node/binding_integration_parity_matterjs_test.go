@@ -368,7 +368,7 @@ func boundLight(t *testing.T) *boundLightSite {
 	t.Helper()
 	b := newBQSwitch(t, bqOptions{client: true})
 	h := observeBindings(b.dev.Node().Bindings())
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light", Clock: b.site.Clock()})
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light:1"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
 	}

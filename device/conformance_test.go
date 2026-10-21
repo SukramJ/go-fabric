@@ -55,7 +55,7 @@ var refusedDefaults = map[string]string{
 	// A mandatory cluster whose generated server refuses its definition
 	// and that has no core default: the requestor needs the node's
 	// connector.
-	"OtaRequestor": "attribute DefaultOtaProviders: supply its server with WithServer",
+	"OtaRequestor": "attribute DefaultOtaProviders: supply its server as the declaration's HostServer",
 	// The node's root clusters have no committed definitions; the root is
 	// the node facade's, not a bridged device.
 	"RootNode": "requires AccessControl (0x001F, conformance \"M\") and no generated definition is committed",
@@ -118,7 +118,7 @@ func part(t *testing.T, owner *Device, name string, conds []string, with ...Opti
 
 func opts(o ...Option) func(*testing.T) []Option { return func(*testing.T) []Option { return o } }
 
-func feat[F ~uint32](clusterID uint32, f F) Option { return WithFeatures(clusterID, uint32(f)) }
+func feat[F ~uint32](clusterID uint32, f F) Option { return withFeatures(clusterID, uint32(f)) }
 
 var (
 	wired    = feat(0x002F, psdef.FeatureWired)
@@ -139,8 +139,8 @@ func meteredSensor(t *testing.T, features uint32) []Option {
 	t.Helper()
 	return []Option{
 		nodeTopo,
-		WithFeatures(0x0090, features),
-		WithElements(0x0090, spec.Options{Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent}}),
+		withFeatures(0x0090, features),
+		withElements(0x0090, spec.Options{Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent}}),
 		feat(0x0091, eemdef.FeatureImportedEnergy|eemdef.FeatureExportedEnergy|eemdef.FeatureCumulativeEnergy),
 	}
 }
@@ -157,7 +157,7 @@ var fixtures = map[string]fixture{
 			part(t, d, "ElectricalSensor", nil, meteredSensor(t, uint32(epmdef.FeatureDirectCurrent))...)
 			part(t, d, "PowerSource", nil, wired)
 			part(t, d, "PowerSource", nil, feat(0x002F, psdef.FeatureBattery|psdef.FeatureRechargeable),
-				WithElements(0x002F, spec.Options{Attributes: []uint32{
+				withElements(0x002F, spec.Options{Attributes: []uint32{
 					psdef.AttrBatVoltage, psdef.AttrBatPercentRemaining, psdef.AttrBatTimeRemaining, psdef.AttrActiveBatFaults,
 					psdef.AttrBatCapacity, psdef.AttrBatTimeToFullCharge, psdef.AttrBatChargingCurrent, psdef.AttrActiveBatChargeFaults,
 				}}))

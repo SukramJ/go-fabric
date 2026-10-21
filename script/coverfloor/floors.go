@@ -172,6 +172,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
 	{
+		pkg: "github.com/SukramJ/go-fabric/internal/deviceseam",
+		min: 0,
+		why: "declaration-only seam: an interface and a function variable device installs from its init, so the package holds no statement a test could execute",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/internal/nodeseam",
 		min: 0,
 		why: "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",

@@ -52,9 +52,10 @@ var WaterHeaterType = Type{
 type WaterHeater struct{ *Device }
 
 // NewWaterHeater returns a WaterHeater device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewWaterHeater(opts Options, with ...Option) (*WaterHeater, error) {
-	d, err := New(&WaterHeaterType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type WaterHeaterID (see [New]).
+func NewWaterHeater(opts Options, decls ...Declaration) (*WaterHeater, error) {
+	d, err := FromSpec(Spec{Type: WaterHeaterID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -62,20 +63,25 @@ func NewWaterHeater(opts Options, with ...Option) (*WaterHeater, error) {
 }
 
 // WaterHeaterManagement returns the typed WaterHeaterManagement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterManagement() *waterheatermanagementdef.Server {
-	return waterheatermanagementdef.Wrap(d.Server(0x0094))
+	return waterheatermanagementdef.WrapOn(d.Server(0x0094), d.queue)
 }
 
 // WaterHeaterMode returns the typed WaterHeaterMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterHeater) WaterHeaterMode() *waterheatermodedef.Server {
-	return waterheatermodedef.Wrap(d.Server(0x009E))
+	return waterheatermodedef.WrapOn(d.Server(0x009E), d.queue)
 }
 
 // Thermostat returns the typed Thermostat server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *WaterHeater) Thermostat() *thermostatdef.Server { return thermostatdef.Wrap(d.Server(0x0201)) }
+func (d *WaterHeater) Thermostat() *thermostatdef.Server {
+	return thermostatdef.WrapOn(d.Server(0x0201), d.queue)
+}

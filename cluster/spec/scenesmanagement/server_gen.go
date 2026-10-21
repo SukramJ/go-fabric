@@ -7,6 +7,7 @@ package scenesmanagement
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -39,12 +40,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -55,11 +62,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -118,4 +135,130 @@ func (s *Server) HandleGetSceneMembership(fn func(ctx context.Context, req GetSc
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleCopyScene(fn func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCopyScene, fn)
+}
+
+// Declare is the declaration of the ScenesManagement cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleAddScene handles the AddScene command in place of the server
+	// (Server.HandleAddScene), inline; an optional command it handles is accepted.
+	HandleAddScene func(ctx context.Context, req AddSceneRequest) (AddSceneResponse, error)
+	// HandleViewScene handles the ViewScene command in place of the server
+	// (Server.HandleViewScene), inline; an optional command it handles is accepted.
+	HandleViewScene func(ctx context.Context, req ViewSceneRequest) (ViewSceneResponse, error)
+	// HandleRemoveScene handles the RemoveScene command in place of the server
+	// (Server.HandleRemoveScene), inline; an optional command it handles is accepted.
+	HandleRemoveScene func(ctx context.Context, req RemoveSceneRequest) (RemoveSceneResponse, error)
+	// HandleRemoveAllScenes handles the RemoveAllScenes command in place of the server
+	// (Server.HandleRemoveAllScenes), inline; an optional command it handles is accepted.
+	HandleRemoveAllScenes func(ctx context.Context, req RemoveAllScenesRequest) (RemoveAllScenesResponse, error)
+	// HandleStoreScene handles the StoreScene command in place of the server
+	// (Server.HandleStoreScene), inline; an optional command it handles is accepted.
+	HandleStoreScene func(ctx context.Context, req StoreSceneRequest) (StoreSceneResponse, error)
+	// HandleRecallScene handles the RecallScene command in place of the server
+	// (Server.HandleRecallScene), inline; an optional command it handles is accepted.
+	HandleRecallScene func(ctx context.Context, req RecallSceneRequest) (struct{}, error)
+	// HandleGetSceneMembership handles the GetSceneMembership command in place of the server
+	// (Server.HandleGetSceneMembership), inline; an optional command it handles is accepted.
+	HandleGetSceneMembership func(ctx context.Context, req GetSceneMembershipRequest) (GetSceneMembershipResponse, error)
+	// HandleCopyScene handles the CopyScene command in place of the server
+	// (Server.HandleCopyScene), inline; an optional command it handles is accepted.
+	HandleCopyScene func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)
+	// HostServer is the host's own server for the cluster, mounted in
+	// place of the kit's — also for a cluster the device type does not
+	// list. The hooks above go on it; Initial, Features and the ports are
+	// the kit's server's and are refused beside it.
+	HostServer contract.ClusterServer
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleAddScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleViewScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdViewScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleRemoveAllScenes != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveAllScenes)
+		decl.Attach = d.attach
+	}
+	if d.HandleStoreScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStoreScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleRecallScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRecallScene)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetSceneMembership != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetSceneMembership)
+		decl.Attach = d.attach
+	}
+	if d.HandleCopyScene != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdCopyScene)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	var errs []error
+	if d.OnWrite != nil {
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
+	}
+	if d.HandleAddScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleAddScene", s.HandleAddScene(d.HandleAddScene)))
+	}
+	if d.HandleViewScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleViewScene", s.HandleViewScene(d.HandleViewScene)))
+	}
+	if d.HandleRemoveScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRemoveScene", s.HandleRemoveScene(d.HandleRemoveScene)))
+	}
+	if d.HandleRemoveAllScenes != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRemoveAllScenes", s.HandleRemoveAllScenes(d.HandleRemoveAllScenes)))
+	}
+	if d.HandleStoreScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStoreScene", s.HandleStoreScene(d.HandleStoreScene)))
+	}
+	if d.HandleRecallScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRecallScene", s.HandleRecallScene(d.HandleRecallScene)))
+	}
+	if d.HandleGetSceneMembership != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetSceneMembership", s.HandleGetSceneMembership(d.HandleGetSceneMembership)))
+	}
+	if d.HandleCopyScene != nil {
+		errs = append(errs, spec.HookError(Name, "HandleCopyScene", s.HandleCopyScene(d.HandleCopyScene)))
+	}
+	return errors.Join(errs...)
 }

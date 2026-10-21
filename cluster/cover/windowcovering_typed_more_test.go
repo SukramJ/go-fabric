@@ -31,7 +31,10 @@ func TestWindowCoveringTypedSetRules(t *testing.T) {
 	t.Parallel()
 	s := typedCovering(t)
 	var changes [][]uint32
-	defer s.OnChanged(func(_ wcdef.State, changed []uint32) { changes = append(changes, changed) })()
+	defer s.OnChanged(func(_ wcdef.State, change contract.Change) {
+		changed := change.Attributes
+		changes = append(changes, changed)
+	})()
 
 	moving := wcdef.OperationalStatusBitmap(0x05) // Global and Lift opening
 	if err := s.Set(wcdef.Patch{OperationalStatus: &moving}); err != nil {
@@ -104,7 +107,10 @@ func TestWindowCoveringModeWriteRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	var changes [][]uint32
-	defer s.OnChanged(func(_ wcdef.State, changed []uint32) { changes = append(changes, changed) })()
+	defer s.OnChanged(func(_ wcdef.State, change contract.Change) {
+		changed := change.Attributes
+		changes = append(changes, changed)
+	})()
 	if err := srv.MatterWrite(ctx, wcdef.AttrMode, uint64(wcdef.ModeMaintenanceMode|wcdef.ModeCalibrationMode)); err != nil {
 		t.Fatalf("Maintenance+Calibration write: %v", err)
 	}

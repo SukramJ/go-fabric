@@ -31,7 +31,6 @@ func TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe(t *testing.T) {
 		{"LevelControl FQ", 0x0008, spec.Options{Features: uint32(lvldef.FeatureFrequency)}},
 		{"ColorControl unknown bit", 0x0300, spec.Options{Features: 1 << 7}},
 		{"Thermostat without HEAT or COOL", 0x0201, spec.Options{}},
-		{"DoorLock without features", 0x0101, spec.Options{}},
 		{"DoorLock unserved bit", 0x0101, spec.Options{Features: 1 << 20}},
 		{"WindowCovering Lift alone", 0x0102, spec.Options{Features: 0x1}},
 		{"HepaFilterMonitoring ResetCondition", 0x0071, spec.Options{Commands: []uint32{hepadef.CmdResetCondition}}},

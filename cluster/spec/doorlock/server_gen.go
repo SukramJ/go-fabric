@@ -7,6 +7,7 @@ package doorlock
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -128,12 +129,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -144,11 +151,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -321,4 +338,282 @@ func (s *Server) EmitLockOperationError(endpoint uint16, data LockOperationError
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data)
+}
+
+// StateSource is the lock's actuator: it reports whether the bolt is
+// jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor
+// (cmdID) the kit's DoorLock server admitted (cluster/lock
+// StateSource). Without one the server keeps its own lock state.
+type StateSource interface {
+	IsJammed() bool
+	IsLocked() (locked, observed bool)
+	LockInvoke(ctx context.Context, cmdID uint32) error
+}
+
+// Declare is the declaration of the DoorLock cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandleLockDoor handles the LockDoor command in place of the server
+	// (Server.HandleLockDoor), inline; an optional command it handles is accepted.
+	HandleLockDoor func(ctx context.Context, req LockDoorRequest) (struct{}, error)
+	// HandleUnlockDoor handles the UnlockDoor command in place of the server
+	// (Server.HandleUnlockDoor), inline; an optional command it handles is accepted.
+	HandleUnlockDoor func(ctx context.Context, req UnlockDoorRequest) (struct{}, error)
+	// HandleToggle handles the Toggle command in place of the server
+	// (Server.HandleToggle), inline; an optional command it handles is accepted.
+	HandleToggle func(ctx context.Context, req ToggleRequest) (struct{}, error)
+	// HandleUnlockWithTimeout handles the UnlockWithTimeout command in place of the server
+	// (Server.HandleUnlockWithTimeout), inline; an optional command it handles is accepted.
+	HandleUnlockWithTimeout func(ctx context.Context, req UnlockWithTimeoutRequest) (struct{}, error)
+	// HandleSetWeekDaySchedule handles the SetWeekDaySchedule command in place of the server
+	// (Server.HandleSetWeekDaySchedule), inline; an optional command it handles is accepted.
+	HandleSetWeekDaySchedule func(ctx context.Context, req SetWeekDayScheduleRequest) (struct{}, error)
+	// HandleGetWeekDaySchedule handles the GetWeekDaySchedule command in place of the server
+	// (Server.HandleGetWeekDaySchedule), inline; an optional command it handles is accepted.
+	HandleGetWeekDaySchedule func(ctx context.Context, req GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error)
+	// HandleClearWeekDaySchedule handles the ClearWeekDaySchedule command in place of the server
+	// (Server.HandleClearWeekDaySchedule), inline; an optional command it handles is accepted.
+	HandleClearWeekDaySchedule func(ctx context.Context, req ClearWeekDayScheduleRequest) (struct{}, error)
+	// HandleSetYearDaySchedule handles the SetYearDaySchedule command in place of the server
+	// (Server.HandleSetYearDaySchedule), inline; an optional command it handles is accepted.
+	HandleSetYearDaySchedule func(ctx context.Context, req SetYearDayScheduleRequest) (struct{}, error)
+	// HandleGetYearDaySchedule handles the GetYearDaySchedule command in place of the server
+	// (Server.HandleGetYearDaySchedule), inline; an optional command it handles is accepted.
+	HandleGetYearDaySchedule func(ctx context.Context, req GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error)
+	// HandleClearYearDaySchedule handles the ClearYearDaySchedule command in place of the server
+	// (Server.HandleClearYearDaySchedule), inline; an optional command it handles is accepted.
+	HandleClearYearDaySchedule func(ctx context.Context, req ClearYearDayScheduleRequest) (struct{}, error)
+	// HandleSetHolidaySchedule handles the SetHolidaySchedule command in place of the server
+	// (Server.HandleSetHolidaySchedule), inline; an optional command it handles is accepted.
+	HandleSetHolidaySchedule func(ctx context.Context, req SetHolidayScheduleRequest) (struct{}, error)
+	// HandleGetHolidaySchedule handles the GetHolidaySchedule command in place of the server
+	// (Server.HandleGetHolidaySchedule), inline; an optional command it handles is accepted.
+	HandleGetHolidaySchedule func(ctx context.Context, req GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error)
+	// HandleClearHolidaySchedule handles the ClearHolidaySchedule command in place of the server
+	// (Server.HandleClearHolidaySchedule), inline; an optional command it handles is accepted.
+	HandleClearHolidaySchedule func(ctx context.Context, req ClearHolidayScheduleRequest) (struct{}, error)
+	// HandleSetUser handles the SetUser command in place of the server
+	// (Server.HandleSetUser), inline; an optional command it handles is accepted.
+	HandleSetUser func(ctx context.Context, req SetUserRequest) (struct{}, error)
+	// HandleGetUser handles the GetUser command in place of the server
+	// (Server.HandleGetUser), inline; an optional command it handles is accepted.
+	HandleGetUser func(ctx context.Context, req GetUserRequest) (GetUserResponse, error)
+	// HandleClearUser handles the ClearUser command in place of the server
+	// (Server.HandleClearUser), inline; an optional command it handles is accepted.
+	HandleClearUser func(ctx context.Context, req ClearUserRequest) (struct{}, error)
+	// HandleSetCredential handles the SetCredential command in place of the server
+	// (Server.HandleSetCredential), inline; an optional command it handles is accepted.
+	HandleSetCredential func(ctx context.Context, req SetCredentialRequest) (SetCredentialResponse, error)
+	// HandleGetCredentialStatus handles the GetCredentialStatus command in place of the server
+	// (Server.HandleGetCredentialStatus), inline; an optional command it handles is accepted.
+	HandleGetCredentialStatus func(ctx context.Context, req GetCredentialStatusRequest) (GetCredentialStatusResponse, error)
+	// HandleClearCredential handles the ClearCredential command in place of the server
+	// (Server.HandleClearCredential), inline; an optional command it handles is accepted.
+	HandleClearCredential func(ctx context.Context, req ClearCredentialRequest) (struct{}, error)
+	// HandleUnboltDoor handles the UnboltDoor command in place of the server
+	// (Server.HandleUnboltDoor), inline; an optional command it handles is accepted.
+	HandleUnboltDoor func(ctx context.Context, req UnboltDoorRequest) (struct{}, error)
+	// HandleSetAliroReaderConfig handles the SetAliroReaderConfig command in place of the server
+	// (Server.HandleSetAliroReaderConfig), inline; an optional command it handles is accepted.
+	HandleSetAliroReaderConfig func(ctx context.Context, req SetAliroReaderConfigRequest) (struct{}, error)
+	// HandleClearAliroReaderConfig handles the ClearAliroReaderConfig command in place of the server
+	// (Server.HandleClearAliroReaderConfig), inline; an optional command it handles is accepted.
+	HandleClearAliroReaderConfig func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
+	// HostServer is the host's own server for the cluster, mounted in
+	// place of the kit's — also for a cluster the device type does not
+	// list. The hooks above go on it; Initial, Features and the ports are
+	// the kit's server's and are refused beside it.
+	HostServer contract.ClusterServer
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandleLockDoor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdLockDoor)
+		decl.Attach = d.attach
+	}
+	if d.HandleUnlockDoor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUnlockDoor)
+		decl.Attach = d.attach
+	}
+	if d.HandleToggle != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdToggle)
+		decl.Attach = d.attach
+	}
+	if d.HandleUnlockWithTimeout != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUnlockWithTimeout)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetWeekDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetWeekDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetWeekDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetWeekDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearWeekDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearWeekDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetYearDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetYearDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetYearDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetYearDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearYearDaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearYearDaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetHolidaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetHolidaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetHolidaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetHolidaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearHolidaySchedule != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearHolidaySchedule)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetUser != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetUser)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetUser != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetUser)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearUser != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearUser)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetCredential != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetCredential)
+		decl.Attach = d.attach
+	}
+	if d.HandleGetCredentialStatus != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdGetCredentialStatus)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearCredential != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearCredential)
+		decl.Attach = d.attach
+	}
+	if d.HandleUnboltDoor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdUnboltDoor)
+		decl.Attach = d.attach
+	}
+	if d.HandleSetAliroReaderConfig != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetAliroReaderConfig)
+		decl.Attach = d.attach
+	}
+	if d.HandleClearAliroReaderConfig != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearAliroReaderConfig)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	var errs []error
+	if d.OnWrite != nil {
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
+	}
+	if d.HandleLockDoor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleLockDoor", s.HandleLockDoor(d.HandleLockDoor)))
+	}
+	if d.HandleUnlockDoor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleUnlockDoor", s.HandleUnlockDoor(d.HandleUnlockDoor)))
+	}
+	if d.HandleToggle != nil {
+		errs = append(errs, spec.HookError(Name, "HandleToggle", s.HandleToggle(d.HandleToggle)))
+	}
+	if d.HandleUnlockWithTimeout != nil {
+		errs = append(errs, spec.HookError(Name, "HandleUnlockWithTimeout", s.HandleUnlockWithTimeout(d.HandleUnlockWithTimeout)))
+	}
+	if d.HandleSetWeekDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetWeekDaySchedule", s.HandleSetWeekDaySchedule(d.HandleSetWeekDaySchedule)))
+	}
+	if d.HandleGetWeekDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetWeekDaySchedule", s.HandleGetWeekDaySchedule(d.HandleGetWeekDaySchedule)))
+	}
+	if d.HandleClearWeekDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearWeekDaySchedule", s.HandleClearWeekDaySchedule(d.HandleClearWeekDaySchedule)))
+	}
+	if d.HandleSetYearDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetYearDaySchedule", s.HandleSetYearDaySchedule(d.HandleSetYearDaySchedule)))
+	}
+	if d.HandleGetYearDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetYearDaySchedule", s.HandleGetYearDaySchedule(d.HandleGetYearDaySchedule)))
+	}
+	if d.HandleClearYearDaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearYearDaySchedule", s.HandleClearYearDaySchedule(d.HandleClearYearDaySchedule)))
+	}
+	if d.HandleSetHolidaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetHolidaySchedule", s.HandleSetHolidaySchedule(d.HandleSetHolidaySchedule)))
+	}
+	if d.HandleGetHolidaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetHolidaySchedule", s.HandleGetHolidaySchedule(d.HandleGetHolidaySchedule)))
+	}
+	if d.HandleClearHolidaySchedule != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearHolidaySchedule", s.HandleClearHolidaySchedule(d.HandleClearHolidaySchedule)))
+	}
+	if d.HandleSetUser != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetUser", s.HandleSetUser(d.HandleSetUser)))
+	}
+	if d.HandleGetUser != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetUser", s.HandleGetUser(d.HandleGetUser)))
+	}
+	if d.HandleClearUser != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearUser", s.HandleClearUser(d.HandleClearUser)))
+	}
+	if d.HandleSetCredential != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetCredential", s.HandleSetCredential(d.HandleSetCredential)))
+	}
+	if d.HandleGetCredentialStatus != nil {
+		errs = append(errs, spec.HookError(Name, "HandleGetCredentialStatus", s.HandleGetCredentialStatus(d.HandleGetCredentialStatus)))
+	}
+	if d.HandleClearCredential != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearCredential", s.HandleClearCredential(d.HandleClearCredential)))
+	}
+	if d.HandleUnboltDoor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleUnboltDoor", s.HandleUnboltDoor(d.HandleUnboltDoor)))
+	}
+	if d.HandleSetAliroReaderConfig != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSetAliroReaderConfig", s.HandleSetAliroReaderConfig(d.HandleSetAliroReaderConfig)))
+	}
+	if d.HandleClearAliroReaderConfig != nil {
+		errs = append(errs, spec.HookError(Name, "HandleClearAliroReaderConfig", s.HandleClearAliroReaderConfig(d.HandleClearAliroReaderConfig)))
+	}
+	return errors.Join(errs...)
 }

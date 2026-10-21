@@ -5,8 +5,11 @@ package device
 
 import (
 	"context"
+	"maps"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/groups"
@@ -91,4 +94,33 @@ func violationsOf(topo *endpoint.Topology) []endpoint.DeviceTypeViolation {
 		out = append(out, all[i])
 	}
 	return out
+}
+
+// The kit's per-cluster statements by cluster id, for the tests that walk
+// every device type or every cluster without naming its generated package:
+// the untyped form a <cluster>def.Declare compiles to, merged the same way.
+// There is no public form of these: a host declares the cluster.
+
+// withFeatures states the FeatureMap selection of a cluster.
+func withFeatures(clusterID, features uint32) Option {
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Features: features, HasFeatures: true}, mount: true}
+}
+
+// withInitial states initial attribute values of a cluster.
+func withInitial(clusterID uint32, values map[uint32]any) Option {
+	initial := maps.Clone(values)
+	if initial == nil {
+		initial = map[uint32]any{}
+	}
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Initial: initial}}
+}
+
+// withElements states optional elements of a cluster.
+func withElements(clusterID uint32, opts spec.Options) Option {
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID, Elements: opts}, mount: true}
+}
+
+// withServer states the host's own server of a cluster.
+func withServer(srv contract.ClusterServer) Option {
+	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}}
 }

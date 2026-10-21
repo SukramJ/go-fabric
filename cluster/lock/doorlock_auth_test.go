@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/lock"
@@ -124,18 +125,21 @@ func TestRecordsPersistEncrypted(t *testing.T) {
 	}
 }
 
-// TestDefaultSelectionServesAsBefore: a configuration that names no
-// feature serves the former selection, Unbolting without UnlockWithTimeout.
-func TestDefaultSelectionServesAsBefore(t *testing.T) {
+// TestEmptySelectionIsNone: a configuration that names no feature serves
+// none — matter.js's DoorLockServer without features — and accepts
+// UnlockWithTimeout, as every selection does (brief BU; before v0.10.0 it
+// served Unbolting without UnlockWithTimeout).
+func TestEmptySelectionIsNone(t *testing.T) {
 	t.Parallel()
 	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: &stubSourceFull{}})
-	if fm, _ := srv.MatterRead(0xFFFC); fm != uint32(lockdef.FeatureUnbolting) {
-		t.Errorf("FeatureMap %v, want Unbolting", fm)
+	if fm, _ := srv.MatterRead(0xFFFC); fm != uint32(0) {
+		t.Errorf("FeatureMap %v, want 0", fm)
 	}
-	for _, id := range srv.MatterAcceptedCommands() {
-		if id == lockdef.CmdUnlockWithTimeout {
-			t.Error("UnlockWithTimeout accepted by the default selection")
-		}
+	if !slices.Contains(srv.MatterAcceptedCommands(), lockdef.CmdUnlockWithTimeout) {
+		t.Error("UnlockWithTimeout not accepted by the empty selection")
+	}
+	if slices.Contains(srv.MatterAcceptedCommands(), lockdef.CmdUnboltDoor) {
+		t.Error("UnboltDoor accepted without Unbolting")
 	}
 }
 

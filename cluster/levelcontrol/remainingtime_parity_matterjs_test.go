@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 // transitioningLight is
@@ -31,7 +32,7 @@ import (
 func transitioningLight(t *testing.T) *nodeLight {
 	t.Helper()
 	l := newNodeLight(t, nodeLightOptions{level: 1, on: true})
-	l.invoke(t, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 254, TransitionTime: u16(150)})
+	l.invoke(t, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 254, TransitionTime: u16(150)})
 	return l
 }
 

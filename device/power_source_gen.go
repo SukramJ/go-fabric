@@ -34,9 +34,10 @@ var PowerSourceType = Type{
 type PowerSource struct{ *Device }
 
 // NewPowerSource returns a PowerSource device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewPowerSource(opts Options, with ...Option) (*PowerSource, error) {
-	d, err := New(&PowerSourceType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type PowerSourceID (see [New]).
+func NewPowerSource(opts Options, decls ...Declaration) (*PowerSource, error) {
+	d, err := FromSpec(Spec{Type: PowerSourceID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +45,9 @@ func NewPowerSource(opts Options, with ...Option) (*PowerSource, error) {
 }
 
 // PowerSource returns the typed PowerSource server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *PowerSource) PowerSource() *powersourcedef.Server {
-	return powersourcedef.Wrap(d.Server(0x002F))
+	return powersourcedef.WrapOn(d.Server(0x002F), d.queue)
 }

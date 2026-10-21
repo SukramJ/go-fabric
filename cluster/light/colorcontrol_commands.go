@@ -9,6 +9,7 @@ import (
 
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/transition"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -54,7 +55,7 @@ func (s *ColorControlServer) rollback(prev colorState, gen uint64) {
 	}
 	s.st = prev
 	s.mu.Unlock()
-	s.report(cur, prev)
+	s.report(contract.OriginCommand, cur, prev)
 }
 
 func (s *ColorControlServer) invoke(ctx context.Context, cmdID uint32, fields any) error { //nolint:gocyclo // a dispatch table: one case per command

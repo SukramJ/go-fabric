@@ -21,12 +21,14 @@ import (
 // leaving no change): spec.Server.SetAttributes checks every value before
 // it stores any.
 //
-// Server.OnChanged reports a change with the state and the changed
-// attribute ids. Mirrors matter.js
+// Server.OnChanged reports a change with the state and the change (the
+// changed attribute ids and the origin). Mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:202 (Events, the
-// per-attribute `$Changed` observables emitted after a change commits),
-// delivered through the server's contract.AttributeChangeNotifier or
-// contract.ChangeNotifier.
+// per-attribute `$Changed` observables emitted after a change commits) and
+// :1473-1476 (each emitted with the new value, the old one and the session
+// that made the change), delivered through the server's
+// contract.AttributeChangeNotifier or contract.ChangeNotifier.
+// Server.OnChangedAsync queues the same call on the device's goroutine.
 //
 // Server.OnWrite installs a veto on a controller's write, called after the
 // definition's checks and before the store, an error refusing the write.
@@ -150,6 +152,7 @@ func (g *generator) server() ([]byte, error) {
 	w.p("")
 	w.p("import (")
 	w.p("\t\"context\"")
+	w.p("\t\"errors\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
@@ -198,12 +201,18 @@ func (g *generator) server() ([]byte, error) {
 	w.p("type Server struct{ spec.Wrapper }")
 	w.p("")
 	w.p("// Wrap returns srv as the typed server; nil for nil. A typed server is")
-	w.p("// no contract.ClusterServer, so it is never wrapped twice.")
-	w.p("func Wrap(srv contract.ClusterServer) *Server {")
+	w.p("// no contract.ClusterServer, so it is never wrapped twice. Its")
+	w.p("// asynchronous callbacks need a queue: WrapOn.")
+	w.p("func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }")
+	w.p("")
+	w.p("// WrapOn is Wrap with the queue the typed server's asynchronous")
+	w.p("// callbacks (OnChangedAsync) run on — a device's, which its typed")
+	w.p("// accessors pass; nil for a nil srv.")
+	w.p("func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {")
 	w.p("\tif srv == nil {")
 	w.p("\t\treturn nil")
 	w.p("\t}")
-	w.p("\treturn &Server{spec.NewWrapper(srv)}")
+	w.p("\treturn &Server{spec.NewWrapperOn(srv, q)}")
 	w.p("}")
 	w.p("")
 	w.p("// Set applies p through the server's SetAttributes: every value is")
@@ -214,11 +223,21 @@ func (g *generator) server() ([]byte, error) {
 	w.p("// Get returns the state, each attribute as the server reads it.")
 	w.p("func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }")
 	w.p("")
-	w.p("// OnChanged calls fn with the state and the ids of the attributes that")
-	w.p("// changed, after each change the server reports; it returns the")
+	w.p("// OnChanged calls fn with the state and the change — the attributes")
+	w.p("// that changed and its origin (contract.Origin) — after each change the")
+	w.p("// server reports, inline: on the goroutine that made the change, before")
+	w.p("// the write, command or Set that made it returns. It returns the")
 	w.p("// unsubscribe function.")
-	w.p("func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {")
+	w.p("func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {")
 	w.p("\treturn spec.OnChangedOf(s.Underlying(), fn)")
+	w.p("}")
+	w.p("")
+	w.p("// OnChangedAsync is OnChanged with fn queued: the state and the change")
+	w.p("// are taken when the server reports it, and fn runs later on the")
+	w.p("// device's goroutine, one call after the other. spec.ErrNoQueue for a")
+	w.p("// server wrapped outside a device (Wrap).")
+	w.p("func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {")
+	w.p("\treturn spec.OnChangedAsyncOf(s.Wrapper, fn)")
 	w.p("}")
 	w.p("")
 	w.p("// OnWrite installs fn as the veto of a controller's write")
@@ -246,6 +265,8 @@ func (g *generator) server() ([]byte, error) {
 		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data)", he.eventID)
 		w.p("}")
 	}
+	w.p("")
+	g.declaration(w, cmds)
 
 	out, err := format.Source(w.Bytes())
 	if err != nil {
@@ -264,7 +285,7 @@ func (g *generator) serverTest(w *writer) {
 	w.p("// TestTypedServer drives every method of the typed server once.")
 	w.p("func TestTypedServer(t *testing.T) {")
 	w.p("\tt.Parallel()")
-	w.p("\tif Wrap(nil) != nil {")
+	w.p("\tif Wrap(nil) != nil || WrapOn(nil, nil) != nil {")
 	w.p("\t\tt.Error(\"Wrap(nil) is not nil\")")
 	w.p("\t}")
 	w.p("\tsrv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})")
@@ -279,7 +300,10 @@ func (g *generator) serverTest(w *writer) {
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
 	w.p("\t_ = s.Get()")
-	w.p("\ts.OnChanged(func(State, []uint32) {})()")
+	w.p("\ts.OnChanged(func(State, contract.Change) {})()")
+	w.p("\tif _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {")
+	w.p("\t\tt.Errorf(\"OnChangedAsync without a queue: %%v, want spec.ErrNoQueue\", err)")
+	w.p("\t}")
 	w.p("\tif err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {")
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
@@ -292,6 +316,29 @@ func (g *generator) serverTest(w *writer) {
 	}
 	for _, he := range g.hullEvents() {
 		w.p("\t_ = s.%s(0, %s{}) // not in the empty definition's EventList: refused", he.method, he.payload)
+	}
+	w.p("\t// The declaration: its cluster, its kit form, its veto installed.")
+	w.p("\td := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}")
+	w.p("\tdecl := d.ClusterDeclaration()")
+	w.p("\tif d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {")
+	w.p("\t\tt.Errorf(\"Declare: cluster %%v / %%v, attach %%v\", d.ClusterID(), decl.Cluster, decl.Attach != nil)")
+	w.p("\t}")
+	w.p("\tif err := decl.Attach(srv); err != nil {")
+	w.p("\t\tt.Error(err)")
+	w.p("\t}")
+	for _, port := range ports[g.c.Name].ports {
+		w.p("\tvar _ %s = d.%s", port.name, port.name)
+	}
+	if len(cmds) > 0 {
+		w.p("\t// Every handler declared: each is installed, and refused by the")
+		w.p("\t// empty definition's AcceptedCommandList.")
+		w.p("\tall := d")
+		for _, hc := range cmds {
+			w.p("\tall.%s = func(context.Context, %s) (%s, error) { return %s{}, nil }", hc.method, hc.request, hc.response, hc.response)
+		}
+		w.p("\tif decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != %d || decl.Attach(srv) == nil {", len(cmds))
+		w.p("\t\tt.Error(\"Declare: every handler accepted by the empty definition\")")
+		w.p("\t}")
 	}
 	w.p("}")
 }

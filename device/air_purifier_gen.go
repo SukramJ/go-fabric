@@ -60,9 +60,10 @@ var AirPurifierType = Type{
 type AirPurifier struct{ *Device }
 
 // NewAirPurifier returns a AirPurifier device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewAirPurifier(opts Options, with ...Option) (*AirPurifier, error) {
-	d, err := New(&AirPurifierType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type AirPurifierID (see [New]).
+func NewAirPurifier(opts Options, decls ...Declaration) (*AirPurifier, error) {
+	d, err := FromSpec(Spec{Type: AirPurifierID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -70,28 +71,31 @@ func NewAirPurifier(opts Options, with ...Option) (*AirPurifier, error) {
 }
 
 // FanControl returns the typed FanControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *AirPurifier) FanControl() *fancontroldef.Server { return fancontroldef.Wrap(d.Server(0x0202)) }
+func (d *AirPurifier) FanControl() *fancontroldef.Server {
+	return fancontroldef.WrapOn(d.Server(0x0202), d.queue)
+}
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
-func (d *AirPurifier) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
+func (d *AirPurifier) OnOff() *onoffdef.Server { return onoffdef.WrapOn(d.Server(0x0006), d.queue) }
 
 // HepaFilterMonitoring returns the typed HepaFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirPurifier) HepaFilterMonitoring() *hepafiltermonitoringdef.Server {
-	return hepafiltermonitoringdef.Wrap(d.Server(0x0071))
+	return hepafiltermonitoringdef.WrapOn(d.Server(0x0071), d.queue)
 }
 
 // ActivatedCarbonFilterMonitoring returns the typed ActivatedCarbonFilterMonitoring server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirPurifier) ActivatedCarbonFilterMonitoring() *activatedcarbonfiltermonitoringdef.Server {
-	return activatedcarbonfiltermonitoringdef.Wrap(d.Server(0x0072))
+	return activatedcarbonfiltermonitoringdef.WrapOn(d.Server(0x0072), d.queue)
 }

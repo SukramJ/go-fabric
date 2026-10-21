@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/wire"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/transition"
@@ -89,7 +91,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
 	s.quiet = &cluster.Quieter{Report: func() {
 		if !s.quiescing.Load() {
-			s.changes.Notify(AttrCurrentLevel)
+			s.changes.NotifyFrom(contract.Origin(s.levelOrigin.Load()), AttrCurrentLevel) //nolint:gosec // only an Origin is stored
 		}
 	}, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
@@ -103,7 +105,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 		Apply: s.applyLevel,
 		RemainingTimeChanged: func() {
 			if s.lighting {
-				s.changes.Notify(AttrRemainingTime)
+				s.changes.NotifyFrom(contract.OriginCommand, AttrRemainingTime)
 			}
 		},
 		Settled: func(string) { s.quiet.EmitNow() },
@@ -137,14 +139,14 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 	ctx := context.Background()
 	for _, c := range changes {
 		zero := uint16(0)
-		if err := s.src.MoveToLevel(ctx, MoveToLevelRequest{
+		if err := s.src.MoveToLevel(ctx, wire.MoveToLevelRequest{
 			Level: uint8(c.Value), TransitionTime: &zero, //nolint:gosec // the engine keeps the value between MinLevel and MaxLevel
 			OptionsMask: OptionExecuteIfOff, OptionsOverride: OptionExecuteIfOff,
 		}); err != nil {
 			return fmt.Errorf("levelcontrol: apply level %v: %w", c.Value, err)
 		}
 	}
-	s.observeLevel()
+	s.observeLevel(contract.OriginCommand)
 	s.mu.Lock()
 	c := s.coupling
 	s.mu.Unlock()
@@ -156,8 +158,10 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 // otherwise at most once a second, the end of a transition flushing the
 // last value. It runs after every level the engine applied and on every
 // change notification of the host, so a level the device moved by itself
-// is reported the same way.
-func (s *Server) observeLevel() {
+// is reported the same way, from origin — a report the quieter defers
+// carries the origin of the last change before it.
+func (s *Server) observeLevel(origin contract.Origin) {
+	s.levelOrigin.Store(uint32(origin))
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
 	wasNull := !s.levelKnown
@@ -187,7 +191,7 @@ func (s *Server) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscri
 	s.mu.Unlock()
 	if subscribe {
 		if n, ok := s.src.(contract.ChangeNotifier); ok && n != nil {
-			stop := n.OnMatterValueChanged(s.observeLevel)
+			stop := n.OnMatterValueChanged(func() { s.observeLevel(contract.OriginHostSet) }) // the device moved: the host's own change
 			s.mu.Lock()
 			s.unsubSrc = stop
 			s.mu.Unlock()
@@ -273,7 +277,7 @@ func (s *Server) currentLevel() (uint8, error) {
 // TransitionTime (none for a null or zero TransitionTime — no
 // OnOffTransitionTime is served), and the plain command gated by
 // ExecuteIfOff.
-func (s *Server) runMoveToLevel(ctx context.Context, req MoveToLevelRequest, withOnOff bool) error {
+func (s *Server) runMoveToLevel(ctx context.Context, req wire.MoveToLevelRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -293,7 +297,7 @@ func (s *Server) runMoveToLevel(ctx context.Context, req MoveToLevelRequest, wit
 // bound in the direction of MoveMode at Rate per second, at once for a
 // null Rate (no DefaultMoveRate is served). The zero Rate was refused
 // before.
-func (s *Server) runMove(ctx context.Context, req MoveRequest, withOnOff bool) error {
+func (s *Server) runMove(ctx context.Context, req wire.MoveRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -315,7 +319,7 @@ func (s *Server) runMove(ctx context.Context, req MoveRequest, withOnOff bool) e
 // runStep is matter.js step / stepWithOnOff and stepLogic: StepSize from
 // the current level, over TransitionTime (at once for a null one, or a
 // zero one, whose rate is infinite).
-func (s *Server) runStep(ctx context.Context, req StepRequest, withOnOff bool) error {
+func (s *Server) runStep(ctx context.Context, req wire.StepRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	options := s.effectiveOptions(req.OptionsMask, req.OptionsOverride)
@@ -341,7 +345,7 @@ func (s *Server) runStep(ctx context.Context, req StepRequest, withOnOff bool) e
 // runStop is matter.js stop / stopWithOnOff and stopLogic: the transition
 // ends where it is and RemainingTime reports 0. Only the plain Stop is
 // gated by ExecuteIfOff.
-func (s *Server) runStop(req StopRequest, withOnOff bool) error {
+func (s *Server) runStop(req wire.StopRequest, withOnOff bool) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	if !withOnOff && !s.executes(s.effectiveOptions(req.OptionsMask, req.OptionsOverride)) {
@@ -400,7 +404,7 @@ func (s *Server) couple(ctx context.Context, withOnOff bool, options uint8, targ
 		if err := s.onOff.SetOnOff(ctx, true); err != nil {
 			return c, fmt.Errorf("levelcontrol: switch on: %w", err)
 		}
-		s.observeLevel()
+		s.observeLevel(contract.OriginCommand)
 	}
 	return c, nil
 }

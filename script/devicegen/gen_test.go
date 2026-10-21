@@ -404,7 +404,7 @@ func TestSyntheticElements(t *testing.T) {
 		`Conditions: []string{"K"}`,
 		`ID: 0x001D, Name: "Descriptor"`,
 		`Definition: cdef.Definition`,
-		`func (d *T) C() *cdef.Server { return cdef.Wrap(d.Server(0x0001)) }`,
+		`func (d *T) C() *cdef.Server { return cdef.WrapOn(d.Server(0x0001), d.queue) }`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("generated source lacks %q:\n%s", want, src)

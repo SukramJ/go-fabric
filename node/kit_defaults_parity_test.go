@@ -33,11 +33,11 @@ func attributePath(ep uint16, cluster, attr uint32) im.ConcreteAttributePath {
 
 func TestKitDefaultsOverTheWire(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light", Clock: site.Clock()})
+	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	sensor, err := device.NewContactSensor(device.Options{StableKey: endpoint.StringKey("door"), Name: "door", Clock: site.Clock()})
+	sensor, err := device.NewContactSensor(device.Options{StableKey: endpoint.StringKey("door"), Name: "door"})
 	if err != nil {
 		t.Fatal(err)
 	}

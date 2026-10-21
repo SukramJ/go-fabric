@@ -7,6 +7,7 @@ package mediaplayback
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -57,12 +58,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -73,11 +80,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -178,4 +195,190 @@ func (s *Server) HandleDeactivateTextTrack(fn func(ctx context.Context, req Deac
 // spec.ErrNoEvents for a server without one.
 func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
+}
+
+// Declare is the declaration of the MediaPlayback cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// HandlePlay handles the Play command in place of the server
+	// (Server.HandlePlay), inline; an optional command it handles is accepted.
+	HandlePlay func(ctx context.Context, req PlayRequest) (PlaybackResponse, error)
+	// HandlePause handles the Pause command in place of the server
+	// (Server.HandlePause), inline; an optional command it handles is accepted.
+	HandlePause func(ctx context.Context, req PauseRequest) (PlaybackResponse, error)
+	// HandleStop handles the Stop command in place of the server
+	// (Server.HandleStop), inline; an optional command it handles is accepted.
+	HandleStop func(ctx context.Context, req StopRequest) (PlaybackResponse, error)
+	// HandleStartOver handles the StartOver command in place of the server
+	// (Server.HandleStartOver), inline; an optional command it handles is accepted.
+	HandleStartOver func(ctx context.Context, req StartOverRequest) (PlaybackResponse, error)
+	// HandlePrevious handles the Previous command in place of the server
+	// (Server.HandlePrevious), inline; an optional command it handles is accepted.
+	HandlePrevious func(ctx context.Context, req PreviousRequest) (PlaybackResponse, error)
+	// HandleNext handles the Next command in place of the server
+	// (Server.HandleNext), inline; an optional command it handles is accepted.
+	HandleNext func(ctx context.Context, req NextRequest) (PlaybackResponse, error)
+	// HandleRewind handles the Rewind command in place of the server
+	// (Server.HandleRewind), inline; an optional command it handles is accepted.
+	HandleRewind func(ctx context.Context, req RewindRequest) (PlaybackResponse, error)
+	// HandleFastForward handles the FastForward command in place of the server
+	// (Server.HandleFastForward), inline; an optional command it handles is accepted.
+	HandleFastForward func(ctx context.Context, req FastForwardRequest) (PlaybackResponse, error)
+	// HandleSkipForward handles the SkipForward command in place of the server
+	// (Server.HandleSkipForward), inline; an optional command it handles is accepted.
+	HandleSkipForward func(ctx context.Context, req SkipForwardRequest) (PlaybackResponse, error)
+	// HandleSkipBackward handles the SkipBackward command in place of the server
+	// (Server.HandleSkipBackward), inline; an optional command it handles is accepted.
+	HandleSkipBackward func(ctx context.Context, req SkipBackwardRequest) (PlaybackResponse, error)
+	// HandleSeek handles the Seek command in place of the server
+	// (Server.HandleSeek), inline; an optional command it handles is accepted.
+	HandleSeek func(ctx context.Context, req SeekRequest) (PlaybackResponse, error)
+	// HandleActivateAudioTrack handles the ActivateAudioTrack command in place of the server
+	// (Server.HandleActivateAudioTrack), inline; an optional command it handles is accepted.
+	HandleActivateAudioTrack func(ctx context.Context, req ActivateAudioTrackRequest) (struct{}, error)
+	// HandleActivateTextTrack handles the ActivateTextTrack command in place of the server
+	// (Server.HandleActivateTextTrack), inline; an optional command it handles is accepted.
+	HandleActivateTextTrack func(ctx context.Context, req ActivateTextTrackRequest) (struct{}, error)
+	// HandleDeactivateTextTrack handles the DeactivateTextTrack command in place of the server
+	// (Server.HandleDeactivateTextTrack), inline; an optional command it handles is accepted.
+	HandleDeactivateTextTrack func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)
+	// HostServer is the host's own server for the cluster, mounted in
+	// place of the kit's — also for a cluster the device type does not
+	// list. The hooks above go on it; Initial, Features and the ports are
+	// the kit's server's and are refused beside it.
+	HostServer contract.ClusterServer
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	if d.HandlePlay != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdPlay)
+		decl.Attach = d.attach
+	}
+	if d.HandlePause != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdPause)
+		decl.Attach = d.attach
+	}
+	if d.HandleStop != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStop)
+		decl.Attach = d.attach
+	}
+	if d.HandleStartOver != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStartOver)
+		decl.Attach = d.attach
+	}
+	if d.HandlePrevious != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdPrevious)
+		decl.Attach = d.attach
+	}
+	if d.HandleNext != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdNext)
+		decl.Attach = d.attach
+	}
+	if d.HandleRewind != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdRewind)
+		decl.Attach = d.attach
+	}
+	if d.HandleFastForward != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdFastForward)
+		decl.Attach = d.attach
+	}
+	if d.HandleSkipForward != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSkipForward)
+		decl.Attach = d.attach
+	}
+	if d.HandleSkipBackward != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSkipBackward)
+		decl.Attach = d.attach
+	}
+	if d.HandleSeek != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdSeek)
+		decl.Attach = d.attach
+	}
+	if d.HandleActivateAudioTrack != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdActivateAudioTrack)
+		decl.Attach = d.attach
+	}
+	if d.HandleActivateTextTrack != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdActivateTextTrack)
+		decl.Attach = d.attach
+	}
+	if d.HandleDeactivateTextTrack != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdDeactivateTextTrack)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	var errs []error
+	if d.OnWrite != nil {
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
+	}
+	if d.HandlePlay != nil {
+		errs = append(errs, spec.HookError(Name, "HandlePlay", s.HandlePlay(d.HandlePlay)))
+	}
+	if d.HandlePause != nil {
+		errs = append(errs, spec.HookError(Name, "HandlePause", s.HandlePause(d.HandlePause)))
+	}
+	if d.HandleStop != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStop", s.HandleStop(d.HandleStop)))
+	}
+	if d.HandleStartOver != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStartOver", s.HandleStartOver(d.HandleStartOver)))
+	}
+	if d.HandlePrevious != nil {
+		errs = append(errs, spec.HookError(Name, "HandlePrevious", s.HandlePrevious(d.HandlePrevious)))
+	}
+	if d.HandleNext != nil {
+		errs = append(errs, spec.HookError(Name, "HandleNext", s.HandleNext(d.HandleNext)))
+	}
+	if d.HandleRewind != nil {
+		errs = append(errs, spec.HookError(Name, "HandleRewind", s.HandleRewind(d.HandleRewind)))
+	}
+	if d.HandleFastForward != nil {
+		errs = append(errs, spec.HookError(Name, "HandleFastForward", s.HandleFastForward(d.HandleFastForward)))
+	}
+	if d.HandleSkipForward != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSkipForward", s.HandleSkipForward(d.HandleSkipForward)))
+	}
+	if d.HandleSkipBackward != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSkipBackward", s.HandleSkipBackward(d.HandleSkipBackward)))
+	}
+	if d.HandleSeek != nil {
+		errs = append(errs, spec.HookError(Name, "HandleSeek", s.HandleSeek(d.HandleSeek)))
+	}
+	if d.HandleActivateAudioTrack != nil {
+		errs = append(errs, spec.HookError(Name, "HandleActivateAudioTrack", s.HandleActivateAudioTrack(d.HandleActivateAudioTrack)))
+	}
+	if d.HandleActivateTextTrack != nil {
+		errs = append(errs, spec.HookError(Name, "HandleActivateTextTrack", s.HandleActivateTextTrack(d.HandleActivateTextTrack)))
+	}
+	if d.HandleDeactivateTextTrack != nil {
+		errs = append(errs, spec.HookError(Name, "HandleDeactivateTextTrack", s.HandleDeactivateTextTrack(d.HandleDeactivateTextTrack)))
+	}
+	return errors.Join(errs...)
 }

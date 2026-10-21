@@ -7,10 +7,12 @@ package generalcommissioning
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 var _ = spec.Register
@@ -41,7 +43,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -56,7 +58,10 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
-	s.OnChanged(func(State, []uint32) {})()
+	s.OnChanged(func(State, contract.Change) {})()
+	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
+		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
+	}
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
@@ -79,5 +84,32 @@ func TestTypedServer(t *testing.T) {
 		return SetTcAcknowledgementsResponse{}, nil
 	}); err == nil {
 		t.Error("HandleSetTcAcknowledgements: a command the server does not accept was registered")
+	}
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandleArmFailSafe = func(context.Context, ArmFailSafeRequest) (ArmFailSafeResponse, error) {
+		return ArmFailSafeResponse{}, nil
+	}
+	all.HandleSetRegulatoryConfig = func(context.Context, SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error) {
+		return SetRegulatoryConfigResponse{}, nil
+	}
+	all.HandleCommissioningComplete = func(context.Context, CommissioningCompleteRequest) (CommissioningCompleteResponse, error) {
+		return CommissioningCompleteResponse{}, nil
+	}
+	all.HandleSetTcAcknowledgements = func(context.Context, SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error) {
+		return SetTcAcknowledgementsResponse{}, nil
+	}
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 4 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
 	}
 }

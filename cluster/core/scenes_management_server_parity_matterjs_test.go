@@ -35,7 +35,7 @@ import (
 func TestScenesManagementServerAddAndRecallOnOff(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light", Clock: site.Clock()})
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
 	}

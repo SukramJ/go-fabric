@@ -135,7 +135,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 
 	if len(changed) > 0 {
 		slices.Sort(changed)
-		s.changes.Notify(changed...)
+		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if setpoints {
 		for _, id := range moved {

@@ -40,9 +40,10 @@ var LightSensorType = Type{
 type LightSensor struct{ *Device }
 
 // NewLightSensor returns a LightSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewLightSensor(opts Options, with ...Option) (*LightSensor, error) {
-	d, err := New(&LightSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type LightSensorID (see [New]).
+func NewLightSensor(opts Options, decls ...Declaration) (*LightSensor, error) {
+	d, err := FromSpec(Spec{Type: LightSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,9 @@ func NewLightSensor(opts Options, with ...Option) (*LightSensor, error) {
 }
 
 // IlluminanceMeasurement returns the typed IlluminanceMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *LightSensor) IlluminanceMeasurement() *illuminancemeasurementdef.Server {
-	return illuminancemeasurementdef.Wrap(d.Server(0x0400))
+	return illuminancemeasurementdef.WrapOn(d.Server(0x0400), d.queue)
 }

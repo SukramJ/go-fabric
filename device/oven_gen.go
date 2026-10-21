@@ -33,9 +33,10 @@ var OvenType = Type{
 type Oven struct{ *Device }
 
 // NewOven returns a Oven device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOven(opts Options, with ...Option) (*Oven, error) {
-	d, err := New(&OvenType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OvenID (see [New]).
+func NewOven(opts Options, decls ...Declaration) (*Oven, error) {
+	d, err := FromSpec(Spec{Type: OvenID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}

@@ -59,9 +59,10 @@ var RoboticVacuumCleanerType = Type{
 type RoboticVacuumCleaner struct{ *Device }
 
 // NewRoboticVacuumCleaner returns a RoboticVacuumCleaner device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewRoboticVacuumCleaner(opts Options, with ...Option) (*RoboticVacuumCleaner, error) {
-	d, err := New(&RoboticVacuumCleanerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type RoboticVacuumCleanerID (see [New]).
+func NewRoboticVacuumCleaner(opts Options, decls ...Declaration) (*RoboticVacuumCleaner, error) {
+	d, err := FromSpec(Spec{Type: RoboticVacuumCleanerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -69,31 +70,33 @@ func NewRoboticVacuumCleaner(opts Options, with ...Option) (*RoboticVacuumCleane
 }
 
 // RvcRunMode returns the typed RvcRunMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcRunMode() *rvcrunmodedef.Server {
-	return rvcrunmodedef.Wrap(d.Server(0x0054))
+	return rvcrunmodedef.WrapOn(d.Server(0x0054), d.queue)
 }
 
 // RvcOperationalState returns the typed RvcOperationalState server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *RoboticVacuumCleaner) RvcOperationalState() *rvcoperationalstatedef.Server {
-	return rvcoperationalstatedef.Wrap(d.Server(0x0061))
+	return rvcoperationalstatedef.WrapOn(d.Server(0x0061), d.queue)
 }
 
 // RvcCleanMode returns the typed RvcCleanMode server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RoboticVacuumCleaner) RvcCleanMode() *rvccleanmodedef.Server {
-	return rvccleanmodedef.Wrap(d.Server(0x0055))
+	return rvccleanmodedef.WrapOn(d.Server(0x0055), d.queue)
 }
 
 // ServiceArea returns the typed ServiceArea server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *RoboticVacuumCleaner) ServiceArea() *serviceareadef.Server {
-	return serviceareadef.Wrap(d.Server(0x0150))
+	return serviceareadef.WrapOn(d.Server(0x0150), d.queue)
 }

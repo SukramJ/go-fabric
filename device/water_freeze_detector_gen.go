@@ -49,9 +49,10 @@ var WaterFreezeDetectorType = Type{
 type WaterFreezeDetector struct{ *Device }
 
 // NewWaterFreezeDetector returns a WaterFreezeDetector device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewWaterFreezeDetector(opts Options, with ...Option) (*WaterFreezeDetector, error) {
-	d, err := New(&WaterFreezeDetectorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type WaterFreezeDetectorID (see [New]).
+func NewWaterFreezeDetector(opts Options, decls ...Declaration) (*WaterFreezeDetector, error) {
+	d, err := FromSpec(Spec{Type: WaterFreezeDetectorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -59,16 +60,17 @@ func NewWaterFreezeDetector(opts Options, with ...Option) (*WaterFreezeDetector,
 }
 
 // BooleanState returns the typed BooleanState server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *WaterFreezeDetector) BooleanState() *booleanstatedef.Server {
-	return booleanstatedef.Wrap(d.Server(0x0045))
+	return booleanstatedef.WrapOn(d.Server(0x0045), d.queue)
 }
 
 // BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *WaterFreezeDetector) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
+	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

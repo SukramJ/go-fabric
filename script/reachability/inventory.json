@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6136,
+  "entry_points": 6154,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14151,
-    "reachable": 9722,
-    "whitelisted": 4424,
+    "total_exported": 14433,
+    "reachable": 9995,
+    "whitelisted": 4433,
     "unreachable": 5
   },
   "by_package": [
@@ -8278,6 +8278,13 @@
     },
     {
       "package": "cluster/fan",
+      "identifier": "Stepper",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 244
+    },
+    {
+      "package": "cluster/fan",
       "identifier": "WindBitmap",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
@@ -8313,38 +8320,24 @@
     },
     {
       "package": "cluster/levelcontrol",
-      "identifier": "MoveRequest",
+      "identifier": "LevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 249
+      "line": 243
     },
     {
       "package": "cluster/levelcontrol",
-      "identifier": "MoveToLevelRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 247
-    },
-    {
-      "package": "cluster/levelcontrol",
-      "identifier": "StepRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 251
-    },
-    {
-      "package": "cluster/levelcontrol",
-      "identifier": "StopRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 253
+      "identifier": "WireOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/export_test.go",
+      "line": 11
     },
     {
       "package": "cluster/light",
       "identifier": "ColorFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/light/colorcontrol_server.go",
-      "line": 72
+      "line": 73
     },
     {
       "package": "cluster/lock",
@@ -8764,14 +8757,14 @@
       "identifier": "HandleOn",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 214
+      "line": 252
     },
     {
       "package": "cluster/spec",
       "identifier": "HandlerOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 237
+      "line": 275
     },
     {
       "package": "cluster/spec",
@@ -8803,17 +8796,24 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "OnChangedAsyncOf",
+      "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/typed.go",
+      "line": 213
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "OnChangedOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 174
+      "line": 176
     },
     {
       "package": "cluster/spec",
       "identifier": "OnWriteOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 193
+      "line": 231
     },
     {
       "package": "cluster/spec",
@@ -8915,6 +8915,13 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "TestStoredKeepsAnOutOfWidthValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/stored_test.go",
+      "line": 11
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "TestStructAndListChecks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/checks_internal_test.go",
@@ -8974,21 +8981,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/accountlogin/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/accountlogin",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/accountlogin/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/accountlogin",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/accountlogin/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/actions",
@@ -9086,21 +9093,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/actions/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/actions",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/actions/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/actions",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/actions/definition_gen_test.go",
-      "line": 50
+      "line": 52
     },
     {
       "package": "cluster/spec/activatedcarbonfiltermonitoring",
@@ -9163,21 +9170,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/activatedcarbonfiltermonitoring",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/activatedcarbonfiltermonitoring",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/administratorcommissioning",
@@ -9219,21 +9226,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/administratorcommissioning/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/administratorcommissioning",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/administratorcommissioning/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/administratorcommissioning",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/administratorcommissioning/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/airquality",
@@ -9261,21 +9268,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/airquality/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/airquality",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/airquality/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/airquality",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/airquality/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/ambientcontextsensing",
@@ -9338,21 +9345,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ambientcontextsensing/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ambientcontextsensing",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ambientcontextsensing/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ambientcontextsensing",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ambientcontextsensing/definition_gen_test.go",
-      "line": 44
+      "line": 46
     },
     {
       "package": "cluster/spec/applicationbasic",
@@ -9387,21 +9394,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationbasic/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/applicationbasic",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationbasic/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/applicationbasic",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationbasic/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/applicationlauncher",
@@ -9443,21 +9450,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationlauncher/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/applicationlauncher",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationlauncher/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/applicationlauncher",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationlauncher/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/audiooutput",
@@ -9492,21 +9499,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/audiooutput/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/audiooutput",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/audiooutput/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/audiooutput",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/audiooutput/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/basicinformation",
@@ -9562,21 +9569,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/basicinformation/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/basicinformation",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/basicinformation/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/basicinformation",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/basicinformation/definition_gen_test.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/spec/binding",
@@ -9597,21 +9604,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/binding/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/binding",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/binding/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/binding",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/binding/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/booleanstate",
@@ -9625,21 +9632,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstate/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/booleanstate",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstate/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/booleanstate",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstate/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/booleanstateconfiguration",
@@ -9681,21 +9688,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstateconfiguration/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/booleanstateconfiguration",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstateconfiguration/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/booleanstateconfiguration",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/booleanstateconfiguration/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/bridgeddevicebasicinformation",
@@ -9751,21 +9758,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/bridgeddevicebasicinformation/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/bridgeddevicebasicinformation",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/bridgeddevicebasicinformation/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/bridgeddevicebasicinformation",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/bridgeddevicebasicinformation/definition_gen_test.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/spec/carbondioxideconcentrationmeasurement",
@@ -9821,21 +9828,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbondioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/carbondioxideconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbondioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/carbondioxideconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbondioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
@@ -9891,21 +9898,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/channel",
@@ -10052,21 +10059,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/channel/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/channel",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/channel/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/channel",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/channel/definition_gen_test.go",
-      "line": 50
+      "line": 52
     },
     {
       "package": "cluster/spec/chime",
@@ -10087,21 +10094,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/chime/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/chime",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/chime/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/chime",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/chime/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -10199,21 +10206,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closurecontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closurecontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closurecontrol/definition_gen_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -10339,21 +10346,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closuredimension/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closuredimension/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closuredimension/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/closuredimension",
@@ -10542,21 +10549,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/colorcontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/colorcontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/colorcontrol/definition_gen_test.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/spec/colorcontrol",
@@ -10612,21 +10619,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/commissionercontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/commissionercontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/commoditymetering",
@@ -10661,21 +10668,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditymetering/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/commoditymetering",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditymetering/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/commoditymetering",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditymetering/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/commodityprice",
@@ -10752,21 +10759,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commodityprice/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/commodityprice",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commodityprice/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/commodityprice",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commodityprice/definition_gen_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/spec/commoditytariff",
@@ -10997,21 +11004,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditytariff/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/commoditytariff",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditytariff/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/commoditytariff",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditytariff/definition_gen_test.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/spec/contentappobserver",
@@ -11039,21 +11046,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentappobserver/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/contentappobserver",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentappobserver/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/contentappobserver",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentappobserver/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/contentcontrol",
@@ -11116,21 +11123,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentcontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/contentcontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentcontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/contentcontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentcontrol/definition_gen_test.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/spec/contentcontrol",
@@ -11263,21 +11270,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentlauncher/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/contentlauncher",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentlauncher/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/contentlauncher",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/contentlauncher/definition_gen_test.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "cluster/spec/contentlauncher",
@@ -11326,21 +11333,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/descriptor/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/descriptor",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/descriptor/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/descriptor",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/descriptor/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
@@ -11515,21 +11522,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagement/definition_gen_test.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
@@ -11585,21 +11592,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/diagnosticlogs",
@@ -11641,21 +11648,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/diagnosticlogs/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/diagnosticlogs",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/diagnosticlogs/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/diagnosticlogs",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/diagnosticlogs/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/diagnosticlogs",
@@ -11697,21 +11704,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwasheralarm/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/dishwasheralarm",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwasheralarm/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/dishwasheralarm",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwasheralarm/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/dishwashermode",
@@ -11767,21 +11774,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwashermode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/dishwashermode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwashermode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/dishwashermode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwashermode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/doorlock",
@@ -12124,21 +12131,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/doorlock/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/doorlock",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/doorlock/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/doorlock",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/doorlock/definition_gen_test.go",
-      "line": 66
+      "line": 68
     },
     {
       "package": "cluster/spec/doorlock",
@@ -12208,21 +12215,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ecosysteminformation/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ecosysteminformation",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ecosysteminformation/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ecosysteminformation",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ecosysteminformation/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
@@ -12278,21 +12285,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/spec/electricalgridconditions",
@@ -12313,21 +12320,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/electricalgridconditions",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/electricalgridconditions",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/electricalgridconditions",
@@ -12411,21 +12418,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen_test.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/spec/energyevse",
@@ -12523,21 +12530,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevse/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevse/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevse/definition_gen_test.go",
-      "line": 48
+      "line": 50
     },
     {
       "package": "cluster/spec/energyevsemode",
@@ -12593,21 +12600,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevsemode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/energyevsemode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevsemode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/energyevsemode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energyevsemode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/energypreference",
@@ -12642,21 +12649,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energypreference/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/energypreference",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energypreference/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/energypreference",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/energypreference/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/ethernetnetworkdiagnostics",
@@ -12684,21 +12691,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ethernetnetworkdiagnostics",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ethernetnetworkdiagnostics",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/fancontrol",
@@ -12782,21 +12789,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fancontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/fancontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fancontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/fancontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fancontrol/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/fancontrol",
@@ -12831,21 +12838,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fixedlabel/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/fixedlabel",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fixedlabel/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/fixedlabel",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/fixedlabel/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/flowmeasurement",
@@ -12859,21 +12866,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/flowmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/flowmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/flowmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/flowmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/flowmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/formaldehydeconcentrationmeasurement",
@@ -12929,21 +12936,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/formaldehydeconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/formaldehydeconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/generalcommissioning",
@@ -13006,21 +13013,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generalcommissioning/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/generalcommissioning",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generalcommissioning/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/generalcommissioning",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generalcommissioning/definition_gen_test.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/spec/generaldiagnostics",
@@ -13118,21 +13125,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generaldiagnostics/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/generaldiagnostics",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generaldiagnostics/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/generaldiagnostics",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generaldiagnostics/definition_gen_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/spec/groupcast",
@@ -13195,21 +13202,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groupcast/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/groupcast",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groupcast/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/groupcast",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groupcast/definition_gen_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/spec/groups",
@@ -13251,21 +13258,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groups/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/groups",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groups/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/groups",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/groups/definition_gen_test.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/spec/hepafiltermonitoring",
@@ -13328,21 +13335,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/hepafiltermonitoring/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/hepafiltermonitoring",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/hepafiltermonitoring/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/hepafiltermonitoring",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/hepafiltermonitoring/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/icdmanagement",
@@ -13391,21 +13398,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/icdmanagement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/icdmanagement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/icdmanagement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/icdmanagement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/icdmanagement/definition_gen_test.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/spec/icdmanagement",
@@ -13475,21 +13482,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/identify/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/identify/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/identify/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/illuminancemeasurement",
@@ -13517,21 +13524,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/illuminancemeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/illuminancemeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/illuminancemeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/illuminancemeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/illuminancemeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/keypadinput",
@@ -13573,21 +13580,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/keypadinput/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/keypadinput",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/keypadinput/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/keypadinput",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/keypadinput/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/laundrydryercontrols",
@@ -13615,21 +13622,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrydryercontrols/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/laundrydryercontrols",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrydryercontrols/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/laundrydryercontrols",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrydryercontrols/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/laundrywashercontrols",
@@ -13657,21 +13664,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashercontrols/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/laundrywashercontrols",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashercontrols/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/laundrywashercontrols",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashercontrols/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/laundrywashermode",
@@ -13727,21 +13734,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashermode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashermode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/laundrywashermode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/levelcontrol",
@@ -13797,21 +13804,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/levelcontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/levelcontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/levelcontrol/definition_gen_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/spec/localizationconfiguration",
@@ -13825,21 +13832,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/localizationconfiguration/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/localizationconfiguration",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/localizationconfiguration/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/localizationconfiguration",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/localizationconfiguration/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/lowpower",
@@ -13853,21 +13860,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/lowpower/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/lowpower",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/lowpower/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/lowpower",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/lowpower/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/mediainput",
@@ -13902,21 +13909,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediainput/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/mediainput",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediainput/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/mediainput",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediainput/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/mediaplayback",
@@ -13979,21 +13986,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediaplayback/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/mediaplayback",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediaplayback/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/mediaplayback",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediaplayback/definition_gen_test.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/spec/mediaplayback",
@@ -14077,21 +14084,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/messages/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/messages",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/messages/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/messages",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/messages/definition_gen_test.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/spec/meteridentification",
@@ -14140,21 +14147,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/meteridentification/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/meteridentification",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/meteridentification/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/meteridentification",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/meteridentification/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/microwaveovencontrol",
@@ -14168,21 +14175,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovencontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/microwaveovencontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovencontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/microwaveovencontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovencontrol/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/microwaveovenmode",
@@ -14238,21 +14245,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovenmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/microwaveovenmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovenmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/microwaveovenmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/microwaveovenmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/modeselect",
@@ -14294,21 +14301,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/modeselect/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/modeselect",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/modeselect/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/modeselect",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/modeselect/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/networkcommissioning",
@@ -14343,21 +14350,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/networkcommissioning/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/networkcommissioning",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/networkcommissioning/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/networkcommissioning",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/networkcommissioning/definition_gen_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/spec/networkcommissioning",
@@ -14469,21 +14476,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/occupancysensing",
@@ -14546,21 +14553,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/occupancysensing/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/occupancysensing",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/occupancysensing/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/occupancysensing",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/occupancysensing/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/onoff",
@@ -14644,21 +14651,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/onoff/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/onoff",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/onoff/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/onoff",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/onoff/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/operationalstate",
@@ -14714,21 +14721,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/operationalstate/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/operationalstate/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/operationalstate/definition_gen_test.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "cluster/spec/otasoftwareupdateprovider",
@@ -14784,21 +14791,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdateprovider/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/otasoftwareupdateprovider",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdateprovider/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/otasoftwareupdateprovider",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdateprovider/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
@@ -14847,21 +14854,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
@@ -14931,21 +14938,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen_test.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "cluster/spec/ovenmode",
@@ -15001,21 +15008,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovenmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ovenmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovenmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ovenmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ovenmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/ozoneconcentrationmeasurement",
@@ -15071,21 +15078,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/ozoneconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/ozoneconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/pm10concentrationmeasurement",
@@ -15141,21 +15148,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm10concentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/pm10concentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm10concentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/pm10concentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm10concentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/pm1concentrationmeasurement",
@@ -15211,21 +15218,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm1concentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/pm1concentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm1concentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/pm1concentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm1concentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/pm25concentrationmeasurement",
@@ -15281,21 +15288,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm25concentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/pm25concentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm25concentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/pm25concentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm25concentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/powersource",
@@ -15421,21 +15428,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersource/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersource/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersource/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/powersource",
@@ -15477,21 +15484,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersourceconfiguration/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/powersourceconfiguration",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersourceconfiguration/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/powersourceconfiguration",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powersourceconfiguration/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/powertopology",
@@ -15505,21 +15512,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powertopology/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/powertopology",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powertopology/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/powertopology",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/powertopology/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/pressuremeasurement",
@@ -15533,21 +15540,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pressuremeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/pressuremeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pressuremeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/pressuremeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pressuremeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/pumpconfigurationandcontrol",
@@ -15603,21 +15610,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/pumpconfigurationandcontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/pumpconfigurationandcontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/spec/radonconcentrationmeasurement",
@@ -15673,21 +15680,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/radonconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/radonconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/radonconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/radonconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/radonconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/refrigeratoralarm",
@@ -15715,21 +15722,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratoralarm/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/refrigeratoralarm",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratoralarm/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/refrigeratoralarm",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratoralarm/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
@@ -15785,21 +15792,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/relativehumiditymeasurement",
@@ -15813,21 +15820,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/relativehumiditymeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/relativehumiditymeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/relativehumiditymeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/relativehumiditymeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/relativehumiditymeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/rvccleanmode",
@@ -15883,21 +15890,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvccleanmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/rvccleanmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvccleanmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/rvccleanmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvccleanmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
@@ -15953,21 +15960,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcoperationalstate/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcoperationalstate/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcoperationalstate/definition_gen_test.go",
-      "line": 44
+      "line": 46
     },
     {
       "package": "cluster/spec/rvcrunmode",
@@ -16023,21 +16030,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcrunmode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcrunmode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/rvcrunmode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/scenesmanagement",
@@ -16107,21 +16114,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/scenesmanagement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/scenesmanagement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/scenesmanagement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/scenesmanagement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/scenesmanagement/definition_gen_test.go",
-      "line": 52
+      "line": 54
     },
     {
       "package": "cluster/spec/servicearea",
@@ -16219,21 +16226,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/servicearea/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/servicearea/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/servicearea/definition_gen_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/spec/smokecoalarm",
@@ -16331,21 +16338,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/smokecoalarm",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/smokecoalarm",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
-      "line": 44
+      "line": 46
     },
     {
       "package": "cluster/spec/softwarediagnostics",
@@ -16359,21 +16366,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/softwarediagnostics/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/softwarediagnostics",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/softwarediagnostics/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/softwarediagnostics",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/softwarediagnostics/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/softwarediagnostics",
@@ -16422,21 +16429,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/soilmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/soilmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/soilmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/soilmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/soilmeasurement/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/spectest",
@@ -16464,21 +16471,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/switchcluster/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/switchcluster",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/switchcluster/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/switchcluster",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/switchcluster/definition_gen_test.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/spec/targetnavigator",
@@ -16513,21 +16520,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/targetnavigator/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/targetnavigator",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/targetnavigator/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/targetnavigator",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/targetnavigator/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/temperaturealarm",
@@ -16555,21 +16562,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturealarm/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/temperaturealarm",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturealarm/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/temperaturealarm",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturealarm/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/temperaturecontrol",
@@ -16583,21 +16590,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturecontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/temperaturecontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturecontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/temperaturecontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturecontrol/definition_gen_test.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/spec/temperaturemeasurement",
@@ -16611,21 +16618,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturemeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/temperaturemeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturemeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/temperaturemeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/temperaturemeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/thermostat",
@@ -16996,21 +17003,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostat/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/thermostat",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostat/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/thermostat",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostat/definition_gen_test.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/spec/thermostat",
@@ -17108,21 +17115,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/thermostatuserinterfaceconfiguration",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/thermostatuserinterfaceconfiguration",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/timeformatlocalization",
@@ -17164,21 +17171,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timeformatlocalization/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/timeformatlocalization",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timeformatlocalization/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/timeformatlocalization",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timeformatlocalization/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/timesynchronization",
@@ -17234,21 +17241,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timesynchronization/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/timesynchronization",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timesynchronization/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/timesynchronization",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timesynchronization/definition_gen_test.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/spec/timesynchronization",
@@ -17346,21 +17353,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/unitlocalization",
@@ -17388,21 +17395,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/unitlocalization/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/unitlocalization",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/unitlocalization/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/unitlocalization",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/unitlocalization/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/userlabel",
@@ -17423,21 +17430,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/userlabel/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/userlabel",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/userlabel/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/userlabel",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/userlabel/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
@@ -17465,21 +17472,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
@@ -17521,21 +17528,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wakeonlan/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/wakeonlan",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wakeonlan/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/wakeonlan",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wakeonlan/definition_gen_test.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/spec/waterheatermanagement",
@@ -17563,21 +17570,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermanagement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/waterheatermanagement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermanagement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/waterheatermanagement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermanagement/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/waterheatermanagement",
@@ -17654,21 +17661,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermode/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/waterheatermode",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermode/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/waterheatermode",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/waterheatermode/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/watertanklevelmonitoring",
@@ -17731,21 +17738,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/watertanklevelmonitoring/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/watertanklevelmonitoring",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/watertanklevelmonitoring/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/watertanklevelmonitoring",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/watertanklevelmonitoring/definition_gen_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/spec/wifinetworkdiagnostics",
@@ -17801,21 +17808,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkdiagnostics/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/wifinetworkdiagnostics",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkdiagnostics/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/wifinetworkdiagnostics",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkdiagnostics/definition_gen_test.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/spec/wifinetworkdiagnostics",
@@ -17843,21 +17850,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkmanagement/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/wifinetworkmanagement",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkmanagement/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/wifinetworkmanagement",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/wifinetworkmanagement/definition_gen_test.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/spec/windowcovering",
@@ -17955,21 +17962,21 @@
       "identifier": "TestCodecsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/windowcovering/definition_gen_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/spec/windowcovering",
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/windowcovering/definition_gen_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "cluster/spec/windowcovering",
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/windowcovering/definition_gen_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/spec/windowcovering",
@@ -18123,14 +18130,14 @@
       "identifier": "Preset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "cluster/thermo",
       "identifier": "PresetType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "cluster/thermo",
@@ -18138,6 +18145,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
       "line": 53
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "SetpointChange",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/thermostat_server.go",
+      "line": 252
     },
     {
       "package": "cluster/thermo",
@@ -21532,35 +21546,42 @@
       "identifier": "AvailabilityProbe",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 58
+      "line": 57
+    },
+    {
+      "package": "device",
+      "identifier": "Option",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "device/options.go",
+      "line": 81
     },
     {
       "package": "device",
       "identifier": "SourceKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 54
+      "line": 53
     },
     {
       "package": "device",
       "identifier": "TestApplyInitial",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_internal_test.go",
-      "line": 143
+      "line": 142
     },
     {
       "package": "device",
       "identifier": "TestCheckSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_internal_test.go",
-      "line": 115
+      "line": 114
     },
     {
       "package": "device",
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 469
+      "line": 470
     },
     {
       "package": "device",
@@ -21581,7 +21602,7 @@
       "identifier": "TestDefaultSelectionKeepsTheClusterMandatedFeatures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 497
+      "line": 498
     },
     {
       "package": "device",
@@ -21599,6 +21620,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestDeviceClockAndQueue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 131
+    },
+    {
+      "package": "device",
       "identifier": "TestDeviceRequirementsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/parity_matterjs_test.go",
@@ -21609,21 +21637,21 @@
       "identifier": "TestDimmableLightCouplesItsServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 148
+      "line": 150
     },
     {
       "package": "device",
       "identifier": "TestDimmableLightServesMinAndMaxLevel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 195
+      "line": 196
     },
     {
       "package": "device",
       "identifier": "TestElementAlterationsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 215
+      "line": 216
     },
     {
       "package": "device",
@@ -21651,7 +21679,7 @@
       "identifier": "TestFeatureMasksMatchTheDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 418
+      "line": 419
     },
     {
       "package": "device",
@@ -21662,10 +21690,31 @@
     },
     {
       "package": "device",
+      "identifier": "TestFromSpecRefusesAnUnknownType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/fromspec_test.go",
+      "line": 60
+    },
+    {
+      "package": "device",
       "identifier": "TestGeneratedConstructorsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/types_gen_test.go",
-      "line": 14
+      "line": 16
+    },
+    {
+      "package": "device",
+      "identifier": "TestKitOptionsAndPorts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 163
+    },
+    {
+      "package": "device",
+      "identifier": "TestLifecycleThroughTheSeam",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 61
     },
     {
       "package": "device",
@@ -21686,14 +21735,14 @@
       "identifier": "TestOnChangedFiresOnSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 249
+      "line": 250
     },
     {
       "package": "device",
       "identifier": "TestOnOffPortOverABareServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_internal_test.go",
-      "line": 159
+      "line": 158
     },
     {
       "package": "device",
@@ -21707,7 +21756,7 @@
       "identifier": "TestOptionalClusterWithItsAlterations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 150
+      "line": 151
     },
     {
       "package": "device",
@@ -21728,7 +21777,21 @@
       "identifier": "TestParts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 284
+      "line": 285
+    },
+    {
+      "package": "device",
+      "identifier": "TestPortConfigurationAndHookRefusal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/lifecycle_internal_test.go",
+      "line": 212
+    },
+    {
+      "package": "device",
+      "identifier": "TestPortServersNeedTheirPort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_ports_test.go",
+      "line": 163
     },
     {
       "package": "device",
@@ -21742,7 +21805,7 @@
       "identifier": "TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 126
+      "line": 128
     },
     {
       "package": "device",
@@ -21756,7 +21819,7 @@
       "identifier": "TestSelfHeldFactoriesMapTheSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_internal_test.go",
-      "line": 49
+      "line": 48
     },
     {
       "package": "device",
@@ -21770,14 +21833,14 @@
       "identifier": "TestSpec",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 335
+      "line": 336
     },
     {
       "package": "device",
       "identifier": "TestTypeLookups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 361
+      "line": 362
     },
     {
       "package": "device",
@@ -21791,7 +21854,7 @@
       "identifier": "TestTypedDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 392
+      "line": 393
     },
     {
       "package": "device",
@@ -21805,7 +21868,7 @@
       "identifier": "TestWithElements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 511
+      "line": 512
     },
     {
       "package": "device",
@@ -23058,7 +23121,7 @@
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 277
+      "line": 279
     },
     {
       "package": "examples/reference-bridge",
@@ -23086,7 +23149,7 @@
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 237
+      "line": 238
     },
     {
       "package": "examples/reference-bridge",
@@ -23163,7 +23226,7 @@
       "identifier": "TestFridgeHasItsCoolingCabinetPart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 390
+      "line": 392
     },
     {
       "package": "examples/reference-bridge",
@@ -23184,7 +23247,7 @@
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 312
+      "line": 314
     },
     {
       "package": "examples/reference-bridge",
@@ -23240,7 +23303,7 @@
       "identifier": "TestNativeDimmerTakesTheHandOffPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_lighting_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "examples/reference-bridge",
@@ -23408,7 +23471,7 @@
       "identifier": "TestValveTravelsThroughATarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 332
+      "line": 334
     },
     {
       "package": "examples/reference-bridge",
@@ -23429,7 +23492,7 @@
       "identifier": "TestWaterHeaterAndThermostatEnergyPreference",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 443
+      "line": 445
     },
     {
       "package": "examples/reference-bridge",

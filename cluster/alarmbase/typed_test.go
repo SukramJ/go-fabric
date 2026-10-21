@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarmbase"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func alarm[T any](v T) *T { return &v }
@@ -31,7 +32,7 @@ func TestTypedAlarmBaseServer(t *testing.T) {
 	srv.SetMatterEventEmitter(em)
 	s := dwa.Wrap(srv)
 	var changed [][]uint32
-	defer s.OnChanged(func(_ dwa.State, ids []uint32) { changed = append(changed, ids) })()
+	defer s.OnChanged(func(_ dwa.State, change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })()
 
 	if err := s.Set(dwa.Patch{Mask: alarm(dwa.AlarmBitmap(0x3)), State: alarm(dwa.AlarmBitmap(0x1))}); err != nil {
 		t.Fatal(err)

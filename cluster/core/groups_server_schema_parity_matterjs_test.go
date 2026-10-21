@@ -64,7 +64,7 @@ func encodeNode(t *testing.T, v spec.Encodable) spec.Node {
 func invokeAddGroup(t *testing.T, groupID uint16, groupName string) (status im.StatusCode, respGroupID uint16) {
 	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{})
-	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light", Clock: site.Clock()})
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light"), Name: "light"})
 	if err != nil {
 		t.Fatal(err)
 	}

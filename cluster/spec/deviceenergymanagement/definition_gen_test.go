@@ -7,10 +7,12 @@ package deviceenergymanagement
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 var _ = spec.Register
@@ -50,7 +52,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()
-	if Wrap(nil) != nil {
+	if Wrap(nil) != nil || WrapOn(nil, nil) != nil {
 		t.Error("Wrap(nil) is not nil")
 	}
 	srv, err := spec.NewServer(&spec.Cluster{ID: ClusterID, Name: Name, Revision: Revision}, spec.Options{}, spec.ServerConfig{})
@@ -65,7 +67,10 @@ func TestTypedServer(t *testing.T) {
 		t.Error(err)
 	}
 	_ = s.Get()
-	s.OnChanged(func(State, []uint32) {})()
+	s.OnChanged(func(State, contract.Change) {})()
+	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
+		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
+	}
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
@@ -97,4 +102,27 @@ func TestTypedServer(t *testing.T) {
 	_ = s.EmitPowerAdjustEnd(0, PowerAdjustEndEvent{})     // not in the empty definition's EventList: refused
 	_ = s.EmitPaused(0, PausedEvent{})                     // not in the empty definition's EventList: refused
 	_ = s.EmitResumed(0, ResumedEvent{})                   // not in the empty definition's EventList: refused
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
+	// Every handler declared: each is installed, and refused by the
+	// empty definition's AcceptedCommandList.
+	all := d
+	all.HandlePowerAdjustRequest = func(context.Context, PowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleCancelPowerAdjustRequest = func(context.Context, CancelPowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleStartTimeAdjustRequest = func(context.Context, StartTimeAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandlePauseRequest = func(context.Context, PauseRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleResumeRequest = func(context.Context, ResumeRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleModifyForecastRequest = func(context.Context, ModifyForecastRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleRequestConstraintBasedForecast = func(context.Context, RequestConstraintBasedForecastRequest) (struct{}, error) { return struct{}{}, nil }
+	all.HandleCancelRequest = func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }
+	if decl := all.ClusterDeclaration(); len(decl.Elements.Commands) != 8 || decl.Attach(srv) == nil {
+		t.Error("Declare: every handler accepted by the empty definition")
+	}
 }

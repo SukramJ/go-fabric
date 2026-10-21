@@ -17,6 +17,9 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -258,51 +261,51 @@ func TestNativeSourceCommands(t *testing.T) {
 	}{
 		{
 			"MoveToLevel over 2 s", levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 150, TransitionTime: u16(20)},
+			wire.MoveToLevelRequest{Level: 150, TransitionTime: u16(20)},
 			[]string{"ramp 150 2s false"},
 		},
 		{
 			"MoveToLevel null time is at once", levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 120},
+			wire.MoveToLevelRequest{Level: 120},
 			[]string{"ramp 120 0s false"},
 		},
 		{
 			"MoveToLevel 0 is cropped to the Lighting minimum", levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 0, TransitionTime: u16(0)},
+			wire.MoveToLevelRequest{Level: 0, TransitionTime: u16(0)},
 			[]string{"ramp 1 0s false"},
 		},
 		{
 			"MoveToLevel to where the device is ramps nothing", levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)},
+			wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)},
 			nil,
 		},
 		{
 			"Move up at 10/s from 1: 25.3 s", levelcontrol.CmdMove,
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)},
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)},
 			[]string{"ramp 254 25.3s false"},
 		},
 		{
 			"Move down with a null rate is at once", levelcontrol.CmdMove,
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown},
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown},
 			[]string{"ramp 1 0s false"},
 		},
 		{
 			"Step up 100 over 4 s", levelcontrol.CmdStep,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 100, TransitionTime: u16(40)},
+			wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 100, TransitionTime: u16(40)},
 			[]string{"ramp 101 4s false"},
 		},
 		{
 			"Step up cropped arrives sooner: 153 of 200 over 2 s", levelcontrol.CmdStep,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 200, TransitionTime: u16(20)},
+			wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 200, TransitionTime: u16(20)},
 			[]string{"ramp 254 1.5s false"},
 		},
 		{
 			"Step down with a null time is at once", levelcontrol.CmdStep,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 4},
+			wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 4},
 			[]string{"ramp 250 0s false"},
 		},
-		{"Stop", levelcontrol.CmdStop, levelcontrol.StopRequest{}, []string{"stop"}},
-		{"StopWithOnOff", levelcontrol.CmdStopWithOnOff, levelcontrol.StopRequest{}, []string{"stop"}},
+		{"Stop", levelcontrol.CmdStop, wire.StopRequest{}, []string{"stop"}},
+		{"StopWithOnOff", levelcontrol.CmdStopWithOnOff, wire.StopRequest{}, []string{"stop"}},
 	}
 	for _, s := range steps {
 		if _, err := srv.MatterInvoke(ctx, s.cmd, s.fields); err != nil {
@@ -330,10 +333,10 @@ func TestNativeSourceExecuteIfOff(t *testing.T) {
 		cmd    uint32
 		fields any
 	}{
-		{levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 50}},
-		{levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp}},
-		{levelcontrol.CmdStep, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 5}},
-		{levelcontrol.CmdStop, levelcontrol.StopRequest{}},
+		{levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 50}},
+		{levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp}},
+		{levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 5}},
+		{levelcontrol.CmdStop, wire.StopRequest{}},
 	}
 	for _, g := range gated {
 		if _, err := srv.MatterInvoke(ctx, g.cmd, g.fields); err != nil {
@@ -346,7 +349,7 @@ func TestNativeSourceExecuteIfOff(t *testing.T) {
 	// attribute.
 	ex := levelcontrol.OptionExecuteIfOff
 	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel,
-		levelcontrol.MoveToLevelRequest{Level: 50, OptionsMask: ex, OptionsOverride: ex}); err != nil {
+		wire.MoveToLevelRequest{Level: 50, OptionsMask: ex, OptionsOverride: ex}); err != nil {
 		t.Fatal(err)
 	}
 	wantLog(t, d, "ramp 50 0s false")
@@ -355,11 +358,11 @@ func TestNativeSourceExecuteIfOff(t *testing.T) {
 	if err := srv.MatterWrite(ctx, levelcontrol.AttrOptions, uint64(ex)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStop, levelcontrol.StopRequest{OptionsMask: ex}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStop, wire.StopRequest{OptionsMask: ex}); err != nil {
 		t.Fatal(err)
 	}
 	wantLog(t, d)
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStop, levelcontrol.StopRequest{}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStop, wire.StopRequest{}); err != nil {
 		t.Fatal(err)
 	}
 	wantLog(t, d, "stop")
@@ -368,7 +371,7 @@ func TestNativeSourceExecuteIfOff(t *testing.T) {
 	if err := srv.MatterWrite(ctx, levelcontrol.AttrOptions, uint64(0)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStopWithOnOff, levelcontrol.StopRequest{}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStopWithOnOff, wire.StopRequest{}); err != nil {
 		t.Fatal(err)
 	}
 	wantLog(t, d, "stop")
@@ -377,7 +380,7 @@ func TestNativeSourceExecuteIfOff(t *testing.T) {
 	_ = d.SetOnOff(ctx, true)
 	d.take()
 	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStep,
-		levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 10}); err != nil {
+		wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 10}); err != nil {
 		t.Fatal(err)
 	}
 	wantLog(t, d, "ramp 40 0s false")
@@ -398,7 +401,7 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// MoveWithOnOff up from off: on first (OnLevel 51), then 203 left
 		// at 10/s.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveWithOnOff,
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)}); err != nil {
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "on", "ramp 254 20.3s true")
@@ -407,7 +410,7 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// MoveToLevelWithOnOff to the minimum over 1 s: the device stays
 		// on while it ramps and goes off once it is there.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff,
-			levelcontrol.MoveToLevelRequest{Level: 0, TransitionTime: u16(10)}); err != nil {
+			wire.MoveToLevelRequest{Level: 0, TransitionTime: u16(10)}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "ramp 1 1s true")
@@ -421,7 +424,7 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// StepWithOnOff down to the minimum when already there and off:
 		// no ramp, no switch.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStepWithOnOff,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 10, TransitionTime: u16(5)}); err != nil {
+			wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 10, TransitionTime: u16(5)}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d)
@@ -430,7 +433,7 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// taken from the level before the coupling (1 + 20), as matter.js
 		// evaluates it (:478), and the rest of the way at 20 per 2 s.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStepWithOnOff,
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 20, TransitionTime: u16(20)}); err != nil {
+			wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 20, TransitionTime: u16(20)}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "on", "ramp 21 3s true")
@@ -439,12 +442,12 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// MoveWithOnOff down, then StopWithOnOff part-way: the pending
 		// switch-off is dropped with the ramp.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveWithOnOff,
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}); err != nil {
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "ramp 1 2s true")
 		sleep(time.Second)
-		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStopWithOnOff, levelcontrol.StopRequest{}); err != nil {
+		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdStopWithOnOff, wire.StopRequest{}); err != nil {
 			t.Fatal(err)
 		}
 		sleep(5 * time.Second)
@@ -456,14 +459,14 @@ func TestNativeSourceOnOffCoupling(t *testing.T) {
 		// The plain commands never couple: MoveToLevel to the minimum
 		// leaves the device on.
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel,
-			levelcontrol.MoveToLevelRequest{Level: 1}); err != nil {
+			wire.MoveToLevelRequest{Level: 1}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "ramp 1 0s false")
 		// MoveToLevelWithOnOff to the minimum at once, already there:
 		// switched off at once (#coupleOnCommit).
 		if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff,
-			levelcontrol.MoveToLevelRequest{Level: 1}); err != nil {
+			wire.MoveToLevelRequest{Level: 1}); err != nil {
 			t.Fatal(err)
 		}
 		wantLog(t, d, "off")
@@ -533,7 +536,7 @@ func TestNativeSourceAttributesAndRefusals(t *testing.T) {
 	d.mu.Lock()
 	d.refuse = fail
 	d.mu.Unlock()
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 3}); !errors.Is(err, fail) {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 3}); !errors.Is(err, fail) {
 		t.Errorf("refused ramp: %v, want %v", err, fail)
 	}
 	// A null level cannot be stepped (matter.js stepLogic reads the
@@ -542,7 +545,7 @@ func TestNativeSourceAttributesAndRefusals(t *testing.T) {
 	d.mu.Lock()
 	d.refuse, d.known = nil, false
 	d.mu.Unlock()
-	_, err := srv.MatterInvoke(ctx, levelcontrol.CmdStep, levelcontrol.StepRequest{StepSize: 1})
+	_, err := srv.MatterInvoke(ctx, levelcontrol.CmdStep, wire.StepRequest{StepSize: 1})
 	wantStatus(t, err, im.StatusFailure)
 	if v, _ := srv.MatterRead(levelcontrol.AttrCurrentLevel); v != nil {
 		t.Errorf("CurrentLevel of an unknown level = %v, want null", v)
@@ -586,9 +589,9 @@ func TestNativeSourceWithoutOnOff(t *testing.T) {
 		cmd    uint32
 		fields any
 	}{
-		{levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 0}},
-		{levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 0, TransitionTime: u16(3)}},
-		{levelcontrol.CmdStop, levelcontrol.StopRequest{}},
+		{levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 0}},
+		{levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 0, TransitionTime: u16(3)}},
+		{levelcontrol.CmdStop, wire.StopRequest{}},
 	} {
 		if _, err := srv.MatterInvoke(ctx, c.cmd, c.fields); err != nil {
 			t.Fatal(err)
@@ -610,11 +613,11 @@ func TestNativeSourceRatedMoveOnUnknownLevel(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		cmd  uint32
-		req  levelcontrol.MoveRequest
+		req  wire.MoveRequest
 		want []string
 	}{
-		{"up", levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)}, []string{"ramp 254 0s false"}},
-		{"down with on/off", levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}, []string{"ramp 1 0s true", "off"}},
+		{"up", levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)}, []string{"ramp 254 0s false"}},
+		{"down with on/off", levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}, []string{"ramp 1 0s true", "off"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -638,7 +641,7 @@ func TestNativeSourceSettlesBelowMinLevel(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	srv, d := nativeServer(100, true, true, levelcontrol.NativeConfig{})
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
 		t.Fatalf("MoveToLevelWithOnOff: %v", err)
 	}
 	if !d.OnOff() {
@@ -667,7 +670,7 @@ type moverDevice struct {
 	moves int
 }
 
-func (m *moverDevice) MoveLevel(context.Context, levelcontrol.MoveRequest, bool) error {
+func (m *moverDevice) MoveLevel(context.Context, wire.MoveRequest, bool) error {
 	m.moves++
 	return nil
 }
@@ -684,7 +687,7 @@ func TestNativeSourceMover(t *testing.T) {
 	d.src = levelcontrol.NewNativeSource(m, d, levelcontrol.NativeConfig{Lighting: true})
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
 	for _, cmd := range []uint32{levelcontrol.CmdMove, levelcontrol.CmdMoveWithOnOff} {
-		if _, err := srv.MatterInvoke(ctx, cmd, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}); err != nil {
+		if _, err := srv.MatterInvoke(ctx, cmd, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}); err != nil {
 			t.Fatalf("Move %#x through a NativeMover: %v", cmd, err)
 		}
 	}
@@ -697,7 +700,7 @@ func TestNativeSourceMover(t *testing.T) {
 	}
 
 	plain, pd := nativeServer(100, true, true, levelcontrol.NativeConfig{})
-	if _, err := plain.MatterInvoke(ctx, levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp}); err != nil {
+	if _, err := plain.MatterInvoke(ctx, levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp}); err != nil {
 		t.Fatalf("Move without a NativeMover: %v", err)
 	}
 	wantLog(t, pd, "ramp 254 0s false")
@@ -727,7 +730,7 @@ func TestNativeSourceImmediateSwitchOff(t *testing.T) {
 	s := &slowReportDevice{rampDevice: d}
 	d.src = levelcontrol.NewNativeSource(s, d, levelcontrol.NativeConfig{Lighting: true})
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(0)}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(0)}); err != nil {
 		t.Fatalf("MoveToLevelWithOnOff(1, 0): %v", err)
 	}
 	if d.OnOff() {
@@ -759,7 +762,7 @@ func TestNativeSourceImmediateSwitchOffRefused(t *testing.T) {
 	t.Parallel()
 	d := &rampDevice{level: 100, known: true}
 	src := levelcontrol.NewNativeSource(d, &failingOnOff{on: true}, levelcontrol.NativeConfig{Lighting: true})
-	err := src.MoveToLevelWithOnOff(context.Background(), levelcontrol.MoveToLevelRequest{Level: 1})
+	err := src.MoveToLevelWithOnOff(context.Background(), lvldef.MoveToLevelWithOnOffRequest{Level: 1, TransitionTime: spec.NullOf[uint16]()})
 	if err == nil || !strings.Contains(err.Error(), "switch off") {
 		t.Fatalf("refused switch-off: %v, want the switch-off error", err)
 	}
@@ -791,13 +794,13 @@ func TestNativeSourceSwitcher(t *testing.T) {
 	sw := &switcherDevice{rampDevice: d}
 	d.src = levelcontrol.NewNativeSource(sw, d, levelcontrol.NativeConfig{Lighting: true})
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 80, TransitionTime: u16(10)}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 80, TransitionTime: u16(10)}); err != nil {
 		t.Fatalf("MoveToLevelWithOnOff from off: %v", err)
 	}
 	d.mu.Lock()
 	d.on = true
 	d.mu.Unlock()
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
 		t.Fatalf("MoveToLevelWithOnOff to the minimum: %v", err)
 	}
 	if want := []string{"on 80 1s", "off 500ms"}; !slices.Equal(sw.calls, want) {
@@ -817,7 +820,7 @@ func TestNativeSourceSettlesAtDeadline(t *testing.T) {
 	s := &slowReportDevice{rampDevice: d}
 	d.src = levelcontrol.NewNativeSource(s, d, levelcontrol.NativeConfig{Lighting: true})
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
-	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(1)}); err != nil {
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(1)}); err != nil {
 		t.Fatalf("MoveToLevelWithOnOff(1, 0.1 s): %v", err)
 	}
 	if !d.OnOff() {

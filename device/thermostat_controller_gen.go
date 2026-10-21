@@ -50,9 +50,10 @@ var ThermostatControllerType = Type{
 type ThermostatController struct{ *Device }
 
 // NewThermostatController returns a ThermostatController device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewThermostatController(opts Options, with ...Option) (*ThermostatController, error) {
-	d, err := New(&ThermostatControllerType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ThermostatControllerID (see [New]).
+func NewThermostatController(opts Options, decls ...Declaration) (*ThermostatController, error) {
+	d, err := FromSpec(Spec{Type: ThermostatControllerID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -60,6 +61,9 @@ func NewThermostatController(opts Options, with ...Option) (*ThermostatControlle
 }
 
 // Binding returns the typed Binding server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *ThermostatController) Binding() *bindingdef.Server { return bindingdef.Wrap(d.Server(0x001E)) }
+func (d *ThermostatController) Binding() *bindingdef.Server {
+	return bindingdef.WrapOn(d.Server(0x001E), d.queue)
+}

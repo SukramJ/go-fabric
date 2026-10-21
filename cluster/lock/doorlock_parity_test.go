@@ -28,7 +28,7 @@ func (f *fakeLockSource) LockInvoke(_ context.Context, _ uint32) error {
 // ({vacation:true,privacy:true,passage:true,alwaysSet:2047}).
 func TestParity_DoorLock_LockType_SupportedOperatingModes(t *testing.T) {
 	t.Parallel()
-	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: &fakeLockSource{}})
+	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Features: lock.FeatureUBOLT, Source: &fakeLockSource{}})
 
 	lt, ok := srv.MatterRead(wire.DoorLockAttrLockType)
 	if !ok {

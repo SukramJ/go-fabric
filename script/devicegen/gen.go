@@ -31,7 +31,8 @@ var assemblerMounted = map[string]bool{
 // device.Device; an accessor may not shadow one.
 var deviceMethods = map[string]bool{
 	"Type": true, "Server": true, "Servers": true, "AddPart": true, "Parts": true,
-	"Spec": true, "OnChanged": true, "MatterDeviceType": true, "MatterClusterServers": true,
+	"Spec": true, "OnChanged": true, "OnChangedAsync": true, "MatterDeviceType": true, "MatterClusterServers": true,
+	"EndpointNumber": true, "SetReachable": true, "Reachable": true, "Rename": true,
 }
 
 // systemEndpointTypes are matter.js's simple device types that are
@@ -432,9 +433,10 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	fmt.Fprintf(&w, "// %s is an endpoint of the %s device type.\n", n, dt.Name)
 	fmt.Fprintf(&w, "type %s struct{ *Device }\n\n", n)
 	fmt.Fprintf(&w, "// New%s returns a %s device: its mandatory server clusters and the\n", n, dt.Name)
-	w.WriteString("// optional ones opted in, each with its default server or the host's (see [New]).\n")
-	fmt.Fprintf(&w, "func New%s(opts Options, with ...Option) (*%s, error) {\n", n, n)
-	fmt.Fprintf(&w, "\td, err := New(&%sType, opts, with...)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\treturn &%s{d}, nil\n}\n", n, n)
+	w.WriteString("// optional ones declared, each with its default server or the host's —\n")
+	fmt.Fprintf(&w, "// [FromSpec] with Type %sID (see [New]).\n", n)
+	fmt.Fprintf(&w, "func New%s(opts Options, decls ...Declaration) (*%s, error) {\n", n, n)
+	fmt.Fprintf(&w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\treturn &%s{d}, nil\n}\n", n, n)
 
 	for _, cr := range m.servers {
 		acc, ok := g.accessor(cr)
@@ -449,11 +451,11 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		}
 		state := "// The device type mandates the cluster.\n"
 		if !cr.mandatory {
-			state = "// It is nil until WithOptional, WithFeatures or WithServer mounts\n// the optional cluster.\n"
+			state = "// It is nil until a declaration mounts the optional cluster.\n"
 		}
 		fmt.Fprintf(&w, "\n// %s returns the typed %s server over the one the device mounts,\n", method, cr.def.Name)
-		w.WriteString("// whatever its type (Underlying returns it).\n" + state)
-		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.Wrap(d.Server(0x%04X)) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
+		w.WriteString("// whatever its type (Underlying returns it); its OnChangedAsync runs on\n// the device's goroutine.\n" + state)
+		fmt.Fprintf(&w, "func (d *%s) %s() %s { return %s.WrapOn(d.Server(0x%04X), d.queue) }\n", n, method, acc.Type, acc.Alias, cr.def.ID)
 	}
 	return w.Bytes(), nil
 }
@@ -596,7 +598,9 @@ func (g *generator) generateRegistry(names []string) (*output, error) {
 // constructor refusing a device without a StableKey, and called with the
 // options a host gives a device of the type (the hand-written testWith);
 // where it constructs, each accessor is read: a mandatory cluster's is
-// mounted, an optional one's is the device's server for the cluster.
+// mounted, an optional one's is the device's server for the cluster; and
+// the device as data (FromSpec with the type's id and the same
+// declarations) is the same device, or refused with the same error.
 func (g *generator) generateTest(names []string) (*output, error) {
 	var w bytes.Buffer
 	w.WriteString("// SPDX-License-Identifier: Apache-2.0\n// Copyright (C) 2026 SukramJ.\n\n")
@@ -605,7 +609,9 @@ func (g *generator) generateTest(names []string) (*output, error) {
 	w.WriteString("// TestGeneratedConstructorsAndAccessors calls every generated constructor\n")
 	w.WriteString("// with a host's options (testWith); a device that constructs has every\n")
 	w.WriteString("// mandatory accessor mounted. Which types refuse, and why, is\n")
-	w.WriteString("// TestEveryTypeConstructsAndConforms's.\n")
+	w.WriteString("// TestEveryTypeConstructsAndConforms's. FromSpec with the type's id and\n")
+	w.WriteString("// the same declarations builds the same device (sameDevice), or refuses\n")
+	w.WriteString("// it with the same error.\n")
 	w.WriteString("func TestGeneratedConstructorsAndAccessors(t *testing.T) {\n\tt.Parallel()\n")
 	for _, name := range names {
 		m, err := g.model(name)
@@ -627,7 +633,8 @@ func (g *generator) generateTest(names []string) (*output, error) {
 				fmt.Fprintf(&w, "\t\tif s, srv := d.%s(), d.Server(0x%04X); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {\n\t\t\tt.Error(\"%s: optional %s is not the device's server\")\n\t\t}\n", method, cr.def.ID, name, cr.def.Name)
 			}
 		}
-		fmt.Fprintf(&w, "\t} else if !refusesFixture(%q) {\n\t\tt.Errorf(\"%s: %%v\", err)\n\t}\n", name, name)
+		fmt.Fprintf(&w, "\t\tif s, err := FromSpec(Spec{Type: %sID, Options: testOptions(%q), Declarations: testWith(t, %q)}); err != nil {\n\t\t\tt.Errorf(\"%s: FromSpec: %%v\", err)\n\t\t} else {\n\t\t\tsameDevice(t, %q, s, d.Device)\n\t\t}\n", n, name, name, name, name)
+		fmt.Fprintf(&w, "\t} else if _, serr := FromSpec(Spec{Type: %sID, Options: testOptions(%q), Declarations: testWith(t, %q)}); serr == nil || serr.Error() != err.Error() {\n\t\tt.Errorf(\"%s: FromSpec refuses with %%v, New%s with %%v\", serr, err)\n\t} else if !refusesFixture(%q) {\n\t\tt.Errorf(\"%s: %%v\", err)\n\t}\n", n, name, name, name, n, name, name)
 	}
 	w.WriteString("}\n")
 	out, err := format.Source(w.Bytes())

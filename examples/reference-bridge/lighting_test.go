@@ -39,7 +39,7 @@ func TestCeilingLightRampsThroughTheEngine(t *testing.T) {
 		}
 		ctx := context.Background()
 		tenths := uint16(20)
-		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 227, TransitionTime: &tenths}); err != nil {
+		if _, err := lvl.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 227, TransitionTime: &tenths}); err != nil {
 			t.Fatal(err)
 		}
 		if !lamp.isOn() {

@@ -77,9 +77,10 @@ var MountedDimmableLoadControlType = Type{
 type MountedDimmableLoadControl struct{ *Device }
 
 // NewMountedDimmableLoadControl returns a MountedDimmableLoadControl device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewMountedDimmableLoadControl(opts Options, with ...Option) (*MountedDimmableLoadControl, error) {
-	d, err := New(&MountedDimmableLoadControlType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type MountedDimmableLoadControlID (see [New]).
+func NewMountedDimmableLoadControl(opts Options, decls ...Declaration) (*MountedDimmableLoadControl, error) {
+	d, err := FromSpec(Spec{Type: MountedDimmableLoadControlID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -87,13 +88,17 @@ func NewMountedDimmableLoadControl(opts Options, with ...Option) (*MountedDimmab
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *MountedDimmableLoadControl) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *MountedDimmableLoadControl) OnOff() *onoffdef.Server {
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
+}
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *MountedDimmableLoadControl) LevelControl() *levelcontroldef.Server {
-	return levelcontroldef.Wrap(d.Server(0x0008))
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }

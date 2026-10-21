@@ -45,9 +45,10 @@ var ContactSensorType = Type{
 type ContactSensor struct{ *Device }
 
 // NewContactSensor returns a ContactSensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewContactSensor(opts Options, with ...Option) (*ContactSensor, error) {
-	d, err := New(&ContactSensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ContactSensorID (see [New]).
+func NewContactSensor(opts Options, decls ...Declaration) (*ContactSensor, error) {
+	d, err := FromSpec(Spec{Type: ContactSensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +56,17 @@ func NewContactSensor(opts Options, with ...Option) (*ContactSensor, error) {
 }
 
 // BooleanState returns the typed BooleanState server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ContactSensor) BooleanState() *booleanstatedef.Server {
-	return booleanstatedef.Wrap(d.Server(0x0045))
+	return booleanstatedef.WrapOn(d.Server(0x0045), d.queue)
 }
 
 // BooleanStateConfiguration returns the typed BooleanStateConfiguration server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *ContactSensor) BooleanStateConfiguration() *booleanstateconfigurationdef.Server {
-	return booleanstateconfigurationdef.Wrap(d.Server(0x0080))
+	return booleanstateconfigurationdef.WrapOn(d.Server(0x0080), d.queue)
 }

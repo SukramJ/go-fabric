@@ -40,9 +40,10 @@ var HumiditySensorType = Type{
 type HumiditySensor struct{ *Device }
 
 // NewHumiditySensor returns a HumiditySensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewHumiditySensor(opts Options, with ...Option) (*HumiditySensor, error) {
-	d, err := New(&HumiditySensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type HumiditySensorID (see [New]).
+func NewHumiditySensor(opts Options, decls ...Declaration) (*HumiditySensor, error) {
+	d, err := FromSpec(Spec{Type: HumiditySensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,9 @@ func NewHumiditySensor(opts Options, with ...Option) (*HumiditySensor, error) {
 }
 
 // RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *HumiditySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }

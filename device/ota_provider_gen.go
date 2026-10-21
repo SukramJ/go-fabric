@@ -39,9 +39,10 @@ var OtaProviderType = Type{
 type OtaProvider struct{ *Device }
 
 // NewOtaProvider returns a OtaProvider device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewOtaProvider(opts Options, with ...Option) (*OtaProvider, error) {
-	d, err := New(&OtaProviderType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type OtaProviderID (see [New]).
+func NewOtaProvider(opts Options, decls ...Declaration) (*OtaProvider, error) {
+	d, err := FromSpec(Spec{Type: OtaProviderID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +50,9 @@ func NewOtaProvider(opts Options, with ...Option) (*OtaProvider, error) {
 }
 
 // OtaSoftwareUpdateProvider returns the typed OtaSoftwareUpdateProvider server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *OtaProvider) OtaSoftwareUpdateProvider() *otasoftwareupdateproviderdef.Server {
-	return otasoftwareupdateproviderdef.Wrap(d.Server(0x0029))
+	return otasoftwareupdateproviderdef.WrapOn(d.Server(0x0029), d.queue)
 }

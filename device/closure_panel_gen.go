@@ -41,9 +41,10 @@ var ClosurePanelType = Type{
 type ClosurePanel struct{ *Device }
 
 // NewClosurePanel returns a ClosurePanel device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewClosurePanel(opts Options, with ...Option) (*ClosurePanel, error) {
-	d, err := New(&ClosurePanelType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ClosurePanelID (see [New]).
+func NewClosurePanel(opts Options, decls ...Declaration) (*ClosurePanel, error) {
+	d, err := FromSpec(Spec{Type: ClosurePanelID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +52,9 @@ func NewClosurePanel(opts Options, with ...Option) (*ClosurePanel, error) {
 }
 
 // ClosureDimension returns the typed ClosureDimension server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ClosurePanel) ClosureDimension() *closuredimensiondef.Server {
-	return closuredimensiondef.Wrap(d.Server(0x0105))
+	return closuredimensiondef.WrapOn(d.Server(0x0105), d.queue)
 }

@@ -22,7 +22,7 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 	fixed := &hostServer{id: 0x0040}    // FixedLabel: not an OnOffLight requirement
 	eco := &hostServer{id: 0x0750}      // EcosystemInformation: BridgedNode's, not the light's
 	levelCtl := &hostServer{id: 0x0008} // LevelControl: an optional requirement
-	d, err := NewOnOffLight(testOptions("l"), WithServer(eco), WithServer(levelCtl), WithServer(fixed))
+	d, err := NewOnOffLight(testOptions("l"), withServer(eco), withServer(levelCtl), withServer(fixed))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 	// A second WithServer for the same unlisted cluster replaces the first
 	// and keeps its place.
 	other := &hostServer{id: 0x0750}
-	d, err = NewOnOffLight(testOptions("l"), WithServer(eco), WithServer(fixed), WithServer(other))
+	d, err = NewOnOffLight(testOptions("l"), withServer(eco), withServer(fixed), withServer(other))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,10 +43,10 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 		t.Errorf("servers %#04x after a replacing WithServer", got)
 	}
 	for name, with := range map[string][]Option{
-		"opt-in":      {WithServer(fixed), WithOptional(0x0040)},
-		"initial":     {WithServer(fixed), WithInitial(0x0040, map[uint32]any{0: true})},
+		"opt-in":      {withServer(fixed), WithOptional(0x0040)},
+		"initial":     {withServer(fixed), withInitial(0x0040, map[uint32]any{0: true})},
 		"no server":   {WithOptional(0x0040)},
-		"assembler's": {WithServer(&hostServer{id: 0x0039})},
+		"assembler's": {withServer(&hostServer{id: 0x0039})},
 	} {
 		_, err := NewOnOffLight(testOptions("l"), with...)
 		if err == nil || !strings.Contains(err.Error(), "0x00") {
@@ -108,11 +108,11 @@ func TestWithChangeNotifier(t *testing.T) {
 		t.Error("the source changes between Spec calls")
 	}
 	// A part keeps its own source.
-	p, err := NewPowerSource(Options{StableKey: testOptions("battery").StableKey}, WithServer(&hostServer{id: 0x002F}))
+	p, err := NewPowerSource(Options{StableKey: testOptions("battery").StableKey}, withServer(&hostServer{id: 0x002F}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	alarm, err := NewSmokeCoAlarm(testOptions("alarm"), WithServer(&hostServer{id: 0x005C}), WithChangeNotifier(n))
+	alarm, err := NewSmokeCoAlarm(testOptions("alarm"), withServer(&hostServer{id: 0x005C}), WithChangeNotifier(n))
 	if err != nil {
 		t.Fatal(err)
 	}

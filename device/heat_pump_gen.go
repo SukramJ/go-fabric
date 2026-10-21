@@ -38,9 +38,10 @@ var HeatPumpType = Type{
 type HeatPump struct{ *Device }
 
 // NewHeatPump returns a HeatPump device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewHeatPump(opts Options, with ...Option) (*HeatPump, error) {
-	d, err := New(&HeatPumpType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type HeatPumpID (see [New]).
+func NewHeatPump(opts Options, decls ...Declaration) (*HeatPump, error) {
+	d, err := FromSpec(Spec{Type: HeatPumpID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}

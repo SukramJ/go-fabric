@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 // TestServerMatchesTheGeneratedDefinition holds both selections the server
@@ -50,49 +51,49 @@ func TestCommandsTakeTheGeneratedRequests(t *testing.T) {
 			levelcontrol.CmdMoveToLevel,
 			lvldef.MoveToLevelRequest{Level: 7, TransitionTime: tt, OptionsMask: 1, OptionsOverride: 1},
 			"MoveToLevel",
-			levelcontrol.MoveToLevelRequest{Level: 7, TransitionTime: &twenty, OptionsMask: 1, OptionsOverride: 1},
+			wire.MoveToLevelRequest{Level: 7, TransitionTime: &twenty, OptionsMask: 1, OptionsOverride: 1},
 		},
 		{
 			levelcontrol.CmdMoveToLevelWithOnOff,
 			lvldef.MoveToLevelWithOnOffRequest{Level: 7, TransitionTime: null16},
 			"MoveToLevelWithOnOff",
-			levelcontrol.MoveToLevelRequest{Level: 7},
+			wire.MoveToLevelRequest{Level: 7},
 		},
 		{
 			levelcontrol.CmdMove,
 			lvldef.MoveRequest{MoveMode: lvldef.MoveModeDown, Rate: rate},
 			"Move",
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: &five},
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: &five},
 		},
 		{
 			levelcontrol.CmdMoveWithOnOff,
 			lvldef.MoveWithOnOffRequest{MoveMode: lvldef.MoveModeUp, Rate: null8},
 			"MoveWithOnOff",
-			levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp},
+			wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp},
 		},
 		{
 			levelcontrol.CmdStep,
 			lvldef.StepRequest{StepMode: lvldef.StepModeDown, StepSize: 3, TransitionTime: tt},
 			"Step",
-			levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 3, TransitionTime: &twenty},
+			wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 3, TransitionTime: &twenty},
 		},
 		{
 			levelcontrol.CmdStepWithOnOff,
 			lvldef.StepWithOnOffRequest{StepSize: 3, TransitionTime: null16, OptionsMask: 1},
 			"StepWithOnOff",
-			levelcontrol.StepRequest{StepSize: 3, OptionsMask: 1},
+			wire.StepRequest{StepSize: 3, OptionsMask: 1},
 		},
 		{
 			levelcontrol.CmdStop,
 			lvldef.StopRequest{OptionsMask: 1, OptionsOverride: 1},
 			"Stop",
-			levelcontrol.StopRequest{OptionsMask: 1, OptionsOverride: 1},
+			wire.StopRequest{OptionsMask: 1, OptionsOverride: 1},
 		},
 		{
 			levelcontrol.CmdStopWithOnOff,
 			lvldef.StopWithOnOffRequest{},
 			"StopWithOnOff",
-			levelcontrol.StopRequest{},
+			wire.StopRequest{},
 		},
 	}
 	for _, tc := range cases {

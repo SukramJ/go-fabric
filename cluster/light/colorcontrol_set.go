@@ -3,7 +3,11 @@
 
 package light
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"github.com/SukramJ/go-fabric/contract"
+)
 
 // Set records a colour the device took on itself — a program on the
 // device, a wall transmitter, or the device confirming a different value
@@ -71,7 +75,7 @@ func (s *ColorControlServer) Set(c Color) {
 	s.st = next
 	s.setGen++
 	s.mu.Unlock()
-	s.report(prev, next)
+	s.report(contract.OriginHostSet, prev, next)
 }
 
 // deviceColor is st with the device's colour c: the mode switch's

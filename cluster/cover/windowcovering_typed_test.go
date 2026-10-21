@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 func ptrOf[T any](v T) *T { return &v }
@@ -31,7 +32,10 @@ func TestWindowCoveringTypedSetGetOnChanged(t *testing.T) {
 	t.Parallel()
 	s := typedCovering(t)
 	var changes [][]uint32
-	unsubscribe := s.OnChanged(func(_ wcdef.State, changed []uint32) { changes = append(changes, changed) })
+	unsubscribe := s.OnChanged(func(_ wcdef.State, change contract.Change) {
+		changed := change.Attributes
+		changes = append(changes, changed)
+	})
 	defer unsubscribe()
 
 	if err := s.Set(wcdef.Patch{

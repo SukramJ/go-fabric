@@ -7,6 +7,7 @@ package colorcontrol
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -139,12 +140,18 @@ type Patch struct {
 type Server struct{ spec.Wrapper }
 
 // Wrap returns srv as the typed server; nil for nil. A typed server is
-// no contract.ClusterServer, so it is never wrapped twice.
-func Wrap(srv contract.ClusterServer) *Server {
+// no contract.ClusterServer, so it is never wrapped twice. Its
+// asynchronous callbacks need a queue: WrapOn.
+func Wrap(srv contract.ClusterServer) *Server { return WrapOn(srv, nil) }
+
+// WrapOn is Wrap with the queue the typed server's asynchronous
+// callbacks (OnChangedAsync) run on — a device's, which its typed
+// accessors pass; nil for a nil srv.
+func WrapOn(srv contract.ClusterServer, q spec.Queue) *Server {
 	if srv == nil {
 		return nil
 	}
-	return &Server{spec.NewWrapper(srv)}
+	return &Server{spec.NewWrapperOn(srv, q)}
 }
 
 // Set applies p through the server's SetAttributes: every value is
@@ -155,11 +162,21 @@ func (s *Server) Set(p Patch) error { return spec.SetPatch(s.Underlying(), p) }
 // Get returns the state, each attribute as the server reads it.
 func (s *Server) Get() State { return spec.StateOf[State](s.Underlying()) }
 
-// OnChanged calls fn with the state and the ids of the attributes that
-// changed, after each change the server reports; it returns the
+// OnChanged calls fn with the state and the change — the attributes
+// that changed and its origin (contract.Origin) — after each change the
+// server reports, inline: on the goroutine that made the change, before
+// the write, command or Set that made it returns. It returns the
 // unsubscribe function.
-func (s *Server) OnChanged(fn func(state State, changed []uint32)) (unsubscribe func()) {
+func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedOf(s.Underlying(), fn)
+}
+
+// OnChangedAsync is OnChanged with fn queued: the state and the change
+// are taken when the server reports it, and fn runs later on the
+// device's goroutine, one call after the other. spec.ErrNoQueue for a
+// server wrapped outside a device (Wrap).
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
 // OnWrite installs fn as the veto of a controller's write
@@ -284,4 +301,244 @@ func (s *Server) HandleMoveColorTemperature(fn func(ctx context.Context, req Mov
 // spec.ErrNoHandlers for a server that takes none.
 func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepColorTemperature, fn)
+}
+
+// Declare is the declaration of the ColorControl cluster on a device:
+// device.New<Type> and device.FromSpec take it, and every field is
+// optional — the zero value mounts the cluster (an optional one too)
+// with the kit's default server and the device type's defaults. A
+// device takes one Declare per cluster.
+type Declare struct {
+	// Initial is the state the server starts with, over the device
+	// type's defaults; an optional attribute it sets is served.
+	Initial Patch
+	// Features is the FeatureMap selection; zero is the device type's.
+	Features Feature
+	// OnWrite vetoes a controller's write before it is stored
+	// (Server.OnWrite); it runs inline.
+	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// Transitions runs the commands as transitions over their
+	// TransitionTime (ADR 0014); false applies the target at once.
+	Transitions bool
+	// HandleMoveToHue handles the MoveToHue command in place of the server
+	// (Server.HandleMoveToHue), inline; an optional command it handles is accepted.
+	HandleMoveToHue func(ctx context.Context, req MoveToHueRequest) (struct{}, error)
+	// HandleMoveHue handles the MoveHue command in place of the server
+	// (Server.HandleMoveHue), inline; an optional command it handles is accepted.
+	HandleMoveHue func(ctx context.Context, req MoveHueRequest) (struct{}, error)
+	// HandleStepHue handles the StepHue command in place of the server
+	// (Server.HandleStepHue), inline; an optional command it handles is accepted.
+	HandleStepHue func(ctx context.Context, req StepHueRequest) (struct{}, error)
+	// HandleMoveToSaturation handles the MoveToSaturation command in place of the server
+	// (Server.HandleMoveToSaturation), inline; an optional command it handles is accepted.
+	HandleMoveToSaturation func(ctx context.Context, req MoveToSaturationRequest) (struct{}, error)
+	// HandleMoveSaturation handles the MoveSaturation command in place of the server
+	// (Server.HandleMoveSaturation), inline; an optional command it handles is accepted.
+	HandleMoveSaturation func(ctx context.Context, req MoveSaturationRequest) (struct{}, error)
+	// HandleStepSaturation handles the StepSaturation command in place of the server
+	// (Server.HandleStepSaturation), inline; an optional command it handles is accepted.
+	HandleStepSaturation func(ctx context.Context, req StepSaturationRequest) (struct{}, error)
+	// HandleMoveToHueAndSaturation handles the MoveToHueAndSaturation command in place of the server
+	// (Server.HandleMoveToHueAndSaturation), inline; an optional command it handles is accepted.
+	HandleMoveToHueAndSaturation func(ctx context.Context, req MoveToHueAndSaturationRequest) (struct{}, error)
+	// HandleMoveToColor handles the MoveToColor command in place of the server
+	// (Server.HandleMoveToColor), inline; an optional command it handles is accepted.
+	HandleMoveToColor func(ctx context.Context, req MoveToColorRequest) (struct{}, error)
+	// HandleMoveColor handles the MoveColor command in place of the server
+	// (Server.HandleMoveColor), inline; an optional command it handles is accepted.
+	HandleMoveColor func(ctx context.Context, req MoveColorRequest) (struct{}, error)
+	// HandleStepColor handles the StepColor command in place of the server
+	// (Server.HandleStepColor), inline; an optional command it handles is accepted.
+	HandleStepColor func(ctx context.Context, req StepColorRequest) (struct{}, error)
+	// HandleMoveToColorTemperature handles the MoveToColorTemperature command in place of the server
+	// (Server.HandleMoveToColorTemperature), inline; an optional command it handles is accepted.
+	HandleMoveToColorTemperature func(ctx context.Context, req MoveToColorTemperatureRequest) (struct{}, error)
+	// HandleEnhancedMoveToHue handles the EnhancedMoveToHue command in place of the server
+	// (Server.HandleEnhancedMoveToHue), inline; an optional command it handles is accepted.
+	HandleEnhancedMoveToHue func(ctx context.Context, req EnhancedMoveToHueRequest) (struct{}, error)
+	// HandleEnhancedMoveHue handles the EnhancedMoveHue command in place of the server
+	// (Server.HandleEnhancedMoveHue), inline; an optional command it handles is accepted.
+	HandleEnhancedMoveHue func(ctx context.Context, req EnhancedMoveHueRequest) (struct{}, error)
+	// HandleEnhancedStepHue handles the EnhancedStepHue command in place of the server
+	// (Server.HandleEnhancedStepHue), inline; an optional command it handles is accepted.
+	HandleEnhancedStepHue func(ctx context.Context, req EnhancedStepHueRequest) (struct{}, error)
+	// HandleEnhancedMoveToHueAndSaturation handles the EnhancedMoveToHueAndSaturation command in place of the server
+	// (Server.HandleEnhancedMoveToHueAndSaturation), inline; an optional command it handles is accepted.
+	HandleEnhancedMoveToHueAndSaturation func(ctx context.Context, req EnhancedMoveToHueAndSaturationRequest) (struct{}, error)
+	// HandleColorLoopSet handles the ColorLoopSet command in place of the server
+	// (Server.HandleColorLoopSet), inline; an optional command it handles is accepted.
+	HandleColorLoopSet func(ctx context.Context, req ColorLoopSetRequest) (struct{}, error)
+	// HandleStopMoveStep handles the StopMoveStep command in place of the server
+	// (Server.HandleStopMoveStep), inline; an optional command it handles is accepted.
+	HandleStopMoveStep func(ctx context.Context, req StopMoveStepRequest) (struct{}, error)
+	// HandleMoveColorTemperature handles the MoveColorTemperature command in place of the server
+	// (Server.HandleMoveColorTemperature), inline; an optional command it handles is accepted.
+	HandleMoveColorTemperature func(ctx context.Context, req MoveColorTemperatureRequest) (struct{}, error)
+	// HandleStepColorTemperature handles the StepColorTemperature command in place of the server
+	// (Server.HandleStepColorTemperature), inline; an optional command it handles is accepted.
+	HandleStepColorTemperature func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)
+	// HostServer is the host's own server for the cluster, mounted in
+	// place of the kit's — also for a cluster the device type does not
+	// list. The hooks above go on it; Initial, Features and the ports are
+	// the kit's server's and are refused beside it.
+	HostServer contract.ClusterServer
+}
+
+// ClusterID implements device.Declaration: the cluster declared.
+func (Declare) ClusterID() uint32 { return ClusterID }
+
+// ClusterDeclaration implements device.Declaration: the declaration in
+// the form the device kit applies it.
+func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	if d.OnWrite != nil {
+		decl.Attach = d.attach
+	}
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Transitions = d.Transitions
+	if d.HandleMoveToHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleStepHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToSaturation != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToSaturation)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveSaturation != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveSaturation)
+		decl.Attach = d.attach
+	}
+	if d.HandleStepSaturation != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepSaturation)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToHueAndSaturation != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToHueAndSaturation)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToColor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToColor)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveColor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveColor)
+		decl.Attach = d.attach
+	}
+	if d.HandleStepColor != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepColor)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveToColorTemperature != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToColorTemperature)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnhancedMoveToHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnhancedMoveToHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnhancedMoveHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnhancedMoveHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnhancedStepHue != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnhancedStepHue)
+		decl.Attach = d.attach
+	}
+	if d.HandleEnhancedMoveToHueAndSaturation != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnhancedMoveToHueAndSaturation)
+		decl.Attach = d.attach
+	}
+	if d.HandleColorLoopSet != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdColorLoopSet)
+		decl.Attach = d.attach
+	}
+	if d.HandleStopMoveStep != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStopMoveStep)
+		decl.Attach = d.attach
+	}
+	if d.HandleMoveColorTemperature != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveColorTemperature)
+		decl.Attach = d.attach
+	}
+	if d.HandleStepColorTemperature != nil {
+		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepColorTemperature)
+		decl.Attach = d.attach
+	}
+	return decl
+}
+
+// attach installs the declaration's veto and handlers on srv; the
+// error names each one the server refused.
+func (d Declare) attach(srv contract.ClusterServer) error {
+	s := Wrap(srv)
+	var errs []error
+	if d.OnWrite != nil {
+		errs = append(errs, spec.HookError(Name, "OnWrite", s.OnWrite(d.OnWrite)))
+	}
+	if d.HandleMoveToHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveToHue", s.HandleMoveToHue(d.HandleMoveToHue)))
+	}
+	if d.HandleMoveHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveHue", s.HandleMoveHue(d.HandleMoveHue)))
+	}
+	if d.HandleStepHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStepHue", s.HandleStepHue(d.HandleStepHue)))
+	}
+	if d.HandleMoveToSaturation != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveToSaturation", s.HandleMoveToSaturation(d.HandleMoveToSaturation)))
+	}
+	if d.HandleMoveSaturation != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveSaturation", s.HandleMoveSaturation(d.HandleMoveSaturation)))
+	}
+	if d.HandleStepSaturation != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStepSaturation", s.HandleStepSaturation(d.HandleStepSaturation)))
+	}
+	if d.HandleMoveToHueAndSaturation != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveToHueAndSaturation", s.HandleMoveToHueAndSaturation(d.HandleMoveToHueAndSaturation)))
+	}
+	if d.HandleMoveToColor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveToColor", s.HandleMoveToColor(d.HandleMoveToColor)))
+	}
+	if d.HandleMoveColor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveColor", s.HandleMoveColor(d.HandleMoveColor)))
+	}
+	if d.HandleStepColor != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStepColor", s.HandleStepColor(d.HandleStepColor)))
+	}
+	if d.HandleMoveToColorTemperature != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveToColorTemperature", s.HandleMoveToColorTemperature(d.HandleMoveToColorTemperature)))
+	}
+	if d.HandleEnhancedMoveToHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveToHue", s.HandleEnhancedMoveToHue(d.HandleEnhancedMoveToHue)))
+	}
+	if d.HandleEnhancedMoveHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveHue", s.HandleEnhancedMoveHue(d.HandleEnhancedMoveHue)))
+	}
+	if d.HandleEnhancedStepHue != nil {
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedStepHue", s.HandleEnhancedStepHue(d.HandleEnhancedStepHue)))
+	}
+	if d.HandleEnhancedMoveToHueAndSaturation != nil {
+		errs = append(errs, spec.HookError(Name, "HandleEnhancedMoveToHueAndSaturation", s.HandleEnhancedMoveToHueAndSaturation(d.HandleEnhancedMoveToHueAndSaturation)))
+	}
+	if d.HandleColorLoopSet != nil {
+		errs = append(errs, spec.HookError(Name, "HandleColorLoopSet", s.HandleColorLoopSet(d.HandleColorLoopSet)))
+	}
+	if d.HandleStopMoveStep != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStopMoveStep", s.HandleStopMoveStep(d.HandleStopMoveStep)))
+	}
+	if d.HandleMoveColorTemperature != nil {
+		errs = append(errs, spec.HookError(Name, "HandleMoveColorTemperature", s.HandleMoveColorTemperature(d.HandleMoveColorTemperature)))
+	}
+	if d.HandleStepColorTemperature != nil {
+		errs = append(errs, spec.HookError(Name, "HandleStepColorTemperature", s.HandleStepColorTemperature(d.HandleStepColorTemperature)))
+	}
+	return errors.Join(errs...)
 }

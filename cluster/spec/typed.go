@@ -164,25 +164,63 @@ func stateOf[S any](srv contract.ClusterServer, attrID uint32, value any, with b
 	return st
 }
 
-// OnChangedOf calls fn with the State S of srv and the changed attribute
-// ids after every change srv reports: through its
-// [contract.AttributeChangeNotifier], or through its
-// [contract.ChangeNotifier] with every attribute it reports — the switch
-// of device.Device.OnChanged. It returns the unsubscribe function; a
-// server that notifies nothing never calls fn.
+// OnChangedOf calls fn with the State S of srv and the change after every
+// change srv reports, on the goroutine that made it and before the
+// operation that made it returns: through its
+// [contract.AttributeChangeNotifier], the origin read with
+// [contract.OriginOf], or through its [contract.ChangeNotifier] with
+// every attribute it reports and [contract.OriginUnknown] — the switch of
+// device.Device.OnChanged. It returns the unsubscribe function; a server
+// that notifies nothing never calls fn.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, changed []uint32)) (unsubscribe func()) {
+func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, change contract.Change)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}
 	}
+	return ChangesOf(srv, func(c contract.Change) { fn(StateOf[S](srv), c) })
+}
+
+// ChangesOf calls fn with every change srv reports, inline: through its
+// [contract.AttributeChangeNotifier] with the origin [contract.OriginOf]
+// reads, or through its [contract.ChangeNotifier] with every attribute it
+// reports and [contract.OriginUnknown]. It returns the unsubscribe
+// function; a server that notifies nothing never calls fn.
+func ChangesOf(srv contract.ClusterServer, fn func(contract.Change)) (unsubscribe func()) {
 	switch n := srv.(type) {
 	case contract.AttributeChangeNotifier:
-		return n.OnMatterAttributesChanged(func(ids []uint32) { fn(StateOf[S](srv), ids) })
+		return n.OnMatterAttributesChanged(func(ids []uint32) {
+			fn(contract.Change{Attributes: ids, Origin: contract.OriginOf(ids)})
+		})
 	case contract.ChangeNotifier:
-		return n.OnMatterValueChanged(func() { fn(StateOf[S](srv), srv.MatterReportable()) })
+		return n.OnMatterValueChanged(func() {
+			fn(contract.Change{Attributes: srv.MatterReportable(), Origin: contract.OriginUnknown})
+		})
 	default:
 		return func() {}
 	}
+}
+
+// ErrNoQueue is the refusal of an asynchronous callback on a typed server
+// wrapped without a queue ([NewWrapper]); a device's typed accessors wrap
+// with the device's.
+var ErrNoQueue = errors.New("spec: the typed server has no queue for asynchronous callbacks (wrapped outside a device)")
+
+// OnChangedAsyncOf is [OnChangedOf] with fn queued on w's queue: the state
+// is read and the change taken when the server reports it, and fn runs
+// later, one call after the other, on the queue's goroutine.
+// [ErrNoQueue] for a wrapper without a queue.
+// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
+func OnChangedAsyncOf[S any](w Wrapper, fn func(state S, change contract.Change)) (unsubscribe func(), err error) {
+	if w.queue == nil {
+		return func() {}, ErrNoQueue
+	}
+	if fn == nil {
+		return func() {}, nil
+	}
+	q := w.queue
+	return OnChangedOf(w.srv, func(state S, change contract.Change) {
+		q.Enqueue(func() { fn(state, change) })
+	}), nil
 }
 
 // OnWriteOf installs a typed write veto on srv ([ServerConfig.BeforeWrite]):

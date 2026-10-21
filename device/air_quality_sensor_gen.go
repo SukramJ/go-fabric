@@ -100,9 +100,10 @@ var AirQualitySensorType = Type{
 type AirQualitySensor struct{ *Device }
 
 // NewAirQualitySensor returns a AirQualitySensor device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewAirQualitySensor(opts Options, with ...Option) (*AirQualitySensor, error) {
-	d, err := New(&AirQualitySensorType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type AirQualitySensorID (see [New]).
+func NewAirQualitySensor(opts Options, decls ...Declaration) (*AirQualitySensor, error) {
+	d, err := FromSpec(Spec{Type: AirQualitySensorID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -110,104 +111,105 @@ func NewAirQualitySensor(opts Options, with ...Option) (*AirQualitySensor, error
 }
 
 // AirQuality returns the typed AirQuality server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *AirQualitySensor) AirQuality() *airqualitydef.Server {
-	return airqualitydef.Wrap(d.Server(0x005B))
+	return airqualitydef.WrapOn(d.Server(0x005B), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	return temperaturemeasurementdef.Wrap(d.Server(0x0402))
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	return relativehumiditymeasurementdef.Wrap(d.Server(0x0405))
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }
 
 // CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
-	return carbonmonoxideconcentrationmeasurementdef.Wrap(d.Server(0x040C))
+	return carbonmonoxideconcentrationmeasurementdef.WrapOn(d.Server(0x040C), d.queue)
 }
 
 // CarbonDioxideConcentrationMeasurement returns the typed CarbonDioxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) CarbonDioxideConcentrationMeasurement() *carbondioxideconcentrationmeasurementdef.Server {
-	return carbondioxideconcentrationmeasurementdef.Wrap(d.Server(0x040D))
+	return carbondioxideconcentrationmeasurementdef.WrapOn(d.Server(0x040D), d.queue)
 }
 
 // NitrogenDioxideConcentrationMeasurement returns the typed NitrogenDioxideConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) NitrogenDioxideConcentrationMeasurement() *nitrogendioxideconcentrationmeasurementdef.Server {
-	return nitrogendioxideconcentrationmeasurementdef.Wrap(d.Server(0x0413))
+	return nitrogendioxideconcentrationmeasurementdef.WrapOn(d.Server(0x0413), d.queue)
 }
 
 // OzoneConcentrationMeasurement returns the typed OzoneConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) OzoneConcentrationMeasurement() *ozoneconcentrationmeasurementdef.Server {
-	return ozoneconcentrationmeasurementdef.Wrap(d.Server(0x0415))
+	return ozoneconcentrationmeasurementdef.WrapOn(d.Server(0x0415), d.queue)
 }
 
 // Pm25ConcentrationMeasurement returns the typed Pm25ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm25ConcentrationMeasurement() *pm25concentrationmeasurementdef.Server {
-	return pm25concentrationmeasurementdef.Wrap(d.Server(0x042A))
+	return pm25concentrationmeasurementdef.WrapOn(d.Server(0x042A), d.queue)
 }
 
 // FormaldehydeConcentrationMeasurement returns the typed FormaldehydeConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) FormaldehydeConcentrationMeasurement() *formaldehydeconcentrationmeasurementdef.Server {
-	return formaldehydeconcentrationmeasurementdef.Wrap(d.Server(0x042B))
+	return formaldehydeconcentrationmeasurementdef.WrapOn(d.Server(0x042B), d.queue)
 }
 
 // Pm1ConcentrationMeasurement returns the typed Pm1ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm1ConcentrationMeasurement() *pm1concentrationmeasurementdef.Server {
-	return pm1concentrationmeasurementdef.Wrap(d.Server(0x042C))
+	return pm1concentrationmeasurementdef.WrapOn(d.Server(0x042C), d.queue)
 }
 
 // Pm10ConcentrationMeasurement returns the typed Pm10ConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) Pm10ConcentrationMeasurement() *pm10concentrationmeasurementdef.Server {
-	return pm10concentrationmeasurementdef.Wrap(d.Server(0x042D))
+	return pm10concentrationmeasurementdef.WrapOn(d.Server(0x042D), d.queue)
 }
 
 // TotalVolatileOrganicCompoundsConcentrationMeasurement returns the typed TotalVolatileOrganicCompoundsConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) TotalVolatileOrganicCompoundsConcentrationMeasurement() *totalvolatileorganiccompoundsconcentrationmeasurementdef.Server {
-	return totalvolatileorganiccompoundsconcentrationmeasurementdef.Wrap(d.Server(0x042E))
+	return totalvolatileorganiccompoundsconcentrationmeasurementdef.WrapOn(d.Server(0x042E), d.queue)
 }
 
 // RadonConcentrationMeasurement returns the typed RadonConcentrationMeasurement server over the one the device mounts,
-// whatever its type (Underlying returns it).
-// It is nil until WithOptional, WithFeatures or WithServer mounts
-// the optional cluster.
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
+// It is nil until a declaration mounts the optional cluster.
 func (d *AirQualitySensor) RadonConcentrationMeasurement() *radonconcentrationmeasurementdef.Server {
-	return radonconcentrationmeasurementdef.Wrap(d.Server(0x042F))
+	return radonconcentrationmeasurementdef.WrapOn(d.Server(0x042F), d.queue)
 }

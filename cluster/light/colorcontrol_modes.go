@@ -6,6 +6,8 @@ package light
 import (
 	"context"
 	"math"
+
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // setColorMode is matter.js setColorMode (ColorControlServer.ts:1411-1420
@@ -17,12 +19,12 @@ import (
 // after, so the writers are not driven with the converted colour; the
 // command's own movement writes the target (issue #79). A command whose
 // movement then fails rolls the switch back ([ColorControlServer.MatterInvoke]).
-func (s *ColorControlServer) setColorMode(_ context.Context, mode ColorMode) error {
+func (s *ColorControlServer) setColorMode(ctx context.Context, mode ColorMode) error {
 	if s.state().mode == mode {
 		return nil
 	}
 	s.stopAllColorMovement()
-	s.convert(func(st *colorState) {
+	s.convert(contract.OriginFrom(ctx), func(st *colorState) {
 		s.switchColorMode(st, st.mode, mode)
 		st.mode = mode
 		st.enhancedMode = mode
@@ -31,8 +33,8 @@ func (s *ColorControlServer) setColorMode(_ context.Context, mode ColorMode) err
 }
 
 // convert changes the colour state without the writers: the attributes
-// take the new values and what changed is reported.
-func (s *ColorControlServer) convert(change func(st *colorState)) {
+// take the new values and what changed is reported, from origin.
+func (s *ColorControlServer) convert(origin contract.Origin, change func(st *colorState)) {
 	s.commit.Lock()
 	defer s.commit.Unlock()
 	s.mu.Lock()
@@ -45,7 +47,7 @@ func (s *ColorControlServer) convert(change func(st *colorState)) {
 	}
 	s.st = next
 	s.mu.Unlock()
-	s.report(prev, next)
+	s.report(origin, prev, next)
 }
 
 // setEnhancedColorMode is matter.js setEnhancedColorMode: the enhanced hue
@@ -61,7 +63,7 @@ func (s *ColorControlServer) setEnhancedColorMode(ctx context.Context, mode Colo
 	if err := s.setColorMode(ctx, colorModeOf(mode)); err != nil {
 		return err
 	}
-	s.convert(func(st *colorState) { st.enhancedMode = mode })
+	s.convert(contract.OriginFrom(ctx), func(st *colorState) { st.enhancedMode = mode })
 	return nil
 }
 

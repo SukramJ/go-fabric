@@ -14,6 +14,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -42,10 +45,10 @@ func (d *device) CurrentLevel() (uint8, bool) {
 	return d.level, d.known
 }
 
-func (d *device) Options() uint8 {
+func (d *device) Options() lvldef.OptionsBitmap {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.options
+	return lvldef.OptionsBitmap(d.options)
 }
 
 func (d *device) OnLevel() (uint8, bool) {
@@ -57,9 +60,9 @@ func (d *device) OnLevel() (uint8, bool) {
 	return *d.onLevel, true
 }
 
-func (d *device) SetOptions(_ context.Context, o uint8) error {
+func (d *device) SetOptions(_ context.Context, o lvldef.OptionsBitmap) error {
 	d.mu.Lock()
-	d.options = o
+	d.options = uint8(o)
 	d.mu.Unlock()
 	return nil
 }
@@ -71,7 +74,8 @@ func (d *device) SetOnLevel(_ context.Context, l *uint8) error {
 	return nil
 }
 
-func (d *device) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (d *device) MoveToLevel(_ context.Context, generated lvldef.MoveToLevelRequest) error {
+	req, _ := levelcontrol.WireOf(generated).(wire.MoveToLevelRequest)
 	d.mu.Lock()
 	if d.refuse != nil {
 		d.mu.Unlock()
@@ -97,19 +101,19 @@ func (d *device) record(name string) error {
 	return nil
 }
 
-func (d *device) MoveToLevelWithOnOff(context.Context, levelcontrol.MoveToLevelRequest) error {
+func (d *device) MoveToLevelWithOnOff(context.Context, lvldef.MoveToLevelWithOnOffRequest) error {
 	return d.record("MoveToLevelWithOnOff")
 }
-func (d *device) Move(context.Context, levelcontrol.MoveRequest) error { return d.record("Move") }
-func (d *device) MoveWithOnOff(context.Context, levelcontrol.MoveRequest) error {
+func (d *device) Move(context.Context, lvldef.MoveRequest) error { return d.record("Move") }
+func (d *device) MoveWithOnOff(context.Context, lvldef.MoveWithOnOffRequest) error {
 	return d.record("MoveWithOnOff")
 }
-func (d *device) Step(context.Context, levelcontrol.StepRequest) error { return d.record("Step") }
-func (d *device) StepWithOnOff(context.Context, levelcontrol.StepRequest) error {
+func (d *device) Step(context.Context, lvldef.StepRequest) error { return d.record("Step") }
+func (d *device) StepWithOnOff(context.Context, lvldef.StepWithOnOffRequest) error {
 	return d.record("StepWithOnOff")
 }
-func (d *device) Stop(context.Context, levelcontrol.StopRequest) error { return d.record("Stop") }
-func (d *device) StopWithOnOff(context.Context, levelcontrol.StopRequest) error {
+func (d *device) Stop(context.Context, lvldef.StopRequest) error { return d.record("Stop") }
+func (d *device) StopWithOnOff(context.Context, lvldef.StopWithOnOffRequest) error {
 	return d.record("StopWithOnOff")
 }
 
@@ -234,7 +238,7 @@ func TestMoveToLevelTransitionReadsPartWay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDevice(50, true)
 		srv := engineServer(d, nil)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 200, TransitionTime: u16(300)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200, TransitionTime: u16(300)}); err != nil {
 			t.Fatal(err)
 		}
 		if got := remaining(t, srv); got != 300 {
@@ -266,11 +270,11 @@ func TestMoveAndStop(t *testing.T) {
 		d := newDevice(50, true)
 		srv := engineServer(d, nil)
 		r := listen(t, srv)
-		if err := invoke(t, srv, levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(5)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(5)}); err != nil {
 			t.Fatal(err)
 		}
 		sleep(5 * time.Second)
-		if err := invoke(t, srv, levelcontrol.CmdStop, levelcontrol.StopRequest{}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStop, wire.StopRequest{}); err != nil {
 			t.Fatal(err)
 		}
 		stopped := level(t, srv)
@@ -285,7 +289,7 @@ func TestMoveAndStop(t *testing.T) {
 			t.Errorf("RemainingTime reports %v, want [408 0] (204 units at 5/s, then the stop)", times)
 		}
 
-		err := invoke(t, srv, levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(0)})
+		err := invoke(t, srv, levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(0)})
 		var sce im.StatusCodeError
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
 			t.Errorf("Move with Rate 0 = %v, want INVALID_COMMAND", err)
@@ -294,7 +298,7 @@ func TestMoveAndStop(t *testing.T) {
 			t.Errorf("Move with Rate 0 moved the level to %d", l)
 		}
 
-		if err := invoke(t, srv, levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown}); err != nil {
 			t.Fatal(err)
 		}
 		if l := level(t, srv); l != levelcontrol.LightingLevelMin {
@@ -310,7 +314,7 @@ func TestStepTransition(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDevice(50, true)
 		srv := engineServer(d, nil)
-		if err := invoke(t, srv, levelcontrol.CmdStep, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 150, TransitionTime: u16(300)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 150, TransitionTime: u16(300)}); err != nil {
 			t.Fatal(err)
 		}
 		for _, step := range []struct{ lo, hi uint8 }{{85, 115}, {127, 173}, {170, 200}} {
@@ -325,13 +329,13 @@ func TestStepTransition(t *testing.T) {
 		}
 		// A step with TransitionTime 0 or null lands at once; one past the
 		// maximum stops at it.
-		if err := invoke(t, srv, levelcontrol.CmdStep, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 100, TransitionTime: u16(0)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 100, TransitionTime: u16(0)}); err != nil {
 			t.Fatal(err)
 		}
 		if l := level(t, srv); l != levelcontrol.LevelMax {
 			t.Errorf("CurrentLevel = %d, want %d", l, levelcontrol.LevelMax)
 		}
-		if err := invoke(t, srv, levelcontrol.CmdStep, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 54}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 54}); err != nil {
 			t.Fatal(err)
 		}
 		if l := level(t, srv); l != 200 {
@@ -351,7 +355,7 @@ func TestQuieterReportsOfATransition(t *testing.T) {
 		d := newDevice(1, false)
 		srv := engineServer(d, nil)
 		r := listen(t, srv)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 254, TransitionTime: u16(100)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 254, TransitionTime: u16(100)}); err != nil {
 			t.Fatal(err)
 		}
 		if _, on := d.state(); !on {
@@ -369,11 +373,11 @@ func TestQuieterReportsOfATransition(t *testing.T) {
 		r.mu.Lock()
 		r.levels, r.times = nil, nil
 		r.mu.Unlock()
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(100)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(100)}); err != nil {
 			t.Fatal(err)
 		}
 		sleep(5 * time.Second)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(150)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(150)}); err != nil {
 			t.Fatal(err)
 		}
 		sleep(20 * time.Second)
@@ -401,11 +405,11 @@ func TestOnOffCoupling(t *testing.T) {
 		wantOn bool
 		want   uint8
 	}{
-		"move down reaches the minimum":   {254, true, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)}, 2 * time.Second, false, 1},
-		"step down overshoots":            {50, true, levelcontrol.CmdStepWithOnOff, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 100}, 0, false, 1},
-		"move down while off":             {50, false, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)}, 2 * time.Second, false, 1},
-		"move up while off":               {50, false, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(254)}, 2 * time.Second, true, 254},
-		"MoveToLevel 0 crops to MinLevel": {128, true, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 0, TransitionTime: u16(0)}, 0, false, 1},
+		"move down reaches the minimum":   {254, true, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)}, 2 * time.Second, false, 1},
+		"step down overshoots":            {50, true, levelcontrol.CmdStepWithOnOff, wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 100}, 0, false, 1},
+		"move down while off":             {50, false, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)}, 2 * time.Second, false, 1},
+		"move up while off":               {50, false, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(254)}, 2 * time.Second, true, 254},
+		"MoveToLevel 0 crops to MinLevel": {128, true, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 0, TransitionTime: u16(0)}, 0, false, 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -425,7 +429,7 @@ func TestOnOffCoupling(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDevice(128, true)
 		srv := engineServer(d, nil)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(40)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(40)}); err != nil {
 			t.Fatal(err)
 		}
 		sleep(3800 * time.Millisecond)
@@ -448,7 +452,7 @@ func TestOnLevelOnSwitchOn(t *testing.T) {
 		d := newDevice(1, false)
 		d.onLevel = u8(100)
 		srv := engineServer(d, nil)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 200, TransitionTime: u16(100)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 200, TransitionTime: u16(100)}); err != nil {
 			t.Fatal(err)
 		}
 		if l, on := d.state(); l != 100 || !on {
@@ -469,13 +473,13 @@ func TestExecuteIfOff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := newDevice(1, false)
 		srv := engineServer(d, nil)
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 120, TransitionTime: u16(0)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 120, TransitionTime: u16(0)}); err != nil {
 			t.Fatal(err)
 		}
 		if l := level(t, srv); l != 1 {
 			t.Fatalf("MoveToLevel on an off device moved the level to %d", l)
 		}
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{
 			Level: 254, TransitionTime: u16(300),
 			OptionsMask: levelcontrol.OptionExecuteIfOff, OptionsOverride: levelcontrol.OptionExecuteIfOff,
 		}); err != nil {
@@ -484,13 +488,13 @@ func TestExecuteIfOff(t *testing.T) {
 		if remaining(t, srv) == 0 {
 			t.Fatal("the ExecuteIfOff override started no transition")
 		}
-		if err := invoke(t, srv, levelcontrol.CmdStop, levelcontrol.StopRequest{}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStop, wire.StopRequest{}); err != nil {
 			t.Fatal(err)
 		}
 		if remaining(t, srv) == 0 {
 			t.Error("Stop on an off device ended the transition")
 		}
-		if err := invoke(t, srv, levelcontrol.CmdStopWithOnOff, levelcontrol.StopRequest{}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdStopWithOnOff, wire.StopRequest{}); err != nil {
 			t.Fatal(err)
 		}
 		if remaining(t, srv) != 0 {
@@ -501,7 +505,7 @@ func TestExecuteIfOff(t *testing.T) {
 		if err := srv.MatterWrite(context.Background(), levelcontrol.AttrOptions, levelcontrol.OptionExecuteIfOff); err != nil {
 			t.Fatal(err)
 		}
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 60, TransitionTime: u16(0)}); err != nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60, TransitionTime: u16(0)}); err != nil {
 			t.Fatal(err)
 		}
 		if l := level(t, srv); l != 60 {
@@ -533,13 +537,13 @@ func TestColorTemperatureCoupling(t *testing.T) {
 		fields                  any
 		want                    uint16
 	}{
-		"WithOnOff to the minimum":           {couple, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1}, 370},
-		"to 128":                             {couple, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 128}, 261},
-		"step down to 128":                   {couple, 0, 0, levelcontrol.CmdStepWithOnOff, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 126}, 261},
-		"plain command":                      {couple, 0, 0, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 1}, 370},
-		"option not set":                     {0, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1}, 300},
-		"override sets it for one command":   {0, couple, couple, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1}, 370},
-		"override clears it for one command": {couple, couple, 0, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1}, 300},
+		"WithOnOff to the minimum":           {couple, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1}, 370},
+		"to 128":                             {couple, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 128}, 261},
+		"step down to 128":                   {couple, 0, 0, levelcontrol.CmdStepWithOnOff, wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 126}, 261},
+		"plain command":                      {couple, 0, 0, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1}, 370},
+		"option not set":                     {0, 0, 0, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1}, 300},
+		"override sets it for one command":   {0, couple, couple, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1}, 370},
+		"override clears it for one command": {couple, couple, 0, levelcontrol.CmdMoveToLevelWithOnOff, wire.MoveToLevelRequest{Level: 1}, 300},
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -548,10 +552,10 @@ func TestColorTemperatureCoupling(t *testing.T) {
 				ct := newCT()
 				srv := engineServer(d, ct)
 				switch f := tc.fields.(type) {
-				case levelcontrol.MoveToLevelRequest:
+				case wire.MoveToLevelRequest:
 					f.OptionsMask, f.OptionsOverride = tc.mask, tc.override
 					tc.fields = f
-				case levelcontrol.StepRequest:
+				case wire.StepRequest:
 					f.OptionsMask, f.OptionsOverride = tc.mask, tc.override
 					tc.fields = f
 				}
@@ -571,7 +575,7 @@ func TestColorTemperatureCoupling(t *testing.T) {
 			d.options = couple
 			ct := newCT()
 			srv := engineServer(d, ct)
-			if err := invoke(t, srv, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(100)}); err != nil {
+			if err := invoke(t, srv, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(100)}); err != nil {
 				t.Fatal(err)
 			}
 			sleep(time.Second)
@@ -665,7 +669,7 @@ func TestHostChangeIsReported(t *testing.T) {
 		srv := engineServer(d, nil)
 		r := listen(t, srv)
 		zero := uint16(0)
-		_ = d.MoveToLevel(context.Background(), levelcontrol.MoveToLevelRequest{Level: 80, TransitionTime: &zero, OptionsMask: 1, OptionsOverride: 1})
+		_ = d.MoveToLevel(context.Background(), lvldef.MoveToLevelRequest{Level: 80, TransitionTime: spec.ValueOf(zero), OptionsMask: 1, OptionsOverride: 1})
 		if levels, _ := r.snapshot(); !slices.Equal(levels, []uint8{80}) {
 			t.Errorf("CurrentLevel reports %v, want [80]", levels)
 		}
@@ -681,7 +685,7 @@ func TestQuiesceAndRefusal(t *testing.T) {
 		d := newDevice(1, true)
 		srv := engineServer(d, nil)
 		r := listen(t, srv)
-		_ = invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 254, TransitionTime: u16(100)})
+		_ = invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 254, TransitionTime: u16(100)})
 		sleep(2 * time.Second)
 		srv.MatterQuiesce()
 		at := level(t, srv)
@@ -693,7 +697,7 @@ func TestQuiesceAndRefusal(t *testing.T) {
 			t.Errorf("RemainingTime reports %v, want [100]: quiescing reports nothing", times)
 		}
 
-		_ = invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(100)})
+		_ = invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 1, TransitionTime: u16(100)})
 		d.mu.Lock()
 		d.refuse = errors.New("lamp gone")
 		d.mu.Unlock()
@@ -701,14 +705,14 @@ func TestQuiesceAndRefusal(t *testing.T) {
 		if remaining(t, srv) != 0 {
 			t.Error("a refused step left the transition running")
 		}
-		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 5, TransitionTime: u16(0)}); err == nil {
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 5, TransitionTime: u16(0)}); err == nil {
 			t.Error("an immediate MoveToLevel the host refused reported success")
 		}
 
 		d.mu.Lock()
 		d.known = false
 		d.mu.Unlock()
-		err := invoke(t, srv, levelcontrol.CmdStep, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 1})
+		err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 1})
 		var sce im.StatusCodeError
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure {
 			t.Errorf("Step from a null level = %v, want FAILURE", err)

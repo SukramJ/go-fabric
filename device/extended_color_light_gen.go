@@ -87,9 +87,10 @@ var ExtendedColorLightType = Type{
 type ExtendedColorLight struct{ *Device }
 
 // NewExtendedColorLight returns a ExtendedColorLight device: its mandatory server clusters and the
-// optional ones opted in, each with its default server or the host's (see [New]).
-func NewExtendedColorLight(opts Options, with ...Option) (*ExtendedColorLight, error) {
-	d, err := New(&ExtendedColorLightType, opts, with...)
+// optional ones declared, each with its default server or the host's —
+// [FromSpec] with Type ExtendedColorLightID (see [New]).
+func NewExtendedColorLight(opts Options, decls ...Declaration) (*ExtendedColorLight, error) {
+	d, err := FromSpec(Spec{Type: ExtendedColorLightID, Options: opts, Declarations: decls})
 	if err != nil {
 		return nil, err
 	}
@@ -97,20 +98,25 @@ func NewExtendedColorLight(opts Options, with ...Option) (*ExtendedColorLight, e
 }
 
 // OnOff returns the typed OnOff server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
-func (d *ExtendedColorLight) OnOff() *onoffdef.Server { return onoffdef.Wrap(d.Server(0x0006)) }
+func (d *ExtendedColorLight) OnOff() *onoffdef.Server {
+	return onoffdef.WrapOn(d.Server(0x0006), d.queue)
+}
 
 // LevelControl returns the typed LevelControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtendedColorLight) LevelControl() *levelcontroldef.Server {
-	return levelcontroldef.Wrap(d.Server(0x0008))
+	return levelcontroldef.WrapOn(d.Server(0x0008), d.queue)
 }
 
 // ColorControl returns the typed ColorControl server over the one the device mounts,
-// whatever its type (Underlying returns it).
+// whatever its type (Underlying returns it); its OnChangedAsync runs on
+// the device's goroutine.
 // The device type mandates the cluster.
 func (d *ExtendedColorLight) ColorControl() *colorcontroldef.Server {
-	return colorcontroldef.Wrap(d.Server(0x0300))
+	return colorcontroldef.WrapOn(d.Server(0x0300), d.queue)
 }

@@ -47,6 +47,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -75,8 +76,8 @@ func coupledColorLight(t *testing.T, options uint8) *nodeLight {
 // request is REQUEST (ColorTemperatureCouplingTest.ts:35): level 1, a null
 // transition time, no override; at sets the level, override the
 // coupling override (nil: none).
-func request(level uint8, override *bool) levelcontrol.MoveToLevelRequest {
-	r := levelcontrol.MoveToLevelRequest{Level: level}
+func request(level uint8, override *bool) wire.MoveToLevelRequest {
+	r := wire.MoveToLevelRequest{Level: level}
 	if override != nil {
 		r.OptionsMask = coupleOption
 		if *override {
@@ -118,14 +119,14 @@ func TestParityMatterJS_ColorTemperatureCouplingTest(t *testing.T) {
 
 	t.Run("couples a WithOnOff step when the Options attribute asks for it", func(t *testing.T) {
 		l := coupledColorLight(t, coupleOption)
-		l.invoke(t, levelcontrol.CmdStepWithOnOff, levelcontrol.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 126})
+		l.invoke(t, levelcontrol.CmdStepWithOnOff, wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 126})
 		l.wantLevel(t, 128)
 		l.wantMireds(t, 285)
 	})
 
 	t.Run("couples a WithOnOff move when the Options attribute asks for it", func(t *testing.T) {
 		l := coupledColorLight(t, coupleOption)
-		l.invoke(t, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)})
+		l.invoke(t, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(254)})
 		l.advance(1, time.Second) // the managed move at 254 per second
 		l.wantLevel(t, 1)
 		l.wantMireds(t, miredsAtMinLevel)
@@ -133,7 +134,7 @@ func TestParityMatterJS_ColorTemperatureCouplingTest(t *testing.T) {
 
 	t.Run("couples every step of a managed transition", func(t *testing.T) {
 		l := coupledColorLight(t, coupleOption)
-		l.invoke(t, levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(100)})
+		l.invoke(t, levelcontrol.CmdMoveWithOnOff, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(100)})
 		l.advance(1, time.Second)
 		if mid := l.mireds(t); mid <= miredsAtMaxLevel || mid >= miredsAtMinLevel {
 			t.Errorf("mid-transition ColorTemperatureMireds %d, want between %d and %d", mid, miredsAtMaxLevel, miredsAtMinLevel)
@@ -185,7 +186,7 @@ func TestParityMatterJS_ColorTemperatureCouplingTest(t *testing.T) {
 
 // invokeAll runs MoveToLevelWithOnOff with each request inside one
 // Device.Act: two commands of one matter.js transaction.
-func (l *nodeLight) invokeAll(t *testing.T, reqs ...levelcontrol.MoveToLevelRequest) {
+func (l *nodeLight) invokeAll(t *testing.T, reqs ...wire.MoveToLevelRequest) {
 	t.Helper()
 	if err := l.dev.Act(func(*node.Node) error {
 		for _, r := range reqs {

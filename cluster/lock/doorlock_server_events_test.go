@@ -59,7 +59,7 @@ var errInvokeFailed = errors.New("doorlock: invoke failed")
 // already wired, plus the source and emitter for assertions.
 func newWiredServer(t *testing.T, src *eventTestSource, endpoint uint16) (*lock.DoorLockServer, *fakeEventEmitter) {
 	t.Helper()
-	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: src})
+	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Features: lock.FeatureUBOLT, Source: src})
 	emitter := &fakeEventEmitter{}
 	srv.SetMatterEventEmitter(emitter)
 	srv.SetEndpoint(endpoint)
@@ -327,7 +327,7 @@ func TestDoorLockServer_NoRemoteLockUnlockRefusesRemoteOperations(t *testing.T) 
 func TestDoorLockServer_EmitLockOperation_NoEmitterWired(t *testing.T) {
 	t.Parallel()
 	src := &eventTestSource{observed: true}
-	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: src})
+	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Features: lock.FeatureUBOLT, Source: src})
 
 	if _, err := srv.MatterInvoke(fabricCtx(), wire.DoorLockCmdLockDoor, nil); err != nil {
 		t.Fatalf("MatterInvoke without emitter: %v", err)
@@ -340,7 +340,7 @@ func TestDoorLockServer_EmitLockOperation_NoEmitterWired(t *testing.T) {
 // LockOperationError 0x03).
 func TestDoorLockServer_MatterEvents_AdvertisesThreeEvents(t *testing.T) {
 	t.Parallel()
-	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: &eventTestSource{observed: true}})
+	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Features: lock.FeatureUBOLT, Source: &eventTestSource{observed: true}})
 
 	got := srv.MatterEvents()
 	want := map[uint32]bool{
