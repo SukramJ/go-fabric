@@ -3803,3 +3803,35 @@ each command by the definition; the gap closes per server as it learns
 the selection (the DoorLock case is brief BU's, with the declaration
 that carries the lock's port).
 
+### BD-Matter-AsyncCallbacks-OnlyWhileAdded — the `…Async` callbacks run on the device's own queue and only while the device is added to a running node
+
+matter.js has no queued observer: every `$Changed` observer runs inline in
+the transaction's post-commit (`packages/node/src/behavior/state/managed/Datasource.ts:1473-1476`
+at `862ad75f` pushes the notification with the change's session; the
+commit delivers it), and the facade's inline callbacks mirror that
+(`BD-Matter-Node-ObserversSynchronous`). The asynchronous option ADR 0025
+principle 8 asks for (`OnChangedAsync`, typed and on `device.Device`) is
+the module's own: one serial goroutine per device, owned by the device,
+started when the device is added to a node and drained — waited for — by
+`Aggregator.Remove`, `Aggregator.Replace` and `Node.Stop` (ADR 0026
+principle 5), so a change reported while the device is not added is not
+delivered to the queued callbacks (`device/lifecycle.go` `OnChangedAsync`).
+Reasoning: a queue without an owner that stops it is a goroutine leak; a
+change before the device is part of a node has no controller and no
+report, and the inline `OnChanged` still sees it (phase 20c, brief BU-a).
+
+### BD-Matter-Quieter-OneOriginPerReport — a quieter attribute's deferred change reaches the host once, with the origin of the last change
+
+matter.js notifies its `$Changed` observers once per change, each with the
+session that made it (`Datasource.ts:1473-1476` at `862ad75f`: `params:
+[newval, oldval, this.#session]`), and throttles only the subscription
+report of a quiet-reporting attribute. The module's servers report a
+quiet-reporting attribute (LevelControl CurrentLevel, ColorControl's colour
+attributes, the transitions' outputs) through `cluster.Quieter`, which
+defers the change itself, so the host's `OnChanged` sees one
+`contract.Change` per report window and its `Origin` is the last change's
+(`cluster/attribute_changes.go` `NotifyFrom`). Reasoning: one path from a
+server to the host and to the wire (ADR 0025 principle 2); a transition's
+intermediate steps are the one case where the origins could differ, and
+there every step is the command's own (phase 20c, brief BU-a).
+
