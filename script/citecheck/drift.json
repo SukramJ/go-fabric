@@ -118,7 +118,7 @@
   },
   {
     "file": "ble/bluez/central_linux.go",
-    "line": 410,
+    "line": 420,
     "citation": "NobleBleChannel.ts:299-440",
     "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
     "identifier": "openChannel",
@@ -136,7 +136,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 644,
+    "line": 648,
     "citation": "ExchangeManager.ts:425-431",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -145,7 +145,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1375,
+    "line": 1379,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1700,
+    "line": 1704,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -379,7 +379,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1142,
+    "line": 1139,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -388,7 +388,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1181,
+    "line": 1178,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -766,7 +766,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 625,
+    "line": 631,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
@@ -1164,7 +1164,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 605,
+    "line": 612,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
@@ -1498,7 +1498,7 @@
   },
   {
     "file": "controller/exchange/manager.go",
-    "line": 178,
+    "line": 186,
     "citation": "ExchangeManager.ts:391-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "addProtocolHandler",
@@ -1507,7 +1507,7 @@
   },
   {
     "file": "controller/exchange/manager.go",
-    "line": 185,
+    "line": 193,
     "citation": "SecureChannelProtocol.ts:146-148",
     "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
     "identifier": "CaseServer",
@@ -2122,7 +2122,7 @@
   },
   {
     "file": "node/ota.go",
-    "line": 57,
+    "line": 94,
     "citation": "OtaRequestorTestInstance.ts:166-168",
     "resolved": "support/chip-testing/src/OtaRequestorTestInstance.ts",
     "identifier": "CanConsent",
@@ -2185,7 +2185,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 56,
+    "line": 64,
     "citation": "packages/protocol/src/session/NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2194,7 +2194,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 110,
+    "line": 118,
     "citation": "NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2203,7 +2203,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 319,
+    "line": 327,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -2212,7 +2212,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 810,
+    "line": 818,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2221,7 +2221,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 836,
+    "line": 844,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2230,7 +2230,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 939,
+    "line": 947,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",

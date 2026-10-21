@@ -359,7 +359,7 @@ func (s *DoorLockServer) armExpiryTimer(userIndex uint16, expiresAt int64) {
 	t := &serverTimer{}
 	// The action takes op: it runs in a goroutine of its own, as matter.js's
 	// callback waits for the lock (:166, `{ lock: true }`).
-	t.t = s.clock.AfterFunc(delay, func() { go s.runExpireUser(userIndex, t) })
+	t.t = s.clock.AfterFunc(delay, func() { s.goTimerAction(t, func() { s.runExpireUser(userIndex, t) }) })
 	s.expiryTimers[userIndex] = t
 }
 

@@ -79,12 +79,10 @@ func (o *dlOpener) OpenSessionExchange(_ context.Context, sessionID uint16) (bdx
 // SendAccept, then the blocks into the returned buffer.
 func (o *dlOpener) receive(t *testing.T, refuse bool) (*bytes.Buffer, chan error, bdx.Init) {
 	t.Helper()
-	var p *dlPipe
-	select {
-	case p = <-o.peers:
-	case <-time.After(5 * time.Second):
-		t.Fatal("no exchange opened")
-	}
+	// The exchange opens on the server's own goroutine; a server that
+	// never opens one hangs the test until go test's timeout dumps it —
+	// no wall-clock bound that a loaded machine could outrun.
+	p := <-o.peers
 	first, err := p.Receive(context.Background())
 	if err != nil || bdx.MessageType(first.Opcode) != bdx.MessageSendInit {
 		t.Fatalf("first message %+v %v", first, err)
@@ -101,7 +99,11 @@ func (o *dlOpener) receive(t *testing.T, refuse bool) (*bytes.Buffer, chan error
 		return buf, done, init
 	}
 	go func() {
-		_, err := bdx.Serve(context.Background(), bdx.NewMessenger(p, 5*time.Second), bdx.ServeOptions{
+		// The receiver's idle bound is not under test: an hour, so the
+		// gap a test leaves between the SendAccept and the blocks (the
+		// response held back until after.Run) never times it out on a
+		// loaded machine, as 5 s could.
+		_, err := bdx.Serve(context.Background(), bdx.NewMessenger(p, time.Hour), bdx.ServeOptions{
 			InitType: bdx.MessageSendInit, Init: init, TransferFileDesignator: bdx.FileDesignator(init.FileDesignator),
 			Sink: &bufSink{buf: buf},
 		})

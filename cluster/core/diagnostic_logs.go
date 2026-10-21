@@ -37,6 +37,7 @@ import (
 // DiagnosticLogsProviderDelegate — or from a [LogProvider], which hands
 // the whole log over as one byte slice.
 type DiagnosticLogs struct {
+	// mu guards the fields below.
 	mu        sync.RWMutex
 	collector LogCollector
 	exchanges BDXExchangeOpener
@@ -46,6 +47,10 @@ type DiagnosticLogs struct {
 	// busy is set while a BDX transfer runs: chip has one
 	// BDXDiagnosticLogsProvider (DLC:62-64, :146-150).
 	busy bool
+	// stopTransfer cancels the running transfer's context; idle, on mu,
+	// signals busy fell, which MatterQuiesce waits for.
+	stopTransfer context.CancelFunc
+	idle         sync.Cond
 }
 
 // LogProvider supplies the log of an intent as one byte slice — the
@@ -346,6 +351,7 @@ var (
 	_ contract.ClusterServer          = (*DiagnosticLogs)(nil)
 	_ contract.ClusterAttributeLister = (*DiagnosticLogs)(nil)
 	_ contract.ClusterCommandLister   = (*DiagnosticLogs)(nil)
+	_ contract.ClusterQuiescer        = (*DiagnosticLogs)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -500,7 +506,34 @@ func (d *DiagnosticLogs) logRequestForBdx(ctx context.Context, intent uint8, des
 func (d *DiagnosticLogs) done() {
 	d.mu.Lock()
 	d.busy = false
+	if d.stopTransfer != nil {
+		d.stopTransfer()
+		d.stopTransfer = nil
+	}
+	d.idle.Broadcast()
 	d.mu.Unlock()
+}
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: a BDX log transfer
+// still running is cancelled — its blocks go to a peer the node no longer
+// serves — and MatterQuiesce returns once the cancelled transfer has
+// returned, so no transfer goroutine or collector call outlives the
+// bridge's Stop. The wait has no bound of its own — the interface carries
+// no context — and is bounded by the transfer, whose context is cancelled
+// and whose collector the host keeps responsive to it. A later
+// RetrieveLogsRequest starts a new transfer.
+func (d *DiagnosticLogs) MatterQuiesce() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stopTransfer != nil {
+		d.stopTransfer()
+	}
+	if d.idle.L == nil {
+		d.idle.L = &d.mu
+	}
+	for d.busy {
+		d.idle.Wait() // releases mu: the transfer's end takes it in done
+	}
 }
 
 // initializeTransfer is BDXDiagnosticLogsProvider::InitializeTransfer
@@ -517,8 +550,12 @@ func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector,
 		return RetrieveLogsResponse{}, false // :51-59: a secure session with a peer
 	}
 	// The transfer outlives the command; it is bounded by its own idle
-	// timeout (kBdxTimeout, :36-37).
-	tctx := context.WithoutCancel(ctx)
+	// timeout (kBdxTimeout, :36-37) and ended early by MatterQuiesce
+	// (done cancels it).
+	tctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	d.mu.Lock()
+	d.stopTransfer = cancel
+	d.mu.Unlock()
 	session, ts, err := c.StartLogCollection(ctx, intent) // :65
 	if err != nil {
 		logger.Info("diaglogs.bdx.start_failed", slog.String("err", err.Error()))
@@ -543,15 +580,17 @@ func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector,
 		logger.Info("diaglogs.bdx.not_accepted", slog.String("err", err.Error()))
 		return RetrieveLogsResponse{}, false
 	}
+	// The transfer's goroutine ends in done, which MatterQuiesce waits
+	// for (busy).
 	run := func() {
 		go func() {
 			_, err := transfer.Run(tctx)
 			_ = ex.Close() // :271-278, Reset
 			session.EndLogCollection(err)
-			d.done()
 			if err != nil {
 				logger.Info("diaglogs.bdx.transfer_failed", slog.String("err", err.Error()))
 			}
+			d.done()
 		}()
 	}
 	// The response goes out first, the blocks after it (:171-173, the

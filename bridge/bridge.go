@@ -428,6 +428,10 @@ type Bridge struct {
 	pumpCancel          context.CancelFunc // optional; nil when no AckTracker wired
 	pumpDone            chan struct{}
 	started             bool
+	// reannounces is the session re-announce goroutines
+	// (triggerSessionReannounce), added under mu while started and waited
+	// for by Stop before the advertiser closes.
+	reannounces sync.WaitGroup
 
 	// routing bundles the exchange-src / timed-deadline / sub-target /
 	// status-response-wait tables the receive, ack-pump, and subscribe
@@ -1752,7 +1756,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	if tcpListener != nil {
 		_ = tcpListener.Close()
 	}
-	b.waitServeStopped(ctx, listener, done, tcpDone)
+	b.waitServeStopped(ctx, listener, tcpListener, done, tcpDone)
 	if pumpDone != nil {
 		// Give the pump its own bounded budget. If `ctx` already
 		// expired waiting for the serve loop, the pump still gets a
@@ -1769,6 +1773,16 @@ func (b *Bridge) Stop(ctx context.Context) error {
 			b.logger.Warn("matter.bridge.stop.pump_timeout", slog.Duration("grace", pumpStopGrace))
 		}
 		pumpStopCancel()
+	}
+
+	// A session re-announce still running publishes on the advertiser;
+	// the serve context's cancel above ends it, and it is gone before the
+	// advertiser closes.
+	b.reannounces.Wait()
+	// A BDX responder (an OTA image transfer) runs under the handler
+	// context the cancel above ended; it is gone before Stop returns.
+	if !b.waitBDXResponders(ctx) {
+		b.logger.Warn("matter.bridge.stop.bdx_responder_timeout", slog.String("err", ctx.Err().Error()))
 	}
 
 	// Best-effort mDNS withdraw + close. Errors here are logged but
@@ -1798,15 +1812,22 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// [Symbol.asyncDispose]).
 	quiesceServers(b.Topology(), nil)
 
+	// The commissioning window's expiry timer goes with the bridge: no
+	// timer stays armed on its clock after Stop (ADR 0026 P5).
+	if w := b.CommissioningWindow(); w != nil {
+		w.stopTimer()
+	}
+
 	return nil
 }
 
 // waitServeStopped waits, bounded by ctx, for the UDP and TCP serve loops
-// to end and then for the handlers the UDP listener dispatched, so no
+// to end and then for the handlers the UDP and TCP listeners dispatched
+// (the TCP one's connection readers and close notifications too), so no
 // cluster server or host port still runs once [Bridge.Stop] returns (the
 // handler context was cancelled before, so a handler that honours it
 // ends promptly).
-func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, done, tcpDone <-chan struct{}) {
+func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, tcpListener *tcp.Listener, done, tcpDone <-chan struct{}) {
 	if done != nil {
 		select {
 		case <-done:
@@ -1824,6 +1845,11 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, d
 		case <-tcpDone:
 		case <-ctx.Done():
 			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.String("err", ctx.Err().Error()))
+		}
+	}
+	if tcpListener != nil {
+		if err := tcpListener.WaitIdle(ctx); err != nil {
+			b.logger.Warn("matter.bridge.stop.tcp_handlers_timeout", slog.String("err", err.Error()))
 		}
 	}
 }

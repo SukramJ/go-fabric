@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
@@ -47,6 +48,42 @@ type otaApplier struct {
 	requestor           func() *mattercore.OTASoftwareUpdateRequestor
 	logger              *slog.Logger
 	clock               clock.Clock
+
+	// life bounds the in-place restart (restartedWhenIdle); stop cancels
+	// it. mu guards stopped; work is the restart's goroutine, added under
+	// mu while not stopped and waited for by [otaApplier.close].
+	life    context.Context //nolint:containedctx // the applier's lifetime, cancelled by close
+	stop    context.CancelFunc
+	mu      sync.Mutex
+	stopped bool
+	work    sync.WaitGroup
+}
+
+// started starts the applier's lifetime and returns it.
+func (a *otaApplier) started() *otaApplier {
+	a.life, a.stop = context.WithCancel(context.Background())
+	return a
+}
+
+// close stops the in-place restart still waiting or running and waits
+// for it. Idempotent; Node.Stop calls it after the requestor's Stop.
+func (a *otaApplier) close() {
+	a.mu.Lock()
+	a.stopped = true
+	a.mu.Unlock()
+	a.stop()
+	a.work.Wait()
+}
+
+// goRestart runs the in-place restart on a goroutine the applier owns,
+// unless it was closed.
+func (a *otaApplier) goRestart() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.stopped {
+		return
+	}
+	a.work.Go(func() { a.restartedWhenIdle(a.life) })
 }
 
 var _ OTAApplier = (*otaApplier)(nil)
@@ -100,8 +137,9 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	}
 	a.logger.Info("ota.applied_in_place", slog.Uint64("version", uint64(newSoftwareVersion)))
 	// The requestor returns to Idle once this returns; the start-up path
-	// runs after that, as a restart would.
-	go a.restartedWhenIdle(context.WithoutCancel(ctx))
+	// runs after that, as a restart would — on the applier's lifetime, not
+	// the apply's context, which ends when this returns.
+	a.goRestart()
 	return nil
 }
 
@@ -152,7 +190,7 @@ func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error
 }
 
 // restartedWhenIdle waits for the requestor to leave Applying, then runs
-// its start-up path.
+// its start-up path; a ctx that ended (the node stopped) skips it.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	r := a.requestor()
 	if r == nil {
@@ -168,24 +206,32 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 			break
 		}
 	}
+	if ctx.Err() != nil {
+		return
+	}
 	r.Restarted(ctx)
 }
 
 // buildOtaRequestor builds the root's OTA Software Update Requestor
 // (ota.go:183-216): the configured applier, or the default one.
-func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, basicInfo *mattercore.BasicInformation) (*mattercore.OTASoftwareUpdateRequestor, error) {
+//
+// The default applier is returned too, for Node.Stop to close; nil with
+// the host's own.
+func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, basicInfo *mattercore.BasicInformation) (*mattercore.OTASoftwareUpdateRequestor, *otaApplier, error) {
 	ota := cfg.OTA
 	if err := os.MkdirAll(ota.Dir, 0o750); err != nil {
-		return nil, fmt.Errorf("ota download directory: %w", err)
+		return nil, nil, fmt.Errorf("ota download directory: %w", err)
 	}
 	var requestor *mattercore.OTASoftwareUpdateRequestor
+	var own *otaApplier
 	applier := ota.Applier
 	if applier == nil {
-		applier = &otaApplier{
+		own = (&otaApplier{
 			vendorID: cfg.ProductDescription.VendorID, productID: cfg.ProductDescription.ProductID, basicInfo: basicInfo,
 			dir: ota.Dir, harness: ota.Harness, logger: cfg.Logger, clock: cfg.Clock,
 			requestor: func() *mattercore.OTASoftwareUpdateRequestor { return requestor },
-		}
+		}).started()
+		applier = own
 	}
 	rcfg := mattercore.OTARequestorConfig{
 		NodeInformation: basicInfo.OtaNodeInformation,
@@ -205,8 +251,11 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 	}
 	r, err := mattercore.NewOTASoftwareUpdateRequestor(rcfg)
 	if err != nil {
-		return nil, err
+		if own != nil {
+			own.close()
+		}
+		return nil, nil, err
 	}
 	requestor = r
-	return r, nil
+	return r, own, nil
 }

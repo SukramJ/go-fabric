@@ -37,6 +37,14 @@ type Manager struct {
 	// unset is clock.System.
 	clock clockvar.Var
 
+	// reaperMu guards reaperStop: the cancel of the running idle reaper
+	// ([Manager.StartReaper]), nil when none runs. reaperWG is the
+	// reaper goroutine, waited for by [Manager.StopReaper].
+	reaperMu   sync.Mutex
+	reaperStop context.CancelFunc
+	reaperWG   sync.WaitGroup
+
+	// mu guards the session table (sessions, nextID) and the hooks below.
 	mu             sync.RWMutex
 	sessions       map[uint16]*Entry
 	nextID         uint16
@@ -1176,22 +1184,49 @@ func (m *Manager) Active() int {
 // zero time (freshly opened, no traffic yet) are skipped so that
 // in-progress commissioning handshakes are not torn down.
 //
+// The manager owns the goroutine: [Manager.StopReaper] cancels it and
+// waits for it to return. One reaper runs at a time; a second StartReaper
+// without a StopReaper in between is a no-op, as for the bridge's
+// per-exchange providers (PerExchangeCaseProvider.StartReaper).
+//
 // Mirrors the session-eviction logic in matter.js
 // packages/protocol/src/session/SessionManager.ts and the
 // SessionInactiveBaseInterval defined in Matter §4.13.2.6.1.
 func (m *Manager) StartReaper(ctx context.Context, idleTimeout, poll time.Duration) {
-	go func() {
-		ticker := m.clk().NewTicker(poll)
+	m.reaperMu.Lock()
+	defer m.reaperMu.Unlock()
+	if m.reaperStop != nil {
+		return
+	}
+	rctx, cancel := context.WithCancel(ctx)
+	m.reaperStop = cancel
+	ticker := m.clk().NewTicker(poll)
+	m.reaperWG.Go(func() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-rctx.Done():
 				return
 			case <-ticker.C():
 				m.reapIdle(idleTimeout)
 			}
 		}
-	}()
+	})
+}
+
+// StopReaper stops the idle reaper [Manager.StartReaper] started and
+// waits for its goroutine to return; a sweep in progress finishes first.
+// It is idempotent and safe without StartReaper. The sessions stay; a
+// later StartReaper starts a new reaper.
+func (m *Manager) StopReaper() {
+	m.reaperMu.Lock()
+	cancel := m.reaperStop
+	m.reaperStop = nil
+	m.reaperMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	m.reaperWG.Wait()
 }
 
 // reapIdle collects and closes sessions whose last-activity timestamp

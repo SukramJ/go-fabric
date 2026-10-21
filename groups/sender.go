@@ -195,19 +195,17 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 	if groupID == 0 {
 		return nil, ErrInvalidGroupID
 	}
-	m.mu.Lock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
 		return nil, err
 	}
 	keySetID, ek, err := f.currentKey(groupID, m.sendClock().UnixMilli())
 	if err != nil {
-		m.mu.Unlock()
+		m.mu.RUnlock()
 		return nil, err
 	}
 	address, nodeID := f.multicastAddress(groupID), f.nodeID
-	m.mu.Unlock()
+	m.mu.RUnlock()
 
 	key := senderKey{fabricIndex: fabricIndex, groupID: groupID, sessionID: ek.sessionID, key: hex.EncodeToString(ek.key)}
 	m.senderMu.Lock()

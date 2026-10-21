@@ -301,7 +301,12 @@ type stateful[S any] struct {
 	// value.
 	clone func(S) S
 
-	// mu guards clone, srv, state and values.
+	// op is the command queue: a command holds it from its copy of the
+	// state through its commit, across the port call, so commands run one
+	// at a time; the host never takes it. mu guards state and is released
+	// while the port runs, so the port may call SetState (ADR 0026 P6,
+	// by_design BD-Matter-HostPort-OutsideTheSetterLock).
+	op    sync.Mutex
 	mu    sync.Mutex
 	state S
 }
@@ -350,15 +355,21 @@ func (s *stateful[S]) commitLocked(st S) error {
 
 // transact runs fn on a copy of the state and commits the copy when fn
 // succeeds; a state the definition refuses fails the command with
-// FAILURE.
+// FAILURE. fn — the host port — runs without mu: a SetState it makes
+// meanwhile is overwritten by the command's commit (the command wins the
+// overlap).
 func (s *stateful[S]) transact(fn func(st *S) (any, error)) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	next := s.clone(s.state)
+	s.mu.Unlock()
 	resp, err := fn(&next)
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := s.commitLocked(next); err != nil {
 		return nil, StatusError{Status: im.StatusFailure, Err: err}
 	}

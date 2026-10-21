@@ -57,12 +57,11 @@ func (f *fabricGroups) currentIPK() ([]byte, error) {
 // key with the compressed fabric id. Empty when the store holds no key
 // set 0 for the fabric. [ErrNoFabric] for an unknown fabric.
 func (m *Manager) IPKKeys(ctx context.Context, fabricIndex uint8) ([][]byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer m.mu.RUnlock()
 	keys := f.ipkKeys()
 	out := make([][]byte, len(keys))
 	for i, k := range keys {
@@ -77,12 +76,11 @@ func (m *Manager) IPKKeys(ctx context.Context, fabricIndex uint8) ([][]byte, err
 // KeySets.ts:113-121). [ErrNoKey] when the fabric has no key set 0,
 // [ErrNoFabric] for an unknown fabric.
 func (m *Manager) CurrentIPK(ctx context.Context, fabricIndex uint8) ([]byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer m.mu.RUnlock()
 	k, err := f.currentIPK()
 	if err != nil {
 		return nil, err

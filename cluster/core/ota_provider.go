@@ -45,7 +45,8 @@ type OTAProvider struct {
 	storage *otaImageStorage
 	logger  *slog.Logger
 
-	// mu guards consents and inProgress.
+	// mu guards inProgress and consents; it is released before a listener
+	// is unregistered or an entry's cleanup runs.
 	mu sync.Mutex
 	// inProgress is internal.inProgressDetails (OP:633-636), keyed by the
 	// requestor and the update token.
@@ -534,14 +535,19 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string
 			}
 		})
 	})
-	// OP:368-377: the entry's cleanup unregisters the listener.
+	// OP:368-377: the entry's cleanup unregisters the listener. off takes
+	// the responder's listener lock: it runs after p.mu is released, as
+	// the entry's cleanup does (detailsForPeer), so the two locks are
+	// never held together (ADR 0026 P6).
 	p.mu.Lock()
-	if d := p.inProgress[otaKey(peer, token)]; d != nil {
+	d := p.inProgress[otaKey(peer, token)]
+	if d != nil {
 		d.cleanup = off
-	} else {
-		off()
 	}
 	p.mu.Unlock()
+	if d == nil {
+		off()
+	}
 
 	nodeID, ok := p.cfg.NodeID(peer.FabricIndex)
 	if !ok {

@@ -209,7 +209,7 @@ func (sr *scriptedRegistry) subscribe(t *testing.T, n *client.Node, report []im.
 
 func waitUntil(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(scriptedHangBound)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

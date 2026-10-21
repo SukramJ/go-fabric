@@ -75,6 +75,8 @@ type Identify struct {
 	// continues with the new value). The instance MUST therefore
 	// outlive a single dispatch — a per-call instance both loses the
 	// state and strands one ticker goroutine per invoke.
+	//
+	// timerMu guards timerActive and closed.
 	timerMu     sync.Mutex
 	timerActive bool
 	closed      bool
@@ -82,6 +84,9 @@ type Identify struct {
 	// countdown immediately, so an instance whose endpoint disappeared
 	// cannot keep a ticker alive for up to 65535 s.
 	done chan struct{}
+	// countdown is the countdown goroutine, added under timerMu while
+	// open and waited for by [Identify.Close].
+	countdown sync.WaitGroup
 }
 
 // Cluster ID, revision, attribute and command ids: the generated
@@ -122,9 +127,9 @@ func NewIdentify() *Identify {
 // [clock.System]. A countdown already running keeps its clock.
 func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
 
-// Close releases the cluster: a running countdown terminates at once and
-// no later write / command starts a new one. Idempotent and safe for
-// concurrent use.
+// Close releases the cluster: a running countdown terminates at once —
+// Close returns after its goroutine did — and no later write / command
+// starts a new one. Idempotent and safe for concurrent use.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/identify/IdentifyServer.ts
@@ -132,15 +137,15 @@ func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
 // behavior — and with it the endpoint — is destroyed.
 func (i *Identify) Close() {
 	i.timerMu.Lock()
-	defer i.timerMu.Unlock()
-	if i.closed {
-		return
+	if !i.closed {
+		i.closed = true
+		i.timerActive = false
+		if i.done != nil {
+			close(i.done)
+		}
 	}
-	i.closed = true
-	i.timerActive = false
-	if i.done != nil {
-		close(i.done)
-	}
+	i.timerMu.Unlock()
+	i.countdown.Wait()
 }
 
 // Compile-time assertions.
@@ -259,9 +264,11 @@ func (i *Identify) maybeStartCountdown() {
 	}
 	i.timerActive = true
 	done := i.done
+	i.countdown.Add(1)
 	i.timerMu.Unlock()
 
 	go func() {
+		defer i.countdown.Done()
 		ticker := i.clock.Load().NewTicker(time.Second)
 		defer ticker.Stop()
 		for {

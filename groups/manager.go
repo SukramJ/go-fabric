@@ -118,7 +118,15 @@ type Manager struct {
 	st     Store
 	logger *slog.Logger
 
-	// mu guards allLoaded, fabrics and maxGroups.
+	// storeMu is the store queue: every load from and write to the store
+	// of the group state (fabric loads, Reload, ForgetFabric and the
+	// mutations) takes it first and holds it across the store call, so
+	// they run one at a time and the cache cannot change between a
+	// mutation's read and its write. Nothing else takes it.
+	storeMu sync.Mutex
+	// mu guards the fields below; it is never held across a store call
+	// (ADR 0026 P6), so the receive path and the CASE identity lookups
+	// read the cache without waiting for the disk.
 	mu        sync.RWMutex
 	maxGroups int
 	fabrics   map[uint8]*fabricGroups
@@ -255,7 +263,7 @@ func (m *Manager) notifyTable(fabricIndex uint8) {
 }
 
 // loadFabric reads one fabric's group state from the store. Called with
-// m.mu held for writing.
+// m.storeMu held and m.mu not held.
 func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, error) {
 	rec, err := m.st.GetFabric(ctx, idx)
 	if errors.Is(err, store.ErrFabricNotFound) {
@@ -347,18 +355,44 @@ func deriveKeySet(s store.GroupKeySet, compressed [8]byte) (*keySet, error) {
 	return ks, nil
 }
 
-// fabricLocked returns the loaded fabric, loading it on first use. Called
-// with m.mu held for writing.
-func (m *Manager) fabricLocked(ctx context.Context, idx uint8) (*fabricGroups, error) {
-	if f, ok := m.fabrics[idx]; ok {
+// fabricStore returns the loaded fabric, loading it on first use. Called
+// with m.storeMu held and m.mu not held: the store is read without mu,
+// the loaded fabric installed under it.
+func (m *Manager) fabricStore(ctx context.Context, idx uint8) (*fabricGroups, error) {
+	m.mu.RLock()
+	f, ok := m.fabrics[idx]
+	m.mu.RUnlock()
+	if ok {
 		return f, nil
 	}
 	f, err := m.loadFabric(ctx, idx)
 	if err != nil {
 		return nil, err
 	}
+	m.mu.Lock()
 	m.fabrics[idx] = f
+	m.mu.Unlock()
 	return f, nil
+}
+
+// rlockFabric returns the loaded fabric with m.mu held for reading; the
+// caller releases it. A fabric not loaded yet is loaded first under
+// m.storeMu, without mu (fabricStore).
+func (m *Manager) rlockFabric(ctx context.Context, idx uint8) (*fabricGroups, error) {
+	for range 3 { // a ForgetFabric between the load and the read loads it again
+		m.mu.RLock()
+		if f, ok := m.fabrics[idx]; ok {
+			return f, nil
+		}
+		m.mu.RUnlock()
+		m.storeMu.Lock()
+		_, err := m.fabricStore(ctx, idx)
+		m.storeMu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("%w: %d", ErrNoFabric, idx)
 }
 
 // ensureAllLoaded loads every fabric the store knows the first time the
@@ -372,21 +406,26 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 	if done {
 		return nil
 	}
+	m.storeMu.Lock()
+	defer m.storeMu.Unlock()
+	m.mu.RLock()
+	done = m.allLoaded
+	m.mu.RUnlock()
+	if done {
+		return nil
+	}
 	recs, err := m.st.ListFabrics(ctx)
 	if err != nil {
 		return fmt.Errorf("groups: list fabrics: %w", err)
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.allLoaded {
-		return nil
-	}
 	for _, r := range recs {
-		if _, err := m.fabricLocked(ctx, r.FabricIndex); err != nil {
+		if _, err := m.fabricStore(ctx, r.FabricIndex); err != nil {
 			return err
 		}
 	}
+	m.mu.Lock()
 	m.allLoaded = true
+	m.mu.Unlock()
 	return nil
 }
 
@@ -411,22 +450,23 @@ func (m *Manager) Load(ctx context.Context) error {
 // removeGroupKeySet with #forgetUnreferencedReceptionState, and
 // Groups.idMap's setter.
 func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
-	m.mu.Lock()
-	prev := m.fabrics[fabricIndex]
+	m.storeMu.Lock()
 	f, err := m.loadFabric(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return err
 	}
-	if prev != nil {
+	m.mu.Lock()
+	if prev := m.fabrics[fabricIndex]; prev != nil {
 		// The group table and the Groupcast properties are owned by this
-		// manager; keep the in-memory copies rather than racing a
-		// concurrent membership change.
+		// manager; keep the in-memory copies (no mutation ran while
+		// storeMu was held).
 		f.table = prev.table
 		f.props = prev.props
 	}
 	m.fabrics[fabricIndex] = f
 	m.mu.Unlock()
+	m.storeMu.Unlock()
 	m.forgetUnreferenced()
 	// A GroupKeyMap change moves Membership's KeySetId. Mirrors
 	// GroupcastServer's groupKeyMap$Changed reactor (#deriveNow).
@@ -443,10 +483,12 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 // GroupcastServer #handleFabricDeleted drops the departed fabric's
 // groupProperties.
 func (m *Manager) ForgetFabric(fabricIndex uint8) {
+	m.storeMu.Lock() // no load or mutation installs the fabric again meanwhile
 	m.mu.Lock()
 	_, had := m.fabrics[fabricIndex]
 	delete(m.fabrics, fabricIndex)
 	m.mu.Unlock()
+	m.storeMu.Unlock()
 	m.closeSenders(fabricIndex)
 	m.forgetUnreferenced()
 	if had {
@@ -519,12 +561,11 @@ func (m *Manager) fabricIndexesLocked() []uint8 {
 // a key set. matter.js GroupsServer.addGroup answers UnsupportedAccess for
 // a group without one (`fabric.groups.groupKeyIdMap.has(groupId)`).
 func (m *Manager) HasKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return false, err
 	}
+	defer m.mu.RUnlock()
 	_, ok := f.idMap[groupID]
 	return ok, nil
 }
@@ -533,12 +574,11 @@ func (m *Manager) HasKeyMapping(ctx context.Context, fabricIndex uint8, groupID 
 // holds — matter.js BindingManager #holdsGroupKey (BindingManager.ts:482-490
 // at 0ceb202d): the GroupKeyMap entry alone is not a key.
 func (m *Manager) HasUsableKey(ctx context.Context, fabricIndex uint8, groupID uint16) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return false, err
 	}
+	defer m.mu.RUnlock()
 	ksID, ok := f.idMap[groupID]
 	if !ok {
 		return false, nil
@@ -549,12 +589,11 @@ func (m *Manager) HasUsableKey(ctx context.Context, fabricIndex uint8, groupID u
 
 // GroupTable returns the fabric's group table ordered by group id.
 func (m *Manager) GroupTable(ctx context.Context, fabricIndex uint8) ([]TableEntry, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer m.mu.RUnlock()
 	ids := make([]uint16, 0, len(f.table))
 	for id := range f.table {
 		ids = append(ids, id)
@@ -574,12 +613,15 @@ func (m *Manager) GroupTable(ctx context.Context, fabricIndex uint8) ([]TableEnt
 // GroupKeyManagementServer.addEndpointForGroup: an existing group gains
 // the endpoint (once) and always takes the new name.
 func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, groupID, endpoint uint16, name string) error {
-	m.mu.Lock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	// The entry is computed under mu, written to the store under storeMu
+	// alone, and installed under mu again.
+	m.storeMu.Lock()
+	f, err := m.fabricStore(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return err
 	}
+	m.mu.RLock()
 	e, exists := f.table[groupID]
 	var next TableEntry
 	switch {
@@ -589,19 +631,24 @@ func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, gr
 			next.Endpoints = append(next.Endpoints, endpoint)
 		}
 	case len(f.table) >= m.maxGroups:
-		m.mu.Unlock()
-		return fmt.Errorf("%w: maximum is %d", ErrResourceExhausted, m.maxGroups)
+		maxGroups := m.maxGroups
+		m.mu.RUnlock()
+		m.storeMu.Unlock()
+		return fmt.Errorf("%w: maximum is %d", ErrResourceExhausted, maxGroups)
 	default:
 		next = TableEntry{GroupID: groupID, GroupName: name, Endpoints: []uint16{endpoint}}
 	}
+	m.mu.RUnlock()
 	if err := m.st.UpsertGroupTableEntry(ctx, store.GroupTableEntry{
 		FabricIndex: fabricIndex, GroupID: groupID, GroupName: name, Endpoints: next.Endpoints,
 	}); err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return fmt.Errorf("groups: persist group %d: %w", groupID, err)
 	}
+	m.mu.Lock()
 	f.table[groupID] = &next
 	m.mu.Unlock()
+	m.storeMu.Unlock()
 	m.logger.Info("groups.endpoint_added",
 		slog.Int("fabric_index", int(fabricIndex)), slog.Int("group_id", int(groupID)),
 		slog.Int("endpoint", int(endpoint)), slog.String("name", name))
@@ -636,26 +683,33 @@ func (m *Manager) RemoveEndpointRetainingSender(ctx context.Context, fabricIndex
 }
 
 func (m *Manager) removeEndpoint(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16, all, retainSender bool) (bool, error) {
-	m.mu.Lock()
-	f, err := m.fabricLocked(ctx, fabricIndex)
+	// Each group's change is computed under mu, written to the store
+	// under storeMu alone, and applied under mu again.
+	m.storeMu.Lock()
+	f, err := m.fabricStore(ctx, fabricIndex)
 	if err != nil {
-		m.mu.Unlock()
+		m.storeMu.Unlock()
 		return false, err
 	}
 	var (
 		existing bool
 		removed  bool
 	)
+	m.mu.RLock()
 	ids := make([]uint16, 0, len(f.table))
 	for id := range f.table {
 		ids = append(ids, id)
 	}
+	m.mu.RUnlock()
 	slices.Sort(ids)
 	for _, id := range ids {
 		if !all && id != groupID {
 			continue
 		}
-		e := f.table[id]
+		m.mu.RLock()
+		e := *f.table[id]
+		_, hasProps := f.props[id]
+		m.mu.RUnlock()
 		if !slices.Contains(e.Endpoints, endpoint) {
 			continue
 		}
@@ -663,10 +717,12 @@ func (m *Manager) removeEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 		rest := slices.DeleteFunc(slices.Clone(e.Endpoints), func(ep uint16) bool { return ep == endpoint })
 		if len(rest) == 0 {
 			if err := m.st.RemoveGroupTableEntry(ctx, fabricIndex, id); err != nil {
-				m.mu.Unlock()
+				m.storeMu.Unlock()
 				return existing, fmt.Errorf("groups: remove group %d: %w", id, err)
 			}
+			m.mu.Lock()
 			delete(f.table, id)
+			m.mu.Unlock()
 			removed = true
 			// A group that lost its last endpoint is deleted, not kept as
 			// a Groupcast member without endpoints: matter.js
@@ -675,24 +731,28 @@ func (m *Manager) removeEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 			// that left the group table (CHIP kDeleteGroupIfEmpty) unless
 			// a Groupcast command kept it sender-only (retainSender, the
 			// retainedSenderOnly mark).
-			if _, ok := f.props[id]; ok && !retainSender {
+			if hasProps && !retainSender {
 				if err := m.st.RemoveGroupcastGroup(ctx, fabricIndex, id); err != nil {
-					m.mu.Unlock()
+					m.storeMu.Unlock()
 					return existing, fmt.Errorf("groups: remove groupcast group %d: %w", id, err)
 				}
+				m.mu.Lock()
 				delete(f.props, id)
+				m.mu.Unlock()
 			}
 			continue
 		}
 		if err := m.st.UpsertGroupTableEntry(ctx, store.GroupTableEntry{
 			FabricIndex: fabricIndex, GroupID: id, GroupName: e.GroupName, Endpoints: rest,
 		}); err != nil {
-			m.mu.Unlock()
+			m.storeMu.Unlock()
 			return existing, fmt.Errorf("groups: persist group %d: %w", id, err)
 		}
+		m.mu.Lock()
 		f.table[id] = &TableEntry{GroupID: id, GroupName: e.GroupName, Endpoints: rest}
+		m.mu.Unlock()
 	}
-	m.mu.Unlock()
+	m.storeMu.Unlock()
 	if existing {
 		m.notifyTable(fabricIndex)
 		m.notifyGroupcast(ctx, fabricIndex)

@@ -4,6 +4,7 @@
 package tcp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,11 +46,16 @@ type Conn struct {
 	incoming       bool
 	logger         *slog.Logger
 
+	// writeMu serialises frame writes on nc.
 	writeMu sync.Mutex
 
 	closeOnce sync.Once
 	closed    chan struct{}
 	closeErr  error
+
+	// served is closed once serve returned, after every message it handed
+	// to the handler: what [Conn.Wait] waits for.
+	served chan struct{}
 
 	// received is set by the first complete message; the listener's
 	// idle timer reads it (TcpTransport.ts:89-104 receivedData).
@@ -77,6 +83,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 		incoming:        incoming,
 		logger:          logger,
 		closed:          make(chan struct{}),
+		served:          make(chan struct{}),
 		recoveredPanics: panics,
 	}
 }
@@ -133,10 +140,25 @@ func (c *Conn) Err() error {
 	}
 }
 
-// Close closes the connection. Idempotent.
+// Close closes the connection. Idempotent. It does not wait for a
+// handler still running — a handler may close its own connection — so
+// the connection's owner waits with [Conn.Wait] (the [Listener] does for
+// the connections it accepted).
 func (c *Conn) Close() error {
 	c.close(nil)
 	return nil
+}
+
+// Wait blocks until the connection's reader returned and every handler
+// call it started has returned, or ctx ends (its error is returned then).
+// It returns at once for a connection whose reader never ran.
+func (c *Conn) Wait(ctx context.Context) error {
+	select {
+	case <-c.served:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("tcp: wait %s: %w", c, ctx.Err())
+	}
 }
 
 func (c *Conn) close(reason error) {
@@ -167,10 +189,16 @@ func (c *Conn) String() string {
 }
 
 // serve reads the connection until it closes, handing every complete
-// message to handler in arrival order. Returns once the connection is
-// closed; a handler still running finishes on its own goroutine.
+// message to handler in arrival order. It owns the goroutine of each
+// message and returns once the connection is closed and every one of
+// them returned; then served closes.
 func (c *Conn) serve(handler Handler) {
-	defer c.close(nil)
+	var handlers sync.WaitGroup
+	defer func() {
+		c.close(nil)
+		handlers.Wait()
+		close(c.served)
+	}()
 
 	asm := newAssembler(c.maxPayloadSize)
 	sem := make(chan struct{}, maxInFlightPerConn)
@@ -191,7 +219,9 @@ func (c *Conn) serve(handler Handler) {
 				done := make(chan struct{})
 				var once sync.Once
 				release := func() { once.Do(func() { close(done) }) }
+				handlers.Add(1)
 				go func(prev <-chan struct{}, msg []byte) {
+					defer handlers.Done()
 					defer func() { <-sem }()
 					defer release()
 					<-prev

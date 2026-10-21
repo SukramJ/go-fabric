@@ -69,7 +69,12 @@ type Listener struct {
 
 	recoveredPanics atomic.Uint64
 
-	// mu guards closed and conns.
+	// work is the goroutines of the accepted connections — each one's
+	// reader and its close watcher — added under mu while the listener
+	// is open and waited for by [Listener.WaitIdle].
+	work sync.WaitGroup
+
+	// mu guards conns and closed.
 	mu     sync.Mutex
 	conns  map[*Conn]struct{}
 	closed bool
@@ -152,9 +157,14 @@ func (l *Listener) Serve(ctx context.Context, handler Handler, onClose func(*Con
 	if l.isClosed() {
 		return ErrListenerClosed
 	}
-	done := make(chan struct{})
-	defer close(done)
+	// Serve owns the cancel watcher and returns only after it did.
+	done, watched := make(chan struct{}), make(chan struct{})
+	defer func() {
+		close(done)
+		<-watched
+	}()
 	go func() {
+		defer close(watched)
 		select {
 		case <-ctx.Done():
 			_ = l.Close()
@@ -200,6 +210,7 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 		return
 	}
 	l.conns[c] = struct{}{}
+	l.work.Add(2) // the close watcher and the reader below
 	l.mu.Unlock()
 
 	// Detect and close zombie connections (TcpTransport.ts:89-104).
@@ -212,6 +223,7 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 	})
 
 	go func() {
+		defer l.work.Done()
 		<-c.Closed()
 		idle.Stop()
 		l.mu.Lock()
@@ -221,7 +233,30 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 			onClose(c)
 		}
 	}()
-	go c.serve(handler)
+	go func() {
+		defer l.work.Done()
+		c.serve(handler)
+	}()
+}
+
+// WaitIdle blocks until every accepted connection's reader, its handler
+// calls and its close notification have returned, or ctx ends (its error
+// is returned then). A host calls it after [Listener.Close], as for the
+// UDP listener's WaitIdle, so no handler — and no host code a handler
+// calls — still runs once shutdown reports done. Close does not wait
+// itself: it runs on Serve's cancel and may be called from a handler.
+func (l *Listener) WaitIdle(ctx context.Context) error {
+	idle := make(chan struct{})
+	go func() {
+		l.work.Wait()
+		close(idle)
+	}()
+	select {
+	case <-idle:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("tcp: wait idle: %w", ctx.Err())
+	}
 }
 
 // Close stops accepting and closes every open connection. Idempotent.

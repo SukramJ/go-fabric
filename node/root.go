@@ -78,6 +78,8 @@ type RootClusters struct {
 	Descriptor             *mattercore.Descriptor
 	// OTARequestor is nil unless [Config].OTA is set.
 	OTARequestor *mattercore.OTASoftwareUpdateRequestor
+	// otaApplier is the node's own OTA applier, nil with the host's.
+	otaApplier *otaApplier
 	// WiFiNetworkDiagnostics is nil unless [Network].WiFi has a Reporter.
 	WiFiNetworkDiagnostics *mattercore.WiFiNetworkDiagnostics
 	// PowerSourceConfiguration lists the node's PowerSource endpoints;
@@ -198,7 +200,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(deviceTypeRootNode)}}
 	if cfg.OTA != nil {
-		r.OTARequestor, err = buildOtaRequestor(cfg, d.connector, basicInfo)
+		r.OTARequestor, r.otaApplier, err = buildOtaRequestor(cfg, d.connector, basicInfo)
 		if err != nil {
 			return nil, fmt.Errorf("ota requestor: %w", err)
 		}

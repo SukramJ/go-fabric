@@ -10,12 +10,72 @@ package operational
 // packages/protocol/src/session/Session.ts activity timestamps; the
 // graceful farewell semantics of the sweep itself are pinned in
 // manager_close_parity_test.go.
+//
+// The reaper ticks on a clocktest.Fake: a test moves the clock poll by
+// poll until the effect it waits for (a session's close hook) arrived, so
+// no assertion depends on how fast the machine is. A negative assertion
+// (a session survives) is read after a control session — idle, opened
+// beside it — was reaped: the sweep that reaped the control saw the other
+// session too.
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
+
+const (
+	reaperTestIdle = 30 * time.Second
+	reaperTestPoll = 10 * time.Second
+	// reaperTestSteps bounds a wait: each step is one poll of fake time
+	// and a Fake.Yield, so the bound is wall time only when the reaper
+	// goroutine does not run at all.
+	reaperTestSteps = 10_000
+)
+
+// newReaperManager is a manager on a fake clock with its close hooks
+// recorded and its reaper running; the reaper stops with the test.
+func newReaperManager(t *testing.T) (*Manager, *clocktest.Fake, *closeRecorder) {
+	t.Helper()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m := NewManager(newMinimalFakeStore())
+	m.SetClock(clk)
+	rec := &closeRecorder{}
+	rec.wire(m)
+	m.StartReaper(context.Background(), reaperTestIdle, reaperTestPoll)
+	t.Cleanup(m.StopReaper)
+	return m, clk, rec
+}
+
+// openReaperSession opens a PASE session on m for localID.
+func openReaperSession(t *testing.T, m *Manager, localID uint64) *Entry {
+	t.Helper()
+	e, err := m.OpenFromPase(localID, 0xA11, 0x2222, []byte("shared-secret"))
+	if err != nil {
+		t.Fatalf("OpenFromPase: %v", err)
+	}
+	return e
+}
+
+// advanceUntilClosed moves the clock poll by poll — running each before
+// a step — until the close hook fired for id.
+func advanceUntilClosed(t *testing.T, clk *clocktest.Fake, rec *closeRecorder, id uint16, each func()) {
+	t.Helper()
+	for range reaperTestSteps {
+		if _, closed, _, _ := rec.snapshot(); slices.Contains(closed, id) {
+			return
+		}
+		if each != nil {
+			each()
+		}
+		clk.Advance(reaperTestPoll)
+		clk.Yield()
+	}
+	t.Fatalf("session %d was not reaped within %d polls", id, reaperTestSteps)
+}
 
 // TestStartReaper_EvictsIdleSessionGracefully verifies the end-to-end
 // background path: a session whose last activity falls behind the idle
@@ -24,44 +84,25 @@ import (
 // reapIdle call.
 func TestStartReaper_EvictsIdleSessionGracefully(t *testing.T) {
 	t.Parallel()
-	m := NewManager(newMinimalFakeStore())
-	rec := &closeRecorder{}
-	rec.wire(m)
-
-	entry, err := m.OpenFromPase(0xB0B, 0xA11, 0x2222, []byte("shared-secret"))
-	if err != nil {
-		t.Fatalf("OpenFromPase: %v", err)
-	}
+	m, clk, rec := newReaperManager(t)
+	entry := openReaperSession(t, m, 0xB0B)
 	entry.MarkActiveRx() // traffic once, then silence
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	m.StartReaper(ctx, 30*time.Millisecond, 10*time.Millisecond)
-
-	deadline := time.Now().Add(2 * time.Second)
-	for m.Active() > 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	advanceUntilClosed(t, clk, rec, entry.SessionID, nil)
 	if n := m.Active(); n != 0 {
 		t.Fatalf("Active() = %d, want 0 — reaper did not evict the idle session", n)
 	}
-	// Active() dropping to zero and the notifiers having run are two
-	// different observables: the reaper removes the session from the count
-	// before it notifies, so asserting straight after the loop above races
-	// the reaper's own tail. Wait for what the assertions are about.
-	var graceful, closed []uint16
-	for deadline = time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
-		graceful, closed, _, _ = rec.snapshot()
-		if len(graceful) >= 1 && len(closed) >= 1 {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	// The graceful notifier runs before the close cascade (reapIdle), so
+	// both are recorded once the close hook fired.
+	graceful, closed, _, _ := rec.snapshot()
 	if len(graceful) != 1 || graceful[0] != entry.SessionID {
 		t.Errorf("graceful notifier calls = %v, want [%d]", graceful, entry.SessionID)
 	}
 	if len(closed) != 1 || closed[0] != entry.SessionID {
 		t.Errorf("onSessionClose calls = %v, want [%d]", closed, entry.SessionID)
+	}
+	if clk.Now().Before(time.UnixMilli(1_700_000_000_000).Add(reaperTestIdle)) {
+		t.Errorf("reaped at %v, before the idle timeout", clk.Now())
 	}
 }
 
@@ -73,39 +114,26 @@ func TestStartReaper_EvictsIdleSessionGracefully(t *testing.T) {
 // the Entry/Manager locking under -race.
 func TestStartReaper_ActiveSessionSurvivesSweeps(t *testing.T) {
 	t.Parallel()
-	m := NewManager(newMinimalFakeStore())
-	rec := &closeRecorder{}
-	rec.wire(m)
+	m, clk, rec := newReaperManager(t)
+	active := openReaperSession(t, m, 0xB0B)
+	active.MarkActiveRx()
 
-	entry, err := m.OpenFromPase(0xB0B, 0xA11, 0x2222, []byte("shared-secret"))
-	if err != nil {
-		t.Fatalf("OpenFromPase: %v", err)
-	}
-	entry.MarkActiveRx()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	// The idle timeout is 25× the marking cadence: a scheduler stall on a
-	// loaded machine (a full `make ci` beside the harness) used to stretch
-	// one 10 ms sleep past a 50 ms timeout and evict the live session.
-	m.StartReaper(ctx, 250*time.Millisecond, 10*time.Millisecond)
-
-	// Keep the peer "alive" for well over the TTL: mark every 10 ms for
-	// 750 ms (3× the idle timeout) while the sweep runs concurrently.
-	stopMarking := time.Now().Add(750 * time.Millisecond)
-	for time.Now().Before(stopMarking) {
-		entry.MarkActiveRx()
-		time.Sleep(10 * time.Millisecond)
+	// Three controls in a row, each idle from its open: every one is
+	// reaped while the active session, marked every poll, stays.
+	for i := range 3 {
+		control := openReaperSession(t, m, 0xC00+uint64(i))
+		control.MarkActiveRx()
+		advanceUntilClosed(t, clk, rec, control.SessionID, active.MarkActiveRx)
+		if _, closed, _, _ := rec.snapshot(); slices.Contains(closed, active.SessionID) {
+			t.Fatalf("round %d: the reaper evicted the active session", i)
+		}
 	}
 	if n := m.Active(); n != 1 {
-		t.Fatalf("Active() = %d during live traffic, want 1 — reaper evicted an active session", n)
+		t.Fatalf("Active() = %d during live traffic, want 1", n)
 	}
 
 	// Silence: the session must now age out.
-	deadline := time.Now().Add(2 * time.Second)
-	for m.Active() > 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	advanceUntilClosed(t, clk, rec, active.SessionID, nil)
 	if n := m.Active(); n != 0 {
 		t.Fatalf("Active() = %d after traffic stopped, want 0", n)
 	}
@@ -118,23 +146,48 @@ func TestStartReaper_ActiveSessionSurvivesSweeps(t *testing.T) {
 // after the receive path recorded their first authenticated message.
 func TestStartReaper_NeverMarkedSessionIsNotReaped(t *testing.T) {
 	t.Parallel()
-	m := NewManager(newMinimalFakeStore())
-	rec := &closeRecorder{}
-	rec.wire(m)
+	m, clk, rec := newReaperManager(t)
+	never := openReaperSession(t, m, 0xB0B)
+	control := openReaperSession(t, m, 0xC0C)
+	control.MarkActiveRx()
 
-	if _, err := m.OpenFromPase(0xB0B, 0xA11, 0x2222, []byte("shared-secret")); err != nil {
-		t.Fatalf("OpenFromPase: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	m.StartReaper(ctx, 20*time.Millisecond, 10*time.Millisecond)
-
-	time.Sleep(150 * time.Millisecond) // several TTL windows
+	advanceUntilClosed(t, clk, rec, control.SessionID, nil)
 	if n := m.Active(); n != 1 {
 		t.Fatalf("Active() = %d, want 1 — a never-used session must not be reaped", n)
 	}
-	if graceful, closed, _, _ := rec.snapshot(); len(graceful) != 0 || len(closed) != 0 {
+	if graceful, closed, _, _ := rec.snapshot(); slices.Contains(graceful, never.SessionID) || slices.Contains(closed, never.SessionID) {
 		t.Errorf("close hooks fired (graceful %v / closed %v) for a never-used session", graceful, closed)
+	}
+}
+
+// TestStopReaperWaitsForTheReaper pins the reaper's owner (G1-14, ADR
+// 0026 principle 5): StopReaper returns once the goroutine returned —
+// its deferred ticker Stop has run, so nothing is armed on the clock —
+// is idempotent, and a second StartReaper while one runs starts none.
+func TestStopReaperWaitsForTheReaper(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.UnixMilli(1_700_000_000_000))
+	m := NewManager(newMinimalFakeStore())
+	m.SetClock(clk)
+	m.StopReaper() // safe without a reaper
+
+	m.StartReaper(context.Background(), reaperTestIdle, reaperTestPoll)
+	m.StartReaper(context.Background(), reaperTestIdle, reaperTestPoll)
+	if n := clk.Pending(); n != 1 {
+		t.Fatalf("%d tickers armed after two StartReaper calls, want 1", n)
+	}
+	m.StopReaper()
+	if n := clk.Pending(); n != 0 {
+		t.Fatalf("%d tickers armed after StopReaper, want 0 — the reaper goroutine still runs", n)
+	}
+	m.StopReaper()
+
+	// The parent context's end stops it too; StopReaper then only waits.
+	ctx, cancel := context.WithCancel(context.Background())
+	m.StartReaper(ctx, reaperTestIdle, reaperTestPoll)
+	cancel()
+	m.StopReaper()
+	if n := clk.Pending(); n != 0 {
+		t.Fatalf("%d tickers armed after the parent's cancel and StopReaper, want 0", n)
 	}
 }

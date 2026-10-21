@@ -326,8 +326,12 @@ type DoorLockServer struct {
 
 	supportedModes lockdef.OperatingModesBitmap
 
+	// op serialises lock operations end to end — the hardware move
+	// included, as matter.js runs them under `{ lock: true }` — and is
+	// taken before mu.
 	op sync.Mutex
 
+	// mu guards the fields below.
 	mu       sync.Mutex
 	endpoint uint16
 	data     store.DoorLockAuth
@@ -341,6 +345,11 @@ type DoorLockServer struct {
 	lockoutEndsAt  time.Time
 	autoRelock     *serverTimer
 	expiryTimers   map[uint16]*serverTimer
+	// actions counts the timer actions running on goroutines of their own
+	// (goTimerAction); idle, on mu, signals it reached zero, which
+	// MatterQuiesce waits for.
+	actions int
+	idle    sync.Cond
 }
 
 // queuedEvent is an event decided under mu and emitted after it.
@@ -350,13 +359,47 @@ type queuedEvent struct {
 }
 
 // serverTimer is one armed timer; its identity tells a superseded run to
-// do nothing (DoorLockServer.ts:969-972).
-type serverTimer struct{ t clock.Timer }
+// do nothing (DoorLockServer.ts:969-972). stopped, guarded by the
+// server's mu, tells a callback that fired as the timer was stopped not
+// to start its action.
+type serverTimer struct {
+	t       clock.Timer
+	stopped bool
+}
 
+// stop stops the timer; the caller holds the server's mu.
 func (t *serverTimer) stop() {
-	if t != nil && t.t != nil {
-		t.t.Stop()
+	if t != nil {
+		t.stopped = true
+		if t.t != nil {
+			t.t.Stop()
+		}
 	}
+}
+
+// goTimerAction runs fn, the action of t, on a goroutine the server owns
+// — fn takes op, which a lock operation may hold, so the clock's callback
+// does not wait for it — unless t was stopped meanwhile. MatterQuiesce
+// waits for the running actions.
+func (s *DoorLockServer) goTimerAction(t *serverTimer, fn func()) {
+	s.mu.Lock()
+	if t.stopped {
+		s.mu.Unlock()
+		return
+	}
+	s.actions++
+	s.mu.Unlock()
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			s.actions--
+			if s.actions == 0 {
+				s.idle.Broadcast()
+			}
+			s.mu.Unlock()
+		}()
+		fn()
+	}()
 }
 
 // Compile-time assertions.
@@ -418,6 +461,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 		expiryTimers: map[uint16]*serverTimer{},
 		base:         context.Background(),
 	}
+	s.idle.L = &s.mu
 	if s.tracker == nil {
 		s.tracker = &cluster.DataVersionTracker{}
 	}
@@ -699,7 +743,11 @@ func (s *DoorLockServer) SetEndpoint(endpoint uint16) {
 // and expiry timers stop, as matter.js stops them on dispose
 // (DoorLockServer.ts:182-189). A later lock command arms auto-relock
 // again; an ExpiringUser's deadline stays stored and is checked on its
-// next use.
+// next use. A timer action already running (an auto-relock moving the
+// hardware) finishes first: MatterQuiesce returns once the cancelled timer
+// action has returned. The wait has no bound of its own — the interface
+// carries no context — and is bounded by the action, whose hardware call
+// the host keeps short.
 func (s *DoorLockServer) MatterQuiesce() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -707,6 +755,9 @@ func (s *DoorLockServer) MatterQuiesce() {
 	for idx, t := range s.expiryTimers {
 		t.stop()
 		delete(s.expiryTimers, idx)
+	}
+	for s.actions > 0 {
+		s.idle.Wait() // releases mu: the action takes op, then mu
 	}
 }
 
@@ -967,7 +1018,7 @@ func (s *DoorLockServer) scheduleAutoRelockLocked(timeoutSeconds *uint16) {
 	// The action takes op, which a lock operation may hold: it runs in a
 	// goroutine of its own, as matter.js's callback waits for the lock
 	// (:167, `{ lock: true }`).
-	t.t = s.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { go s.runAutoRelock(t) })
+	t.t = s.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { s.goTimerAction(t, func() { s.runAutoRelock(t) }) })
 	s.autoRelock = t
 }
 

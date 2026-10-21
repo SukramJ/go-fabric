@@ -445,6 +445,20 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	return nil
 }
 
+// stopTimer stops the window's expiry timer, own or administrator, without
+// closing the window or firing its hooks: [Bridge.Stop] calls it so no
+// timer stays armed on the bridge's clock after Stop (ADR 0026 P5). A
+// window open at Stop keeps its state; the node's next start replaces it
+// (OpenOwnWindow), an expiry it would have had is not run.
+func (w *CommissioningWindow) stopTimer() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closeTimer != nil {
+		w.closeTimer.Stop()
+		w.closeTimer = nil // a callback already running sees it is stale
+	}
+}
+
 // closeLocked closes the window and returns what the transition fires:
 // the hooks and the restore closure of the opener. Caller holds w.mu.
 func (w *CommissioningWindow) closeLocked() (hook, restore func()) {

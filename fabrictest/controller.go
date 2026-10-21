@@ -134,59 +134,97 @@ func (s *Site) AddController(opts ControllerOptions) *Controller {
 }
 
 func (c *Controller) start() error {
+	st, err := c.build()
+	if err != nil {
+		// What the failed build opened is closed again, the listener
+		// among it: a host whose start failed holds no address, so the
+		// next start (a Restart, a test's retry) can listen.
+		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
+		defer cancel()
+		st.close(ctx)
+		return err
+	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.listener, c.mgr, c.stop, c.served, c.names = st.listener, st.mgr, st.stop, st.served, st.names
+	c.ca, c.fabric, c.set, c.subs, c.com, c.reg = st.ca, st.fabric, st.set, st.subs, st.com, st.reg
+	c.mu.Unlock()
+	return nil
+}
+
+// stack is one run of a controller's stack: what [Controller.start] builds
+// and [Controller.shutdown] closes.
+type stack struct {
+	listener *udp.Listener
+	mgr      *exchange.Manager
+	stop     context.CancelFunc
+	served   chan struct{}
+	names    *discovery.Names
+	ca       *ca.CA
+	fabric   *commissioner.Fabric
+	set      *peer.Set
+	subs     *interaction.Subscriptions
+	com      *commissioner.Commissioner
+	reg      *client.Registry
+}
+
+// build builds a stack on the controller's stores and address, holding no
+// lock: the stack is the controller's only once start stores it. On an
+// error the stack returned holds what was built before it, for the caller
+// to close.
+func (c *Controller) build() (*stack, error) {
 	clk, log := c.site.clk, c.opts.Logger
+	st := &stack{}
 	l, err := c.site.listen(c.index)
 	if err != nil {
-		return fmt.Errorf("listen: %w", err)
+		return st, fmt.Errorf("listen: %w", err)
 	}
-	c.listener = l
-	if c.mgr, err = exchange.NewManager(l, exchange.Config{Clock: clk, Logger: log}); err != nil {
-		return fmt.Errorf("exchange manager: %w", err)
+	st.listener = l
+	if st.mgr, err = exchange.NewManager(l, exchange.Config{Clock: clk, Logger: log}); err != nil {
+		return st, fmt.Errorf("exchange manager: %w", err)
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	c.stop, c.served = stop, make(chan struct{})
+	served, mgr := make(chan struct{}), st.mgr
+	st.stop, st.served = stop, served
 	go func() {
-		defer close(c.served)
-		_ = l.Serve(ctx, c.mgr.HandleDatagram)
+		defer close(served)
+		_ = l.Serve(ctx, mgr.HandleDatagram)
 	}()
-	c.names = discovery.NewNames(newQueryConn(c.site), log)
-	if c.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk}); err != nil {
-		return fmt.Errorf("certificate authority: %w", err)
+	st.names = discovery.NewNames(newQueryConn(c.site), log)
+	if st.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk}); err != nil {
+		return st, fmt.Errorf("certificate authority: %w", err)
 	}
-	if c.fabric, err = commissioner.NewFabric(c.ca, commissioner.FabricConfig{
+	if st.fabric, err = commissioner.NewFabric(st.ca, commissioner.FabricConfig{
 		FabricID: c.opts.FabricID, RootNodeID: c.opts.NodeID, VendorID: c.opts.VendorID, Label: c.opts.Label, CATs: c.opts.CATs,
 		Store: c.caStore,
 	}); err != nil {
-		return fmt.Errorf("fabric: %w", err)
+		return st, fmt.Errorf("fabric: %w", err)
 	}
-	if c.set, err = peer.NewSet(peer.Context{
-		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: c.resume, Logger: log, Clock: clk,
+	if st.set, err = peer.NewSet(peer.Context{
+		Exchanges: st.mgr, Names: st.names, Fabrics: st.fabric.Lookup, Resumption: c.resume, Logger: log, Clock: clk,
 	}); err != nil {
-		return fmt.Errorf("peer set: %w", err)
+		return st, fmt.Errorf("peer set: %w", err)
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: clk, Logger: log})
+	st.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: clk, Logger: log})
 	// With Fabrics the commissioner runs the CASE responder that adopts
 	// the sessions a device opens to the controller into the peer set.
-	if c.com, err = commissioner.New(commissioner.Context{
-		Exchanges: c.mgr, Peers: c.set, Attestation: c.trustStore(), Logger: log, Clock: clk,
-		Subscriptions: c.subs, Fabrics: []*commissioner.Fabric{c.fabric}, Resumption: c.resume,
+	if st.com, err = commissioner.New(commissioner.Context{
+		Exchanges: st.mgr, Peers: st.set, Attestation: c.trustStore(), Logger: log, Clock: clk,
+		Subscriptions: st.subs, Fabrics: []*commissioner.Fabric{st.fabric}, Resumption: c.resume,
 	}); err != nil {
-		return fmt.Errorf("commissioner: %w", err)
+		return st, fmt.Errorf("commissioner: %w", err)
 	}
 	rc := client.RegistryConfig{
-		Store: c.regStore, Commissioner: c.com, Peers: c.set, Exchanges: c.mgr, Fabrics: []*commissioner.Fabric{c.fabric},
-		Subscriptions: c.subs, Logger: log, Clock: clk, Node: client.Config{Logger: log, Clock: clk},
+		Store: c.regStore, Commissioner: st.com, Peers: st.set, Exchanges: st.mgr, Fabrics: []*commissioner.Fabric{st.fabric},
+		Subscriptions: st.subs, Logger: log, Clock: clk, Node: client.Config{Logger: log, Clock: clk},
 	}
 	if c.opts.Registry != nil {
 		c.opts.Registry(&rc)
 		c.regStore = rc.Store
 	}
-	if c.reg, err = client.NewRegistry(rc); err != nil {
-		return fmt.Errorf("client registry: %w", err)
+	if st.reg, err = client.NewRegistry(rc); err != nil {
+		return st, fmt.Errorf("client registry: %w", err)
 	}
-	return nil
+	return st, nil
 }
 
 // trustStore is the commissioner's attestation trust store.
@@ -240,33 +278,41 @@ func (c *Controller) Restart(ctx context.Context) error {
 // is not held up while the stack winds down.
 func (c *Controller) shutdown(ctx context.Context) {
 	c.mu.RLock()
-	reg, subs, com, set, mgr := c.reg, c.subs, c.com, c.set, c.mgr
-	stop, served, listener, names := c.stop, c.served, c.listener, c.names
+	st := &stack{
+		listener: c.listener, mgr: c.mgr, stop: c.stop, served: c.served, names: c.names,
+		set: c.set, subs: c.subs, com: c.com, reg: c.reg,
+	}
 	c.mu.RUnlock()
-	if reg != nil {
-		_ = reg.Close(ctx)
+	st.close(ctx)
+}
+
+// close stops what of the stack was built, the last built first. The
+// listener's Close returns once its address is free again.
+func (st *stack) close(ctx context.Context) {
+	if st.reg != nil {
+		_ = st.reg.Close(ctx)
 	}
-	if subs != nil {
-		_ = subs.Close(ctx)
+	if st.subs != nil {
+		_ = st.subs.Close(ctx)
 	}
-	if com != nil {
-		com.Close()
+	if st.com != nil {
+		st.com.Close()
 	}
-	if set != nil {
-		set.Close(ctx)
+	if st.set != nil {
+		st.set.Close(ctx)
 	}
-	if mgr != nil {
-		mgr.Close()
+	if st.mgr != nil {
+		_ = st.mgr.Shutdown(ctx)
 	}
-	if stop != nil {
-		stop()
-		<-served
+	if st.stop != nil {
+		st.stop()
+		<-st.served
 	}
-	if listener != nil {
-		_ = listener.Close()
+	if st.listener != nil {
+		_ = st.listener.Close()
 	}
-	if names != nil {
-		_ = names.Close()
+	if st.names != nil {
+		_ = st.names.Close()
 	}
 }
 

@@ -99,9 +99,12 @@ type Listener struct {
 	// that share an order key in arrival order (ordered.go).
 	order *orderedDispatch
 
-	// mu guards closed.
+	// mu guards closed, set by the first [Listener.Close].
 	mu     sync.Mutex
 	closed bool
+	// closeOnce runs the socket's Close once; every Close waits on it, so
+	// no Close returns while the socket still holds its address.
+	closeOnce sync.Once
 }
 
 // bindAddr resolves the (network, address) pair New binds for cfg,
@@ -178,10 +181,16 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 	}
 	// Cancel-via-Close: when ctx fires we close the conn from a
 	// helper goroutine to unblock ReadFromUDP. The Serve goroutine
-	// then unwinds with a closed-conn error, which we suppress.
-	done := make(chan struct{})
-	defer close(done)
+	// then unwinds with a closed-conn error, which we suppress. Serve
+	// owns the helper and returns only after it did, so a cancelled
+	// Serve has returned once the socket's Close has.
+	done, watched := make(chan struct{}), make(chan struct{})
+	defer func() {
+		close(done)
+		<-watched
+	}()
 	go func() {
+		defer close(watched)
 		select {
 		case <-ctx.Done():
 			_ = l.Close()
@@ -310,16 +319,20 @@ func (l *Listener) Send(dst *net.UDPAddr, payload []byte) error {
 	return nil
 }
 
-// Close shuts the listener down. Idempotent.
+// Close shuts the listener down. Idempotent and synchronous for every
+// caller: a Close that finds another one closing the socket (Serve's
+// cancel, a host's shutdown) waits for it, so the socket's address is
+// free once any Close returned. The socket's error goes to the Close
+// that ran it; the others return nil.
 func (l *Listener) Close() error {
-	l.mu.Lock()
-	if l.closed {
+	var err error
+	l.closeOnce.Do(func() {
+		l.mu.Lock()
+		l.closed = true
 		l.mu.Unlock()
-		return nil
-	}
-	l.closed = true
-	l.mu.Unlock()
-	return l.conn.Close()
+		err = l.conn.Close()
+	})
+	return err
 }
 
 func (l *Listener) isClosed() bool {

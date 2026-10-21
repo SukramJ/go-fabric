@@ -73,7 +73,11 @@ type central struct {
 	bus     bus
 	adapter dbus.ObjectPath
 	done    chan struct{}
+	// dispatched is closed when the signal loop (dispatch) returned; Close
+	// waits for it.
+	dispatched chan struct{}
 
+	// mu guards the fields below.
 	mu         sync.Mutex
 	closed     bool
 	scanning   bool
@@ -95,7 +99,7 @@ var (
 // BlueZ already knows give their addresses.
 func newCentral(b bus, adapter dbus.ObjectPath) (*central, error) {
 	c := &central{
-		bus: b, adapter: adapter, done: make(chan struct{}),
+		bus: b, adapter: adapter, done: make(chan struct{}), dispatched: make(chan struct{}),
 		discovered: map[string][]byte{}, addresses: map[dbus.ObjectPath]string{}, devices: map[string]dbus.ObjectPath{},
 		conns: map[dbus.ObjectPath]*connection{}, notifying: map[dbus.ObjectPath]*connection{},
 		watchers: map[dbus.ObjectPath]map[chan struct{}]struct{}{},
@@ -116,11 +120,14 @@ func newCentral(b bus, adapter dbus.ObjectPath) (*central, error) {
 	return c, nil
 }
 
-// Close stops the central's connections and releases the bus.
+// Close stops the central's connections and releases the bus, and
+// returns once the signal loop returned. The scan callback runs on that
+// loop, so it must not call Close.
 func (c *central) Close() error {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
+		<-c.dispatched
 		return nil
 	}
 	c.closed = true
@@ -133,7 +140,9 @@ func (c *central) Close() error {
 		conn.markGone()
 	}
 	close(c.done)
-	return c.bus.Close()
+	err := c.bus.Close()
+	<-c.dispatched
+	return err
 }
 
 func (c *central) under(path dbus.ObjectPath) bool {
@@ -241,6 +250,7 @@ func (c *central) StopScanning(ctx context.Context) error {
 
 // dispatch routes the bus's signals until the central closes.
 func (c *central) dispatch() {
+	defer close(c.dispatched)
 	for {
 		select {
 		case <-c.done:

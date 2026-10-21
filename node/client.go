@@ -135,7 +135,7 @@ func (cs *clientStack) close(ctx context.Context) {
 		cs.peers.Close(ctx)
 	}
 	if cs.exchanges != nil {
-		cs.exchanges.Close()
+		_ = cs.exchanges.Shutdown(ctx) // bounded by Stop's context; the socket closes regardless
 	}
 	if cs.stop != nil {
 		cs.stop()

@@ -104,9 +104,12 @@ type Node struct {
 	cancel        context.CancelFunc
 	keeperWG      sync.WaitGroup
 
-	// mu guards cfg, keeperWG, ownedDB, st, started and stopped.
+	// mu serialises Start and Stop, the lifecycle; it is held across
+	// them, host callbacks included (the host's Snapshotter), and
+	// taken by nothing else. started is atomic so a host's call during
+	// either (SetCommissioningBlocked) never waits for it (ADR 0026 P6).
 	mu      sync.Mutex
-	started bool
+	started atomic.Bool
 	stopped bool
 }
 
@@ -616,7 +619,7 @@ func (n *Node) Start(ctx context.Context) error {
 	switch {
 	case n.stopped:
 		return ErrStopped
-	case n.started:
+	case n.started.Load():
 		return nil
 	}
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
@@ -635,7 +638,7 @@ func (n *Node) Start(ctx context.Context) error {
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
-	n.started = true
+	n.started.Store(true)
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
@@ -712,8 +715,8 @@ func (n *Node) Start(ctx context.Context) error {
 // Stop takes the node offline and releases what New and Start began, in
 // the daemon's shutdown order (main.go:430-450): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
-// node was started), the PASE providers, the CASE reaper, the
-// subscription engine, the re-announce loop, the health probe, the
+// node was started), the PASE providers, the CASE reaper, the session
+// table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
 // bridge, the advertiser and the store the node opened for Store.Path.
 // Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
@@ -727,7 +730,10 @@ func (n *Node) Stop(ctx context.Context) error {
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
-	if n.started {
+	if n.root.otaApplier != nil {
+		n.root.otaApplier.close()
+	}
+	if n.started.Load() {
 		if err := storeOperationalTime(ctx, n.st, n.root.GeneralDiagnostics); err != nil {
 			n.logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 		}
@@ -742,6 +748,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.sec.pase.Stop()
 	n.window.stop()
 	n.sec.casep.StopReaper()
+	n.sec.sessions.StopReaper()
 	n.sec.subs.Stop()
 	n.stopGroupSender()
 	if n.bdx != nil {
@@ -835,10 +842,9 @@ func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
 	if err != nil {
 		return
 	}
-	n.mu.Lock()
-	started := n.started
-	n.mu.Unlock()
-	if started && n.window != nil && n.st != nil {
+	// Lock-free: a host may call this from a callback that runs inside
+	// Start or Stop, which hold n.mu (a Snapshotter, say).
+	if n.started.Load() && n.window != nil && n.st != nil {
 		n.window.reopenIfDecommissioned(ctx, n.st)
 	}
 }

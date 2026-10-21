@@ -87,11 +87,17 @@ type Messages struct {
 	embedded  cluster.DataVersionTracker
 	ext       *cluster.DataVersionTracker
 
+	// mu guards the fields below; it is released before a presenter call
+	// (present, cancel).
 	mu       sync.Mutex
 	messages []messagesdef.MessageStruct
 	active   [][]byte
 	emitter  contract.EventEmitter
 	endpoint uint16
+	// presenting counts the new messages whose PresentMessage runs, held
+	// against the queue's eight so two presents cannot both take its last
+	// slot while the presenter has them.
+	presenting int
 	// pending holds what a change under mu reports once mu is released.
 	pendingAttrs  []uint32
 	pendingEvents []messagesEvent
@@ -246,16 +252,31 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 		StartTime: req.StartTime, Duration: req.Duration, MessageText: req.MessageText,
 		Responses: req.Responses, FabricIndex: fabric,
 	}
+	// The presenter is host code: the queue is checked and a slot held
+	// under mu, the presenter called without it, the result applied under
+	// it again (ADR 0026 P6).
 	m.mu.Lock()
-	defer m.unlock()
-	i := m.indexLocked(msg.MessageId)
-	if i < 0 && len(m.messages) >= messagesMax {
+	reserved := m.indexLocked(msg.MessageId) < 0
+	if reserved && len(m.messages)+m.presenting >= messagesMax {
+		m.unlock()
 		return bindingStatusError{code: im.StatusResourceExhausted, msg: "core: Messages: the queue holds its eight messages"}
 	}
-	if err := m.presenter.PresentMessage(ctx, msg); err != nil {
+	if reserved {
+		m.presenting++
+	}
+	m.mu.Unlock()
+	err := m.presenter.PresentMessage(ctx, msg)
+	m.mu.Lock()
+	defer m.unlock()
+	if reserved {
+		m.presenting--
+	}
+	if err != nil {
 		return messagesStatus(err)
 	}
-	if i >= 0 {
+	// A message with the same id replaces the queued one, looked up again:
+	// it may have gone or come while the presenter ran.
+	if i := m.indexLocked(msg.MessageId); i >= 0 {
 		m.removeLocked(i)
 	}
 	m.messages = append(m.messages, msg)
@@ -266,22 +287,33 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 
 // cancel takes the accessing fabric's messages with the given ids down.
 func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error {
-	m.mu.Lock()
-	defer m.unlock()
+	// Each id is looked up under mu, cancelled at the presenter without it,
+	// and removed under it again if it is still queued (ADR 0026 P6).
 	changed := false
+	defer func() {
+		if changed {
+			m.mu.Lock()
+			m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
+			m.unlock()
+		}
+	}()
 	for _, id := range ids {
+		m.mu.Lock()
 		i := m.indexLocked(id)
-		if i < 0 || m.messages[i].FabricIndex != fabric {
+		visible := i >= 0 && m.messages[i].FabricIndex == fabric
+		m.mu.Unlock()
+		if !visible {
 			continue
 		}
 		if err := m.presenter.CancelMessage(ctx, slices.Clone(id)); err != nil {
 			return messagesStatus(err)
 		}
-		m.removeLocked(i)
-		changed = true
-	}
-	if changed {
-		m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
+		m.mu.Lock()
+		if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex == fabric {
+			m.removeLocked(i)
+			changed = true
+		}
+		m.mu.Unlock() // the events queued go out with the attributes, below
 	}
 	return nil
 }

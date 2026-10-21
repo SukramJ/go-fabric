@@ -49,7 +49,7 @@ type outboundKey struct {
 }
 
 type outboundReliableTracker struct {
-	// mu guards pending and waiters.
+	// mu guards pending, waiters and rtt; it is not held while Tick sends.
 	mu      sync.Mutex
 	pending map[outboundKey]*outboundEntry
 	// waiters lets callers block on Ack via [WaitForAck] — used by the
@@ -315,14 +315,25 @@ type outboundTickResult struct {
 // [mrp.ErrMaxRetransmissionsReached] so the caller can drop the
 // associated subscription / state.
 //
-// `send` is called under the tracker's lock — production
-// implementations enqueue (don't block) on the UDP socket. Send
-// errors are surfaced via the result slice; the entry stays in the
-// pending map for the next tick to retry.
+// The due entries are taken and rescheduled under the tracker's lock and
+// `send` is called after it is released (ADR 0026 P6): an Ack arriving
+// meanwhile removes its entry without waiting for the socket. A send
+// error is surfaced via the result slice and puts the entry's next
+// attempt back to when it was due, so the next tick retries it, as
+// before.
 func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte) error) []outboundTickResult {
+	type resend struct {
+		key      outboundKey
+		p        *outboundEntry
+		dest     net.Addr
+		datagram []byte
+		due      time.Time
+	}
+	var (
+		out  []outboundTickResult
+		todo []resend
+	)
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	var out []outboundTickResult
 	for key, p := range t.pending {
 		if now.Before(p.nextSendAt) {
 			continue
@@ -338,10 +349,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			continue
 		}
 		p.retries++
-		if err := send(p.dest, p.datagram); err != nil {
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: err})
-			continue
-		}
+		due := p.nextSendAt
 		// Full spec backoff per Matter §4.12.2.1: peer-appropriate
 		// base interval (re-evaluated per retransmission — the peer
 		// may have gone idle since the last attempt), margin,
@@ -349,7 +357,28 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
 		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now), p.retries, rand.Float64)
 		p.nextSendAt = now.Add(delay)
-		out = append(out, outboundTickResult{SessionID: key.sessionID, Counter: key.counter})
+		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram, due: due})
+	}
+	t.mu.Unlock()
+	for _, r := range todo {
+		// An Ack that arrived since the sweep removed the entry: its
+		// retransmission is not sent.
+		t.mu.Lock()
+		acked := t.pending[r.key] != r.p
+		t.mu.Unlock()
+		if acked {
+			continue
+		}
+		if err := send(r.dest, r.datagram); err != nil {
+			t.mu.Lock()
+			if t.pending[r.key] == r.p {
+				r.p.nextSendAt = r.due
+			}
+			t.mu.Unlock()
+			out = append(out, outboundTickResult{SessionID: r.key.sessionID, ExchangeID: r.p.exchangeID, Counter: r.key.counter, Err: err})
+			continue
+		}
+		out = append(out, outboundTickResult{SessionID: r.key.sessionID, Counter: r.key.counter})
 	}
 	return out
 }

@@ -122,7 +122,14 @@ func (c bufferConfig) normalized() bufferConfig {
 //
 // Mirrors matter.js packages/protocol/src/interaction/EventHandler.ts.
 type EventLog struct {
-	// mu guards clock, next, occurrences, persistCeiling, persistEpoch and persistFn.
+	// ceilingMu serialises the persistence of a new counter ceiling
+	// (persistFn): Append and DropBuffered take it before mu when the
+	// ceiling has to move, hold it across persistFn — the host's store —
+	// and hand out no number the stored ceiling does not cover. Nothing
+	// else takes it.
+	ceilingMu sync.Mutex
+	// mu guards the fields below; it is not held while persistFn runs
+	// (ADR 0026 P6), so a query never waits for the store.
 	mu   sync.RWMutex
 	next uint64 // next event number; incremented before use so first event is 1
 	// occurrences holds every buffered record across all priorities, in
@@ -173,16 +180,18 @@ func newEventLogWithBuffer(cfg bufferConfig) *EventLog {
 // the oldest entry in that bucket is evicted when the bucket is full.
 func (l *EventLog) Append(rec EventRecord) uint64 {
 	l.mu.Lock()
+	// Persist a fresh ceiling BEFORE handing the number out so a crash
+	// can never reuse it (see the persistCeiling field doc). The write
+	// happens at most once per epoch, not per event, and with mu released
+	// (raiseCeiling); an Append meanwhile waits for it in raiseCeiling.
+	for l.persistFn != nil && l.next+1 >= l.persistCeiling {
+		l.mu.Unlock()
+		l.raiseCeiling()
+		l.mu.Lock()
+	}
 	defer l.mu.Unlock()
 	l.next++
 	rec.Number = l.next
-	// Persist a fresh ceiling BEFORE handing the number out so a crash
-	// can never reuse it (see the persistCeiling field doc). The write
-	// happens at most once per epoch, not per event.
-	if l.persistFn != nil && l.next >= l.persistCeiling {
-		l.persistCeiling = l.next + l.persistEpoch
-		l.persistFn(l.persistCeiling)
-	}
 	if rec.EpochMS == 0 {
 		rec.EpochMS = uint64(clock.Or(l.clock).Now().UnixMilli()) //nolint:gosec // the clock's time is non-negative; see #20
 	}
@@ -205,13 +214,40 @@ func (l *EventLog) Append(rec EventRecord) uint64 {
 // matter.js packages/protocol/src/events/BaseEventStore.ts:62-67, :141-147
 // (clear with keepNumbering: reserveCurrentNumbering before the events go).
 func (l *EventLog) DropBuffered() {
+	l.ceilingMu.Lock()
+	defer l.ceilingMu.Unlock()
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.persistFn != nil {
-		l.persistCeiling = l.next
-		l.persistFn(l.next)
+	fn, ceiling := l.persistFn, l.next
+	if fn != nil {
+		l.persistCeiling = ceiling
 	}
 	l.occurrences = nil
+	l.mu.Unlock()
+	if fn != nil {
+		fn(ceiling)
+	}
+}
+
+// raiseCeiling persists the ceiling the next number needs, unless another
+// Append did meanwhile: under ceilingMu, with mu released across persist.
+// The ceiling in memory moves once the store holds it.
+func (l *EventLog) raiseCeiling() {
+	l.ceilingMu.Lock()
+	defer l.ceilingMu.Unlock()
+	l.mu.Lock()
+	fn := l.persistFn
+	if fn == nil || l.next+1 < l.persistCeiling {
+		l.mu.Unlock()
+		return
+	}
+	ceiling := l.next + 1 + l.persistEpoch
+	l.mu.Unlock()
+	fn(ceiling)
+	l.mu.Lock()
+	if ceiling > l.persistCeiling {
+		l.persistCeiling = ceiling
+	}
+	l.mu.Unlock()
 }
 
 // DropFabric removes the records of fabric-sensitive events that belong to
@@ -343,9 +379,9 @@ func (l *EventLog) SetClock(c clock.Clock) {
 }
 
 // SetCounterPersistence wires the durable half of the EventNumber
-// counter: persist is invoked (under the log's lock, at most once per
-// epoch) with the new ceiling whenever the counter reaches the current
-// one. epoch <= 0 selects the default 0x10000, chip's
+// counter: persist is invoked (with the log's lock released, at most once
+// per epoch; an Append that needs the new ceiling waits for it) with the
+// new ceiling whenever the counter reaches the current one. epoch <= 0 selects the default 0x10000, chip's
 // CHIP_DEVICE_CONFIG_EVENT_ID_COUNTER_EPOCH. Pass nil to detach.
 func (l *EventLog) SetCounterPersistence(persist func(ceiling uint64), epoch uint64) {
 	l.mu.Lock()

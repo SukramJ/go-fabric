@@ -66,9 +66,26 @@ func newLive(t *testing.T) *live {
 	return newLiveWith(t, discardLog())
 }
 
+// siteSlots runs the package's fabrictest sites one at a time, as
+// controller/client's and node's do: a fake site clock moves only while
+// the whole test process is quiet (fabrictest Site.Run, Site.Eventually),
+// so busy sites in parallel starve each other's clocks — under the race
+// detector past the wall-clock budgets of the waits below
+// (TestLiveSustainedSurvivesRestart, a named flake of gate 1). One at a
+// time, every site reaches its quiet points at once.
+var siteSlots = make(chan struct{}, 1)
+
+// holdSite takes the package's site slot until the test ends.
+func holdSite(t *testing.T) {
+	t.Helper()
+	siteSlots <- struct{}{}
+	t.Cleanup(func() { <-siteSlots })
+}
+
 // newLiveWith is newLive with the controller's logger.
 func newLiveWith(t *testing.T, regLog *slog.Logger) *live {
 	t.Helper()
+	holdSite(t)
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, TimeSource: site.Clock()})
 	if err != nil {
