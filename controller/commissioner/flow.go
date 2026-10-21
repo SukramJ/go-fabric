@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
@@ -26,8 +28,6 @@ import (
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	timesync "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

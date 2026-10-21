@@ -322,7 +322,7 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		}
 		// A DataVersion on a wildcard-endpoint path is ignored: Matter
 		// §8.9.2.8.1 forbids a client to send one (the controller refuses
-		// to, controller/interaction/write.go formulateWrite), and the
+		// to, client/interaction/write.go formulateWrite), and the
 		// server stays lenient — matter.js writes a wildcard path without
 		// looking at the version (packages/protocol/src/action/server/AttributeWriteResponse.ts:67-71
 		// at 862ad75f, "dataVersion silently ignored for Wildcard";

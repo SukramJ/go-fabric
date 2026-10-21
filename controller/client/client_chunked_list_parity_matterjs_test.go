@@ -12,11 +12,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/media"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"

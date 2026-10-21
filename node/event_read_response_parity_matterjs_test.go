@@ -32,12 +32,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gendiag "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/spec/messages"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"

@@ -47,11 +47,11 @@ import (
 
 	"github.com/SukramJ/go-fabric/binding"
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	specgroups "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"

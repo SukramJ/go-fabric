@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller/discovery"
 )
 
 var (

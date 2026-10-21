@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	admincommdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	basicinfodef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"

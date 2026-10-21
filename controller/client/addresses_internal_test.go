@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/client/discovery"
 )
 
 func device(id string, addrs ...string) discovery.Device {

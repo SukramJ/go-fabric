@@ -12,7 +12,7 @@
 // a [Resolution] of one of three kinds:
 //
 //   - [KindClient]: the entry names another node. The manager takes the
-//     peer from [Peers] (controller/peer.Set), opens a CASE session to it
+//     peer from [Peers] (client/peer.Set), opens a CASE session to it
 //     in the background and reports the resolution, with an
 //     [interaction.Interaction] bound to the peer, once a session exists.
 //   - [KindGroup]: the entry names a group. It resolves once the fabric

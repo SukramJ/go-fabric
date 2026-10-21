@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/fabrictest"
 )
 

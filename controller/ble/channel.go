@@ -11,7 +11,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )

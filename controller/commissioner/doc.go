@@ -14,7 +14,7 @@
 // initial reads, ArmFailSafe, the regulatory configuration for a Wi-Fi or
 // Thread node, device attestation (controller/attestation), the CSR, the
 // root certificate and the NOC (controller/ca), the operational CASE
-// connection through controller/peer, CommissioningComplete and the
+// connection through client/peer, CommissioningComplete and the
 // fabric label — with matter.js's failsafe bookkeeping and error
 // classes. Not ported yet: BLE commissioning and the Wi-Fi and Thread
 // network steps (ADR 0024, concept v3), time synchronisation, terms and

@@ -24,7 +24,7 @@
 // recorded fabric filter and its storage failures (the Go cache records no
 // filter and the default subscription is fixed at Start); the default
 // subscription's ownership across replacements; and the priming report
-// answered INVALID_SUBSCRIPTION after a cancel (controller/interaction).
+// answered INVALID_SUBSCRIPTION after a cancel (client/interaction).
 package client_test
 
 import (
@@ -34,11 +34,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

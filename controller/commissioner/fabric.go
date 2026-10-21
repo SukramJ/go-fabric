@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 )

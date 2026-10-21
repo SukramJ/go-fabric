@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"

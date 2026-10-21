@@ -15,7 +15,7 @@ import (
 // messages to the mDNS groups (224.0.0.251 and ff02::fb, UDP/5353) and
 // delivers every DNS message received there, with the index of the
 // interface it arrived on. [OperationalResolver] resolves one instance over
-// it; the controller's browser (controller/discovery) keeps a record cache
+// it; the controller's browser (client/discovery) keeps a record cache
 // on top of it. Production joins the groups on every multicast interface
 // ([OpenQueryConn]); tests substitute a fake responder.
 //

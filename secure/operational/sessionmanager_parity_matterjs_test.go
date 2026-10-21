@@ -7,7 +7,7 @@ package operational
 // 862ad75f: the device-side session table — session-id allocation, the
 // per-peer cap and who it spares, and the reported peer activity. The group
 // counter cases live in groups/sessionmanager_parity_matterjs_test.go, the
-// local parameter cases in controller/exchange/sessionmanager_parity_matterjs_test.go.
+// local parameter cases in client/exchange/sessionmanager_parity_matterjs_test.go.
 
 import (
 	"errors"

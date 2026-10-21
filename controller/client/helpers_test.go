@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -34,7 +34,7 @@ func (c *fakeConn) Send(_ *net.UDPAddr, payload []byte) error {
 
 var peerAddr = &net.UDPAddr{IP: net.ParseIP("fd00::1"), Port: 5540}
 
-// The scripted harness below is copied from controller/interaction's
+// The scripted harness below is copied from client/interaction's
 // helpers_test.go (package interaction_test, which another package's tests
 // cannot import): a manager with one secure session, a fake clock, and the
 // peer's half of the session to script the node's answers.

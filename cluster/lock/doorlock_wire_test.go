@@ -6,8 +6,8 @@ package lock_test
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

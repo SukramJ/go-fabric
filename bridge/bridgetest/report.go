@@ -4,12 +4,12 @@
 package bridgetest
 
 // Decoded TLV and the reports the device sends, in the shape a test
-// asserts over — converted from controller/interaction's, which reads the
+// asserts over — converted from client/interaction's, which reads the
 // ReportData chunks and merges them.
 
 import (
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -65,7 +65,7 @@ func decodeNode(dec *tlv.Decoder, el tlv.Element) (TLV, error) {
 	}
 }
 
-// fromNode converts a node tree of controller/interaction into a TLV.
+// fromNode converts a node tree of client/interaction into a TLV.
 func fromNode(n spec.Node) TLV {
 	t := TLV{Element: n.El}
 	if len(n.Children) > 0 {
@@ -98,7 +98,7 @@ type Report struct {
 	Statuses       []AttributeStatus
 }
 
-// fromReport converts a report of controller/interaction.
+// fromReport converts a report of client/interaction.
 func fromReport(r *interaction.Report) *Report {
 	out := &Report{SubscriptionID: r.SubscriptionID}
 	for i := range r.Attributes {

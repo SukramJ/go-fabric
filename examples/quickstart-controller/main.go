@@ -25,6 +25,10 @@ import (
 
 	_ "modernc.org/sqlite" // the host picks the SQLite driver
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -32,10 +36,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"

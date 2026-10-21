@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"

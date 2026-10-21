@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/btp"

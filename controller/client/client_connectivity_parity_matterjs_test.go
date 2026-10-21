@@ -8,7 +8,7 @@
 // disabling during reconnection, the controller restarted with an
 // uncommissioned node or an unavailable device. The cases on several
 // device addresses, moved addresses and blocked DNS-SD stay with the peer
-// set's tests (controller/peer) and in the register's missing list:
+// set's tests (client/peer) and in the register's missing list:
 // fabrictest gives a device one address and answers DNS-SD in-process.
 //
 // matter.js's lifecycle.isOnline is the node's connection state, a
@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 )
