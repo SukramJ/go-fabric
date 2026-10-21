@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6083,
+  "entry_points": 6082,
   "entry_packages": [
     ".",
     "bdx",
@@ -227,9 +227,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14184,
-    "reachable": 9947,
-    "whitelisted": 4232,
+    "total_exported": 14181,
+    "reachable": 9945,
+    "whitelisted": 4231,
     "unreachable": 5
   },
   "by_package": [
@@ -20517,13 +20517,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/measurement_test.go",
       "line": 106
-    },
-    {
-      "package": "device",
-      "identifier": "TestWithOptionalTakesOnlyAClusterWithoutAPackage",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "device/host_options_test.go",
-      "line": 131
     },
     {
       "package": "device",
