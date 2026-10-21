@@ -29,12 +29,23 @@ const (
 var ErrThermostatMalformed = errors.New("wire: Thermostat command malformed")
 
 // SetpointRaiseLowerRequest mirrors Matter §4.3.9.1.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/thermostat.SetpointRaiseLowerRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type SetpointRaiseLowerRequest struct {
 	Mode   uint8 // 0 Heat / 1 Cool / 2 Both
 	Amount int8  // tenths of °C, signed
 }
 
 // DecodeSetpointRaiseLower parses SetpointRaiseLower payloads.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/thermostat.SetpointRaiseLowerRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeSetpointRaiseLower(payload []byte) (SetpointRaiseLowerRequest, error) {
 	var req SetpointRaiseLowerRequest
 	if err := walkContext(payload, ErrThermostatMalformed, func(tag uint32, el tlv.Element) {

@@ -22,8 +22,8 @@ import (
 const Scope = "node"
 
 // Endpoint is what the Aggregator holds: anything that describes itself
-// as an [endpoint.Spec]. Brief P's device.Device satisfies it; until that
-// lands, any type with a Spec method does (ADR 0018 decision 4).
+// as an [endpoint.Spec] — a device.Device, or any type with a Spec method
+// (ADR 0018 decision 4).
 type Endpoint interface {
 	Spec() endpoint.Spec
 }

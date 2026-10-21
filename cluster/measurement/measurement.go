@@ -18,7 +18,6 @@ package measurement
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 
@@ -40,6 +39,7 @@ import (
 	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
 	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // Cluster IDs handled by this package. Each one is its generated
@@ -267,11 +267,11 @@ const (
 // errReadOnly surfaces from MatterWrite — every server in this
 // package is read-only at the cluster level (writes flow through the
 // underlying DP via a different path).
-var errReadOnly = errors.New("measurement: cluster is read-only at the wire layer")
+var errReadOnly = spec.Errorf(im.StatusUnsupportedWrite, "measurement: cluster is read-only at the wire layer")
 
 // errNoCommands surfaces from MatterInvoke — measurement clusters
 // have no Matter commands.
-var errNoCommands = errors.New("measurement: cluster has no commands")
+var errNoCommands = spec.Errorf(im.StatusUnsupportedCommand, "measurement: cluster has no commands")
 
 // --- TemperatureMeasurement (0x0402) -----------------------------------
 

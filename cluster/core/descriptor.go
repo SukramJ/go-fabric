@@ -111,7 +111,7 @@ var ErrTagListNotEnabled = errors.New(`matter: you must enable the descriptor "T
 
 // errDescriptorReadOnly is returned for any write attempt — the
 // Descriptor cluster has no writable attributes.
-var errDescriptorReadOnly = errors.New("core: Descriptor is read-only")
+var errDescriptorReadOnly = spec.Errorf(im.StatusUnsupportedWrite, "core: Descriptor is read-only")
 
 // NewDescriptor returns a Descriptor with the supplied static lists.
 // deviceTypes must contain at least one entry per Matter §9.5.5.1. A

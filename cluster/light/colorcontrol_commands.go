@@ -23,6 +23,9 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	if !s.inst.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("light: command 0x%02X is not supported", cmdID)
 	}
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	s.mu.Lock()

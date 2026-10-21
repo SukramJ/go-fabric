@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 )
 
@@ -71,16 +72,11 @@ func TestApplicationPayloadsMatchMatterJS(t *testing.T) {
 			t.Parallel()
 			switch {
 			case f.Kind == "commands" && f.Element == "Step":
-				got, ok := decodeCommandFields(t, f.Cluster, clusterwire.FanControlCmdStep, f.BytesHex).(clusterwire.FanStepRequest)
-				want := clusterwire.FanStepRequest{Direction: f.Fixture.Direction, LowestOff: true}
-				if f.Fixture.Wrap != nil {
-					want.Wrap = *f.Fixture.Wrap
-				}
-				if f.Fixture.LowestOff != nil {
-					want.LowestOff = *f.Fixture.LowestOff
-				}
-				if !ok || got != want {
-					t.Fatalf("decoded %+v, want %+v", got, want)
+				// The generated request, an absent optional field nil (the
+				// fan server applies its default, LowestOff true).
+				got, ok := decodeCommandFields(t, f.Cluster, clusterwire.FanControlCmdStep, f.BytesHex).(fandef.StepRequest)
+				if !ok || uint8(got.Direction) != f.Fixture.Direction || !samePtr(got.Wrap, f.Fixture.Wrap) || !samePtr(got.LowestOff, f.Fixture.LowestOff) {
+					t.Fatalf("decoded %+v, want Direction %d, Wrap %v, LowestOff %v", got, f.Fixture.Direction, f.Fixture.Wrap, f.Fixture.LowestOff)
 				}
 			case f.Kind == "events" && f.Cluster == matteralarm.ClusterID && f.Fixture.AlarmSeverityLevel != 0:
 				ev := matteralarm.AlarmSeverityEvent{AlarmSeverityLevel: matteralarm.AlarmState(f.Fixture.AlarmSeverityLevel)}
@@ -121,4 +117,12 @@ func switchEventPayload(t *testing.T, event string, newPosition, previousPositio
 	}
 	t.Fatalf("no Switch event %s", event)
 	return nil
+}
+
+// samePtr reports whether a and b are both nil or point to equal values.
+func samePtr[T comparable](a, b *T) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

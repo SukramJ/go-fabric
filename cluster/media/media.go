@@ -306,7 +306,8 @@ type stateful[S any] struct {
 	// at a time; the host never takes it. mu guards state and is released
 	// while the port runs, so the port may call SetState (ADR 0026 P6,
 	// by_design BD-Matter-HostPort-OutsideTheSetterLock).
-	op    sync.Mutex
+	op sync.Mutex
+	// mu guards clone, srv, state and values.
 	mu    sync.Mutex
 	state S
 }

@@ -42,7 +42,7 @@ import (
 //
 // 265 after brief BH-1: the report assembler's InteractionMessenger.ts
 // citation moved to the lines that name what it mirrors.
-const citecheckDriftRatchet = 264
+const citecheckDriftRatchet = 263
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

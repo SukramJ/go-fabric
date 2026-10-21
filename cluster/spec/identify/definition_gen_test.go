@@ -52,10 +52,10 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleIdentify(func(context.Context, IdentifyRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleIdentify(func(context.Context, IdentifyRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleIdentify: a command the server does not accept was registered")
 	}
-	if err := s.HandleTriggerEffect(func(context.Context, TriggerEffectRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleTriggerEffect(func(context.Context, TriggerEffectRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleTriggerEffect: a command the server does not accept was registered")
 	}
 }

@@ -69,29 +69,29 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandlePowerAdjustRequest(func(context.Context, PowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePowerAdjustRequest(func(context.Context, PowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandlePowerAdjustRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleCancelPowerAdjustRequest(func(context.Context, CancelPowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCancelPowerAdjustRequest(func(context.Context, CancelPowerAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCancelPowerAdjustRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleStartTimeAdjustRequest(func(context.Context, StartTimeAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStartTimeAdjustRequest(func(context.Context, StartTimeAdjustRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStartTimeAdjustRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandlePauseRequest(func(context.Context, PauseRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePauseRequest(func(context.Context, PauseRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandlePauseRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleResumeRequest(func(context.Context, ResumeRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleResumeRequest(func(context.Context, ResumeRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleResumeRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleModifyForecastRequest(func(context.Context, ModifyForecastRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleModifyForecastRequest(func(context.Context, ModifyForecastRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleModifyForecastRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleRequestConstraintBasedForecast(func(context.Context, RequestConstraintBasedForecastRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRequestConstraintBasedForecast(func(context.Context, RequestConstraintBasedForecastRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRequestConstraintBasedForecast: a command the server does not accept was registered")
 	}
-	if err := s.HandleCancelRequest(func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCancelRequest(func(context.Context, CancelRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCancelRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitPowerAdjustStart(0, PowerAdjustStartEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitPowerAdjustEnd(0, PowerAdjustEndEvent{})     // not in the empty definition's EventList: refused

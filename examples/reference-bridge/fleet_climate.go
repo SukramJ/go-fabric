@@ -9,8 +9,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/fan"
@@ -349,8 +347,7 @@ func (p *demoPump) device(opts device.Options) (*device.Pump, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, _ := dev.OnOff().Underlying().(*onoff.Server)
-	followOnOff(dev.Device, srv, func(on bool) {
+	followOnOff(dev.Device, dev.OnOff(), func(on bool) {
 		p.setOn(on)
 		slog.Info("pump.set", slog.String("device", p.name), slog.Bool("on", on))
 	})
@@ -402,7 +399,7 @@ func (p *demoPump) reportEvent(event uint32) error {
 		return fmt.Errorf("pump %s is not mounted yet", p.name)
 	}
 	slog.Info("pump.event", slog.String("device", p.name), slog.Int("event", int(event)))
-	return srv.Emit(event)
+	return srv.Emit(srv.Endpoint(), event, nil)
 }
 
 // --- device: an air purifier -------------------------------------------------

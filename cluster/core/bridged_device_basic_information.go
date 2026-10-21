@@ -135,7 +135,7 @@ type ReachableChangedEvent = bdbidef.ReachableChangedEvent
 
 // errBridgedBasicInfoUnknown is returned for unsupported writes /
 // unknown attributes.
-var errBridgedBasicInfoUnknown = errors.New("core: BridgedDeviceBasicInformation unknown / read-only attribute")
+var errBridgedBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "core: BridgedDeviceBasicInformation unknown / read-only attribute")
 
 // BridgedConfig carries the bridged device's static metadata. NodeLabel
 // + Reachable + UniqueID are mandatory; the rest are optional.

@@ -320,8 +320,8 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerAcceptsEveryPayloadShape(t 
 		name   string
 		fields any
 	}{
-		{"typed request", clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}},
-		{"typed request pointer", &clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}},
+		{"typed request", clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}},          //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		{"typed request pointer", &clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
 		{"bridge tag map", map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(5)}},
 	}
 	for _, tc := range shapes {

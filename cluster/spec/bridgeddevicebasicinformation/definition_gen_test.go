@@ -60,8 +60,8 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleKeepActive(func(context.Context, KeepActiveRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleKeepActive(func(context.Context, KeepActiveRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleKeepActive: a command the server does not accept was registered")
 	}
 	_ = s.EmitStartUp(0, StartUpEvent{})                   // not in the empty definition's EventList: refused
 	_ = s.EmitShutDown(0, ShutDownEvent{})                 // not in the empty definition's EventList: refused

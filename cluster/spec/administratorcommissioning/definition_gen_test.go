@@ -53,13 +53,13 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleOpenCommissioningWindow(func(context.Context, OpenCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOpenCommissioningWindow(func(context.Context, OpenCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOpenCommissioningWindow: a command the server does not accept was registered")
 	}
-	if err := s.HandleOpenBasicCommissioningWindow(func(context.Context, OpenBasicCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOpenBasicCommissioningWindow(func(context.Context, OpenBasicCommissioningWindowRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOpenBasicCommissioningWindow: a command the server does not accept was registered")
 	}
-	if err := s.HandleRevokeCommissioning(func(context.Context, RevokeCommissioningRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRevokeCommissioning(func(context.Context, RevokeCommissioningRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRevokeCommissioning: a command the server does not accept was registered")
 	}
 }

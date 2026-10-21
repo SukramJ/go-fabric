@@ -12,6 +12,7 @@ import (
 	"errors"
 	"testing"
 
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -33,21 +34,21 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 		value  uint64
 		decode func(*tlv.Decoder) error
 	}{
-		{"MoveToColorTemperature.ColorTemperatureMireds", 0, 0x10099, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
-		{"MoveToColorTemperature.TransitionTime", 1, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
-		{"MoveToColorTemperature.OptionsMask", 2, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
-		{"MoveToColorTemperature.OptionsOverride", 3, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
-		{"MoveToHue.Hue", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
-		{"MoveToHue.Direction", 1, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
-		{"MoveToHue.TransitionTime", 2, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
-		{"MoveToSaturation.Saturation", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToSaturationFields(d); return err }},
-		{"MoveToSaturation.TransitionTime", 1, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToSaturationFields(d); return err }},
-		{"MoveToHueAndSaturation.Hue", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueAndSaturationFields(d); return err }},
-		{"MoveToHueAndSaturation.Saturation", 1, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueAndSaturationFields(d); return err }},
-		{"MoveToHueAndSaturation.TransitionTime", 2, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToHueAndSaturationFields(d); return err }},
-		{"MoveToLevel.TransitionTime", 1, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToLevelRequest(d); return err }},
-		{"MoveToLevel.OptionsMask", 2, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToLevelRequest(d); return err }},
-		{"MoveToLevel.OptionsOverride", 3, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToLevelRequest(d); return err }},
+		{"MoveToColorTemperature.ColorTemperatureMireds", 0, 0x10099, viaDefinition(0x0300, 0x0A)},
+		{"MoveToColorTemperature.TransitionTime", 1, 0x10000, viaDefinition(0x0300, 0x0A)},
+		{"MoveToColorTemperature.OptionsMask", 2, 0x100, viaDefinition(0x0300, 0x0A)},
+		{"MoveToColorTemperature.OptionsOverride", 3, 0x100, viaDefinition(0x0300, 0x0A)},
+		{"MoveToHue.Hue", 0, 0x100, viaDefinition(0x0300, 0x00)},
+		{"MoveToHue.Direction", 1, 0x100, viaDefinition(0x0300, 0x00)},
+		{"MoveToHue.TransitionTime", 2, 0x10000, viaDefinition(0x0300, 0x00)},
+		{"MoveToSaturation.Saturation", 0, 0x100, viaDefinition(0x0300, 0x03)},
+		{"MoveToSaturation.TransitionTime", 1, 0x10000, viaDefinition(0x0300, 0x03)},
+		{"MoveToHueAndSaturation.Hue", 0, 0x100, viaDefinition(0x0300, 0x06)},
+		{"MoveToHueAndSaturation.Saturation", 1, 0x100, viaDefinition(0x0300, 0x06)},
+		{"MoveToHueAndSaturation.TransitionTime", 2, 0x10000, viaDefinition(0x0300, 0x06)},
+		{"MoveToLevel.TransitionTime", 1, 0x10000, viaDefinition(0x0008, 0x00)},
+		{"MoveToLevel.OptionsMask", 2, 0x100, viaDefinition(0x0008, 0x00)},
+		{"MoveToLevel.OptionsOverride", 3, 0x100, viaDefinition(0x0008, 0x00)},
 		{"ArmFailSafe.ExpiryLengthSeconds", 0, 0x10000, func(d *tlv.Decoder) error { _, err := decodeArmFailSafeRequest(d); return err }},
 		{"SetRegulatoryConfig.NewRegulatoryConfig", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeSetRegulatoryConfigRequest(d); return err }},
 		{"CertificateChainRequest.CertificateType", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeCertificateChainRequest(d); return err }},
@@ -72,22 +73,40 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 	}
 }
 
-// TestDecodeMoveToColorTemperatureFields_InRangeStillDecodes is the
-// negative control for the width check: a value that fits still lands.
-func TestDecodeMoveToColorTemperatureFields_InRangeStillDecodes(t *testing.T) {
+// viaDefinition decodes the fields after the struct opener through the
+// cluster's registered definition, as commandFieldsReader does.
+func viaDefinition(cluster, command uint32) func(*tlv.Decoder) error {
+	return func(d *tlv.Decoder) error {
+		path := im.ConcreteCommandPath{Cluster: cluster, Command: command}
+		_, ok, err := decodeByDefinition(path, d, structOpener)
+		if !ok {
+			return errors.New("no definition decodes the command")
+		}
+		return err
+	}
+}
+
+// structOpener is the fields container's opening element.
+var structOpener = tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeStructure, IsContainer: true}
+
+// TestDecodeMoveToColorTemperature_InRangeStillDecodes is the negative
+// control for the width check: a value that fits still lands, as the
+// generated request the ColorControl server takes.
+func TestDecodeMoveToColorTemperature_InRangeStillDecodes(t *testing.T) {
 	t.Parallel()
 	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {
-		enc.PutUint(tlv.ContextTag(0), 0xFFFF)
-		enc.PutUint(tlv.ContextTag(1), 0xFFFF)
+		enc.PutUint(tlv.ContextTag(0), 0xFEFF)
+		enc.PutUint(tlv.ContextTag(1), 0xFFFE)
 		enc.PutUint(tlv.ContextTag(2), 0x01)
-		enc.PutUint(tlv.ContextTag(3), 0xFF)
+		enc.PutUint(tlv.ContextTag(3), 0x01)
 	})
-	req, err := decodeMoveToColorTemperatureFields(dec)
-	if err != nil {
-		t.Fatalf("decodeMoveToColorTemperatureFields: %v", err)
+	fields, ok, err := decodeByDefinition(im.ConcreteCommandPath{Cluster: 0x0300, Command: 0x0A}, dec, structOpener)
+	if !ok || err != nil {
+		t.Fatalf("decodeByDefinition: ok %t, %v", ok, err)
 	}
-	if req.ColorTemperatureMireds != 0xFFFF || req.TransitionTime != 0xFFFF || req.OptionsMask != 0x01 || req.OptionsOverride != 0xFF {
-		t.Errorf("decoded %+v, want both uint16 fields 0xFFFF and the options 0x01 / 0xFF", req)
+	req, isReq := fields.(ccdef.MoveToColorTemperatureRequest)
+	if !isReq || req.ColorTemperatureMireds != 0xFEFF || req.TransitionTime != 0xFFFE || req.OptionsMask != 0x01 || req.OptionsOverride != 0x01 {
+		t.Errorf("decoded %#v, want the generated request with 0xFEFF / 0xFFFE and the options 0x01", fields)
 	}
 }
 
@@ -114,6 +133,8 @@ func TestInvokeRequestWithOverWideFieldCarriesConstraintErrorStatus(t *testing.T
 		enc.StartStruct(tlv.ContextTag(1)) // CommandFields
 		enc.PutUint(tlv.ContextTag(0), mireds)
 		enc.PutUint(tlv.ContextTag(1), 10)
+		enc.PutUint(tlv.ContextTag(2), 0) // OptionsMask
+		enc.PutUint(tlv.ContextTag(3), 0) // OptionsOverride
 		_ = enc.EndContainer()
 		_ = enc.EndContainer()
 	}

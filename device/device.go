@@ -4,20 +4,15 @@
 package device
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -125,7 +120,12 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
 	}
-	for i := range t.Servers {
+	// The defaults are built in [buildOrder] — a default that couples to
+	// the endpoint's other servers after them — and mounted in the type's
+	// order.
+	built := make(map[uint32]contract.ClusterServer, len(t.Servers))
+	sibling := func(id uint32) contract.ClusterServer { return built[id] }
+	for _, i := range buildOrder(t.Servers) {
 		r := &t.Servers[i]
 		if _, ok := assemblerMounted[r.ID]; ok || measured[r.ID] {
 			continue
@@ -136,11 +136,16 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 		}
 		if !ok {
 			var err error
-			if srv, err = defaultServer(t, r, s); err != nil {
+			if srv, err = defaultServer(t, r, s, sibling); err != nil {
 				return nil, err
 			}
 		}
-		d.servers = append(d.servers, srv)
+		built[r.ID] = srv
+	}
+	for i := range t.Servers {
+		if srv, ok := built[t.Servers[i].ID]; ok {
+			d.servers = append(d.servers, srv)
+		}
 	}
 	// Host servers for clusters the type does not list, after the type's
 	// own (MutableEndpoint.ts:95-110 extends the type's behaviors).
@@ -263,13 +268,14 @@ func onlyHostServer(s *settings, id uint32) bool {
 	return host && !initial && !elements && !features && !s.optional[id]
 }
 
-// defaultServer builds the default server of one cluster: the generated
-// definition with the mandated (or the host's) features, the elements the
-// device type makes mandatory, and the defaults it states as initial
-// values — matter.js's `BaseServer.with(features).alter(...)` of the
-// generated device file (ClusterRequirements.ts:137-208,
-// RequirementGenerator.ts:253-296).
-func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.ClusterServer, error) {
+// defaultServer builds the default server of one cluster — its self-held
+// server ([selfHeldDefaults]) or the generated one — with the mandated (or
+// the host's) features, the elements the device type makes mandatory, and
+// the defaults it states as initial values: matter.js's
+// `BaseServer.with(features).alter(...)` of the generated device file
+// (ClusterRequirements.ts:137-208, RequirementGenerator.ts:253-296).
+// sibling returns the device's servers built before it.
+func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uint32) contract.ClusterServer) (contract.ClusterServer, error) {
 	def := r.Definition
 	if def == nil {
 		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it: supply its server with WithServer",
@@ -329,14 +335,27 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 	for id, v := range s.initial[r.ID] {
 		initial[id] = v
 	}
-	factory, ok := defaultFactories[r.ID]
-	if !ok {
-		factory = newSpecServer
+	if factory, held := selfHeldDefaults[r.ID]; held {
+		srv, err := factory(defaultBuild{def: def, opts: opts, clock: s.clock, sibling: sibling})
+		if err == nil {
+			err = checkSelection(r.Name, srv, opts)
+		}
+		if err == nil {
+			err = applyInitial(r.Name, srv, initial)
+		}
+		switch {
+		case err == nil:
+			return srv, nil
+		case !errors.Is(err, errSelectionNotServed):
+			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
+		}
+		// A selection the self-held server does not serve keeps the
+		// generated server.
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
 	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
-	srv, err := factory(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true}, s.clock)
+	srv, err := spec.NewServer(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
 		return nil, fmt.Errorf("%w: %s %s: %w: supply its server with WithServer", ErrNoDefaultServer, t.Name, r.Name, err)
@@ -356,101 +375,6 @@ func clusterMandatedFeatures(def *spec.Cluster) uint32 {
 		}
 	}
 	return mask
-}
-
-// serverFactory builds a cluster's default server from its definition,
-// the feature and element selection and the initial values.
-type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, clk clock.Clock) (contract.ClusterServer, error)
-
-// defaultFactories is the device layer's default table: the clusters whose
-// default server is one of the module's self-held servers rather than the
-// generated [spec.Server] every other cluster gets (ADR 0018, decisions of
-// wave 6, 2). The generated accessors return the cluster's typed server
-// (<cluster>def.Server) over whichever server this table or the host
-// mounts, so the table types nothing there.
-//
-// The fabric-scoped clusters, whose generated server [spec.NewServer]
-// refuses ([spec.ErrFabricScoped]), take the core server here where it holds
-// its own state: Binding and EcosystemInformation. OtaSoftwareUpdateRequestor
-// has none: its server needs the node's connector to reach a provider
-// (node/ota.go), so a device that mounts it — OtaRequestor — answers
-// [ErrNoDefaultServer] and the host supplies it with [WithServer].
-var defaultFactories = map[uint32]serverFactory{
-	0x0006: newOnOffServer,                // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
-	0x001E: newBindingServer,              // Binding: cluster/core.Binding, matter.js BindingServer.ts.
-	0x0750: newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
-}
-
-// newBindingServer is the module's Binding server ([core.NewBinding]), the
-// default matter.js mounts where the device type — or Base, for a type
-// that would miss it — mandates Binding
-// (support/codegen/src/endpoints/RequirementGenerator.ts:143-155, 187-188;
-// packages/node/src/devices/on-off-sensor.ts:91 `mandatory: { Identify:
-// IdentifyServer, Binding: BindingServer }`; packages/node/src/endpoints/
-// base.ts:15-19, 39 BindingServer as the default implementation). It keeps
-// its own list and data version, so the configuration states nothing it
-// can take.
-func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
-	if err := selfHeldConfig("Binding", cfg); err != nil {
-		return nil, err
-	}
-	return core.NewBinding(), nil
-}
-
-// newEcosystemInformationServer is the module's EcosystemInformation
-// server ([core.NewEcosystemInformation]) over empty directories, the state
-// matter.js's default server starts with
-// (packages/node/src/behaviors/ecosystem-information/
-// EcosystemInformationServer.ts:14, no server logic; both attributes are
-// lists). A host whose bridged device belongs to an ecosystem supplies its
-// own server over its directory with [WithServer].
-func newEcosystemInformationServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
-	if err := selfHeldConfig("EcosystemInformation", cfg); err != nil {
-		return nil, err
-	}
-	return core.NewEcosystemInformation(emptyEcosystem{}), nil
-}
-
-// selfHeldConfig refuses initial values for a core server that keeps its
-// state behind its own API: there is nothing to apply them to.
-func selfHeldConfig(name string, cfg spec.ServerConfig) error {
-	if len(cfg.Initial) != 0 {
-		return fmt.Errorf("%s keeps its own state: no initial values (WithInitial)", name)
-	}
-	return nil
-}
-
-// emptyEcosystem is an ecosystem directory with no devices and no
-// locations.
-type emptyEcosystem struct{}
-
-func (emptyEcosystem) EcosystemDevices(context.Context) []ecodef.EcosystemDeviceStruct { return nil }
-
-func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLocationStruct {
-	return nil
-}
-
-// newOnOffServer is the module's OnOff server ([onoff.New]). A device of
-// this layer sits under the Aggregator, so StartUpOnOff is not applied
-// (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
-// Its countdown runs on the device's clock ([Options].Clock).
-func newOnOffServer(_ *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, clk clock.Clock) (contract.ClusterServer, error) {
-	return onoff.New(onoff.Config{
-		Features:    onoff.Feature(opts.Features),
-		DataVersion: cfg.DataVersion,
-		Initial:     cfg.Initial,
-		Bridged:     true,
-		TimeSource:  clk,
-	})
-}
-
-// newSpecServer is the generated server, [spec.NewServer].
-func newSpecServer(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
-	srv, err := spec.NewServer(def, opts, cfg)
-	if err != nil {
-		return nil, err
-	}
-	return srv, nil
 }
 
 // typedDefault converts a numeric default the device type states into the
@@ -515,13 +439,6 @@ func (d *Device) MatterDeviceType() uint16 { return d.typ.ID }
 // MatterClusterServers implements [contract.EndpointSource]: the device's
 // servers, without the ones the assembler mounts.
 func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Servers() }
-
-// serverAs returns the device's server for clusterID as T, or T's zero
-// value when it mounts none or the host's server is of another type.
-func serverAs[T contract.ClusterServer](d *Device, clusterID uint32) T {
-	v, _ := d.Server(clusterID).(T)
-	return v
-}
 
 // AddPart makes p a part of the device — matter.js's `endpoint.parts.add`
 // (packages/node/src/endpoint/properties/Parts.ts:37-73). matter.js

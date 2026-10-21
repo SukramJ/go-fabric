@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -129,7 +130,17 @@ type subscribed struct {
 func subscribeWithProbe(t *testing.T, paths []im.ConcreteAttributePath) *subscribed {
 	t.Helper()
 	site := quietSite(t)
-	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("dimmer:1"), Name: "dimmer", Clock: site.Clock()})
+	// The generated LevelControl server, whose five attributes the host
+	// sets as matter.js's test sets the behavior's state — the kit's
+	// self-held default derives RemainingTime from its transition.
+	lvl, err := spec.NewServer(levelcontrol.Definition, spec.Options{
+		Features:   uint32(levelcontrol.FeatureOnOff | levelcontrol.FeatureLighting),
+		Attributes: []uint32{levelcontrol.AttrMinLevel, levelcontrol.AttrMaxLevel},
+	}, spec.ServerConfig{Unimplemented: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("dimmer:1"), Name: "dimmer", Clock: site.Clock()}, device.WithServer(lvl))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +183,7 @@ func (s *subscribed) write(t *testing.T, path im.ConcreteAttributePath, v spec.E
 // flipProbe changes the probe locally.
 func (s *subscribed) flipProbe(t *testing.T) {
 	t.Helper()
-	if err := s.m.pair.Device.Act(func(*node.Node) error { s.light.OnOff().Underlying().(*onoff.Server).Set(true); return nil }); err != nil {
+	if err := s.m.pair.Device.Act(func(*node.Node) error { _ = s.light.OnOff().Set(onoffdef.Patch{OnOff: new(true)}); return nil }); err != nil {
 		t.Fatal(err)
 	}
 }

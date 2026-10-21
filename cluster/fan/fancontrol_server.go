@@ -42,6 +42,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -289,6 +290,9 @@ type Server struct {
 	src      StateSource
 	cfg      Config
 	inst     *spec.Instance
+	host     spec.HostHandlers
+	events   spec.Events
+	veto     spec.WriteVeto
 }
 
 // Compile-time assertions.
@@ -297,6 +301,11 @@ var (
 	_ contract.ClusterDataVersion     = (*Server)(nil)
 	_ contract.ClusterAttributeLister = (*Server)(nil)
 	_ contract.ClusterCommandLister   = (*Server)(nil)
+	_ contract.EventReceiver          = (*Server)(nil)
+	_ spec.AttributeSetter            = (*Server)(nil)
+	_ spec.CommandRegistrar           = (*Server)(nil)
+	_ spec.EventEmitting              = (*Server)(nil)
+	_ spec.BeforeWriteSetter          = (*Server)(nil)
 )
 
 // NewServer validates cfg against the cluster's conformance and
@@ -450,6 +459,9 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) err
 	if err != nil {
 		return err
 	}
+	if err := s.veto.Check(ctx, attrID, storedForm(v)); err != nil {
+		return err
+	}
 	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
 	switch attrID {
 	case AttrPercentSetting:
@@ -598,6 +610,9 @@ func (s *Server) writeFanMode(ctx context.Context, value any) error {
 	if err != nil {
 		return err
 	}
+	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
+		return err
+	}
 	return s.apply(ctx, "FanMode write", s.fanModeSettings(m))
 }
 
@@ -643,6 +658,9 @@ func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) error {
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if cmdID != CmdStep || !s.has(FeatureStep) {
 		return nil, im.UnsupportedCommandf("fan: unknown command 0x%02X", cmdID)
+	}
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
 	}
 	req, err := stepRequestFrom(fields)
 	if err != nil {
@@ -744,27 +762,24 @@ func (s *Server) stepMode(current FanMode, req clusterwire.FanStepRequest) FanMo
 	}
 }
 
-// stepRequestFrom normalises the Step payload: the bridge's typed
-// decoder hands over a [clusterwire.FanStepRequest] (the shape a [Stepper]
-// host receives, so the bridge keeps that decoder ahead of the generated
-// one); the generated [fandef.StepRequest] of an in-process caller is
-// carried over with the element defaults for the absent fields; a generic tag map
-// (a host decoding the command itself) is read with the element defaults
-// for the two optional fields. Direction is mandatory, and must be a
-// StepDirectionEnum value.
+// stepRequestFrom normalises the Step payload into the shape a
+// [Stepper] host receives. The primary form is the generated
+// [fandef.StepRequest], value or pointer, which the generated decoder
+// hands over: an absent Wrap reads as false and an absent LowestOff as
+// true, the element defaults (fan-control.element.ts:72-73). The
+// [clusterwire.FanStepRequest] of the bridge's earlier hand decoder is
+// still taken as it is; a generic tag map (a host decoding the command
+// itself) is read with the same defaults. Direction is mandatory, and
+// must be a StepDirectionEnum value.
 func stepRequestFrom(fields any) (clusterwire.FanStepRequest, error) {
 	req := clusterwire.FanStepRequest{LowestOff: true}
+	if v, ok := spec.RequestOf[fandef.StepRequest](fields); ok {
+		req = fromStepRequest(v)
+		return req, checkDirection(req)
+	}
 	switch v := fields.(type) {
 	case clusterwire.FanStepRequest:
 		req = v
-	case fandef.StepRequest:
-		req.Direction = uint8(v.Direction)
-		if v.Wrap != nil {
-			req.Wrap = *v.Wrap
-		}
-		if v.LowestOff != nil {
-			req.LowestOff = *v.LowestOff
-		}
 	case map[uint8]any:
 		raw, present := v[clusterwire.FanStepFieldDirection]
 		if !present {
@@ -784,10 +799,85 @@ func stepRequestFrom(fields any) (clusterwire.FanStepRequest, error) {
 	default:
 		return req, statusError{im.StatusInvalidCommand, fmt.Sprintf("fan: Step payload %T", fields)}
 	}
+	return req, checkDirection(req)
+}
+
+// checkDirection refuses a Direction outside StepDirectionEnum.
+func checkDirection(req clusterwire.FanStepRequest) error {
 	if req.Direction > StepDecrease {
-		return req, statusError{im.StatusConstraintError, fmt.Sprintf("fan: Step Direction %d is not a StepDirectionEnum value", req.Direction)}
+		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: Step Direction %d is not a StepDirectionEnum value", req.Direction)}
 	}
-	return req, nil
+	return nil
+}
+
+// fromStepRequest carries the generated request over with the element
+// defaults for its absent optional fields.
+func fromStepRequest(v fandef.StepRequest) clusterwire.FanStepRequest {
+	req := clusterwire.FanStepRequest{Direction: uint8(v.Direction), LowestOff: true}
+	if v.Wrap != nil {
+		req.Wrap = *v.Wrap
+	}
+	if v.LowestOff != nil {
+		req.LowestOff = *v.LowestOff
+	}
+	return req
+}
+
+// storedForm is a value [spec.Instance.ValidateWrite] normalised, in the
+// stored form a write veto receives: FanControl's writable attributes are
+// all 8 bits wide (percent, uint8, the two map8 bitmaps, an enum8), and
+// nil is a nullable null.
+func storedForm(v any) any {
+	if n, ok := v.(uint64); ok {
+		return uint8(n) //nolint:gosec // an 8-bit attribute per ValidateWrite
+	}
+	return v
+}
+
+// SetAttributes implements [spec.AttributeSetter]. The values are checked
+// against the attributes' types and constraints first, all or nothing;
+// none is then the server's to set: FanMode, PercentSetting,
+// PercentCurrent, SpeedSetting, SpeedCurrent, RockSetting, WindSetting and
+// AirflowDirection are the [StateSource]'s — the host reports a change
+// through it — and FanModeSequence, SpeedMax, RockSupport and WindSupport
+// are fixed by the [Config]. Each refuses with [spec.ErrNotHeld]; an
+// empty map changes nothing.
+func (s *Server) SetAttributes(values map[uint32]any) error {
+	ids := slices.Sorted(maps.Keys(values))
+	for _, id := range ids {
+		if _, err := s.inst.CheckSet(id, values[id], s.peer); err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 {
+		return fmt.Errorf("%w: fan: attribute 0x%04X is the StateSource's or the Config's", spec.ErrNotHeld, ids[0])
+	}
+	return nil
+}
+
+// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
+// handling of Step — its checks, the [Stepper] and the default step
+// included; nil hands it back. Step is accepted with the Step feature
+// only; any other command is refused with [spec.ErrNotAccepted].
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return s.host.Register(s.inst, cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]. FanControl defines no event, so
+// every event is refused with [spec.ErrNotEmitted].
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.events.Emit(s.inst, endpoint, eventID, data)
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver].
+func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) { s.events.SetEmitter(emitter) }
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]: fn vetoes a
+// controller's write after the definition's (and FanMode's) checks and
+// before it reaches the [StateSource], with the value in its stored form
+// (a uint8, nil for null; FanMode as the resolved [FanMode]).
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.veto.Set(fn)
 }
 
 // statusError carries an exact IM status to the dispatcher.

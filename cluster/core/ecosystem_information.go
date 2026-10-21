@@ -6,6 +6,8 @@ package core
 import (
 	"cmp"
 	"context"
+	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -77,6 +79,10 @@ type EcosystemInformation struct {
 
 	dv  cluster.DataVersionTracker
 	dir EcosystemDirectory
+
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 }
 
 // Compile-time assertions.
@@ -87,6 +93,11 @@ var (
 	_ contract.ClusterAttributeReadPrivilege = (*EcosystemInformation)(nil)
 	_ contract.FabricScopedReader            = (*EcosystemInformation)(nil)
 	_ contract.AttributeChangeNotifier       = (*EcosystemInformation)(nil)
+	_ contract.EventReceiver                 = (*EcosystemInformation)(nil)
+	_ spec.AttributeSetter                   = (*EcosystemInformation)(nil)
+	_ spec.CommandRegistrar                  = (*EcosystemInformation)(nil)
+	_ spec.EventEmitting                     = (*EcosystemInformation)(nil)
+	_ spec.BeforeWriteSetter                 = (*EcosystemInformation)(nil)
 )
 
 // ecoInst is the definition bound: no features, both attributes
@@ -264,4 +275,47 @@ func (e *EcosystemInformation) MatterWrite(_ context.Context, attrID uint32, val
 // MatterInvoke answers UNSUPPORTED_COMMAND: the cluster has no commands.
 func (e *EcosystemInformation) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, im.UnsupportedCommandf("EcosystemInformation: command 0x%02X is not supported", cmdID)
+}
+
+// SetAttributes implements [spec.AttributeSetter]. The values are checked
+// against the attributes' types first, all or nothing; neither attribute
+// is then the server's to set: DeviceDirectory and LocationDirectory are
+// read from the host's [EcosystemDirectory], which tells a change with
+// [EcosystemInformation.DirectoryChanged]. Each refuses with
+// [spec.ErrNotHeld]; an empty map changes nothing.
+func (e *EcosystemInformation) SetAttributes(values map[uint32]any) error {
+	ids := slices.Sorted(maps.Keys(values))
+	for _, id := range ids {
+		if _, err := e.CheckSet(id, values[id], nil); err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 {
+		return fmt.Errorf("%w: EcosystemInformation attribute 0x%04X is the EcosystemDirectory's", spec.ErrNotHeld, ids[0])
+	}
+	return nil
+}
+
+// Handle implements [spec.CommandRegistrar]. EcosystemInformation has no
+// command, so every handler is refused with [spec.ErrNotAccepted].
+func (e *EcosystemInformation) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return e.host.Register(e.Instance, cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]. EcosystemInformation defines no
+// event, so every event is refused with [spec.ErrNotEmitted].
+func (e *EcosystemInformation) Emit(endpoint uint16, eventID uint32, data any) error {
+	return e.events.Emit(e.Instance, endpoint, eventID, data)
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver].
+func (e *EcosystemInformation) SetMatterEventEmitter(emitter contract.EventEmitter) {
+	e.events.SetEmitter(emitter)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]. Both attributes are
+// read-only, so every controller write is refused before a veto would
+// run; fn is kept and never called.
+func (e *EcosystemInformation) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	e.veto.Set(fn)
 }

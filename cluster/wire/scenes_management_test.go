@@ -12,14 +12,8 @@ import (
 )
 
 // TestScenesManagementInvokeContainsNoCommands verifies that MatterInvoke
-// returns an error whose message contains "no commands" so the bridge
-// dispatcher maps it to IM StatusCode UnsupportedCommand (0x81) rather
-// than StatusFailure (0x01).
-//
-// The bridge dispatcher in endpoint/dispatcher.go:492
-// maps errors via string-heuristic: containsAny(msg, "unknown command", "no commands")
-// → UnsupportedCommand. A bare errScenesStub without "no commands" would fall
-// through to StatusFailure.
+// returns a typed UnsupportedCommand error so the dispatcher answers IM
+// StatusCode UnsupportedCommand (0x81) rather than StatusFailure (0x01).
 //
 // matter.js packages/node/src/behaviors/scenes-management/ + chip
 // src/app/clusters/scenes-server/ScenesServer.cpp require proper status-code

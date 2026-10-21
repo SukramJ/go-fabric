@@ -696,7 +696,7 @@ func (*DoorLockServer) MatterClusterID() uint32 { return lockdef.ClusterID }
 // goes to its handler, an unknown one is refused.
 func (s *DoorLockServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.Accepts(cmdID) {
-		return nil, fmt.Errorf("%w: 0x%02X", errUnknownCommand, cmdID)
+		return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: 0x%02X", errUnknownCommand, cmdID)
 	}
 	return s.Server.MatterInvoke(ctx, cmdID, fields)
 }

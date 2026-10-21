@@ -55,15 +55,15 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleQueryImage(func(context.Context, QueryImageRequest) (QueryImageResponse, error) { return QueryImageResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleQueryImage(func(context.Context, QueryImageRequest) (QueryImageResponse, error) { return QueryImageResponse{}, nil }); err == nil {
+		t.Error("HandleQueryImage: a command the server does not accept was registered")
 	}
 	if err := s.HandleApplyUpdateRequest(func(context.Context, ApplyUpdateRequestRequest) (ApplyUpdateResponse, error) {
 		return ApplyUpdateResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleApplyUpdateRequest: a command the server does not accept was registered")
 	}
-	if err := s.HandleNotifyUpdateApplied(func(context.Context, NotifyUpdateAppliedRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleNotifyUpdateApplied(func(context.Context, NotifyUpdateAppliedRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleNotifyUpdateApplied: a command the server does not accept was registered")
 	}
 }

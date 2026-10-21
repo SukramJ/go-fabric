@@ -179,6 +179,7 @@ type Server struct {
 	*spec.Instance
 
 	srv        *spec.Server
+	host       spec.HostHandlers
 	sink       Sink
 	clock      Clock
 	lighting   bool
@@ -224,6 +225,11 @@ var (
 	_ contract.ClusterCommandInvokePrivilege  = (*Server)(nil)
 	_ contract.AttributeChangeNotifier        = (*Server)(nil)
 	_ contract.ClusterQuiescer                = (*Server)(nil)
+	_ contract.EventReceiver                  = (*Server)(nil)
+	_ spec.AttributeSetter                    = (*Server)(nil)
+	_ spec.CommandRegistrar                   = (*Server)(nil)
+	_ spec.EventEmitting                      = (*Server)(nil)
+	_ spec.BeforeWriteSetter                  = (*Server)(nil)
 )
 
 // New builds an OnOff server. With LT, StartUpOnOff is applied to OnOff
@@ -631,7 +637,7 @@ func (s *Server) MatterInvalidatesScenes() bool {
 
 // onWithTimedOff is OnOffServer.ts:198-225.
 func (s *Server) onWithTimedOff(ctx context.Context, st *state, fields any) error {
-	req, ok := fields.(onoffdef.OnWithTimedOffRequest)
+	req, ok := spec.RequestOf[onoffdef.OnWithTimedOffRequest](fields)
 	if !ok {
 		return spec.Errorf(im.StatusInvalidCommand, "OnWithTimedOff payload %T", fields)
 	}
@@ -744,7 +750,40 @@ func (s *Server) stopHeldTimer() {
 // OFFONLY, the three LT commands without LT, as their conformance
 // disables them (OnOffServer.ts:26).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
+		return resp, err
+	}
 	return s.srv.MatterInvoke(ctx, cmdID, fields)
+}
+
+// Handle implements [spec.CommandRegistrar]: fn replaces the server's own
+// handling of cmdID — the command's state change, its timers, the scene
+// invalidation and the [Sink] — as a matter.js host overrides the
+// OnOffServer command method (OnOffServer.ts:97-225 are the methods it
+// overrides); fn runs outside the server's queue. nil hands the command
+// back. A command the selection does not accept (On and Toggle with
+// OFFONLY, the LT commands without LT) is refused with
+// [spec.ErrNotAccepted].
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return s.host.Register(s.Instance, cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]. OnOff defines no event, so every
+// event is refused with [spec.ErrNotEmitted].
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.srv.Emit(endpoint, eventID, data)
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver].
+func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
+	s.srv.SetMatterEventEmitter(emitter)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]: fn vetoes a
+// controller's write of OnTime, OffWaitTime or StartUpOnOff after the
+// definition's checks and before it is stored.
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.srv.SetBeforeWrite(fn)
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: both countdown
@@ -777,12 +816,26 @@ func (s *Server) MatterQuiesce() {
 // it: the command wins its own attribute, and the host's echo of the very
 // change carries the same value.
 func (s *Server) Set(on bool) {
+	_ = s.SetAttributes(map[uint32]any{AttrOnOff: on})
+}
+
+// SetAttributes implements [spec.AttributeSetter]: the host's own change
+// of any served attribute, checked against its type and constraint and
+// stored and reported all or nothing — [Server.Set] for several
+// attributes. A change of OnOff drops a pending scene apply (:62,
+// onOff$Changed); no timer moves and the [Sink] is not called. It takes
+// the state lock only, as Set does.
+func (s *Server) SetAttributes(values map[uint32]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if on != s.OnOff() {
+	before := s.OnOff()
+	if err := s.srv.SetAttributes(values); err != nil {
+		return err
+	}
+	if s.OnOff() != before {
 		s.clearSceneApply() // :62, onOff$Changed
 	}
-	_ = s.srv.Set(AttrOnOff, on)
+	return nil
 }
 
 // OnOff returns the current OnOff value.

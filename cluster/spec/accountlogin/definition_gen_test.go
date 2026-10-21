@@ -57,14 +57,14 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleGetSetupPin(func(context.Context, GetSetupPinRequest) (GetSetupPinResponse, error) {
 		return GetSetupPinResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleGetSetupPin: a command the server does not accept was registered")
 	}
-	if err := s.HandleLogin(func(context.Context, LoginRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLogin(func(context.Context, LoginRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleLogin: a command the server does not accept was registered")
 	}
-	if err := s.HandleLogout(func(context.Context, LogoutRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLogout(func(context.Context, LogoutRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleLogout: a command the server does not accept was registered")
 	}
 	_ = s.EmitLoggedOut(0, LoggedOutEvent{}) // not in the empty definition's EventList: refused
 }

@@ -188,3 +188,37 @@ func TestRanges(t *testing.T) {
 		t.Error("StringLength counts UTF-16 code units")
 	}
 }
+
+// TestErrorfWraps pins that a status error built with %w keeps its
+// status and its message, and that errors.Is and errors.As reach the
+// wrapped errors — one, several, or none.
+func TestErrorfWraps(t *testing.T) {
+	t.Parallel()
+	sentinel, other := errors.New("sentinel"), errors.New("other")
+	for _, tc := range []struct {
+		err  error
+		msg  string
+		is   []error
+		isnt error
+	}{
+		{spec.Errorf(im.StatusConstraintError, "x: %w", sentinel), "x: sentinel", []error{sentinel}, other},
+		{spec.Errorf(im.StatusConstraintError, "%w and %w", sentinel, other), "sentinel and other", []error{sentinel, other}, nil},
+		{spec.Errorf(im.StatusConstraintError, "plain %d", 7), "plain 7", nil, sentinel},
+	} {
+		if tc.err.Error() != tc.msg {
+			t.Errorf("message %q, want %q", tc.err, tc.msg)
+		}
+		var se im.StatusCodeError
+		if !errors.As(tc.err, &se) || se.MatterStatusCode() != im.StatusConstraintError {
+			t.Errorf("%q: status lost", tc.err)
+		}
+		for _, w := range tc.is {
+			if !errors.Is(tc.err, w) {
+				t.Errorf("%q does not wrap %v", tc.err, w)
+			}
+		}
+		if tc.isnt != nil && errors.Is(tc.err, tc.isnt) {
+			t.Errorf("%q wraps %v", tc.err, tc.isnt)
+		}
+	}
+}

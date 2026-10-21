@@ -69,61 +69,61 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleMoveToHue(func(context.Context, MoveToHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToHue(func(context.Context, MoveToHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveHue(func(context.Context, MoveHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveHue(func(context.Context, MoveHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleStepHue(func(context.Context, StepHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStepHue(func(context.Context, StepHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStepHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToSaturation(func(context.Context, MoveToSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToSaturation(func(context.Context, MoveToSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToSaturation: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveSaturation(func(context.Context, MoveSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveSaturation(func(context.Context, MoveSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveSaturation: a command the server does not accept was registered")
 	}
-	if err := s.HandleStepSaturation(func(context.Context, StepSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStepSaturation(func(context.Context, StepSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStepSaturation: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToHueAndSaturation(func(context.Context, MoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToHueAndSaturation(func(context.Context, MoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToHueAndSaturation: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToColor(func(context.Context, MoveToColorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToColor(func(context.Context, MoveToColorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToColor: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveColor(func(context.Context, MoveColorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveColor(func(context.Context, MoveColorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveColor: a command the server does not accept was registered")
 	}
-	if err := s.HandleStepColor(func(context.Context, StepColorRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStepColor(func(context.Context, StepColorRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStepColor: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveToColorTemperature(func(context.Context, MoveToColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveToColorTemperature(func(context.Context, MoveToColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveToColorTemperature: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnhancedMoveToHue(func(context.Context, EnhancedMoveToHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnhancedMoveToHue(func(context.Context, EnhancedMoveToHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnhancedMoveToHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnhancedMoveHue(func(context.Context, EnhancedMoveHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnhancedMoveHue(func(context.Context, EnhancedMoveHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnhancedMoveHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnhancedStepHue(func(context.Context, EnhancedStepHueRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnhancedStepHue(func(context.Context, EnhancedStepHueRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnhancedStepHue: a command the server does not accept was registered")
 	}
-	if err := s.HandleEnhancedMoveToHueAndSaturation(func(context.Context, EnhancedMoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleEnhancedMoveToHueAndSaturation(func(context.Context, EnhancedMoveToHueAndSaturationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleEnhancedMoveToHueAndSaturation: a command the server does not accept was registered")
 	}
-	if err := s.HandleColorLoopSet(func(context.Context, ColorLoopSetRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleColorLoopSet(func(context.Context, ColorLoopSetRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleColorLoopSet: a command the server does not accept was registered")
 	}
-	if err := s.HandleStopMoveStep(func(context.Context, StopMoveStepRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStopMoveStep(func(context.Context, StopMoveStepRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStopMoveStep: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveColorTemperature(func(context.Context, MoveColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveColorTemperature(func(context.Context, MoveColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveColorTemperature: a command the server does not accept was registered")
 	}
-	if err := s.HandleStepColorTemperature(func(context.Context, StepColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStepColorTemperature(func(context.Context, StepColorTemperatureRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStepColorTemperature: a command the server does not accept was registered")
 	}
 }

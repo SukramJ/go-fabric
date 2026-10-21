@@ -188,7 +188,7 @@ func TestParityMatterJS_PumpEventsAndPriorities(t *testing.T) {
 	rec := &recorder{}
 	srv.SetMatterEventEmitter(rec)
 	for _, id := range all {
-		if err := srv.Emit(id); err != nil {
+		if err := srv.Emit(0, id, nil); err != nil {
 			t.Fatalf("Emit(0x%02X): %v", id, err)
 		}
 	}

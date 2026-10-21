@@ -260,6 +260,11 @@ type ColorControlServer struct {
 	inst   *spec.Instance
 	engine *transition.Engine
 	onOff  OnOffState
+	// host, events and veto are the typed server's command handlers,
+	// event path and write veto (colorcontrol_typed.go).
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 	// cmd serialises the commands.
 	cmd sync.Mutex
 	// commit serialises the changes of the colour state, which reach it
@@ -567,9 +572,21 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 // endpoint has no start-up of its own, the same reason matter.js gives for
 // skipping it on an Aggregator-owned endpoint (ColorControlServer.ts
 // initializeColorTemperature: `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
-func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
+		return err
+	}
+	// The write veto ([ColorControlServer.SetBeforeWrite]) sees the value
+	// in its stored form.
+	var vetoed any
+	if n, ok := v.(uint64); ok {
+		vetoed = uint16(n) //nolint:gosec // within "1 to 65279" per ValidateWrite
+		if attrID == ccdef.AttrOptions {
+			vetoed = uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
+		}
+	}
+	if err := s.veto.Check(ctx, attrID, vetoed); err != nil {
 		return err
 	}
 	s.mu.Lock()

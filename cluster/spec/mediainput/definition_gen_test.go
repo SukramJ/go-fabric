@@ -56,16 +56,16 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSelectInput(func(context.Context, SelectInputRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSelectInput(func(context.Context, SelectInputRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSelectInput: a command the server does not accept was registered")
 	}
-	if err := s.HandleShowInputStatus(func(context.Context, ShowInputStatusRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleShowInputStatus(func(context.Context, ShowInputStatusRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleShowInputStatus: a command the server does not accept was registered")
 	}
-	if err := s.HandleHideInputStatus(func(context.Context, HideInputStatusRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleHideInputStatus(func(context.Context, HideInputStatusRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleHideInputStatus: a command the server does not accept was registered")
 	}
-	if err := s.HandleRenameInput(func(context.Context, RenameInputRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRenameInput(func(context.Context, RenameInputRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRenameInput: a command the server does not accept was registered")
 	}
 }

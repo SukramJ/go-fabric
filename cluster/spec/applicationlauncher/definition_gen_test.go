@@ -56,13 +56,13 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleLaunchApp(func(context.Context, LaunchAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err == nil {
+		t.Error("HandleLaunchApp: a command the server does not accept was registered")
 	}
-	if err := s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStopApp(func(context.Context, StopAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err == nil {
+		t.Error("HandleStopApp: a command the server does not accept was registered")
 	}
-	if err := s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleHideApp(func(context.Context, HideAppRequest) (LauncherResponse, error) { return LauncherResponse{}, nil }); err == nil {
+		t.Error("HandleHideApp: a command the server does not accept was registered")
 	}
 }

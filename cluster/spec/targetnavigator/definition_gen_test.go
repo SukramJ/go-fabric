@@ -57,8 +57,8 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleNavigateTarget(func(context.Context, NavigateTargetRequest) (NavigateTargetResponse, error) {
 		return NavigateTargetResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleNavigateTarget: a command the server does not accept was registered")
 	}
 	_ = s.EmitTargetUpdated(0, TargetUpdatedEvent{}) // not in the empty definition's EventList: refused
 }

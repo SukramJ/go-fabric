@@ -62,8 +62,8 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSelfTestRequest(func(context.Context, SelfTestRequestRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSelfTestRequest(func(context.Context, SelfTestRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSelfTestRequest: a command the server does not accept was registered")
 	}
 	_ = s.EmitSmokeAlarm(0, SmokeAlarmEvent{})                         // not in the empty definition's EventList: refused
 	_ = s.EmitCoAlarm(0, CoAlarmEvent{})                               // not in the empty definition's EventList: refused

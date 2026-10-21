@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // SchedulesClusterID is the Schedules cluster ID per Matter Application
@@ -150,7 +152,7 @@ func (s *SchedulesServer) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite implements [contract.ClusterServer]. All writes are
 // rejected: the Schedules cluster is read-only in the v1.1 bridge.
 func (s *SchedulesServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("%w: attribute 0x%04X", ErrSchedulesReadOnly, attrID)
+	return spec.Errorf(im.StatusUnsupportedWrite, "%w: attribute 0x%04X", ErrSchedulesReadOnly, attrID)
 }
 
 // MatterInvoke implements [contract.ClusterServer]. All invocations

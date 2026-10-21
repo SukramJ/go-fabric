@@ -100,8 +100,16 @@ Defaults worth knowing:
 The `device/` package has one constructor per Matter device type in scope:
 `device.NewOnOffLight`, `device.NewDimmableLight`, `device.NewThermostat`
 and so on. They are generated from the matter.js model. A constructor
-mounts every server cluster the device type mandates, with a default server
-(the module's own where one exists, otherwise the generated `spec.Server`).
+mounts every server cluster the device type mandates, with a default server:
+the module's own server where one runs on its own state — OnOff,
+LevelControl, ColorControl, Binding, EcosystemInformation, the alarm,
+BooleanStateConfiguration, ThermostatUserInterfaceConfiguration and energy
+servers, and Switch, DoorLock, WindowCovering, Thermostat, the filter
+monitors and LaundryWasherControls for a feature selection their server
+serves (`device/defaults.go` lists them) — otherwise the generated
+`spec.Server`, whose commands are unimplemented until you handle them. A `NewDimmableLight` therefore dims:
+a controller's MoveToLevel moves its level, and the "with On/Off" commands
+switch its OnOff.
 The endpoint assembler mounts Descriptor, Identify,
 BridgedDeviceBasicInformation, Groups and ScenesManagement; the device
 layer never does.
@@ -135,17 +143,24 @@ A device's state moves both ways, and the two directions use different
 calls:
 
 - **Controller to device.** `Device.OnChanged(clusterID, fn)` calls `fn`
-  with the attribute ids that changed. The quickstart uses it to log the
-  light's new state. To refuse a command, for example when the physical
+  with the attribute ids that changed, and the typed
+  `light.OnOff().OnChanged(fn)` with the new state. The quickstart uses it
+  to log the light's new state. Both fire for every change of the
+  attribute — a controller's command or write and your own `Set` alike;
+  they do not tell the two apart. The controller-only hooks are
+  `light.OnOff().HandleOn(fn)` (your handler replaces the server's own
+  handling of the command) and `light.OnOff().OnWrite(fn)` (a veto on a
+  controller's write). To refuse a command, for example when the physical
   lamp did not switch, give the light your own `onoff.Server` with a
   `Sink` (`onoff.Config.Sink` through `WithServer`). An error from the
   sink answers FAILURE and stores nothing.
 - **Device to controller.** When the lamp is switched at the wall, call
-  `light.OnOff().Set(on)`. The value is stored and reported to
-  subscribers, and the sink is not called. `Set` is safe from any
-  goroutine, including from inside the sink.
+  `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
+  `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored
+  and reported to subscribers, and the sink is not called. `Set` is safe
+  from any goroutine, including from inside the sink.
 
-*Source: `device/doc.go:4-27`, `device/options.go:18-43`, `device/options.go:91-215`, `device/device.go:643-661`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`.*
+*Source: `device/doc.go:4-27`, `device/defaults.go`, `device/options.go:18-43`, `device/options.go:91-215`, `device/device.go`, `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 
 ## The Aggregator
 

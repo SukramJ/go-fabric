@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -101,7 +102,7 @@ func TestClosureControlEvents(t *testing.T) {
 	srv.SetCurrentPosition(&closed)
 	srv.SetMainState(clusterwire.ClosureMainStateStopped)
 	open := clusterwire.ClosureTargetPositionMoveToFullyOpen
-	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Position: &open}); err != nil {
+	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&open)}); err != nil {
 		t.Fatal(err)
 	}
 	srv.SetCurrentPosition(&opened)
@@ -169,11 +170,11 @@ func TestClosureControlMoveToAndStopRules(t *testing.T) {
 		t.Errorf("MoveTo with no field: %v, want INVALID_COMMAND", err)
 	}
 	vent := clusterwire.ClosureTargetPositionMoveToVentilationPosition
-	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Position: &vent}); err != nil {
+	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&vent)}); err != nil {
 		t.Fatal(err)
 	}
 	latch := true
-	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Latch: &latch}); err != nil {
+	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Latch: &latch}); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(h.moved, []clusterwire.ClosureTargetPosition{vent, vent}) {
@@ -198,7 +199,7 @@ func TestClosureControlNotifiesChangedAttributes(t *testing.T) {
 	unsub := srv.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, slices.Clone(ids)) })
 	defer unsub()
 	open := clusterwire.ClosureTargetPositionMoveToFullyOpen
-	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Position: &open}); err != nil {
+	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&open)}); err != nil {
 		t.Fatal(err)
 	}
 	opened := clusterwire.ClosureCurrentPositionFullyOpened
@@ -262,7 +263,7 @@ func TestClosureControlReportErrorTruncates(t *testing.T) {
 		t.Errorf("event carries %d errors, want 10", len(v.ErrorState))
 	}
 	pd := clusterwire.ClosureTargetPositionMoveToPedestrianPosition
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Position: &pd})
+	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pd)})
 	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusConstraintError || err.Error() == "" {
 		t.Errorf("MoveTo Pedestrian without PD: %v, want CONSTRAINT_ERROR", err)
 	}

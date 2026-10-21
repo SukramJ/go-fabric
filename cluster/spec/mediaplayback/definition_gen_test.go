@@ -69,47 +69,47 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandlePlay(func(context.Context, PlayRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePlay(func(context.Context, PlayRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandlePlay: a command the server does not accept was registered")
 	}
-	if err := s.HandlePause(func(context.Context, PauseRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePause(func(context.Context, PauseRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandlePause: a command the server does not accept was registered")
 	}
-	if err := s.HandleStop(func(context.Context, StopRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStop(func(context.Context, StopRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleStop: a command the server does not accept was registered")
 	}
-	if err := s.HandleStartOver(func(context.Context, StartOverRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStartOver(func(context.Context, StartOverRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleStartOver: a command the server does not accept was registered")
 	}
-	if err := s.HandlePrevious(func(context.Context, PreviousRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandlePrevious(func(context.Context, PreviousRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandlePrevious: a command the server does not accept was registered")
 	}
-	if err := s.HandleNext(func(context.Context, NextRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleNext(func(context.Context, NextRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleNext: a command the server does not accept was registered")
 	}
-	if err := s.HandleRewind(func(context.Context, RewindRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRewind(func(context.Context, RewindRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleRewind: a command the server does not accept was registered")
 	}
-	if err := s.HandleFastForward(func(context.Context, FastForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleFastForward(func(context.Context, FastForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleFastForward: a command the server does not accept was registered")
 	}
-	if err := s.HandleSkipForward(func(context.Context, SkipForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSkipForward(func(context.Context, SkipForwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleSkipForward: a command the server does not accept was registered")
 	}
-	if err := s.HandleSkipBackward(func(context.Context, SkipBackwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSkipBackward(func(context.Context, SkipBackwardRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleSkipBackward: a command the server does not accept was registered")
 	}
-	if err := s.HandleSeek(func(context.Context, SeekRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSeek(func(context.Context, SeekRequest) (PlaybackResponse, error) { return PlaybackResponse{}, nil }); err == nil {
+		t.Error("HandleSeek: a command the server does not accept was registered")
 	}
-	if err := s.HandleActivateAudioTrack(func(context.Context, ActivateAudioTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleActivateAudioTrack(func(context.Context, ActivateAudioTrackRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleActivateAudioTrack: a command the server does not accept was registered")
 	}
-	if err := s.HandleActivateTextTrack(func(context.Context, ActivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleActivateTextTrack(func(context.Context, ActivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleActivateTextTrack: a command the server does not accept was registered")
 	}
-	if err := s.HandleDeactivateTextTrack(func(context.Context, DeactivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleDeactivateTextTrack(func(context.Context, DeactivateTextTrackRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleDeactivateTextTrack: a command the server does not accept was registered")
 	}
 	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
 }

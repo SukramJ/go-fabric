@@ -190,7 +190,7 @@
   },
   {
     "file": "bridge/fields_reader.go",
-    "line": 140,
+    "line": 102,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "TlvSchema",
@@ -198,17 +198,8 @@
     "occurrences": 2
   },
   {
-    "file": "bridge/fields_reader.go",
-    "line": 174,
-    "citation": "LevelControlServer.ts:596",
-    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
-    "identifier": "#optionsAllowExecution",
-    "nearest": 483,
-    "occurrences": 5
-  },
-  {
     "file": "bridge/fields_reader_range_test.go",
-    "line": 22,
+    "line": 23,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "requestTlv",
@@ -217,7 +208,7 @@
   },
   {
     "file": "bridge/fields_reader_test.go",
-    "line": 927,
+    "line": 951,
     "citation": "LevelControlServer.ts:596",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "ExecuteIfOff",
@@ -532,7 +523,7 @@
   },
   {
     "file": "cluster/closure/closurecontrol_payload_shapes_test.go",
-    "line": 142,
+    "line": 143,
     "citation": "closure-control.element.ts:80-81",
     "resolved": "packages/model/src/standard/elements/closure-control.element.ts",
     "identifier": "MotionLatching",
@@ -541,7 +532,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 197,
+    "line": 198,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -577,7 +568,7 @@
   },
   {
     "file": "cluster/core/binding.go",
-    "line": 98,
+    "line": 103,
     "citation": "packages/node/src/behaviors/binding/BindingManager.ts:714-718",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "entryKey",
@@ -658,7 +649,7 @@
   },
   {
     "file": "cluster/core/groupcast.go",
-    "line": 573,
+    "line": 574,
     "citation": "GroupcastServer.ts:268-277",
     "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
     "identifier": "GroupKeyMap",
@@ -667,7 +658,7 @@
   },
   {
     "file": "cluster/core/groupcast.go",
-    "line": 696,
+    "line": 697,
     "citation": "GroupcastServer.ts:269",
     "resolved": "packages/node/src/behaviors/groupcast/GroupcastServer.ts",
     "identifier": "retainedSenderOnly",
@@ -685,7 +676,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 253,
+    "line": 254,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -694,7 +685,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 349,
+    "line": 350,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -703,7 +694,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1346,
+    "line": 1347,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -712,7 +703,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1890,
+    "line": 1891,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -721,7 +712,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1930,
+    "line": 1931,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -730,7 +721,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2054,
+    "line": 2055,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -739,7 +730,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2245,
+    "line": 2246,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",
@@ -775,7 +766,7 @@
   },
   {
     "file": "cluster/core/scenes_attributes.go",
-    "line": 287,
+    "line": 289,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -847,7 +838,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 225,
+    "line": 231,
     "citation": "window-covering-cluster.element.ts:130-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -856,7 +847,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 742,
+    "line": 754,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -982,7 +973,7 @@
   },
   {
     "file": "cluster/onoff/server.go",
-    "line": 627,
+    "line": 633,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1036,7 +1027,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_payload_shapes_test.go",
-    "line": 29,
+    "line": 30,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1045,7 +1036,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_payload_shapes_test.go",
-    "line": 127,
+    "line": 128,
     "citation": "thermostat-cluster.element.ts:509-513",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1054,7 +1045,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_payload_shapes_test.go",
-    "line": 374,
+    "line": 375,
     "citation": "thermostat-cluster.element.ts:517-521",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "ControlSequenceOfOperationEnum",
@@ -1081,7 +1072,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 791,
+    "line": 800,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1091,7 +1082,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1018,
+    "line": 1030,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1100,7 +1091,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1150,
+    "line": 1162,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1110,7 +1101,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1314,
+    "line": 1326,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1805,7 +1796,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 535,
+    "line": 452,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -1832,7 +1823,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 272,
+    "line": 271,
     "citation": "AttributeWriteResponse.ts:329-331",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "UnsupportedWrite",

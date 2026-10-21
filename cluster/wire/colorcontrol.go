@@ -68,6 +68,11 @@ const (
 var ErrColorControlMalformed = errors.New("wire: ColorControl command malformed")
 
 // MoveToHueRequest mirrors Matter §3.2.7.4.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToHueRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveToHueRequest struct {
 	Hue             uint8
 	Direction       uint8
@@ -77,6 +82,11 @@ type MoveToHueRequest struct {
 }
 
 // MoveToSaturationRequest mirrors Matter §3.2.7.7.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToSaturationRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveToSaturationRequest struct {
 	Saturation      uint8
 	TransitionTime  uint16
@@ -85,6 +95,11 @@ type MoveToSaturationRequest struct {
 }
 
 // MoveToHueAndSaturationRequest mirrors Matter §3.2.7.10.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToHueAndSaturationRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveToHueAndSaturationRequest struct {
 	Hue             uint8
 	Saturation      uint8
@@ -94,6 +109,11 @@ type MoveToHueAndSaturationRequest struct {
 }
 
 // MoveToColorTemperatureRequest mirrors Matter §3.2.7.18.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToColorTemperatureRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveToColorTemperatureRequest struct {
 	ColorTemperatureMireds uint16
 	TransitionTime         uint16
@@ -103,6 +123,11 @@ type MoveToColorTemperatureRequest struct {
 
 // MoveHueRequest mirrors Matter §3.2.7.5. Rate is in units per
 // second; MoveMode 0 = Stop, 1 = Up, 3 = Down.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveHueRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveHueRequest struct {
 	MoveMode        uint8
 	Rate            uint8
@@ -111,6 +136,11 @@ type MoveHueRequest struct {
 }
 
 // StepHueRequest mirrors Matter §3.2.7.6. StepMode 1 = Up, 3 = Down.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.StepHueRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type StepHueRequest struct {
 	StepMode        uint8
 	StepSize        uint8
@@ -121,6 +151,11 @@ type StepHueRequest struct {
 
 // MoveSaturationRequest mirrors Matter §3.2.7.8. Rate is in units
 // per second; MoveMode 0 = Stop, 1 = Up, 3 = Down.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveSaturationRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type MoveSaturationRequest struct {
 	MoveMode        uint8
 	Rate            uint8
@@ -129,6 +164,11 @@ type MoveSaturationRequest struct {
 }
 
 // StepSaturationRequest mirrors Matter §3.2.7.9.
+//
+// Deprecated: the bridge decodes the command into the generated request,
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.StepSaturationRequest,
+// which every module server takes by value or by pointer; use it. Marked in
+// v0.10.0 (brief BX1); removal permissible in v0.12.0.
 type StepSaturationRequest struct {
 	StepMode        uint8
 	StepSize        uint8
@@ -151,6 +191,12 @@ const (
 )
 
 // DecodeMoveToHue parses a MoveToHue command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToHueRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveToHue(payload []byte) (MoveToHueRequest, error) {
 	var req MoveToHueRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -173,6 +219,12 @@ func DecodeMoveToHue(payload []byte) (MoveToHueRequest, error) {
 }
 
 // DecodeMoveToSaturation parses a MoveToSaturation command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToSaturationRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveToSaturation(payload []byte) (MoveToSaturationRequest, error) {
 	var req MoveToSaturationRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -194,6 +246,12 @@ func DecodeMoveToSaturation(payload []byte) (MoveToSaturationRequest, error) {
 
 // DecodeMoveToHueAndSaturation parses a MoveToHueAndSaturation command
 // payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToHueAndSaturationRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveToHueAndSaturation(payload []byte) (MoveToHueAndSaturationRequest, error) {
 	var req MoveToHueAndSaturationRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -216,6 +274,12 @@ func DecodeMoveToHueAndSaturation(payload []byte) (MoveToHueAndSaturationRequest
 }
 
 // DecodeMoveHue parses a MoveHue command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveHueRequest; a
+// server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveHue(payload []byte) (MoveHueRequest, error) {
 	var req MoveHueRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -236,6 +300,12 @@ func DecodeMoveHue(payload []byte) (MoveHueRequest, error) {
 }
 
 // DecodeStepHue parses a StepHue command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.StepHueRequest; a
+// server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeStepHue(payload []byte) (StepHueRequest, error) {
 	var req StepHueRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -258,6 +328,12 @@ func DecodeStepHue(payload []byte) (StepHueRequest, error) {
 }
 
 // DecodeMoveSaturation parses a MoveSaturation command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveSaturationRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveSaturation(payload []byte) (MoveSaturationRequest, error) {
 	var req MoveSaturationRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -278,6 +354,12 @@ func DecodeMoveSaturation(payload []byte) (MoveSaturationRequest, error) {
 }
 
 // DecodeStepSaturation parses a StepSaturation command payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.StepSaturationRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeStepSaturation(payload []byte) (StepSaturationRequest, error) {
 	var req StepSaturationRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {
@@ -301,6 +383,12 @@ func DecodeStepSaturation(payload []byte) (StepSaturationRequest, error) {
 
 // DecodeMoveToColorTemperature parses a MoveToColorTemperature command
 // payload.
+//
+// Deprecated: the bridge decodes the payload through the generated
+// definition into
+// github.com/SukramJ/go-fabric/cluster/spec/colorcontrol.MoveToColorTemperatureRequest;
+// a server takes that request. Marked in v0.10.0 (brief BX1); removal
+// permissible in v0.12.0.
 func DecodeMoveToColorTemperature(payload []byte) (MoveToColorTemperatureRequest, error) {
 	var req MoveToColorTemperatureRequest
 	if err := walkContext(payload, ErrColorControlMalformed, func(tag uint32, el tlv.Element) {

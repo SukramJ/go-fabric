@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -17,7 +19,7 @@ import (
 // sceneLevel is a LevelControl server recording MoveToLevel.
 type sceneLevel struct {
 	level *uint8
-	moved []wire.MoveToLevelRequest
+	moved []lvldef.MoveToLevelRequest
 }
 
 func (s *sceneLevel) MatterClusterID() uint32 { return 0x0008 }
@@ -37,7 +39,7 @@ func (s *sceneLevel) MatterWrite(context.Context, uint32, any) error { return ni
 func (s *sceneLevel) MatterReportable() []uint32                     { return []uint32{0, 4} }
 func (s *sceneLevel) MatterAttributes() []uint32                     { return []uint32{0, 4} }
 func (s *sceneLevel) MatterInvoke(_ context.Context, _ uint32, f any) (any, error) {
-	if r, ok := f.(wire.MoveToLevelRequest); ok {
+	if r, ok := f.(lvldef.MoveToLevelRequest); ok {
 		s.moved = append(s.moved, r)
 	}
 	return nil, nil
@@ -125,7 +127,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
 		t.Fatalf("RecallScene: %v", err)
 	}
-	if len(level.moved) != 1 || level.moved[0].Level != 77 || level.moved[0].OptionsMask != 1 || *level.moved[0].TransitionTime != 15 {
+	if len(level.moved) != 1 || level.moved[0].Level != 77 || level.moved[0].OptionsMask != 1 || level.moved[0].TransitionTime != spec.ValueOf(uint16(15)) {
 		t.Fatalf("MoveToLevel %+v, want level 77, ExecuteIfOff, 15 tenths", level.moved)
 	}
 	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToColorTemperature {

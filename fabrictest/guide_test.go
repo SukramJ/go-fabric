@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -65,7 +66,7 @@ func TestPlugToggles(t *testing.T) {
 			return false
 		}
 	}
-	if err := pair.Device.Act(func(*node.Node) error { plug.OnOff().Underlying().(*onoff.Server).Set(false); return nil }); err != nil {
+	if err := pair.Device.Act(func(*node.Node) error { return plug.OnOff().Set(onoffdef.Patch{OnOff: new(false)}) }); err != nil {
 		t.Fatal(err)
 	}
 	if err := site.Eventually(ctx, "the report", reported); err != nil {

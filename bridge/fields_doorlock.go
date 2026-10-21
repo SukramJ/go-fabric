@@ -5,7 +5,6 @@ package bridge
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
@@ -13,9 +12,9 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// decodeDoorLockFields decodes a DoorLock request through its generated
-// definition with the two request-validation rules matter.js's
-// DoorLockServer installs. Mirrors matter.js
+// refineDoorLockRequest applies to a DoorLock request the generated
+// definition refused (err, decoded from n by [decodeByDefinition]) the two
+// request-validation rules matter.js's DoorLockServer installs. Mirrors matter.js
 // packages/node/src/behaviors/door-lock/DoorLockServer.ts:1491-1521 at
 // 862ad75f:
 //
@@ -28,19 +27,10 @@ import (
 //     their index fields themselves and answer an index out of range in
 //     their response (:1513-1521, constraint = false), so the constraint
 //     of those fields is not applied here; the type's width still is.
-func decodeDoorLockFields(cmdID uint32, dec *tlv.Decoder, el tlv.Element) (any, error) {
-	cmd := lockdef.Definition.Command(cmdID, spec.Request)
-	if cmd == nil || cmd.Decode == nil {
-		return decodeGenericTagMap(dec)
-	}
-	n, err := spec.ReadContainer(dec, el)
-	if err != nil {
-		return nil, fmt.Errorf("DoorLock.%s: %w", cmd.Name, err)
-	}
-	fields, err := cmd.Decode(n)
+func refineDoorLockRequest(cmdID uint32, n spec.Node, err error) (any, error) {
 	var fe *spec.FieldError
-	if err == nil || !errors.As(err, &fe) {
-		return fields, err
+	if !errors.As(err, &fe) {
+		return nil, err
 	}
 	switch cmdID {
 	case lockdef.CmdGetWeekDaySchedule, lockdef.CmdGetYearDaySchedule, lockdef.CmdGetHolidaySchedule:

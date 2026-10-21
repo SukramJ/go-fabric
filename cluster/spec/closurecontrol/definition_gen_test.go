@@ -59,14 +59,14 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleStop(func(context.Context, StopRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleStop: a command the server does not accept was registered")
 	}
-	if err := s.HandleMoveTo(func(context.Context, MoveToRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleMoveTo(func(context.Context, MoveToRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleMoveTo: a command the server does not accept was registered")
 	}
-	if err := s.HandleCalibrate(func(context.Context, CalibrateRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleCalibrate(func(context.Context, CalibrateRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleCalibrate: a command the server does not accept was registered")
 	}
 	_ = s.EmitOperationalError(0, OperationalErrorEvent{})     // not in the empty definition's EventList: refused
 	_ = s.EmitMovementCompleted(0, MovementCompletedEvent{})   // not in the empty definition's EventList: refused

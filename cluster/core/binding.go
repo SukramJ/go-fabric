@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,6 +44,10 @@ type Binding struct {
 	// obsMu guards observers.
 	obsMu     sync.Mutex
 	observers []*bindingObserver
+
+	host   spec.HostHandlers
+	events spec.Events
+	veto   spec.WriteVeto
 }
 
 // bindingObserver is one [Binding.OnChange] registration; its address
@@ -184,6 +189,11 @@ var (
 	_ contract.ClusterServer          = (*Binding)(nil)
 	_ contract.ClusterAttributeLister = (*Binding)(nil)
 	_ contract.FabricScopedReader     = (*Binding)(nil)
+	_ contract.EventReceiver          = (*Binding)(nil)
+	_ spec.AttributeSetter            = (*Binding)(nil)
+	_ spec.CommandRegistrar           = (*Binding)(nil)
+	_ spec.EventEmitting              = (*Binding)(nil)
+	_ spec.BeforeWriteSetter          = (*Binding)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -264,20 +274,33 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if err != nil {
 		return err
 	}
+	if request {
+		for i := range list {
+			list[i].FabricIndex = fabric
+		}
+	}
+	// The veto sees the written entries as they would be stored, the
+	// accessing fabric stamped.
+	if err := b.veto.Check(ctx, bindingAttrBinding, slices.Clone(list)); err != nil {
+		return err
+	}
+	return b.replace(func(before []TargetStruct) []TargetStruct {
+		if !request {
+			return list
+		}
+		after := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric })
+		return append(after, list...)
+	})
+}
+
+// replace commits the list build makes of the current one: saved first,
+// then stored, then told to the [Binding.OnChange] observers.
+func (b *Binding) replace(build func(before []TargetStruct) []TargetStruct) error {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	before := b.bindings
 	b.mu.RUnlock()
-	var after []TargetStruct
-	if request {
-		after = slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric })
-		for _, t := range list {
-			t.FabricIndex = fabric
-			after = append(after, t)
-		}
-	} else {
-		after = list
-	}
+	after := build(before)
 	if after == nil {
 		after = []TargetStruct{}
 	}
@@ -296,6 +319,62 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	b.writeMu.Unlock()
 	b.notify(before, after)
 	return nil
+}
+
+// SetAttributes implements [spec.AttributeSetter]: the host's own change
+// of the Binding list — the only attribute the server holds — replacing
+// every fabric's entries with the given ones ([]TargetStruct, or the
+// generated []bindingdef.TargetStruct checked against the definition),
+// each keeping its FabricIndex, as a matter.js host sets the behavior's
+// state (the list is the BindingBehavior's state; BindingServer.ts:120-158
+// registers the entries it holds at initialize and diffs them at the end
+// of each interaction). It is saved ([Binding.Persist]) and told
+// to the [Binding.OnChange] observers like a write; there is no write
+// veto. Any other attribute is refused ([spec.ErrNotServed] or the
+// definition's refusal).
+func (b *Binding) SetAttributes(values map[uint32]any) error {
+	var list []TargetStruct
+	set := false
+	for _, id := range slices.Sorted(maps.Keys(values)) {
+		if id != bindingAttrBinding {
+			if _, err := bindingInst.CheckSet(id, values[id], nil); err != nil {
+				return err
+			}
+			return fmt.Errorf("%w: matter: Binding attribute 0x%04X", spec.ErrNotHeld, id)
+		}
+		l, err := bindingWriteList(values[id], 0, false)
+		if err != nil {
+			return fmt.Errorf("%w: %w", spec.ErrInvalidValue, err)
+		}
+		list, set = l, true
+	}
+	if !set {
+		return nil
+	}
+	return b.replace(func([]TargetStruct) []TargetStruct { return list })
+}
+
+// Handle implements [spec.CommandRegistrar]. Binding has no command, so
+// every handler is refused with [spec.ErrNotAccepted].
+func (b *Binding) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return b.host.Register(bindingInst, cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]. Binding defines no event, so
+// every event is refused with [spec.ErrNotEmitted].
+func (b *Binding) Emit(endpoint uint16, eventID uint32, data any) error {
+	return b.events.Emit(bindingInst, endpoint, eventID, data)
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver].
+func (b *Binding) SetMatterEventEmitter(emitter contract.EventEmitter) { b.events.SetEmitter(emitter) }
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]: fn vetoes a
+// controller's write of the Binding list after it was decoded and checked
+// and before it is saved or stored, with the written entries as they
+// would be stored ([]TargetStruct, the accessing fabric stamped).
+func (b *Binding) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	b.veto.Set(fn)
 }
 
 // RemoveFabric drops a removed fabric's entries and tells the

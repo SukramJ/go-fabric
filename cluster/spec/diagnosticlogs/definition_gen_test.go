@@ -54,7 +54,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	if err := s.HandleRetrieveLogsRequest(func(context.Context, RetrieveLogsRequestRequest) (RetrieveLogsResponse, error) {
 		return RetrieveLogsResponse{}, nil
-	}); err != nil {
-		t.Error(err)
+	}); err == nil {
+		t.Error("HandleRetrieveLogsRequest: a command the server does not accept was registered")
 	}
 }

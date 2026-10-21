@@ -8,7 +8,6 @@ import (
 	"errors"
 	"reflect"
 	"slices"
-	"strings"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
@@ -380,7 +379,7 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 		}
 		resp, err := srv.MatterInvoke(im.WithCommandPath(ctx, path), path.Command, fields)
 		if err != nil {
-			status, cs, hasCS := classifyError(err, invokeErrorStatus)
+			status, cs, hasCS := classifyError(err)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 		}
 		ep.invalidateSceneOnCommand(srv, path.Cluster)
@@ -455,7 +454,7 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		resp, err := t.srv.MatterInvoke(im.WithCommandPath(ctx, ePath), path.Command, fields)
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
-			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
+			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
 		}
 		results = append(results, res)
 	}
@@ -801,97 +800,30 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 		v = nil
 	}
 	if err := srv.MatterWrite(ctx, path.Attribute, v); err != nil {
-		status, cs, hasCS := classifyError(err, writeErrorStatus)
+		status, cs, hasCS := classifyError(err)
 		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 	}
 	return im.WriteResult{Path: path, Status: im.StatusSuccess}
 }
 
-// classifyError inspects err first for a [im.MatterClusterStatusError]
-// (so the cluster-specific code surfaces into StatusIB.ClusterStatus
-// per Matter §10.6.2.2) and falls back to the supplied IM-status
-// classifier for the generic Status byte. Returns (status, clusterStatus,
+// classifyError maps a cluster server's write or invoke error to the
+// status it answers: an [im.MatterClusterStatusError] carries the
+// cluster-specific code into StatusIB.ClusterStatus as well (Matter
+// §10.6.2.2), an [im.StatusCodeError] its IM status, and any other error
+// is FAILURE — a server names its status by type, never by the wording of
+// its message (ADR 0026 principle 8). Returns (status, clusterStatus,
 // hasClusterStatus).
-func classifyError(err error, classify func(error) im.StatusCode) (im.StatusCode, uint8, bool) {
+func classifyError(err error) (im.StatusCode, uint8, bool) {
 	if err == nil {
 		return im.StatusSuccess, 0, false
 	}
 	if cse, ok := errors.AsType[im.MatterClusterStatusError](err); ok {
 		return cse.MatterStatusCode(), cse.MatterClusterStatus(), true
 	}
-	return classify(err), 0, false
-}
-
-// writeErrorStatus maps a cluster-server write error to a Matter IM
-// StatusCode. The type-assert against [im.StatusCodeError] takes
-// priority — it lets cluster packages carry an exact status code
-// without the dispatcher importing their error types. The string
-// heuristic below is the legacy fallback for callers that have not
-// yet been migrated to the typed interface.
-func writeErrorStatus(err error) im.StatusCode {
-	if err == nil {
-		return im.StatusSuccess
-	}
-	// Type-assert first: StatusCodeError carries an exact code.
 	if sce, ok := errors.AsType[im.StatusCodeError](err); ok {
-		return sce.MatterStatusCode()
+		return sce.MatterStatusCode(), 0, false
 	}
-	// Legacy string-heuristic fallback — migrate callers to StatusCodeError.
-	msg := err.Error()
-	switch {
-	case containsAny(msg, "read-only", "read only"):
-		return im.StatusUnsupportedWrite
-	case containsAny(msg, "unknown attribute"):
-		return im.StatusUnsupportedAttribute
-	case containsAny(msg, "resource exhausted"):
-		// Mirrors matter.js StatusResponseError(ResourceExhausted) used
-		// by AccessControlServer.ts when AccessControlEntriesPerFabric /
-		// SubjectsPerAccessControlEntry / TargetsPerAccessControlEntry
-		// caps are exceeded.
-		return im.StatusResourceExhausted
-	case containsAny(msg, "constraint"):
-		return im.StatusConstraintError
-	}
-	return im.StatusFailure
-}
-
-// invokeErrorStatus mirrors writeErrorStatus for command dispatch.
-// Type-asserts against [im.StatusCodeError] first; falls back to
-// the string-heuristic for legacy callers.
-func invokeErrorStatus(err error) im.StatusCode {
-	if err == nil {
-		return im.StatusSuccess
-	}
-	// Type-assert first: StatusCodeError carries an exact code.
-	if sce, ok := errors.AsType[im.StatusCodeError](err); ok {
-		return sce.MatterStatusCode()
-	}
-	// Legacy string-heuristic fallback — migrate callers to StatusCodeError.
-	msg := err.Error()
-	switch {
-	case containsAny(msg, "unknown command", "no commands"):
-		return im.StatusUnsupportedCommand
-	case containsAny(msg, "constraint"):
-		return im.StatusConstraintError
-	case containsAny(msg, "invalid command argument"):
-		// Mirrors matter.js StatusResponseError(InvalidCommand) — used
-		// by cluster handlers (e.g. GroupKeyManagement.KeySetRemove(0))
-		// to surface a "command supported but argument rejected" path
-		// distinct from UnsupportedCommand (cluster does not implement
-		// the command).
-		return im.StatusInvalidCommand
-	}
-	return im.StatusFailure
-}
-
-// containsAny reports whether any of subs is present in s.
-func containsAny(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if strings.Contains(s, sub) {
-			return true
-		}
-	}
-	return false
+	return im.StatusFailure, 0, false
 }
 
 // MinReadPrivilege implements [im.AttributeReadPrivilegeProvider]. It

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -113,7 +114,7 @@ func TestClosureControlMoveToForwardsAndRecordsTheTarget(t *testing.T) {
 			s := closure.NewControlServer(h.config())
 
 			_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-				clusterwire.MoveToRequest{Position: new(tc.target)})
+				closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(tc.target))})
 			if err != nil {
 				t.Fatalf("MoveTo: %v", err)
 			}
@@ -140,7 +141,7 @@ func TestClosureControlMoveToRejectsAPositionOutsideTheFeatureSet(t *testing.T) 
 	s := closure.NewControlServer(h.config())
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToPedestrianPosition)})
+		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToPedestrianPosition))})
 	if err == nil {
 		t.Fatal("MoveTo to an unadvertised position must be refused")
 	}
@@ -164,7 +165,7 @@ func TestClosureControlMoveToKeepsTheTargetUnchangedWhenTheDeviceRefuses(t *test
 	s := closure.NewControlServer(h.config())
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToFullyOpen)})
+		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToFullyOpen))})
 	if err == nil {
 		t.Fatal("MoveTo must report the device's refusal")
 	}
@@ -182,7 +183,7 @@ func TestClosureControlMoveToWithoutAPositionIsRefused(t *testing.T) {
 	s := closure.NewControlServer(h.config())
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{})
+		closuredef.MoveToRequest{})
 	if err == nil {
 		t.Fatal("MoveTo carrying no supported field must be refused")
 	}
@@ -200,7 +201,7 @@ func TestClosureControlStopClearsTheTarget(t *testing.T) {
 	s := closure.NewControlServer(h.config())
 
 	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToFullyOpen)}); err != nil {
+		closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(new(clusterwire.ClosureTargetPositionMoveToFullyOpen))}); err != nil {
 		t.Fatalf("MoveTo: %v", err)
 	}
 	if got := readOverallTarget(t, s); got.Position == nil {

@@ -54,10 +54,10 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleSelectOutput(func(context.Context, SelectOutputRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleSelectOutput(func(context.Context, SelectOutputRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleSelectOutput: a command the server does not accept was registered")
 	}
-	if err := s.HandleRenameOutput(func(context.Context, RenameOutputRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleRenameOutput(func(context.Context, RenameOutputRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleRenameOutput: a command the server does not accept was registered")
 	}
 }

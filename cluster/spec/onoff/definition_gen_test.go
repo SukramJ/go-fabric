@@ -56,22 +56,22 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if err := s.HandleOff(func(context.Context, OffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOff(func(context.Context, OffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOff: a command the server does not accept was registered")
 	}
-	if err := s.HandleOn(func(context.Context, OnRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOn(func(context.Context, OnRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOn: a command the server does not accept was registered")
 	}
-	if err := s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleToggle(func(context.Context, ToggleRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleToggle: a command the server does not accept was registered")
 	}
-	if err := s.HandleOffWithEffect(func(context.Context, OffWithEffectRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOffWithEffect(func(context.Context, OffWithEffectRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOffWithEffect: a command the server does not accept was registered")
 	}
-	if err := s.HandleOnWithRecallGlobalScene(func(context.Context, OnWithRecallGlobalSceneRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOnWithRecallGlobalScene(func(context.Context, OnWithRecallGlobalSceneRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOnWithRecallGlobalScene: a command the server does not accept was registered")
 	}
-	if err := s.HandleOnWithTimedOff(func(context.Context, OnWithTimedOffRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
-		t.Error(err)
+	if err := s.HandleOnWithTimedOff(func(context.Context, OnWithTimedOffRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
+		t.Error("HandleOnWithTimedOff: a command the server does not accept was registered")
 	}
 }
