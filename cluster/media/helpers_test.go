@@ -68,7 +68,7 @@ func changes(t *testing.T, srv contract.ClusterServer) *[]uint32 {
 		t.Fatalf("%T reports no attribute changes", srv)
 	}
 	var got []uint32
-	stop := n.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, ids...) })
+	stop := n.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; got = append(got, ids...) })
 	t.Cleanup(stop)
 	return &got
 }

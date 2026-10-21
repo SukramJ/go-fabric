@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // TestParityMatterJS_WindowCovering_TravellingMovement mirrors matter.js
@@ -27,7 +28,8 @@ func TestParityMatterJS_WindowCovering_TravellingMovement(t *testing.T) {
 		s := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0b101, InitialPositionPercent100ths: 10000, MoveStep: step})
 		var mu sync.Mutex
 		var reported [][]uint32
-		s.OnMatterAttributesChanged(func(ids []uint32) {
+		s.OnAttributeChange(func(change contract.Change) {
+			ids := change.Attributes
 			mu.Lock()
 			reported = append(reported, ids)
 			mu.Unlock()

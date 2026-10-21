@@ -165,7 +165,7 @@ func TestOnOffPortOverABareServer(t *testing.T) {
 		t.Errorf("SetOnOff: %v", err)
 	}
 	called := false
-	p.OnMatterAttributesChanged(func([]uint32) { called = true })()
+	p.OnAttributeChange(func(contract.Change) { called = true })()
 	if called {
 		t.Error("a bare server notified")
 	}

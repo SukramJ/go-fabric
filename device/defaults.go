@@ -335,12 +335,12 @@ func (p onOffPort) SetOnOff(_ context.Context, on bool) error {
 	return setter.SetAttributes(map[uint32]any{onoff.AttrOnOff: on})
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]
+// OnAttributeChange implements [contract.AttributeChangeNotifier]
 // over the OnOff server's own notification; a server without one reports
 // nothing.
-func (p onOffPort) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+func (p onOffPort) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	if n, ok := p.srv.(contract.AttributeChangeNotifier); ok {
-		return n.OnMatterAttributesChanged(cb)
+		return n.OnAttributeChange(cb)
 	}
 	return func() {}
 }

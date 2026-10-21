@@ -44,8 +44,8 @@ func (o *typedOnOff) SetOnOff(_ context.Context, on bool) error {
 	return nil
 }
 
-func (o *typedOnOff) OnMatterAttributesChanged(cb func([]uint32)) func() {
-	return o.changes.OnMatterAttributesChanged(cb)
+func (o *typedOnOff) OnAttributeChange(cb func(contract.Change)) func() {
+	return o.changes.OnAttributeChange(cb)
 }
 
 func heldServer(t *testing.T, onOff *typedOnOff) (typed *lvldef.Server, srv *levelcontrol.Server) {

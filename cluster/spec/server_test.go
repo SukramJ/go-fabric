@@ -138,7 +138,7 @@ func TestServerWrite(t *testing.T) {
 	sk := &sink{}
 	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
 	var seen [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids) })
 	ctx := context.Background()
 
 	v0 := srv.MatterDataVersion()
@@ -199,7 +199,7 @@ func TestServerSet(t *testing.T) {
 	t.Parallel()
 	srv := hepaServer(t, spec.ServerConfig{})
 	var seen [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids) })
 	v0 := srv.MatterDataVersion()
 
 	// The device changes a read-only attribute: Set checks the value, not

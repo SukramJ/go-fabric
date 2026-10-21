@@ -121,7 +121,7 @@ func TestMessagesPerFabric(t *testing.T) {
 	m, d, ev := newMessages(t, 0)
 	before := m.MatterDataVersion()
 	got := []uint32{}
-	stop := m.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, ids...) })
+	stop := m.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; got = append(got, ids...) })
 	defer stop()
 	if err := decodeAndInvoke(t, m, msgCtx(1, false), messagesdef.CmdPresentMessagesRequest, presentRequest(messageID(1), "one")); err != nil {
 		t.Fatal(err)

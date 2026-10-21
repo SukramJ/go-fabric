@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -164,7 +165,8 @@ type reports struct {
 func listen(t *testing.T, srv *levelcontrol.Server) *reports {
 	t.Helper()
 	r := &reports{}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		for _, id := range ids {
 			v, _ := srv.MatterRead(id)
 			r.mu.Lock()

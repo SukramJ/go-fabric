@@ -1145,7 +1145,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
-    "line": 361,
+    "line": 362,
     "citation": "window-covering-cluster.element.ts:72",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "GoToLiftPercentage",

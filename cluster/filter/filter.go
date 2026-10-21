@@ -283,9 +283,9 @@ func (s *Server) values(st State) map[uint32]any {
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *Server) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *Server) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *Server) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // Notify tells the listeners that attrIDs changed.

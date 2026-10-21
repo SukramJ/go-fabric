@@ -25,7 +25,7 @@
 // [transition] (matter.js behavior/Transitions.ts), and the host receives
 // the levels it steps through as [LevelSource.MoveToLevel] requests with
 // TransitionTime 0. CurrentLevel and RemainingTime are then reported by
-// the server's own rules (see [Server.OnMatterAttributesChanged]).
+// the server's own rules (see [Server.OnAttributeChange]).
 //
 // # What is served, and what is deliberately not
 //
@@ -498,7 +498,7 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 // no-op unsubscribe when the port cannot notify.
 //
 // Under the engine the server reports CurrentLevel itself (see
-// [Server.OnMatterAttributesChanged]) and this hop stays silent.
+// [Server.OnAttributeChange]) and this hop stays silent.
 func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	n, ok := s.src.(contract.ChangeNotifier)
 	if !ok || n == nil || s.engine != nil {

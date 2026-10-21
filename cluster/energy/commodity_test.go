@@ -18,6 +18,7 @@ import (
 	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -170,7 +171,7 @@ func TestCommodityPrice(t *testing.T) {
 	if plain.MatterDataVersion() == 0 {
 		t.Log("data version starts at 0")
 	}
-	unsub := plain.OnMatterAttributesChanged(func([]uint32) {})
+	unsub := plain.OnAttributeChange(func(contract.Change) {})
 	unsub()
 	wantStatus(t, plain.MatterWrite(context.Background(), cp.AttrTariffUnit, uint64(1)), im.StatusUnsupportedWrite)
 }
@@ -234,7 +235,7 @@ func TestElectricalGridConditions(t *testing.T) {
 	}
 	_, err = plain.MatterInvoke(context.Background(), 0, nil)
 	wantStatus(t, err, im.StatusUnsupportedCommand)
-	plain.OnMatterAttributesChanged(func([]uint32) {})()
+	plain.OnAttributeChange(func(contract.Change) {})()
 	_ = plain.MatterDataVersion()
 }
 
@@ -473,7 +474,7 @@ func TestCommodityTariffDerived(t *testing.T) { //nolint:funlen // one sequence
 	if err := srv.SyncTime(); err != nil {
 		t.Errorf("SyncTime without a tariff: %v", err)
 	}
-	srv.OnMatterAttributesChanged(func([]uint32) {})()
+	srv.OnAttributeChange(func(contract.Change) {})()
 	wantStatus(t, srv.MatterWrite(context.Background(), ct.AttrTariffUnit, uint64(0)), im.StatusUnsupportedWrite)
 }
 

@@ -1107,9 +1107,9 @@ func (s *DeviceEnergyManagementServer) MatterDataVersion() uint32 {
 	return s.srv.MatterDataVersion()
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *DeviceEnergyManagementServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *DeviceEnergyManagementServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute.

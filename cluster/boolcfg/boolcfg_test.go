@@ -455,7 +455,7 @@ func TestNotificationsAndVersion(t *testing.T) {
 	t.Parallel()
 	srv, _ := newServer(t, full(nil))
 	var seen []uint32
-	unsubscribe := srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids...) })
+	unsubscribe := srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids...) })
 	before := srv.MatterDataVersion()
 	if err := srv.SetAlarmsActive(boolcfg.AlarmVisual); err != nil {
 		t.Fatal(err)

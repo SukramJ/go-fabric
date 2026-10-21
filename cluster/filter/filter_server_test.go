@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/filter"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -147,7 +148,7 @@ func TestWrite(t *testing.T) {
 	var tracker cluster.DataVersionTracker
 	srv := full(t, h)
 	changes := 0
-	srv.OnMatterAttributesChanged(func([]uint32) { changes++ })
+	srv.OnAttributeChange(func(contract.Change) { changes++ })
 	ctx := context.Background()
 	before := srv.MatterDataVersion()
 	if err := srv.MatterWrite(ctx, hepa.AttrLastChangedTime, uint64(1000)); err != nil {
@@ -234,7 +235,7 @@ func TestSetState(t *testing.T) {
 	t.Parallel()
 	srv := full(t, &host{})
 	var seen [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids) })
 	if err := srv.SetState(filter.State{Condition: 120}); !errors.Is(err, filter.ErrInvalidValue) {
 		t.Errorf("Condition 120: %v", err)
 	}

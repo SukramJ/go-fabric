@@ -29,6 +29,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -188,7 +189,8 @@ func testAsyncObservers(t *testing.T) {
 	var mu sync.Mutex
 	var observed []bool
 	var pending sync.WaitGroup
-	unsubscribe := m.srv.OnMatterAttributesChanged(func(ids []uint32) {
+	unsubscribe := m.srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		for _, id := range ids {
 			if id != onoff.AttrOnOff {
 				continue

@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -393,7 +394,8 @@ func TestCurrentStateReporting(t *testing.T) {
 	srv := newDimension(t, cfg)
 	var mu sync.Mutex
 	var reports int
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		mu.Lock()
 		defer mu.Unlock()
 		if slices.Contains(ids, cd.AttrCurrentState) {

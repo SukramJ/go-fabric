@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -61,7 +62,8 @@ func managedCT(on bool) (*light.ColorControlServer, *ctReports, *onOff) {
 		MinMireds: 153, MaxMireds: 370, InitialMireds: 250, ManageTransitions: true, OnOff: o,
 	})
 	r := &ctReports{}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		for _, id := range ids {
 			v, _ := srv.MatterRead(id)
 			r.mu.Lock()

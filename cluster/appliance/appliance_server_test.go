@@ -15,6 +15,7 @@ import (
 	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -417,7 +418,7 @@ func TestChangeReporting(t *testing.T) {
 	ctx := context.Background()
 	type server interface {
 		MatterDataVersion() uint32
-		OnMatterAttributesChanged(func([]uint32)) func()
+		OnAttributeChange(func(contract.Change)) func()
 	}
 	mw := newMicrowave(t, &oven{}, appliance.MicrowaveFeaturePowerAsNumber)
 	washer, err := appliance.NewLaundryWasherControls(appliance.WasherConfig{Features: appliance.WasherFeatureSpin, SpinSpeeds: []string{"Off", "800"}})
@@ -438,7 +439,7 @@ func TestChangeReporting(t *testing.T) {
 		{dryer, func() error { return dryer.SetSelectedDrynessLevel(ptr(appliance.DrynessLevel(1))) }, ldc.AttrSelectedDrynessLevel},
 	} {
 		var seen []uint32
-		stop := c.srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids...) })
+		stop := c.srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids...) })
 		before := c.srv.MatterDataVersion()
 		if err := c.change(); err != nil {
 			t.Fatal(err)

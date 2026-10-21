@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // TestCountdownTimeIsReportedAsAQuieterAttribute: the value is read back
@@ -25,7 +26,7 @@ func TestCountdownTimeIsReportedAsAQuieterAttribute(t *testing.T) {
 	clk := clocktest.New(time.Unix(5000, 0))
 	srv.quiet.Clock = clk
 	var reports [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { reports = append(reports, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; reports = append(reports, ids) })
 	set := func(v *uint32) {
 		t.Helper()
 		if err := srv.SetCountdownTime(v); err != nil {

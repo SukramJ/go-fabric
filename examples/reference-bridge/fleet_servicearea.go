@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // --- the robot vacuum's areas ----------------------------------------------
@@ -77,7 +78,8 @@ func (a *vacuumArea) server() *servicearea.Server {
 		a.v.build()
 		// TestServiceAreaServer #reactOnModeChange: back to Idle (mode 0)
 		// marks every Progress entry Skipped.
-		a.v.run.OnMatterAttributesChanged(func(ids []uint32) {
+		a.v.run.OnAttributeChange(func(change contract.Change) {
+			ids := change.Attributes
 			if slices.Contains(ids, modebase.AttrCurrentMode) && a.runMode() == rvcIdle {
 				a.skipAll()
 			}

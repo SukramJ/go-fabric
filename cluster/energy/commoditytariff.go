@@ -1186,9 +1186,9 @@ func (s *CommodityTariffServer) getDayEntry(_ context.Context, fields any) (any,
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *CommodityTariffServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *CommodityTariffServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *CommodityTariffServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute; a list as its generated list

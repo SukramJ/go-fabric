@@ -32,6 +32,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
 )
@@ -71,7 +72,8 @@ func setupColorNode(t *testing.T) *colorNode {
 		t.Fatal(err)
 	}
 	c := &colorNode{site: site, srv: srv}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		if !slices.Contains(ids, ccdef.AttrRemainingTime) {
 			return
 		}

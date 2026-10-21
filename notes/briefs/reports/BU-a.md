@@ -130,17 +130,18 @@ after Add/Replace/Remove.
 - Origin: `contract.Origin` (`OriginHostSet`, `OriginControllerWrite`,
   `OriginCommand`, zero `OriginUnknown`) and `contract.Change{Attributes,
   Origin}`; `OnChanged(func(State, contract.Change))` and
-  `Device.OnChanged(id, func(contract.Change))`. How it is carried without
-  a second notifier interface: the dispatcher stamps a write and a command
-  on the request's context (`contract.WithOrigin`; `endpoint/dispatcher.go`
-  at the three server calls); a server reports a change with its origin —
-  `cluster.AttributeChanges.NotifyFrom(origin, ids…)`,
+  `Device.OnChanged(id, func(contract.Change))`. How it is carried (after
+  the review of #208): the one notifier interface's listener takes the
+  change value — `contract.AttributeChangeNotifier.OnAttributeChange(func(contract.Change))`,
+  renamed from `OnMatterAttributesChanged(func([]uint32))` — and every
+  reporter passes the origin it has: the dispatcher stamps a write and a
+  command on the request's context (`contract.WithOrigin`;
+  `endpoint/dispatcher.go` at the three server calls), a server reports
+  with it — `cluster.AttributeChanges.NotifyFrom(origin, ids…)`,
   `spec.Server.SetAttributesFrom(origin, …)` (`SetAttributes` is the
-  host's, `MatterWrite` the controller's) — and `AttributeChanges` delivers
-  each listener its own copy of the ids through `contract.DeliverChange`,
-  which keys the origin by that slice for the length of the call;
-  `spec.ChangesOf` asks `contract.OriginOf(ids)`. A host's own
-  `AttributeChangeNotifier` that does not use it reports `OriginUnknown`.
+  host's, `MatterWrite` the controller's) — and `OriginUnknown` where a
+  server does not know yet. (The first form carried the origin beside the
+  ids in a package-level map keyed by the slice; removed.)
   Audited servers: `spec.Server` (every stub and every server built on
   one, OnOff included), LevelControl (a quieter report carries the origin
   of the last level change), ColorControl (likewise), WindowCovering,

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -94,7 +95,7 @@ func TestParityMatterJS_Thermostat_SetpointLimitWrites(t *testing.T) {
 		t.Parallel()
 		s := thermo.NewThermostatServer(thermo.DefaultThermostatConfig())
 		var reported [][]uint32
-		s.OnMatterAttributesChanged(func(ids []uint32) { reported = append(reported, ids) })
+		s.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; reported = append(reported, ids) })
 		if err := s.MatterWrite(ctx, attrOccupiedHeating, int16(2500)); err != nil {
 			t.Fatal(err)
 		}

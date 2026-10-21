@@ -67,7 +67,7 @@ func TestActionsListsAreTheHosts(t *testing.T) {
 		t.Errorf("ActionList does not decode: %v", err)
 	}
 	var changed []uint32
-	a.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids...) })
+	a.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids...) })
 	before := a.MatterDataVersion()
 	a.ActionListChanged()
 	a.EndpointListsChanged()

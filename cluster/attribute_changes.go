@@ -21,15 +21,15 @@ type AttributeChanges struct {
 	// mu guards listeners and next.
 	mu        sync.Mutex
 	next      int
-	listeners map[int]func([]uint32)
+	listeners map[int]func(contract.Change)
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (c *AttributeChanges) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (c *AttributeChanges) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.listeners == nil {
-		c.listeners = map[int]func([]uint32){}
+		c.listeners = map[int]func(contract.Change){}
 	}
 	id := c.next
 	c.next++
@@ -51,11 +51,10 @@ func (c *AttributeChanges) Notify(attrIDs ...uint32) {
 	c.NotifyFrom(contract.OriginUnknown, attrIDs...)
 }
 
-// NotifyFrom tells every listener that attrIDs changed, and where the
-// change came from: each listener gets its own copy of the ids, delivered
-// through [contract.DeliverChange], so [contract.OriginOf] reads origin
-// from inside the listener. It calls them outside its lock, in
-// registration order; an empty list notifies nobody.
+// NotifyFrom tells every listener that attrIDs changed and where the
+// change came from ([contract.Change]); each listener gets its own copy of
+// the ids. It calls them outside its lock, in registration order; an empty
+// list notifies nobody.
 func (c *AttributeChanges) NotifyFrom(origin contract.Origin, attrIDs ...uint32) {
 	if len(attrIDs) == 0 {
 		return
@@ -66,13 +65,13 @@ func (c *AttributeChanges) NotifyFrom(origin contract.Origin, attrIDs ...uint32)
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
-	cbs := make([]func([]uint32), 0, len(ids))
+	cbs := make([]func(contract.Change), 0, len(ids))
 	for _, id := range ids {
 		cbs = append(cbs, c.listeners[id])
 	}
 	c.mu.Unlock()
 	for _, cb := range cbs {
-		contract.DeliverChange(origin, slices.Clone(attrIDs), cb)
+		cb(contract.Change{Attributes: slices.Clone(attrIDs), Origin: origin})
 	}
 }
 

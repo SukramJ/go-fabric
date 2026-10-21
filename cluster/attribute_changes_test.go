@@ -19,8 +19,12 @@ func TestAttributeChangesNotifiesInOrderAndUnsubscribes(t *testing.T) {
 	t.Parallel()
 	var c cluster.AttributeChanges
 	var got []string
-	unA := c.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, "a"+string(rune('0'+ids[0]))) })
-	c.OnMatterAttributesChanged(func(ids []uint32) {
+	unA := c.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
+		got = append(got, "a"+string(rune('0'+ids[0])))
+	})
+	c.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		ids[0] = 9 // a listener's slice is its own
 		got = append(got, "b")
 	})

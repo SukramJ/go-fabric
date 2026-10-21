@@ -427,12 +427,12 @@ func (s *ScenesManagement) RecallGlobalScene(ctx context.Context, fabricIndex ui
 	st.mu.Unlock()
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
+// OnAttributeChange implements [contract.AttributeChangeNotifier]:
 // FabricSceneInfo reports whenever a scene count, the current scene or its
 // validity changes (matter.js fabricSceneInfo is behavior state). The
 // listeners live on the endpoint's [ScenesState], which outlives the server.
-func (s *ScenesManagement) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.cfg.State.changes.OnMatterAttributesChanged(cb)
+func (s *ScenesManagement) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.cfg.State.changes.OnAttributeChange(cb)
 }
 
 // MatterClusterID implements [contract.ClusterServer].

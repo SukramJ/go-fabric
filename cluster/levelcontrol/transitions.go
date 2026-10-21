@@ -173,15 +173,15 @@ func (s *Server) observeLevel(origin contract.Origin) {
 	}
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
 // Under the engine it reports CurrentLevel by its quieter rules and
 // RemainingTime when matter.js's #updateRemainingTime would; while a
 // listener is registered the server follows the host's own change
 // notification, so a level the device changed by itself is reported too.
 // On the hand-off path nothing is reported here: the host's notifier
 // reports CurrentLevel ([Server.OnMatterValueChanged]).
-func (s *Server) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	unsub := s.changes.OnMatterAttributesChanged(cb)
+func (s *Server) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	unsub := s.changes.OnAttributeChange(cb)
 	if s.engine == nil {
 		return unsub
 	}

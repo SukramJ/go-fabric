@@ -14,6 +14,7 @@ import (
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // echoSink is a Sink whose calls run the given functions; a nil function
@@ -176,7 +177,7 @@ func TestSinkCompanionsRecomputedOnTheReReadState(t *testing.T) {
 				srv.SetOccupiedCoolingSetpoint(tc.hostCool)
 			}
 			var changed []uint32
-			srv.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids...) })
+			srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids...) })
 			within(t, "the setpoint write", func() {
 				if err := srv.MatterWrite(context.Background(), tdef.AttrOccupiedHeatingSetpoint, int16(2500)); err != nil {
 					t.Errorf("write: %v", err)

@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -191,7 +192,7 @@ func TestEcosystemInformationDirectoryChanged(t *testing.T) {
 	t.Parallel()
 	e := NewEcosystemInformation(&ecoDir{})
 	var got []uint32
-	e.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, ids...) })
+	e.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; got = append(got, ids...) })
 	before := e.MatterDataVersion()
 	e.DirectoryChanged()
 	if e.MatterDataVersion() == before {

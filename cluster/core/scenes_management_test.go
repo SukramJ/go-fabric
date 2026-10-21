@@ -208,7 +208,8 @@ func TestScenesRemainingCapacityIsBoundByTheTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	reports := 0
-	unsub := srv.OnMatterAttributesChanged(func(ids []uint32) {
+	unsub := srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		if len(ids) == 1 && ids[0] == 0x0002 {
 			reports++
 		}
