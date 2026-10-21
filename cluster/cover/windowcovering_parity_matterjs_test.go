@@ -10,6 +10,8 @@ import (
 	"slices"
 	"testing"
 
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
@@ -464,8 +466,8 @@ func TestParityMatterJS_WindowCoveringServesGlobalAttributes(t *testing.T) {
 // in: the bridge has no typed decoder for cluster 0x0102, so its generic
 // salvage path hands over map[uint8]any with field 0
 // (LiftPercent100thsValue, window-covering-cluster.element.ts:95) as a
-// uint64. The typed [clusterwire.GoToLiftPercentageRequest] stays
-// accepted for hosts that decode the command themselves.
+// uint64. The generated request stays accepted for hosts that decode
+// the command themselves.
 func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t *testing.T) {
 	t.Parallel()
 
@@ -474,7 +476,7 @@ func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t
 		fields any
 	}{
 		{"bridge tag map", map[uint8]any{0: uint64(2500)}},
-		{"typed request", clusterwire.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		{"typed request", wcdef.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

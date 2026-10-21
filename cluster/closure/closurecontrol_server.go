@@ -404,8 +404,7 @@ func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) err
 // schema answers it), by value or by pointer — the primary form; a host
 // that decodes the command itself may pass the tag-keyed map of the
 // bridge's generic salvage path (bridge/fields_reader.go
-// decodeGenericTagMap), and, until their removal in v0.12.0, the
-// [wire.MoveToRequest] (Deprecated) or the raw TLV.
+// decodeGenericTagMap).
 func moveToRequest(fields any) (closuredef.MoveToRequest, error) {
 	if req, ok := spec.RequestOf[closuredef.MoveToRequest](fields); ok {
 		if req.Position == nil && req.Latch == nil && req.Speed == nil {
@@ -419,40 +418,9 @@ func moveToRequest(fields any) (closuredef.MoveToRequest, error) {
 	case *closuredef.MoveToRequest: // nil: RequestOf takes a non-nil one
 		return closuredef.MoveToRequest{}, wire.ErrClosureControlMalformed
 	}
-	legacy, ok, err := legacyMoveToRequest(fields)
-	if !ok {
-		return closuredef.MoveToRequest{}, fmt.Errorf(
-			"closure: MoveTo expected closurecontrol.MoveToRequest or map[uint8]any, got %T", fields,
-		)
-	}
-	if err != nil {
-		return closuredef.MoveToRequest{}, err
-	}
-	return moveToRequest(closuredef.MoveToRequest{
-		Position: (*closuredef.TargetPositionEnum)(legacy.Position),
-		Latch:    legacy.Latch,
-		Speed:    (*closuredef.ThreeLevelAutoEnum)(legacy.Speed),
-	})
-}
-
-// legacyMoveToRequest reads the deprecated in-process forms: the
-// cluster/wire request and the raw TLV it decodes. ok is false for any
-// other payload.
-func legacyMoveToRequest(fields any) (req wire.MoveToRequest, ok bool, err error) { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-	switch v := fields.(type) {
-	case wire.MoveToRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		return v, true, nil
-	case *wire.MoveToRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		if v == nil {
-			return req, true, wire.ErrClosureControlMalformed
-		}
-		return *v, true, nil
-	case []byte:
-		req, err := wire.DecodeClosureMoveTo(v) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		return req, true, err
-	default:
-		return req, false, nil
-	}
+	return closuredef.MoveToRequest{}, fmt.Errorf(
+		"closure: MoveTo expected closurecontrol.MoveToRequest or map[uint8]any, got %T", fields,
+	)
 }
 
 // MoveTo field tags (closure-control.element.ts:79-81).
@@ -465,7 +433,7 @@ const (
 // moveToRequestFromTagMap reads the three "O.a+" MoveTo fields out of the
 // generic tag map. Unsigned TLV integers surface as uint64 and an explicit
 // null keeps its tag with a nil value (decodeGenericTagMap), which counts
-// as absent here — the same reading [wire.DecodeClosureMoveTo] gives a
+// as absent here — the same reading the generated decoder gives a
 // null element. A map carrying none of the three fields is malformed for
 // the same reason the TLV decoder says so: at least one is mandatory.
 func moveToRequestFromTagMap(m map[uint8]any) (closuredef.MoveToRequest, error) {

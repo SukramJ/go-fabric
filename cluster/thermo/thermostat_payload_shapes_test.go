@@ -74,9 +74,8 @@ func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 	mode := clusterwire.ThermostatSetpointModeHeat
 
 	shapes := map[string]any{
-		"typed value":    clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		"typed pointer":  &clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		"raw TLV":        setpointPayload(t, mode, amount),
+		"typed value":    tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
+		"typed pointer":  &tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
 		"bridge tag map": map[uint8]any{0: uint64(mode), 1: int64(amount)},
 		"string map":     map[string]any{"mode": mode, "amount": amount},
 	}
@@ -103,7 +102,10 @@ func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 func TestSetpointRaiseLowerRejectsAPayloadItCannotRead(t *testing.T) {
 	t.Parallel()
 	cases := map[string]any{
-		"nil typed pointer": (*clusterwire.SetpointRaiseLowerRequest)(nil), //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		"nil typed pointer": (*tdef.SetpointRaiseLowerRequest)(nil),
+		// The raw TLV is the bridge's to decode (through the generated
+		// definition); the server takes the decoded request only.
+		"raw TLV": setpointPayload(t, clusterwire.ThermostatSetpointModeHeat, 5),
 		// Mode is conformance M — a payload without it is refused rather
 		// than acknowledged as a no-op.
 		"tag map without Mode":   map[uint8]any{1: int64(5)},

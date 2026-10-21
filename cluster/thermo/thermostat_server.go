@@ -1336,8 +1336,7 @@ const (
 // value or by pointer — the primary form; a host that decodes the command
 // itself may pass the tag-keyed map of the bridge's generic salvage path
 // (bridge/fields_reader.go decodeGenericTagMap: unsigned as uint64, signed
-// as int64), and, until their removal in v0.12.0, the deprecated
-// [wire.SetpointRaiseLowerRequest] or the raw TLV. The "mode" / "amount"
+// as int64). The "mode" / "amount"
 // string-keyed map stays accepted for direct callers.
 //
 // Both fields are conformance M (element :322-323), so a payload without
@@ -1345,12 +1344,6 @@ const (
 func setpointRaiseLowerRequest(fields any) (tdef.SetpointRaiseLowerRequest, error) {
 	if req, ok := spec.RequestOf[tdef.SetpointRaiseLowerRequest](fields); ok {
 		return req, nil
-	}
-	if legacy, ok, err := legacySetpointRaiseLowerRequest(fields); ok {
-		if err != nil {
-			return tdef.SetpointRaiseLowerRequest{}, err
-		}
-		return tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(legacy.Mode), Amount: legacy.Amount}, nil
 	}
 	switch v := fields.(type) {
 	case *tdef.SetpointRaiseLowerRequest: // nil: RequestOf takes a non-nil one
@@ -1396,29 +1389,6 @@ func setpointRaiseLowerRequest(fields any) (tdef.SetpointRaiseLowerRequest, erro
 		return tdef.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{
 			fmt.Sprintf("thermo: SetpointRaiseLower expected thermostat.SetpointRaiseLowerRequest or map[uint8]any, got %T", fields),
 		}
-	}
-}
-
-// legacySetpointRaiseLowerRequest reads the deprecated in-process forms:
-// the cluster/wire request and the raw TLV it decodes. ok is false for any
-// other payload.
-func legacySetpointRaiseLowerRequest(fields any) (req wire.SetpointRaiseLowerRequest, ok bool, err error) { //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-	switch v := fields.(type) {
-	case wire.SetpointRaiseLowerRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		return v, true, nil
-	case *wire.SetpointRaiseLowerRequest: //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		if v == nil {
-			return req, true, thermoInvalidCommandErr{"thermo: SetpointRaiseLower carried no fields"}
-		}
-		return *v, true, nil
-	case []byte:
-		req, err := wire.DecodeSetpointRaiseLower(v) //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		if err != nil {
-			return req, true, thermoInvalidCommandErr{fmt.Sprintf("thermo: SetpointRaiseLower: %v", err)}
-		}
-		return req, true, nil
-	default:
-		return req, false, nil
 	}
 }
 

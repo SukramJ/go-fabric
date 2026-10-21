@@ -341,8 +341,8 @@ gesture input of this entry (`contract.SwitchEventEmitter`) stays as the
 second input: a gesture is emitted as narrated, without the decision
 machine, and moves CurrentPosition (`cluster/switch/server.go` `gesture`),
 because a bus that reports finished gestures cannot be turned back into
-positions without inventing their timing. `wire.GenericSwitch` is a
-deprecated wrapper over the server (removable from v0.10.0).
+positions without inventing their timing. The deprecated wrapper
+`wire.GenericSwitch` is removed in v0.10.0 (brief BZ).
 
 ### BD-Matter-ButtonGroupCurrentPositionReporting — Switch.CurrentPosition answered on read, not proactively reported
 

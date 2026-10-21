@@ -62,8 +62,8 @@ func TestClosureControlAdvertisesItsClusterIDAndFeatureMap(t *testing.T) {
 }
 
 // TestClosureControlMoveToAcceptsEveryPayloadShape drives MoveTo through
-// each shape moveToRequest normalises: the typed request a host may
-// decode itself, a pointer to it, and the raw TLV the firmware sends.
+// each shape moveToRequest normalises: the generated request the bridge
+// decodes, a pointer to it, and the bridge's generic tag map.
 // Each must reach the device handler with the same target, because the
 // shape a payload arrives in is a transport detail and must not change
 // what the drive does.
@@ -72,11 +72,8 @@ func TestClosureControlMoveToAcceptsEveryPayloadShape(t *testing.T) {
 	pos := clusterwire.ClosureTargetPositionMoveToVentilationPosition
 
 	shapes := map[string]any{
-		"typed value":   clusterwire.MoveToRequest{Position: &pos},  //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		"typed pointer": &clusterwire.MoveToRequest{Position: &pos}, //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
-		"raw TLV": closureMoveToPayload(t, func(e *tlv.Encoder) {
-			e.PutUint(tlv.ContextTag(0), uint64(pos))
-		}),
+		"typed value":    closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pos)},
+		"typed pointer":  &closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&pos)},
 		"bridge tag map": map[uint8]any{0: uint64(pos)},
 	}
 	for name, fields := range shapes {
@@ -104,7 +101,12 @@ func TestClosureControlMoveToRejectsAPayloadItCannotRead(t *testing.T) {
 	t.Parallel()
 	cases := map[string]any{
 		// A nil typed pointer carries no fields at all.
-		"nil typed pointer": (*clusterwire.MoveToRequest)(nil), //nolint:staticcheck // SA1019: the deprecated in-process form, removal in v0.12.0
+		"nil typed pointer": (*closuredef.MoveToRequest)(nil),
+		// The raw TLV is the bridge's to decode (through the generated
+		// definition); the server takes the decoded request only.
+		"raw TLV": closureMoveToPayload(t, func(e *tlv.Encoder) {
+			e.PutUint(tlv.ContextTag(0), uint64(clusterwire.ClosureTargetPositionMoveToFullyOpen))
+		}),
 		// Position is TargetPositionEnum, an enum8
 		// (closure-control.element.ts:79,97): a wider integer is a
 		// malformed field, not a large position.

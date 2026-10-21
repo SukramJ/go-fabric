@@ -5,7 +5,6 @@ package wire
 
 import (
 	"errors"
-	"math"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
@@ -233,79 +232,9 @@ const (
 // command payloads.
 var ErrClosureControlMalformed = errors.New("wire: ClosureControl command malformed")
 
-// MoveToRequest mirrors the ClosureControl MoveTo command payload.
-//
-// Mirrors matter.js closure-control.element.ts:78-83. All three fields
-// carry conformance "O.a+": each is optional, but at least one must be
-// present. A request carrying none is malformed, which
-// [DecodeClosureMoveTo] reports rather than silently treating as a no-op.
-//
-// Deprecated: the bridge decodes the command into the generated request,
-// github.com/SukramJ/go-fabric/cluster/spec/closurecontrol.MoveToRequest,
-// which every module server takes by value or by pointer; use it. Marked in
-// v0.10.0 (brief BX1); removal permissible in v0.12.0.
-type MoveToRequest struct {
-	// Position is field 0. Nil when the request omitted it.
-	Position *ClosureTargetPosition
-	// Latch is field 1. Nil when the request omitted it.
-	Latch *bool
-	// Speed is field 2. Nil when the request omitted it.
-	Speed *uint8
-}
-
 // MoveTo field tags.
 const (
 	closureMoveToFieldPosition uint32 = 0
 	closureMoveToFieldLatch    uint32 = 1
 	closureMoveToFieldSpeed    uint32 = 2
 )
-
-// DecodeClosureMoveTo parses a MoveTo payload.
-//
-// Returns [ErrClosureControlMalformed] when the payload carries none of
-// the three optional fields: the "O.a+" conformance makes at least one
-// mandatory, and a request that asks for nothing is a controller bug
-// worth reporting rather than an expensive no-op.
-//
-// Deprecated: the bridge decodes the payload through the generated
-// definition into
-// github.com/SukramJ/go-fabric/cluster/spec/closurecontrol.MoveToRequest; a
-// server takes that request. Marked in v0.10.0 (brief BX1); removal
-// permissible in v0.12.0.
-func DecodeClosureMoveTo(payload []byte) (MoveToRequest, error) {
-	var req MoveToRequest
-	if err := walkContext(payload, ErrClosureControlMalformed, func(tag uint32, el tlv.Element) {
-		// A null element for an optional field means "explicitly absent";
-		// treating it as present would put a zero-valued Position on the
-		// target state, which reads as MoveToFullyClosed.
-		if el.IsNull {
-			return
-		}
-		switch tag {
-		case closureMoveToFieldPosition:
-			// TargetPositionEnum is enum8, so a wider element is a
-			// malformed field rather than a large position.
-			if el.Type == tlv.TypeUnsignedInt1 && el.Uint <= math.MaxUint8 {
-				pos := ClosureTargetPosition(el.Uint)
-				req.Position = &pos
-			}
-		case closureMoveToFieldLatch:
-			if el.Type == tlv.TypeBoolTrue || el.Type == tlv.TypeBoolFalse {
-				latch := el.Bool
-				req.Latch = &latch
-			}
-		case closureMoveToFieldSpeed:
-			// ThreeLevelAutoEnum is enum8; same reasoning as Position.
-			if el.Type == tlv.TypeUnsignedInt1 && el.Uint <= math.MaxUint8 {
-				speed := uint8(el.Uint)
-				req.Speed = &speed
-			}
-		}
-	}); err != nil {
-		return MoveToRequest{}, err
-	}
-	if req.Position == nil && req.Latch == nil && req.Speed == nil {
-		return MoveToRequest{}, ErrClosureControlMalformed
-	}
-	return req, nil
-}
