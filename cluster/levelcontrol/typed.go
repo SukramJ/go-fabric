@@ -30,7 +30,9 @@ var (
 // from the port, so it is not the server's to set: [spec.ErrNotHeld]); a
 // running transition is not stopped — its next step overwrites the value,
 // as matter.js's next step overwrites a state write
-// (packages/node/src/behavior/Transitions.ts:455-534, :537-574). OnLevel
+// (packages/node/src/behavior/Transitions.ts:455-534, :537-574); matter.js
+// ends the transition only when the written value equals its target
+// (:659-693 #instrumentProperty), which the engine does not mirror. OnLevel
 // and Options go to the port (the held state of [New]), StartUpCurrentLevel
 // is the server's, and MinLevel and MaxLevel accept their fixed values only.
 // RemainingTime is derived: [spec.ErrNotHeld].

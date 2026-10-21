@@ -19,7 +19,26 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acfdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	boolcfgdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	meteringdef "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
+	pricedef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
+	dwadef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
+	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
+	griddef "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
+	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	washerdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	rfadef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
+	switchdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
@@ -78,35 +97,35 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", errSelectionNotSer
 // OtaRequestor — answers [ErrNoDefaultServer] and the host supplies it
 // with [WithServer].
 var selfHeldDefaults = map[uint32]serverFactory{
-	0x0006: newOnOffServer,                // OnOff: cluster/onoff, matter.js OnOffServer.ts.
-	0x0008: newLevelControlServer,         // LevelControl: cluster/levelcontrol.New, matter.js LevelControlServer.ts.
-	0x001E: newBindingServer,              // Binding: cluster/core.Binding, matter.js BindingServer.ts.
-	0x003B: newSwitchServer,               // Switch: cluster/switch, matter.js SwitchServer.ts.
-	0x0101: newDoorLockServer,             // DoorLock: cluster/lock, matter.js DoorLockServer.ts.
-	0x0102: newWindowCoveringServer,       // WindowCovering: cluster/cover, matter.js WindowCoveringServer.ts.
-	0x0201: newThermostatServer,           // Thermostat: cluster/thermo, matter.js ThermostatServer.ts.
-	0x0300: newColorControlServer,         // ColorControl: cluster/light, matter.js ColorControlServer.ts.
-	0x0750: newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+	onoffdef.ClusterID:      newOnOffServer,                // OnOff: cluster/onoff, matter.js OnOffServer.ts.
+	lvldef.ClusterID:        newLevelControlServer,         // LevelControl: cluster/levelcontrol.New, matter.js LevelControlServer.ts.
+	bindingdef.ClusterID:    newBindingServer,              // Binding: cluster/core.Binding, matter.js BindingServer.ts.
+	switchdef.ClusterID:     newSwitchServer,               // Switch: cluster/switch, matter.js SwitchServer.ts.
+	doorlockdef.ClusterID:   newDoorLockServer,             // DoorLock: cluster/lock, matter.js DoorLockServer.ts.
+	wcdef.ClusterID:         newWindowCoveringServer,       // WindowCovering: cluster/cover, matter.js WindowCoveringServer.ts.
+	thermostatdef.ClusterID: newThermostatServer,           // Thermostat: cluster/thermo, matter.js ThermostatServer.ts.
+	ccdef.ClusterID:         newColorControlServer,         // ColorControl: cluster/light, matter.js ColorControlServer.ts.
+	ecodef.ClusterID:        newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
 
 	// The appliance, sensor-configuration and energy servers
 	// (defaults_appliance.go).
-	0x0053: newLaundryWasherControlsServer,                          // LaundryWasherControls: cluster/appliance.
-	0x0057: alarmServer(alarmbase.NewRefrigeratorAlarm),             // RefrigeratorAlarm: cluster/alarmbase.
-	0x005D: alarmServer(alarmbase.NewDishwasherAlarm),               // DishwasherAlarm: cluster/alarmbase.
-	0x0071: filterServer(filter.NewHepaFilterMonitoring),            // HepaFilterMonitoring: cluster/filter.
-	0x0072: filterServer(filter.NewActivatedCarbonFilterMonitoring), // ActivatedCarbonFilterMonitoring: cluster/filter.
-	0x0080: newBooleanStateConfigurationServer,                      // BooleanStateConfiguration: cluster/boolcfg.
-	0x0095: newCommodityPriceServer,                                 // CommodityPrice: cluster/energy.
-	0x0099: newEnergyEvseServer,                                     // EnergyEvse: cluster/energy.
-	0x00A0: newGridConditionsServer,                                 // ElectricalGridConditions: cluster/energy.
-	0x0204: newThermostatUIServer,                                   // ThermostatUserInterfaceConfiguration: cluster/thermo.
-	0x0B07: newCommodityMeteringServer,                              // CommodityMetering: cluster/energy.
+	washerdef.ClusterID:   newLaundryWasherControlsServer,                          // LaundryWasherControls: cluster/appliance.
+	rfadef.ClusterID:      alarmServer(alarmbase.NewRefrigeratorAlarm),             // RefrigeratorAlarm: cluster/alarmbase.
+	dwadef.ClusterID:      alarmServer(alarmbase.NewDishwasherAlarm),               // DishwasherAlarm: cluster/alarmbase.
+	hepadef.ClusterID:     filterServer(filter.NewHepaFilterMonitoring),            // HepaFilterMonitoring: cluster/filter.
+	acfdef.ClusterID:      filterServer(filter.NewActivatedCarbonFilterMonitoring), // ActivatedCarbonFilterMonitoring: cluster/filter.
+	boolcfgdef.ClusterID:  newBooleanStateConfigurationServer,                      // BooleanStateConfiguration: cluster/boolcfg.
+	pricedef.ClusterID:    newCommodityPriceServer,                                 // CommodityPrice: cluster/energy.
+	evsedef.ClusterID:     newEnergyEvseServer,                                     // EnergyEvse: cluster/energy.
+	griddef.ClusterID:     newGridConditionsServer,                                 // ElectricalGridConditions: cluster/energy.
+	tuidef.ClusterID:      newThermostatUIServer,                                   // ThermostatUserInterfaceConfiguration: cluster/thermo.
+	meteringdef.ClusterID: newCommodityMeteringServer,                              // CommodityMetering: cluster/energy.
 }
 
 // coupledLast are the defaults built after the device's other servers,
 // because they couple to them: LevelControl follows OnOff and moves
 // ColorControl's colour temperature.
-var coupledLast = []uint32{0x0008}
+var coupledLast = []uint32{lvldef.ClusterID}
 
 // buildOrder returns the indexes of reqs in the order their defaults are
 // built: the type's order, the coupled clusters last.
@@ -180,10 +199,10 @@ func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 // false, :782-790).
 func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock}
-	if srv := b.sibling(0x0006); srv != nil {
+	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
-	if ct, ok := b.sibling(0x0300).(levelcontrol.ColorTemperatureCoupling); ok {
+	if ct, ok := b.sibling(ccdef.ClusterID).(levelcontrol.ColorTemperatureCoupling); ok {
 		cfg.ColorTemperature = ct
 	}
 	srv, err := levelcontrol.New(cfg)
@@ -200,7 +219,7 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // (managedTransitionTimeHandling false).
 func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock}
-	if srv := b.sibling(0x0006); srv != nil {
+	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
 	srv, err := light.NewColorControl(cfg)
@@ -309,7 +328,7 @@ func applyInitial(name string, srv contract.ClusterServer, initial map[uint32]an
 // selection the device type and the host made: its FeatureMap, the
 // attributes, commands and events the selection mandates.
 func checkSelection(name string, srv contract.ClusterServer, opts spec.Options) error {
-	if fm, ok := srv.MatterRead(0xFFFC); ok {
+	if fm, ok := srv.MatterRead(spec.AttrFeatureMap); ok {
 		if got, _ := fm.(uint32); got != opts.Features {
 			return notServed(fmt.Errorf("%s: the server advertises FeatureMap 0x%X, the selection is 0x%X", name, got, opts.Features))
 		}

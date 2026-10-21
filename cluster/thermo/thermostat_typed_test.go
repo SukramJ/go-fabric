@@ -133,3 +133,47 @@ func TestThermostatTypedEmitAndOnWrite(t *testing.T) {
 		t.Errorf("the veto saw %v; heating %d", seen, s.Get().OccupiedHeatingSetpoint)
 	}
 }
+
+// TestThermostatTypedSetPresets: the host sets Presets and
+// ActivePresetHandle through the typed Set, as through SetPresets and
+// SetActivePresetHandle — validated against the preset rules; a refused
+// preset list leaves the other attributes of the patch unset.
+func TestThermostatTypedSetPresets(t *testing.T) {
+	t.Parallel()
+	srv, err := thermo.New(unconfiguredPresets())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := tdef.Wrap(srv)
+
+	// A handle the old list does not hold is refused (NOT_FOUND), and the
+	// patch's LocalTemperature is not stored.
+	if err := s.Set(tdef.Patch{
+		Presets:          ptrOf([]tdef.PresetStruct{newPreset(withHandle([]byte{1, 2, 3, 4}))}),
+		LocalTemperature: ptrOf(int16(2150)),
+	}); err == nil {
+		t.Fatal("a preset with an unknown handle was accepted")
+	}
+	if st := s.Get(); len(st.Presets) != 0 || st.LocalTemperature != nil {
+		t.Fatalf("a refused patch stored %+v / %v", st.Presets, st.LocalTemperature)
+	}
+
+	if err := s.Set(tdef.Patch{Presets: ptrOf([]tdef.PresetStruct{newPreset()}), LocalTemperature: ptrOf(int16(2150))}); err != nil {
+		t.Fatal(err)
+	}
+	st := s.Get()
+	if len(st.Presets) != 1 || len(st.Presets[0].PresetHandle.Value) != 16 || st.LocalTemperature == nil || *st.LocalTemperature != 2150 {
+		t.Fatalf("presets %+v, LocalTemperature %v", st.Presets, st.LocalTemperature)
+	}
+	handle := st.Presets[0].PresetHandle.Value
+	if err := s.Set(tdef.Patch{ActivePresetHandle: &handle}); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().ActivePresetHandle; got == nil || !slices.Equal(*got, handle) {
+		t.Errorf("ActivePresetHandle %v, want %v", got, handle)
+	}
+	// The configuration's lists stay refused.
+	if err := s.Set(tdef.Patch{NumberOfPresets: ptrOf(uint8(9))}); !errors.Is(err, spec.ErrNotHeld) {
+		t.Errorf("NumberOfPresets: %v", err)
+	}
+}

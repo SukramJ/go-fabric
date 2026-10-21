@@ -32,7 +32,9 @@ var (
 // no write veto runs. A colour state set while a transition or colour
 // loop runs does not stop it: its next step overwrites the value, as
 // matter.js's next step overwrites a state write
-// (packages/node/src/behavior/Transitions.ts:455-534, :537-574), and a
+// (packages/node/src/behavior/Transitions.ts:455-534, :537-574; matter.js
+// ends it only when the written value equals its target, :659-693
+// #instrumentProperty, not mirrored, as on [ColorControlServer.Set]), and a
 // command whose writers are running does not store its own colour over
 // the host's (as [ColorControlServer.Set]). ColorMode and
 // EnhancedColorMode move together: one set alone sets the other to the

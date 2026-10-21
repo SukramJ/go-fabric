@@ -122,7 +122,7 @@ return an error (`ErrNotAccepted` at registration); `Handle(cmd, nil)` on
 | levelcontrol (held and port) | CurrentLevel (held only; port form ErrNotHeld), OnLevel, Options, StartUpCurrentLevel; Min/MaxLevel fixed values only; RemainingTime ErrNotHeld; transition not stopped | replaces the command incl. ExecuteIfOff and transition | none | Options/OnLevel/StartUpCurrentLevel, before the port |
 | light.ColorControl | colour attributes, modes, ColorLoop*, Options, StartUpColorTemperatureMireds; RemainingTime and the physical bounds ErrNotHeld unless equal; no writer; transition not stopped | replaces | none | Options, StartUpColorTemperatureMireds |
 | cover | positions, OperationalStatus, Mode; ConfigStatus/percentages derived; no Mover | replaces | none | Mode |
-| thermo.Thermostat | temperatures, calibration, SystemMode, Occupancy, setpoints and limits held to their limits; Presets/ActivePresetHandle ErrNotHeld (Questions) | replaces | events per feature (none served today) | every write, before presets, reconcile, Sink |
+| thermo.Thermostat | temperatures, calibration, SystemMode, Occupancy, setpoints and limits held to their limits; Presets and ActivePresetHandle through `SetPresets` / `SetActivePresetHandle` (first, in that order; review follow-up); ErrNotHeld only for the derived and configured ones | replaces | events per feature (none served today) | every write, before presets, reconcile, Sink |
 | fan, pump | nothing held: every attribute ErrNotHeld (StateSource / config) | fan Step replaced; pump none | pump alarms (new signature) | before the port |
 | core.Binding | the list (all fabrics, FabricIndex kept), persisted and told to OnChange | none (ErrNotAccepted) | none | the written entries before save |
 | core.EcosystemInformation | ErrNotHeld (directory port) | none | none | never fires (read-only) |
@@ -230,6 +230,13 @@ before or now).
   overwrites.
 - `pump.Server.Emit` takes the `EventEmitting` signature (break, CHANGELOG
   Changed) instead of a second emitter method.
+- `levelcontrol.LevelSource` and `fan.Stepper` keep the `cluster/wire`
+  request types as the ports' vocabulary for now; BU's declaration
+  decides whether a port takes the generated request (owner, review of
+  #204).
+- `device/defaults.go` keys the table and the couplings with the
+  generated `ClusterID` constants (`onoffdef.ClusterID`, …) and
+  `spec.AttrFeatureMap`, never a literal id (review of #204).
 - Unreachable checks the definition already makes removed
   (`CommodityMetering` minimum and id cap, a filter enum check).
 - `fabrictest` (BX2's path): two doc lines (`Options.Logger`) and the
@@ -239,6 +246,11 @@ before or now).
   :313 and :393 — a merge neighbour of BX2's :320-337).
 
 ## Left out
+
+- `lock.New` reads an empty feature selection as Unbolting (its
+  pre-users default), so a DoorLock device keeps the stub unless the host
+  selects features: a hidden default, BU's with the declaration that
+  carries the lock's port (an announced break under v0.10.0).
 
 - AppBasic and WakeOnLan (media) keep a typed state beside their store;
   the `SetAttributes` they inherit from `*spec.Server` bypasses it (a gap
@@ -250,23 +262,21 @@ before or now).
   construction) is not unsubscribed from its sibling OnOff — only
   LevelControl subscribes, and no device type hits that path today.
 
-## Questions
+## Questions (answered in review of #204)
 
-1. `levelcontrol.LevelSource` and `fan.Stepper` take `cluster/wire`
-   request types: retire them with BU's declaration (the port takes the
-   generated request), or keep them as the ports' vocabulary?
-2. `lock.New` reads an empty feature selection as Unbolting (its
-   pre-users default), so a DoorLock device keeps the stub unless the host
-   selects features. Change `lock.New` so 0 means none (a break for hosts
-   that relied on it)?
-3. Thermostat Presets / ActivePresetHandle through `Set`: refused today
-   (they persist through the PresetStore under the command queue);
-   route them through `SetPresets` / `SetActivePresetHandle` instead?
-4. `Set` and a running transition: matter.js's behaviour (the next step
-   overwrites) is what this wave does — confirm, or decide the facade
-   stops the transition (a `by_design` entry then).
+1. `LevelSource` / `Stepper` keep the `cluster/wire` types for now (BU decides) — Decisions.
+2. `lock.New`'s empty selection — BU's (Left out).
+3. Thermostat Presets / ActivePresetHandle are settable through `Set`,
+   routed to `SetPresets` / `SetActivePresetHandle`
+   (`TestThermostatTypedSetPresets`).
+4. matter.js confirmed: a state write ends a transition only when it
+   equals the target (`Transitions.ts:659-693`), otherwise the next step
+   overwrites it; the citation is on levelcontrol's and light's `Set`
+   docs, no `by_design` entry.
 
 ## by_design candidates
+
+Accepted in review; the coordinator writes the entries after the merge.
 
 - **A host `Handle` replaces the whole command.** matter.js names the
   override point of its commands the logic method, which keeps the

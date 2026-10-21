@@ -60,18 +60,26 @@ var setpointKeys = map[uint32]struct {
 // preset in effect, as a local direct change does (ThermostatServer.ts:744-768
 // at 862ad75f).
 //
-// Presets and ActivePresetHandle are validated against the preset rules
-// and persisted through the [PresetStore] under the command queue
-// ([ThermostatServer.SetPresets], [ThermostatServer.SetActivePresetHandle]):
-// SetAttributes refuses them with [spec.ErrNotHeld] and names the setter.
+// Presets and ActivePresetHandle, which the host owns too, go through
+// [ThermostatServer.SetPresets] and [ThermostatServer.SetActivePresetHandle]
+// — validated against the preset rules and persisted through the
+// [PresetStore] under the command queue — before the other attributes, in
+// that order: a refusal there leaves the other attributes unset (a
+// refused handle after accepted presets keeps the presets).
 // ControlSequenceOfOperation is derived from the features, and
 // MinSetpointDeadBand, PresetTypes and NumberOfPresets are the
 // configuration's: [spec.ErrNotHeld] for a value other than the one they
 // read (any value for the two lists).
 func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
-	checked, err := s.checkSet(values)
-	if err != nil || len(checked) == 0 {
+	checked, presets, err := s.checkSet(values)
+	if err != nil {
 		return err
+	}
+	if err := s.setPresetAttributes(presets); err != nil {
+		return err
+	}
+	if len(checked) == 0 {
+		return nil
 	}
 	s.mu.Lock()
 	st := s.setpointState()
@@ -142,31 +150,62 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
+// presetValues are the Presets and ActivePresetHandle a
+// [ThermostatServer.SetAttributes] sets, each when given.
+type presetValues struct {
+	presets    []Preset
+	hasPresets bool
+	handle     []byte
+	hasHandle  bool
+}
+
+// setPresetAttributes applies p through the preset setters, Presets first.
+func (s *ThermostatServer) setPresetAttributes(p presetValues) error {
+	ctx := context.Background()
+	if p.hasPresets {
+		if err := s.SetPresets(ctx, p.presets); err != nil {
+			return err
+		}
+	}
+	if p.hasHandle {
+		return s.SetActivePresetHandle(ctx, p.handle)
+	}
+	return nil
+}
+
 // checkSet checks every value of a [ThermostatServer.SetAttributes] and
-// returns the held ones in their stored form.
-func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, error) {
+// returns the held ones in their stored form, the preset attributes apart.
+func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, presetValues, error) {
+	var presets presetValues
 	checked := make(map[uint32]any, len(values))
 	for _, id := range slices.Sorted(maps.Keys(values)) {
 		v, err := s.inst.CheckSet(id, values[id], s.MatterRead)
 		if err != nil {
-			return nil, err
+			return nil, presets, err
 		}
 		switch id {
 		case tdef.AttrPresets:
-			return nil, fmt.Errorf("%w: thermostat: Presets is set with SetPresets", spec.ErrNotHeld)
+			list, err := presetsValue(v)
+			if err != nil {
+				return nil, presets, err
+			}
+			presets.presets, presets.hasPresets = list, true
+			continue
 		case tdef.AttrActivePresetHandle:
-			return nil, fmt.Errorf("%w: thermostat: ActivePresetHandle is set with SetActivePresetHandle", spec.ErrNotHeld)
+			handle, _ := v.([]byte) // octstr per CheckSet; nil is null
+			presets.handle, presets.hasHandle = handle, true
+			continue
 		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets:
-			return nil, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
+			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
 		case thermoAttrControlSequenceOfOperation, thermoAttrMinSetpointDeadBand:
 			if cur, _ := s.MatterRead(id); v != cur {
-				return nil, fmt.Errorf("%w: thermostat: attribute 0x%04X is fixed at %v", spec.ErrNotHeld, id, cur)
+				return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is fixed at %v", spec.ErrNotHeld, id, cur)
 			}
 			continue
 		}
 		checked[id] = v
 	}
-	return checked, nil
+	return checked, presets, nil
 }
 
 // applySet puts the absolute limits, user limits and setpoints checked
