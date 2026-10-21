@@ -1429,10 +1429,10 @@ By design, until the bridge exposes its listener (findings register).
 matter.js's node initiates CASE to a bound peer on the same operational
 socket it answers on (`BindingManager.ts:585-627` at `0ceb202d`,
 `PeerSet.for(addr).connect()`). `node.Config.Client` opens a second
-`udp.Listener` with a `controller/exchange.Manager` and a `peer.Set`
+`udp.Listener` with a `client/exchange.Manager` and a `peer.Set`
 built from the node's own fabric identities (`node/security.go`): the
 device stack (`transport/mrp`, `secure/channel`) and the controller
-stack (`controller/exchange`) do not share a socket. A Matter initiator's
+stack (`client/exchange`) do not share a socket. A Matter initiator's
 source port is free; the responder answers the source. Report AO.
 
 By design. One stack per role; CASE resumption records of the client
@@ -2108,9 +2108,9 @@ default is matter.js's.
 (`controller/`, ADR 0020) wired for a test, since brief AJ: `controller/ca`
 with a fixed issuing instant (2026-01-01, so the validity is matter.js's
 −1 y / +10 y of `CertificateAuthority.ts:233, :304` around that instant
-rather than around now), MRP retransmission through `controller/exchange`,
+rather than around now), MRP retransmission through `client/exchange`,
 the commissioning flow of `controller/commissioner`, the handshakes and the
-CASE responder of `controller/handshake`, and DNS-SD answers injected into
+CASE responder of `client/handshake`, and DNS-SD answers injected into
 the controller's cache from the device's advertiser or the dialled address
 instead of multicast. `Options.Seed` seeds the IPK, the flow's nonces, the
 keys of further controller identities and the MRP jitter; the root and
@@ -2479,7 +2479,7 @@ signature with; a key lifted from an unverified NOC authenticates nothing
 until the chain is verified. Every input matter.js refuses is refused here
 too; only the error class differs for a NOC that is at once unverifiable
 and mismatched — `ErrSignatureInvalid` here, the identity mismatch there —
-and no peer can observe which. `controller/handshake.CASE` reports
+and no peer can observe which. `client/handshake.CASE` reports
 InvalidParam either way (`CaseClient.ts:83-99`). Report AF, question 2.
 
 ---
@@ -2494,7 +2494,7 @@ stays invalid across two searches holds two pairs. Once its TXT becomes
 valid every pending observer calls `#cacheDevice`; the later overwrites
 the cache entry and the earlier `IpService` and name observer are never
 released, so the name is observed, and never evicted, for the scanner's
-lifetime. `controller/discovery.Scanner.onDiscovered` returns when the
+lifetime. `client/discovery.Scanner.onDiscovered` returns when the
 instance is already pending.
 
 By design. A leak is not behaviour to mirror; what a peer observes — the
@@ -2512,7 +2512,7 @@ matter.js `packages/general/src/net/dns-sd/MdnsSocket.ts:155-222` (at
 `0ceb202d`) splits a query whose questions and known answers exceed
 `MAX_MDNS_MESSAGE_SIZE` (1232 bytes) into several packets, and
 `MdnsRelevanceFilter.ts` drops packets that name no Matter service before
-decoding them. `controller/discovery.Solicitor` sends one packet whatever
+decoding them. `client/discovery.Solicitor` sends one packet whatever
 its known-answer count, and `discovery.Names` decodes every packet and
 filters on the decoded names. A TXT value that is not valid UTF-8 decodes
 to one U+FFFD per invalid byte (`Parameters.Get`), where `TextDecoder`'s
@@ -2536,7 +2536,7 @@ matter.js `Peer.ts:99-106` (at `0ceb202d`) wraps the descriptor in an
 (`:575-579`) unless one is already running; `#save` is an async function
 that runs synchronously up to its `await this.#updated.emit(this)`, so
 the `#isSaving` guard coalesces nothing in practice and the node layer
-sees one `updated` per changed field. `controller/peer.Peer` starts one
+sees one `updated` per changed field. `client/peer.Peer` starts one
 save worker per burst — the fields `AddKnownPeer` or a session adoption
 change together reach `Store.SavePeer` as one descriptor — and logs a
 store error, as `BasicMultiplex.add` logs a rejected worker
@@ -2658,7 +2658,7 @@ unsupported message (`InteractionMessenger.ts:357-361`).
 
 matter.js assigns `list[index] = value` (`TlvArray.ts:150` at `0ceb202d`),
 which in JavaScript extends the array with holes. The report assembler of
-`controller/interaction` treats such an entry as malformed and skips it,
+`client/interaction` treats such an entry as malformed and skips it,
 as it skips every other malformed entry (`InputChunk.ts:233-241`). Report AI.
 
 By design. Go slices do not hold holes; a report whose set-at-index
@@ -3520,7 +3520,7 @@ cancelled context.
 
 ### BD-Matter-Controller-SingleCommandBuilders — numeric, single-command request builders
 
-`controller/interaction` builds a Read, Write or Invoke from numeric
+`client/interaction` builds a Read, Write or Invoke from numeric
 paths, one command per invoke. matter.js's request builders
 (`action/request/Read.ts`, `Write.ts`, `Invoke.ts`) also accept element
 names and a zero-argument form, and batch commands. The name and
@@ -3534,7 +3534,7 @@ request is the same.
 
 `SubscriptionsConfig.ReportStarted` and `SubscribeRequest.ActiveChanged`
 are single callbacks, and a report reaches `Updated` as one value per kind
-(`controller/interaction/report.go`, the assembler of
+(`client/interaction/report.go`, the assembler of
 `action/client/InputChunk.ts:174-245`); matter.js hands out observables
 (`action/client/subscription/ClientSubscriptions.ts`, `reportStarted`) and
 a chunk stream. Extends `BD-Matter-Controller-MergedReports`. Report BH

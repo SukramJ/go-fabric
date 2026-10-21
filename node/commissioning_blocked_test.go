@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	admincommdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"

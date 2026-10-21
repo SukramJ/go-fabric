@@ -29,9 +29,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"

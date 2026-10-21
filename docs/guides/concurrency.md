@@ -116,10 +116,10 @@ the report, inside the report's exchange. The priming report is delivered
 inside `Subscribe`, before it returns. The reference controller hands each
 report to a channel.
 
-**`controller/discovery`** runs one goroutine per `Names` that holds all
+**`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`, `node/observers.go:4-21`, `device/device.go:643-661`, `controller/interaction/handler.go:126-138`, `controller/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `controller/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`, `node/observers.go:4-21`, `device/device.go:643-661`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
 
 ## Changing the topology
 

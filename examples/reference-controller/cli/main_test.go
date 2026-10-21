@@ -24,9 +24,9 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"

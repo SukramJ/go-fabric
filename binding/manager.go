@@ -10,11 +10,11 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -80,7 +80,7 @@ type Resolution struct {
 
 // Peers is where the manager takes the peer of a node entry from —
 // matter.js `node.peers.forAddress` (BindingManager.ts:333);
-// controller/peer.Set satisfies it.
+// client/peer.Set satisfies it.
 type Peers interface {
 	For(addr handshake.PeerAddress) (*peer.Peer, error)
 }

@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -477,7 +477,7 @@ type peerLink interface {
 	observe(p *peer.Peer, sessionAdded func()) (stop func())
 }
 
-// realLink is [peerLink] over controller/peer: PeerSet.for(addr).connect()
+// realLink is [peerLink] over client/peer: PeerSet.for(addr).connect()
 // (BindingManager.ts:600-601) and the peer's session set.
 type realLink struct{}
 

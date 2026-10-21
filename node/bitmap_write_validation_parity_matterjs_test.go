@@ -14,9 +14,9 @@ package node_test
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"

@@ -20,6 +20,10 @@ import (
 	// The pure-Go SQLite driver; no store package imports one.
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -27,10 +31,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )

@@ -22,13 +22,13 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	secattestation "github.com/SukramJ/go-fabric/secure/attestation"

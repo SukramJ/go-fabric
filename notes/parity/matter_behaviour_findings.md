@@ -285,7 +285,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 - NodeLabel/Location writes not persisted across restart. `cluster/core/basic_information.go:500`. **FIXED (0.31.0–0.33.0):** a Matter write to NodeLabel/Location (both "N" quality, §11.1.6) fires `BasicInformation.SetOnPersistentWrite`; the daemon persists them to the new `matter_settings` table (migration 025, `store.SetSetting`) and restores them at boot via `SetNodeLabel`/`SetLocation` before the first Subscribe. matter.js persists them through its behavior state.
 
 **CASE**
-- Unresolvable destinationId falls back to a wrong identity instead of `NO_SHARED_TRUST_ROOTS`. `secure/sigma/protocol.go:705` vs `CaseServer.ts:238`. **FIXED (verified 2026-10-13):** `secure/sigma/protocol.go:806-811` returns `ErrNoSharedTrustRoots` on a resolver miss and `bridge/handlers.go:804` answers it; resolvers at `node/security.go:66` and, for the controller, `controller/handshake.FabricList` (`bridge/bridgetest` resolves through it since brief AJ). Without a resolver (test path) the single constructor identity remains.
+- Unresolvable destinationId falls back to a wrong identity instead of `NO_SHARED_TRUST_ROOTS`. `secure/sigma/protocol.go:705` vs `CaseServer.ts:238`. **FIXED (verified 2026-10-13):** `secure/sigma/protocol.go:806-811` returns `ErrNoSharedTrustRoots` on a resolver miss and `bridge/handlers.go:804` answers it; resolvers at `node/security.go:66` and, for the controller, `client/handshake.FabricList` (`bridge/bridgetest` resolves through it since brief AJ). Without a resolver (test path) the single constructor identity remains.
 - Attestation challenge is one global slot, set only on PASE. `cluster/core/operational_credentials.go:158` vs `OperationalCredentialsServer.ts:113`. **FIXED (verified 2026-10-13):** the challenge is per session — `bridge/receive_dispatch.go:510-511` stamps `sessionAttestationChallenge(sessionID)` (`:903-920`, `secure/operational/manager.go:835` `AttestationChallengeFor`) into the invoke context, `operational_credentials.go:1294` and `:1461` sign with it, CASE sessions carry theirs (`manager.go:545`); the global `SetAttestationChallenge` (`:201`) is the fallback.
 
 **Endpoint / ACL**
@@ -388,17 +388,17 @@ Device side:
 Controller side:
 
 - **Known answers are sent with their original TTL.**
-  `controller/discovery/solicitor.go:368-375`; matter.js #4756 sends the
+  `client/discovery/solicitor.go:368-375`; matter.js #4756 sends the
   remaining TTL rounded up and omits a record past half its TTL
   (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Left open by phase 16; milestone 5 phase 25.)
 - **Discovery has one error and no abort.** matter.js #4747 distinguishes
   `DeviceNotDiscoveredError`, `DiscoveryIncompleteError`,
   `NoDiscoveryTransportError` and lets the caller abort every attempt
-  (`DiscoveryError.ts:9-31`); `controller/discovery` and the commissioner
+  (`DiscoveryError.ts:9-31`); `client/discovery` and the commissioner
   report one error and stop on context cancellation only. (Milestone 5,
   controller remainder.)
 - **A status the peer sent is not told from a local one.**
-  `controller/interaction/interaction.go:56` `StatusError`; matter.js #4750
+  `client/interaction/interaction.go:56` `StatusError`; matter.js #4750
   `ResultStatus.received` (`ResultStatus.ts:1-35`). Low. (Milestone 5.)
 
 Found by the phase-16 port of `packages/protocol/test` (brief BH, PR #164,
@@ -448,12 +448,12 @@ Device side:
 Controller side:
 
 - **Network profiles.** One network, MRP margins 0
-  (`controller/peer/doc.go:15-17`, `controller/exchange/mrp.go:62-65`);
+  (`client/peer/doc.go:15-17`, `client/exchange/mrp.go:62-65`);
   matter.js `peer/NetworkProfile.ts:78-245` with the margins of
   `protocol/MRP.ts:162-190`. Register `until M5 phase 25`
   (NetworkProfileTest; 32 cases with BH-1's MRP cases). (Milestone 5 phase 25.)
 - **`ClientInteraction.close`, in-flight tracking, abandoned subscriptions,
-  multi-command invoke and write chunking.** `controller/interaction` has
+  multi-command invoke and write chunking.** `client/interaction` has
   no Close, no in-flight set, no abandonment and one command per invoke
   (`action/client/ClientInteraction.ts:264-297`, `:520-640`); `Write`
   refuses an oversized write with `ErrRequestTooLarge` where matter.js
@@ -549,7 +549,7 @@ Controller side:
   does (`ClientNodeInteraction.ts:123-124`). API change. (Milestone 5
   phase 25.)
 - **A priming report after a cancelled establishment is acknowledged
-  Success.** `controller/interaction/handler.go`; matter.js answers
+  Success.** `client/interaction/handler.go`; matter.js answers
   INVALID_SUBSCRIPTION (five ClientSubscribeTest cases; brief BH's path).
   (Milestone 5 phase 25.)
 - **`Cluster.Supports` applies no conformance, `Cluster.Revision` is 0
@@ -663,7 +663,7 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   (Milestone 4, a host option and a level source in `contract/`.)
 - **The controller chooses no TCP session.** `PeerExchangeProvider`'s
   selection of a TCP session among a peer's sessions (skipping closing
-  ones) has no Go counterpart: `controller/peer` opens UDP sessions. Four
+  ones) has no Go counterpart: `client/peer` opens UDP sessions. Four
   `TcpSessionBindingTest.ts` cases are `missing` for this. (Register
   candidate, with a controller TCP transport.)
 - **The node's session intervals are not configurable.** matter.js takes

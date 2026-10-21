@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -25,7 +25,7 @@ import (
 
 // Peer-loss causes of the registry — matter.js PeerLeftError and
 // PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:80-84,
-// :62-66 at 0ceb202d), which controller/peer and controller/exchange do
+// :62-66 at 0ceb202d), which client/peer and client/exchange do
 // not declare.
 var (
 	// ErrPeerLeft: the peer left the fabric — the cause its sessions are
@@ -371,7 +371,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (handshake.PeerAdd
 // command was delivered: matter.js causedBy(PeerMessageMissingError,
 // PeerLeftError, FabricRemovedError, PeerInitiatedCloseError)
 // (CommissioningClient.ts:406-408). PeerMessageMissingError and
-// PeerInitiatedCloseError are controller/exchange's
+// PeerInitiatedCloseError are client/exchange's
 // [*exchange.PeerMessageMissingError] and [*exchange.PeerInitiatedCloseError];
 // PeerLeftError is [ErrPeerLeft]; FabricRemovedError is [ErrFabricRemoved].
 func removalConfirmedBy(err error) bool {

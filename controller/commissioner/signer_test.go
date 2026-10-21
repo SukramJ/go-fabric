@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 )
 

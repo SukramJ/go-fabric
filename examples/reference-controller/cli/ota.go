@@ -12,9 +12,9 @@ import (
 	"strconv"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

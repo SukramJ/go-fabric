@@ -19,7 +19,7 @@ import (
 // the records each device's advertiser holds (an mdns.Noop the site gives
 // it), its commissionable record while a window is open and its
 // operational record per fabric, with the device's address on the
-// network. It replaces the DNS answers controller/interaction's and
+// network. It replaces the DNS answers client/interaction's and
 // controller/client's live tests injected by hand, and multicast with it.
 
 // TTLs of the answers: the host and SRV records 120 s, the PTR and TXT

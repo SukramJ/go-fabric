@@ -30,9 +30,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/secure/channel"
 )
 

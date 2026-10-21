@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 )
 
 // DefaultUpdateInterval is how often the trust store refreshes — matter.js

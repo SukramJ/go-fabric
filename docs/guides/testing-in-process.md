@@ -176,7 +176,7 @@ test.
 *Source: `fabrictest/site.go` (`Run`, `Eventually`, `Settle`, `busy`),
 `node/config.go` (`Config.Clock`), `device/options.go` (`Options.Clock`),
 `endpoint/assembler.go` (`Config.Clock`), `node/root.go`
-(`buildAggregatorClusters`), `controller/discovery/names.go` (`newNames`).*
+(`buildAggregatorClusters`), `client/discovery/names.go` (`newNames`).*
 
 ## Shaping the network
 
@@ -213,7 +213,7 @@ registry's nodes. On loopback sockets the controller gets a new port.
 
 *Source: `fabrictest/device.go` (`Restart`, `siteResolver`),
 `fabrictest/controller.go` (`Restart`),
-`controller/interaction/live_test.go` (`TestLiveSustainedSurvivesRestart`),
+`client/interaction/live_test.go` (`TestLiveSustainedSurvivesRestart`),
 `controller/client/live_test.go` (`TestLiveClientNode`).*
 
 ## Sockets

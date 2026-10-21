@@ -22,9 +22,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 )
 
 // The endpoints and device types of ClientBridgeStructureTest.ts.

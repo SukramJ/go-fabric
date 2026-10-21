@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )

@@ -4,7 +4,7 @@
 package bridgetest
 
 // A secure session (PASE or CASE) of the commissioner's exchange manager
-// and the Interaction Model client over it — controller/interaction bound
+// and the Interaction Model client over it — client/interaction bound
 // to the session, the subscriptions in the commissioner's registry.
 
 import (
@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -74,7 +74,7 @@ func (s *Session) Close() {
 // handler closes it) or by the commissioner.
 func (s *Session) closed() bool { return s.s.IsClosed() }
 
-// failure maps an error of controller/interaction onto this package's:
+// failure maps an error of client/interaction onto this package's:
 // a status the device ended the interaction with is a [*StatusError], an
 // error on a session that closed meanwhile wraps [ErrSessionClosed].
 func (s *Session) failure(err error) error {

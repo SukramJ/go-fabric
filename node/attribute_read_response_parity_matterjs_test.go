@@ -29,9 +29,9 @@ package node_test
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"

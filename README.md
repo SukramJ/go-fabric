@@ -102,7 +102,7 @@ through which the test-support packages reach package internals
 unimportable from outside. Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
-Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `cluster/…`,
+Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `client/…`, `cluster/…`,
 `commissioning/`, `contract/`, `controller/…`, `device/`, `diagevent/`,
 `eligibility/`, `endpoint/` (including `endpoint/sqlitestore`), `groups/`,
 `im/`, `im/subscription`, `mdns/`, `node/`,

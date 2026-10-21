@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"

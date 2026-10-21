@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/store"
 )
 

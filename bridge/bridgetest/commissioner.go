@@ -14,15 +14,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -203,7 +203,7 @@ func Dial(tb testing.TB, addr string, opts Options) *Commissioner {
 	return c
 }
 
-// start builds the controller's parts, as controller/interaction's live
+// start builds the controller's parts, as client/interaction's live
 // test wires them.
 func (c *Commissioner) start() error {
 	discard := slog.New(slog.DiscardHandler)
@@ -452,7 +452,7 @@ func (c *Commissioner) RemoveFabric(ctx context.Context, s *Session) (uint8, err
 // ControllerIdentity is the operational identity of controller nodeID on
 // the commissioner's fabric — its key and NOC with cats, minted on first
 // use as [Commissioner.CASEAs] mints them — for a CASE initiator outside
-// this package (controller/handshake's tests). The IPK is the operational
+// this package (client/handshake's tests). The IPK is the operational
 // one, the fabric index 1. ControllerNodeID's is the fabric's own identity,
 // the NOC the commissioning flow presents.
 func (c *Commissioner) ControllerIdentity(nodeID uint64, cats ...uint32) sigma.Identity {

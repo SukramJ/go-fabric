@@ -6,8 +6,8 @@ package commissioner
 import (
 	"errors"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 )
 
 // The classes of commissioning failure — matter.js CommissioningError

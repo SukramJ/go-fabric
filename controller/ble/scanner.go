@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
 

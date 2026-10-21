@@ -6,9 +6,9 @@ package commissioner
 // A port of matter.js packages/protocol/test/peer/PeerConnectionErrorHandlerTest.ts
 // at 862ad75f: its "commissioning NoSharedTrustRoots handler" group, against
 // the commissioner's CASE error handler (the other groups of the file are in
-// controller/peer). A handler's (delay, true, nil) replaces the peer's default
+// client/peer). A handler's (delay, true, nil) replaces the peer's default
 // delay — the full-flow half of two cases — as TestPeerConnectionErrorHandlerDelayContract
-// holds in controller/peer; the commissioner cannot be driven through that
+// holds in client/peer; the commissioner cannot be driven through that
 // package's harness, so those two cases stay missing.
 
 import (
@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 

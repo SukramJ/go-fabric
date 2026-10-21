@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/client/interaction"
 )
 
 // readingStore reads the node from inside EraseNode, as a host store that

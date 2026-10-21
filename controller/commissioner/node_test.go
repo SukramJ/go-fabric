@@ -16,15 +16,15 @@ import (
 	"github.com/miekg/dns"
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/interaction"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/interaction"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -41,7 +41,7 @@ const (
 )
 
 // startNode starts an uncommissioned node on loopback, as the
-// controller/handshake and controller/peer tests do.
+// client/handshake and client/peer tests do.
 func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")

@@ -6,13 +6,13 @@ package bridgetest
 // The controller's DNS-SD cache without multicast: the commissioner's
 // query socket sends nowhere, and the device's operational record —
 // read from Options.Advertiser, or the dialled address — is written into
-// the cache as an answer, as controller/interaction's live test injects
+// the cache as an answer, as client/interaction's live test injects
 // it. The peer set resolves the commissioned node through that cache.
 
 import (
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/mdns"
 )
 

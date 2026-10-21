@@ -62,18 +62,26 @@ Reports flow the other way through the subscription engine
 ## The controller-side stack
 
 ```
-controller/discovery     DNS-SD browse for commissionable and operational nodes
+client/discovery         DNS-SD browse for commissionable and operational nodes
 controller/ble           BLE scanner, the Central seam, the BTP commissioning channel (transport/btp)
-controller/exchange      unsecured and secure sessions, exchanges, MRP (initiator side; none over BTP)
-controller/handshake     PASE and CASE as initiator, CASE responder for reconnects
+client/exchange          unsecured and secure sessions, exchanges, MRP (initiator side; none over BTP)
+client/handshake         PASE and CASE as initiator, CASE responder for reconnects
 controller/ca            the fabric's root CA, NOC issuance
 controller/attestation   DAC → PAI → PAA, Certification Declaration, revocation hook
 controller/dcl           CSA Distributed Compliance Ledger client (opt-in)
 controller/commissioner  the commissioning flow (ControllerCommissioningFlow), incl. the Wi-Fi / Thread network steps
-controller/interaction   Read, Write, Invoke, Subscribe as a client
-controller/peer          peer sets, address monitoring, session resumption
+client/interaction       Read, Write, Invoke, Subscribe as a client
+client/peer              peer sets, address monitoring, session resumption
 controller/client        a typed image of each remote node, the registry, sqlstore
 ```
+
+The five `client/` packages are the client machinery, not the role: the
+device side uses them too (`binding` sends to bound peers through them,
+`node` builds its client stack from them), so they sit in the
+model-and-protocol layer and `binding` and `node` import them downward
+([ADR 0026](adr/0026-architecture-principles.md) principles 1 and 12).
+They lived under `controller/` before v0.10.0; the old import paths
+forward to them until v0.12.0.
 
 The order of [`examples/reference-controller`](https://github.com/SukramJ/go-fabric/tree/main/examples/reference-controller)'s
 `open()` is the canonical construction order.

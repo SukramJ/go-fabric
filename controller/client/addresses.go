@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/client/discovery"
 )
 
 // The address book's lifespans — node/client/Peers.ts:73-74 at 0ceb202d.

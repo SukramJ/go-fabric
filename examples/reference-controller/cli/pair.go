@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/setup"
 )

@@ -4,7 +4,7 @@
 package client
 
 import (
-	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

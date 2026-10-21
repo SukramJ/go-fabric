@@ -8,7 +8,7 @@ package groups
 // data counter and the group message reception state a key set's removal
 // or rewrite forgets. The unicast session cases live in
 // secure/operational/sessionmanager_parity_matterjs_test.go, the local
-// parameter cases in controller/exchange/sessionmanager_parity_matterjs_test.go.
+// parameter cases in client/exchange/sessionmanager_parity_matterjs_test.go.
 
 import (
 	"context"

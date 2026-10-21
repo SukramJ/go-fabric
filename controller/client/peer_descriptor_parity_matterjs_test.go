@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 

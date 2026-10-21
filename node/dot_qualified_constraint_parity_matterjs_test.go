@@ -22,12 +22,12 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ambient "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
 	occ "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	soil "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"

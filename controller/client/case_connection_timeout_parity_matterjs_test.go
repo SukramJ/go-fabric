@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/transport/message"
 )

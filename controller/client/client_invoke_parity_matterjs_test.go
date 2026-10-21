@@ -5,7 +5,7 @@
 // 862ad75f: the controller's invokes through a client node. matter.js
 // batches commands up to the peer's maxPathsPerInvoke and propagates
 // network and per-request options through the batcher; the Go client
-// sends one command per InvokeRequest (controller/interaction
+// sends one command per InvokeRequest (client/interaction
 // Interaction.Invoke), so the batching, splitting, commandRef,
 // suppressResponse, network-profile and batch-exchange cases are missing
 // with that reason in the register, and the cases about the commands
@@ -16,8 +16,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 )
 

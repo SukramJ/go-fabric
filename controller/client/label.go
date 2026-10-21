@@ -6,7 +6,7 @@ package client
 import (
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/client/interaction"
 )
 
 // latchLabel sets the node's once-per-start latch of the fabric-label

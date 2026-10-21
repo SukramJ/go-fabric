@@ -17,9 +17,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/transport/btp"
 )
 

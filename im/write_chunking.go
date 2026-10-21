@@ -18,7 +18,7 @@ const (
 // the attribute list-chunked — REPLACE-ALL with the empty list, then one
 // append per element — by default: every attribute but AccessControl ACL
 // and Extension (Write.ts:18-21 isAclOrExtensionPath, :149-171). Unicast
-// (controller/interaction) and group (groups) writes share it.
+// (client/interaction) and group (groups) writes share it.
 func ListChunkedByDefault(cluster, attribute uint32) bool {
 	return cluster != accessControlCluster || (attribute != accessControlACL && attribute != accessControlExtension)
 }

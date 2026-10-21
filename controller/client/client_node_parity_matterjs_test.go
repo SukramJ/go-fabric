@@ -40,6 +40,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -48,8 +50,6 @@ import (
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"

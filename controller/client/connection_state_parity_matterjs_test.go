@@ -13,7 +13,7 @@
 // and the default subscription found inactive on the site's clock.
 //
 // matter.js emits the protocol peer's establishmentUnresponsive by hand;
-// the Go peer's signal is not emitted from outside (controller/peer
+// the Go peer's signal is not emitted from outside (client/peer
 // unresponsiveDetector), so the port lets it fire as it does in the field:
 // the stopped device leaves the sustained subscription's CASE
 // re-establishment unanswered until the detector reports it. A repeated

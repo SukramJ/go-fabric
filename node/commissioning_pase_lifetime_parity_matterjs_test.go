@@ -19,8 +19,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/fabrictest"
 )
 

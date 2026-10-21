@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/handshake"
-	"github.com/SukramJ/go-fabric/controller/peer"
+	"github.com/SukramJ/go-fabric/client/handshake"
+	"github.com/SukramJ/go-fabric/client/peer"
 )
 
 // TestRegistryRecordFollowsDescriptorSave: the record follows every save
