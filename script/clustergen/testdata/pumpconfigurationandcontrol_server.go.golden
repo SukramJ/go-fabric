@@ -75,6 +75,89 @@ type Patch struct {
 	Null                   []uint32           // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.MaxPressure != nil {
+		v[AttrMaxPressure] = *p.MaxPressure
+	}
+	if p.MaxSpeed != nil {
+		v[AttrMaxSpeed] = *p.MaxSpeed
+	}
+	if p.MaxFlow != nil {
+		v[AttrMaxFlow] = *p.MaxFlow
+	}
+	if p.MinConstPressure != nil {
+		v[AttrMinConstPressure] = *p.MinConstPressure
+	}
+	if p.MaxConstPressure != nil {
+		v[AttrMaxConstPressure] = *p.MaxConstPressure
+	}
+	if p.MinCompPressure != nil {
+		v[AttrMinCompPressure] = *p.MinCompPressure
+	}
+	if p.MaxCompPressure != nil {
+		v[AttrMaxCompPressure] = *p.MaxCompPressure
+	}
+	if p.MinConstSpeed != nil {
+		v[AttrMinConstSpeed] = *p.MinConstSpeed
+	}
+	if p.MaxConstSpeed != nil {
+		v[AttrMaxConstSpeed] = *p.MaxConstSpeed
+	}
+	if p.MinConstFlow != nil {
+		v[AttrMinConstFlow] = *p.MinConstFlow
+	}
+	if p.MaxConstFlow != nil {
+		v[AttrMaxConstFlow] = *p.MaxConstFlow
+	}
+	if p.MinConstTemp != nil {
+		v[AttrMinConstTemp] = *p.MinConstTemp
+	}
+	if p.MaxConstTemp != nil {
+		v[AttrMaxConstTemp] = *p.MaxConstTemp
+	}
+	if p.PumpStatus != nil {
+		v[AttrPumpStatus] = *p.PumpStatus
+	}
+	if p.EffectiveOperationMode != nil {
+		v[AttrEffectiveOperationMode] = *p.EffectiveOperationMode
+	}
+	if p.EffectiveControlMode != nil {
+		v[AttrEffectiveControlMode] = *p.EffectiveControlMode
+	}
+	if p.Capacity != nil {
+		v[AttrCapacity] = *p.Capacity
+	}
+	if p.Speed != nil {
+		v[AttrSpeed] = *p.Speed
+	}
+	if p.LifetimeRunningHours != nil {
+		v[AttrLifetimeRunningHours] = *p.LifetimeRunningHours
+	}
+	if p.Power != nil {
+		v[AttrPower] = *p.Power
+	}
+	if p.LifetimeEnergyConsumed != nil {
+		v[AttrLifetimeEnergyConsumed] = *p.LifetimeEnergyConsumed
+	}
+	if p.OperationMode != nil {
+		v[AttrOperationMode] = *p.OperationMode
+	}
+	if p.ControlMode != nil {
+		v[AttrControlMode] = *p.ControlMode
+	}
+	if p.AlarmMask != nil {
+		v[AttrAlarmMask] = *p.AlarmMask
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed PumpConfigurationAndControl server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

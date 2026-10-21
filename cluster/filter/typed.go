@@ -60,6 +60,8 @@ func productsOf(v any) ([]ReplacementProduct, bool) {
 		return []ReplacementProduct(l), true
 	case []ReplacementProduct:
 		return l, true
+	case spec.List[carbon.ReplacementProductStruct]:
+		return productsOf([]carbon.ReplacementProductStruct(l))
 	case []carbon.ReplacementProductStruct:
 		out := make([]ReplacementProduct, len(l))
 		for i, e := range l {

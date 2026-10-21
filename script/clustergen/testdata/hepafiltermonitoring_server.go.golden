@@ -39,6 +39,35 @@ type Patch struct {
 	Null                   []uint32                    // attribute ids set to null
 }
 
+// AttributeValues implements spec.PatchValuer: the attributes p sets,
+// by id, in their stored form — a list of a structure as its
+// spec.List — and nil for each id in Null.
+func (p Patch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Condition != nil {
+		v[AttrCondition] = *p.Condition
+	}
+	if p.DegradationDirection != nil {
+		v[AttrDegradationDirection] = *p.DegradationDirection
+	}
+	if p.ChangeIndication != nil {
+		v[AttrChangeIndication] = *p.ChangeIndication
+	}
+	if p.InPlaceIndicator != nil {
+		v[AttrInPlaceIndicator] = *p.InPlaceIndicator
+	}
+	if p.LastChangedTime != nil {
+		v[AttrLastChangedTime] = *p.LastChangedTime
+	}
+	if p.ReplacementProductList != nil {
+		v[AttrReplacementProductList] = spec.List[ReplacementProductStruct](*p.ReplacementProductList)
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
+}
+
 // Server is the typed HepaFilterMonitoring server over the cluster's server — the
 // generated spec.Server or a self-held one (Underlying) — with a typed
 // state, typed change reports, a write veto, typed command handlers and

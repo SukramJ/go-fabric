@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6225,
+  "entry_points": 6227,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14282,
-    "reachable": 9943,
-    "whitelisted": 4334,
+    "total_exported": 14287,
+    "reachable": 9946,
+    "whitelisted": 4336,
     "unreachable": 5
   },
   "by_package": [
@@ -494,10 +494,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestAPlainGeneratedListEncodesAsItsList",
+      "identifier": "TestATypedPatchListIsStoredAsItsList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_values_list_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "bridge",
@@ -9198,14 +9198,14 @@
       "identifier": "HandleOn",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 250
+      "line": 261
     },
     {
       "package": "cluster/spec",
       "identifier": "HandlerOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 273
+      "line": 284
     },
     {
       "package": "cluster/spec",
@@ -9240,21 +9240,21 @@
       "identifier": "OnChangedAsyncOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 211
+      "line": 222
     },
     {
       "package": "cluster/spec",
       "identifier": "OnChangedOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 176
+      "line": 187
     },
     {
       "package": "cluster/spec",
       "identifier": "OnWriteOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 229
+      "line": 240
     },
     {
       "package": "cluster/spec",
@@ -9324,7 +9324,7 @@
       "identifier": "StateOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 142
+      "line": 153
     },
     {
       "package": "cluster/spec",
@@ -20710,6 +20710,20 @@
     },
     {
       "package": "device",
+      "identifier": "TestADeclaredSelectionTheServerDoesNotServeIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_test.go",
+      "line": 133
+    },
+    {
+      "package": "device",
+      "identifier": "TestADefaultSelectionKeepsTheGeneratedServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_test.go",
+      "line": 154
+    },
+    {
+      "package": "device",
       "identifier": "TestAHookForAClusterThatIsNotMounted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
@@ -20720,7 +20734,7 @@
       "identifier": "TestALevelSourceServesTheSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_selection_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "device",
@@ -20742,6 +20756,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
       "line": 254
+    },
+    {
+      "package": "device",
+      "identifier": "TestAnOptionalCommandThePortLacksIsUnsupported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_media_optional_test.go",
+      "line": 36
     },
     {
       "package": "device",
@@ -20867,7 +20888,7 @@
       "identifier": "TestDimmableLightCouplesItsServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 150
+      "line": 177
     },
     {
       "package": "device",
@@ -21098,7 +21119,7 @@
       "identifier": "TestPumpSpeedLimitsWithoutAuto",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_selection_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "device",
@@ -21123,17 +21144,10 @@
     },
     {
       "package": "device",
-      "identifier": "TestSelfHeldDefaultKeepsTheGeneratedServerForASelectionItDoesNotServe",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "device/defaults_test.go",
-      "line": 128
-    },
-    {
-      "package": "device",
       "identifier": "TestSelfHeldDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 41
+      "line": 46
     },
     {
       "package": "device",
