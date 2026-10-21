@@ -103,6 +103,23 @@ func (s *Server) HandleChangeToMode(fn func(ctx context.Context, req ChangeToMod
 	return spec.HandleOn(s.Underlying(), CmdChangeToMode, fn)
 }
 
+// ModeSource is the device's mode selection: the description,
+// namespace and modes it offers, the mode it is in, and
+// ChangeToMode for a mode the kit's server checked against
+// SupportedModes (cluster/modeselect).
+type ModeSource interface {
+	// ModeDescription is what this instance selects between.
+	ModeDescription() string
+	// ModeNamespace is the StandardNamespace; present false is null.
+	ModeNamespace() (namespace uint8, present bool)
+	// SupportedModes are the selectable modes, each Mode distinct.
+	SupportedModes() []ModeOptionStruct
+	// CurrentMode is the mode the device is in.
+	CurrentMode() uint8
+	// ChangeToMode applies a checked mode.
+	ChangeToMode(ctx context.Context, newMode uint8) error
+}
+
 // Declare is the declaration of the ModeSelect cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -120,6 +137,8 @@ type Declare struct {
 	// HandleChangeToMode handles the ChangeToMode command in place of the server
 	// (Server.HandleChangeToMode), inline; an optional command it handles is accepted.
 	HandleChangeToMode func(ctx context.Context, req ChangeToModeRequest) (struct{}, error)
+	// ModeSource is the host port the kit's server runs on ([ModeSource]).
+	ModeSource ModeSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

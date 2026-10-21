@@ -52,14 +52,14 @@ func TestServer_OpenTakesTheGeneratedRequest(t *testing.T) {
 			t.Fatalf("%s: Open: %v", tc.name, err)
 		}
 		got := host.openCalls[0]
-		if got.HasOpenDuration != tc.has {
-			t.Errorf("%s: HasOpenDuration = %v, want %v", tc.name, got.HasOpenDuration, tc.has)
+		if has := got.OpenDuration != nil; has != tc.has {
+			t.Errorf("%s: OpenDuration present = %v, want %v", tc.name, has, tc.has)
 		}
-		switch {
-		case tc.duration == 0 && got.OpenDuration != nil:
-			t.Errorf("%s: OpenDuration = %d, want nil", tc.name, *got.OpenDuration)
-		case tc.duration != 0 && (got.OpenDuration == nil || *got.OpenDuration != tc.duration):
-			t.Errorf("%s: OpenDuration = %v, want %d", tc.name, got.OpenDuration, tc.duration)
+		switch d := got.OpenDuration; {
+		case tc.duration == 0 && d != nil && !d.Null:
+			t.Errorf("%s: OpenDuration = %d, want absent or null", tc.name, d.Value)
+		case tc.duration != 0 && (d == nil || d.Null || d.Value != tc.duration):
+			t.Errorf("%s: OpenDuration = %+v, want %d", tc.name, d, tc.duration)
 		}
 	}
 

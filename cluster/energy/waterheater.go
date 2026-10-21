@@ -66,10 +66,7 @@ const (
 // only), whose timer the app runs (examples/water-heater-app/
 // water-heater-common/src/WaterHeaterDelegateImpl.cpp:181, :234-259,
 // :439-455).
-type Booster interface {
-	Boost(ctx context.Context, info BoostInfo) error
-	CancelBoost(ctx context.Context) error
-}
+type Booster = whm.Booster
 
 // WaterHeaterState is the state the device reports.
 type WaterHeaterState struct {

@@ -109,6 +109,21 @@ func (s *Server) HandleSkipArea(fn func(ctx context.Context, req SkipAreaRequest
 	return spec.HandleOn(s.Underlying(), CmdSkipArea, fn)
 }
 
+// Selector decides a SelectAreas request whose areas are all
+// supported (areas without duplicates): a non-Success status is
+// answered as is and changes nothing, an error answers FAILURE
+// (cluster/servicearea).
+type Selector interface {
+	SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)
+}
+
+// Skipper carries out SkipArea for a selected area and updates
+// Progress itself; without one SkipArea is not accepted
+// (cluster/servicearea).
+type Skipper interface {
+	SkipArea(ctx context.Context, area uint32) (SkipAreaStatus, string, error)
+}
+
 // Declare is the declaration of the ServiceArea cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -129,6 +144,10 @@ type Declare struct {
 	// HandleSkipArea handles the SkipArea command in place of the server
 	// (Server.HandleSkipArea), inline; an optional command it handles is accepted.
 	HandleSkipArea func(ctx context.Context, req SkipAreaRequest) (SkipAreaResponse, error)
+	// Selector is the host port the kit's server runs on ([Selector]).
+	Selector Selector
+	// Skipper is the host port the kit's server runs on ([Skipper]).
+	Skipper Skipper
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

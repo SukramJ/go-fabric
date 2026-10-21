@@ -78,22 +78,19 @@ const servedFeatures = wire.ClosureControlFeaturePositioning |
 // ErrFeatureMap reports a Config.FeatureMap the server does not serve.
 var ErrFeatureMap = errors.New("closure: FeatureMap names features this server does not serve")
 
-// MoveHandler applies a target position to the underlying device.
+// Mover is the drive (closurecontroldef.Mover): MoveTo applies a target
+// position the server checked, Stop halts motion.
 //
-// It returns an error to refuse the move; the server maps that onto a
-// Failure status and leaves its target state untouched, so a controller
-// that could not reach the device does not see a target the device never
+// Either returns an error to refuse; the server maps that onto a Failure
+// status and leaves its target state untouched, so a controller that
+// could not reach the device does not see a target the device never
 // accepted.
 //
-// The handler owns the southbound urgency of the write it performs: the
+// The mover owns the southbound urgency of the writes it performs: the
 // cluster contract carries no priority, so a host whose command queue
-// ranks by urgency names the value it wants at the handler, where the
-// device vocabulary is already in scope.
-type MoveHandler func(ctx context.Context, target wire.ClosureTargetPosition) error
-
-// StopHandler halts motion. Like [MoveHandler] it owns the southbound
-// urgency of its own write.
-type StopHandler func(ctx context.Context) error
+// ranks by urgency names the value it wants there, where the device
+// vocabulary is already in scope.
+type Mover = closuredef.Mover
 
 // Config carries the handlers and initial state for a
 // [ControlServer].
@@ -104,11 +101,9 @@ type Config struct {
 	// Ventilation, Pedestrian, Protection and ManuallyOperable — or
 	// [New] refuses it.
 	FeatureMap uint32
-	// Move applies a MoveTo. Nil makes MoveTo report Failure rather than
-	// accepting a command that reaches nothing.
-	Move MoveHandler
-	// Stop halts motion. Nil makes Stop report Failure.
-	Stop StopHandler
+	// Mover carries out MoveTo and Stop. Nil makes both report Failure
+	// rather than accepting a command that reaches nothing.
+	Mover Mover
 }
 
 // ControlServer implements
@@ -127,9 +122,8 @@ type ControlServer struct {
 	// mu guards currentPosition, errorList, mainState, secureState and targetPosition.
 	mu sync.RWMutex
 
-	inst *spec.Instance
-	move MoveHandler
-	stop StopHandler
+	inst  *spec.Instance
+	mover Mover
 
 	mainState wire.ClosureMainState
 	errorList wire.ClosureErrorList
@@ -174,9 +168,8 @@ func New(cfg Config) (*ControlServer, error) {
 	// declared, so spec.New cannot refuse it.
 	inst, _ := spec.New(closuredef.Definition, spec.Options{Features: fm})
 	return &ControlServer{
-		inst: inst,
-		move: cfg.Move,
-		stop: cfg.Stop,
+		inst:  inst,
+		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
 		// Mirrors matter.js closure-control.element.ts:113 MainStateEnum.
@@ -333,10 +326,10 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	if err := s.checkPositionSupported(*target); err != nil {
 		return err
 	}
-	if s.move == nil {
-		return errors.New("closure: MoveTo has no handler")
+	if s.mover == nil {
+		return errors.New("closure: MoveTo has no mover")
 	}
-	if err := s.move(ctx, *target); err != nil {
+	if err := s.mover.MoveTo(ctx, closuredef.TargetPositionEnum(*target)); err != nil {
 		// Deliberately no state change: recording a target the device
 		// refused would leave the controller reading a move that never
 		// happened.
@@ -363,10 +356,10 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 	default:
 		return nil
 	}
-	if s.stop == nil {
-		return errors.New("closure: Stop has no handler")
+	if s.mover == nil {
+		return errors.New("closure: Stop has no mover")
 	}
-	if err := s.stop(ctx); err != nil {
+	if err := s.mover.Stop(ctx); err != nil {
 		return fmt.Errorf("closure: Stop: %w", err)
 	}
 	s.mu.Lock()

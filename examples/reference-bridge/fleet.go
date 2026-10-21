@@ -404,8 +404,11 @@ func (v *demoValve) SetDefaultOpenDuration(_ context.Context, seconds *uint32) e
 func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	v.mu.Lock()
 	duration := v.defaultOpen
-	if req.HasOpenDuration {
-		duration = req.OpenDuration
+	if d := req.OpenDuration; d != nil {
+		duration = nil
+		if !d.Null {
+			duration = &d.Value
+		}
 	}
 	v.travelLocked(valve.StateOpen)
 	v.openFor = copyUint32(duration)

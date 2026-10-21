@@ -70,9 +70,7 @@ const (
 // [ErrTemperatureRefused] — the device cannot accept the change now —
 // answers INVALID_IN_STATE; any other error answers FAILURE. Either way
 // nothing changes.
-type TemperatureSetter interface {
-	SetTemperature(ctx context.Context, target *int16, level *uint8) error
-}
+type TemperatureSetter = tc.TemperatureSetter
 
 // TemperatureControlConfig carries the construction parameters.
 type TemperatureControlConfig struct {

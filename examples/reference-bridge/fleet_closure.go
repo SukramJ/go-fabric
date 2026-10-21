@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -40,7 +41,7 @@ var _ contract.ChangeNotifier = (*demoGarage)(nil)
 
 func newDemoGarage(name string) *demoGarage {
 	g := &demoGarage{name: name}
-	g.ctl = closure.NewControlServer(closure.Config{Move: g.move, Stop: g.stop})
+	g.ctl = closure.NewControlServer(closure.Config{Mover: garageMover{g}})
 	closed := clusterwire.ClosureCurrentPositionFullyClosed
 	g.ctl.SetCurrentPosition(&closed)
 	g.ctl.SetMainState(clusterwire.ClosureMainStateStopped)
@@ -62,6 +63,17 @@ var arrivalOf = map[clusterwire.ClosureTargetPosition]clusterwire.ClosureCurrent
 	clusterwire.ClosureTargetPositionMoveToPedestrianPosition:  clusterwire.ClosureCurrentPositionOpenedForPedestrian,
 	clusterwire.ClosureTargetPositionMoveToSignaturePosition:   clusterwire.ClosureCurrentPositionOpenedAtSignature,
 }
+
+// garageMover is the garage's drive as the server's [closure.Mover].
+type garageMover struct{ g *demoGarage }
+
+// MoveTo implements [closure.Mover].
+func (m garageMover) MoveTo(ctx context.Context, target closurecontroldef.TargetPositionEnum) error {
+	return m.g.move(ctx, clusterwire.ClosureTargetPosition(target))
+}
+
+// Stop implements [closure.Mover].
+func (m garageMover) Stop(ctx context.Context) error { return m.g.stop(ctx) }
 
 // move is the drive's MoveTo: it starts travelling and arrives after
 // garageTravel. The server sets MainState Moving and the target once this

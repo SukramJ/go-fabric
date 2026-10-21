@@ -129,17 +129,13 @@ const (
 // areas are all supported (matter.js's assertSelectServiceArea extension
 // point). areas is the request without duplicates. A non-Success status
 // is answered as is and changes nothing; an error answers FAILURE.
-type Selector interface {
-	SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)
-}
+type Selector = sa.Selector
 
 // Skipper carries out SkipArea for an area that is selected (matter.js's
 // assertSkipServiceArea passed). It moves the device on and updates the
 // Progress itself ([Server.SetProgress]); a non-Success status is
 // answered as is, an error answers FAILURE.
-type Skipper interface {
-	SkipArea(ctx context.Context, area uint32) (SkipAreaStatus, string, error)
-}
+type Skipper = sa.Skipper
 
 // Config carries the construction parameters.
 type Config struct {

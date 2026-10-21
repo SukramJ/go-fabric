@@ -81,17 +81,14 @@ func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 // over: MoveTo decodes through the generated definition.
 func TestMoveToTakesTheGeneratedRequest(t *testing.T) {
 	t.Parallel()
-	var got []clusterwire.ClosureTargetPosition
-	srv := closure.NewControlServer(closure.Config{Move: func(_ context.Context, p clusterwire.ClosureTargetPosition) error {
-		got = append(got, p)
-		return nil
-	}})
+	h := &recordingHandlers{}
+	srv := closure.NewControlServer(h.config())
 	vent := closuredef.TargetPositionMoveToVentilationPosition
 	if _, err := srv.MatterInvoke(context.Background(), closuredef.CmdMoveTo, closuredef.MoveToRequest{Position: &vent}); err != nil {
 		t.Fatalf("MoveTo: %v", err)
 	}
-	if len(got) != 1 || got[0] != clusterwire.ClosureTargetPositionMoveToVentilationPosition {
-		t.Errorf("Move handler got %v, want [MoveToVentilationPosition]", got)
+	if got := h.moved; len(got) != 1 || got[0] != clusterwire.ClosureTargetPositionMoveToVentilationPosition {
+		t.Errorf("Mover got %v, want [MoveToVentilationPosition]", got)
 	}
 	ped := closuredef.TargetPositionMoveToPedestrianPosition
 	_, err := srv.MatterInvoke(context.Background(), closuredef.CmdMoveTo, &closuredef.MoveToRequest{Position: &ped})

@@ -131,6 +131,30 @@ func (s *Server) EmitValveFault(endpoint uint16, data ValveFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventValveFault, data)
 }
 
+// StateSource is the valve: the readers report its state, known
+// false for null (quality X), and the command methods drive it
+// after the kit's checks (cluster/valve).
+type StateSource interface {
+	// CurrentState reports the valve's observed state.
+	CurrentState() (state ValveStateEnum, known bool)
+	// TargetState reports the state the valve is moving towards.
+	TargetState() (state ValveStateEnum, known bool)
+	// OpenDuration reports the duration of the current opening, in seconds.
+	OpenDuration() (seconds uint32, known bool)
+	// RemainingDuration reports the time left before the valve closes.
+	RemainingDuration() (seconds uint32, known bool)
+	// DefaultOpenDuration reports the configured default open duration.
+	DefaultOpenDuration() (seconds uint32, known bool)
+	// SetDefaultOpenDuration persists a new default; nil for a null
+	// write, which clears it.
+	SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error
+	// Open drives the valve open: an absent OpenDuration means
+	// DefaultOpenDuration, a null one stays open until closed.
+	Open(ctx context.Context, req OpenRequest) error
+	// Close drives the valve closed.
+	Close(ctx context.Context) error
+}
+
 // Declare is the declaration of the ValveConfigurationAndControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -151,6 +175,8 @@ type Declare struct {
 	// HandleClose handles the Close command in place of the server
 	// (Server.HandleClose), inline; an optional command it handles is accepted.
 	HandleClose func(ctx context.Context, req CloseRequest) (struct{}, error)
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

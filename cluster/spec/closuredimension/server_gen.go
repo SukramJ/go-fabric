@@ -121,6 +121,17 @@ func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struc
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
 
+// DimensionHandler carries out SetTarget and Step after the kit's
+// checks and before TargetState changes; an error answers FAILURE
+// (cluster/closure).
+type DimensionHandler interface {
+	// SetTarget takes Position after the LimitRange clamp and the
+	// Resolution rounding, Latch and Speed as sent.
+	SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAutoEnum) error
+	// Step takes the request's fields as sent.
+	Step(ctx context.Context, direction StepDirectionEnum, numberOfSteps uint16, speed *ThreeLevelAutoEnum) error
+}
+
 // Declare is the declaration of the ClosureDimension cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -141,6 +152,8 @@ type Declare struct {
 	// HandleStep handles the Step command in place of the server
 	// (Server.HandleStep), inline; an optional command it handles is accepted.
 	HandleStep func(ctx context.Context, req StepRequest) (struct{}, error)
+	// DimensionHandler is the host port the kit's server runs on ([DimensionHandler]).
+	DimensionHandler DimensionHandler
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -101,6 +101,15 @@ func (s *Server) HandleSetTemperature(fn func(ctx context.Context, req SetTemper
 	return spec.HandleOn(s.Underlying(), CmdSetTemperature, fn)
 }
 
+// TemperatureSetter applies a SetTemperature the kit's server
+// checked: target (TN, 0.01 °C) or level (TL, an index into
+// SupportedTemperatureLevels). Nil error stores it; an error
+// answers FAILURE, or INVALID_IN_STATE when it wraps
+// thermo.ErrTemperatureRefused (cluster/thermo).
+type TemperatureSetter interface {
+	SetTemperature(ctx context.Context, target *int16, level *uint8) error
+}
+
 // Declare is the declaration of the TemperatureControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -118,6 +127,8 @@ type Declare struct {
 	// HandleSetTemperature handles the SetTemperature command in place of the server
 	// (Server.HandleSetTemperature), inline; an optional command it handles is accepted.
 	HandleSetTemperature func(ctx context.Context, req SetTemperatureRequest) (struct{}, error)
+	// TemperatureSetter is the host port the kit's server runs on ([TemperatureSetter]).
+	TemperatureSetter TemperatureSetter
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

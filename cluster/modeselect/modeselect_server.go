@@ -142,28 +142,7 @@ type ChangeToModeRequest = msdef.ChangeToModeRequest
 // the cluster contract carries no priority, so a host whose command
 // queue ranks by urgency names the value it wants inside ChangeToMode,
 // where the device vocabulary is already in scope.
-type ModeSource interface {
-	// ModeDescription reports what this cluster instance selects
-	// between, in readable text — a coffee machine's "Milk" as against
-	// its "Sugar" instance.
-	ModeDescription() string
-	// ModeNamespace reports the StandardNamespace, and whether there is
-	// one. present=false encodes as null: no standard namespace, and so
-	// no standard semantic tags in this instance.
-	ModeNamespace() (namespace uint8, present bool)
-	// SupportedModes reports the selectable modes. Each entry needs a
-	// distinct Mode value. The model bounds the list to
-	// [SupportedModesMaxEntries] entries, each Label to [LabelMaxBytes]
-	// UTF-8 bytes and each SemanticTags to [SemanticTagsMaxEntries]
-	// entries; the server returns the list as given and the generated
-	// codec writes it, so staying within them is the host's part.
-	SupportedModes() []ModeOptionStruct
-	// CurrentMode reports the mode the device is in.
-	CurrentMode() uint8
-	// ChangeToMode applies a mode the server has already checked against
-	// SupportedModes.
-	ChangeToMode(ctx context.Context, newMode uint8) error
-}
+type ModeSource = msdef.ModeSource
 
 // Config carries the construction parameters for [Server].
 type Config struct {

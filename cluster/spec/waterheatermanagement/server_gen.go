@@ -119,6 +119,13 @@ func (s *Server) EmitBoostEnded(endpoint uint16, data BoostEndedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBoostEnded, data)
 }
 
+// Booster starts and cancels a boost the kit's server admitted;
+// the device ends it through the server (cluster/energy).
+type Booster interface {
+	Boost(ctx context.Context, info WaterHeaterBoostInfoStruct) error
+	CancelBoost(ctx context.Context) error
+}
+
 // Declare is the declaration of the WaterHeaterManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -139,6 +146,8 @@ type Declare struct {
 	// HandleCancelBoost handles the CancelBoost command in place of the server
 	// (Server.HandleCancelBoost), inline; an optional command it handles is accepted.
 	HandleCancelBoost func(ctx context.Context, req CancelBoostRequest) (struct{}, error)
+	// Booster is the host port the kit's server runs on ([Booster]).
+	Booster Booster
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

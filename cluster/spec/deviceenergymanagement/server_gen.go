@@ -173,6 +173,24 @@ func (s *Server) EmitResumed(endpoint uint16, data ResumedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventResumed, data)
 }
 
+// DemManager is the device's energy management behind the kit's
+// server: the hooks run after the server's checks; an error
+// answers FAILURE and changes nothing (cluster/energy).
+type DemManager interface {
+	// ApproxEnergyDuringSession is PowerAdjustEnd's EnergyUse, in mWh.
+	ApproxEnergyDuringSession() int64
+	PowerAdjust(ctx context.Context, powerMw int64, durationS uint32, cause AdjustmentCauseEnum) error
+	PowerAdjustCompleted() error
+	CancelPowerAdjust(cause CauseEnum) error
+	StartTimeAdjust(ctx context.Context, requestedStartTime uint32, cause AdjustmentCauseEnum) error
+	Pause(ctx context.Context, durationS uint32, cause AdjustmentCauseEnum) error
+	PauseCompleted() error
+	CancelPause(cause CauseEnum) error
+	CancelRequest(ctx context.Context) error
+	ModifyForecast(ctx context.Context, forecastID uint32, adjustments []SlotAdjustmentStruct, cause AdjustmentCauseEnum) error
+	RequestConstraintBasedForecast(ctx context.Context, constraints []ConstraintsStruct, cause AdjustmentCauseEnum) error
+}
+
 // Declare is the declaration of the DeviceEnergyManagement cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -211,6 +229,8 @@ type Declare struct {
 	// HandleCancelRequest handles the CancelRequest command in place of the server
 	// (Server.HandleCancelRequest), inline; an optional command it handles is accepted.
 	HandleCancelRequest func(ctx context.Context, req CancelRequestRequest) (struct{}, error)
+	// DemManager is the host port the kit's server runs on ([DemManager]).
+	DemManager DemManager
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

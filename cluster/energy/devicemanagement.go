@@ -129,21 +129,7 @@ const (
 // overwritten by what the command itself records after it: the command
 // wins the overlap, as for the other servers with a host port (by_design
 // BD-Matter-HostPort-OutsideTheSetterLock).
-type DemManager interface {
-	// ApproxEnergyDuringSession is the PowerAdjustEnd event's EnergyUse,
-	// in mWh (DelegateImpl.cpp:322-329).
-	ApproxEnergyDuringSession() int64
-	PowerAdjust(ctx context.Context, powerMw int64, durationS uint32, cause AdjustmentCause) error
-	PowerAdjustCompleted() error
-	CancelPowerAdjust(cause DemCause) error
-	StartTimeAdjust(ctx context.Context, requestedStartTime uint32, cause AdjustmentCause) error
-	Pause(ctx context.Context, durationS uint32, cause AdjustmentCause) error
-	PauseCompleted() error
-	CancelPause(cause DemCause) error
-	CancelRequest(ctx context.Context) error
-	ModifyForecast(ctx context.Context, forecastID uint32, adjustments []SlotAdjustment, cause AdjustmentCause) error
-	RequestConstraintBasedForecast(ctx context.Context, constraints []ForecastConstraint, cause AdjustmentCause) error
-}
+type DemManager = dem.DemManager
 
 // NopDemManager is DEMManufacturerDelegate's defaults: every hook
 // succeeds and does nothing, and the session used no energy.

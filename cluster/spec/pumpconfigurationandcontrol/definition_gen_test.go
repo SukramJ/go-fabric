@@ -98,4 +98,5 @@ func TestTypedServer(t *testing.T) {
 	if err := decl.Attach(srv); err != nil {
 		t.Error(err)
 	}
+	var _ StateSource = d.StateSource
 }

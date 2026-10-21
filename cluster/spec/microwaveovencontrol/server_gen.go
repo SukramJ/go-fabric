@@ -113,6 +113,27 @@ func (s *Server) HandleAddMoreTime(fn func(ctx context.Context, req AddMoreTimeR
 	return spec.HandleOn(s.Underlying(), CmdAddMoreTime, fn)
 }
 
+// Oven is the oven behind the kit's MicrowaveOvenControl server:
+// the first four answer from the endpoint's OperationalState and
+// MicrowaveOvenMode, the last two carry out a command; an error
+// wrapping an IM status answers it, any other FAILURE
+// (cluster/appliance).
+type Oven interface {
+	// OperationalState is the endpoint's current OperationalState.
+	OperationalState() uint8
+	// NormalMode is the MicrowaveOvenMode mode tagged Normal.
+	NormalMode() (uint8, bool)
+	// SupportedMode reports whether mode is a MicrowaveOvenMode mode.
+	SupportedMode(mode uint8) bool
+	// StartSupported reports whether OperationalState accepts Start.
+	StartSupported() bool
+	// SetCookingParameters applies checked parameters: exactly one
+	// of power (PWRNUM) and wattIndex (WATTS) is set.
+	SetCookingParameters(ctx context.Context, mode uint8, cookTime uint32, start bool, power, wattIndex *uint8) error
+	// ModifyCookTime applies AddMoreTime's new CookTime.
+	ModifyCookTime(ctx context.Context, cookTime uint32) error
+}
+
 // Declare is the declaration of the MicrowaveOvenControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -133,6 +154,8 @@ type Declare struct {
 	// HandleAddMoreTime handles the AddMoreTime command in place of the server
 	// (Server.HandleAddMoreTime), inline; an optional command it handles is accepted.
 	HandleAddMoreTime func(ctx context.Context, req AddMoreTimeRequest) (struct{}, error)
+	// Oven is the host port the kit's server runs on ([Oven]).
+	Oven Oven
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

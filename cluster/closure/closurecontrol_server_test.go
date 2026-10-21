@@ -22,23 +22,24 @@ type recordingHandlers struct {
 	stopErr error
 }
 
-func (h *recordingHandlers) config() closure.Config {
-	return closure.Config{
-		Move: func(_ context.Context, target clusterwire.ClosureTargetPosition) error {
-			if h.moveErr != nil {
-				return h.moveErr
-			}
-			h.moved = append(h.moved, target)
-			return nil
-		},
-		Stop: func(_ context.Context) error {
-			if h.stopErr != nil {
-				return h.stopErr
-			}
-			h.stopped++
-			return nil
-		},
+func (h *recordingHandlers) config() closure.Config { return closure.Config{Mover: h} }
+
+// MoveTo implements [closure.Mover].
+func (h *recordingHandlers) MoveTo(_ context.Context, target closuredef.TargetPositionEnum) error {
+	if h.moveErr != nil {
+		return h.moveErr
 	}
+	h.moved = append(h.moved, clusterwire.ClosureTargetPosition(target))
+	return nil
+}
+
+// Stop implements [closure.Mover].
+func (h *recordingHandlers) Stop(context.Context) error {
+	if h.stopErr != nil {
+		return h.stopErr
+	}
+	h.stopped++
+	return nil
 }
 
 // readOverallCurrent reads attribute 0x0003 as its struct.

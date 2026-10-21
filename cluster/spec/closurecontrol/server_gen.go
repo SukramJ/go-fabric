@@ -139,6 +139,14 @@ func (s *Server) EmitSecureStateChanged(endpoint uint16, data SecureStateChanged
 	return spec.EmitOn(s.Underlying(), endpoint, EventSecureStateChanged, data)
 }
 
+// Mover drives the closure after the kit's checks: MoveTo to a
+// target position, Stop halts motion; an error answers FAILURE and
+// leaves the target state (cluster/closure).
+type Mover interface {
+	MoveTo(ctx context.Context, position TargetPositionEnum) error
+	Stop(ctx context.Context) error
+}
+
 // Declare is the declaration of the ClosureControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -162,6 +170,8 @@ type Declare struct {
 	// HandleCalibrate handles the Calibrate command in place of the server
 	// (Server.HandleCalibrate), inline; an optional command it handles is accepted.
 	HandleCalibrate func(ctx context.Context, req CalibrateRequest) (struct{}, error)
+	// Mover is the host port the kit's server runs on ([Mover]).
+	Mover Mover
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

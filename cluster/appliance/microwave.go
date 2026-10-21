@@ -64,27 +64,7 @@ const (
 // (microwave-oven-control-server/IntegrationDelegate.h, AppDelegate.h).
 // The first four answer from the endpoint's OperationalState and
 // MicrowaveOvenMode servers; the last two carry out a command.
-type Oven interface {
-	// OperationalState is the endpoint's current OperationalState.
-	OperationalState() uint8
-	// NormalMode is the MicrowaveOvenMode mode tagged Normal; false when
-	// there is none (CodegenIntegration.cpp:44-47).
-	NormalMode() (uint8, bool)
-	// SupportedMode reports whether mode is a MicrowaveOvenMode mode.
-	SupportedMode(mode uint8) bool
-	// StartSupported reports whether the endpoint's OperationalState
-	// accepts Start (CodegenIntegration.cpp:54-68).
-	StartSupported() bool
-	// SetCookingParameters applies checked cooking parameters: exactly one
-	// of power (PWRNUM) and wattIndex (WATTS) is set. A nil error makes
-	// cookTime the CookTime and the power or watt index the PowerSetting
-	// or SelectedWattIndex; an error wrapping an im.StatusCodeError
-	// answers that status, any other FAILURE.
-	SetCookingParameters(ctx context.Context, mode uint8, cookTime uint32, start bool, power, wattIndex *uint8) error
-	// ModifyCookTime applies AddMoreTime's new CookTime, with the same
-	// error answers.
-	ModifyCookTime(ctx context.Context, cookTime uint32) error
-}
+type Oven = mwo.Oven
 
 // MicrowaveConfig carries the construction parameters.
 type MicrowaveConfig struct {

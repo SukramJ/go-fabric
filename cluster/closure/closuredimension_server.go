@@ -114,14 +114,7 @@ const positionQuietInterval = 5 * time.Second
 // DimensionHandler carries out the commands on the device. It is called
 // after the server's checks and before TargetState changes; an error
 // answers FAILURE and leaves TargetState as it was.
-type DimensionHandler interface {
-	// SetTarget receives the request's fields as chip's delegate does:
-	// Position after the LimitRange clamp and the Resolution rounding,
-	// Latch and Speed as sent.
-	SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAuto) error
-	// Step receives the request's fields as sent.
-	Step(ctx context.Context, direction StepDirection, numberOfSteps uint16, speed *ThreeLevelAuto) error
-}
+type DimensionHandler = cd.DimensionHandler
 
 // DimensionConfig carries the construction parameters.
 type DimensionConfig struct {

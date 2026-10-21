@@ -126,22 +126,17 @@ const (
 	StateTransitioning = valvedef.ValveStateTransitioning
 )
 
-// OpenRequest is the cluster-native payload of the Open command
+// OpenRequest is the Open command's payload in the generated type
 // (element :59-63).
 //
-// Presence and null are distinct and both are carried: an absent
-// OpenDuration field means "use DefaultOpenDuration" while a present
-// null means "stay open until something closes me" (resource :46-52 vs
-// :213-218). Collapsing the two into one nil pointer would silently turn
-// an indefinite opening into the default one.
-type OpenRequest struct {
-	// HasOpenDuration reports whether the command carried the
-	// OpenDuration field at all.
-	HasOpenDuration bool
-	// OpenDuration is the field's value in seconds, or nil when the
-	// field was present and null.
-	OpenDuration *uint32
-}
+// Presence and null are distinct and both are carried: a nil
+// OpenDuration (the field absent) means "use DefaultOpenDuration" while a
+// present null (OpenDuration.Null) means "stay open until something
+// closes me" (resource :46-52 vs :213-218). Collapsing the two would
+// silently turn an indefinite opening into the default one. TargetLevel
+// needs the Level feature this server does not advertise, so the source
+// never sees one.
+type OpenRequest = valvedef.OpenRequest
 
 // StateSource is the host port this server reads and drives. The host
 // implements it over whatever actually owns the valve; nothing in this
@@ -157,25 +152,9 @@ type OpenRequest struct {
 // perform: the cluster contract carries no priority, so a host whose
 // command queue ranks by urgency names the value it wants inside its
 // own implementation, where the device vocabulary is in scope.
-type StateSource interface {
-	// CurrentState reports the valve's observed state.
-	CurrentState() (state State, known bool)
-	// TargetState reports the state the valve is moving towards.
-	TargetState() (state State, known bool)
-	// OpenDuration reports the duration of the current opening, in seconds.
-	OpenDuration() (seconds uint32, known bool)
-	// RemainingDuration reports the time left before the valve closes.
-	RemainingDuration() (seconds uint32, known bool)
-	// DefaultOpenDuration reports the configured default open duration.
-	DefaultOpenDuration() (seconds uint32, known bool)
-	// SetDefaultOpenDuration persists a new default; seconds is nil for
-	// a null write, which clears the default.
-	SetDefaultOpenDuration(ctx context.Context, seconds *uint32) error
-	// Open drives the valve to its open position.
-	Open(ctx context.Context, req OpenRequest) error
-	// Close drives the valve to its closed position.
-	Close(ctx context.Context) error
-}
+//
+// It is the generated port (valveconfigurationandcontroldef.StateSource).
+type StateSource = valvedef.StateSource
 
 // Config carries the construction parameters for [Server].
 type Config struct {
@@ -350,28 +329,20 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 
 // openRequestFrom normalises the payload the bridge hands over. The
 // bridge decodes the request through the generated definition into a
-// [valvedef.OpenRequest], with matter.js's field checks (OpenDuration "min
+// [OpenRequest], with matter.js's field checks (OpenDuration "min
 // 1", TargetLevel "1 to 100"); an in-process caller may hand over the
-// tag-keyed map, a host that decodes the command itself [OpenRequest]
-// directly, and a parameterless Open arrives as nil.
+// tag-keyed map, and a parameterless Open arrives as nil.
 func openRequestFrom(fields any) (OpenRequest, error) {
 	switch v := fields.(type) {
 	case nil:
 		return OpenRequest{}, nil
-	case valvedef.OpenRequest:
-		return openRequestFromGenerated(v)
-	case *valvedef.OpenRequest:
-		if v == nil {
-			return OpenRequest{}, nil
-		}
-		return openRequestFromGenerated(*v)
 	case OpenRequest:
-		return v, nil
+		return openRequestFromGenerated(v)
 	case *OpenRequest:
 		if v == nil {
 			return OpenRequest{}, nil
 		}
-		return *v, nil
+		return openRequestFromGenerated(*v)
 	case map[uint8]any:
 		return openRequestFromTagMap(v)
 	default:
@@ -381,21 +352,13 @@ func openRequestFrom(fields any) (OpenRequest, error) {
 	}
 }
 
-// openRequestFromGenerated carries the decoded request over to the host's
-// [OpenRequest], keeping an absent OpenDuration apart from a null one.
-func openRequestFromGenerated(r valvedef.OpenRequest) (OpenRequest, error) {
+// openRequestFromGenerated refuses a decoded request that carries
+// TargetLevel; an absent OpenDuration stays apart from a null one.
+func openRequestFromGenerated(r OpenRequest) (OpenRequest, error) {
 	if r.TargetLevel != nil {
 		return OpenRequest{}, errTargetLevel
 	}
-	if r.OpenDuration == nil {
-		return OpenRequest{}, nil
-	}
-	req := OpenRequest{HasOpenDuration: true}
-	if !r.OpenDuration.Null {
-		seconds := r.OpenDuration.Value
-		req.OpenDuration = &seconds
-	}
-	return req, nil
+	return r, nil
 }
 
 // errTargetLevel refuses an Open that carries TargetLevel: it is
@@ -420,8 +383,8 @@ func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 	if !present {
 		return req, nil
 	}
-	req.HasOpenDuration = true
 	if raw == nil {
+		req.OpenDuration = &spec.Nullable[uint32]{Null: true}
 		return req, nil
 	}
 	seconds, ok := asUint32(raw)
@@ -432,7 +395,7 @@ func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 		// constraint "min 1" (element :61).
 		return req, constraintError{"valve: Open OpenDuration violates constraint min 1"}
 	}
-	req.OpenDuration = &seconds
+	req.OpenDuration = &spec.Nullable[uint32]{Value: seconds}
 	return req, nil
 }
 

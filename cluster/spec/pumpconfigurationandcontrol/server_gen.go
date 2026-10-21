@@ -235,6 +235,35 @@ func (s *Server) EmitTurbineOperation(endpoint uint16, data TurbineOperationEven
 	return spec.EmitOn(s.Underlying(), endpoint, EventTurbineOperation, data)
 }
 
+// ControlModeSetter is a StateSource that takes a controller's
+// ControlMode write; the optional ControlMode attribute needs it.
+type ControlModeSetter interface {
+	SetControlMode(ctx context.Context, mode ControlModeEnum) error
+}
+
+// RunningHoursSetter is a StateSource that takes a controller's
+// LifetimeRunningHours write (nil for null).
+type RunningHoursSetter interface {
+	SetLifetimeRunningHours(ctx context.Context, hours *uint32) error
+}
+
+// EnergyConsumedSetter is a StateSource that takes a controller's
+// LifetimeEnergyConsumed write (nil for null).
+type EnergyConsumedSetter interface {
+	SetLifetimeEnergyConsumed(ctx context.Context, kWh *uint32) error
+}
+
+// StateSource is the pump: PumpState reports its state (the
+// limits come from the declaration's Initial, not from here),
+// SetOperationMode applies a controller's OperationMode write. A
+// source that also implements ControlModeSetter,
+// RunningHoursSetter or EnergyConsumedSetter takes those writes
+// (cluster/pump).
+type StateSource interface {
+	PumpState() State
+	SetOperationMode(ctx context.Context, mode OperationModeEnum) error
+}
+
 // Declare is the declaration of the PumpConfigurationAndControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -249,6 +278,8 @@ type Declare struct {
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
 	OnWrite func(ctx context.Context, next State, attrID uint32) error
+	// StateSource is the host port the kit's server runs on ([StateSource]).
+	StateSource StateSource
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
