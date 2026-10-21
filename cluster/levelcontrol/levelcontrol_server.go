@@ -350,6 +350,13 @@ type Config struct {
 	// skips start-up behaviour on an endpoint an Aggregator owns
 	// (LevelControlServer.ts initializeLighting).
 	Lighting bool
+	// Features, with HasFeatures, is the FeatureMap the server advertises
+	// — OO and LT, each optional, so every subset conforms — in place of
+	// OO with Lighting above: a device kit's selection, which matter.js's
+	// LevelControlServer starts empty (LevelControlServer.ts:865,
+	// LevelControlBaseServer.with()). LT then decides the Lighting surface.
+	Features    uint32
+	HasFeatures bool
 	// Transitions, when non-nil, runs the module's transition engine
 	// instead of forwarding the commands (see the package doc). Nil keeps
 	// the hand-off path, where the host ramps natively and RemainingTime
@@ -431,6 +438,9 @@ func NewServer(cfg Config) *Server {
 	features := featureMap
 	if cfg.Lighting {
 		features |= FeatureLighting
+	}
+	if cfg.HasFeatures {
+		features = cfg.Features & (featureMap | FeatureLighting)
 	}
 	s := newServer(sourceOf(cfg.Source), cfg.DataVersion, features)
 	if cfg.Transitions != nil {

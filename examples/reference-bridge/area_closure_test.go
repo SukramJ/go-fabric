@@ -47,14 +47,14 @@ func TestVacuumServesItsAreas(t *testing.T) {
 	}
 	srv := mountedServer(t, vac, sa.ClusterID)
 	ctx := context.Background()
-	if err := f.vacuum.run.SetCurrentMode(rvcCleaning); err != nil {
+	if err := f.vacuum.setRunMode(rvcCleaning); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := srv.MatterInvoke(ctx, sa.CmdSelectAreas, sa.SelectAreasRequest{NewAreas: []uint32{areaKitchen}})
 	if err != nil || resp.(sa.SelectAreasResponse).Status != servicearea.SelectAreasInvalidInMode {
 		t.Errorf("select while cleaning: %+v %v", resp, err)
 	}
-	if err := f.vacuum.run.SetCurrentMode(rvcIdle); err != nil {
+	if err := f.vacuum.setRunMode(rvcIdle); err != nil {
 		t.Fatal(err)
 	}
 	resp, _ = srv.MatterInvoke(ctx, sa.CmdSelectAreas, sa.SelectAreasRequest{NewAreas: []uint32{areaKitchen, areaLivingRoom}})
@@ -65,7 +65,7 @@ func TestVacuumServesItsAreas(t *testing.T) {
 	if resp.(sa.SkipAreaResponse).Status != servicearea.SkipAreaInvalidInMode {
 		t.Errorf("skip while idle: %+v", resp)
 	}
-	if err := f.vacuum.run.SetCurrentMode(rvcCleaning); err != nil {
+	if err := f.vacuum.setRunMode(rvcCleaning); err != nil {
 		t.Fatal(err)
 	}
 	resp, _ = srv.MatterInvoke(ctx, sa.CmdSkipArea, sa.SkipAreaRequest{SkippedArea: areaKitchen})
@@ -73,7 +73,7 @@ func TestVacuumServesItsAreas(t *testing.T) {
 		t.Errorf("skip while cleaning: %+v", resp)
 	}
 	// Back to Idle: every Progress entry Skipped.
-	if err := f.vacuum.run.SetCurrentMode(rvcIdle); err != nil {
+	if err := f.vacuum.setRunMode(rvcIdle); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range readMounted(t, vac, sa.ClusterID, sa.AttrProgress).(spec.List[servicearea.Progress]) {

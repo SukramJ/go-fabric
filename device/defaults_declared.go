@@ -123,6 +123,12 @@ func newPumpServer(b defaultBuild) (contract.ClusterServer, error) {
 		Source: d.StateSource, Features: pump.Feature(b.opts.Features), Optional: pump.OptionalFor(b.opts.Attributes),
 		Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion,
 	}
+	// A limit the declaration's Initial sets is in the selection whether
+	// its own feature mandates it or AUTO offers it ("SPD, [AUTO]"); the
+	// group of optional limits is AUTO's alone.
+	if cfg.Features&pump.FeatureAutomatic == 0 {
+		cfg.Optional &^= pump.OptionalAutomaticLimits
+	}
 	configFrom(&cfg.Limits, b.def, b.initial)
 	hostState(b.initial)
 	return pump.NewServer(cfg)

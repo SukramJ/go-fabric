@@ -22,13 +22,13 @@ func TestBoolCfgTestEventTriggers(t *testing.T) {
 	if err := f.testEventTrigger(ctx, triggerBoolCfgSensorTrigger|0x0000_0014_0000_0000); err != nil {
 		t.Fatalf("SensorTrigger: %v", err)
 	}
-	if got := f.contact.config.State().AlarmsActive; got != boolcfg.AlarmVisual {
+	if got := f.contact.config.Get().AlarmsActive; got != boolcfg.AlarmVisual {
 		t.Fatalf("AlarmsActive after SensorTrigger = %v, want visual", got)
 	}
 	if err := f.testEventTrigger(ctx, triggerBoolCfgSensorUntrigger); err != nil {
 		t.Fatalf("SensorUntrigger: %v", err)
 	}
-	if got := f.contact.config.State().AlarmsActive; got != 0 {
+	if got := f.contact.config.Get().AlarmsActive; got != 0 {
 		t.Fatalf("AlarmsActive after SensorUntrigger = %v, want none", got)
 	}
 }
@@ -41,7 +41,7 @@ func TestMeterTestEventTriggers(t *testing.T) {
 	ctx := context.Background()
 	read := func(id uint32) any {
 		t.Helper()
-		v, _ := f.meter.srv.MatterRead(id)
+		v, _ := f.meter.srv.Underlying().MatterRead(id)
 		return v
 	}
 	beforeType, beforeSerial := read(mtrid.AttrMeterType), read(mtrid.AttrMeterSerialNumber)

@@ -24,16 +24,12 @@ func TestCeilingLightRampsThroughTheEngine(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		lamp := newDemoCeilingLight("ceiling")
-		var lvl *levelcontrol.Server
-		var cc *light.ColorControlServer
-		for _, s := range lamp.servers() {
-			switch v := s.(type) {
-			case *levelcontrol.Server:
-				lvl = v
-			case *light.ColorControlServer:
-				cc = v
-			}
+		d, err := lamp.device(part("demo:ceiling:test"))
+		if err != nil {
+			t.Fatal(err)
 		}
+		lvl, _ := d.Server(levelcontrol.ClusterID).(*levelcontrol.Server)
+		cc, _ := d.Server(0x0300).(*light.ColorControlServer)
 		if lvl == nil || cc == nil {
 			t.Fatal("the ceiling light mounts no LevelControl or ColorControl server")
 		}

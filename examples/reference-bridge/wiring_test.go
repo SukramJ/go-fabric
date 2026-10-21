@@ -20,6 +20,7 @@ import (
 	"time"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -201,7 +202,11 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 	restoreBlind(ctx, st, first, slog.Default())
 	persist := first.persist
 	first.persist = func(pos uint16) { persist(pos); saved <- struct{}{} }
-	srv := first.servers()[0]
+	firstDevice, err := first.device(part("demo:blind:test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := firstDevice.Server(wcdef.ClusterID)
 	if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdGoToLiftPercentage, uint16(9000)); err != nil {
 		t.Fatalf("GoToLiftPercentage: %v", err)
 	}
@@ -218,7 +223,11 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 	}
 	second := newDemoBlind("blind")
 	restoreBlind(ctx, st, second, slog.Default())
-	if v, _ := second.servers()[0].MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
+	secondDevice, err := second.device(part("demo:blind:test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := secondDevice.Server(wcdef.ClusterID).MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
 		t.Fatalf("restarted blind at %v, want 9000", v)
 	}
 }

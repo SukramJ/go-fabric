@@ -539,10 +539,12 @@ func (m *demoElectricalMeter) update() {
 	if unit == commtr.TariffUnitKWh {
 		sample = meteredQuantitySamples[1]
 	}
+	// MaximumMeteredQuantities first: MeteredQuantity is constrained by it
+	// ("max maximumMeteredQuantities"), as the app's setters run in that
+	// order.
 	maximum := uint16(len(sample)) //nolint:gosec // two or three
-	m.log(m.metering.Set(commtr.Patch{
-		MaximumMeteredQuantities: &maximum, MeteredQuantity: &sample, MeteredQuantityTimestamp: &ts, TariffUnit: &unit,
-	}))
+	m.log(m.metering.Set(commtr.Patch{MaximumMeteredQuantities: &maximum}))
+	m.log(m.metering.Set(commtr.Patch{MeteredQuantity: &sample, MeteredQuantityTimestamp: &ts, TariffUnit: &unit}))
 }
 
 // clear is TestDataManager::Clear (:251-255): ClearAttributes nulls the

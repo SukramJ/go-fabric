@@ -633,3 +633,20 @@ func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
 	}
 	return nil
 }
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// StateSource's: a change the host reports there moves the server's data
+// version, then cb runs — the bridge hears a pull server's change through
+// it. A StateSource that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.src.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.tracker().Bump()
+		if cb != nil {
+			cb()
+		}
+	})
+}

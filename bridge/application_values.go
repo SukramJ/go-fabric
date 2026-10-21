@@ -4,6 +4,8 @@
 package bridge
 
 import (
+	"reflect"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -42,8 +44,30 @@ func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		// encodes itself as matter.js's TlvOfModel does.
 		x.EncodeTLV(enc, tag)
 	default:
+		return encodeGeneratedList(enc, tag, v)
+	}
+	return true
+}
+
+// encodableType is spec.Encodable's interface type.
+var encodableType = reflect.TypeFor[spec.Encodable]()
+
+// encodeGeneratedList writes a plain slice of a generated type — what a
+// generated server stores for a list attribute a typed Patch sets
+// (cluster/spec PatchValues hands the field's []T on) — as spec.List
+// writes it: an array of the entries' own encodings, anonymous tags. It
+// reports false for anything else.
+func encodeGeneratedList(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice || !rv.Type().Elem().Implements(encodableType) {
 		return false
 	}
+	enc.StartArray(tag)
+	for i := range rv.Len() {
+		e, _ := rv.Index(i).Interface().(spec.Encodable)
+		e.EncodeTLV(enc, tlv.AnonymousTag())
+	}
+	_ = enc.EndContainer()
 	return true
 }
 

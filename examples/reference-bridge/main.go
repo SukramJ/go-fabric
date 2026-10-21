@@ -328,7 +328,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	// PowerSourceConfiguration and the demo actions name endpoints by
 	// their StableKey, resolved through the live topology.
-	attachNodeProviders(n.Bridge(), n.Root().PowerSourceConfiguration, devices)
+	attachNodeProviders(n.Topology, n.Root().PowerSourceConfiguration, devices)
 	ok = true
 	return n, nil
 }

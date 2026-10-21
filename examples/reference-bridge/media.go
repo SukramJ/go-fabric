@@ -24,7 +24,6 @@ import (
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -64,7 +63,7 @@ import (
 // this daemon; the tv-app has no app pipe).
 
 // mediaAppKey is the content app's StableKey (bridged("contentapp", …)).
-const mediaAppKey endpoint.StringKey = "demo:contentapp:1"
+const mediaAppKey device.StringKey = "demo:contentapp:1"
 
 // The test suite's content app (AppTv.cpp:548-551, :667-669).
 const (

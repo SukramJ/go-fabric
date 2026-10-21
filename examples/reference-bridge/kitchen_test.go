@@ -109,7 +109,7 @@ func TestKitchenAlarmsAndControls(t *testing.T) {
 	f, br := startFleetBridge(t)
 	topo := br.Topology()
 	dish := mountedEndpoint(t, br, "demo-dishwasher-1")
-	if v := readMounted(t, dish, alarmbase.ClusterIDDishwasherAlarm, alarmbase.AttrSupported); v != dishwasherAlarms {
+	if v := readMounted(t, dish, alarmbase.ClusterIDDishwasherAlarm, alarmbase.AttrSupported); v != uint32(dishwasherAlarms) {
 		t.Errorf("DishwasherAlarm Supported %v", v)
 	}
 	washer := mountedEndpoint(t, br, "demo-washer-1")
@@ -128,7 +128,7 @@ func TestKitchenAlarmsAndControls(t *testing.T) {
 	if err := f.applyPipeCommand(pipeCommand{Name: "SetRefrigeratorDoorStatus", EndpointID: fridge.ID, DoorOpen: &one}); err != nil {
 		t.Fatal(err)
 	}
-	if v := readMounted(t, fridge, alarmbase.ClusterIDRefrigeratorAlarm, alarmbase.AttrState); v != fridgeDoorOpen {
+	if v := readMounted(t, fridge, alarmbase.ClusterIDRefrigeratorAlarm, alarmbase.AttrState); v != uint32(fridgeDoorOpen) {
 		t.Errorf("State after the door opened %v", v)
 	}
 	if err := f.applyPipeCommand(pipeCommand{Name: "SetRefrigeratorDoorStatus", EndpointID: fridge.ID, DoorOpen: &zero}); err != nil {

@@ -8,13 +8,13 @@ import (
 	"log/slog"
 	"sync"
 
-	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // The node-level clusters of the reference daemon: Actions on the
@@ -28,21 +28,25 @@ const (
 	// evsePowerKey is the EV charger's PowerSource part (fleet_evse.go
 	// parts), the node's one PowerSource endpoint that is a power source
 	// of its own rather than a battery of a sensor.
-	evsePowerKey = endpoint.StringKey("demo:evse:power")
+	evsePowerKey = device.StringKey("demo:evse:power")
 	// lampKey is the desk lamp, the endpoint the demo actions switch.
-	lampKey = endpoint.StringKey("demo:light:1")
+	lampKey = device.StringKey("demo:light:1")
 )
 
-// endpointByKey returns the live endpoint id of the endpoint with key;
-// false before the first assembly or for a key the topology does not hold.
-func endpointByKey(br *matterbridge.Bridge, key endpoint.StringKey) (uint16, bool) {
-	topology := br.Topology()
-	if topology == nil {
-		return 0, false
-	}
-	for _, ep := range topology.Endpoints {
-		if ep != nil && ep.SourceKey == key {
-			return ep.ID, true
+// endpointByKey returns the live endpoint number of the bridged device or
+// part with key; false before the first assembly or for a key the
+// topology does not hold.
+func endpointByKey(topology node.BridgeTopology, key device.StringKey) (uint16, bool) {
+	return findByKey(topology.Devices, key)
+}
+
+func findByKey(devices []node.BridgedDevice, key device.StringKey) (uint16, bool) {
+	for _, d := range devices {
+		if d.Key == key {
+			return d.Endpoint, true
+		}
+		if n, ok := findByKey(d.Parts, key); ok {
+			return n, true
 		}
 	}
 	return 0, false
@@ -52,22 +56,23 @@ func endpointByKey(br *matterbridge.Bridge, key endpoint.StringKey) (uint16, boo
 // charger's PowerSource endpoint, the demo actions at the desk lamp's and
 // the fleet's endpoint lookup at the live topology. Attached after Start,
 // as the PartsList providers are.
-func attachNodeProviders(br *matterbridge.Bridge, pscfg *mattercore.PowerSourceConfiguration, f *fleet) {
-	f.endpointOf = func(key endpoint.StringKey) (uint16, bool) { return endpointByKey(br, key) }
+func attachNodeProviders(topology func() node.BridgeTopology, pscfg *mattercore.PowerSourceConfiguration, f *fleet) {
+	resolve := func(key device.StringKey) (uint16, bool) { return endpointByKey(topology(), key) }
+	f.endpointOf = resolve
 	actions := f.actions
 	if pscfg != nil {
 		pscfg.SetSourcesProvider(func() []uint16 {
-			if id, ok := endpointByKey(br, evsePowerKey); ok {
+			if id, ok := resolve(evsePowerKey); ok {
 				return []uint16{id}
 			}
 			return nil
 		})
 	}
 	if actions != nil {
-		actions.setLampEndpoint(func() (uint16, bool) { return endpointByKey(br, lampKey) })
+		actions.setLampEndpoint(func() (uint16, bool) { return resolve(lampKey) })
 	}
 	if f.media != nil {
-		f.media.setAppEndpoint(func() (uint16, bool) { return endpointByKey(br, mediaAppKey) })
+		f.media.setAppEndpoint(func() (uint16, bool) { return resolve(mediaAppKey) })
 	}
 }
 

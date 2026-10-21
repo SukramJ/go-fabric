@@ -896,3 +896,20 @@ func (e statusError) Error() string                   { return e.msg }
 func (e statusError) MatterStatusCode() im.StatusCode { return e.status }
 
 var _ im.StatusCodeError = statusError{}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier] over the
+// source's: a change the host reports there moves the server's data
+// version, then cb runs — the bridge hears a pull server's change through
+// it. A source that notifies nothing never calls cb.
+func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	n, ok := s.cfg.Source.(contract.ChangeNotifier)
+	if !ok || n == nil {
+		return func() {}
+	}
+	return n.OnMatterValueChanged(func() {
+		s.tracker().Bump()
+		if cb != nil {
+			cb()
+		}
+	})
+}

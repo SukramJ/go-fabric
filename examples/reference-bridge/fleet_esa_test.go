@@ -59,16 +59,16 @@ func TestDemTriggerReachesBothEsas(t *testing.T) {
 		t.Fatalf("trigger: %v", err)
 	}
 	for name, d := range map[string]*demoDem{"esa": f.esa.dem, "charger": f.evse.dem} {
-		if fc := d.srv.Forecast(); fc == nil || len(fc.Slots) != 2 {
+		if fc := d.server().Get().Forecast; fc == nil || len(fc.Slots) != 2 {
 			t.Errorf("%s forecast after the pausable trigger: %+v", name, fc)
 		}
 	}
 	// SFR: the ESA's slots carry ManufacturerESAState (DEMTestEventTriggers.cpp
 	// ConfigureForecast), the charger's (no SFR) do not.
-	if fc := f.esa.dem.srv.Forecast(); fc == nil || fc.Slots[0].ManufacturerEsaState == nil {
+	if fc := f.esa.dem.server().Get().Forecast; fc == nil || fc.Slots[0].ManufacturerEsaState == nil {
 		t.Errorf("ESA slot 0 has no ManufacturerESAState: %+v", fc)
 	}
-	if fc := f.evse.dem.srv.Forecast(); fc == nil || fc.Slots[0].ManufacturerEsaState != nil {
+	if fc := f.evse.dem.server().Get().Forecast; fc == nil || fc.Slots[0].ManufacturerEsaState != nil {
 		t.Errorf("charger slot 0 carries ManufacturerESAState: %+v", fc)
 	}
 }

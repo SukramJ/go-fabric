@@ -94,11 +94,13 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.ClusterServer, error) {
 	cfg := levelcontrol.Config{
 		Source: d.LevelSource, DataVersion: b.cfg.DataVersion,
-		Lighting: b.opts.Features&uint32(lvldef.FeatureLighting) != 0,
+		Features: b.opts.Features, HasFeatures: true,
 	}
 	if d.Transitions {
 		t := &levelcontrol.Transitions{Clock: b.clock}
-		if srv := b.sibling(onoffdef.ClusterID); srv != nil {
+		// Coupled to OnOff under OO only (matter.js LevelControlServer.ts
+		// :141, :558 `this.features.onOff && …`), as the held server is.
+		if srv := b.sibling(onoffdef.ClusterID); srv != nil && b.opts.Features&levelcontrol.FeatureOnOff != 0 {
 			t.OnOff = onOffOf(srv)
 		}
 		if ct, ok := b.sibling(ccdef.ClusterID).(levelcontrol.ColorTemperatureCoupling); ok {
