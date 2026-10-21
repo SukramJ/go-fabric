@@ -12,22 +12,20 @@ import (
 )
 
 // WakeOnLanState is the WakeOnLan attribute state (wake-on-lan.element.ts:
-// 15-22), both optional and served when the configuration lists them:
-// MacAddress, the 48-bit MAC as 12 hex digits (max 12), and
-// LinkLocalAddress, the 16-byte IPv6 link-local address.
-type WakeOnLanState struct {
-	MacAddress       string
-	LinkLocalAddress []byte
-}
+// 15-22), the cluster's generated State; both attributes are optional and
+// served when the configuration lists them: MacAddress, the 48-bit MAC as
+// 12 hex digits (max 12), and LinkLocalAddress, the 16-byte IPv6
+// link-local address.
+type WakeOnLanState = woldef.State
 
-func (st WakeOnLanState) values() map[uint32]any {
+func wakeOnLanValues(st WakeOnLanState) map[uint32]any {
 	return map[uint32]any{
 		woldef.AttrMacAddress:       st.MacAddress,
 		woldef.AttrLinkLocalAddress: st.LinkLocalAddress,
 	}
 }
 
-func (st WakeOnLanState) clone() WakeOnLanState {
+func cloneWakeOnLan(st WakeOnLanState) WakeOnLanState {
 	st.LinkLocalAddress = slices.Clone(st.LinkLocalAddress)
 	return st
 }
@@ -58,8 +56,11 @@ func NewWakeOnLan(cfg WakeOnLanConfig) (*WakeOnLanServer, error) {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	s := &WakeOnLanServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, WakeOnLanState.values, WakeOnLanState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, wakeOnLanValues, cloneWakeOnLan, storeState[WakeOnLanState]); err != nil {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *WakeOnLanServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }

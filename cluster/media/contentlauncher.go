@@ -13,15 +13,13 @@ import (
 )
 
 // ContentLauncherState is the ContentLauncher attribute state
-// (content-launcher.element.ts:31-42), served with UrlPlayback (UP):
-// AcceptHeader, the content types the player takes, defaults to the empty
-// list (:34); SupportedStreamingProtocols to none (:41).
-type ContentLauncherState struct {
-	AcceptHeader                []string
-	SupportedStreamingProtocols launchdef.SupportedProtocolsBitmap
-}
+// (content-launcher.element.ts:31-42), the cluster's generated State,
+// served with UrlPlayback (UP): AcceptHeader, the content types the player
+// takes, defaults to the empty list (:34); SupportedStreamingProtocols to
+// none (:41).
+type ContentLauncherState = launchdef.State
 
-func (st ContentLauncherState) values() map[uint32]any {
+func contentLauncherValues(st ContentLauncherState) map[uint32]any {
 	header := st.AcceptHeader
 	if header == nil {
 		header = []string{} // the element's default, :34
@@ -32,19 +30,17 @@ func (st ContentLauncherState) values() map[uint32]any {
 	}
 }
 
-func (st ContentLauncherState) clone() ContentLauncherState {
+func cloneContentLauncher(st ContentLauncherState) ContentLauncherState {
 	st.AcceptHeader = slices.Clone(st.AcceptHeader)
 	return st
 }
 
-// ContentLauncher is the ContentLauncher host port: LaunchContent
-// (ContentSearch, CS, :44-54) and LaunchURL (UrlPlayback, UP, :56-65),
-// each answered by LauncherResponse (:67-71). A command whose feature the
-// selection leaves out is not accepted, implemented or not.
-type ContentLauncher interface {
-	LaunchContent(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchContentRequest) (launchdef.LauncherResponse, error)
-	LaunchURL(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchUrlRequest) (launchdef.LauncherResponse, error)
-}
+// ContentLauncher is the ContentLauncher host port (the generated
+// [launchdef.ContentLauncher], the declaration's ContentLauncher):
+// LaunchContent (ContentSearch, CS, :44-54) and LaunchURL (UrlPlayback,
+// UP, :56-65), each answered by LauncherResponse (:67-71). A command whose
+// feature the selection leaves out is not accepted, implemented or not.
+type ContentLauncher = launchdef.ContentLauncher
 
 // ContentLauncherConfig carries the construction parameters of a
 // ContentLauncher server.
@@ -85,8 +81,13 @@ func NewContentLauncher(cfg ContentLauncherConfig) (*ContentLauncherServer, erro
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, ContentLauncherState.values, ContentLauncherState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, contentLauncherValues, cloneContentLauncher, storeState[ContentLauncherState]); err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	return s, nil
+}
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *ContentLauncherServer) SetAttributes(values map[uint32]any) error {
+	return s.setAttributes(values)
 }

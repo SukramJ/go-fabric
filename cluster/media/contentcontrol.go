@@ -231,13 +231,24 @@ func NewContentControl(cfg ContentControlConfig) (*ContentControlServer, error) 
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, ContentControlState.values, ContentControlState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, ContentControlState.values, ContentControlState.clone, readContentControl); err != nil {
 		return nil, fmt.Errorf("media: ContentControl: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// readContentControl is the ContentControlState the store holds: the
+// generated State, whose fields it has.
+func readContentControl(srv *spec.Server) ContentControlState {
+	return ContentControlState(spec.StateOf[ccdef.State](srv))
+}
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *ContentControlServer) SetAttributes(values map[uint32]any) error {
+	return s.setAttributes(values)
 }
 
 // EmitRemainingScreenTimeExpired emits RemainingScreenTimeExpired (event

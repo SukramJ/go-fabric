@@ -27,7 +27,10 @@
 // the change (checked against the definition, a data-version bump and a
 // change report for what moved); one that fails leaves the state as it
 // was, as a matter.js transaction rolls back when its command throws. A
-// change the device makes on its own goes through the server's SetState.
+// change the device makes on its own goes through the server's SetState or
+// its SetAttributes — the typed Set of the cluster's generated server — and
+// is the state the next command is handed. A command's changes report
+// [contract.OriginCommand], the host's [contract.OriginHostSet].
 //
 // A command answers the port's error as its status: a [StatusError] with
 // its IM status, any other error FAILURE. A command the cluster's
@@ -49,10 +52,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -282,6 +287,25 @@ func structOr[T any](p *T) any {
 	return *p
 }
 
+// nullListOr is *p as a generated list, or nil (null) when p is nil: the
+// generated State's form of a nullable list.
+func nullListOr[T spec.Encodable](p *[]T) any {
+	if p == nil {
+		return nil
+	}
+	return spec.List[T](*p)
+}
+
+// cloneList copies the list p points to, so a port changing it touches no
+// committed value; nil stays nil.
+func cloneList[T any](p *[]T) *[]T {
+	if p == nil {
+		return nil
+	}
+	l := slices.Clone(*p)
+	return &l
+}
+
 // nullOr is *p, or nil (null) when p is nil.
 func nullOr[T any](p *T) any {
 	if p == nil {
@@ -300,6 +324,9 @@ type stateful[S any] struct {
 	// clone copies a state so a port changing it touches no committed
 	// value.
 	clone func(S) S
+	// read is the state the store holds: a host's SetAttributes stores
+	// values, and the state takes them from it.
+	read func(*spec.Server) S
 
 	// op is the command queue: a command holds it from its copy of the
 	// state through its commit, across the port call, so commands run one
@@ -307,14 +334,14 @@ type stateful[S any] struct {
 	// while the port runs, so the port may call SetState (ADR 0026 P6,
 	// by_design BD-Matter-HostPort-OutsideTheSetterLock).
 	op sync.Mutex
-	// mu guards clone, srv, state and values.
+	// mu guards clone, read, srv, state and values.
 	mu    sync.Mutex
 	state S
 }
 
 // init commits the initial state; the server's checks apply.
-func (s *stateful[S]) init(srv *spec.Server, st S, values func(S) map[uint32]any, clone func(S) S) error {
-	s.srv, s.values, s.clone = srv, values, clone
+func (s *stateful[S]) init(srv *spec.Server, st S, values func(S) map[uint32]any, clone func(S) S, read func(*spec.Server) S) error {
+	s.srv, s.values, s.clone, s.read = srv, values, clone, read
 	vals, err := served(srv, values(st))
 	if err != nil {
 		return err
@@ -325,6 +352,10 @@ func (s *stateful[S]) init(srv *spec.Server, st S, values func(S) map[uint32]any
 	s.state = clone(st)
 	return nil
 }
+
+// storeState reads the generated State S from the store ([spec.StateOf]):
+// the read of a server whose state is its cluster's generated State.
+func storeState[S any](srv *spec.Server) S { return spec.StateOf[S](srv) }
 
 // State returns a copy of the committed state.
 func (s *stateful[S]) State() S {
@@ -339,15 +370,30 @@ func (s *stateful[S]) State() S {
 func (s *stateful[S]) SetState(st S) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.commitLocked(st)
+	return s.commitLocked(contract.OriginHostSet, st)
 }
 
-func (s *stateful[S]) commitLocked(st S) error {
+// setAttributes is the server's [spec.AttributeSetter]: the host's own
+// change, checked and stored all or nothing by the store and reported as
+// [contract.OriginHostSet]; the state then holds what the store holds, so
+// the next command is handed it.
+func (s *stateful[S]) setAttributes(values map[uint32]any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.srv.SetAttributes(values); err != nil {
+		return err
+	}
+	s.state = s.clone(s.read(s.srv))
+	return nil
+}
+
+// commitLocked stores st and reports what moved as origin's.
+func (s *stateful[S]) commitLocked(origin contract.Origin, st S) error {
 	vals, err := served(s.srv, s.values(st))
 	if err != nil {
 		return err
 	}
-	if err := s.srv.SetAttributes(vals); err != nil {
+	if err := s.srv.SetAttributesFrom(origin, vals); err != nil {
 		return err
 	}
 	s.state = s.clone(st)
@@ -371,7 +417,7 @@ func (s *stateful[S]) transact(fn func(st *S) (any, error)) (any, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.commitLocked(next); err != nil {
+	if err := s.commitLocked(contract.OriginCommand, next); err != nil {
 		return nil, StatusError{Status: im.StatusFailure, Err: err}
 	}
 	return resp, nil

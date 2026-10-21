@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
@@ -19,11 +18,11 @@ import (
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
 	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
 	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
+	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
 	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
 	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
@@ -50,6 +49,11 @@ import (
 //     ConvertToPlatformCatalogVendorApp and InstallContentApp: "Vendor1",
 //     version "Version1", setup PIN "34567890").
 //
+// Each cluster is declared (<cluster>def.Declare) with the manager as its
+// port and the manager's state as its Initial: the device kit mounts the
+// module's media server on it, and the state the daemon moves on its own
+// goes through the device's typed accessors.
+//
 // The player's ApplicationLauncher is the content app platform: LaunchApp,
 // StopApp and HideApp of the app move its ApplicationBasic.Status, as
 // chip's application-launcher-server does through the platform
@@ -71,26 +75,13 @@ const (
 	mediaAppSetupPIN            = "34567890"
 )
 
-// demoMedia is the --media pair: the player's and the app's servers and
-// the simulations behind them.
+// demoMedia is the --media pair: the player and the app, and the
+// simulations behind their ports.
 type demoMedia struct {
 	logger *slog.Logger
 
-	playback  *media.PlaybackServer
-	keypad    *media.KeypadServer
-	launcher  *media.ContentLauncherServer
-	platform  *media.AppLauncherServer
-	inputs    *media.InputsServer
-	outputs   *media.OutputsServer
-	channels  *media.ChannelsServer
-	targets   *media.TargetsServer
-	lowPower  *media.LowPowerServer
-	wakeOnLan *media.WakeOnLanServer
-
-	app         *media.AppBasicServer
-	appKeypad   *media.KeypadServer
-	appLauncher *media.AppLauncherServer
-	appLogin    *media.AccountLoginServer
+	player *device.CastingVideoPlayer
+	app    *device.ContentApp
 
 	mu sync.Mutex
 	// appEndpoint resolves the app's endpoint number; set by
@@ -100,169 +91,132 @@ type demoMedia struct {
 
 func newDemoMedia(logger *slog.Logger) (*demoMedia, error) {
 	m := &demoMedia{logger: logger}
-	if err := m.buildPlayer(); err != nil {
+	var err error
+	if m.player, err = m.newPlayer(); err != nil {
 		return nil, fmt.Errorf("media player: %w", err)
 	}
-	if err := m.buildApp(); err != nil {
+	if m.app, err = m.newApp(); err != nil {
 		return nil, fmt.Errorf("content app: %w", err)
 	}
 	return m, nil
 }
 
-//nolint:funlen // one server per cluster of the player
-func (m *demoMedia) buildPlayer() error {
-	var err error
+//nolint:funlen // one declaration per cluster of the player
+func (m *demoMedia) newPlayer() (*device.CastingVideoPlayer, error) {
 	// MediaPlaybackManager.h:74-123: Playing at speed 0 (the CI cases'
 	// expectation, the header says), position 0, duration 80000.
-	duration, start := uint64(80000), uint64(0)
-	if m.playback, err = media.NewPlayback(media.PlaybackConfig{
-		Port: playerTransport{},
-		// tv-app.matter:4475 (featureMap 0x001F: AS, VS, TT, AT, AA).
-		Features: mpdef.FeatureAdvancedSeek | mpdef.FeatureVariableSpeed | mpdef.FeatureTextTracks |
-			mpdef.FeatureAudioTracks | mpdef.FeatureAudioAdvance,
-		Initial: media.PlaybackState{
-			CurrentState:         mpdef.PlaybackStatePlaying,
-			StartTime:            &start,
-			Duration:             &duration,
-			SampledPosition:      &mpdef.PlaybackPositionStruct{UpdatedAt: 0, Position: spec.Nullable[uint64]{Value: 0}},
-			SeekRangeStart:       &start,
-			SeekRangeEnd:         &duration,
-			ActiveAudioTrack:     &tvAudioTracks()[0],
-			AvailableAudioTracks: tvAudioTracks(),
-			AvailableTextTracks:  tvTextTracks(),
-		},
-	}); err != nil {
-		return err
-	}
-	// tv-app.matter:4515 (KeypadInput featureMap 0x0007).
-	if m.keypad, err = media.NewKeypad(media.KeypadConfig{
-		Port:     tvKeys{},
-		Features: keypaddef.FeatureNavigationKeyCodes | keypaddef.FeatureLocationKeys | keypaddef.FeatureNumberKeys,
-	}); err != nil {
-		return err
-	}
+	duration, start, speed := uint64(80000), uint64(0), float32(0)
+	playing := mpdef.PlaybackStatePlaying
+	audio, text := tvAudioTracks(), tvTextTracks()
 	// ContentLauncherManager.h:47: accept header {"example","example"},
 	// no streaming protocol.
-	if m.launcher, err = media.NewContentLauncher(media.ContentLauncherConfig{
-		Port:     tvLauncher{},
-		Features: launchdef.FeatureContentSearch | launchdef.FeatureUrlPlayback,
-		Initial:  media.ContentLauncherState{AcceptHeader: []string{"example", "example"}},
-	}); err != nil {
-		return err
-	}
+	header, protocols := []string{"example", "example"}, launchdef.SupportedProtocolsBitmap(0)
 	// ApplicationLauncherManager.cpp:27: catalogs 123 and 456.
-	if m.platform, err = media.NewAppLauncher(media.AppLauncherConfig{
-		Port:       &tvPlatform{media: m},
-		Features:   launcherdef.FeatureApplicationPlatform,
-		Attributes: []uint32{launcherdef.AttrCurrentApp},
-		Initial:    media.AppLauncherState{CatalogList: []uint16{123, 456}},
-	}); err != nil {
-		return err
-	}
+	catalogs := []uint16{123, 456}
 	// MediaInputManager.cpp:25-38: two HDMI inputs, 1 current.
-	if m.inputs, err = media.NewInputs(media.InputsConfig{
-		Port:     tvInputs{},
-		Features: inputdef.FeatureNameUpdates,
-		Initial: media.InputState{CurrentInput: 1, InputList: []inputdef.InputInfoStruct{
-			{Index: 1, InputType: inputdef.InputTypeHdmi, Name: "HDMI", Description: "High-Definition Multimedia Interface"},
-			{Index: 2, InputType: inputdef.InputTypeHdmi, Name: "HDMI", Description: "High-Definition Multimedia Interface"},
-		}},
-	}); err != nil {
-		return err
-	}
+	inputs, currentInput := []inputdef.InputInfoStruct{
+		{Index: 1, InputType: inputdef.InputTypeHdmi, Name: "HDMI", Description: "High-Definition Multimedia Interface"},
+		{Index: 2, InputType: inputdef.InputTypeHdmi, Name: "HDMI", Description: "High-Definition Multimedia Interface"},
+	}, uint8(1)
 	// AudioOutputManager.cpp:27-40: three HDMI outputs, 1 current.
-	if m.outputs, err = media.NewOutputs(media.OutputsConfig{
-		Port:     tvOutputs{},
-		Features: outputdef.FeatureNameUpdates,
-		Initial: media.OutputState{CurrentOutput: 1, OutputList: []outputdef.OutputInfoStruct{
-			{Index: 1, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
-			{Index: 2, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
-			{Index: 3, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
-		}},
-	}); err != nil {
-		return err
-	}
+	outputs, currentOutput := []outputdef.OutputInfoStruct{
+		{Index: 1, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
+		{Index: 2, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
+		{Index: 3, OutputType: outputdef.OutputTypeHdmi, Name: "HDMI"},
+	}, uint8(1)
 	// ChannelManager.cpp:30-65 and HandleGetLineup :120-129; the first
 	// three of its channels, 6.0 current.
 	list := tvChannels()
-	if m.channels, err = media.NewChannels(media.ChannelsConfig{
-		Port:       tvTuner{},
-		Features:   channeldef.FeatureChannelList | channeldef.FeatureLineupInfo,
-		Attributes: []uint32{channeldef.AttrCurrentChannel},
-		Initial: media.ChannelState{
-			ChannelList: list,
-			Lineup: &channeldef.LineupInfoStruct{
-				OperatorName: "Comcast", LineupName: ptr("Comcast King County"), PostalCode: ptr("98052"),
-				LineupInfoType: channeldef.LineupInfoTypeMso,
-			},
-			CurrentChannel: &list[0],
-		},
-	}); err != nil {
-		return err
+	lineup := &channeldef.LineupInfoStruct{
+		OperatorName: "Comcast", LineupName: ptr("Comcast King County"), PostalCode: ptr("98052"),
+		LineupInfoType: channeldef.LineupInfoTypeMso,
 	}
 	// TargetNavigatorManager.h:35, :46: two targets, none current (0).
-	if m.targets, err = media.NewTargets(media.TargetsConfig{
-		Port:       tvTargets{},
-		Attributes: []uint32{targetdef.AttrCurrentTarget},
-		Initial: media.TargetState{TargetList: []targetdef.TargetInfoStruct{
-			{Identifier: 1, Name: "exampleName"}, {Identifier: 2, Name: "exampleName"},
-		}},
-	}); err != nil {
-		return err
-	}
-	if m.lowPower, err = media.NewLowPower(media.LowPowerConfig{Port: tvSleep{logger: m.logger}}); err != nil {
-		return err
-	}
+	targets, currentTarget := []targetdef.TargetInfoStruct{
+		{Identifier: 1, Name: "exampleName"}, {Identifier: 2, Name: "exampleName"},
+	}, uint8(0)
 	// WakeOnLanManager.cpp:52-65 serves the primary MAC as 12 hex digits;
 	// the daemon has no radio, so a locally administered address.
-	m.wakeOnLan, err = media.NewWakeOnLan(media.WakeOnLanConfig{
-		Attributes: []uint32{woldef.AttrMacAddress},
-		Initial:    media.WakeOnLanState{MacAddress: "02005E102002"},
-	})
-	return err
-}
+	mac := "02005E102002"
 
-func (m *demoMedia) buildApp() error {
-	var err error
-	if m.app, err = media.NewAppBasic(media.AppBasicConfig{
-		Attributes: []uint32{basicdef.AttrVendorName, basicdef.AttrVendorId, basicdef.AttrProductId},
-		Initial: media.AppBasicState{
-			VendorName: "Vendor1", VendorID: mediaAppVendorID, ApplicationName: mediaAppID, ProductID: mediaAppProductID,
-			Application:        &basicdef.ApplicationStruct{CatalogVendorId: mediaCatalogVendorID, ApplicationId: mediaAppID},
-			Status:             basicdef.ApplicationStatusStopped,
-			ApplicationVersion: "Version1",
-			AllowedVendorList:  []uint16{mediaAppVendorID},
+	opts := bridged("player", "Living Room TV")
+	opts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
+	return device.NewCastingVideoPlayer(opts,
+		mpdef.Declare{
+			Playback: playerTransport{},
+			// tv-app.matter:4475 (featureMap 0x001F: AS, VS, TT, AT, AA).
+			Features: mpdef.FeatureAdvancedSeek | mpdef.FeatureVariableSpeed | mpdef.FeatureTextTracks |
+				mpdef.FeatureAudioTracks | mpdef.FeatureAudioAdvance,
+			Initial: mpdef.Patch{
+				CurrentState:         &playing,
+				StartTime:            &start,
+				Duration:             &duration,
+				SampledPosition:      &mpdef.PlaybackPositionStruct{UpdatedAt: 0, Position: spec.Nullable[uint64]{Value: 0}},
+				PlaybackSpeed:        &speed,
+				SeekRangeStart:       &start,
+				SeekRangeEnd:         &duration,
+				ActiveAudioTrack:     &audio[0],
+				AvailableAudioTracks: &audio,
+				AvailableTextTracks:  &text,
+				Null:                 []uint32{mpdef.AttrActiveTextTrack},
+			},
 		},
-	}); err != nil {
-		return err
-	}
-	// tv-app.matter's endpoint 3: KeypadInput featureMap 0.
-	if m.appKeypad, err = media.NewKeypad(media.KeypadConfig{Port: tvKeys{}}); err != nil {
-		return err
-	}
-	if m.appLauncher, err = media.NewAppLauncher(media.AppLauncherConfig{Port: &tvApp{media: m}}); err != nil {
-		return err
-	}
-	m.appLogin, err = media.NewAccountLogin(media.AccountLoginConfig{Port: tvLogin{}})
-	return err
+		// tv-app.matter:4515 (KeypadInput featureMap 0x0007).
+		keypaddef.Declare{
+			Keypad:   tvKeys{},
+			Features: keypaddef.FeatureNavigationKeyCodes | keypaddef.FeatureLocationKeys | keypaddef.FeatureNumberKeys,
+		},
+		launchdef.Declare{
+			ContentLauncher: tvLauncher{},
+			Features:        launchdef.FeatureContentSearch | launchdef.FeatureUrlPlayback,
+			Initial:         launchdef.Patch{AcceptHeader: &header, SupportedStreamingProtocols: &protocols},
+		},
+		launcherdef.Declare{
+			AppLauncher: &tvPlatform{media: m},
+			Features:    launcherdef.FeatureApplicationPlatform,
+			Initial:     launcherdef.Patch{CatalogList: &catalogs, Null: []uint32{launcherdef.AttrCurrentApp}},
+		},
+		inputdef.Declare{
+			Inputs: tvInputs{}, Features: inputdef.FeatureNameUpdates,
+			Initial: inputdef.Patch{InputList: &inputs, CurrentInput: &currentInput},
+		},
+		outputdef.Declare{
+			Outputs: tvOutputs{}, Features: outputdef.FeatureNameUpdates,
+			Initial: outputdef.Patch{OutputList: &outputs, CurrentOutput: &currentOutput},
+		},
+		channeldef.Declare{
+			Channels: tvTuner{}, Features: channeldef.FeatureChannelList | channeldef.FeatureLineupInfo,
+			Initial: channeldef.Patch{ChannelList: &list, Lineup: lineup, CurrentChannel: &list[0]},
+		},
+		targetdef.Declare{Targets: tvTargets{}, Initial: targetdef.Patch{TargetList: &targets, CurrentTarget: &currentTarget}},
+		lowpowerdef.Declare{LowPower: tvSleep{logger: m.logger}},
+		woldef.Declare{Initial: woldef.Patch{MacAddress: &mac}},
+	)
 }
 
-// devices builds the two media endpoints.
-func (m *demoMedia) devices() ([]node.Endpoint, error) {
-	playerOpts := bridged("player", "Living Room TV")
-	playerOpts.Conditions = []string{"ContentAppPlatform", "PhysicalInputs"}
-	player, err := device.NewCastingVideoPlayer(playerOpts, serve([]contract.ClusterServer{
-		m.playback, m.keypad, m.launcher, m.platform, m.inputs, m.outputs, m.channels, m.targets, m.lowPower, m.wakeOnLan,
-	})...)
-	if err != nil {
-		return nil, err
-	}
-	app, err := device.NewContentApp(bridged("contentapp", "Example App"),
-		serve([]contract.ClusterServer{m.app, m.appKeypad, m.appLauncher, m.appLogin})...)
-	if err != nil {
-		return nil, err
-	}
-	return []node.Endpoint{player, app}, nil
+func (m *demoMedia) newApp() (*device.ContentApp, error) {
+	vendor, name, version := "Vendor1", mediaAppID, "Version1"
+	vendorID, productID := mediaAppVendorID, mediaAppProductID
+	stopped := basicdef.ApplicationStatusStopped
+	allowed := []uint16{mediaAppVendorID}
+	return device.NewContentApp(bridged("contentapp", "Example App"),
+		basicdef.Declare{Initial: basicdef.Patch{
+			VendorName: &vendor, VendorId: &vendorID, ApplicationName: &name, ProductId: &productID,
+			Application:        &basicdef.ApplicationStruct{CatalogVendorId: mediaCatalogVendorID, ApplicationId: mediaAppID},
+			Status:             &stopped,
+			ApplicationVersion: &version,
+			AllowedVendorList:  &allowed,
+		}},
+		// tv-app.matter's endpoint 3: KeypadInput featureMap 0.
+		keypaddef.Declare{Keypad: tvKeys{}},
+		launcherdef.Declare{AppLauncher: &tvApp{media: m}},
+		logindef.Declare{AccountLogin: tvLogin{}},
+	)
+}
+
+// devices is the two media endpoints, built with the pair.
+func (m *demoMedia) devices() ([]node.Endpoint, error) { //nolint:unparam // the fleet's builder (fleet.go endpoints) takes the error
+	return []node.Endpoint{m.player, m.app}, nil
 }
 
 // setAppEndpoint hands the platform the resolver of the app's endpoint
@@ -275,9 +229,7 @@ func (m *demoMedia) setAppEndpoint(resolve func() (uint16, bool)) {
 
 // appStatus moves the content app's ApplicationBasic.Status.
 func (m *demoMedia) appStatus(s basicdef.ApplicationStatusEnum) error {
-	st := m.app.State()
-	st.Status = s
-	return m.app.SetState(st)
+	return m.app.ApplicationBasic().Set(basicdef.Patch{Status: &s})
 }
 
 // currentApp is the platform's CurrentApp for the test app: its
@@ -305,9 +257,7 @@ func (m *demoMedia) setPlaybackState(state string) error {
 	if !ok {
 		return fmt.Errorf("MediaPlaybackState %q: want Playing, Paused, NotPlaying or Buffering", state)
 	}
-	st := m.playback.State()
-	st.CurrentState = s
-	return m.playback.SetState(st)
+	return m.player.MediaPlayback().Set(mpdef.Patch{CurrentState: &s})
 }
 
 // --- the tv-app managers -------------------------------------------------
@@ -331,7 +281,7 @@ func position(v uint64) *mpdef.PlaybackPositionStruct {
 	return &mpdef.PlaybackPositionStruct{Position: spec.Nullable[uint64]{Value: v}}
 }
 
-func positionOf(st *media.PlaybackState) uint64 {
+func positionOf(st *mpdef.State) uint64 {
 	if st.SampledPosition == nil || st.SampledPosition.Position.Null {
 		return 0
 	}
@@ -339,43 +289,43 @@ func positionOf(st *media.PlaybackState) uint64 {
 }
 
 // Play is HandlePlay (:124-134).
-func (playerTransport) Play(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) {
+func (playerTransport) Play(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) {
 	st.CurrentState, st.PlaybackSpeed = mpdef.PlaybackStatePlaying, 1
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // Pause is HandlePause (:136-146).
-func (playerTransport) Pause(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) {
+func (playerTransport) Pause(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) {
 	st.CurrentState, st.PlaybackSpeed = mpdef.PlaybackStatePaused, 0
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // Stop is HandleStop (:148-159).
-func (playerTransport) Stop(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) {
+func (playerTransport) Stop(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) {
 	st.CurrentState, st.PlaybackSpeed, st.SampledPosition = mpdef.PlaybackStateNotPlaying, 0, position(0)
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // StartOver is HandleStartOver (:294-303).
-func (playerTransport) StartOver(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) StartOver(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	st.SampledPosition = position(0)
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // Previous is HandlePrevious (:189-200).
-func (playerTransport) Previous(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) Previous(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	st.CurrentState, st.PlaybackSpeed, st.SampledPosition = mpdef.PlaybackStatePlaying, 1, position(0)
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // Next is HandleNext (:281-292).
-func (playerTransport) Next(_ context.Context, st *media.PlaybackState) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) Next(_ context.Context, st *mpdef.State) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	st.CurrentState, st.PlaybackSpeed, st.SampledPosition = mpdef.PlaybackStatePlaying, 1, position(0)
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
 // FastForward is HandleFastForward (:161-187).
-func (playerTransport) FastForward(_ context.Context, st *media.PlaybackState, _ mpdef.FastForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) FastForward(_ context.Context, st *mpdef.State, _ mpdef.FastForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	if st.PlaybackSpeed == tvMaxForwardSpeed {
 		return tvResponse(mpdef.StatusSpeedOutOfRange), nil
 	}
@@ -389,7 +339,7 @@ func (playerTransport) FastForward(_ context.Context, st *media.PlaybackState, _
 }
 
 // Rewind is HandleRewind (:202-228).
-func (playerTransport) Rewind(_ context.Context, st *media.PlaybackState, _ mpdef.RewindRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) Rewind(_ context.Context, st *mpdef.State, _ mpdef.RewindRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	if st.PlaybackSpeed == tvMaxRewindSpeed {
 		return tvResponse(mpdef.StatusSpeedOutOfRange), nil
 	}
@@ -403,7 +353,7 @@ func (playerTransport) Rewind(_ context.Context, st *media.PlaybackState, _ mpde
 }
 
 // SkipForward is HandleSkipForward (:245-257): up to the duration.
-func (playerTransport) SkipForward(_ context.Context, st *media.PlaybackState, req mpdef.SkipForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) SkipForward(_ context.Context, st *mpdef.State, req mpdef.SkipForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	next := positionOf(st) + req.DeltaPositionMilliseconds
 	if st.Duration != nil {
 		next = min(next, *st.Duration)
@@ -413,7 +363,7 @@ func (playerTransport) SkipForward(_ context.Context, st *media.PlaybackState, r
 }
 
 // SkipBackward is HandleSkipBackward (:230-243): down to 0.
-func (playerTransport) SkipBackward(_ context.Context, st *media.PlaybackState, req mpdef.SkipBackwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) SkipBackward(_ context.Context, st *mpdef.State, req mpdef.SkipBackwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	cur := positionOf(st)
 	next := uint64(0)
 	if cur > req.DeltaPositionMilliseconds {
@@ -424,7 +374,7 @@ func (playerTransport) SkipBackward(_ context.Context, st *media.PlaybackState, 
 }
 
 // Seek is HandleSeek (:259-279): SeekOutOfRange past the duration.
-func (playerTransport) Seek(_ context.Context, st *media.PlaybackState, req mpdef.SeekRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the cluster/media port signature
+func (playerTransport) Seek(_ context.Context, st *mpdef.State, req mpdef.SeekRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
 	if st.Duration != nil && req.Position > *st.Duration {
 		return tvResponse(mpdef.StatusSeekOutOfRange), nil
 	}
@@ -458,6 +408,14 @@ func tvTextTracks() []mpdef.TrackStruct {
 	}
 }
 
+// tracks is the track list p points to; none for null.
+func tracks(p *[]mpdef.TrackStruct) []mpdef.TrackStruct {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 // errNoTrack refuses a track id the player does not offer:
 // HandleActivateAudioTrack and HandleActivateTextTrack answer false
 // (MediaPlaybackManager.cpp:305-333), which the server sends as FAILURE.
@@ -465,8 +423,8 @@ var errNoTrack = errors.New("no such track")
 
 // ActivateAudioTrack is HandleActivateAudioTrack (:305-318); the audio
 // output index is not used.
-func (playerTransport) ActivateAudioTrack(_ context.Context, st *media.PlaybackState, req mpdef.ActivateAudioTrackRequest) error {
-	for _, tr := range st.AvailableAudioTracks {
+func (playerTransport) ActivateAudioTrack(_ context.Context, st *mpdef.State, req mpdef.ActivateAudioTrackRequest) error {
+	for _, tr := range tracks(st.AvailableAudioTracks) {
 		if tr.Id == req.TrackId {
 			st.ActiveAudioTrack = &tr
 			return nil
@@ -476,8 +434,8 @@ func (playerTransport) ActivateAudioTrack(_ context.Context, st *media.PlaybackS
 }
 
 // ActivateTextTrack is HandleActivateTextTrack (:320-333).
-func (playerTransport) ActivateTextTrack(_ context.Context, st *media.PlaybackState, req mpdef.ActivateTextTrackRequest) error {
-	for _, tr := range st.AvailableTextTracks {
+func (playerTransport) ActivateTextTrack(_ context.Context, st *mpdef.State, req mpdef.ActivateTextTrackRequest) error {
+	for _, tr := range tracks(st.AvailableTextTracks) {
 		if tr.Id == req.TrackId {
 			st.ActiveTextTrack = &tr
 			return nil
@@ -487,7 +445,7 @@ func (playerTransport) ActivateTextTrack(_ context.Context, st *media.PlaybackSt
 }
 
 // DeactivateTextTrack is HandleDeactivateTextTrack (:335-343).
-func (playerTransport) DeactivateTextTrack(_ context.Context, st *media.PlaybackState) error { //nolint:unparam // the cluster/media port signature
+func (playerTransport) DeactivateTextTrack(_ context.Context, st *mpdef.State) error { //nolint:unparam // the mediaplayback port signature
 	st.ActiveTextTrack = nil
 	return nil
 }
@@ -520,11 +478,11 @@ var tvSupportedKeys = map[keypaddef.CecKeyCodeEnum]bool{
 // https://csa-iot.org/badauth, else Success (:126-138).
 type tvLauncher struct{}
 
-func (tvLauncher) LaunchContent(context.Context, *media.ContentLauncherState, launchdef.LaunchContentRequest) (launchdef.LauncherResponse, error) {
+func (tvLauncher) LaunchContent(context.Context, *launchdef.State, launchdef.LaunchContentRequest) (launchdef.LauncherResponse, error) {
 	return launchdef.LauncherResponse{Status: launchdef.StatusSuccess, Data: ptr("exampleData")}, nil
 }
 
-func (tvLauncher) LaunchURL(_ context.Context, _ *media.ContentLauncherState, req launchdef.LaunchUrlRequest) (launchdef.LauncherResponse, error) {
+func (tvLauncher) LaunchURL(_ context.Context, _ *launchdef.State, req launchdef.LaunchUrlRequest) (launchdef.LauncherResponse, error) {
 	resp := launchdef.LauncherResponse{Status: launchdef.StatusSuccess, Data: ptr("exampleData")}
 	switch req.ContentUrl {
 	case "https://badurl":
@@ -552,7 +510,7 @@ func launched() launcherdef.LauncherResponse {
 	return launcherdef.LauncherResponse{Status: launcherdef.StatusSuccess, Data: ptr([]byte("data"))}
 }
 
-func (p *tvPlatform) LaunchApp(_ context.Context, st *media.AppLauncherState, req launcherdef.LaunchAppRequest) (launcherdef.LauncherResponse, error) {
+func (p *tvPlatform) LaunchApp(_ context.Context, st *launcherdef.State, req launcherdef.LaunchAppRequest) (launcherdef.LauncherResponse, error) {
 	if !p.known(req.Application) {
 		return launcherdef.LauncherResponse{Status: launcherdef.StatusAppNotAvailable}, nil
 	}
@@ -560,7 +518,7 @@ func (p *tvPlatform) LaunchApp(_ context.Context, st *media.AppLauncherState, re
 	return launched(), p.media.appStatus(basicdef.ApplicationStatusActiveVisibleFocus)
 }
 
-func (p *tvPlatform) StopApp(_ context.Context, st *media.AppLauncherState, req launcherdef.StopAppRequest) (launcherdef.LauncherResponse, error) {
+func (p *tvPlatform) StopApp(_ context.Context, st *launcherdef.State, req launcherdef.StopAppRequest) (launcherdef.LauncherResponse, error) {
 	if !p.known(req.Application) {
 		return launcherdef.LauncherResponse{Status: launcherdef.StatusAppNotAvailable}, nil
 	}
@@ -568,7 +526,7 @@ func (p *tvPlatform) StopApp(_ context.Context, st *media.AppLauncherState, req 
 	return launched(), p.media.appStatus(basicdef.ApplicationStatusStopped)
 }
 
-func (p *tvPlatform) HideApp(_ context.Context, _ *media.AppLauncherState, req launcherdef.HideAppRequest) (launcherdef.LauncherResponse, error) {
+func (p *tvPlatform) HideApp(_ context.Context, _ *launcherdef.State, req launcherdef.HideAppRequest) (launcherdef.LauncherResponse, error) {
 	if !p.known(req.Application) {
 		return launcherdef.LauncherResponse{Status: launcherdef.StatusAppNotAvailable}, nil
 	}
@@ -581,15 +539,15 @@ func (p *tvPlatform) HideApp(_ context.Context, _ *media.AppLauncherState, req l
 // Success with "data".
 type tvApp struct{ media *demoMedia }
 
-func (a *tvApp) LaunchApp(context.Context, *media.AppLauncherState, launcherdef.LaunchAppRequest) (launcherdef.LauncherResponse, error) {
+func (a *tvApp) LaunchApp(context.Context, *launcherdef.State, launcherdef.LaunchAppRequest) (launcherdef.LauncherResponse, error) {
 	return launched(), a.media.appStatus(basicdef.ApplicationStatusActiveVisibleFocus)
 }
 
-func (a *tvApp) StopApp(context.Context, *media.AppLauncherState, launcherdef.StopAppRequest) (launcherdef.LauncherResponse, error) {
+func (a *tvApp) StopApp(context.Context, *launcherdef.State, launcherdef.StopAppRequest) (launcherdef.LauncherResponse, error) {
 	return launched(), a.media.appStatus(basicdef.ApplicationStatusStopped)
 }
 
-func (a *tvApp) HideApp(context.Context, *media.AppLauncherState, launcherdef.HideAppRequest) (launcherdef.LauncherResponse, error) {
+func (a *tvApp) HideApp(context.Context, *launcherdef.State, launcherdef.HideAppRequest) (launcherdef.LauncherResponse, error) {
 	return launched(), a.media.appStatus(basicdef.ApplicationStatusActiveHidden)
 }
 
@@ -597,7 +555,7 @@ func (a *tvApp) HideApp(context.Context, *media.AppLauncherState, launcherdef.Hi
 // (:57-71, :93-114), the status display logged (:73-91).
 type tvInputs struct{}
 
-func (tvInputs) SelectInput(_ context.Context, st *media.InputState, req inputdef.SelectInputRequest) error {
+func (tvInputs) SelectInput(_ context.Context, st *inputdef.State, req inputdef.SelectInputRequest) error {
 	for _, in := range st.InputList {
 		if in.Index == req.Index {
 			st.CurrentInput = req.Index
@@ -607,11 +565,11 @@ func (tvInputs) SelectInput(_ context.Context, st *media.InputState, req inputde
 	return fmt.Errorf("no input %d", req.Index)
 }
 
-func (tvInputs) ShowInputStatus(context.Context, *media.InputState) error { return nil }
+func (tvInputs) ShowInputStatus(context.Context, *inputdef.State) error { return nil }
 
-func (tvInputs) HideInputStatus(context.Context, *media.InputState) error { return nil }
+func (tvInputs) HideInputStatus(context.Context, *inputdef.State) error { return nil }
 
-func (tvInputs) RenameInput(_ context.Context, st *media.InputState, req inputdef.RenameInputRequest) error {
+func (tvInputs) RenameInput(_ context.Context, st *inputdef.State, req inputdef.RenameInputRequest) error {
 	for i := range st.InputList {
 		if st.InputList[i].Index == req.Index {
 			st.InputList[i].Name = req.Name
@@ -625,7 +583,7 @@ func (tvInputs) RenameInput(_ context.Context, st *media.InputState, req inputde
 // (:59-96).
 type tvOutputs struct{}
 
-func (tvOutputs) SelectOutput(_ context.Context, st *media.OutputState, req outputdef.SelectOutputRequest) error {
+func (tvOutputs) SelectOutput(_ context.Context, st *outputdef.State, req outputdef.SelectOutputRequest) error {
 	for _, out := range st.OutputList {
 		if out.Index == req.Index {
 			st.CurrentOutput = req.Index
@@ -635,7 +593,7 @@ func (tvOutputs) SelectOutput(_ context.Context, st *media.OutputState, req outp
 	return fmt.Errorf("no output %d", req.Index)
 }
 
-func (tvOutputs) RenameOutput(_ context.Context, st *media.OutputState, req outputdef.RenameOutputRequest) error {
+func (tvOutputs) RenameOutput(_ context.Context, st *outputdef.State, req outputdef.RenameOutputRequest) error {
 	for i := range st.OutputList {
 		if st.OutputList[i].Index == req.Index {
 			st.OutputList[i].Name = req.Name
@@ -660,7 +618,7 @@ func tvChannels() []channeldef.ChannelInfoStruct {
 // wrapping around the list (:216-232).
 type tvTuner struct{}
 
-func (tvTuner) ChangeChannel(_ context.Context, st *media.ChannelState, req channeldef.ChangeChannelRequest) (channeldef.ChangeChannelResponse, error) {
+func (tvTuner) ChangeChannel(_ context.Context, st *channeldef.State, req channeldef.ChangeChannelRequest) (channeldef.ChangeChannelResponse, error) {
 	var hits []int
 	for i, c := range st.ChannelList {
 		number := fmt.Sprintf("%d.%d", c.MajorNumber, c.MinorNumber)
@@ -680,7 +638,7 @@ func (tvTuner) ChangeChannel(_ context.Context, st *media.ChannelState, req chan
 	return channeldef.ChangeChannelResponse{Status: channeldef.StatusMultipleMatches}, nil
 }
 
-func (tvTuner) ChangeChannelByNumber(_ context.Context, st *media.ChannelState, req channeldef.ChangeChannelByNumberRequest) error {
+func (tvTuner) ChangeChannelByNumber(_ context.Context, st *channeldef.State, req channeldef.ChangeChannelByNumberRequest) error {
 	for _, c := range st.ChannelList {
 		if c.MajorNumber == req.MajorNumber && c.MinorNumber == req.MinorNumber {
 			st.CurrentChannel = &c
@@ -690,7 +648,7 @@ func (tvTuner) ChangeChannelByNumber(_ context.Context, st *media.ChannelState, 
 	return fmt.Errorf("no channel %d.%d", req.MajorNumber, req.MinorNumber)
 }
 
-func (tvTuner) SkipChannel(_ context.Context, st *media.ChannelState, req channeldef.SkipChannelRequest) error {
+func (tvTuner) SkipChannel(_ context.Context, st *channeldef.State, req channeldef.SkipChannelRequest) error {
 	n := len(st.ChannelList)
 	if n == 0 {
 		return errors.New("no channels")
@@ -716,7 +674,7 @@ func (tvTuner) SkipChannel(_ context.Context, st *media.ChannelState, req channe
 // "error" for 0 or past the list, else the target current.
 type tvTargets struct{}
 
-func (tvTargets) NavigateTarget(_ context.Context, st *media.TargetState, req targetdef.NavigateTargetRequest) (targetdef.NavigateTargetResponse, error) {
+func (tvTargets) NavigateTarget(_ context.Context, st *targetdef.State, req targetdef.NavigateTargetRequest) (targetdef.NavigateTargetResponse, error) {
 	if req.Target == 0 || int(req.Target) > len(st.TargetList) {
 		return targetdef.NavigateTargetResponse{Status: targetdef.StatusTargetNotFound, Data: ptr("error")}, nil
 	}

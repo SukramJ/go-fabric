@@ -13,38 +13,30 @@ import (
 )
 
 // InputState is the MediaInput attribute state (media-input.element.ts:
-// 25-29). InputList is mandatory and has no default: nil refuses
-// construction ([ErrMissingState]).
-type InputState struct {
-	InputList    []inputdef.InputInfoStruct
-	CurrentInput uint8
-}
+// 25-29), the cluster's generated State. InputList is mandatory and has no
+// default: nil refuses construction ([ErrMissingState]).
+type InputState = inputdef.State
 
-func (st InputState) values() map[uint32]any {
+func inputValues(st InputState) map[uint32]any {
 	return map[uint32]any{
 		inputdef.AttrInputList:    listOr(st.InputList),
 		inputdef.AttrCurrentInput: st.CurrentInput,
 	}
 }
 
-func (st InputState) clone() InputState {
+func cloneInput(st InputState) InputState {
 	st.InputList = slices.Clone(st.InputList)
 	return st
 }
 
-// Inputs is the MediaInput host port: SelectInput, ShowInputStatus and
-// HideInputStatus (:30-35), status only. A port that also implements
-// [InputRenamer] takes RenameInput.
-type Inputs interface {
-	SelectInput(ctx context.Context, st *InputState, req inputdef.SelectInputRequest) error
-	ShowInputStatus(ctx context.Context, st *InputState) error
-	HideInputStatus(ctx context.Context, st *InputState) error
-}
+// Inputs is the MediaInput host port (the generated [inputdef.Inputs], the
+// declaration's Inputs): SelectInput, ShowInputStatus and HideInputStatus
+// (:30-35), status only. A port that also implements [InputRenamer] takes
+// RenameInput.
+type Inputs = inputdef.Inputs
 
 // InputRenamer is RenameInput, required with NameUpdates (NU, :36-40).
-type InputRenamer interface {
-	RenameInput(ctx context.Context, st *InputState, req inputdef.RenameInputRequest) error
-}
+type InputRenamer = inputdef.InputRenamer
 
 // InputsConfig carries the construction parameters of a MediaInput server.
 type InputsConfig struct {
@@ -98,7 +90,7 @@ func NewInputs(cfg InputsConfig) (*InputsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, InputState.values, InputState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, inputValues, cloneInput, storeState[InputState]); err != nil {
 		return nil, fmt.Errorf("media: MediaInput: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -106,3 +98,6 @@ func NewInputs(cfg InputsConfig) (*InputsServer, error) {
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *InputsServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }

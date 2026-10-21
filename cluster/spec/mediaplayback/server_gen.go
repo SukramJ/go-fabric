@@ -197,6 +197,66 @@ func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error
 	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
 }
 
+// PlaybackStartOver is a Playback that takes StartOver.
+type PlaybackStartOver interface {
+	StartOver(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackPrevious is a Playback that takes Previous.
+type PlaybackPrevious interface {
+	Previous(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackNext is a Playback that takes Next.
+type PlaybackNext interface {
+	Next(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
+// PlaybackVariableSpeed is a Playback that takes Rewind and
+// FastForward; VariableSpeed (VS) requires it.
+type PlaybackVariableSpeed interface {
+	Rewind(ctx context.Context, st *State, req RewindRequest) (PlaybackResponse, error)
+	FastForward(ctx context.Context, st *State, req FastForwardRequest) (PlaybackResponse, error)
+}
+
+// PlaybackSkip is a Playback that takes SkipForward and SkipBackward.
+type PlaybackSkip interface {
+	SkipForward(ctx context.Context, st *State, req SkipForwardRequest) (PlaybackResponse, error)
+	SkipBackward(ctx context.Context, st *State, req SkipBackwardRequest) (PlaybackResponse, error)
+}
+
+// PlaybackSeek is a Playback that takes Seek; AdvancedSeek (AS)
+// requires it.
+type PlaybackSeek interface {
+	Seek(ctx context.Context, st *State, req SeekRequest) (PlaybackResponse, error)
+}
+
+// PlaybackAudioTracks is a Playback that takes ActivateAudioTrack
+// (status only); AudioTracks (AT) requires it.
+type PlaybackAudioTracks interface {
+	ActivateAudioTrack(ctx context.Context, st *State, req ActivateAudioTrackRequest) error
+}
+
+// PlaybackTextTracks is a Playback that takes ActivateTextTrack and
+// DeactivateTextTrack (status only); TextTracks (TT) requires it.
+type PlaybackTextTracks interface {
+	ActivateTextTrack(ctx context.Context, st *State, req ActivateTextTrackRequest) error
+	DeactivateTextTrack(ctx context.Context, st *State) error
+}
+
+// Playback is the transport behind the kit's MediaPlayback server: the
+// three mandatory commands, each answering a PlaybackResponse; st is
+// the state the attributes report, changed to what the command did.
+// A port that also implements PlaybackStartOver, PlaybackPrevious,
+// PlaybackNext, PlaybackVariableSpeed, PlaybackSkip, PlaybackSeek,
+// PlaybackAudioTracks or PlaybackTextTracks takes those commands
+// (cluster/media).
+type Playback interface {
+	Play(ctx context.Context, st *State) (PlaybackResponse, error)
+	Pause(ctx context.Context, st *State) (PlaybackResponse, error)
+	Stop(ctx context.Context, st *State) (PlaybackResponse, error)
+}
+
 // Declare is the declaration of the MediaPlayback cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -260,6 +320,8 @@ type Declare struct {
 	// HandleDeactivateTextTrack handles the DeactivateTextTrack command in place of the server
 	// (Server.HandleDeactivateTextTrack), inline; an optional command it handles is accepted.
 	HandleDeactivateTextTrack func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)
+	// Playback is the host port the kit's server runs on ([Playback]).
+	Playback Playback
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

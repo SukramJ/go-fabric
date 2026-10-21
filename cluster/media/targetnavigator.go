@@ -13,33 +13,30 @@ import (
 )
 
 // TargetState is the TargetNavigator attribute state
-// (target-navigator.element.ts:22-29). TargetList is mandatory and has no
-// default: nil refuses construction ([ErrMissingState]). CurrentTarget
-// (optional, served when the configuration lists it) is 0xFF — the
-// element's default (:28) — while no target is current.
-type TargetState struct {
-	TargetList    []targetdef.TargetInfoStruct
-	CurrentTarget uint8
-}
+// (target-navigator.element.ts:22-29), the cluster's generated State.
+// TargetList is mandatory and has no default: nil refuses construction
+// ([ErrMissingState]). CurrentTarget (optional, served when the
+// configuration lists it) is 0xFF — the element's default (:28) — while no
+// target is current.
+type TargetState = targetdef.State
 
-func (st TargetState) values() map[uint32]any {
+func targetValues(st TargetState) map[uint32]any {
 	return map[uint32]any{
 		targetdef.AttrTargetList:    listOr(st.TargetList),
 		targetdef.AttrCurrentTarget: st.CurrentTarget,
 	}
 }
 
-func (st TargetState) clone() TargetState {
+func cloneTarget(st TargetState) TargetState {
 	st.TargetList = slices.Clone(st.TargetList)
 	return st
 }
 
-// Targets is the TargetNavigator host port: NavigateTarget (:41-48),
-// answered by NavigateTargetResponse (:50-54); the port makes the target
-// current in st.
-type Targets interface {
-	NavigateTarget(ctx context.Context, st *TargetState, req targetdef.NavigateTargetRequest) (targetdef.NavigateTargetResponse, error)
-}
+// Targets is the TargetNavigator host port (the generated
+// [targetdef.Targets], the declaration's Targets): NavigateTarget
+// (:41-48), answered by NavigateTargetResponse (:50-54); the port makes
+// the target current in st.
+type Targets = targetdef.Targets
 
 // TargetsConfig carries the construction parameters of a TargetNavigator
 // server.
@@ -80,7 +77,7 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, TargetState.values, TargetState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, targetValues, cloneTarget, storeState[TargetState]); err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -88,6 +85,9 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *TargetsServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }
 
 // EmitTargetUpdated emits TargetUpdated (event 0x00, info; :31-39), which
 // the server emits when cfg.Events lists it.

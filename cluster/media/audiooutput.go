@@ -4,7 +4,6 @@
 package media
 
 import (
-	"context"
 	"fmt"
 	"slices"
 
@@ -13,36 +12,30 @@ import (
 )
 
 // OutputState is the AudioOutput attribute state (audio-output.element.ts:
-// 25-29). OutputList is mandatory and has no default: nil refuses
-// construction ([ErrMissingState]).
-type OutputState struct {
-	OutputList    []outputdef.OutputInfoStruct
-	CurrentOutput uint8
-}
+// 25-29), the cluster's generated State. OutputList is mandatory and has
+// no default: nil refuses construction ([ErrMissingState]).
+type OutputState = outputdef.State
 
-func (st OutputState) values() map[uint32]any {
+func outputValues(st OutputState) map[uint32]any {
 	return map[uint32]any{
 		outputdef.AttrOutputList:    listOr(st.OutputList),
 		outputdef.AttrCurrentOutput: st.CurrentOutput,
 	}
 }
 
-func (st OutputState) clone() OutputState {
+func cloneOutput(st OutputState) OutputState {
 	st.OutputList = slices.Clone(st.OutputList)
 	return st
 }
 
-// Outputs is the AudioOutput host port: SelectOutput (:30-33), status
-// only; the port makes the output current in st. A port that also
-// implements [OutputRenamer] takes RenameOutput.
-type Outputs interface {
-	SelectOutput(ctx context.Context, st *OutputState, req outputdef.SelectOutputRequest) error
-}
+// Outputs is the AudioOutput host port (the generated [outputdef.Outputs],
+// the declaration's Outputs): SelectOutput (:30-33), status only; the port
+// makes the output current in st. A port that also implements
+// [OutputRenamer] takes RenameOutput.
+type Outputs = outputdef.Outputs
 
 // OutputRenamer is RenameOutput, required with NameUpdates (NU, :34-38).
-type OutputRenamer interface {
-	RenameOutput(ctx context.Context, st *OutputState, req outputdef.RenameOutputRequest) error
-}
+type OutputRenamer = outputdef.OutputRenamer
 
 // OutputsConfig carries the construction parameters of an AudioOutput
 // server.
@@ -85,7 +78,7 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, OutputState.values, OutputState.clone); err != nil {
+	if err := s.init(srv, cfg.Initial, outputValues, cloneOutput, storeState[OutputState]); err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -93,3 +86,6 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 	}
 	return s, nil
 }
+
+// SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).
+func (s *OutputsServer) SetAttributes(values map[uint32]any) error { return s.setAttributes(values) }

@@ -127,6 +127,31 @@ func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req Canc
 	return spec.HandleOn(s.Underlying(), CmdCancelRecordProgram, fn)
 }
 
+// ChannelGuide is a Channels that takes GetProgramGuide;
+// ElectronicGuide (EG) requires it.
+type ChannelGuide interface {
+	GetProgramGuide(ctx context.Context, st *State, req GetProgramGuideRequest) (ProgramGuideResponse, error)
+}
+
+// ChannelRecorder is a Channels that takes RecordProgram and
+// CancelRecordProgram (status only); RecordProgram with
+// ElectronicGuide (RP & EG) requires it.
+type ChannelRecorder interface {
+	RecordProgram(ctx context.Context, st *State, req RecordProgramRequest) error
+	CancelRecordProgram(ctx context.Context, st *State, req CancelRecordProgramRequest) error
+}
+
+// Channels tunes: ChangeChannel answers ChangeChannelResponse,
+// ChangeChannelByNumber and SkipChannel are status only; the port
+// makes the channel current in st. A port that also implements
+// ChannelGuide takes the ElectronicGuide commands, ChannelRecorder
+// RecordProgram's (cluster/media).
+type Channels interface {
+	ChangeChannel(ctx context.Context, st *State, req ChangeChannelRequest) (ChangeChannelResponse, error)
+	ChangeChannelByNumber(ctx context.Context, st *State, req ChangeChannelByNumberRequest) error
+	SkipChannel(ctx context.Context, st *State, req SkipChannelRequest) error
+}
+
 // Declare is the declaration of the Channel cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -163,6 +188,8 @@ type Declare struct {
 	// HandleCancelRecordProgram handles the CancelRecordProgram command in place of the server
 	// (Server.HandleCancelRecordProgram), inline; an optional command it handles is accepted.
 	HandleCancelRecordProgram func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)
+	// Channels is the host port the kit's server runs on ([Channels]).
+	Channels Channels
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

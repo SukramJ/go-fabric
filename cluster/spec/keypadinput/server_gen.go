@@ -89,6 +89,13 @@ func (s *Server) HandleSendKey(fn func(ctx context.Context, req SendKeyRequest) 
 	return spec.HandleOn(s.Underlying(), CmdSendKey, fn)
 }
 
+// Keypad takes SendKey with the CEC key code and answers its
+// SendKeyResponse: UnsupportedKey or InvalidKeyInCurrentState for a
+// key the device does not take (cluster/media).
+type Keypad interface {
+	SendKey(ctx context.Context, req SendKeyRequest) (SendKeyResponse, error)
+}
+
 // Declare is the declaration of the KeypadInput cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -110,6 +117,8 @@ type Declare struct {
 	// HandleSendKey handles the SendKey command in place of the server
 	// (Server.HandleSendKey), inline; an optional command it handles is accepted.
 	HandleSendKey func(ctx context.Context, req SendKeyRequest) (SendKeyResponse, error)
+	// Keypad is the host port the kit's server runs on ([Keypad]).
+	Keypad Keypad
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -89,6 +89,12 @@ func (s *Server) HandleSleep(fn func(ctx context.Context, req SleepRequest) (str
 	return spec.HandleOn(s.Underlying(), CmdSleep, fn)
 }
 
+// LowPower carries out Sleep, status only: it puts the device into
+// its low-power mode (cluster/media).
+type LowPower interface {
+	Sleep(ctx context.Context) error
+}
+
 // Declare is the declaration of the LowPower cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -108,6 +114,8 @@ type Declare struct {
 	// HandleSleep handles the Sleep command in place of the server
 	// (Server.HandleSleep), inline; an optional command it handles is accepted.
 	HandleSleep func(ctx context.Context, req SleepRequest) (struct{}, error)
+	// LowPower is the host port the kit's server runs on ([LowPower]).
+	LowPower LowPower
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are
