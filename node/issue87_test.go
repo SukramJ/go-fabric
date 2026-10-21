@@ -121,9 +121,8 @@ func TestHostTopology(t *testing.T) {
 // TestUniqueIDPinned: the first boot of a store derives UniqueID and pins
 // it under store.SettingUniqueID; a later boot with another NodeLabel
 // serves the pinned value, as matter.js serves the uniqueId it created
-// once (BasicInformationServer.ts:89-91); a value flagged by the old
-// rotation marker (store.SettingUniqueIDRotated) is migrated once; a
-// host's own pin is served verbatim; a pin over 32 bytes is refused.
+// once (BasicInformationServer.ts:89-91); a host's own pin is served
+// verbatim; a pin over 32 bytes is refused.
 func TestUniqueIDPinned(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -159,34 +158,9 @@ func TestUniqueIDPinned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A value a host's own pinning flagged as written under rotation is
-	// stale to a boot without it: re-derived, pinned, flag cleared — the
-	// one-time migration until the deprecated key goes (issue #122).
-	st := store.New(db)
-	if err := st.SetSetting(ctx, store.SettingUniqueID, "rotated-per-boot"); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.SetSetting(ctx, store.SettingUniqueIDRotated, "1"); err != nil { //nolint:staticcheck // the deprecated marker the migration reads
-		t.Fatal(err)
-	}
-	n3 := newNode(t, cfg)
-	want := mattercore.DeriveUniqueID(pd.VendorID, pd.ProductID, "renamed node", bi.SerialNumber)
-	if got := readUniqueID(n3); got != want {
-		t.Errorf("after a flagged value UniqueID %q, want re-derived %q", got, want)
-	}
-	if v, _, _ := st.GetSetting(ctx, store.SettingUniqueID); v != want {
-		t.Errorf("pinned %q, want %q", v, want)
-	}
-	if flag, _, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); flag != "" { //nolint:staticcheck // as above
-		t.Errorf("rotated flag %q still set", flag)
-	}
-	if err := n3.Stop(ctx); err != nil {
-		t.Fatal(err)
-	}
-
 	cfg.BasicInformation.UniqueID = "host-pinned-0123456789abcdef"
-	n4 := newNode(t, cfg)
-	if got := readUniqueID(n4); got != cfg.BasicInformation.UniqueID {
+	n3 := newNode(t, cfg)
+	if got := readUniqueID(n3); got != cfg.BasicInformation.UniqueID {
 		t.Errorf("host pin served as %q", got)
 	}
 

@@ -21,8 +21,8 @@ func HookError(cluster, hook string, err error) error {
 
 // ClusterDeclaration is one cluster's declaration on a device in the form
 // the device kit applies it: what a generated <cluster>def.Declare states,
-// untyped, and what the kit's per-cluster options (device.WithOptional,
-// device.WithServer) state. The kit merges the
+// untyped, and what the kit's per-cluster option (device.WithServer)
+// states. The kit merges the
 // declarations of one cluster into one; it is the kit's form, not one a
 // host writes.
 //

@@ -16,7 +16,7 @@ const (
 	scenesID = 0x0062
 )
 
-// TestOptionalGroupsAndScenes: WithOptional opts a device into the Groups
+// TestOptionalGroupsAndScenes: the declaration opts a device into the Groups
 // or ScenesManagement its type lists as optional (report P question 7);
 // the assembler mounts the stack's server (endpoint.Spec.OptIn), the
 // device mounts none itself, and the endpoint still conforms to its

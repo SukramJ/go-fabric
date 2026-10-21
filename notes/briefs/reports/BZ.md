@@ -41,12 +41,13 @@ Every row has its line in `docs/guides/migrating-to-the-facade.md`, section
 | `store.DiagnosticsRecord`, `Store.LoadDiagnostics`, `SaveDiagnostics` | the facade's settings rows | same |
 | `mrp.Retransmitter`, `NewRetransmitter`, `SendFunc`, `TickResult` | none in `mrp` (the bridge's tracker; `BackoffDuration`) | same |
 | `modeselect.ModeOptionField…`, `SemanticTagField…` | the generated codec | same |
-| `device.WithOptional` for a cluster with a generated package | `<cluster>def.Declare{}` | `#removed-in-v0100-the-declaration` |
+| `device.WithOptional` (review answer 3: removed entirely) | `<cluster>def.Declare{}`; a cluster without a generated package: `WithServer`, the one form | `#removed-in-v0100-the-declaration` |
+| `store.SettingUniqueIDRotated` and the node's one-time read of it (review answer 1) | none: the migration ended; a store that never booted on v0.5.0 or later serves its salted unique id | `#others` |
 
 `script/archcheck/layers.json` has no exception left (`cluster/wire →
 cluster/switch` is gone with the wrapper). README §API stability: the table
-holds one row (Kept below) and the suspension paragraph; `docs/architecture.md`
-says the same. CHANGELOG `[Unreleased]`: six `### Removed` lines, one
+is empty to its header, with the suspension paragraph; `docs/architecture.md`
+says the same. CHANGELOG `[Unreleased]`: seven `### Removed` lines, one
 `### Changed` line for the policy; the Unreleased `### Deprecated` section
 (BX1, BX4) is dropped — those marks were never released.
 
@@ -54,9 +55,8 @@ says the same. CHANGELOG `[Unreleased]`: six `### Removed` lines, one
 
 | Symbol | Why |
 | --- | --- |
-| `store.SettingUniqueIDRotated` | no replacement: the node reads it once as the issue-#122 migration (`node/persist.go` `uniqueID`) and clears it; removing the key removes the migration. Question 1 |
-| the `matter_diagnostics` table | schema, not API: created and seeded, read by nothing; dropping it is a migration. Question 2 |
-| `device.WithOptional` for a cluster without a generated package | the addition (a): kept beside the narrowed `WithServer`. See Differences 4 |
+| the `matter_diagnostics` table | schema, not API: created and seeded, read by nothing; a drop is a migration for no gain (review answer 2) |
+| bootid rotation (`Config.BootID.RotateUniqueIDs`, `bootid.EnableRotation`) | a live feature, not the migration: a rotated boot still derives a per-boot id and leaves the store alone |
 | `wire.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest`, `wire.FanStepRequest`, the FanControl port forms | BU-b's (the self-held servers still use them); not marked |
 | `wire.GoToLiftValueRequest`, `GoToTiltValueRequest`, their decoders; `wire.GenericSwitchSource` and its capabilities, the `wire.Switch…Event` aliases | not deprecated; the materialiser reads the sources |
 
@@ -91,13 +91,11 @@ held without an edit.
    became unexported (`timerClock`, `otaClock`) behind the same
    `portClock` adapter; btp keeps a `clock.Clock` directly. Resolution is
    `clock.Or(cfg.TimeSource|Clock)` everywhere.
-4. **`WithOptional` narrowed** (refuses a cluster `spec.Lookup` knows, naming
-   `<cluster>def.Declare{}`; test `TestWithOptionalTakesOnlyAClusterWithoutAPackage`).
-   What it still accepts is a device type's optional cluster without a
-   definition — RootNode's 0x0035, 0x0801, 0x0802 and
-   SecondaryNetworkInterface's 0x0035 — where `WithServer` alone already
-   mounts the host's server. Device tests that walk clusters by id use an
-   internal `withOptional` (the untyped form, like `withFeatures`). Question 3.
+4. **`WithOptional` removed** (review answer 3). It was first narrowed to
+   clusters without a definition (`21f81fde`); its only accepted uses then
+   were RootNode's 0x0035, 0x0801, 0x0802, where `WithServer` alone mounts
+   the host's server, so it went. Device tests that walk clusters by id use
+   an internal `withOptional` (the untyped form, like `withFeatures`).
 5. **Tests that existed only for a deprecated form** were removed (the wire
    decoder and wrapper tests, `TestQuieterDeprecatedNowAndAfterFunc`,
    `TestDeprecatedSystemClockFires`, the ca `Now` case,
@@ -109,17 +107,16 @@ held without an edit.
 6. **Reachability.** `wire.GenericSwitchPositionSource` was reached only
    through the wrapper's test; the measurement test's `stated` helper now
    takes it (unreached stays 5, ratchet unchanged).
-7. The README table is not empty: `store.SettingUniqueIDRotated` is still
-   deprecated and was never listed; it is now.
+7. **The issue-#122 migration** (review answer 1): `node/persist.go`
+   `uniqueID` serves any stored unique id; the flag's read, the re-derive
+   it forced and the clearing are gone, with the migration's test cases
+   (`TestUniqueIDPinned`'s flagged boot, the migration block of the
+   internal rotation test). Rotation itself is untouched (Kept).
 
 ## Questions
 
-1. `store.SettingUniqueIDRotated`: end the issue-#122 migration (remove the
-   key and the read; a store still flagged would then serve its salted id)
-   or keep it until loom's stores have booted once on v0.5.0 or later (the release that added the migration)?
-2. `matter_diagnostics`: drop the table with a schema migration, or keep it?
-3. `WithOptional`: with the narrowing its accepted uses are redundant with
-   `WithServer`. Remove it outright?
+None open: the review answered the three (owner decisions 2026-10-21) —
+the migration ends, the table stays, `WithOptional` goes.
 
 ## by_design candidates
 

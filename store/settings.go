@@ -32,19 +32,6 @@ const (
 	// shape matter.js uses (BasicInformationServer's uniqueId, quality
 	// "FN": created once, restored from state afterwards).
 	SettingUniqueID = "basic_information.unique_id"
-	// SettingUniqueIDRotated is "1" when the value currently persisted under
-	// [SettingUniqueID] was written by a boot with the host's development
-	// rotation of unique ids enabled (a per-boot salted value,
-	// never meant to be pinned), and unset/"" otherwise. It lets a later
-	// boot with the dev flag off recognise a leftover salted value as
-	// stale — rather than pinning it as the bridge's permanent identity —
-	// and re-derive the deterministic one instead.
-	//
-	// Deprecated: read for the migration only; never written. The node
-	// facade pins nothing under rotation, so it has no salted value to
-	// flag; it reads the key once to re-derive a value a host's own pinning
-	// flagged, and clears it (issue #122). Removed after the API window.
-	SettingUniqueIDRotated = "basic_information.unique_id_rotated"
 )
 
 // MetadataKeyEventNumber is the matter_metadata key holding the
