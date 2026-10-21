@@ -59,4 +59,13 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleResetCounts: a command the server does not accept was registered")
 	}
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
 }

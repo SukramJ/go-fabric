@@ -73,4 +73,13 @@ func TestTypedServer(t *testing.T) {
 	_ = s.EmitLeave(0, LeaveEvent{})                       // not in the empty definition's EventList: refused
 	_ = s.EmitReachableChanged(0, ReachableChangedEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitActiveChanged(0, ActiveChangedEvent{})       // not in the empty definition's EventList: refused
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
 }

@@ -91,4 +91,14 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleMoveToClosestFrequency(func(context.Context, MoveToClosestFrequencyRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleMoveToClosestFrequency: a command the server does not accept was registered")
 	}
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
+	var _ LevelSource = d.LevelSource
 }

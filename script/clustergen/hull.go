@@ -311,6 +311,18 @@ func (g *generator) serverTest(w *writer) {
 	for _, he := range g.hullEvents() {
 		w.p("\t_ = s.%s(0, %s{}) // not in the empty definition's EventList: refused", he.method, he.payload)
 	}
+	w.p("\t// The declaration: its cluster, its kit form, its veto installed.")
+	w.p("\td := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}")
+	w.p("\tdecl := d.ClusterDeclaration()")
+	w.p("\tif d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {")
+	w.p("\t\tt.Errorf(\"Declare: cluster %%v / %%v, attach %%v\", d.ClusterID(), decl.Cluster, decl.Attach != nil)")
+	w.p("\t}")
+	w.p("\tif err := decl.Attach(srv); err != nil {")
+	w.p("\t\tt.Error(err)")
+	w.p("\t}")
+	for _, port := range ports[g.c.Name].ports {
+		w.p("\tvar _ %s = d.%s", port.name, port.name)
+	}
 	w.p("}")
 }
 

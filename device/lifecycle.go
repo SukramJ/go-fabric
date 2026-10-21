@@ -18,9 +18,11 @@ import (
 // the device itself says whether it is reachable and what it is called,
 // and knows its endpoint number once it is added. Mirrors matter.js's
 // bridged endpoint, whose BridgedDeviceBasicInformation state the host
-// sets (`reachable`, `nodeLabel`) and whose number the node assigns when
-// it is added (packages/node/src/behaviors/bridged-device-basic-information/
-// BridgedDeviceBasicInformationServer.ts:37, :100-102, :129-132).
+// sets and whose number the node assigns when it is added; its server
+// reacts to a Reachable change with the event
+// (packages/node/src/behaviors/bridged-device-basic-information/
+// BridgedDeviceBasicInformationServer.ts:37 reactTo, :100-102
+// #emitReachableChange).
 
 // ErrAddedElsewhere is the refusal to add a device a node holds already to
 // another.
@@ -100,9 +102,10 @@ func (d *Device) EndpointNumber() (uint16, bool) {
 // SetReachable says whether the bridged device is reachable: its
 // BridgedDeviceBasicInformation Reachable attribute, and on a change the
 // ReachableChanged event a subscribed controller receives — as a matter.js
-// host sets `reachable` and the server emits the event
-// (BridgedDeviceBasicInformationServer.ts:37, :100-102). A device starts
-// reachable (:129-132). [Options].Reachable, when set, still decides as
+// host sets the state and the server emits the event
+// (BridgedDeviceBasicInformationServer.ts:37 reactTo, :100-102
+// #emitReachableChange). A device starts reachable, as matter.js's State
+// does (BridgedDeviceBasicInformationServer.ts:129-132). [Options].Reachable, when set, still decides as
 // well: the device is reachable while both say so. Before the device is
 // added only the value changes.
 func (d *Device) SetReachable(ctx context.Context, reachable bool) {

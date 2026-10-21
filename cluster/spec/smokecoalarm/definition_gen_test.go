@@ -81,4 +81,13 @@ func TestTypedServer(t *testing.T) {
 	_ = s.EmitInterconnectSmokeAlarm(0, InterconnectSmokeAlarmEvent{}) // not in the empty definition's EventList: refused
 	_ = s.EmitInterconnectCoAlarm(0, InterconnectCoAlarmEvent{})       // not in the empty definition's EventList: refused
 	_ = s.EmitAllClear(0, AllClearEvent{})                             // not in the empty definition's EventList: refused
+	// The declaration: its cluster, its kit form, its veto installed.
+	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
+	decl := d.ClusterDeclaration()
+	if d.ClusterID() != ClusterID || decl.Cluster != ClusterID || decl.Attach == nil {
+		t.Errorf("Declare: cluster %v / %v, attach %v", d.ClusterID(), decl.Cluster, decl.Attach != nil)
+	}
+	if err := decl.Attach(srv); err != nil {
+		t.Error(err)
+	}
 }

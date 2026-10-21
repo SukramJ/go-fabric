@@ -588,9 +588,9 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 // DataVersion bump and the Reachable attribute marked dirty — what
 // device.Device.SetReachable reaches through the node. It reports false
 // when no bridged endpoint has the id. Mirrors matter.js
-// BridgedDeviceBasicInformationServer, whose reachable$Changed reaction
-// emits reachableChanged (BridgedDeviceBasicInformationServer.ts:37,
-// :100-102).
+// BridgedDeviceBasicInformationServer, which reacts to a change of its
+// Reachable with the event (BridgedDeviceBasicInformationServer.ts:37
+// reactTo, #emitReachableChange at :100-102).
 func (b *Bridge) NotifyEndpointReachable(endpointID uint16, reachable bool) bool {
 	if b == nil {
 		return false
