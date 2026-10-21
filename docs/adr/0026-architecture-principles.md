@@ -45,13 +45,16 @@ hold gets the guard (principle 11).
    (`transport/*`, `mdns`); security and storage (`secure/*`,
    `commissioning`, `store`, `bdx/*`, `diagevent`, `bootid`); model and
    protocol (`im/*`, `groups`, `cluster/spec/*`, `cluster/wire`,
-   `contract`, `eligibility`); servers (`cluster/*` except `spec` and
+   `contract`, `eligibility`, and the client machinery both roles share,
+   `client/*` — exchanges, the CASE/PASE initiators, the client
+   interaction, the peer set, discovery — moved there from `controller/`
+   by brief BX4, 2026-10-21); servers (`cluster/*` except `spec` and
    `wire`, `binding`); composition of endpoints (`endpoint/*`,
    `device/*`); the two roles (`bridge`, `controller/*`); the facade
    (`node`); and test support, examples and scripts above everything. A
-   package imports only its own layer or a lower one. The one upward edge
-   of today (`binding` → `controller/*`) is the first exception on the
-   archcheck ratchet, to be resolved by principle 12. `cluster/spec/*` and
+   package imports only its own layer or a lower one; the archcheck
+   ratchet carries no layer exception since BX4 resolved `binding` →
+   `controller/*` by the `client/*` move (principle 12). `cluster/spec/*` and
    `cluster/wire` are model packages under the servers' directory;
    archcheck assigns them to the model layer (the exact pattern wins) and
    they stay where they are: a move to `spec/` would rename 119 public

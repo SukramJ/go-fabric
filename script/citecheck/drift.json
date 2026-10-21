@@ -522,6 +522,340 @@
     "occurrences": 4
   },
   {
+    "file": "client/discovery/parity_matterjs_test.go",
+    "line": 47,
+    "citation": "DnssdName.ts:25",
+    "resolved": "packages/general/src/net/dns-sd/DnssdName.ts",
+    "identifier": "installedAt",
+    "nearest": 87,
+    "occurrences": 6
+  },
+  {
+    "file": "client/exchange/exchange.go",
+    "line": 53,
+    "citation": "MessageExchange.ts:1272-1273",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "suppressPeerLoss",
+    "nearest": 1304,
+    "occurrences": 10
+  },
+  {
+    "file": "client/exchange/exchange_test.go",
+    "line": 244,
+    "citation": "MessageExchange.ts:894-918",
+    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
+    "identifier": "PeerUnresponsiveError",
+    "nearest": 781,
+    "occurrences": 2
+  },
+  {
+    "file": "client/exchange/manager.go",
+    "line": 186,
+    "citation": "ExchangeManager.ts:391-440",
+    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
+    "identifier": "addProtocolHandler",
+    "nearest": 126,
+    "occurrences": 1
+  },
+  {
+    "file": "client/exchange/manager.go",
+    "line": 193,
+    "citation": "SecureChannelProtocol.ts:146-148",
+    "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
+    "identifier": "CaseServer",
+    "nearest": 99,
+    "occurrences": 3
+  },
+  {
+    "file": "client/handshake/case.go",
+    "line": 61,
+    "citation": "PeerConnection.ts:829-860",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "identifier": "CaseClient",
+    "nearest": 555,
+    "occurrences": 2
+  },
+  {
+    "file": "client/handshake/pase_test.go",
+    "line": 101,
+    "citation": "PaseClient.ts:192-197",
+    "resolved": "packages/protocol/src/session/pase/PaseClient.ts",
+    "identifier": "InvalidParam",
+    "nearest": 111,
+    "occurrences": 4
+  },
+  {
+    "file": "client/handshake/server_test.go",
+    "line": 212,
+    "citation": "CaseServer.ts:309",
+    "resolved": "packages/protocol/src/session/case/CaseServer.ts",
+    "identifier": "InvalidParam",
+    "nearest": 93,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/handler.go",
+    "line": 50,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "readDataReports",
+    "nearest": 1012,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/interaction.go",
+    "line": 43,
+    "citation": "InteractionMessenger.ts:186-190",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "MatterFlowError",
+    "nearest": 20,
+    "occurrences": 7
+  },
+  {
+    "file": "client/interaction/interaction.go",
+    "line": 53,
+    "citation": "ControllerCommissioningFlow.ts:519-523",
+    "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
+    "identifier": "StatusResponseError",
+    "nearest": 460,
+    "occurrences": 4
+  },
+  {
+    "file": "client/interaction/interaction.go",
+    "line": 55,
+    "citation": "InteractionMessenger.ts:201-214",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "ReceivedStatusResponseError",
+    "nearest": 268,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/interaction.go",
+    "line": 140,
+    "citation": "ClientInteraction.ts:1249-1251",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "maximumPeerResponseTime",
+    "nearest": 1333,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/interaction.go",
+    "line": 165,
+    "citation": "InteractionMessenger.ts:148-161",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 208,
+    "occurrences": 6
+  },
+  {
+    "file": "client/interaction/invoke.go",
+    "line": 71,
+    "citation": "InteractionMessenger.ts:1082-1105",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "client/interaction/parity_matterjs_test.go",
+    "line": 53,
+    "citation": "ClientSubscription.ts:104",
+    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscription.ts",
+    "identifier": "SubscriptionId",
+    "nearest": 55,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/provider.go",
+    "line": 177,
+    "citation": "ClientInteraction.ts:1112",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "verifyReachability",
+    "nearest": 1159,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/read.go",
+    "line": 29,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/read.go",
+    "line": 111,
+    "citation": "InteractionMessenger.ts:1006-1009",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "dataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 6
+  },
+  {
+    "file": "client/interaction/read.go",
+    "line": 116,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "#shortenDataVersionFilters",
+    "nearest": 1163,
+    "occurrences": 2
+  },
+  {
+    "file": "client/interaction/report.go",
+    "line": 75,
+    "citation": "ClientSubscriptionHandler.ts:89",
+    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
+    "identifier": "reportStarted",
+    "nearest": 112,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/report_internal_test.go",
+    "line": 159,
+    "citation": "InteractionMessenger.ts:998-1050",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "DataVersionFilters",
+    "nearest": 1149,
+    "occurrences": 1
+  },
+  {
+    "file": "client/interaction/scripted_test.go",
+    "line": 85,
+    "citation": "InteractionMessenger.ts:1082-1105",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "client/interaction/scripted_test.go",
+    "line": 86,
+    "citation": "ClientInteraction.ts:457-464",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "commandRef",
+    "nearest": 510,
+    "occurrences": 34
+  },
+  {
+    "file": "client/interaction/scripted_test.go",
+    "line": 175,
+    "citation": "ClientInteraction.ts:438-440",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "TimedRequest",
+    "nearest": 422,
+    "occurrences": 0
+  },
+  {
+    "file": "client/interaction/scripted_test.go",
+    "line": 296,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "TlvReadRequest",
+    "nearest": 1140,
+    "occurrences": 4
+  },
+  {
+    "file": "client/interaction/subscribe.go",
+    "line": 118,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "SubscribeResponse",
+    "nearest": 1108,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/subscribe.go",
+    "line": 230,
+    "citation": "InteractionMessenger.ts:1052-1055",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "#encodeReadingRequest",
+    "nearest": 1140,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/subscribe_test.go",
+    "line": 65,
+    "citation": "InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "SubscribeResponse",
+    "nearest": 1108,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/write.go",
+    "line": 25,
+    "citation": "Write.ts:204-218",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "identifier": "WriteRequest",
+    "nearest": 29,
+    "occurrences": 3
+  },
+  {
+    "file": "client/interaction/write.go",
+    "line": 48,
+    "citation": "ClientInteraction.ts:369-371",
+    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
+    "identifier": "TimedRequest",
+    "nearest": 422,
+    "occurrences": 0
+  },
+  {
+    "file": "client/interaction/write_test.go",
+    "line": 114,
+    "citation": "Write.ts:74",
+    "resolved": "packages/protocol/src/action/request/Write.ts",
+    "identifier": "AccessControl",
+    "nearest": 16,
+    "occurrences": 4
+  },
+  {
+    "file": "client/interaction/write_test.go",
+    "line": 167,
+    "citation": "InteractionMessenger.ts:1138-1162",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 992,
+    "occurrences": 6
+  },
+  {
+    "file": "client/peer/connection.go",
+    "line": 52,
+    "citation": "types/src/protocol/definitions/general.ts:33",
+    "resolved": "packages/types/src/protocol/definitions/general.ts",
+    "identifier": "GeneralStatusCode",
+    "nearest": 7,
+    "occurrences": 1
+  },
+  {
+    "file": "client/peer/connection.go",
+    "line": 822,
+    "citation": "PeerConnection.ts:674-696",
+    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
+    "identifier": "handleConnectionError",
+    "nearest": 656,
+    "occurrences": 2
+  },
+  {
+    "file": "client/peer/observer.go",
+    "line": 26,
+    "citation": "Peer.ts:190-195",
+    "resolved": "packages/protocol/src/peer/Peer.ts",
+    "at": "0ceb202d",
+    "identifier": "#save",
+    "nearest": 105,
+    "occurrences": 2
+  },
+  {
+    "file": "client/peer/probe.go",
+    "line": 36,
+    "citation": "interaction/InteractionMessenger.ts:938-972",
+    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
+    "identifier": "StatusResponse",
+    "nearest": 991,
+    "occurrences": 6
+  },
+  {
     "file": "cluster/closure/closurecontrol_payload_shapes_test.go",
     "line": 143,
     "citation": "closure-control.element.ts:80-81",
@@ -1459,340 +1793,6 @@
     "identifier": "GitHub",
     "nearest": 37,
     "occurrences": 4
-  },
-  {
-    "file": "controller/discovery/parity_matterjs_test.go",
-    "line": 47,
-    "citation": "DnssdName.ts:25",
-    "resolved": "packages/general/src/net/dns-sd/DnssdName.ts",
-    "identifier": "installedAt",
-    "nearest": 87,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/exchange/exchange.go",
-    "line": 53,
-    "citation": "MessageExchange.ts:1272-1273",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "suppressPeerLoss",
-    "nearest": 1304,
-    "occurrences": 10
-  },
-  {
-    "file": "controller/exchange/exchange_test.go",
-    "line": 244,
-    "citation": "MessageExchange.ts:894-918",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "PeerUnresponsiveError",
-    "nearest": 781,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/exchange/manager.go",
-    "line": 186,
-    "citation": "ExchangeManager.ts:391-440",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "addProtocolHandler",
-    "nearest": 126,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/exchange/manager.go",
-    "line": 193,
-    "citation": "SecureChannelProtocol.ts:146-148",
-    "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
-    "identifier": "CaseServer",
-    "nearest": 99,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/handshake/case.go",
-    "line": 61,
-    "citation": "PeerConnection.ts:829-860",
-    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
-    "identifier": "CaseClient",
-    "nearest": 555,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/handshake/pase_test.go",
-    "line": 101,
-    "citation": "PaseClient.ts:192-197",
-    "resolved": "packages/protocol/src/session/pase/PaseClient.ts",
-    "identifier": "InvalidParam",
-    "nearest": 111,
-    "occurrences": 4
-  },
-  {
-    "file": "controller/handshake/server_test.go",
-    "line": 212,
-    "citation": "CaseServer.ts:309",
-    "resolved": "packages/protocol/src/session/case/CaseServer.ts",
-    "identifier": "InvalidParam",
-    "nearest": 93,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/handler.go",
-    "line": 50,
-    "citation": "InteractionMessenger.ts:938-972",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "readDataReports",
-    "nearest": 1012,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/interaction.go",
-    "line": 43,
-    "citation": "InteractionMessenger.ts:186-190",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "MatterFlowError",
-    "nearest": 20,
-    "occurrences": 7
-  },
-  {
-    "file": "controller/interaction/interaction.go",
-    "line": 53,
-    "citation": "ControllerCommissioningFlow.ts:519-523",
-    "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
-    "identifier": "StatusResponseError",
-    "nearest": 460,
-    "occurrences": 4
-  },
-  {
-    "file": "controller/interaction/interaction.go",
-    "line": 55,
-    "citation": "InteractionMessenger.ts:201-214",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "ReceivedStatusResponseError",
-    "nearest": 268,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/interaction.go",
-    "line": 140,
-    "citation": "ClientInteraction.ts:1249-1251",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "maximumPeerResponseTime",
-    "nearest": 1333,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/interaction.go",
-    "line": 165,
-    "citation": "InteractionMessenger.ts:148-161",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "StatusResponse",
-    "nearest": 208,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/interaction/invoke.go",
-    "line": 71,
-    "citation": "InteractionMessenger.ts:1082-1105",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "StatusResponse",
-    "nearest": 992,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/interaction/parity_matterjs_test.go",
-    "line": 53,
-    "citation": "ClientSubscription.ts:104",
-    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscription.ts",
-    "identifier": "SubscriptionId",
-    "nearest": 55,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/provider.go",
-    "line": 177,
-    "citation": "ClientInteraction.ts:1112",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "verifyReachability",
-    "nearest": 1159,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/read.go",
-    "line": 29,
-    "citation": "InteractionMessenger.ts:998-1050",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "DataVersionFilters",
-    "nearest": 1149,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/read.go",
-    "line": 111,
-    "citation": "InteractionMessenger.ts:1006-1009",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "dataVersionFilters",
-    "nearest": 1149,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/interaction/read.go",
-    "line": 116,
-    "citation": "InteractionMessenger.ts:998-1050",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "#shortenDataVersionFilters",
-    "nearest": 1163,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/interaction/report.go",
-    "line": 75,
-    "citation": "ClientSubscriptionHandler.ts:89",
-    "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
-    "identifier": "reportStarted",
-    "nearest": 112,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/report_internal_test.go",
-    "line": 159,
-    "citation": "InteractionMessenger.ts:998-1050",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "DataVersionFilters",
-    "nearest": 1149,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/scripted_test.go",
-    "line": 85,
-    "citation": "InteractionMessenger.ts:1082-1105",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "StatusResponse",
-    "nearest": 992,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/interaction/scripted_test.go",
-    "line": 86,
-    "citation": "ClientInteraction.ts:457-464",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "commandRef",
-    "nearest": 510,
-    "occurrences": 34
-  },
-  {
-    "file": "controller/interaction/scripted_test.go",
-    "line": 175,
-    "citation": "ClientInteraction.ts:438-440",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "TimedRequest",
-    "nearest": 422,
-    "occurrences": 0
-  },
-  {
-    "file": "controller/interaction/scripted_test.go",
-    "line": 296,
-    "citation": "InteractionMessenger.ts:938-972",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "TlvReadRequest",
-    "nearest": 1140,
-    "occurrences": 4
-  },
-  {
-    "file": "controller/interaction/subscribe.go",
-    "line": 118,
-    "citation": "InteractionMessenger.ts:938-972",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "SubscribeResponse",
-    "nearest": 1108,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/subscribe.go",
-    "line": 230,
-    "citation": "InteractionMessenger.ts:1052-1055",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "#encodeReadingRequest",
-    "nearest": 1140,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/subscribe_test.go",
-    "line": 65,
-    "citation": "InteractionMessenger.ts:938-972",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "SubscribeResponse",
-    "nearest": 1108,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/write.go",
-    "line": 25,
-    "citation": "Write.ts:204-218",
-    "resolved": "packages/protocol/src/action/request/Write.ts",
-    "identifier": "WriteRequest",
-    "nearest": 29,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/interaction/write.go",
-    "line": 48,
-    "citation": "ClientInteraction.ts:369-371",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "TimedRequest",
-    "nearest": 422,
-    "occurrences": 0
-  },
-  {
-    "file": "controller/interaction/write_test.go",
-    "line": 114,
-    "citation": "Write.ts:74",
-    "resolved": "packages/protocol/src/action/request/Write.ts",
-    "identifier": "AccessControl",
-    "nearest": 16,
-    "occurrences": 4
-  },
-  {
-    "file": "controller/interaction/write_test.go",
-    "line": 167,
-    "citation": "InteractionMessenger.ts:1138-1162",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "StatusResponse",
-    "nearest": 992,
-    "occurrences": 6
-  },
-  {
-    "file": "controller/peer/connection.go",
-    "line": 52,
-    "citation": "types/src/protocol/definitions/general.ts:33",
-    "resolved": "packages/types/src/protocol/definitions/general.ts",
-    "identifier": "GeneralStatusCode",
-    "nearest": 7,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/peer/connection.go",
-    "line": 822,
-    "citation": "PeerConnection.ts:674-696",
-    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
-    "identifier": "handleConnectionError",
-    "nearest": 656,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/peer/observer.go",
-    "line": 26,
-    "citation": "Peer.ts:190-195",
-    "resolved": "packages/protocol/src/peer/Peer.ts",
-    "at": "0ceb202d",
-    "identifier": "#save",
-    "nearest": 105,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/peer/probe.go",
-    "line": 36,
-    "citation": "interaction/InteractionMessenger.ts:938-972",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "StatusResponse",
-    "nearest": 991,
-    "occurrences": 6
   },
   {
     "file": "device/device.go",

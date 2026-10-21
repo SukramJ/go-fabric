@@ -21,6 +21,9 @@
 __pycache__/
 *.pyc
 
+# mkdocs build output (the Pages workflow builds its own; a local `mkdocs build` drops it here).
+/site/
+
 # Claude Code agent worktrees.
 /.claude/worktrees/
 
