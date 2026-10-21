@@ -31,6 +31,14 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   commit it was built from (`CHIP_TEST_IMAGE_COMMIT`). It carries chip-tool,
   the YAML runner and the Python `TC_*` cases at that commit; the run uses the
   same image matter.js tests itself with.
+- **The CSA Test Harness is not used.** The cases are driven straight from
+  the `connectedhomeip` tree in that image; the harness
+  (`project-chip/certification-tool`) would orchestrate the same YAML and
+  Python cases with its own PICS handling, manual prompt steps, a web UI and
+  the report format of a submission. It is deliberately no part of the
+  guards (owner, 2026-10-21); one spot-check run of its backend against the
+  reference daemon, with the report kept under `notes/`, is planned for
+  milestone 6 as evidence that the results hold as the harness sees them.
 - **Families** run in full, the way matter.js declares its own
   (`support/chip-testing/test/core`, `test/app-*`). A case that is not run is
   a gap of exactly one class:
