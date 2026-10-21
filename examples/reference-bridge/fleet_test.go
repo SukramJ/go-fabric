@@ -27,11 +27,11 @@ import (
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
-	bcdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
+	bcdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
