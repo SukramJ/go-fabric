@@ -91,7 +91,7 @@ const defaultSupportedOperatingModes = lockdef.OperatingModesAlwaysSet | lockdef
 
 // ErrConfig reports a configuration the cluster's model, or matter.js's
 // initialize, refuses.
-var ErrConfig = errors.New("doorlock: configuration outside the cluster's model")
+var ErrConfig = errors.New("lock: configuration outside the cluster's model")
 
 // LockOperationEvent is the cluster-native payload for the DoorLock
 // LockOperation event (id 0x02, priority critical) per Matter §5.2.10.3
@@ -110,7 +110,7 @@ type LockOperationEvent struct {
 	SourceNode        *uint64
 }
 
-var errUnknownCommand = errors.New("doorlock: unknown command")
+var errUnknownCommand = errors.New("lock: unknown command")
 
 // StateSource is the read-side interface a model-layer lock DP must
 // satisfy so DoorLockServer can project its Matter attribute surface.
@@ -203,7 +203,7 @@ func (e *LockOperationFailedError) Error() string {
 	if e.Message != "" {
 		return e.Message
 	}
-	return fmt.Sprintf("doorlock: lock operation failed: operation error %d", uint8(e.Reason))
+	return fmt.Sprintf("lock: lock operation failed: operation error %d", uint8(e.Reason))
 }
 
 // DoorLockConfig holds the construction parameters for [New]. The zero
@@ -326,8 +326,12 @@ type DoorLockServer struct {
 
 	supportedModes lockdef.OperatingModesBitmap
 
+	// op serialises lock operations end to end — the hardware move
+	// included, as matter.js runs them under `{ lock: true }` — and is
+	// taken before mu.
 	op sync.Mutex
 
+	// mu guards the fields below.
 	mu       sync.Mutex
 	endpoint uint16
 	data     store.DoorLockAuth
@@ -341,6 +345,11 @@ type DoorLockServer struct {
 	lockoutEndsAt  time.Time
 	autoRelock     *serverTimer
 	expiryTimers   map[uint16]*serverTimer
+	// actions counts the timer actions running on goroutines of their own
+	// (goTimerAction); idle, on mu, signals it reached zero, which
+	// MatterQuiesce waits for.
+	actions int
+	idle    sync.Cond
 }
 
 // queuedEvent is an event decided under mu and emitted after it.
@@ -350,13 +359,47 @@ type queuedEvent struct {
 }
 
 // serverTimer is one armed timer; its identity tells a superseded run to
-// do nothing (DoorLockServer.ts:969-972).
-type serverTimer struct{ t clock.Timer }
+// do nothing (DoorLockServer.ts:969-972). stopped, guarded by the
+// server's mu, tells a callback that fired as the timer was stopped not
+// to start its action.
+type serverTimer struct {
+	t       clock.Timer
+	stopped bool
+}
 
+// stop stops the timer; the caller holds the server's mu.
 func (t *serverTimer) stop() {
-	if t != nil && t.t != nil {
-		t.t.Stop()
+	if t != nil {
+		t.stopped = true
+		if t.t != nil {
+			t.t.Stop()
+		}
 	}
+}
+
+// goTimerAction runs fn, the action of t, on a goroutine the server owns
+// — fn takes op, which a lock operation may hold, so the clock's callback
+// does not wait for it — unless t was stopped meanwhile. MatterQuiesce
+// waits for the running actions.
+func (s *DoorLockServer) goTimerAction(t *serverTimer, fn func()) {
+	s.mu.Lock()
+	if t.stopped {
+		s.mu.Unlock()
+		return
+	}
+	s.actions++
+	s.mu.Unlock()
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			s.actions--
+			if s.actions == 0 {
+				s.idle.Broadcast()
+			}
+			s.mu.Unlock()
+		}()
+		fn()
+	}()
 }
 
 // Compile-time assertions.
@@ -418,6 +461,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 		expiryTimers: map[uint16]*serverTimer{},
 		base:         context.Background(),
 	}
+	s.idle.L = &s.mu
 	if s.tracker == nil {
 		s.tracker = &cluster.DataVersionTracker{}
 	}
@@ -550,7 +594,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	if s.auth != nil {
 		saved, ok, err := s.auth.LoadDoorLockAuth(ctx, s.authKey)
 		if err != nil {
-			return fmt.Errorf("doorlock: load records: %w", err)
+			return fmt.Errorf("lock: load records: %w", err)
 		}
 		if ok {
 			s.data = saved
@@ -561,7 +605,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 	for i := range data.Credentials {
 		enc, err := s.cipher.Encrypt(data.Credentials[i].Data)
 		if err != nil {
-			return fmt.Errorf("doorlock: encrypt an initial credential: %w", err)
+			return fmt.Errorf("lock: encrypt an initial credential: %w", err)
 		}
 		data.Credentials[i].Data = enc
 	}
@@ -576,7 +620,7 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	if s.auth != nil {
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
-			return nil, fmt.Errorf("doorlock: read the credential key: %w", err)
+			return nil, fmt.Errorf("lock: read the credential key: %w", err)
 		}
 		if ok {
 			key, err := hex.DecodeString(v)
@@ -588,11 +632,11 @@ func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	}
 	key := make([]byte, credentialKeySize)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("doorlock: generate the credential key: %w", err)
+		return nil, fmt.Errorf("lock: generate the credential key: %w", err)
 	}
 	if s.auth != nil {
 		if err := s.auth.SetSetting(ctx, store.SettingDoorLockCredentialKey, hex.EncodeToString(key)); err != nil {
-			return nil, fmt.Errorf("doorlock: store the credential key: %w", err)
+			return nil, fmt.Errorf("lock: store the credential key: %w", err)
 		}
 	}
 	return key, nil
@@ -667,7 +711,7 @@ func (s *DoorLockServer) MatterWriteAttribute(_ context.Context, attrID uint32, 
 	}
 	m, _ := value.(uint8)
 	if !modeSupported(s.supportedModes, lockdef.OperatingModeEnum(m)) {
-		return spec.Errorf(im.StatusConstraintError, "doorlock: %s", unsupportedOperatingMode(lockdef.OperatingModeEnum(m)))
+		return spec.Errorf(im.StatusConstraintError, "lock: %s", unsupportedOperatingMode(lockdef.OperatingModeEnum(m)))
 	}
 	return nil
 }
@@ -699,7 +743,11 @@ func (s *DoorLockServer) SetEndpoint(endpoint uint16) {
 // and expiry timers stop, as matter.js stops them on dispose
 // (DoorLockServer.ts:182-189). A later lock command arms auto-relock
 // again; an ExpiringUser's deadline stays stored and is checked on its
-// next use.
+// next use. A timer action already running (an auto-relock moving the
+// hardware) finishes first: MatterQuiesce returns once the cancelled timer
+// action has returned. The wait has no bound of its own — the interface
+// carries no context — and is bounded by the action, whose hardware call
+// the host keeps short.
 func (s *DoorLockServer) MatterQuiesce() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -707,6 +755,9 @@ func (s *DoorLockServer) MatterQuiesce() {
 	for idx, t := range s.expiryTimers {
 		t.stop()
 		delete(s.expiryTimers, idx)
+	}
+	for s.actions > 0 {
+		s.idle.Wait() // releases mu: the action takes op, then mu
 	}
 }
 
@@ -818,7 +869,7 @@ func lockRequest(fields any) (pinCode *[]byte, timeout *uint16, err error) {
 	case *lockdef.UnlockWithTimeoutRequest:
 		pinCode, timeout = r.PinCode, &r.Timeout
 	default:
-		return nil, nil, spec.Errorf(im.StatusInvalidCommand, "doorlock: lock command fields %T", fields)
+		return nil, nil, spec.Errorf(im.StatusInvalidCommand, "lock: lock command fields %T", fields)
 	}
 	return pinCode, timeout, nil
 }
@@ -847,7 +898,7 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 	// Events of a lock operation name the requesting fabric; without one
 	// the hardware must not move (:1016-1022).
 	if _, fabricIndex := im.FabricFilterFromContext(ctx); fabricIndex == 0 {
-		return spec.Errorf(im.StatusUnsupportedAccess, "doorlock: lock commands need the fabric of a remote requester")
+		return spec.Errorf(im.StatusUnsupportedAccess, "lock: lock commands need the fabric of a remote requester")
 	}
 	// UnboltDoor retracts the bolt without pulling the latch: the lock ends
 	// up Unlocked and reports an Unlock (§ 5.2.10.25, § 5.2.11.3;
@@ -878,7 +929,7 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 		if errors.As(err, &sc) {
 			return err
 		}
-		return spec.Errorf(im.StatusFailure, "doorlock: lock hardware failed to %s: %v", actuation, err)
+		return spec.Errorf(im.StatusFailure, "lock: lock hardware failed to %s: %v", actuation, err)
 	}
 
 	if err := s.setActuated(locking); err != nil {
@@ -967,7 +1018,7 @@ func (s *DoorLockServer) scheduleAutoRelockLocked(timeoutSeconds *uint16) {
 	// The action takes op, which a lock operation may hold: it runs in a
 	// goroutine of its own, as matter.js's callback waits for the lock
 	// (:167, `{ lock: true }`).
-	t.t = s.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { go s.runAutoRelock(t) })
+	t.t = s.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { s.goTimerAction(t, func() { s.runAutoRelock(t) }) })
 	s.autoRelock = t
 }
 
@@ -1030,10 +1081,10 @@ func (s *DoorLockServer) authorizeLocked(ctx context.Context, opType lockdef.Loc
 	mode := s.operatingMode()
 	if mode == lockdef.OperatingModePrivacy || mode == lockdef.OperatingModeNoRemoteLockUnlock {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorUnspecified, anonymous)
-		return anonymous, spec.Errorf(im.StatusFailure, "doorlock: remote lock operations are disabled in operating mode %d", mode)
+		return anonymous, spec.Errorf(im.StatusFailure, "lock: remote lock operations are disabled in operating mode %d", mode)
 	}
 	if s.isLockedOutLocked() {
-		return anonymous, spec.Errorf(im.StatusFailure, "doorlock: lock operations are ignored during the wrong code lockout")
+		return anonymous, spec.Errorf(im.StatusFailure, "lock: lock operations are ignored during the wrong code lockout")
 	}
 	if pinCode == nil {
 		if s.requirePin() {
@@ -1064,20 +1115,20 @@ func (s *DoorLockServer) authorizeUserLocked(ctx context.Context, opType lockdef
 	}
 	if status == lockdef.UserStatusOccupiedDisabled || expired {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorDisabledUserDenied, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: user %d is disabled", user.UserIndex)
+		return spec.Errorf(im.StatusFailure, "lock: user %d is disabled", user.UserIndex)
 	}
 	userType := lockdef.UserTypeEnum(user.UserType)
 	if !IsAccessGranted(userType, user.UserIndex, s.data.WeekDaySchedules, s.data.YearDaySchedules, LocalInstantOf(s.clock.Now().In(s.loc))) {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorRestricted, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: access denied by schedule")
+		return spec.Errorf(im.StatusFailure, "lock: access denied by schedule")
 	}
 	if userType == lockdef.UserTypeExpiringUser && !s.Serves(lockdef.AttrExpiringUserTimeout) {
 		s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorRestricted, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: an ExpiringUser cannot be granted access without ExpiringUserTimeout")
+		return spec.Errorf(im.StatusFailure, "lock: an ExpiringUser cannot be granted access without ExpiringUserTimeout")
 	}
 	if userType == lockdef.UserTypeNonAccessUser {
 		s.emitLockOperationLocked(ctx, lockdef.LockOperationTypeNonAccessUserEvent, req)
-		return spec.Errorf(im.StatusFailure, "doorlock: a NonAccessUser cannot operate the lock")
+		return spec.Errorf(im.StatusFailure, "lock: a NonAccessUser cannot operate the lock")
 	}
 	return nil
 }
@@ -1144,7 +1195,7 @@ func (s *DoorLockServer) refuseWrongCodeLocked(ctx context.Context, opType lockd
 		}
 	}
 	s.emitLockOperationErrorLocked(ctx, opType, lockdef.OperationErrorInvalidCredential, anonymous)
-	return spec.Errorf(im.StatusFailure, "doorlock: %s", message)
+	return spec.Errorf(im.StatusFailure, "lock: %s", message)
 }
 
 // isLockedOutLocked mirrors matter.js DoorLockServer.ts:1192-1195. The
@@ -1341,7 +1392,7 @@ func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 			s.data = before
 			s.mu.Unlock()
 			s.emit(events)
-			return spec.Errorf(im.StatusFailure, "doorlock: save records: %v", perr)
+			return spec.Errorf(im.StatusFailure, "lock: save records: %v", perr)
 		}
 	}
 	s.emit(events)

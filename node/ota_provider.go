@@ -24,18 +24,18 @@ import (
 // SoftwareUpdateManager (mattercore.OTAProvider).
 type OTAProviderConfig struct {
 	// ImageSource names and serves the images; nil mounts no provider.
-	ImageSource mattercore.OTAImageSource
+	ImageSource OTAImageSource
 	// Consent asks the user; nil declines an image that needs a consent
 	// the requestor cannot give.
-	Consent mattercore.OTAConsent
+	Consent OTAConsent
 	// ApplyPolicy decides an allowed apply; nil proceeds at once.
-	ApplyPolicy mattercore.OTAApplyPolicy
+	ApplyPolicy OTAApplyPolicy
 	// BDXMaxBlockSize, when set, caps the block size of the image
 	// transfers.
 	BDXMaxBlockSize uint16
 	// OnStatusChange observes the requestors' update states; nil observes
 	// nothing.
-	OnStatusChange func(peer mattercore.OTAPeer, status mattercore.OTAUpdateStatus, version uint32)
+	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
 }
 
 // otaProviderKey is the stable key the provider endpoint's number is kept

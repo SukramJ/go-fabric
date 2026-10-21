@@ -7,14 +7,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -31,10 +29,10 @@ var (
 	// but no [PaseHandler] is wired. The bridge still drops the
 	// datagram with a debug log so PASE traffic during pre-commissioner
 	// boot does not flood the warn channel.
-	ErrPaseHandlerMissing = errors.New("securechannel: PASE handler not wired")
+	ErrPaseHandlerMissing = errors.New("bridge: PASE handler not wired")
 	// ErrCaseHandlerMissing is returned when a CASE (Sigma) opcode
 	// arrives but no [CaseHandler] is wired.
-	ErrCaseHandlerMissing = errors.New("securechannel: CASE handler not wired")
+	ErrCaseHandlerMissing = errors.New("bridge: CASE handler not wired")
 )
 
 // PaseHandler is the inbound PASE port — the Spake2+ verifier the
@@ -1085,8 +1083,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 		b.logger.Debug("matter.rx.sc.status_report",
 			slog.String("src", srcString(src)),
 			slog.Int("session_id", int(requestHdr.SessionID)),
-			slog.Int("payload_bytes", len(payload)),
-			slog.String("hex", hex.EncodeToString(payload)))
+			slog.Int("payload_bytes", len(payload)))
 		return nil
 	}
 	// Deferred: the route goes after the session, and with the session's
@@ -1261,23 +1258,35 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 // matter.js DeviceAdvertiser.ts:132-149 (sessions.deleted →
 // serviceDisconnected resumes broadcasting).
 //
-// Fire-and-forget: the republish runs on its own goroutine bounded by
-// the advertise timeout, because the trigger fires from the reaper /
-// receive paths which must not block on mDNS probe/announce rounds.
-// No-op once the bridge stopped — matter.js shuts the advertiser down
-// before removing sessions to prevent exactly this re-announce
+// The republish runs on its own goroutine bounded by the advertise
+// timeout, because the trigger fires from the reaper / receive paths
+// which must not block on mDNS probe/announce rounds. The bridge owns
+// it: it runs under the serve context, which Stop cancels, and Stop
+// waits for it before the advertiser closes. No-op once the bridge
+// stopped — matter.js shuts the advertiser down before removing
+// sessions to prevent exactly this re-announce
 // (ServerNetworkRuntime.ts:427).
 func (b *Bridge) triggerSessionReannounce() {
 	b.mu.RLock()
 	started := b.started
 	advertiser := b.advertiser
 	timeout := b.cfg.AdvertiseTimeout
+	base := b.handlerCtx
+	if started && advertiser != nil {
+		// Added under mu while started: Stop's Wait follows its
+		// started=false under the write lock, so no Add races it.
+		b.reannounces.Add(1)
+	}
 	b.mu.RUnlock()
 	if !started || advertiser == nil {
 		return
 	}
+	if base == nil {
+		base = context.Background()
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer b.reannounces.Done()
+		ctx, cancel := context.WithTimeout(base, timeout)
 		defer cancel()
 		// Zeroconf exposes a direct republish trigger; other
 		// advertisers degrade to a per-record re-publish, which the
@@ -1327,12 +1336,16 @@ func (b *Bridge) closeSecureSessionsForShutdown() {
 	deadline := b.clk().Now().Add(stopSessionCloseBudget)
 	done := make(chan int, 1)
 	go func() { done <- reg.CloseAllGraceful(deadline) }()
+	// The budget's timer is stopped on either branch, so none stays armed
+	// on the bridge's clock after Stop.
+	budget := b.clk().NewTimer(stopSessionCloseBudget)
+	defer budget.Stop()
 	select {
 	case n := <-done:
 		if n > 0 {
 			b.logger.Info("matter.bridge.stop.sessions_closed", slog.Int("count", n))
 		}
-	case <-clock.After(b.clk(), stopSessionCloseBudget):
+	case <-budget.C():
 		b.logger.Warn("matter.bridge.stop.session_close_timeout",
 			slog.Duration("budget", stopSessionCloseBudget))
 	}

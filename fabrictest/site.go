@@ -45,6 +45,11 @@ type Options struct {
 	Loopback bool
 	// Settle is the quiet period of [Site.Settle]; 0 is [DefaultSettle].
 	Settle time.Duration
+	// Wall is the clock the quiet period is measured on and the quiet
+	// check paces itself by — the machine's time, whatever Clock the hosts
+	// run on, since "nothing ran for 10 ms" is a statement about the
+	// process; nil is [clock.System].
+	Wall clock.Clock
 	// Logger receives the logs of the hosts the site builds — the nodes,
 	// the controllers and their components; nil discards those. A
 	// component that logs to slog.Default() rather than to the logger it
@@ -66,6 +71,7 @@ type Site struct {
 	// stopped every node (cleanups run last-registered first).
 	dir  string
 	clk  clock.Clock
+	wall clock.Clock // Options.Wall
 	fake *clocktest.Fake
 	net  *Network
 	log  *slog.Logger
@@ -87,7 +93,7 @@ type Site struct {
 // NewSite returns an empty site, closed when tb ends.
 func NewSite(tb testing.TB, opts Options) *Site {
 	tb.Helper()
-	s := &Site{tb: tb, opts: opts, clk: opts.Clock, log: opts.Logger, nextIndex: 1}
+	s := &Site{tb: tb, opts: opts, clk: opts.Clock, wall: clock.Or(opts.Wall), log: opts.Logger, nextIndex: 1}
 	if s.clk == nil {
 		s.fake = clocktest.New(DefaultStart)
 		s.clk = s.fake
@@ -201,7 +207,7 @@ func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil) }
 
 // quiet is Settle that also returns, with nil, once done is closed.
 func (s *Site) quiet(ctx context.Context, done <-chan struct{}) error {
-	wall := clock.System{}
+	wall := s.wall
 	since := wall.Now()
 	lastSent := s.sent()
 	samples := make([]metrics.Sample, len(busyMetrics))

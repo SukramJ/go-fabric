@@ -124,6 +124,7 @@ type Server struct {
 	source   Source
 	sink     Sink
 
+	// mu guards beforeWrite, emitter, handlers and values.
 	mu          sync.Mutex
 	beforeWrite func(ctx context.Context, attrID uint32, value any) error
 	values      map[uint32]any

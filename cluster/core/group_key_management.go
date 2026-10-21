@@ -80,7 +80,7 @@ const (
 )
 
 // Errors.
-var errGroupKeyMgmtInvalidArg = errors.New("matter: GroupKeyManagement invalid argument")
+var errGroupKeyMgmtInvalidArg = errors.New("core: GroupKeyManagement invalid argument")
 
 // groupKeyNotFoundErr is the typed [im.StatusCodeError] returned when a
 // KeySetRead / KeySetRemove targets a group key set that does not exist on
@@ -90,7 +90,7 @@ var errGroupKeyMgmtInvalidArg = errors.New("matter: GroupKeyManagement invalid a
 type groupKeyNotFoundErr struct{ id uint16 }
 
 func (e groupKeyNotFoundErr) Error() string {
-	return fmt.Sprintf("matter: GroupKeyManagement key set not found: id=%d", e.id)
+	return fmt.Sprintf("core: GroupKeyManagement key set not found: id=%d", e.id)
 }
 
 func (groupKeyNotFoundErr) MatterStatusCode() im.StatusCode { return im.StatusNotFound }
@@ -104,7 +104,7 @@ var _ im.StatusCodeError = groupKeyNotFoundErr{}
 type groupKeyExhaustedErr struct{ maxKeys uint16 }
 
 func (e groupKeyExhaustedErr) Error() string {
-	return fmt.Sprintf("matter: GroupKeyManagement key sets exhausted: max=%d per fabric", e.maxKeys)
+	return fmt.Sprintf("core: GroupKeyManagement key sets exhausted: max=%d per fabric", e.maxKeys)
 }
 
 func (groupKeyExhaustedErr) MatterStatusCode() im.StatusCode { return im.StatusResourceExhausted }
@@ -138,7 +138,7 @@ const (
 // NewGroupKeyManagement constructs the cluster.
 func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKeyManagement, error) {
 	if s == nil {
-		return nil, errors.New("matter: GroupKeyManagement store is required")
+		return nil, errors.New("core: GroupKeyManagement store is required")
 	}
 	if cfg.MaxGroupsPerFabric == 0 {
 		cfg.MaxGroupsPerFabric = defaultMaxGroupsPerFabric
@@ -176,7 +176,7 @@ func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) error
 		return nil
 	}
 	if err := g.groups.Reload(ctx, fabric); err != nil {
-		return fmt.Errorf("matter: GroupKeyManagement: refresh group state: %w", err)
+		return fmt.Errorf("core: GroupKeyManagement: refresh group state: %w", err)
 	}
 	return nil
 }
@@ -421,7 +421,7 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 	if lister, ok := g.store.(fabricLister); ok {
 		recs, err := lister.ListFabrics(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("matter: GroupKeyManagement: list fabrics: %w", err)
+			return nil, fmt.Errorf("core: GroupKeyManagement: list fabrics: %w", err)
 		}
 		out := make([]uint8, 0, len(recs))
 		for _, r := range recs {
@@ -433,7 +433,7 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 	if g.groups != nil {
 		idxs, err := g.groups.Fabrics(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("matter: GroupKeyManagement: list fabrics: %w", err)
+			return nil, fmt.Errorf("core: GroupKeyManagement: list fabrics: %w", err)
 		}
 		return idxs, nil
 	}
@@ -449,7 +449,7 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]ui
 // fabric.
 func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
-		return spec.Errorf(im.StatusUnsupportedWrite, "matter: GroupKeyManagement attribute 0x%04X is read-only", attrID)
+		return spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
 	}
 	list, ok := value.([]GroupKeyMapStruct)
 	if !ok {
@@ -491,7 +491,7 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	}
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
-		return fmt.Errorf("matter: GroupKeyMap write: list current bindings: %w", err)
+		return fmt.Errorf("core: GroupKeyMap write: list current bindings: %w", err)
 	}
 	for _, m := range list {
 		if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{
@@ -499,7 +499,7 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 			GroupID:       m.GroupID,
 			GroupKeySetID: m.GroupKeySetID,
 		}); err != nil {
-			return fmt.Errorf("matter: GroupKeyMap write: %w", err)
+			return fmt.Errorf("core: GroupKeyMap write: %w", err)
 		}
 	}
 	for _, prev := range existing {
@@ -507,7 +507,7 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 			continue
 		}
 		if err := g.store.RemoveGroupKeyMapping(ctx, fabric, prev.GroupID); err != nil {
-			return fmt.Errorf("matter: GroupKeyMap write: remove dropped binding %d: %w", prev.GroupID, err)
+			return fmt.Errorf("core: GroupKeyMap write: remove dropped binding %d: %w", prev.GroupID, err)
 		}
 	}
 	// Bump DataVersion after a successful GroupKeyMap mutation so
@@ -523,7 +523,7 @@ type gkmStatusError struct {
 	msg  string
 }
 
-func (e gkmStatusError) Error() string { return "matter: GroupKeyManagement: " + e.msg }
+func (e gkmStatusError) Error() string { return "core: GroupKeyManagement: " + e.msg }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e gkmStatusError) MatterStatusCode() im.StatusCode { return e.code }
@@ -605,7 +605,7 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		g.mu.RUnlock()
 	}
 	if fabric == 0 {
-		return nil, errors.New("matter: GroupKeyManagement command without active fabric")
+		return nil, errors.New("core: GroupKeyManagement command without active fabric")
 	}
 
 	switch cmdID {
@@ -618,7 +618,7 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	case groupKeyMgmtCmdKeySetReadAllIndices:
 		return g.handleKeySetReadAllIndices(ctx, fabric)
 	}
-	return nil, im.UnsupportedCommandf("matter: GroupKeyManagement command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: GroupKeyManagement command 0x%02X not supported", cmdID)
 }
 
 // MatterReportable lists subscribe-able attributes.
@@ -746,41 +746,41 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// Status::ConstraintError (substring "constraint" triggers that path).
 	const epochKeyLen = 16
 	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
+		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
 	}
 	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
+		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
 	}
 	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "matter: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
+		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
 	}
 
 	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
 	}
 	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
 	}
 
 	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
 	}
 	if len(gks.EpochKey1) == 0 && gks.EpochStartTime1 != 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
 	}
 
 	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
 	}
 	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
 	}
 	if len(gks.EpochKey2) == 0 && gks.EpochStartTime2 != 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
 	}
 
 	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
 	}
 	// GroupKeyMulticastPolicy (field 8) is accepted whatever its value and
 	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check
@@ -802,7 +802,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 		EpochStart2:    gks.EpochStartTime2,
 	}
 	if err := g.store.UpsertGroupKeySet(ctx, rec); err != nil {
-		return nil, fmt.Errorf("matter: KeySetWrite: %w", err)
+		return nil, fmt.Errorf("core: KeySetWrite: %w", err)
 	}
 	// Bump DataVersion after a successful KeySetWrite so DataVersionFilter
 	// evaluation correctly detects the cluster changed.
@@ -821,7 +821,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 func (g *GroupKeyManagement) enforceKeySetBudget(ctx context.Context, fabric uint8, id uint16) error {
 	existing, err := g.store.ListGroupKeySets(ctx, fabric)
 	if err != nil {
-		return fmt.Errorf("matter: KeySetWrite: %w", err)
+		return fmt.Errorf("core: KeySetWrite: %w", err)
 	}
 	written := 0
 	for _, ks := range existing {
@@ -848,7 +848,7 @@ func (g *GroupKeyManagement) handleKeySetRead(ctx context.Context, fabric uint8,
 		return nil, groupKeyNotFoundErr{req.GroupKeySetID}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("matter: KeySetRead: %w", err)
+		return nil, fmt.Errorf("core: KeySetRead: %w", err)
 	}
 	return KeySetReadResponse{
 		GroupKeySet: GroupKeySetStruct{
@@ -880,7 +880,7 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	// StatusResponseError with InvalidCommand; we surface the same
 	// status as a typed spec.Errorf.
 	if req.GroupKeySetID == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "matter: KeySetRemove: invalid command argument: GroupKeySet 0 (IPK) cannot be removed")
+		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetRemove: invalid command argument: GroupKeySet 0 (IPK) cannot be removed")
 	}
 	// Removing a non-existent key set must return NotFound, not silent
 	// success. matter.js GroupKeyManagementServer.ts throws Status.NotFound
@@ -889,10 +889,10 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	if _, err := g.store.GetGroupKeySet(ctx, fabric, req.GroupKeySetID); errors.Is(err, store.ErrGroupKeySetNotFound) {
 		return nil, groupKeyNotFoundErr{req.GroupKeySetID}
 	} else if err != nil {
-		return nil, fmt.Errorf("matter: KeySetRemove: %w", err)
+		return nil, fmt.Errorf("core: KeySetRemove: %w", err)
 	}
 	if err := g.store.RemoveGroupKeySet(ctx, fabric, req.GroupKeySetID); err != nil {
-		return nil, fmt.Errorf("matter: KeySetRemove: %w", err)
+		return nil, fmt.Errorf("core: KeySetRemove: %w", err)
 	}
 	// Bump DataVersion after a successful KeySetRemove. The store has
 	// dropped the fabric's GroupKeyMap entries that referred to the key
@@ -905,7 +905,7 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fabric uint8) (any, error) {
 	sets, err := g.store.ListGroupKeySets(ctx, fabric)
 	if err != nil {
-		return nil, fmt.Errorf("matter: KeySetReadAllIndices: %w", err)
+		return nil, fmt.Errorf("core: KeySetReadAllIndices: %w", err)
 	}
 	// Key set 0 (the IPK) is always listed, first, whether or not the
 	// store holds a row for it. Mirrors matter.js
@@ -940,7 +940,7 @@ func (g *GroupKeyManagement) validateKeySetID(ctx context.Context, fabric uint8,
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("matter: GroupKeyManagement: %w", err)
+		return false, fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	return true, nil
 }
@@ -958,7 +958,7 @@ func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabri
 		FabricIndex: fabric, GroupKeySetID: id, SecurityPolicy: store.SecurityPolicyTrustFirst,
 		EpochKey0: slices.Clone(key), EpochStart0: groupcastKeyEpochStartTime,
 	}); err != nil {
-		return fmt.Errorf("matter: GroupKeyManagement: create Groupcast key set: %w", err)
+		return fmt.Errorf("core: GroupKeyManagement: create Groupcast key set: %w", err)
 	}
 	g.dataVersion.Bump()
 	return g.syncGroups(ctx, fabric)
@@ -976,7 +976,7 @@ func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric ui
 	}
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
-		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	n := len(existing)
 	if !slices.ContainsFunc(existing, func(m store.GroupKeyMapping) bool { return m.GroupID == groupID }) {
@@ -1000,7 +1000,7 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 		return err
 	}
 	if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: fabric, GroupID: groupID, GroupKeySetID: keySetID}); err != nil {
-		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
 	return g.syncGroups(ctx, fabric)
@@ -1010,7 +1010,7 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 // matter.js GroupcastServer #removeGroupKeyMappings.
 func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric uint8, groupID uint16) error {
 	if err := g.store.RemoveGroupKeyMapping(ctx, fabric, groupID); err != nil {
-		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
 	return g.syncGroups(ctx, fabric)

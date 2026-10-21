@@ -117,10 +117,10 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	}
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if fabricIndex == 0 {
-		return nil, opcredsUnsupportedAccessErr{"matter: SetVIDVerificationStatement needs an accessing fabric"}
+		return nil, opcredsUnsupportedAccessErr{"core: SetVIDVerificationStatement needs an accessing fabric"}
 	}
 	if !req.HasVendorID && !req.HasVidVerificationStatement && !req.HasVvsc {
-		return nil, opcredsInvalidCommandErr{"matter: SetVIDVerificationStatement: at least one of VendorID, VIDVerificationStatement or VVSC must be provided"}
+		return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: at least one of VendorID, VIDVerificationStatement or VVSC must be provided"}
 	}
 	// The VendorID must be operational — valid and not the Matter Standard
 	// vendor ID 0x0000 — not merely valid. Mirrors matter.js
@@ -131,15 +131,15 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	// isValid(v)`, isValid being 0..0xFFF4 at :21-26), which is
 	// isOperationalAdminVendorID.
 	if req.HasVendorID && !isOperationalAdminVendorID(req.VendorID) {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("matter: SetVIDVerificationStatement: invalid VendorID 0x%04X", req.VendorID)}
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SetVIDVerificationStatement: invalid VendorID 0x%04X", req.VendorID)}
 	}
 	if req.HasVvsc {
 		id, err := o.store.GetIdentity(ctx, fabricIndex)
 		if err != nil {
-			return nil, fmt.Errorf("matter: SetVIDVerificationStatement: identity: %w", err)
+			return nil, fmt.Errorf("core: SetVIDVerificationStatement: identity: %w", err)
 		}
 		if len(id.ICAC) > 0 {
-			return nil, opcredsInvalidCommandErr{"matter: SetVIDVerificationStatement: a VVSC is only allowed without an ICAC"}
+			return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: a VVSC is only allowed without an ICAC"}
 		}
 	}
 	d := o.vidVerification(ctx, fabricIndex)
@@ -150,7 +150,7 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 		case vidVerificationStatementSize:
 			d.statement = append([]byte(nil), req.VidVerificationStatement...)
 		default:
-			return nil, opcredsConstraintErr{msg: "matter: SetVIDVerificationStatement: the statement must be 0 or 85 bytes long"}
+			return nil, opcredsConstraintErr{msg: "core: SetVIDVerificationStatement: the statement must be 0 or 85 bytes long"}
 		}
 	}
 	if req.HasVvsc {
@@ -162,14 +162,14 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	if req.HasVendorID {
 		up, ok := o.store.(fabricVendorIDUpdater)
 		if !ok {
-			return nil, opcredsInvalidCommandErr{"matter: SetVIDVerificationStatement: the store cannot change a fabric's vendor id"}
+			return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: the store cannot change a fabric's vendor id"}
 		}
 		if err := up.UpdateFabricVendorID(ctx, fabricIndex, req.VendorID); err != nil {
-			return nil, fmt.Errorf("matter: SetVIDVerificationStatement: vendor id: %w", err)
+			return nil, fmt.Errorf("core: SetVIDVerificationStatement: vendor id: %w", err)
 		}
 	}
 	if err := o.storeVidVerification(ctx, fabricIndex, d); err != nil {
-		return nil, fmt.Errorf("matter: SetVIDVerificationStatement: persist: %w", err)
+		return nil, fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
 	}
 	o.dataVersion.Bump()
 	// The fabric changed: matter.js Fabric.updateVendorVerificationData
@@ -188,19 +188,19 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 		return nil, fmt.Errorf("%w: SignVidVerificationRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
 	if len(req.ClientChallenge) != vidClientChallengeSize {
-		return nil, opcredsConstraintErr{msg: "matter: SignVIDVerificationRequest: ClientChallenge must be 32 bytes"}
+		return nil, opcredsConstraintErr{msg: "core: SignVIDVerificationRequest: ClientChallenge must be 32 bytes"}
 	}
 	fabric, err := o.store.GetFabric(ctx, req.FabricIndex)
 	if err != nil {
-		return nil, opcredsConstraintErr{msg: fmt.Sprintf("matter: SignVIDVerificationRequest: fabric %d does not exist", req.FabricIndex)}
+		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SignVIDVerificationRequest: fabric %d does not exist", req.FabricIndex)}
 	}
 	id, err := o.store.GetIdentity(ctx, req.FabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter: SignVIDVerificationRequest: identity: %w", err)
+		return nil, fmt.Errorf("core: SignVIDVerificationRequest: identity: %w", err)
 	}
 	priv, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), id.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("matter: SignVIDVerificationRequest: operational key: %w", err)
+		return nil, fmt.Errorf("core: SignVIDVerificationRequest: operational key: %w", err)
 	}
 	challenge := InvokeAttestationChallengeFromContext(ctx)
 	if challenge == nil {
@@ -213,7 +213,7 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 	digest := sha256.Sum256(tbs)
 	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
 	if err != nil {
-		return nil, fmt.Errorf("matter: SignVIDVerificationRequest: sign: %w", err)
+		return nil, fmt.Errorf("core: SignVIDVerificationRequest: sign: %w", err)
 	}
 	sig := make([]byte, 64)
 	r.FillBytes(sig[:32])

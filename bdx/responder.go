@@ -73,6 +73,7 @@ type ScopeConfig struct {
 type Responder struct {
 	logger *slog.Logger
 
+	// mu guards clock, scopes, sessions and started.
 	mu       sync.Mutex
 	scopes   map[scopeKey]scopeEntry
 	sessions map[*ServerSession]struct{}

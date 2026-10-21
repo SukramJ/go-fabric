@@ -32,17 +32,17 @@ type ResumptionRecord struct {
 }
 
 // ErrResumptionNotFound is returned when a lookup misses.
-var ErrResumptionNotFound = errors.New("matter store: resumption record not found")
+var ErrResumptionNotFound = errors.New("store: resumption record not found")
 
 // UpsertResumption inserts or replaces the resumption row for
 // (fabric_index, peer_node_id). CASEAuthTags is serialised as JSON;
 // nil and empty slice both persist as '[]'.
 func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
-		return fmt.Errorf("matter store: resumption_id length=%d (want 16)", len(rec.ResumptionID))
+		return fmt.Errorf("store: resumption_id length=%d (want 16)", len(rec.ResumptionID))
 	}
 	if len(rec.SharedSecret) != 32 {
-		return fmt.Errorf("matter store: shared_secret length=%d (want 32)", len(rec.SharedSecret))
+		return fmt.Errorf("store: shared_secret length=%d (want 32)", len(rec.SharedSecret))
 	}
 	cats := rec.CASEAuthTags
 	if cats == nil {
@@ -50,7 +50,7 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	}
 	catsJSON, err := json.Marshal(cats)
 	if err != nil {
-		return fmt.Errorf("matter store: marshal case_authenticated_tags: %w", err)
+		return fmt.Errorf("store: marshal case_authenticated_tags: %w", err)
 	}
 	if _, err := s.db.ExecContext(
 		ctx, `
@@ -64,7 +64,7 @@ ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
     last_used_at               = CURRENT_TIMESTAMP`,
 		rec.FabricIndex, uint64ToBE(rec.PeerNodeID), rec.ResumptionID, rec.SharedSecret, catsJSON,
 	); err != nil {
-		return fmt.Errorf("matter store: upsert resumption: %w", err)
+		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
 // fabric/peer it points at).
 func (s *Store) GetResumptionByID(ctx context.Context, resumptionID []byte) (ResumptionRecord, error) {
 	if len(resumptionID) != 16 {
-		return ResumptionRecord{}, fmt.Errorf("matter store: resumption_id length=%d (want 16)", len(resumptionID))
+		return ResumptionRecord{}, fmt.Errorf("store: resumption_id length=%d (want 16)", len(resumptionID))
 	}
 	var (
 		rec      ResumptionRecord
@@ -89,10 +89,10 @@ FROM matter_resumption WHERE resumption_id = ?`, resumptionID).
 		return ResumptionRecord{}, ErrResumptionNotFound
 	}
 	if err != nil {
-		return ResumptionRecord{}, fmt.Errorf("matter store: get resumption: %w", err)
+		return ResumptionRecord{}, fmt.Errorf("store: get resumption: %w", err)
 	}
 	if len(nodeBlob) != 8 {
-		return ResumptionRecord{}, fmt.Errorf("matter store: peer_node_id length=%d (want 8)", len(nodeBlob))
+		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
 	}
 	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
 	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
@@ -117,10 +117,10 @@ FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`,
 		return ResumptionRecord{}, ErrResumptionNotFound
 	}
 	if err != nil {
-		return ResumptionRecord{}, fmt.Errorf("matter store: get resumption: %w", err)
+		return ResumptionRecord{}, fmt.Errorf("store: get resumption: %w", err)
 	}
 	if len(nodeBlob) != 8 {
-		return ResumptionRecord{}, fmt.Errorf("matter store: peer_node_id length=%d (want 8)", len(nodeBlob))
+		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
 	}
 	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
 	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
@@ -134,7 +134,7 @@ func (s *Store) RemoveResumption(ctx context.Context, fabricIndex uint8, peerNod
 	if _, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`,
 		fabricIndex, uint64ToBE(peerNodeID)); err != nil {
-		return fmt.Errorf("matter store: remove resumption: %w", err)
+		return fmt.Errorf("store: remove resumption: %w", err)
 	}
 	return nil
 }
@@ -148,7 +148,7 @@ DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`,
 func (s *Store) RemoveResumptionsByFabric(ctx context.Context, fabricIndex uint8) error {
 	if _, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_resumption WHERE fabric_index = ?`, fabricIndex); err != nil {
-		return fmt.Errorf("matter store: remove resumptions by fabric: %w", err)
+		return fmt.Errorf("store: remove resumptions by fabric: %w", err)
 	}
 	return nil
 }

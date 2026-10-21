@@ -109,6 +109,7 @@ type Actions struct {
 	host ActionsHost
 	dv   cluster.DataVersionTracker
 
+	// mu guards endpoint.
 	mu       sync.Mutex
 	endpoint uint16
 }
@@ -143,7 +144,7 @@ func NewActions(cfg ActionsConfig) (*Actions, error) {
 }
 
 // errNilActionsHost: NewActions without a host.
-var errNilActionsHost = errors.New("a host is required")
+var errNilActionsHost = errors.New("core: a host is required")
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
 // calls it when it mounts the server.

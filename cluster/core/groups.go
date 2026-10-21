@@ -110,7 +110,7 @@ type groupsStatusError struct {
 	msg  string
 }
 
-func (e groupsStatusError) Error() string { return "matter: Groups: " + e.msg }
+func (e groupsStatusError) Error() string { return "core: Groups: " + e.msg }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e groupsStatusError) MatterStatusCode() im.StatusCode { return e.code }
@@ -145,7 +145,7 @@ func (s *Groups) SetScenes(st *ScenesState) { s.scenes = st }
 // endpoint's Identify.IdentifyTime and may be nil (never identifying).
 func NewGroups(endpoint uint16, m *groups.Manager, identifyTime func() uint16) (*Groups, error) {
 	if m == nil {
-		return nil, errors.New("matter: Groups: group manager is required")
+		return nil, errors.New("core: Groups: group manager is required")
 	}
 	return &Groups{endpoint: endpoint, groups: m, identifyTime: identifyTime}, nil
 }
@@ -195,7 +195,7 @@ func (s *Groups) MatterRead(attrID uint32) (any, bool) {
 // attribute.
 func (s *Groups) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	_, err := groupsInst.ValidateWrite(attrID, value, nil)
-	return refusedWrite{sentinel: fmt.Errorf("matter: Groups attribute 0x%04X is read-only", attrID), status: err}
+	return refusedWrite{sentinel: fmt.Errorf("core: Groups attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -260,7 +260,7 @@ func (s *Groups) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		}
 		return s.addGroupIfIdentifying(ctx, fabric, req.GroupID, req.GroupName)
 	}
-	return nil, im.UnsupportedCommandf("matter: Groups command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: Groups command 0x%02X not supported", cmdID)
 }
 
 // nameLength is the length matter.js checks GroupName against: a JS string
@@ -277,7 +277,7 @@ func (s *Groups) addGroup(ctx context.Context, fabric uint8, groupID uint16, nam
 	}
 	mapped, err := s.groups.HasKeyMapping(ctx, fabric, groupID)
 	if err != nil {
-		return nil, fmt.Errorf("matter: Groups.AddGroup: %w", err)
+		return nil, fmt.Errorf("core: Groups.AddGroup: %w", err)
 	}
 	if !mapped {
 		return AddGroupResponse{Status: im.StatusUnsupportedAccess, GroupID: groupID}, nil
@@ -286,7 +286,7 @@ func (s *Groups) addGroup(ctx context.Context, fabric uint8, groupID uint16, nam
 		if errors.Is(err, groups.ErrResourceExhausted) {
 			return AddGroupResponse{Status: im.StatusResourceExhausted, GroupID: groupID}, nil
 		}
-		return nil, fmt.Errorf("matter: Groups.AddGroup: %w", err)
+		return nil, fmt.Errorf("core: Groups.AddGroup: %w", err)
 	}
 	return AddGroupResponse{Status: im.StatusSuccess, GroupID: groupID}, nil
 }
@@ -298,7 +298,7 @@ func (s *Groups) viewGroup(ctx context.Context, fabric uint8, groupID uint16) (a
 	}
 	table, err := s.groups.GroupTable(ctx, fabric)
 	if err != nil {
-		return nil, fmt.Errorf("matter: Groups.ViewGroup: %w", err)
+		return nil, fmt.Errorf("core: Groups.ViewGroup: %w", err)
 	}
 	for _, e := range table {
 		if e.GroupID == groupID && slices.Contains(e.Endpoints, s.endpoint) {
@@ -319,7 +319,7 @@ func (s *Groups) getGroupMembership(ctx context.Context, fabric uint8, list []ui
 	}
 	table, err := s.groups.GroupTable(ctx, fabric)
 	if err != nil {
-		return nil, fmt.Errorf("matter: Groups.GetGroupMembership: %w", err)
+		return nil, fmt.Errorf("core: Groups.GetGroupMembership: %w", err)
 	}
 	member := make([]uint16, 0, len(table))
 	for _, e := range table {
@@ -349,7 +349,7 @@ func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) 
 	}
 	existed, err := s.groups.RemoveEndpoint(ctx, fabric, s.endpoint, groupID, false)
 	if err != nil {
-		return nil, fmt.Errorf("matter: Groups.RemoveGroup: %w", err)
+		return nil, fmt.Errorf("core: Groups.RemoveGroup: %w", err)
 	}
 	if !existed {
 		return RemoveGroupResponse{Status: im.StatusNotFound, GroupID: groupID}, nil
@@ -363,7 +363,7 @@ func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) 
 // removeAllGroups mirrors GroupsServer.removeAllGroups.
 func (s *Groups) removeAllGroups(ctx context.Context, fabric uint8) (any, error) {
 	if _, err := s.groups.RemoveEndpoint(ctx, fabric, s.endpoint, 0, true); err != nil {
-		return nil, fmt.Errorf("matter: Groups.RemoveAllGroups: %w", err)
+		return nil, fmt.Errorf("core: Groups.RemoveAllGroups: %w", err)
 	}
 	if s.scenes != nil {
 		s.scenes.RemoveScenesForFabric(fabric)

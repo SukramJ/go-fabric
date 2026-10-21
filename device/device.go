@@ -53,6 +53,7 @@ type Device struct {
 	// mandatory ones ([WithClientClusters]).
 	clients []uint32
 
+	// mu guards parts.
 	mu    sync.Mutex
 	parts []*Device
 }

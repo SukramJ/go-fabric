@@ -28,7 +28,7 @@ ON CONFLICT(subscription_id) DO UPDATE SET
     updated_at   = CURRENT_TIMESTAMP`,
 		int64(subscriptionID), fabricIndex, uint64ToBE(peerNodeID), payload)
 	if err != nil {
-		return fmt.Errorf("matter store: save server subscription: %w", err)
+		return fmt.Errorf("store: save server subscription: %w", err)
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ ON CONFLICT(subscription_id) DO UPDATE SET
 // DeleteServerSubscription removes the row of subscriptionID. Idempotent.
 func (s *Store) DeleteServerSubscription(ctx context.Context, subscriptionID uint32) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_server_subscriptions WHERE subscription_id = ?`, int64(subscriptionID)); err != nil {
-		return fmt.Errorf("matter store: delete server subscription: %w", err)
+		return fmt.Errorf("store: delete server subscription: %w", err)
 	}
 	return nil
 }
@@ -45,7 +45,7 @@ func (s *Store) DeleteServerSubscription(ctx context.Context, subscriptionID uin
 // Called when the fabric is removed.
 func (s *Store) DeleteServerSubscriptionsByFabric(ctx context.Context, fabricIndex uint8) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_server_subscriptions WHERE fabric_index = ?`, fabricIndex); err != nil {
-		return fmt.Errorf("matter store: delete server subscriptions by fabric: %w", err)
+		return fmt.Errorf("store: delete server subscriptions by fabric: %w", err)
 	}
 	return nil
 }
@@ -55,7 +55,7 @@ func (s *Store) LoadServerSubscriptions(ctx context.Context) ([][]byte, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT payload FROM matter_server_subscriptions ORDER BY updated_at ASC, subscription_id ASC`)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: load server subscriptions: %w", err)
+		return nil, fmt.Errorf("store: load server subscriptions: %w", err)
 	}
 	defer rows.Close() //nolint:errcheck // cleanup-only; the scan error is the actionable one
 
@@ -63,12 +63,12 @@ SELECT payload FROM matter_server_subscriptions ORDER BY updated_at ASC, subscri
 	for rows.Next() {
 		var payload []byte
 		if err := rows.Scan(&payload); err != nil {
-			return nil, fmt.Errorf("matter store: load server subscriptions: scan: %w", err)
+			return nil, fmt.Errorf("store: load server subscriptions: scan: %w", err)
 		}
 		out = append(out, payload)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: load server subscriptions: rows: %w", err)
+		return nil, fmt.Errorf("store: load server subscriptions: rows: %w", err)
 	}
 	return out, nil
 }
@@ -78,7 +78,7 @@ SELECT payload FROM matter_server_subscriptions ORDER BY updated_at ASC, subscri
 // SubscriptionsServer.beginRun starts each run's record from empty.
 func (s *Store) ClearServerSubscriptions(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_server_subscriptions`); err != nil {
-		return fmt.Errorf("matter store: clear server subscriptions: %w", err)
+		return fmt.Errorf("store: clear server subscriptions: %w", err)
 	}
 	return nil
 }

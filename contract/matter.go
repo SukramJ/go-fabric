@@ -409,7 +409,7 @@ var (
 // return would let start-up continue with a registry that lies.
 func RegisterMeasurementKind(kind MeasurementKind) MeasurementClass {
 	if kind.Materialize == nil {
-		panic("matter: RegisterMeasurementKind: kind " + kind.Name + " has no Materialize; a kind the registry can name but not build advertises an exposure the bridge cannot deliver")
+		panic("contract: RegisterMeasurementKind: kind " + kind.Name + " has no Materialize; a kind the registry can name but not build advertises an exposure the bridge cannot deliver")
 	}
 	measurementKindsMu.Lock()
 	defer measurementKindsMu.Unlock()
@@ -464,10 +464,10 @@ func MeasurementMaterializerFor(class MeasurementClass) (m MeasurementMaterializ
 // describe, and both are decidable at the call site.
 func SetMeasurementMaterializer(class MeasurementClass, m MeasurementMaterializer) {
 	if m == nil {
-		panic("matter: SetMeasurementMaterializer: nil materializer")
+		panic("contract: SetMeasurementMaterializer: nil materializer")
 	}
 	if class < 0 || class >= measurementClassBuiltinEnd {
-		panic(fmt.Sprintf("matter: SetMeasurementMaterializer: class %d is not a built-in; host kinds carry their materializer through RegisterMeasurementKind", class))
+		panic(fmt.Sprintf("contract: SetMeasurementMaterializer: class %d is not a built-in; host kinds carry their materializer through RegisterMeasurementKind", class))
 	}
 	measurementKindsMu.Lock()
 	defer measurementKindsMu.Unlock()

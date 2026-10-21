@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -68,9 +69,9 @@ type EndpointPersistence interface {
 	endpoint.ScenesStore
 	// OnNodeLabelWritten persists a commissioner-written NodeLabel of the
 	// bridged endpoint under key; it is endpoint.Config.OnNodeLabelWritten.
-	OnNodeLabelWritten(key endpoint.SourceKey, label string)
+	OnNodeLabelWritten(key device.SourceKey, label string)
 	// NodeLabel is the label persisted for key, "" for none.
-	NodeLabel(ctx context.Context, key endpoint.SourceKey) string
+	NodeLabel(ctx context.Context, key device.SourceKey) string
 }
 
 // NewEndpointPersistence returns the facade's [EndpointPersistence] over
@@ -86,7 +87,7 @@ func NewEndpointPersistence(st *store.Store, logger *slog.Logger) EndpointPersis
 }
 
 // keyString is the settings-key suffix of a stable key, false for nil.
-func keyString(key endpoint.SourceKey) (string, bool) {
+func keyString(key device.SourceKey) (string, bool) {
 	if key == nil {
 		return "", false
 	}
@@ -107,7 +108,7 @@ func (p persisted) loadUint32(ctx context.Context, key string) uint32 {
 
 // configVersion returns the ConfigurationVersion persisted for a bridged
 // endpoint, 0 for none.
-func (p persisted) configVersion(ctx context.Context, key endpoint.SourceKey) uint32 {
+func (p persisted) configVersion(ctx context.Context, key device.SourceKey) uint32 {
 	k, ok := keyString(key)
 	if !ok {
 		return 0
@@ -138,7 +139,7 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 
 // OnNodeLabelWritten implements [EndpointPersistence]: it is the
 // endpoint.Config.OnNodeLabelWritten hook.
-func (p persisted) OnNodeLabelWritten(key endpoint.SourceKey, label string) {
+func (p persisted) OnNodeLabelWritten(key device.SourceKey, label string) {
 	k, ok := keyString(key)
 	if !ok {
 		return
@@ -150,7 +151,7 @@ func (p persisted) OnNodeLabelWritten(key endpoint.SourceKey, label string) {
 
 // NodeLabel implements [EndpointPersistence]: the label persisted for a
 // bridged endpoint, "" for none.
-func (p persisted) NodeLabel(ctx context.Context, key endpoint.SourceKey) string {
+func (p persisted) NodeLabel(ctx context.Context, key device.SourceKey) string {
 	k, ok := keyString(key)
 	if !ok {
 		return ""
@@ -182,7 +183,7 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 }
 
 // LoadScenes implements endpoint.ScenesStore ([EndpointPersistence]).
-func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
+func (p persisted) LoadScenes(key device.SourceKey) []byte {
 	k, ok := keyString(key)
 	if !ok {
 		return nil
@@ -195,7 +196,7 @@ func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 }
 
 // SaveScenes implements endpoint.ScenesStore ([EndpointPersistence]).
-func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
+func (p persisted) SaveScenes(key device.SourceKey, table []byte) {
 	k, ok := keyString(key)
 	if !ok {
 		return

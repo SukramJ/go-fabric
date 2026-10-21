@@ -157,7 +157,7 @@ type groupcastStatusError struct {
 	msg  string
 }
 
-func (e groupcastStatusError) Error() string { return "matter: Groupcast: " + e.msg }
+func (e groupcastStatusError) Error() string { return "core: Groupcast: " + e.msg }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e groupcastStatusError) MatterStatusCode() im.StatusCode { return e.code }
@@ -254,13 +254,13 @@ var (
 func NewGroupcast(cfg GroupcastConfig) (*Groupcast, error) {
 	switch {
 	case cfg.Groups == nil:
-		return nil, errors.New("matter: Groupcast: group state is required")
+		return nil, errors.New("core: Groupcast: group state is required")
 	case cfg.GroupKeyManagement == nil:
-		return nil, errors.New("matter: Groupcast: GroupKeyManagement is required")
+		return nil, errors.New("core: Groupcast: GroupKeyManagement is required")
 	case cfg.GroupKeyManagement.groups != cfg.Groups:
-		return nil, errors.New("matter: Groupcast: GroupKeyManagement must share the Groupcast group state")
+		return nil, errors.New("core: Groupcast: GroupKeyManagement must share the Groupcast group state")
 	case cfg.AccessControl == nil:
-		return nil, errors.New("matter: Groupcast: the Listener feature requires AccessControl with the Auxiliary feature")
+		return nil, errors.New("core: Groupcast: the Listener feature requires AccessControl with the Auxiliary feature")
 	}
 	g := &Groupcast{
 		groups: cfg.Groups, gkm: cfg.GroupKeyManagement, acl: cfg.AccessControl, timer: cfg.TestingTimer,
@@ -429,7 +429,7 @@ func usedMcastAddrCount(ms []groups.GroupcastMembership) uint16 {
 // MatterWrite implements [contract.ClusterServer]: Groupcast has no
 // writable attribute.
 func (g *Groupcast) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return spec.Errorf(im.StatusUnsupportedWrite, "matter: Groupcast attribute 0x%04X is read-only", attrID)
+	return spec.Errorf(im.StatusUnsupportedWrite, "core: Groupcast attribute 0x%04X is read-only", attrID)
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -515,7 +515,7 @@ func (g *Groupcast) MatterInvoke(ctx context.Context, cmdID uint32, fields any) 
 		}
 		return nil, g.groupcastTesting(fabric, req)
 	}
-	return nil, im.UnsupportedCommandf("matter: Groupcast command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: Groupcast command 0x%02X not supported", cmdID)
 }
 
 // requireAdmin refuses a key or an auxiliary-ACL field without Administer.
@@ -558,7 +558,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 	}
 	ms, err := g.groups.GroupcastMemberships(ctx)
 	if err != nil {
-		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
+		return fmt.Errorf("core: Groupcast.JoinGroup: %w", err)
 	}
 	existing, isMember := memberOf(ms, fabric, req.GroupID)
 	if err := checkJoinCapacity(ms, fabric, req.GroupID, isMember, policy, g.maxMcastAddr); err != nil {
@@ -575,7 +575,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 	// refusals are known before anything changes.
 	table, err := g.groups.GroupTable(ctx, fabric)
 	if err != nil {
-		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
+		return fmt.Errorf("core: Groupcast.JoinGroup: %w", err)
 	}
 	name, inTable := "", false
 	for _, e := range table {
@@ -728,7 +728,7 @@ func (g *Groupcast) groupStateErr(cmd string, err error) error {
 	if errors.Is(err, groups.ErrResourceExhausted) {
 		return groupcastErr(im.StatusResourceExhausted, "%s: %v", cmd, err)
 	}
-	return fmt.Errorf("matter: Groupcast.%s: %w", cmd, err)
+	return fmt.Errorf("core: Groupcast.%s: %w", cmd, err)
 }
 
 // applyKeySet validates or creates the key set a command names: with a key
@@ -761,7 +761,7 @@ func (g *Groupcast) leaveGroup(ctx context.Context, fabric uint8, req LeaveGroup
 	}
 	ms, err := g.groups.GroupcastMemberships(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("matter: Groupcast.LeaveGroup: %w", err)
+		return nil, fmt.Errorf("core: Groupcast.LeaveGroup: %w", err)
 	}
 	var ids []uint16
 	if req.GroupID == 0 {
@@ -864,7 +864,7 @@ func (g *Groupcast) updateGroupKey(ctx context.Context, fabric uint8, req Update
 	}
 	ms, err := g.groups.GroupcastMemberships(ctx)
 	if err != nil {
-		return fmt.Errorf("matter: Groupcast.UpdateGroupKey: %w", err)
+		return fmt.Errorf("core: Groupcast.UpdateGroupKey: %w", err)
 	}
 	if _, ok := memberOf(ms, fabric, req.GroupID); !ok {
 		return groupcastErr(im.StatusNotFound, "Group %d not found", req.GroupID)
@@ -880,7 +880,7 @@ func (g *Groupcast) updateGroupKey(ctx context.Context, fabric uint8, req Update
 func (g *Groupcast) configureAuxiliaryACL(ctx context.Context, fabric uint8, req ConfigureAuxiliaryACLRequest) error {
 	ms, err := g.groups.GroupcastMemberships(ctx)
 	if err != nil {
-		return fmt.Errorf("matter: Groupcast.ConfigureAuxiliaryAcl: %w", err)
+		return fmt.Errorf("core: Groupcast.ConfigureAuxiliaryAcl: %w", err)
 	}
 	if _, ok := memberOf(ms, fabric, req.GroupID); !ok {
 		return groupcastErr(im.StatusNotFound, "Group %d not found", req.GroupID)

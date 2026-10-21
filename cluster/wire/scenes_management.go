@@ -39,7 +39,7 @@ const (
 )
 
 // errScenesStub surfaces from Write / Invoke on the stub.
-var errScenesStub = errors.New("matter: ScenesManagement is a read-only stub (HM has no scene management)")
+var errScenesStub = errors.New("wire: ScenesManagement is a read-only stub (HM has no scene management)")
 
 // Compile-time assertions.
 var (

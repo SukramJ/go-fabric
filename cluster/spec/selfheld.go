@@ -36,6 +36,7 @@ var (
 // names the override point of its commands); nil hands the command back
 // to the server.
 type HostHandlers struct {
+	// mu guards m.
 	mu sync.Mutex
 	m  map[uint32]CommandHandler
 }
@@ -76,6 +77,7 @@ func (h *HostHandlers) Invoke(ctx context.Context, cmdID uint32, fields any) (re
 // hands it ([contract.EventReceiver]) and the emission of its cluster's
 // events with the definition's priority.
 type Events struct {
+	// mu guards emitter.
 	mu      sync.Mutex
 	emitter contract.EventEmitter
 }
@@ -107,6 +109,7 @@ func (e *Events) Emit(inst *Instance, endpoint uint16, eventID uint32, data any)
 // WriteVeto is a self-held server's write veto ([BeforeWriteSetter]):
 // the hook [ServerConfig.BeforeWrite] is on the generated server.
 type WriteVeto struct {
+	// mu guards fn.
 	mu sync.Mutex
 	fn func(ctx context.Context, attrID uint32, value any) error
 }

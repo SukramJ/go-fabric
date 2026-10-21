@@ -75,6 +75,8 @@ type Identify struct {
 	// continues with the new value). The instance MUST therefore
 	// outlive a single dispatch — a per-call instance both loses the
 	// state and strands one ticker goroutine per invoke.
+	//
+	// timerMu guards timerActive and closed.
 	timerMu     sync.Mutex
 	timerActive bool
 	closed      bool
@@ -82,6 +84,9 @@ type Identify struct {
 	// countdown immediately, so an instance whose endpoint disappeared
 	// cannot keep a ticker alive for up to 65535 s.
 	done chan struct{}
+	// countdown is the countdown goroutine, added under timerMu while
+	// open and waited for by [Identify.Close].
+	countdown sync.WaitGroup
 }
 
 // Cluster ID, revision, attribute and command ids: the generated
@@ -122,9 +127,9 @@ func NewIdentify() *Identify {
 // [clock.System]. A countdown already running keeps its clock.
 func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
 
-// Close releases the cluster: a running countdown terminates at once and
-// no later write / command starts a new one. Idempotent and safe for
-// concurrent use.
+// Close releases the cluster: a running countdown terminates at once —
+// Close returns after its goroutine did — and no later write / command
+// starts a new one. Idempotent and safe for concurrent use.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/identify/IdentifyServer.ts
@@ -132,15 +137,15 @@ func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
 // behavior — and with it the endpoint — is destroyed.
 func (i *Identify) Close() {
 	i.timerMu.Lock()
-	defer i.timerMu.Unlock()
-	if i.closed {
-		return
+	if !i.closed {
+		i.closed = true
+		i.timerActive = false
+		if i.done != nil {
+			close(i.done)
+		}
 	}
-	i.closed = true
-	i.timerActive = false
-	if i.done != nil {
-		close(i.done)
-	}
+	i.timerMu.Unlock()
+	i.countdown.Wait()
 }
 
 // Compile-time assertions.
@@ -185,7 +190,7 @@ func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) erro
 	}
 	t, err := coerceUint16(value)
 	if err != nil {
-		return fmt.Errorf("matter: Identify.IdentifyTime: %w", err)
+		return fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
 	i.identifyTime.Store(uint32(t))
 	i.maybeStartCountdown()
@@ -218,7 +223,7 @@ func (i *Identify) MatterInvoke(_ context.Context, cmdID uint32, fields any) (an
 		// not flag the cluster as broken during the topology probe.
 		return nil, nil
 	}
-	return nil, im.UnsupportedCommandf("matter: Identify command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: Identify command 0x%02X not supported", cmdID)
 }
 
 // MatterReportable returns the attributes that change over the
@@ -259,9 +264,11 @@ func (i *Identify) maybeStartCountdown() {
 	}
 	i.timerActive = true
 	done := i.done
+	i.countdown.Add(1)
 	i.timerMu.Unlock()
 
 	go func() {
+		defer i.countdown.Done()
 		ticker := i.clock.Load().NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
@@ -308,7 +315,7 @@ func coerceUint16(v any) (uint16, error) {
 	case map[uint8]any:
 		raw, ok := x[identifyFieldIdentifyTime]
 		if !ok {
-			return 0, errors.New("identify: missing the IdentifyTime field")
+			return 0, errors.New("core: missing the IdentifyTime field")
 		}
 		return coerceUint16(raw)
 	case uint16:

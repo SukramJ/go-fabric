@@ -158,7 +158,7 @@ func parseECPrivateKey(der []byte) (*ecdsa.PrivateKey, error) {
 	if k, err := x509.ParsePKCS8PrivateKey(der); err == nil {
 		ec, ok := k.(*ecdsa.PrivateKey)
 		if !ok {
-			return nil, errors.New("not an EC key")
+			return nil, errors.New("attestation: not an EC key")
 		}
 		return checkP256(ec)
 	}

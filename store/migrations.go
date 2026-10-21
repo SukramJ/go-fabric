@@ -127,14 +127,14 @@ func SchemaFingerprint(ctx context.Context, db *sql.DB) (string, error) {
 func schemaRows(ctx context.Context, db *sql.DB) ([]string, error) {
 	rs, err := db.QueryContext(ctx, `SELECT type, name, tbl_name, COALESCE(sql, '') FROM sqlite_schema`)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: read schema: %w", err)
+		return nil, fmt.Errorf("store: read schema: %w", err)
 	}
 	defer func() { _ = rs.Close() }()
 	var out []string
 	for rs.Next() {
 		var typ, name, tbl, ddl string
 		if err := rs.Scan(&typ, &name, &tbl, &ddl); err != nil {
-			return nil, fmt.Errorf("matter store: read schema: %w", err)
+			return nil, fmt.Errorf("store: read schema: %w", err)
 		}
 		if !inSchema(typ, name, tbl) {
 			continue
@@ -142,7 +142,7 @@ func schemaRows(ctx context.Context, db *sql.DB) ([]string, error) {
 		out = append(out, typ+"|"+name+"|"+tbl+"|"+normaliseDDL(ddl))
 	}
 	if err := rs.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: read schema: %w", err)
+		return nil, fmt.Errorf("store: read schema: %w", err)
 	}
 	slices.Sort(out)
 	return out, nil

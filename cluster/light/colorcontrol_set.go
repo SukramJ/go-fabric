@@ -44,7 +44,7 @@ import "log/slog"
 // SUCCESS: the device accepted the command and reported what it did.
 func (s *ColorControlServer) Set(c Color) {
 	if !s.supportsColorMode(c.Mode) {
-		slog.Default().Warn("matter.colorcontrol.inbound_color_mode_ignored",
+		s.logger().Warn("matter.colorcontrol.inbound_color_mode_ignored",
 			slog.Int("color_mode", int(c.Mode)),
 			slog.String("reason", "the server has no feature for this colour mode"))
 		return

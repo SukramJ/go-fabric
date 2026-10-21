@@ -27,7 +27,7 @@ const groupSendAddr = "[::]:0"
 // sends from one of its own. Without IPv6 no socket opens, and Sender
 // answers groups.ErrNoInterface. Called by Start with n.mu held.
 func (n *Node) startGroupSender() {
-	l, err := udp.New(udp.Config{LocalAddr: groupSendAddr})
+	l, err := udp.New(udp.Config{LocalAddr: groupSendAddr, Logger: n.logger})
 	if err != nil {
 		n.logger.Warn("matter.groups.send_socket", slog.String("err", err.Error()))
 		return

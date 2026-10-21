@@ -46,7 +46,7 @@ ON CONFLICT(fabric_index) DO UPDATE SET
     ipk         = excluded.ipk`,
 		rec.FabricIndex, rec.NOC, nullableBytes(rec.ICAC), rec.PrivateKey, rec.IPK,
 	); err != nil {
-		return fmt.Errorf("matter store: upsert identity: %w", err)
+		return fmt.Errorf("store: upsert identity: %w", err)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ WHERE fabric_index = ?`, fabricIndex).Scan(&rec.NOC, &icac, &rec.PrivateKey, &re
 		return IdentityRecord{}, ErrIdentityNotFound
 	}
 	if err != nil {
-		return IdentityRecord{}, fmt.Errorf("matter store: get identity: %w", err)
+		return IdentityRecord{}, fmt.Errorf("store: get identity: %w", err)
 	}
 	if icac.Valid {
 		rec.ICAC = []byte(icac.String)

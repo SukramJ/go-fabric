@@ -38,7 +38,8 @@ import (
 // (Sigma1 arrived, Sigma3 never came) do not leak entries in the
 // sigma1Replied dedupe map — see [Bridge.forgetSigma1Replied].
 type PerExchangeCaseProvider struct {
-	clock    clockvar.Var // see SetClock
+	clock clockvar.Var // see SetClock
+	// mu guards cancel, entries and onEvict.
 	mu       sync.Mutex
 	entries  map[uint16]*caseEntry
 	factory  func() *CaseAdapter

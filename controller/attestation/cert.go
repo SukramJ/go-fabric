@@ -58,13 +58,13 @@ type attCert struct {
 func checkRequiredExtensions(c *x509.Certificate, authorityKeyID bool) error {
 	switch {
 	case !c.BasicConstraintsValid:
-		return errors.New("missing required extension basicConstraints")
+		return errors.New("attestation: missing required extension basicConstraints")
 	case c.KeyUsage == 0:
-		return errors.New("missing required extension keyUsage")
+		return errors.New("attestation: missing required extension keyUsage")
 	case len(c.SubjectKeyId) == 0:
-		return errors.New("missing required extension subjectKeyIdentifier")
+		return errors.New("attestation: missing required extension subjectKeyIdentifier")
 	case authorityKeyID && len(c.AuthorityKeyId) == 0:
-		return errors.New("missing required extension authorityKeyIdentifier")
+		return errors.New("attestation: missing required extension authorityKeyIdentifier")
 	}
 	return nil
 }
@@ -176,7 +176,7 @@ func fallbackID(cn, prefix string) (*uint16, error) {
 func P256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
 	k, ok := c.PublicKey.(*ecdsa.PublicKey)
 	if !ok || k.Curve != elliptic.P256() {
-		return nil, errors.New("public key is not EC P-256")
+		return nil, errors.New("attestation: public key is not EC P-256")
 	}
 	return k, nil
 }
@@ -190,7 +190,7 @@ func VerifySignedBy(c *x509.Certificate, key *ecdsa.PublicKey) error {
 	}
 	digest := sha256.Sum256(c.RawTBSCertificate)
 	if !ecdsa.VerifyASN1(key, digest[:], c.Signature) {
-		return errors.New("signature does not verify")
+		return errors.New("attestation: signature does not verify")
 	}
 	return nil
 }

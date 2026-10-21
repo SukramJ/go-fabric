@@ -30,12 +30,11 @@ const groupsTestFabricID uint64 = 0x1122334455667788 // GroupsTest.ts:15
 // groupsTestFabric returns the loaded group state of fabric 1.
 func groupsTestFabric(t *testing.T, m *Manager) *fabricGroups {
 	t.Helper()
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	f, err := m.fabricLocked(context.Background(), 1)
+	f, err := m.rlockFabric(context.Background(), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.mu.RUnlock()
 	return f
 }
 

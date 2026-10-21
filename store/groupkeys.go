@@ -61,7 +61,7 @@ ON CONFLICT(fabric_index, group_key_set_id) DO UPDATE SET
 		nullableBytes(rec.EpochKey1), nullableEpochStart(rec.EpochKey1, rec.EpochStart1),
 		nullableBytes(rec.EpochKey2), nullableEpochStart(rec.EpochKey2, rec.EpochStart2),
 	); err != nil {
-		return fmt.Errorf("matter store: upsert group key set: %w", err)
+		return fmt.Errorf("store: upsert group key set: %w", err)
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ WHERE fabric_index = ? AND group_key_set_id = ?`, fabricIndex, groupKeySetID)
 		return GroupKeySet{}, ErrGroupKeySetNotFound
 	}
 	if err != nil {
-		return GroupKeySet{}, fmt.Errorf("matter store: get group key set: %w", err)
+		return GroupKeySet{}, fmt.Errorf("store: get group key set: %w", err)
 	}
 	return rec, nil
 }
@@ -97,7 +97,7 @@ SELECT fabric_index, group_key_set_id, security_policy,
 FROM matter_group_keys WHERE fabric_index = ?
 ORDER BY group_key_set_id ASC`, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list group key sets: %w", err)
+		return nil, fmt.Errorf("store: list group key sets: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -105,12 +105,12 @@ ORDER BY group_key_set_id ASC`, fabricIndex)
 	for rows.Next() {
 		rec, err := scanGroupKeySet(rows)
 		if err != nil {
-			return nil, fmt.Errorf("matter store: list group key sets: scan: %w", err)
+			return nil, fmt.Errorf("store: list group key sets: scan: %w", err)
 		}
 		out = append(out, rec)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list group key sets: rows: %w", err)
+		return nil, fmt.Errorf("store: list group key sets: rows: %w", err)
 	}
 	return out, nil
 }
@@ -155,14 +155,14 @@ DELETE FROM matter_group_keys WHERE fabric_index = ?`, fabricIndex)
 func (s *Store) inTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("matter store: %s: %w", op, err)
+		return fmt.Errorf("store: %s: %w", op, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := fn(tx); err != nil {
-		return fmt.Errorf("matter store: %s: %w", op, err)
+		return fmt.Errorf("store: %s: %w", op, err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("matter store: %s: %w", op, err)
+		return fmt.Errorf("store: %s: %w", op, err)
 	}
 	return nil
 }
@@ -185,7 +185,7 @@ VALUES (?, ?, ?)
 ON CONFLICT(fabric_index, group_id) DO UPDATE SET
     group_key_set_id = excluded.group_key_set_id`,
 		m.FabricIndex, m.GroupID, m.GroupKeySetID); err != nil {
-		return fmt.Errorf("matter store: set group key mapping: %w", err)
+		return fmt.Errorf("store: set group key mapping: %w", err)
 	}
 	return nil
 }
@@ -195,7 +195,7 @@ func (s *Store) RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, gr
 	if _, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_group_key_map WHERE fabric_index = ? AND group_id = ?`,
 		fabricIndex, groupID); err != nil {
-		return fmt.Errorf("matter store: remove group key mapping: %w", err)
+		return fmt.Errorf("store: remove group key mapping: %w", err)
 	}
 	return nil
 }
@@ -208,7 +208,7 @@ SELECT fabric_index, group_id, group_key_set_id
 FROM matter_group_key_map WHERE fabric_index = ?
 ORDER BY group_id ASC`, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list group key mappings: %w", err)
+		return nil, fmt.Errorf("store: list group key mappings: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -216,12 +216,12 @@ ORDER BY group_id ASC`, fabricIndex)
 	for rows.Next() {
 		var m GroupKeyMapping
 		if err := rows.Scan(&m.FabricIndex, &m.GroupID, &m.GroupKeySetID); err != nil {
-			return nil, fmt.Errorf("matter store: list group key mappings: scan: %w", err)
+			return nil, fmt.Errorf("store: list group key mappings: scan: %w", err)
 		}
 		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list group key mappings: rows: %w", err)
+		return nil, fmt.Errorf("store: list group key mappings: rows: %w", err)
 	}
 	return out, nil
 }

@@ -66,8 +66,13 @@ type SoilMeasurementServer struct {
 	src    SoilMoistureSource
 	limits soildef.MeasurementAccuracyStruct
 
+	// mu guards last and the read tickets; it is not held while the
+	// source is read (measured).
 	mu   sync.Mutex
 	last *uint8 // the last reading inside the limits; nil until one arrives
+	// taken and applied order the reads: a reading is applied only when
+	// no later one was, so two reads that overlap leave the newer.
+	taken, applied uint64
 }
 
 // Compile-time assertions.
@@ -110,9 +115,18 @@ func (s *SoilMeasurementServer) MatterRead(attrID uint32) (any, bool) {
 // reading when it lies inside the limits, else the last one that did; nil
 // for null.
 func (s *SoilMeasurementServer) measured() *uint8 {
+	// The source is host code: it is read with mu released (ADR 0026 P6).
+	s.mu.Lock()
+	s.taken++
+	ticket := s.taken
+	s.mu.Unlock()
+	v, ok := s.src.MatterFloatValue()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v, ok := s.src.MatterFloatValue()
+	if ticket < s.applied {
+		return s.last // a later read was applied first
+	}
+	s.applied = ticket
 	if !ok {
 		// No reading — null, as the attribute starts (:30) and as a
 		// null set stores it (:61, :68).

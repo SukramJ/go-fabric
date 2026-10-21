@@ -76,7 +76,7 @@ const servedFeatures = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureManuallyOperable
 
 // ErrFeatureMap reports a Config.FeatureMap the server does not serve.
-var ErrFeatureMap = errors.New("closurecontrol: FeatureMap names features this server does not serve")
+var ErrFeatureMap = errors.New("closure: FeatureMap names features this server does not serve")
 
 // MoveHandler applies a target position to the underlying device.
 //
@@ -124,6 +124,7 @@ type ControlServer struct {
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
 
+	// mu guards currentPosition, errorList, mainState, secureState and targetPosition.
 	mu sync.RWMutex
 
 	inst *spec.Instance
@@ -294,10 +295,10 @@ func (s *ControlServer) MatterInvoke(
 		return nil, s.invokeStop(ctx)
 	case closuredef.CmdCalibrate:
 		return nil, closureUnsupportedCommandErr{
-			"closurecontrol: Calibrate requires the Calibration feature, which this server does not advertise",
+			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
 		}
 	default:
-		return nil, im.UnsupportedCommandf("closurecontrol: unknown command 0x%02X", cmdID)
+		return nil, im.UnsupportedCommandf("closure: unknown command 0x%02X", cmdID)
 	}
 }
 
@@ -312,7 +313,7 @@ func (s *ControlServer) MatterInvoke(
 func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	req, err := moveToRequest(fields)
 	if errors.Is(err, wire.ErrClosureControlMalformed) {
-		return closureInvalidCommandErr{"closurecontrol: MoveTo carries none of Position, Latch and Speed"}
+		return closureInvalidCommandErr{"closure: MoveTo carries none of Position, Latch and Speed"}
 	}
 	if err != nil {
 		return err
@@ -333,13 +334,13 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		return err
 	}
 	if s.move == nil {
-		return errors.New("closurecontrol: MoveTo has no handler")
+		return errors.New("closure: MoveTo has no handler")
 	}
 	if err := s.move(ctx, *target); err != nil {
 		// Deliberately no state change: recording a target the device
 		// refused would leave the controller reading a move that never
 		// happened.
-		return fmt.Errorf("closurecontrol: MoveTo: %w", err)
+		return fmt.Errorf("closure: MoveTo: %w", err)
 	}
 	s.mu.Lock()
 	t := *target
@@ -363,10 +364,10 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 		return nil
 	}
 	if s.stop == nil {
-		return errors.New("closurecontrol: Stop has no handler")
+		return errors.New("closure: Stop has no handler")
 	}
 	if err := s.stop(ctx); err != nil {
-		return fmt.Errorf("closurecontrol: Stop: %w", err)
+		return fmt.Errorf("closure: Stop: %w", err)
 	}
 	s.mu.Lock()
 	// The target is dropped, not kept: after a stop the drive is heading
@@ -386,11 +387,11 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 // controller was never told about.
 func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) error {
 	if !slices.ContainsFunc(closuredef.TargetPositionEnumDef.Values, func(v spec.EnumValue) bool { return v.Value == uint64(p) }) {
-		return closureConstraintErr{fmt.Sprintf("closurecontrol: MoveTo position %d is not a TargetPositionEnum value", p)}
+		return closureConstraintErr{fmt.Sprintf("closure: MoveTo position %d is not a TargetPositionEnum value", p)}
 	}
 	if !s.inst.EnumSupported(closuredef.TargetPositionEnumDef, uint64(p)) {
 		return closureConstraintErr{
-			fmt.Sprintf("closurecontrol: MoveTo position %d needs a feature this server does not advertise", p),
+			fmt.Sprintf("closure: MoveTo position %d needs a feature this server does not advertise", p),
 		}
 	}
 	return nil
@@ -421,7 +422,7 @@ func moveToRequest(fields any) (closuredef.MoveToRequest, error) {
 	legacy, ok, err := legacyMoveToRequest(fields)
 	if !ok {
 		return closuredef.MoveToRequest{}, fmt.Errorf(
-			"closurecontrol: MoveTo expected closurecontrol.MoveToRequest or map[uint8]any, got %T", fields,
+			"closure: MoveTo expected closurecontrol.MoveToRequest or map[uint8]any, got %T", fields,
 		)
 	}
 	if err != nil {

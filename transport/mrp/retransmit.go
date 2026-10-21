@@ -108,6 +108,7 @@ type SendFunc func(payload []byte) error
 // which uses only [BackoffDuration]. It is kept for one deprecation window and
 // removed afterwards; do not build on it.
 type Retransmitter struct {
+	// mu guards entries.
 	mu      sync.Mutex
 	entries map[uint32]*pending // keyed on message counter; one session per instance
 	send    SendFunc

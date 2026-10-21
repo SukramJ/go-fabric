@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"slices"
 
@@ -77,6 +78,8 @@ type RootClusters struct {
 	Descriptor             *mattercore.Descriptor
 	// OTARequestor is nil unless [Config].OTA is set.
 	OTARequestor *mattercore.OTASoftwareUpdateRequestor
+	// otaApplier is the node's own OTA applier, nil with the host's.
+	otaApplier *otaApplier
 	// WiFiNetworkDiagnostics is nil unless [Network].WiFi has a Reporter.
 	WiFiNetworkDiagnostics *mattercore.WiFiNetworkDiagnostics
 	// PowerSourceConfiguration lists the node's PowerSource endpoints;
@@ -92,6 +95,7 @@ func (r *RootClusters) Servers() []contract.ClusterServer { return slices.Clone(
 // rootDeps is what buildRoot needs from the node under construction.
 type rootDeps struct {
 	cfg               *Config
+	logger            *slog.Logger
 	bootReason        uint8
 	st                *store.Store
 	groups            *groups.Manager
@@ -126,6 +130,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		UniqueID:           bi.UniqueID,
 		CapabilityMinima:   cfg.CapabilityMinima,
 		MaxPathsPerInvoke:  cfg.MaxPathsPerInvoke,
+		Logger:             d.logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
@@ -140,6 +145,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
 	}
 	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
+	r.GeneralDiagnostics.SetLogger(d.logger)
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)
@@ -194,7 +200,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(deviceTypeRootNode)}}
 	if cfg.OTA != nil {
-		r.OTARequestor, err = buildOtaRequestor(cfg, d.connector, basicInfo)
+		r.OTARequestor, r.otaApplier, err = buildOtaRequestor(cfg, d.connector, basicInfo)
 		if err != nil {
 			return nil, fmt.Errorf("ota requestor: %w", err)
 		}

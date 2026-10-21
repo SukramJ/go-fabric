@@ -81,6 +81,13 @@ type msg struct {
 	payload []byte
 }
 
+// scriptedHangBound only names a hang: the registry runs on a fake clock
+// and sends at once, so a wait for its message is a wait for the
+// scheduler, which a loaded machine under -race can stretch past the
+// 5 s and 10 s this replaced (TestRegistryDecommission, a named flake of
+// gate 1).
+const scriptedHangBound = time.Minute
+
 // next returns the next message the manager sent, skipping standalone
 // acknowledgements.
 func (s *scripted) next(t *testing.T) msg {
@@ -104,7 +111,7 @@ func (s *scripted) next(t *testing.T) msg {
 				continue
 			}
 			return msg{hdr: hdr, proto: proto, payload: plain[pl:]}
-		case <-time.After(5 * time.Second):
+		case <-time.After(scriptedHangBound):
 			t.Fatal("the manager sent nothing")
 			return msg{}
 		}

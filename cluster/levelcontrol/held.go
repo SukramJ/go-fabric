@@ -93,6 +93,7 @@ var ErrFeatures = errors.New("levelcontrol: feature selection not served")
 // level the engine applies and the two writable attributes; the server
 // reports their changes.
 type heldLevel struct {
+	// mu guards level, levelKnown, onLevel and options.
 	mu         sync.Mutex
 	level      uint8
 	levelKnown bool

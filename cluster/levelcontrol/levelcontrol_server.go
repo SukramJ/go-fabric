@@ -398,6 +398,7 @@ type Server struct {
 	// the one it holds back.
 	quiescing atomic.Bool
 
+	// mu guards startUp.
 	mu sync.Mutex
 	// startUp is StartUpCurrentLevel; nil is null.
 	startUp *uint8

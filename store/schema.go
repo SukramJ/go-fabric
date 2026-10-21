@@ -51,7 +51,7 @@ func Schema() string { return schemaDDL }
 // earlier release of this package in line with the current schema.
 func Apply(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, schemaDDL); err != nil {
-		return fmt.Errorf("matter store: apply schema: %w", err)
+		return fmt.Errorf("store: apply schema: %w", err)
 	}
 	return Upgrade(ctx, db)
 }
@@ -75,7 +75,7 @@ func Apply(ctx context.Context, db *sql.DB) error {
 //     the map first) — and the constraint turned that write into a Failure.
 func Upgrade(ctx context.Context, db *sql.DB) error {
 	if err := dropGroupKeyMapKeySetForeignKey(ctx, db); err != nil {
-		return fmt.Errorf("matter store: upgrade: %w", err)
+		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	return nil
 }

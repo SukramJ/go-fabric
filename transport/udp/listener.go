@@ -4,6 +4,7 @@
 package udp
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -67,12 +68,16 @@ type Config struct {
 	// PreferIPv4 forces an IPv4-only socket. Default (false) opens an
 	// IPv6 dual-stack socket which also accepts IPv4 traffic.
 	PreferIPv4 bool
+	// Logger receives the listener's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // Listener is the Matter UDP transport. Construct with [New], invoke
 // [Listener.Serve] in a goroutine to receive, [Listener.Send] to
 // transmit, [Listener.Close] to tear down. The zero value is unusable.
 type Listener struct {
+	// log is the listener's logger ([Config.Logger]; slog.Default() when nil).
+	log *slog.Logger
 	// conn is the socket: a *net.UDPConn from [New], or the in-memory
 	// socket of fabrictest's network through internal/udpseam.
 	conn udpseam.PacketConn
@@ -94,8 +99,12 @@ type Listener struct {
 	// that share an order key in arrival order (ordered.go).
 	order *orderedDispatch
 
+	// mu guards closed, set by the first [Listener.Close].
 	mu     sync.Mutex
 	closed bool
+	// closeOnce runs the socket's Close once; every Close waits on it, so
+	// no Close returns while the socket still holds its address.
+	closeOnce sync.Once
 }
 
 // bindAddr resolves the (network, address) pair New binds for cfg,
@@ -132,7 +141,9 @@ func New(cfg Config) (*Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("udp: listen %s: %w", addr, err)
 	}
-	return newListener(conn), nil
+	l := newListener(conn)
+	l.log = cmp.Or(cfg.Logger, slog.Default())
+	return l, nil
 }
 
 // newListener returns a Listener ready to Serve on conn.
@@ -170,10 +181,16 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 	}
 	// Cancel-via-Close: when ctx fires we close the conn from a
 	// helper goroutine to unblock ReadFromUDP. The Serve goroutine
-	// then unwinds with a closed-conn error, which we suppress.
-	done := make(chan struct{})
-	defer close(done)
+	// then unwinds with a closed-conn error, which we suppress. Serve
+	// owns the helper and returns only after it did, so a cancelled
+	// Serve has returned once the socket's Close has.
+	done, watched := make(chan struct{}), make(chan struct{})
+	defer func() {
+		close(done)
+		<-watched
+	}()
 	go func() {
+		defer close(watched)
 		select {
 		case <-ctx.Done():
 			_ = l.Close()
@@ -252,7 +269,7 @@ func (l *Listener) safeDispatch(handler Handler, buf []byte, src *net.UDPAddr) {
 			if src != nil {
 				peer = src.String()
 			}
-			slog.Default().Error("matter.udp.dispatch_panic",
+			l.logger().Error("matter.udp.dispatch_panic",
 				slog.Any("panic", r),
 				slog.String("src", peer),
 				slog.Int("datagram_bytes", len(buf)),
@@ -302,20 +319,33 @@ func (l *Listener) Send(dst *net.UDPAddr, payload []byte) error {
 	return nil
 }
 
-// Close shuts the listener down. Idempotent.
+// Close shuts the listener down. Idempotent and synchronous for every
+// caller: a Close that finds another one closing the socket (Serve's
+// cancel, a host's shutdown) waits for it, so the socket's address is
+// free once any Close returned. The socket's error goes to the Close
+// that ran it; the others return nil.
 func (l *Listener) Close() error {
-	l.mu.Lock()
-	if l.closed {
+	var err error
+	l.closeOnce.Do(func() {
+		l.mu.Lock()
+		l.closed = true
 		l.mu.Unlock()
-		return nil
-	}
-	l.closed = true
-	l.mu.Unlock()
-	return l.conn.Close()
+		err = l.conn.Close()
+	})
+	return err
 }
 
 func (l *Listener) isClosed() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.closed
+}
+
+// logger is the Listener's logger; a value built without its constructor
+// logs through slog.Default().
+func (l *Listener) logger() *slog.Logger {
+	if l.log != nil {
+		return l.log
+	}
+	return slog.Default()
 }

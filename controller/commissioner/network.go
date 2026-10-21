@@ -45,16 +45,16 @@ var (
 	// ErrWifiOrThreadNetworkCredentialsNotConfigured: the device has no
 	// Ethernet and no connected network, and no credentials were given
 	// (:236).
-	ErrWifiOrThreadNetworkCredentialsNotConfigured = errors.New("Wi-Fi or Thread network credentials not configured") //nolint:revive,staticcheck // matter.js's class, by name
+	ErrWifiOrThreadNetworkCredentialsNotConfigured = errors.New("commissioner: Wi-Fi or Thread network credentials not configured") //nolint:revive,staticcheck // matter.js's class, by name
 	// ErrWifiNetworkSetupFailed: the device refused the Wi-Fi network or
 	// could not connect to it (:239).
-	ErrWifiNetworkSetupFailed = errors.New("Wi-Fi network setup failed") //nolint:revive,staticcheck // matter.js's class, by name
+	ErrWifiNetworkSetupFailed = errors.New("commissioner: Wi-Fi network setup failed") //nolint:revive,staticcheck // matter.js's class, by name
 	// ErrThreadNetworkSetupFailed: the device refused the Thread network
 	// or could not connect to it (:242).
-	ErrThreadNetworkSetupFailed = errors.New("Thread network setup failed") //nolint:revive,staticcheck // matter.js's class, by name
+	ErrThreadNetworkSetupFailed = errors.New("commissioner: Thread network setup failed") //nolint:revive,staticcheck // matter.js's class, by name
 	// ErrThreadNetworkNameMismatch: the given network name contradicts the
 	// dataset's (:254).
-	ErrThreadNetworkNameMismatch = errors.New("Thread network name mismatch") //nolint:revive,staticcheck // matter.js's class, by name
+	ErrThreadNetworkNameMismatch = errors.New("commissioner: Thread network name mismatch") //nolint:revive,staticcheck // matter.js's class, by name
 )
 
 // Timing of the network steps.
@@ -75,7 +75,7 @@ const meshCopNetworkName = 3
 
 // errThreadTLV is a dataset BasicTlv.walk refuses
 // (packages/protocol/src/thread/BasicTlvCodec.ts).
-var errThreadTLV = errors.New("truncated Thread TLV")
+var errThreadTLV = errors.New("commissioner: truncated Thread TLV")
 
 // threadNetworkNameOf is the Network Name of a Thread operational
 // dataset: the MeshCoP TLVs walked as BasicTlv.walk does (one-byte type,

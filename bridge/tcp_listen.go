@@ -46,7 +46,7 @@ func (b *Bridge) openTransports() (udpListener *udp.Listener, tcpListener *tcp.L
 		udpListener, err = (*open)()
 		return udpListener, nil, err
 	}
-	udpCfg := udp.Config{LocalAddr: b.cfg.Listen, PreferIPv4: b.cfg.PreferIPv4}
+	udpCfg := udp.Config{LocalAddr: b.cfg.Listen, PreferIPv4: b.cfg.PreferIPv4, Logger: b.logger}
 	if !b.cfg.TCP.Incoming {
 		udpListener, err = udp.New(udpCfg)
 		return udpListener, nil, err

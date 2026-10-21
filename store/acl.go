@@ -62,7 +62,7 @@ SELECT id, fabric_index, privilege, auth_mode, subjects_json, targets_json, posi
 FROM matter_acl_entries WHERE fabric_index = ?
 ORDER BY position ASC`, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("matter store: list acl: %w", err)
+		return nil, fmt.Errorf("store: list acl: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -70,12 +70,12 @@ ORDER BY position ASC`, fabricIndex)
 	for rows.Next() {
 		entry, err := scanACLEntry(rows)
 		if err != nil {
-			return nil, fmt.Errorf("matter store: list acl: scan: %w", err)
+			return nil, fmt.Errorf("store: list acl: scan: %w", err)
 		}
 		out = append(out, entry)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("matter store: list acl: rows: %w", err)
+		return nil, fmt.Errorf("store: list acl: rows: %w", err)
 	}
 	return out, nil
 }
@@ -86,12 +86,12 @@ ORDER BY position ASC`, fabricIndex)
 func (s *Store) ReplaceACL(ctx context.Context, fabricIndex uint8, entries []ACLEntry) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("matter store: replace acl: begin tx: %w", err)
+		return fmt.Errorf("store: replace acl: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_acl_entries WHERE fabric_index = ?`, fabricIndex); err != nil {
-		return fmt.Errorf("matter store: replace acl: delete: %w", err)
+		return fmt.Errorf("store: replace acl: delete: %w", err)
 	}
 
 	const ins = `
@@ -100,32 +100,32 @@ INSERT INTO matter_acl_entries
 VALUES (?, ?, ?, ?, ?, ?)`
 	stmt, err := tx.PrepareContext(ctx, ins)
 	if err != nil {
-		return fmt.Errorf("matter store: replace acl: prepare: %w", err)
+		return fmt.Errorf("store: replace acl: prepare: %w", err)
 	}
 	defer func() { _ = stmt.Close() }()
 
 	for i := range entries {
 		subjectsJSON, err := json.Marshal(entries[i].Subjects)
 		if err != nil {
-			return fmt.Errorf("matter store: replace acl: marshal subjects: %w", err)
+			return fmt.Errorf("store: replace acl: marshal subjects: %w", err)
 		}
 		var targetsJSON any
 		if entries[i].Targets != nil {
 			b, err := json.Marshal(entries[i].Targets)
 			if err != nil {
-				return fmt.Errorf("matter store: replace acl: marshal targets: %w", err)
+				return fmt.Errorf("store: replace acl: marshal targets: %w", err)
 			}
 			targetsJSON = string(b)
 		}
 		//nolint:gosec // i fits in uint16 — ACL list size capped well below 65k; see #20
 		if _, err := stmt.ExecContext(ctx, fabricIndex, uint8(entries[i].Privilege), uint8(entries[i].AuthMode),
 			string(subjectsJSON), targetsJSON, uint16(i)); err != nil {
-			return fmt.Errorf("matter store: replace acl: insert %d: %w", i, err)
+			return fmt.Errorf("store: replace acl: insert %d: %w", i, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("matter store: replace acl: commit: %w", err)
+		return fmt.Errorf("store: replace acl: commit: %w", err)
 	}
 	return nil
 }

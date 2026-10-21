@@ -4,6 +4,7 @@
 package mdns
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -82,6 +83,7 @@ func listHostNameIfaces() ([]hostNameIface, error) {
 // querier that hears the node on several interfaces must see one host, so
 // the name may not follow interface order.
 type hostNameChooser struct {
+	// mu guards current.
 	mu      sync.Mutex
 	current string
 }
@@ -259,6 +261,8 @@ type OperationalServiceConfig struct {
 	// default deployment; the field is present for completeness and
 	// future ICD-proxy support.
 	ICD *uint8
+	// Logger receives the builder's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // BuildOperationalService constructs the operational `_matter._tcp`
@@ -311,7 +315,7 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	if sai == 0 {
 		sai = defaultOperationalSAI
 	}
-	sii, sai, sat = capAdvertisedIntervals(sii, sai, sat)
+	sii, sai, sat = capAdvertisedIntervals(cmp.Or(cfg.Logger, slog.Default()), sii, sai, sat)
 	txt := []TXTRecord{
 		{Key: "SII", Value: strconv.FormatUint(uint64(sii), 10)},
 		{Key: "SAI", Value: strconv.FormatUint(uint64(sai), 10)},
@@ -410,6 +414,8 @@ type CommissionableServiceConfig struct {
 	// SessionActiveThreshold is the SAT TXT key (Matter 1.4) — see
 	// the operational config; default 4000 ms when zero.
 	SessionActiveThreshold uint32
+	// Logger receives the builder's diagnostics; nil is slog.Default().
+	Logger *slog.Logger
 }
 
 // PairingHintDefault is the bitmask go-fabric emits for PH when the
@@ -479,12 +485,12 @@ const (
 // MdnsAdvertisement.ts:51. matter.js logs the cap at info level; here it
 // is a warning, since it means a host configured an interval the record
 // cannot carry.
-func capAdvertisedIntervals(sii, sai, sat uint32) (cappedSII, cappedSAI, cappedSAT uint32) {
+func capAdvertisedIntervals(log *slog.Logger, sii, sai, sat uint32) (cappedSII, cappedSAI, cappedSAT uint32) {
 	capped := func(key string, v, bound uint32) uint32 {
 		if v <= bound {
 			return v
 		}
-		slog.Default().Warn("matter.mdns.interval_capped",
+		log.Warn("matter.mdns.interval_capped",
 			slog.String("key", key),
 			slog.Uint64("configured_ms", uint64(v)),
 			slog.Uint64("advertised_ms", uint64(bound)))
@@ -522,7 +528,7 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 	if sat == 0 {
 		sat = defaultSessionActiveThreshold
 	}
-	sii, sai, sat = capAdvertisedIntervals(sii, sai, sat)
+	sii, sai, sat = capAdvertisedIntervals(cmp.Or(cfg.Logger, slog.Default()), sii, sai, sat)
 
 	txt := []TXTRecord{
 		{Key: "D", Value: strconv.FormatUint(uint64(long), 10)},

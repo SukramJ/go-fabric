@@ -5,6 +5,8 @@ package exchange
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -288,6 +290,48 @@ func TestPeerOpenedExchangeOnClosingSessionDeclined(t *testing.T) {
 	select {
 	case c := <-calls:
 		t.Fatalf("handler called on a lost session: %+v", c.first)
+	default:
+	}
+}
+
+// TestShutdownWaitsForTheHandlers pins the manager as the owner of its
+// handler goroutines (G1-14, ADR 0026 P5): Shutdown returns only after a
+// running handler did, is bounded by its context while one still runs,
+// and a closed manager starts no handler for a message that arrives
+// later.
+func TestShutdownWaitsForTheHandlers(t *testing.T) {
+	t.Parallel()
+	m, _, _ := newTestManager(t, Config{})
+	s, p := newSecurePair(t, m, 0x0401, false)
+	release := make(chan struct{})
+	h, calls := recordingHandler(release)
+	var returned atomic.Bool
+	m.SetProtocolHandler(im.InteractionModelProtocolID, func(x *Exchange, first *Message) {
+		h(x, first)
+		returned.Store(true)
+	})
+	p.send(t, s.ID(), peerOpens(0x6001, im.InteractionModelProtocolID, im.OpcodeReportData, true), []byte{0x15, 0x18})
+	waitHandled(t, calls)
+
+	// The handler blocks (host code that does not watch its exchange):
+	// a bounded Shutdown reports it.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := m.Shutdown(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Shutdown with a handler running = %v, want context.Canceled", err)
+	}
+	close(release)
+	if err := m.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+	if !returned.Load() {
+		t.Fatal("Shutdown returned before the handler did")
+	}
+	// Closed: a message for a new exchange starts no handler.
+	p.send(t, s.ID(), peerOpens(0x6002, im.InteractionModelProtocolID, im.OpcodeReportData, true), []byte{0x15, 0x18})
+	select {
+	case got := <-calls:
+		t.Fatalf("a closed manager ran a handler for exchange %d", got.x.ID())
 	default:
 	}
 }

@@ -32,6 +32,7 @@ const testPasscode uint32 = 20202021
 // manager of their own on a loopback socket — and returns its UDP address.
 func startNode(t *testing.T) *net.UDPAddr {
 	t.Helper()
+	holdSite(t) // a busy real-clock site keeps the fake ones from settling
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Clock: clock.System{}})
 	d := site.AddDevice(fabrictest.Topology{Configure: func(c *node.Config) {
 		c.Network = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true}

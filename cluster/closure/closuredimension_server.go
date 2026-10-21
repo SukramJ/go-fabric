@@ -163,10 +163,10 @@ type DimensionConfig struct {
 
 // ClosureDimension errors.
 var (
-	ErrNoDimensionHandler = errors.New("closuredimension: a DimensionHandler is required")
+	ErrNoDimensionHandler = errors.New("closure: a DimensionHandler is required")
 	// ErrDimensionValue: a value chip's setters refuse (CHIP_ERROR_
 	// INVALID_ARGUMENT or CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE).
-	ErrDimensionValue = errors.New("closuredimension: value outside the cluster's rules")
+	ErrDimensionValue = errors.New("closure: value outside the cluster's rules")
 )
 
 // DimensionServer implements [contract.ClusterServer] for
@@ -180,6 +180,7 @@ type DimensionServer struct {
 	ext      *cluster.DataVersionTracker
 	cfg      DimensionConfig
 
+	// mu guards current, lastPosDirt, limit, target and unitRange.
 	mu          sync.Mutex
 	current     *DimensionState
 	target      *DimensionState
@@ -207,7 +208,7 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	}
 	inst, err := spec.New(cd.Definition, spec.Options{Features: uint32(cfg.Features)})
 	if err != nil {
-		return nil, fmt.Errorf("closuredimension: %w", err)
+		return nil, fmt.Errorf("closure: %w", err)
 	}
 	switch {
 	case cfg.Clock != nil:
@@ -448,19 +449,19 @@ func (s *DimensionServer) MatterWrite(_ context.Context, attrID uint32, value an
 // only.
 func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("closuredimension: command 0x%02X is not supported", cmdID)
+		return nil, im.UnsupportedCommandf("closure: command 0x%02X is not supported", cmdID)
 	}
 	if cmdID == cd.CmdSetTarget {
 		req, ok := dimRequest[cd.SetTargetRequest](fields)
 		if !ok {
-			return nil, spec.Errorf(im.StatusInvalidCommand, "closuredimension: SetTarget fields %T", fields)
+			return nil, spec.Errorf(im.StatusInvalidCommand, "closure: SetTarget fields %T", fields)
 		}
 		return nil, s.setTarget(ctx, req)
 	}
 	// Step, the other command Accepts admits.
 	req, ok := dimRequest[cd.StepRequest](fields)
 	if !ok {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "closuredimension: Step fields %T", fields)
+		return nil, spec.Errorf(im.StatusInvalidCommand, "closure: Step fields %T", fields)
 	}
 	return nil, s.step(ctx, req)
 }
@@ -482,7 +483,7 @@ func dimRequest[T any](fields any) (T, bool) {
 // setTarget is chip's HandleSetTargetCommand (:457-560).
 func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest) error {
 	if req.Position == nil && req.Latch == nil && req.Speed == nil {
-		return spec.Errorf(im.StatusInvalidCommand, "closuredimension: SetTarget without a field")
+		return spec.Errorf(im.StatusInvalidCommand, "closure: SetTarget without a field")
 	}
 	s.mu.Lock()
 	target := DimensionState{}
@@ -495,7 +496,7 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 	position := clone(req.Position)
 	if position != nil && s.has(cd.FeaturePositioning) {
 		if *position > Percent100thsMax {
-			return spec.Errorf(im.StatusConstraintError, "closuredimension: Position %d", *position)
+			return spec.Errorf(im.StatusConstraintError, "closure: Position %d", *position)
 		}
 		if s.has(cd.FeatureLimitation) {
 			s.mu.Lock()
@@ -511,33 +512,33 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 	if req.Latch != nil && s.has(cd.FeatureMotionLatching) {
 		modes := s.cfg.LatchControlModes
 		if (*req.Latch && modes&cd.LatchControlModesRemoteLatching == 0) || (!*req.Latch && modes&cd.LatchControlModesRemoteUnlatching == 0) {
-			return spec.Errorf(im.StatusInvalidInState, "closuredimension: Latch %v is not remotely controllable", *req.Latch)
+			return spec.Errorf(im.StatusInvalidInState, "closure: Latch %v is not remotely controllable", *req.Latch)
 		}
 		target.Latch = &spec.Nullable[bool]{Value: *req.Latch}
 	}
 	if req.Speed != nil && s.has(cd.FeatureSpeed) {
 		if !s.EnumSupported(cd.ThreeLevelAutoEnumDef, uint64(*req.Speed)) {
-			return spec.Errorf(im.StatusConstraintError, "closuredimension: Speed %d", *req.Speed)
+			return spec.Errorf(im.StatusConstraintError, "closure: Speed %d", *req.Speed)
 		}
 		target.Speed = clone(req.Speed)
 	}
 	if current == nil {
-		return spec.Errorf(im.StatusInvalidInState, "closuredimension: CurrentState is null")
+		return spec.Errorf(im.StatusInvalidInState, "closure: CurrentState is null")
 	}
 	if s.has(cd.FeaturePositioning) && (current.Position == nil || current.Position.Null) {
-		return spec.Errorf(im.StatusInvalidInState, "closuredimension: the current Position is unknown")
+		return spec.Errorf(im.StatusInvalidInState, "closure: the current Position is unknown")
 	}
 	// A position change while latched needs the same command to unlatch
 	// (:541-552); chip asks for the request's Position, whatever the
 	// feature selection.
 	if s.has(cd.FeatureMotionLatching) && req.Position != nil && latched(current) && (req.Latch == nil || *req.Latch) {
-		return spec.Errorf(im.StatusInvalidInState, "closuredimension: latched; a position change must unlatch")
+		return spec.Errorf(im.StatusInvalidInState, "closure: latched; a position change must unlatch")
 	}
 	if err := s.cfg.Handler.SetTarget(ctx, position, req.Latch, req.Speed); err != nil {
-		return spec.Errorf(im.StatusFailure, "closuredimension: SetTarget: %v", err)
+		return spec.Errorf(im.StatusFailure, "closure: SetTarget: %v", err)
 	}
 	if err := s.SetTargetState(&target); err != nil {
-		return spec.Errorf(im.StatusFailure, "closuredimension: SetTarget: %v", err)
+		return spec.Errorf(im.StatusFailure, "closure: SetTarget: %v", err)
 	}
 	return nil
 }
@@ -550,10 +551,10 @@ func latched(st *DimensionState) bool {
 // step is chip's HandleStepCommand (:562-662).
 func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 	if !s.EnumSupported(cd.StepDirectionEnumDef, uint64(req.Direction)) {
-		return spec.Errorf(im.StatusConstraintError, "closuredimension: Direction %d", req.Direction)
+		return spec.Errorf(im.StatusConstraintError, "closure: Direction %d", req.Direction)
 	}
 	if req.NumberOfSteps == 0 {
-		return spec.Errorf(im.StatusConstraintError, "closuredimension: NumberOfSteps 0")
+		return spec.Errorf(im.StatusConstraintError, "closure: NumberOfSteps 0")
 	}
 	s.mu.Lock()
 	target := DimensionState{}
@@ -566,15 +567,15 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 
 	if req.Speed != nil && s.has(cd.FeatureSpeed) {
 		if !s.EnumSupported(cd.ThreeLevelAutoEnumDef, uint64(*req.Speed)) {
-			return spec.Errorf(im.StatusConstraintError, "closuredimension: Speed %d", *req.Speed)
+			return spec.Errorf(im.StatusConstraintError, "closure: Speed %d", *req.Speed)
 		}
 		target.Speed = clone(req.Speed)
 	}
 	if current == nil || current.Position == nil || current.Position.Null {
-		return spec.Errorf(im.StatusInvalidInState, "closuredimension: the current Position is unknown")
+		return spec.Errorf(im.StatusInvalidInState, "closure: the current Position is unknown")
 	}
 	if s.has(cd.FeatureMotionLatching) && latched(current) {
-		return spec.Errorf(im.StatusInvalidInState, "closuredimension: latched; Step cannot move")
+		return spec.Errorf(im.StatusInvalidInState, "closure: latched; Step cannot move")
 	}
 	delta := uint32(req.NumberOfSteps) * uint32(s.cfg.StepValue)
 	pos := uint32(current.Position.Value)
@@ -592,11 +593,11 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		pos = min(pos+delta, ceiling)
 	}
 	if err := s.cfg.Handler.Step(ctx, req.Direction, req.NumberOfSteps, req.Speed); err != nil {
-		return spec.Errorf(im.StatusFailure, "closuredimension: Step: %v", err)
+		return spec.Errorf(im.StatusFailure, "closure: Step: %v", err)
 	}
 	target.Position = &spec.Nullable[uint16]{Value: uint16(pos)} //nolint:gosec // at most the ceiling, 10000
 	if err := s.SetTargetState(&target); err != nil {
-		return spec.Errorf(im.StatusFailure, "closuredimension: Step: %v", err)
+		return spec.Errorf(im.StatusFailure, "closure: Step: %v", err)
 	}
 	return nil
 }

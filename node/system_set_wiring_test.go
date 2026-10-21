@@ -106,7 +106,7 @@ func TestStartChecksDataModelTest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Start: %v", err)
 		}
-		if !log.contains("The DataModelTest feature is enabled but is only required") {
+		if !log.contains("matter.general_diagnostics.data_model_test_optional") {
 			t.Error("no DataModelTest advisory logged")
 		}
 	})

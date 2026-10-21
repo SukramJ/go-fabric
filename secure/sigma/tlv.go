@@ -95,7 +95,7 @@ func (d *sigmaDecoder) openStruct() error {
 		return fmt.Errorf("read struct: %w", err)
 	}
 	if !el.IsContainer {
-		return errors.New("expected struct container")
+		return errors.New("sigma: expected struct container")
 	}
 	d.depth = 1
 	return nil

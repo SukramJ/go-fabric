@@ -290,6 +290,7 @@ type Server struct {
 	host     spec.HostHandlers
 	veto     spec.WriteVeto
 
+	// mu guards emitter and endpoint.
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16

@@ -183,6 +183,7 @@ type CommissionerControl struct {
 	rand io.Reader
 	now  func() time.Time
 
+	// mu guards approvedAt, closed, endpoint, request, step and wg.
 	mu         sync.Mutex
 	endpoint   uint16
 	step       ccStep
@@ -195,8 +196,8 @@ type CommissionerControl struct {
 }
 
 var (
-	errNilApprover     = errors.New("an approver is required")
-	errNilCommissioner = errors.New("a commissioner is required")
+	errNilApprover     = errors.New("core: an approver is required")
+	errNilCommissioner = errors.New("core: a commissioner is required")
 )
 
 // NewCommissionerControl builds a CommissionerControl server.

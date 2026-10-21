@@ -116,6 +116,7 @@ type CertificateStore struct {
 	store  Store
 	github *githubClient
 
+	// mu guards closed, githubRateLimited, index and timer.
 	mu      sync.Mutex
 	index   map[string]storedCertificate
 	closed  bool

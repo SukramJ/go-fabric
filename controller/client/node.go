@@ -422,7 +422,6 @@ func (n *Node) Erase(ctx context.Context) error {
 		return err
 	}
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	n.settings = settings{}
 	n.record = Record{}
 	for _, ep := range n.s.endpoints {
@@ -433,6 +432,9 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	n.props = nil
 	n.frozen = false
+	n.mu.Unlock()
+	// The store is the host's (SQLite in the reference controller): it is
+	// erased with the node's lock released (ADR 0026 P6).
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
 		n.log.Warn("matter.controller.client.store_erase_failed", slog.String("err", err.Error()))
 	}

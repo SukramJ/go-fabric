@@ -111,7 +111,7 @@ var ErrTagListNotEnabled = errors.New(`matter: you must enable the descriptor "T
 
 // errDescriptorReadOnly is returned for any write attempt — the
 // Descriptor cluster has no writable attributes.
-var errDescriptorReadOnly = spec.Errorf(im.StatusUnsupportedWrite, "matter: Descriptor is read-only")
+var errDescriptorReadOnly = spec.Errorf(im.StatusUnsupportedWrite, "core: Descriptor is read-only")
 
 // NewDescriptor returns a Descriptor with the supplied static lists.
 // deviceTypes must contain at least one entry per Matter §9.5.5.1. A
@@ -119,7 +119,7 @@ var errDescriptorReadOnly = spec.Errorf(im.StatusUnsupportedWrite, "matter: Desc
 // entry (see [dedupeDeviceTypes]).
 func NewDescriptor(deviceTypes []DeviceTypeStruct, serverList, clientList []uint32, partsList []uint16) (*Descriptor, error) {
 	if len(deviceTypes) == 0 {
-		return nil, errors.New("matter: Descriptor requires at least one DeviceType entry")
+		return nil, errors.New("core: Descriptor requires at least one DeviceType entry")
 	}
 	return &Descriptor{
 		deviceTypes: dedupeDeviceTypes(deviceTypes),
@@ -309,7 +309,7 @@ func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, value any) er
 
 // MatterInvoke always rejects — Descriptor has no commands.
 func (d *Descriptor) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: Descriptor has no commands (got 0x%02X)", cmdID)
+	return nil, im.UnsupportedCommandf("core: Descriptor has no commands (got 0x%02X)", cmdID)
 }
 
 // MatterReportable returns the attributes that subscribe-able. PartsList

@@ -442,6 +442,7 @@ type Server struct {
 	changer  ModeChanger
 	modes    []ModeOption
 
+	// mu guards current.
 	mu      sync.Mutex
 	current uint8
 }

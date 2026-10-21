@@ -170,7 +170,7 @@ const (
 var gencommInst = mustInstance(gencommdef.Definition, spec.Options{})
 
 // errGencommInvalidArg is returned for malformed command payloads.
-var errGencommInvalidArg = errors.New("matter: GeneralCommissioning invalid argument")
+var errGencommInvalidArg = errors.New("core: GeneralCommissioning invalid argument")
 
 // GeneralCommissioningConfig drives [NewGeneralCommissioning].
 type GeneralCommissioningConfig struct {
@@ -221,7 +221,7 @@ type GeneralCommissioningConfig struct {
 // NewGeneralCommissioning constructs the cluster.
 func NewGeneralCommissioning(cfg GeneralCommissioningConfig) (*GeneralCommissioning, error) {
 	if cfg.LocationCapability > RegulatoryIndoorOutdoor {
-		return nil, fmt.Errorf("matter: GeneralCommissioning LocationCapability=%d", cfg.LocationCapability)
+		return nil, fmt.Errorf("core: GeneralCommissioning LocationCapability=%d", cfg.LocationCapability)
 	}
 	if cfg.FailSafeMaxSeconds < 900 {
 		// Matter §11.10.5.2 ArmFailSafe ExpiryLengthSeconds field default is
@@ -383,7 +383,7 @@ func (g *GeneralCommissioning) MatterWrite(_ context.Context, attrID uint32, val
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
 		_, err := gencommInst.ValidateWrite(attrID, value, nil)
-		return refusedWrite{sentinel: fmt.Errorf("matter: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
+		return refusedWrite{sentinel: fmt.Errorf("core: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(uint64)
 	if !ok {
@@ -454,7 +454,7 @@ func (g *GeneralCommissioning) dispatchCmd(ctx context.Context, cmdID uint32, fi
 	case gencommCmdCommissioningComplete:
 		return g.handleCommissioningComplete(ctx)
 	}
-	return nil, im.UnsupportedCommandf("matter: GeneralCommissioning command 0x%02X not supported", cmdID)
+	return nil, im.UnsupportedCommandf("core: GeneralCommissioning command 0x%02X not supported", cmdID)
 }
 
 func gencommCmdName(cmdID uint32) string {

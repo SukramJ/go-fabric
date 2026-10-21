@@ -21,7 +21,7 @@ import (
 // transition.
 func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if !s.inst.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("colorcontrol: command 0x%02X is not supported", cmdID)
+		return nil, im.UnsupportedCommandf("light: command 0x%02X is not supported", cmdID)
 	}
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
@@ -98,13 +98,13 @@ func (s *ColorControlServer) invoke(ctx context.Context, cmdID uint32, fields an
 	case ccdef.CmdStepColorTemperature:
 		return s.stepColorTemperature(ctx, fields)
 	}
-	return im.UnsupportedCommandf("colorcontrol: command 0x%02X is not supported", cmdID)
+	return im.UnsupportedCommandf("light: command 0x%02X is not supported", cmdID)
 }
 
 // assertRate is matter.js #assertRate.
 func assertRate(mode ccdef.MoveModeEnum, rate float64) error {
 	if (mode == ccdef.MoveModeUp || mode == ccdef.MoveModeDown) && rate == 0 {
-		return colorControlInvalidCommandErr("colorcontrol: Rate must not be 0 when moving Up or Down")
+		return colorControlInvalidCommandErr("light: Rate must not be 0 when moving Up or Down")
 	}
 	return nil
 }
@@ -112,7 +112,7 @@ func assertRate(mode ccdef.MoveModeEnum, rate float64) error {
 // assertStepSize is matter.js #assertStepSize.
 func assertStepSize(step float64, what string) error {
 	if step == 0 {
-		return colorControlInvalidCommandErr("colorcontrol: " + what + " step size must not be 0")
+		return colorControlInvalidCommandErr("light: " + what + " step size must not be 0")
 	}
 	return nil
 }
@@ -476,7 +476,7 @@ func (s *ColorControlServer) stepColor(ctx context.Context, fields any) error {
 		return err
 	}
 	if r.StepX == 0 && r.StepY == 0 {
-		return colorControlInvalidCommandErr("colorcontrol: Color step sizes must not be 0")
+		return colorControlInvalidCommandErr("light: Color step sizes must not be 0")
 	}
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil

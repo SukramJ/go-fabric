@@ -89,6 +89,7 @@ type connection struct {
 	abort    context.CancelCauseFunc
 	changed  chan struct{}
 
+	// mu guards holding, lastErr, lastNonRetryable, pending and winner.
 	mu               sync.Mutex
 	queue            []queued
 	devices          map[string]*deviceAbort

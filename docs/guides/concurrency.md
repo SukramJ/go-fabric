@@ -12,17 +12,18 @@ gate for these paths.
 | Goroutine | Started by | Cadence | Stopped by |
 | --- | --- | --- | --- |
 | UDP read loop (one) | `bridge.Start` | per datagram | `bridge.Stop` (context cancel, socket close) |
-| Datagram handlers | the read loop | one per datagram, or per session (below) | returns; not awaited by `Stop` |
-| TCP accept loop and one reader per connection | `bridge.Start` with `Network.TCP` | per message | `bridge.Stop` |
+| Datagram handlers | the read loop | one per datagram, or per session (below) | returns; `bridge.Stop` waits for them, bounded by its context |
+| TCP accept loop and one reader per connection | `bridge.Start` with `Network.TCP` | per message | `bridge.Stop` (readers and their handler calls waited for, bounded by its context) |
 | ACK pump | `bridge.Start`, when an ACK tracker is attached | every 50 ms | `bridge.Stop` |
 | Subscription engine tick | `node.New` | every 250 ms | `Node.Stop` |
 | One report per due subscription | the engine tick | at most one at a time per subscription | returns |
-| Session reaper | `node.New` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` |
+| Session reaper | `node.New` | sweep every minute; evicts sessions idle for 5 minutes | `Node.Stop` (and waited for) |
 | PASE and CASE handler reapers | `node.New` | sweep every minute; evict handlers idle for 30 s | `Node.Stop` |
 | Operational-time keeper | `Node.Start` | every minute | `Node.Stop` (and waited for) |
 | DNS-SD re-announce loop | `Node.Start`, when the advertiser is an `mdns.Reannouncer` | 30 minutes by default | `Node.Stop` |
-| Session-triggered re-announce | a session event | once, bounded by the advertise timeout | returns |
-| BDX transfer | a peer's BDX init on a secure session | one per exchange | returns |
+| Session-triggered re-announce | a session event | once, bounded by the advertise timeout | `bridge.Stop` (cancelled and waited for) |
+| BDX transfer | a peer's BDX init on a secure session | one per exchange | `bridge.Stop` (cancelled and waited for, bounded by its context) |
+| BDX log transfer | a RetrieveLogsRequest answered over BDX | one at a time | `bridge.Stop` (DiagnosticLogs' `MatterQuiesce` cancels it and waits) |
 | Binding manager | `node.New` | on change | `Node.Stop` |
 | Client stack socket | `node.New` with `Config.Client.Enabled` | per datagram | `Node.Stop` |
 
@@ -92,6 +93,15 @@ other sessions. A server must therefore be safe for concurrent use. The
 takes. It may confirm through `Set`, from its own goroutine or another.
 Commands, writes and countdown ticks of that server wait behind it.
 
+**The other host ports** — DeviceEnergyManagement's `DemManager` hooks,
+the media servers' ports, Messages' `MessagePresenter`, SoilMeasurement's
+source — run the same way: with the server's state lock released, so they
+may call that server's setters and reads. Commands of the server wait
+behind a port that runs, so a port must not issue one; what the command
+records after the port returns stands over what the port set meanwhile.
+WindowCovering's `Mover` and MicrowaveOvenControl's `Oven` run behind the
+command queue alike.
+
 **`node.Config.Observers`** run synchronously on the event's goroutine. For
 fabric events, that is inside the command that caused the event, before
 its response is sent, so a blocking observer delays the response. Hand
@@ -135,10 +145,14 @@ on every `Reassemble`, and its result is never cached.
 | `Node.Run(ctx)` | starts, waits for `ctx` to end, then stops with a fresh 5-second budget |
 | `Node.Stop(ctx)` | bounds the bridge's wait for its read loop. It closes the sessions with a CloseSession each, stops the engine and reapers, withdraws the mDNS records and closes the advertiser |
 
-`Stop` waits for the read loop, the TCP loop, the ACK pump and the
-operational-time keeper. It does not wait for datagram handlers that are
-already running. Their context is cancelled, and a server call can return
-after `Stop` has. Close the database only after your own servers have
-returned, or make them tolerate a closed handle.
+`Stop` waits for the read loop and the datagram handlers it dispatched,
+the TCP loop with its connection readers and their handler calls, the ACK
+pump, the session re-announce, the BDX responders, the reapers and the
+operational-time keeper. The waits for handlers and responders are bounded
+by `ctx`: their context is cancelled first, and one that does not return
+— host code that ignores its context — is waited for only until `ctx`
+ends, so a server call can still return after `Stop` has. Close the
+database only after your own servers have returned, or make them tolerate
+a closed handle.
 
 *Source: `node/node.go:109-120`, `node/node.go:465-535`, `node/node.go:545-599`, `bridge/bridge.go:1541-1650`, `bridge/bridge.go:1805-1812`, `transport/udp/listener.go:147-212`.*

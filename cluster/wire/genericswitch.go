@@ -197,7 +197,7 @@ func (s *GenericSwitch) MatterWrite(ctx context.Context, attrID uint32, value an
 
 // MatterInvoke rejects all commands — Switch cluster has no commands.
 func (s *GenericSwitch) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, im.UnsupportedCommandf("matter: GenericSwitch has no command 0x%02X", cmdID)
+	return nil, im.UnsupportedCommandf("wire: GenericSwitch has no command 0x%02X", cmdID)
 }
 
 // MatterReportable lists the attributes that emit reports: CurrentPosition,
