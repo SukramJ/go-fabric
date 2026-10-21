@@ -228,9 +228,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14314,
-    "reachable": 9880,
-    "whitelisted": 4429,
+    "total_exported": 14308,
+    "reachable": 9875,
+    "whitelisted": 4428,
     "unreachable": 5
   },
   "by_package": [
@@ -8278,6 +8278,13 @@
     },
     {
       "package": "cluster/fan",
+      "identifier": "Stepper",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 244
+    },
+    {
+      "package": "cluster/fan",
       "identifier": "WindBitmap",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
@@ -8313,31 +8320,17 @@
     },
     {
       "package": "cluster/levelcontrol",
-      "identifier": "MoveRequest",
+      "identifier": "LevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 257
+      "line": 243
     },
     {
       "package": "cluster/levelcontrol",
-      "identifier": "MoveToLevelRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 251
-    },
-    {
-      "package": "cluster/levelcontrol",
-      "identifier": "StepRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 263
-    },
-    {
-      "package": "cluster/levelcontrol",
-      "identifier": "StopRequest",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 269
+      "identifier": "WireOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/export_test.go",
+      "line": 11
     },
     {
       "package": "cluster/light",
@@ -21546,21 +21539,21 @@
       "identifier": "AvailabilityProbe",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 65
+      "line": 57
     },
     {
       "package": "device",
       "identifier": "Option",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 89
+      "line": 81
     },
     {
       "package": "device",
       "identifier": "SourceKey",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
-      "line": 61
+      "line": 53
     },
     {
       "package": "device",
@@ -21581,7 +21574,7 @@
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 469
+      "line": 470
     },
     {
       "package": "device",
@@ -21602,7 +21595,7 @@
       "identifier": "TestDefaultSelectionKeepsTheClusterMandatedFeatures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 497
+      "line": 498
     },
     {
       "package": "device",
@@ -21637,14 +21630,14 @@
       "identifier": "TestDimmableLightServesMinAndMaxLevel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 195
+      "line": 196
     },
     {
       "package": "device",
       "identifier": "TestElementAlterationsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 215
+      "line": 216
     },
     {
       "package": "device",
@@ -21672,7 +21665,7 @@
       "identifier": "TestFeatureMasksMatchTheDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 418
+      "line": 419
     },
     {
       "package": "device",
@@ -21714,7 +21707,7 @@
       "identifier": "TestOnChangedFiresOnSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 249
+      "line": 250
     },
     {
       "package": "device",
@@ -21735,7 +21728,7 @@
       "identifier": "TestOptionalClusterWithItsAlterations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 150
+      "line": 151
     },
     {
       "package": "device",
@@ -21756,7 +21749,7 @@
       "identifier": "TestParts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 284
+      "line": 285
     },
     {
       "package": "device",
@@ -21805,14 +21798,14 @@
       "identifier": "TestSpec",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 335
+      "line": 336
     },
     {
       "package": "device",
       "identifier": "TestTypeLookups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 361
+      "line": 362
     },
     {
       "package": "device",
@@ -21826,7 +21819,7 @@
       "identifier": "TestTypedDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 392
+      "line": 393
     },
     {
       "package": "device",
@@ -21840,7 +21833,7 @@
       "identifier": "TestWithElements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 511
+      "line": 512
     },
     {
       "package": "device",
@@ -23275,7 +23268,7 @@
       "identifier": "TestNativeDimmerTakesTheHandOffPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_lighting_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "examples/reference-bridge",

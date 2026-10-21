@@ -84,152 +84,175 @@ import (
 // itself (device.WithServer takes only a cluster without a generated
 // package). A stopgap of brief BU-a: the bridge moves to the declaration's
 // own fields (Initial, the ports, the handlers) with BU-b and this table
-// goes with it. nil for a cluster the table does not list.
+// goes with it. A cluster the table does not list goes to device.WithServer.
 func hosted(srv contract.ClusterServer) device.Declaration {
-	switch srv.MatterClusterID() {
-	case levelcontroldef.ClusterID:
-		return levelcontroldef.Declare{HostServer: srv}
-	case fixedlabeldef.ClusterID:
-		return fixedlabeldef.Declare{HostServer: srv}
-	case booleanstatedef.ClusterID:
-		return booleanstatedef.Declare{HostServer: srv}
-	case ovencavityoperationalstatedef.ClusterID:
-		return ovencavityoperationalstatedef.Declare{HostServer: srv}
-	case ovenmodedef.ClusterID:
-		return ovenmodedef.Declare{HostServer: srv}
-	case laundrydryercontrolsdef.ClusterID:
-		return laundrydryercontrolsdef.Declare{HostServer: srv}
-	case modeselectdef.ClusterID:
-		return modeselectdef.Declare{HostServer: srv}
-	case laundrywashermodedef.ClusterID:
-		return laundrywashermodedef.Declare{HostServer: srv}
-	case refrigeratorandtemperaturecontrolledcabinetmodedef.ClusterID:
-		return refrigeratorandtemperaturecontrolledcabinetmodedef.Declare{HostServer: srv}
-	case laundrywashercontrolsdef.ClusterID:
-		return laundrywashercontrolsdef.Declare{HostServer: srv}
-	case rvcrunmodedef.ClusterID:
-		return rvcrunmodedef.Declare{HostServer: srv}
-	case rvccleanmodedef.ClusterID:
-		return rvccleanmodedef.Declare{HostServer: srv}
-	case temperaturecontroldef.ClusterID:
-		return temperaturecontroldef.Declare{HostServer: srv}
-	case refrigeratoralarmdef.ClusterID:
-		return refrigeratoralarmdef.Declare{HostServer: srv}
-	case airqualitydef.ClusterID:
-		return airqualitydef.Declare{HostServer: srv}
-	case smokecoalarmdef.ClusterID:
-		return smokecoalarmdef.Declare{HostServer: srv}
-	case dishwasheralarmdef.ClusterID:
-		return dishwasheralarmdef.Declare{HostServer: srv}
-	case microwaveovenmodedef.ClusterID:
-		return microwaveovenmodedef.Declare{HostServer: srv}
-	case microwaveovencontroldef.ClusterID:
-		return microwaveovencontroldef.Declare{HostServer: srv}
-	case operationalstatedef.ClusterID:
-		return operationalstatedef.Declare{HostServer: srv}
-	case rvcoperationalstatedef.ClusterID:
-		return rvcoperationalstatedef.Declare{HostServer: srv}
-	case hepafiltermonitoringdef.ClusterID:
-		return hepafiltermonitoringdef.Declare{HostServer: srv}
-	case activatedcarbonfiltermonitoringdef.ClusterID:
-		return activatedcarbonfiltermonitoringdef.Declare{HostServer: srv}
-	case booleanstateconfigurationdef.ClusterID:
-		return booleanstateconfigurationdef.Declare{HostServer: srv}
-	case valveconfigurationandcontroldef.ClusterID:
-		return valveconfigurationandcontroldef.Declare{HostServer: srv}
-	case electricalpowermeasurementdef.ClusterID:
-		return electricalpowermeasurementdef.Declare{HostServer: srv}
-	case electricalenergymeasurementdef.ClusterID:
-		return electricalenergymeasurementdef.Declare{HostServer: srv}
-	case waterheatermanagementdef.ClusterID:
-		return waterheatermanagementdef.Declare{HostServer: srv}
-	case commoditypricedef.ClusterID:
-		return commoditypricedef.Declare{HostServer: srv}
-	case deviceenergymanagementdef.ClusterID:
-		return deviceenergymanagementdef.Declare{HostServer: srv}
-	case energyevsedef.ClusterID:
-		return energyevsedef.Declare{HostServer: srv}
-	case energypreferencedef.ClusterID:
-		return energypreferencedef.Declare{HostServer: srv}
-	case energyevsemodedef.ClusterID:
-		return energyevsemodedef.Declare{HostServer: srv}
-	case waterheatermodedef.ClusterID:
-		return waterheatermodedef.Declare{HostServer: srv}
-	case deviceenergymanagementmodedef.ClusterID:
-		return deviceenergymanagementmodedef.Declare{HostServer: srv}
-	case electricalgridconditionsdef.ClusterID:
-		return electricalgridconditionsdef.Declare{HostServer: srv}
-	case doorlockdef.ClusterID:
-		return doorlockdef.Declare{HostServer: srv}
-	case windowcoveringdef.ClusterID:
-		return windowcoveringdef.Declare{HostServer: srv}
-	case closurecontroldef.ClusterID:
-		return closurecontroldef.Declare{HostServer: srv}
-	case closuredimensiondef.ClusterID:
-		return closuredimensiondef.Declare{HostServer: srv}
-	case serviceareadef.ClusterID:
-		return serviceareadef.Declare{HostServer: srv}
-	case pumpconfigurationandcontroldef.ClusterID:
-		return pumpconfigurationandcontroldef.Declare{HostServer: srv}
-	case thermostatdef.ClusterID:
-		return thermostatdef.Declare{HostServer: srv}
-	case fancontroldef.ClusterID:
-		return fancontroldef.Declare{HostServer: srv}
-	case thermostatuserinterfaceconfigurationdef.ClusterID:
-		return thermostatuserinterfaceconfigurationdef.Declare{HostServer: srv}
-	case colorcontroldef.ClusterID:
-		return colorcontroldef.Declare{HostServer: srv}
-	case flowmeasurementdef.ClusterID:
-		return flowmeasurementdef.Declare{HostServer: srv}
-	case carbonmonoxideconcentrationmeasurementdef.ClusterID:
-		return carbonmonoxideconcentrationmeasurementdef.Declare{HostServer: srv}
-	case carbondioxideconcentrationmeasurementdef.ClusterID:
-		return carbondioxideconcentrationmeasurementdef.Declare{HostServer: srv}
-	case nitrogendioxideconcentrationmeasurementdef.ClusterID:
-		return nitrogendioxideconcentrationmeasurementdef.Declare{HostServer: srv}
-	case ozoneconcentrationmeasurementdef.ClusterID:
-		return ozoneconcentrationmeasurementdef.Declare{HostServer: srv}
-	case pm25concentrationmeasurementdef.ClusterID:
-		return pm25concentrationmeasurementdef.Declare{HostServer: srv}
-	case formaldehydeconcentrationmeasurementdef.ClusterID:
-		return formaldehydeconcentrationmeasurementdef.Declare{HostServer: srv}
-	case pm1concentrationmeasurementdef.ClusterID:
-		return pm1concentrationmeasurementdef.Declare{HostServer: srv}
-	case pm10concentrationmeasurementdef.ClusterID:
-		return pm10concentrationmeasurementdef.Declare{HostServer: srv}
-	case totalvolatileorganiccompoundsconcentrationmeasurementdef.ClusterID:
-		return totalvolatileorganiccompoundsconcentrationmeasurementdef.Declare{HostServer: srv}
-	case radonconcentrationmeasurementdef.ClusterID:
-		return radonconcentrationmeasurementdef.Declare{HostServer: srv}
-	case wakeonlandef.ClusterID:
-		return wakeonlandef.Declare{HostServer: srv}
-	case channeldef.ClusterID:
-		return channeldef.Declare{HostServer: srv}
-	case targetnavigatordef.ClusterID:
-		return targetnavigatordef.Declare{HostServer: srv}
-	case mediaplaybackdef.ClusterID:
-		return mediaplaybackdef.Declare{HostServer: srv}
-	case mediainputdef.ClusterID:
-		return mediainputdef.Declare{HostServer: srv}
-	case lowpowerdef.ClusterID:
-		return lowpowerdef.Declare{HostServer: srv}
-	case keypadinputdef.ClusterID:
-		return keypadinputdef.Declare{HostServer: srv}
-	case contentlauncherdef.ClusterID:
-		return contentlauncherdef.Declare{HostServer: srv}
-	case audiooutputdef.ClusterID:
-		return audiooutputdef.Declare{HostServer: srv}
-	case applicationlauncherdef.ClusterID:
-		return applicationlauncherdef.Declare{HostServer: srv}
-	case commoditytariffdef.ClusterID:
-		return commoditytariffdef.Declare{HostServer: srv}
-	case ecosysteminformationdef.ClusterID:
-		return ecosysteminformationdef.Declare{HostServer: srv}
-	case meteridentificationdef.ClusterID:
-		return meteridentificationdef.Declare{HostServer: srv}
-	case commoditymeteringdef.ClusterID:
-		return commoditymeteringdef.Declare{HostServer: srv}
-	default:
-		return device.WithServer(srv)
+	if declare, ok := hostedDeclarations[srv.MatterClusterID()]; ok {
+		return declare(srv)
 	}
+	return device.WithServer(srv)
+}
+
+// hostedDeclarations maps a cluster id to its declaration of a host server.
+var hostedDeclarations = map[uint32]func(contract.ClusterServer) device.Declaration{
+	levelcontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return levelcontroldef.Declare{HostServer: srv} },
+	fixedlabeldef.ClusterID:   func(srv contract.ClusterServer) device.Declaration { return fixedlabeldef.Declare{HostServer: srv} },
+	booleanstatedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return booleanstatedef.Declare{HostServer: srv} },
+	ovencavityoperationalstatedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return ovencavityoperationalstatedef.Declare{HostServer: srv}
+	},
+	ovenmodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return ovenmodedef.Declare{HostServer: srv} },
+	laundrydryercontrolsdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return laundrydryercontrolsdef.Declare{HostServer: srv}
+	},
+	modeselectdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return modeselectdef.Declare{HostServer: srv} },
+	laundrywashermodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return laundrywashermodedef.Declare{HostServer: srv}
+	},
+	refrigeratorandtemperaturecontrolledcabinetmodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return refrigeratorandtemperaturecontrolledcabinetmodedef.Declare{HostServer: srv}
+	},
+	laundrywashercontrolsdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return laundrywashercontrolsdef.Declare{HostServer: srv}
+	},
+	rvcrunmodedef.ClusterID:   func(srv contract.ClusterServer) device.Declaration { return rvcrunmodedef.Declare{HostServer: srv} },
+	rvccleanmodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return rvccleanmodedef.Declare{HostServer: srv} },
+	temperaturecontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return temperaturecontroldef.Declare{HostServer: srv}
+	},
+	refrigeratoralarmdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return refrigeratoralarmdef.Declare{HostServer: srv}
+	},
+	airqualitydef.ClusterID:   func(srv contract.ClusterServer) device.Declaration { return airqualitydef.Declare{HostServer: srv} },
+	smokecoalarmdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return smokecoalarmdef.Declare{HostServer: srv} },
+	dishwasheralarmdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return dishwasheralarmdef.Declare{HostServer: srv}
+	},
+	microwaveovenmodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return microwaveovenmodedef.Declare{HostServer: srv}
+	},
+	microwaveovencontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return microwaveovencontroldef.Declare{HostServer: srv}
+	},
+	operationalstatedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return operationalstatedef.Declare{HostServer: srv}
+	},
+	rvcoperationalstatedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return rvcoperationalstatedef.Declare{HostServer: srv}
+	},
+	hepafiltermonitoringdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return hepafiltermonitoringdef.Declare{HostServer: srv}
+	},
+	activatedcarbonfiltermonitoringdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return activatedcarbonfiltermonitoringdef.Declare{HostServer: srv}
+	},
+	booleanstateconfigurationdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return booleanstateconfigurationdef.Declare{HostServer: srv}
+	},
+	valveconfigurationandcontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return valveconfigurationandcontroldef.Declare{HostServer: srv}
+	},
+	electricalpowermeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return electricalpowermeasurementdef.Declare{HostServer: srv}
+	},
+	electricalenergymeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return electricalenergymeasurementdef.Declare{HostServer: srv}
+	},
+	waterheatermanagementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return waterheatermanagementdef.Declare{HostServer: srv}
+	},
+	commoditypricedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return commoditypricedef.Declare{HostServer: srv} },
+	deviceenergymanagementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return deviceenergymanagementdef.Declare{HostServer: srv}
+	},
+	energyevsedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return energyevsedef.Declare{HostServer: srv} },
+	energypreferencedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return energypreferencedef.Declare{HostServer: srv}
+	},
+	energyevsemodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return energyevsemodedef.Declare{HostServer: srv} },
+	waterheatermodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return waterheatermodedef.Declare{HostServer: srv}
+	},
+	deviceenergymanagementmodedef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return deviceenergymanagementmodedef.Declare{HostServer: srv}
+	},
+	electricalgridconditionsdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return electricalgridconditionsdef.Declare{HostServer: srv}
+	},
+	doorlockdef.ClusterID:       func(srv contract.ClusterServer) device.Declaration { return doorlockdef.Declare{HostServer: srv} },
+	windowcoveringdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return windowcoveringdef.Declare{HostServer: srv} },
+	closurecontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return closurecontroldef.Declare{HostServer: srv} },
+	closuredimensiondef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return closuredimensiondef.Declare{HostServer: srv}
+	},
+	serviceareadef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return serviceareadef.Declare{HostServer: srv} },
+	pumpconfigurationandcontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return pumpconfigurationandcontroldef.Declare{HostServer: srv}
+	},
+	thermostatdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return thermostatdef.Declare{HostServer: srv} },
+	fancontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return fancontroldef.Declare{HostServer: srv} },
+	thermostatuserinterfaceconfigurationdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return thermostatuserinterfaceconfigurationdef.Declare{HostServer: srv}
+	},
+	colorcontroldef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return colorcontroldef.Declare{HostServer: srv} },
+	flowmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return flowmeasurementdef.Declare{HostServer: srv}
+	},
+	carbonmonoxideconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return carbonmonoxideconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	carbondioxideconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return carbondioxideconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	nitrogendioxideconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return nitrogendioxideconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	ozoneconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return ozoneconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	pm25concentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return pm25concentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	formaldehydeconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return formaldehydeconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	pm1concentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return pm1concentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	pm10concentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return pm10concentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	totalvolatileorganiccompoundsconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return totalvolatileorganiccompoundsconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	radonconcentrationmeasurementdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return radonconcentrationmeasurementdef.Declare{HostServer: srv}
+	},
+	wakeonlandef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return wakeonlandef.Declare{HostServer: srv} },
+	channeldef.ClusterID:   func(srv contract.ClusterServer) device.Declaration { return channeldef.Declare{HostServer: srv} },
+	targetnavigatordef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return targetnavigatordef.Declare{HostServer: srv}
+	},
+	mediaplaybackdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return mediaplaybackdef.Declare{HostServer: srv} },
+	mediainputdef.ClusterID:    func(srv contract.ClusterServer) device.Declaration { return mediainputdef.Declare{HostServer: srv} },
+	lowpowerdef.ClusterID:      func(srv contract.ClusterServer) device.Declaration { return lowpowerdef.Declare{HostServer: srv} },
+	keypadinputdef.ClusterID:   func(srv contract.ClusterServer) device.Declaration { return keypadinputdef.Declare{HostServer: srv} },
+	contentlauncherdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return contentlauncherdef.Declare{HostServer: srv}
+	},
+	audiooutputdef.ClusterID: func(srv contract.ClusterServer) device.Declaration { return audiooutputdef.Declare{HostServer: srv} },
+	applicationlauncherdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return applicationlauncherdef.Declare{HostServer: srv}
+	},
+	commoditytariffdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return commoditytariffdef.Declare{HostServer: srv}
+	},
+	ecosysteminformationdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return ecosysteminformationdef.Declare{HostServer: srv}
+	},
+	meteridentificationdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return meteridentificationdef.Declare{HostServer: srv}
+	},
+	commoditymeteringdef.ClusterID: func(srv contract.ClusterServer) device.Declaration {
+		return commoditymeteringdef.Declare{HostServer: srv}
+	},
 }

@@ -1199,7 +1199,7 @@
   },
   {
     "file": "cluster/levelcontrol/levelcontrol_server_test.go",
-    "line": 243,
+    "line": 245,
     "citation": "LevelControlServer.ts:114-120",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "LevelControl",
@@ -1208,7 +1208,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 65,
+    "line": 67,
     "citation": "LevelControlServer.ts:529-550",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "#turnOnForLevel",
@@ -1217,7 +1217,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 278,
+    "line": 280,
     "citation": "LevelControlServer.ts:186-195",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "MoveMode",
@@ -1226,7 +1226,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 478,
+    "line": 480,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "targetValue",
@@ -1235,7 +1235,7 @@
   },
   {
     "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
-    "line": 757,
+    "line": 760,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "preCommit",
@@ -1796,7 +1796,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 499,
+    "line": 497,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",

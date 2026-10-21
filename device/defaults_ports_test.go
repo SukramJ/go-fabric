@@ -37,7 +37,7 @@ func (f *fakeFan) ApplyFanSettings(_ context.Context, p fandef.Patch) error {
 // fakeModes is a mode changer of every ModeBase derivation.
 type fakeModes struct{ changed []uint8 }
 
-func (f *fakeModes) ChangeToMode(_ context.Context, mode uint8) (uint8, string, error) {
+func (f *fakeModes) ChangeToMode(_ context.Context, mode uint8) (status uint8, text string, err error) {
 	f.changed = append(f.changed, mode)
 	return 0, "", nil
 }
