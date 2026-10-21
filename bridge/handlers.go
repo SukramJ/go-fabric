@@ -215,32 +215,6 @@ func (a *PaseAdapter) SetResponderSessionParams(p *sessionparams.Parameters) {
 	a.responderSessionParams = p
 }
 
-// SetResponderMRPParams configures the MRP triplet of the advertised
-// SessionParameters, keeping the other fields of
-// [DefaultSessionParameters]. Nil restores the defaults.
-//
-// Deprecated: use [PaseAdapter.SetResponderSessionParams]. Marked in
-// v0.3.0; removal is permissible from v0.5.0, the second minor release
-// after the marking one (README §API stability).
-func (a *PaseAdapter) SetResponderMRPParams(p *spake2.MRPParameters) {
-	if p == nil {
-		a.SetResponderSessionParams(nil)
-		return
-	}
-	sp := DefaultSessionParameters()
-	m := p.Parameters()
-	if m.SessionIdleInterval != 0 {
-		sp.SessionIdleInterval = m.SessionIdleInterval
-	}
-	if m.SessionActiveInterval != 0 {
-		sp.SessionActiveInterval = m.SessionActiveInterval
-	}
-	if m.SessionActiveThreshold != 0 {
-		sp.SessionActiveThreshold = m.SessionActiveThreshold
-	}
-	a.SetResponderSessionParams(&sp)
-}
-
 // PeerSessionParams returns the commissioner's SessionParameters from
 // the most recent PBKDFParamRequest, or nil when it sent none. The PASE
 // session opener stamps them onto the operational entry (matter.js
@@ -253,36 +227,6 @@ func (a *PaseAdapter) PeerSessionParams() *sessionparams.Parameters {
 	}
 	cp := *a.peerSessionParams
 	return &cp
-}
-
-// PeerMRPParams returns the MRP triplet of the commissioner's
-// SessionParameters, or nil when it stated none of the three.
-//
-// Deprecated: use [PaseAdapter.PeerSessionParams]. Marked in v0.3.0;
-// removal is permissible from v0.5.0, the second minor release after the
-// marking one (README §API stability).
-func (a *PaseAdapter) PeerMRPParams() *spake2.MRPParameters {
-	p := a.PeerSessionParams()
-	if p == nil {
-		return nil
-	}
-	m := spake2.MRPParameters{}
-	if p.SessionIdleInterval != 0 {
-		v := p.SessionIdleInterval
-		m.IdleRetransTimeoutMs = &v
-	}
-	if p.SessionActiveInterval != 0 {
-		v := p.SessionActiveInterval
-		m.ActiveRetransTimeoutMs = &v
-	}
-	if p.SessionActiveThreshold != 0 {
-		v := p.SessionActiveThreshold
-		m.ActiveThresholdTimeMs = &v
-	}
-	if m.IdleRetransTimeoutMs == nil && m.ActiveRetransTimeoutMs == nil && m.ActiveThresholdTimeMs == nil {
-		return nil
-	}
-	return &m
 }
 
 // ProcessPBKDFParamRequest decodes the commissioner's request, picks
@@ -478,7 +422,7 @@ func (a *PaseAdapter) ProcessPake3(payload []byte) (opcode uint8, respPayload []
 		return 0, nil, err
 	}
 	// The pickup callback runs OUTSIDE a.mu: the daemon's production
-	// callback calls back into adapter getters (PeerMRPParams), and a
+	// callback calls back into adapter getters (PeerSessionParams), and a
 	// non-reentrant mutex held across the callback self-deadlocks the
 	// PASE receive goroutine — the commissioner then never receives
 	// the closing StatusReport and times out after Pake3. Mirrors

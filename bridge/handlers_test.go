@@ -361,7 +361,7 @@ func TestPaseAdapter_CallbackInvokedOnSuccess(t *testing.T) {
 }
 
 // TestPaseAdapter_OnEstablishedRunsOutsideAdapterLock — the daemon's
-// production pickup callback reads adapter state (PeerMRPParams)
+// production pickup callback reads adapter state (PeerSessionParams)
 // while handling OnSessionEstablished, so the callback MUST run
 // outside the adapter mutex. Invoked under a.mu it self-deadlocks
 // the PASE receive goroutine: the commissioner never receives the
@@ -378,7 +378,7 @@ func TestPaseAdapter_OnEstablishedRunsOutsideAdapterLock(t *testing.T) {
 	a.SetOnSessionEstablished(func(_ []byte, _ uint16) error {
 		// Calling back into the adapter is what the daemon's
 		// production callback does; it must not deadlock.
-		_ = a.PeerMRPParams()
+		_ = a.PeerSessionParams()
 		gotParams.Store(true)
 		return nil
 	})
