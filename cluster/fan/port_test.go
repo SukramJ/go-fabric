@@ -43,9 +43,9 @@ func TestPortInTheGeneratedTypes(t *testing.T) {
 	p := &genPort{state: fandef.State{FanMode: fandef.FanModeLow, PercentCurrent: 33}}
 	srv, err := fan.NewServer(fan.Config{
 		Port: p, Stepper: p,
-		Features:    fan.Feature(fandef.FeatureRocking | fandef.FeatureWind | fandef.FeatureAirflowDirection | fandef.FeatureStep | fandef.FeatureAuto),
-		Sequence:    fan.Sequence(fandef.FanModeSequenceOffLowMedHighAuto),
-		RockSupport: fan.RockBitmap(fandef.RockRockLeftRight), WindSupport: fan.WindBitmap(fandef.WindSleepWind),
+		Features:    fandef.FeatureRocking | fandef.FeatureWind | fandef.FeatureAirflowDirection | fandef.FeatureStep | fandef.FeatureAuto,
+		Sequence:    fandef.FanModeSequenceOffLowMedHighAuto,
+		RockSupport: fandef.RockRockLeftRight, WindSupport: fandef.WindSleepWind,
 	})
 	if err != nil {
 		t.Fatal(err)
