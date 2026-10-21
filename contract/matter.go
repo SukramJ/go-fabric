@@ -672,8 +672,9 @@ type ChangeNotifier interface {
 // quieter property only when its QuietEvent emits.
 //
 // Each change carries the attributes that moved and where the change came
-// from ([Change], [Origin]) — the session matter.js hands every `$Changed`
-// observer (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476);
+// from ([Change], [Origin]) — the session matter.js hands every change
+// observer with the new and the old value
+// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476);
 // a server that cannot tell reports [OriginUnknown]. The ids are the
 // listener's own.
 //
