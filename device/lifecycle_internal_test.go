@@ -14,8 +14,11 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
 )
@@ -201,6 +204,40 @@ func TestKitOptionsAndPorts(t *testing.T) {
 	if len(ch.changed) != 1 || ch.changed[0] != 1 {
 		t.Errorf("the declared ModeChanger saw %v, want [1]", ch.changed)
 	}
+}
+
+// TestPortConfigurationAndHookRefusal: a fan's configuration attributes
+// come from the declaration's Initial; a hook the host's server cannot
+// take refuses the device.
+func TestPortConfigurationAndHookRefusal(t *testing.T) {
+	t.Parallel()
+	d, err := NewFan(testOptions("fan"), fandef.Declare{
+		StateSource: &fakeFan{},
+		Features:    fandef.FeatureMultiSpeed | fandef.FeatureRocking | fandef.FeatureWind,
+		Initial: fandef.Patch{
+			FanModeSequence: new(fandef.FanModeSequenceOffLowMedHigh), SpeedMax: new(uint8(10)),
+			RockSupport: new(fandef.RockRockLeftRight), WindSupport: new(fandef.WindSleepWind),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := d.Server(fandef.ClusterID).MatterRead(fandef.AttrSpeedMax); v != uint8(10) && v != uint64(10) {
+		t.Errorf("SpeedMax %v, want the declared 10", v)
+	}
+	host := &hostServer{id: onoffdef.ClusterID}
+	if _, err := NewOnOffLight(testOptions("refused"), onoffdef.Declare{
+		HostServer: host,
+		HandleOn:   func(context.Context, onoffdef.OnRequest) (struct{}, error) { return struct{}{}, nil },
+	}); !errors.Is(err, ErrConfiguration) {
+		t.Errorf("a handler the host's server cannot take: %v, want ErrConfiguration", err)
+	}
+	lamp, err := NewOnOffLight(testOptions("async"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lamp.OnChangedAsync(onoffdef.ClusterID, nil)()
+	lamp.OnChanged(0xFFFF, func(contract.Change) {})()
 }
 
 // levelPort is a LevelSource in the generated requests.
