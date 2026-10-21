@@ -139,7 +139,7 @@ func TestDeclareOverTheWire(t *testing.T) {
 
 // TestDeclareOnAnyServer: a declaration's hooks go on the host's own server
 // (HostServer) as on the kit's, and an empty declaration of an assembler
-// cluster the type allows opts the endpoint in, as WithOptional does.
+// cluster the type allows opts the endpoint in.
 func TestDeclareOnAnyServer(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

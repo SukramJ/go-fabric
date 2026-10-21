@@ -73,7 +73,6 @@ facade's own state.
 | `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them |
 | `basic_information.configuration_version` | the facade | the root's ConfigurationVersion |
 | `basic_information.unique_id` | the facade | UniqueID, derived on the first boot and pinned |
-| `basic_information.unique_id_rotated` | (deprecated) | read once for a migration and cleared |
 | `bridged_node_label.<key>` | the facade | a bridged endpoint's NodeLabel |
 | `bridged_configuration_version.<key>` | the facade | a bridged endpoint's ConfigurationVersion |
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |

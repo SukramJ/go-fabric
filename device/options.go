@@ -62,8 +62,8 @@ type AvailabilityProbe = endpoint.AvailabilityProbe
 // cluster packages (cluster/spec/<cluster>, imported as <cluster>def), the
 // one form of a cluster's initial state, feature selection, write veto,
 // command handlers and host ports — or one of the kit's own options
-// ([WithOptional], [WithChangeNotifier], [WithMeasurement],
-// [WithClientClusters], and the deprecated per-cluster ones). It is the
+// ([WithServer], [WithChangeNotifier], [WithMeasurement],
+// [WithClientClusters]). It is the
 // Go form of what matter.js states on an endpoint type and its behaviors
 // (`Endpoint.with(…)`, the behaviors' initial state, a behavior subclass
 // overriding a command; packages/node/src/devices/on-off-light.ts:103-135,
@@ -80,10 +80,10 @@ type Declaration interface {
 // Option is the kit's own [Declaration], what the With… functions return.
 type Option = Declaration
 
-// clusterOption is a per-cluster option of the kit's own ([WithOptional],
-// [WithServer]): a declaration that mounts the cluster when mount is set;
-// undeclared marks the two, which take only a cluster without a generated
-// declaration.
+// clusterOption is a per-cluster option of the kit's own ([WithServer], and
+// the tests' untyped forms): a declaration that mounts the cluster when
+// mount is set; undeclared marks a WithServer, which takes only a cluster
+// without a generated declaration.
 type clusterOption struct {
 	decl       spec.ClusterDeclaration
 	mount      bool
@@ -150,16 +150,12 @@ func (s *settings) declare(d Declaration) error {
 		return nil
 	case clusterOption:
 		if o.undeclared {
-			if !o.mount && o.decl.Server == nil {
+			if o.decl.Server == nil {
 				return fmt.Errorf("%w: WithServer(nil)", ErrConfiguration)
 			}
 			if def := spec.Lookup(o.decl.Cluster); def != nil {
-				name, form := "WithServer", "HostServer: …"
-				if o.mount {
-					name, form = "WithOptional", ""
-				}
-				return fmt.Errorf("%w: %s for %s (0x%04X): declare it, %sdef.Declare{%s}",
-					ErrConfiguration, name, def.Name, o.decl.Cluster, strings.ToLower(def.Name), form)
+				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …}",
+					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
 			}
 		}
 		s.merge(o.decl, o.mount)
@@ -252,20 +248,6 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 	if decl.Ports != nil {
 		s.ports[id] = decl.Ports
 	}
-}
-
-// WithOptional mounts an optional cluster of the device type that has no
-// generated package — matter.js's `Device.with(…Server)` for a cluster in
-// `server.optional` (src/devices/on-off-light.ts:111, 126-131) — beside
-// [WithServer], which supplies its server. A cluster with a generated
-// package is declared, `<cluster>def.Declare{}` — for Groups (0x0004) and
-// ScenesManagement (0x0062), whose server is the stack's, the declaration
-// opts the endpoint in ([endpoint.Spec.OptIn]) and the assembler mounts
-// them, as `MutableEndpoint.with(GroupsServer)` extends any endpoint type
-// (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112); WithOptional
-// refuses it.
-func WithOptional(clusterID uint32) Option {
-	return clusterOption{decl: spec.ClusterDeclaration{Cluster: clusterID}, mount: true, undeclared: true}
 }
 
 // WithServer mounts the host's own server for a cluster without a

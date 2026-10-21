@@ -2052,11 +2052,11 @@ endpoint whose type asks for them (`endpoint/materialize.go`
 ClusterServers, partClusterServers, mountGroups, mountScenes) and replaces
 a source-supplied Groups or ScenesManagement with the stack's. `device/`
 skips them (`device/device.go` `assemblerMounted`) and refuses a
-`WithServer` / `WithOptional` / `WithFeatures` for them, so there is one
+`WithServer` or a declaration for them, so there is one
 owner per cluster. An optional Groups or ScenesManagement a device type
 allows is opted in through `endpoint.Spec.OptIn` (set by its declaration,
-`groupsdef.Declare{}` / `scenesmanagementdef.Declare{}`; `device.WithOptional` until
-brief BZ), and the assembler mounts it only where the
+`groupsdef.Declare{}` / `scenesmanagementdef.Declare{}`; `device.WithOptional`, removed
+by brief BZ), and the assembler mounts it only where the
 type allows it — matter.js's `MutableEndpoint.with(GroupsServer)` mounts
 on any endpoint (`MutableEndpoint.ts:95-110`).
 
