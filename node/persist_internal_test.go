@@ -215,31 +215,4 @@ func TestUniqueIDRotationOnOffOn(t *testing.T) {
 			t.Errorf("boot %d (salt %d): stored %q (%v), want the pin %q", i, rotation, v, ok, pinned)
 		}
 	}
-	if _, ok, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); ok { //nolint:staticcheck // the deprecated marker must stay unwritten
-		t.Error("the rotation marker was written")
-	}
-
-	// The migration: a stored value a host's pinning flagged "1" is
-	// re-derived, pinned and the flag cleared by a boot without rotation;
-	// a rotated boot leaves both alone.
-	for _, k := range []struct{ key, v string }{{store.SettingUniqueID, "salted-by-host"}, {store.SettingUniqueIDRotated, "1"}} { //nolint:staticcheck // the deprecated marker the migration reads
-		if err := st.SetSetting(ctx, k.key, k.v); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := boot(5); got != "id-5" {
-		t.Errorf("rotated boot over a flagged value served %q", got)
-	}
-	if v, _ := stored(); v != "salted-by-host" {
-		t.Errorf("rotated boot rewrote the stored value to %q", v)
-	}
-	if got := boot(0); got != "id-0" {
-		t.Errorf("migration served %q, want the re-derived id-0", got)
-	}
-	if v, _ := stored(); v != "id-0" {
-		t.Errorf("migration pinned %q", v)
-	}
-	if flag, _, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); flag != "" { //nolint:staticcheck // as above
-		t.Errorf("flag %q not cleared", flag)
-	}
 }

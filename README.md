@@ -168,7 +168,6 @@ becomes permissible in:
 
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
-| `store.SettingUniqueIDRotated` | none: the node reads it once, as the unique-id migration of issue #122, and clears it; kept until the owner decides that migration's end | open |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
