@@ -26,6 +26,9 @@ A host names none of the packages below for these:
 | Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers` |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
+| The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type, name, reachability and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
+| A device's lifecycle | `Device.SetReachable`, `Device.Rename`, `Device.EndpointNumber`; `Aggregator.Add`, `Remove`, `Replace` |
+| Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
 | Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
 | Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
 | Bindings (seam) | `Node.Bindings()` returns the `*binding.Manager` that resolves the Binding servers' entries into peers; no facade route yet |
@@ -35,19 +38,22 @@ An alias is the type of the lower package under a second name, not a new
 type: a host that names it does not import the package, and code written
 against the original keeps compiling.
 
-*Source: `node/facade.go`, `node/config.go`, `node/mdns.go`, `node/attestation.go`, `node/credentials.go`, `node/health.go`, `node/store_path.go`, `node/observers.go`.*
+*Source: `node/facade.go`, `node/config.go`, `node/mdns.go`, `node/attestation.go`, `node/credentials.go`, `node/health.go`, `node/store_path.go`, `node/observers.go`, `node/lifecycle.go` (`Topology`), `device/lifecycle.go`, `contract/` (`Change`).*
 
 ## `bridge`
 
 **Gives.** `Node.Bridge()` returns the `*bridge.Bridge` the node runs on:
-the `Attach…` and `Set…` ports, the assembled topology (`Topology`),
-`Reassemble`, the event log (`EventLog`), `NotifyDeviceReachable`, the
-controller round-trip statistics (`ControllerRTT`) and the hooks the
-facade leaves to the host (`SetOnReassembled`, `SetOnFabricAdded`).
+the `Attach…` and `Set…` ports, `Reassemble`, the event log
+(`EventLog`), the controller round-trip statistics (`ControllerRTT`) and
+the hooks the facade leaves to the host (`SetOnReassembled`,
+`SetOnFabricAdded`).
 
-**When.** A host that reads the live topology, reports reachability per
-device, records controller round trips, or needs a port the facade does
-not configure. The facade's own ports are listed in
+**When.** A host that records controller round trips, or needs a port the
+facade does not configure. The served topology and a device's reachability
+have facade routes (`Node.Topology`, `Device.SetReachable`; see the table
+above); the bridge's `Topology` stays for the whole endpoint tree with its
+cluster servers, `NotifyDeviceReachable` for a host that assembles its own
+endpoints behind `Config.Topology`. The facade's own ports are listed in
 [Host ports](ports.md); the bridge's package doc lists every port in call
 order with what a skip costs
 ([`bridge/bridge.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridge.go)).

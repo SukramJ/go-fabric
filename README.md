@@ -67,6 +67,7 @@ The site (rendered from `docs/`) is at
 | [`docs/index.md`](./docs/index.md) | Where to start, by role: embedding the device side, driving the controller, evaluating the architecture. |
 | [`docs/architecture.md`](./docs/architecture.md) | The two roles, the layers, the request path, the package map and the scope boundaries that are decisions rather than backlog. |
 | [`docs/getting-started/`](./docs/getting-started) | A minimal device host and a minimal controller, each a compiling example. |
+| [`docs/guides/host-view.md`](./docs/guides/host-view.md) | A bridge as a host writes it — two declared devices, the change's origin, the device's lifecycle — every line explained. |
 | [`docs/guides/`](./docs/guides) | Host ports, concurrency, persistence. |
 | [`docs/security.md`](./docs/security.md) | The security model of both roles. |
 | [`docs/matterjs-comparison.md`](./docs/matterjs-comparison.md) | Feature-by-feature against matter.js, with a verdict on whether each gap is worth closing here. |

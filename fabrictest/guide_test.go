@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -30,15 +29,15 @@ func TestPlugToggles(t *testing.T) {
 	pair := site.CommissionedPair(fabrictest.PairOptions{
 		Device: fabrictest.Topology{Bridged: []node.Endpoint{plug}},
 	})
-	ep, _ := pair.Device.EndpointOf("plug:1")
+	ep, _ := plug.EndpointNumber()
 	ctx := context.Background()
 
-	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoff.ClusterID, Command: onoff.CmdToggle}
+	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
 	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {
 		t.Fatal(err)
 	}
 	onOff := im.ConcreteAttributePath{
-		Endpoint: ep, Cluster: onoff.ClusterID, Attribute: onoff.AttrOnOff,
+		Endpoint: ep, Cluster: onoffdef.ClusterID, Attribute: onoffdef.AttrOnOff,
 		HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	}
 	got, err := fabrictest.Read(ctx, pair, onOff)
@@ -60,7 +59,7 @@ func TestPlugToggles(t *testing.T) {
 	reported := func() bool {
 		select {
 		case r := <-reports:
-			v, ok := r.Value(ep, onoff.ClusterID, onoff.AttrOnOff)
+			v, ok := r.Value(ep, onoffdef.ClusterID, onoffdef.AttrOnOff)
 			return ok && !v.El.Bool
 		default:
 			return false
