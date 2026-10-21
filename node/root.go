@@ -158,6 +158,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralDiagnostics.SetPersistedOperationalTime(opTime)
 
 	r.GeneralCommissioning, err = mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
+		Logger:                       d.logger,
 		LocationCapability:           cfg.Commissioning.LocationCapability,
 		SupportsConcurrentConnection: true,
 		Clock:                        cfg.Clock,
@@ -176,6 +177,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		return nil, err
 	}
 	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, mattercore.OpcredsConfig{
+		Logger:                   d.logger,
 		SupportedFabrics:         supportedFabrics,
 		DACPrivateKey:            chain.DACKey,
 		DAC:                      chain.DAC,
@@ -224,6 +226,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if err != nil {
 		return nil, fmt.Errorf("access control: %w", err)
 	}
+	r.AccessControl.SetLogger(d.logger)
 	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{Groups: d.groups})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)

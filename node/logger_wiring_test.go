@@ -61,4 +61,14 @@ func TestNodeLoggerReachesTheRootClusters(t *testing.T) {
 	if !log.contains("matter.general_diagnostics.emit_bootreason") {
 		t.Error("GeneralDiagnostics did not log through node.Config.Logger")
 	}
+	// The two security servers log every command at its entry; an invoke
+	// without a session is refused, but the entry line is written first.
+	_, _ = n.Root().GeneralCommissioning.MatterInvoke(context.Background(), 0x00, map[uint8]any{})
+	if !log.contains("matter.gencomm.cmd") {
+		t.Error("GeneralCommissioning did not log through node.Config.Logger")
+	}
+	_, _ = n.Root().OperationalCredentials.MatterInvoke(context.Background(), 0x00, map[uint8]any{})
+	if !log.contains("matter.opcreds.cmd") {
+		t.Error("OperationalCredentials did not log through node.Config.Logger")
+	}
 }

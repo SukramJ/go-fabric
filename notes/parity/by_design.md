@@ -2380,10 +2380,12 @@ overlap: a `Set` that lands while the Sink is in flight is adopted and
 then overwritten by the command's own attribute — the command wins,
 where matter.js's waiting write would win. Chosen because the host's
 echo of the very change carries the command's value, and a different
-host value in that window is a race the host created. DEM and EVSE keep
-chip's delegate model (ports called under the state lock, the host must
-not call the server from them — `cluster/energy/devicemanagement.go:123-124`,
-`evse.go:131-132`); they are the documented exception.
+host value in that window is a race the host created. DEM moved into
+this shape in phase 20 (brief BX2: an `op` queue held across its hooks,
+`mu` released, so a hook may call the setters); EVSE still keeps chip's
+delegate model (ports called under the state lock, the host must not
+call the server from them — `cluster/energy/evse.go:131-132`) and is the
+one documented exception until gate 2.
 
 ### BD-Matter-Thermostat-CompanionsAfterSink — the thermostat re-runs the reconcile after the Sink and logs companions that moved
 

@@ -9,10 +9,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
@@ -37,6 +39,8 @@ import (
 // keeps Apple happy through the post-CASE handshake.
 type AccessControl struct {
 	store ACLStoreFacade
+	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
+	log atomic.Pointer[slog.Logger]
 
 	mu            sync.RWMutex
 	currentFabric uint8
@@ -1226,4 +1230,17 @@ func extensionsEqual(a, b []AccessControlExtensionEntry) bool {
 		}
 	}
 	return true
+}
+
+// SetLogger routes the server's diagnostics to l; nil restores
+// slog.Default(). Safe at any time (ADR 0026 P9).
+func (a *AccessControl) SetLogger(l *slog.Logger) { a.log.Store(l) }
+
+// logger is the server's logger; a value without SetLogger logs through
+// slog.Default().
+func (a *AccessControl) logger() *slog.Logger {
+	if l := a.log.Load(); l != nil {
+		return l
+	}
+	return slog.Default()
 }
