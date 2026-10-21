@@ -75,10 +75,7 @@ func NewSmokeCoAlarm(opts Options, decls ...Declaration) (*SmokeCoAlarm, error) 
 // the device's goroutine.
 // The device type mandates the cluster.
 func (d *SmokeCoAlarm) SmokeCoAlarm() *smokecoalarmdef.Server {
-	if w, ok := d.typed(0x005C); ok {
-		return &smokecoalarmdef.Server{Wrapper: w}
-	}
-	return nil
+	return smokecoalarmdef.WrapOn(d.Server(0x005C), d.queue)
 }
 
 // RelativeHumidityMeasurement returns the typed RelativeHumidityMeasurement server over the one the device mounts,
@@ -86,10 +83,7 @@ func (d *SmokeCoAlarm) SmokeCoAlarm() *smokecoalarmdef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SmokeCoAlarm) RelativeHumidityMeasurement() *relativehumiditymeasurementdef.Server {
-	if w, ok := d.typed(0x0405); ok {
-		return &relativehumiditymeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return relativehumiditymeasurementdef.WrapOn(d.Server(0x0405), d.queue)
 }
 
 // TemperatureMeasurement returns the typed TemperatureMeasurement server over the one the device mounts,
@@ -97,10 +91,7 @@ func (d *SmokeCoAlarm) RelativeHumidityMeasurement() *relativehumiditymeasuremen
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SmokeCoAlarm) TemperatureMeasurement() *temperaturemeasurementdef.Server {
-	if w, ok := d.typed(0x0402); ok {
-		return &temperaturemeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return temperaturemeasurementdef.WrapOn(d.Server(0x0402), d.queue)
 }
 
 // CarbonMonoxideConcentrationMeasurement returns the typed CarbonMonoxideConcentrationMeasurement server over the one the device mounts,
@@ -108,8 +99,5 @@ func (d *SmokeCoAlarm) TemperatureMeasurement() *temperaturemeasurementdef.Serve
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *SmokeCoAlarm) CarbonMonoxideConcentrationMeasurement() *carbonmonoxideconcentrationmeasurementdef.Server {
-	if w, ok := d.typed(0x040C); ok {
-		return &carbonmonoxideconcentrationmeasurementdef.Server{Wrapper: w}
-	}
-	return nil
+	return carbonmonoxideconcentrationmeasurementdef.WrapOn(d.Server(0x040C), d.queue)
 }

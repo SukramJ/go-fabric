@@ -70,10 +70,7 @@ func NewBridgedNode(opts Options, decls ...Declaration) (*BridgedNode, error) {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) PowerSourceConfiguration() *powersourceconfigurationdef.Server {
-	if w, ok := d.typed(0x002E); ok {
-		return &powersourceconfigurationdef.Server{Wrapper: w}
-	}
-	return nil
+	return powersourceconfigurationdef.WrapOn(d.Server(0x002E), d.queue)
 }
 
 // PowerSource returns the typed PowerSource server over the one the device mounts,
@@ -81,10 +78,7 @@ func (d *BridgedNode) PowerSourceConfiguration() *powersourceconfigurationdef.Se
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) PowerSource() *powersourcedef.Server {
-	if w, ok := d.typed(0x002F); ok {
-		return &powersourcedef.Server{Wrapper: w}
-	}
-	return nil
+	return powersourcedef.WrapOn(d.Server(0x002F), d.queue)
 }
 
 // AdministratorCommissioning returns the typed AdministratorCommissioning server over the one the device mounts,
@@ -92,10 +86,7 @@ func (d *BridgedNode) PowerSource() *powersourcedef.Server {
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) AdministratorCommissioning() *administratorcommissioningdef.Server {
-	if w, ok := d.typed(0x003C); ok {
-		return &administratorcommissioningdef.Server{Wrapper: w}
-	}
-	return nil
+	return administratorcommissioningdef.WrapOn(d.Server(0x003C), d.queue)
 }
 
 // EcosystemInformation returns the typed EcosystemInformation server over the one the device mounts,
@@ -103,8 +94,5 @@ func (d *BridgedNode) AdministratorCommissioning() *administratorcommissioningde
 // the device's goroutine.
 // It is nil until a declaration mounts the optional cluster.
 func (d *BridgedNode) EcosystemInformation() *ecosysteminformationdef.Server {
-	if w, ok := d.typed(0x0750); ok {
-		return &ecosysteminformationdef.Server{Wrapper: w}
-	}
-	return nil
+	return ecosysteminformationdef.WrapOn(d.Server(0x0750), d.queue)
 }
