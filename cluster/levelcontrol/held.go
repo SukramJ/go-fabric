@@ -196,7 +196,7 @@ func (s *Server) followOnOff(n contract.AttributeChangeNotifier) {
 	s.mu.Lock()
 	s.wasOn = s.onOff.OnOff()
 	s.mu.Unlock()
-	n.OnMatterAttributesChanged(func([]uint32) {
+	n.OnAttributeChange(func(contract.Change) {
 		on := s.onOff.OnOff()
 		s.mu.Lock()
 		turnedOn := on && !s.wasOn

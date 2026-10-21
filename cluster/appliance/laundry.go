@@ -205,9 +205,9 @@ func (w washerRules) MatterWriteAttribute(_ context.Context, attrID uint32, valu
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *WasherServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *WasherServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *WasherServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute.
@@ -330,9 +330,9 @@ func (d dryerRules) MatterWriteAttribute(_ context.Context, _ uint32, value any)
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *DryerServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *DryerServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *DryerServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute.

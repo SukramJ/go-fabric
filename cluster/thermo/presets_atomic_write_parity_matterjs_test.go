@@ -10,7 +10,7 @@
 // the port commissions a fabrictest pair and invokes and writes over the
 // wire. The controller's cache of Presets is the pair's subscription to
 // it (the reports it received); the device's announcements
-// (recordThermostatChanges) are the server's OnMatterAttributesChanged;
+// (recordThermostatChanges) are the server's OnAttributeChange;
 // `deviceEp.state.thermostat.persistedPresets` is the server's Presets().
 // A write matter.js rejects ("Not found", "Constraint error", "Multiple
 // writes failed") is a WriteStatuses entry with that status.

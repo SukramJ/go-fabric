@@ -167,10 +167,9 @@ func stateOf[S any](srv contract.ClusterServer, attrID uint32, value any, with b
 // OnChangedOf calls fn with the State S of srv and the change after every
 // change srv reports, on the goroutine that made it and before the
 // operation that made it returns: through its
-// [contract.AttributeChangeNotifier], the origin read with
-// [contract.OriginOf], or through its [contract.ChangeNotifier] with
-// every attribute it reports and [contract.OriginUnknown] — the switch of
-// device.Device.OnChanged. It returns the unsubscribe function; a server
+// [contract.AttributeChangeNotifier] as it reports it, or through its
+// [contract.ChangeNotifier] with every attribute it reports and
+// [contract.OriginUnknown] — the switch of device.Device.OnChanged. It returns the unsubscribe function; a server
 // that notifies nothing never calls fn.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, change contract.Change)) (unsubscribe func()) {
@@ -181,16 +180,14 @@ func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, change cont
 }
 
 // ChangesOf calls fn with every change srv reports, inline: through its
-// [contract.AttributeChangeNotifier] with the origin [contract.OriginOf]
-// reads, or through its [contract.ChangeNotifier] with every attribute it
-// reports and [contract.OriginUnknown]. It returns the unsubscribe
+// [contract.AttributeChangeNotifier] as it reports it, or through its
+// [contract.ChangeNotifier] with every attribute it reports and
+// [contract.OriginUnknown]. It returns the unsubscribe
 // function; a server that notifies nothing never calls fn.
 func ChangesOf(srv contract.ClusterServer, fn func(contract.Change)) (unsubscribe func()) {
 	switch n := srv.(type) {
 	case contract.AttributeChangeNotifier:
-		return n.OnMatterAttributesChanged(func(ids []uint32) {
-			fn(contract.Change{Attributes: ids, Origin: contract.OriginOf(ids)})
-		})
+		return n.OnAttributeChange(fn)
 	case contract.ChangeNotifier:
 		return n.OnMatterValueChanged(func() {
 			fn(contract.Change{Attributes: srv.MatterReportable(), Origin: contract.OriginUnknown})

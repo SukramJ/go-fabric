@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -110,7 +111,7 @@ func thermostatEndpoint(srv *thermo.ThermostatServer) node.Endpoint {
 
 // changeRecorder is preset-helpers.ts:79-87 recordThermostatChanges: the
 // attribute ids the server announces as changed — its
-// OnMatterAttributesChanged, the input a subscription has for the
+// OnAttributeChange, the input a subscription has for the
 // thermostat's own changes.
 type changeRecorder struct {
 	mu            sync.Mutex
@@ -119,7 +120,8 @@ type changeRecorder struct {
 
 func recordThermostatChanges(srv *thermo.ThermostatServer) *changeRecorder {
 	r := &changeRecorder{}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		r.announcements = append(r.announcements, slices.Clone(ids))

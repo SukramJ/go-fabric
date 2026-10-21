@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -98,7 +99,8 @@ func newServer(t *testing.T, cfg servicearea.Config) *servicearea.Server {
 func notifications(srv *servicearea.Server) *[]uint32 {
 	var mu sync.Mutex
 	seen := &[]uint32{}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		mu.Lock()
 		*seen = append(*seen, ids...)
 		mu.Unlock()

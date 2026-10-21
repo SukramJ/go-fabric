@@ -357,9 +357,9 @@ func (s *CommodityPriceServer) SetMatterEventEmitter(emitter contract.EventEmitt
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *CommodityPriceServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *CommodityPriceServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *CommodityPriceServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute; a list as its generated list

@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/filter"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // TestNotifyReachesListeners holds the Notify the server exported when it
@@ -21,7 +22,7 @@ func TestNotifyReachesListeners(t *testing.T) {
 		t.Fatal(err)
 	}
 	var seen []uint32
-	unsubscribe := srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids...) })
+	unsubscribe := srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids...) })
 	srv.Notify(hepa.AttrChangeIndication)
 	unsubscribe()
 	srv.Notify(hepa.AttrChangeIndication)

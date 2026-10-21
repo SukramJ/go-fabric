@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -29,7 +30,7 @@ func TestDEMRefusals(t *testing.T) {
 		t.Error("data version not started")
 	}
 	changed := 0
-	unsub := srv.OnMatterAttributesChanged(func([]uint32) { changed++ })
+	unsub := srv.OnAttributeChange(func(contract.Change) { changed++ })
 	defer unsub()
 	demWantStatus(t, "write", srv.MatterWrite(context.Background(), dem.AttrEsaState, uint64(1)), im.StatusUnsupportedWrite)
 	now := demEpoch(time.Now())
@@ -166,7 +167,7 @@ func TestEvseTransitions(t *testing.T) {
 		if srv.MatterDataVersion() == 0 {
 			t.Error("data version not started")
 		}
-		unsub := srv.OnMatterAttributesChanged(func([]uint32) {})
+		unsub := srv.OnAttributeChange(func(contract.Change) {})
 		defer unsub()
 		if srv.IsPluggedIn() || srv.BatteryCapacity() != nil || srv.StateOfCharge() != nil {
 			t.Error("initial readings")

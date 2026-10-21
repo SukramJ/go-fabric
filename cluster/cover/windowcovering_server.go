@@ -286,9 +286,9 @@ func (s *WindowCoveringServer) setAxisStatusLocked(a *axis, st uint8) {
 	s.operationalStatus = globalStatus(lift, tilt)
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *WindowCoveringServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.changes.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.changes.OnAttributeChange(cb)
 }
 
 // New constructs a [WindowCoveringServer] from cfg. A cfg.FeatureMap other

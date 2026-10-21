@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/light"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -60,7 +61,8 @@ type report struct {
 
 func watch(srv *light.ColorControlServer, attrs ...uint32) *reportLog {
 	r := &reportLog{start: time.Now()}
-	srv.OnMatterAttributesChanged(func(ids []uint32) {
+	srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		for _, id := range ids {
 			if !slices.Contains(attrs, id) {
 				continue

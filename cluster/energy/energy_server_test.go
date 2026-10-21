@@ -109,7 +109,7 @@ func TestBoostLifecycle(t *testing.T) {
 	srv.SetMatterEventEmitter(em)
 	srv.SetEndpoint(7)
 	var changed [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })
 	ctx := context.Background()
 
 	yes := true

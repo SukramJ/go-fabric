@@ -327,7 +327,8 @@ func (b *demoBlind) servers() []contract.ClusterServer {
 		})
 		if b.persist != nil {
 			srv := b.srv
-			srv.OnMatterAttributesChanged(func(ids []uint32) {
+			srv.OnAttributeChange(func(change contract.Change) {
+				ids := change.Attributes
 				if !slices.Contains(ids, wire.WindowCoveringAttrCurrentPositionLiftPercent100ths) {
 					return
 				}

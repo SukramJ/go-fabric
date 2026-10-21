@@ -78,9 +78,9 @@ type changes struct {
 	seen [][]uint32
 }
 
-func (c *changes) record(ids []uint32) {
+func (c *changes) record(change contract.Change) {
 	c.mu.Lock()
-	c.seen = append(c.seen, ids)
+	c.seen = append(c.seen, change.Attributes)
 	c.mu.Unlock()
 }
 
@@ -425,7 +425,7 @@ func TestStateAndErrorReactors(t *testing.T) {
 	srv.SetMatterEventEmitter(rec)
 	srv.SetEndpoint(7)
 	ch := &changes{}
-	srv.OnMatterAttributesChanged(ch.record)
+	srv.OnAttributeChange(ch.record)
 
 	if err := srv.SetOperationalState(opstate.StateDocked); !errors.Is(err, opstate.ErrStateNotListed) {
 		t.Errorf("unlisted state: %v", err)
@@ -495,7 +495,7 @@ func TestPhases(t *testing.T) {
 		c.Phases, c.CurrentPhase = []string{"pre-soak", "rinse"}, ptr(uint8(1))
 	})
 	ch := &changes{}
-	srv.OnMatterAttributesChanged(ch.record)
+	srv.OnAttributeChange(ch.record)
 	if v, _ := srv.MatterRead(opstate.AttrPhaseList); !slices.Equal(v.([]string), []string{"pre-soak", "rinse"}) {
 		t.Errorf("PhaseList = %v", v)
 	}

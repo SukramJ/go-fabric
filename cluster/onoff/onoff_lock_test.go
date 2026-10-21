@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // funcSink is a Sink that runs fn.
@@ -63,7 +64,7 @@ func TestSinkSynchronousEcho(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var changed []uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids...) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids...) })
 	within(t, "On", func() {
 		if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOn, nil); err != nil {
 			t.Errorf("On: %v", err)

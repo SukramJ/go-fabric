@@ -317,7 +317,7 @@ func TestReadOnly(t *testing.T) {
 		t.Errorf("write Mask: %v", err)
 	}
 	var seen []uint32
-	stop := srv.OnMatterAttributesChanged(func(ids []uint32) { seen = append(seen, ids...) })
+	stop := srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; seen = append(seen, ids...) })
 	defer stop()
 	before := srv.MatterDataVersion()
 	if err := srv.SetMask(inflow); err != nil {

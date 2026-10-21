@@ -630,7 +630,7 @@ func (colorControlInvalidCommandErr) MatterStatusCode() im.StatusCode { return i
 
 // MatterReportable implements [contract.ClusterServer]. It is empty: the
 // server reports every attribute it changes itself
-// ([ColorControlServer.OnMatterAttributesChanged]), the "Q" ones by their
+// ([ColorControlServer.OnAttributeChange]), the "Q" ones by their
 // quieter rules, so a change notification of the endpoint's source must
 // not report them as well.
 func (s *ColorControlServer) MatterReportable() []uint32 { return []uint32{} }

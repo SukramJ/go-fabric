@@ -196,7 +196,7 @@ func TestClosureControlNotifiesChangedAttributes(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := newEmittingServer(t, 0)
 	var got [][]uint32
-	unsub := srv.OnMatterAttributesChanged(func(ids []uint32) { got = append(got, slices.Clone(ids)) })
+	unsub := srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; got = append(got, slices.Clone(ids)) })
 	defer unsub()
 	open := clusterwire.ClosureTargetPositionMoveToFullyOpen
 	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, closuredef.MoveToRequest{Position: (*closuredef.TargetPositionEnum)(&open)}); err != nil {

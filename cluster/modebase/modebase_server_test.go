@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	"github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
+	"github.com/SukramJ/go-fabric/contract"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
@@ -209,7 +210,7 @@ func TestChangeToModeFollowsModeUtils(t *testing.T) {
 	c := &changer{}
 	srv := newRun(t, c)
 	var notes [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { notes = append(notes, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; notes = append(notes, ids) })
 
 	// The current mode: Success, the device is not asked.
 	if r := change(t, srv, 0); r != (clusterwire.ChangeToModeResponse{Status: 0}) || len(c.asked) != 0 {
@@ -278,7 +279,7 @@ func TestSetCurrentModeAndWrites(t *testing.T) {
 	t.Parallel()
 	srv := newRun(t, &changer{})
 	var notes int
-	srv.OnMatterAttributesChanged(func([]uint32) { notes++ })
+	srv.OnAttributeChange(func(contract.Change) { notes++ })
 	if err := srv.SetCurrentMode(7); !errors.Is(err, modebase.ErrUnsupportedMode) {
 		t.Errorf("unsupported mode: %v", err)
 	}

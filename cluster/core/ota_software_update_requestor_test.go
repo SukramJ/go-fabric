@@ -1185,7 +1185,8 @@ func TestOTARequestor_BusyReportsDelayedOnQuery(t *testing.T) {
 		reported []uint8
 		versions []uint32
 	)
-	unsub := h.r.OnMatterAttributesChanged(func(attrs []uint32) {
+	unsub := h.r.OnAttributeChange(func(change contract.Change) {
+		attrs := change.Attributes
 		if !slices.Contains(attrs, otadef.AttrUpdateState) {
 			return
 		}

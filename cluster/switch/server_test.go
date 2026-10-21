@@ -133,7 +133,7 @@ func TestGesturesEmitAndMoveTheCurrentPosition(t *testing.T) {
 		t.Fatal(err)
 	}
 	var changed [][]uint32
-	s.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids) })
+	s.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })
 	e := &emitted{}
 	s.SetMatterEventEmitter(e)
 

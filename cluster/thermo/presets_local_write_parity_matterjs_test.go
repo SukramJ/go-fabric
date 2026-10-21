@@ -12,7 +12,7 @@
 // server, for the Presets attribute and for persistedPresets alike — and
 // reads the stored presets with Presets() (`persistedPresets`) or the
 // attribute with MatterRead. recordThermostatChanges is the server's
-// OnMatterAttributesChanged. The restart case adds the thermostat to the
+// OnAttributeChange. The restart case adds the thermostat to the
 // running node (Aggregator.Add inside Device.Act), so its PresetStore is
 // the node's own store, restarts the device and adds a new server on the
 // restarted node's store.

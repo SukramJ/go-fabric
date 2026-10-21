@@ -1348,7 +1348,8 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				continue
 			}
 			clusterID := srv.MatterClusterID()
-			unsub := notifier.OnMatterAttributesChanged(func(attrIDs []uint32) {
+			unsub := notifier.OnAttributeChange(func(change contract.Change) {
+				attrIDs := change.Attributes
 				if len(attrIDs) == 0 {
 					return
 				}

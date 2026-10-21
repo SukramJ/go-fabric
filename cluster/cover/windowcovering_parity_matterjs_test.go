@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
 )
@@ -544,7 +545,7 @@ func TestWindowCoveringMaintenanceMode(t *testing.T) {
 	ctx := context.Background()
 	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
 	var notes [][]uint32
-	srv.OnMatterAttributesChanged(func(ids []uint32) { notes = append(notes, ids) })
+	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; notes = append(notes, ids) })
 	status := func() uint8 {
 		v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrConfigStatus)
 		return v.(uint8)

@@ -20,7 +20,7 @@ import (
 // names the attributes that moved.
 type statefulServer struct {
 	mu  sync.Mutex
-	cbs []func([]uint32)
+	cbs []func(contract.Change)
 }
 
 func (*statefulServer) MatterClusterID() uint32 { return 0xFFF1_FC01 }
@@ -30,7 +30,7 @@ func (*statefulServer) MatterWrite(context.Context, uint32, any) error         {
 func (*statefulServer) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
 func (*statefulServer) MatterReportable() []uint32                             { return []uint32{0, 1, 2} }
 
-func (s *statefulServer) OnMatterAttributesChanged(cb func([]uint32)) func() {
+func (s *statefulServer) OnAttributeChange(cb func(contract.Change)) func() {
 	s.mu.Lock()
 	s.cbs = append(s.cbs, cb)
 	s.mu.Unlock()
@@ -42,7 +42,7 @@ func (s *statefulServer) fire(attrs ...uint32) {
 	cbs := slices.Clone(s.cbs)
 	s.mu.Unlock()
 	for _, cb := range cbs {
-		cb(attrs)
+		cb(contract.Change{Attributes: attrs})
 	}
 }
 

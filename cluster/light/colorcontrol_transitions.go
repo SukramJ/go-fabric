@@ -238,13 +238,13 @@ func (s *ColorControlServer) report(origin contract.Origin, prev, next colorStat
 	}
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
+// OnAttributeChange implements [contract.AttributeChangeNotifier]:
 // the "Q" attributes by their quieter rules — at most once a second while
 // a transition runs, the end flushing the last value — RemainingTime when
 // matter.js's #updateRemainingTime would report it, and the colour mode
 // and colour loop attributes when they change.
-func (s *ColorControlServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.changes.OnMatterAttributesChanged(cb)
+func (s *ColorControlServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.changes.OnAttributeChange(cb)
 }
 
 // MatterSelfReportedAttributes implements

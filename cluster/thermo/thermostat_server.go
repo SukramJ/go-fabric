@@ -981,10 +981,10 @@ func companionsMoved(attrID uint32, st, next setpointState, saw, recomputed []Se
 	return out
 }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
+// OnAttributeChange implements [contract.AttributeChangeNotifier]:
 // the setpoints a write's reconcile moved besides the written attribute.
-func (s *ThermostatServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.changes.OnMatterAttributesChanged(cb)
+func (s *ThermostatServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.changes.OnAttributeChange(cb)
 }
 
 // MatterInvoke handles SetpointRaiseLower and, with PRES,

@@ -3,10 +3,7 @@
 
 package contract
 
-import (
-	"context"
-	"sync"
-)
+import "context"
 
 // Origin names where a change of a cluster server's state came from: the
 // host's own Set, a controller's write, or a command (with the work the
@@ -21,9 +18,9 @@ type Origin uint8
 
 // The origins of a change.
 const (
-	// OriginUnknown: the server did not say — a host's own server that
-	// reports through [AttributeChangeNotifier] without
-	// [DeliverChange], or one that reports through [ChangeNotifier].
+	// OriginUnknown: the server did not say — a server that cannot tell
+	// where a change came from, or one that reports through
+	// [ChangeNotifier].
 	OriginUnknown Origin = iota
 	// OriginHostSet: the host set the state (the server's SetAttributes,
 	// a typed server's Set), a command handler of the host's included.
@@ -81,39 +78,4 @@ func OriginFrom(ctx context.Context) Origin {
 		return o
 	}
 	return OriginHostSet
-}
-
-// delivering maps the first element of an attribute-id slice being
-// delivered to a listener to the origin of its change.
-var delivering sync.Map // *uint32 → Origin
-
-// DeliverChange calls listener with attrIDs, the change's origin readable
-// by [OriginOf] from inside the call. attrIDs must be the listener's own
-// slice — a fresh one per listener, as an [AttributeChangeNotifier]
-// hands each of its listeners — so the origin travels with this delivery
-// and no other. This is how the origin is carried without a second
-// notifier interface: [AttributeChangeNotifier] stays as it is, and a
-// listener that wants the origin asks for it with the slice it was
-// handed.
-func DeliverChange(origin Origin, attrIDs []uint32, listener func(attrIDs []uint32)) {
-	if len(attrIDs) == 0 {
-		listener(attrIDs)
-		return
-	}
-	key := &attrIDs[0]
-	delivering.Store(key, origin)
-	defer delivering.Delete(key)
-	listener(attrIDs)
-}
-
-// OriginOf returns the origin of the change attrIDs reports, called from
-// inside the listener [DeliverChange] handed attrIDs to; [OriginUnknown]
-// for a slice delivered otherwise, or after the listener returned.
-func OriginOf(attrIDs []uint32) Origin {
-	if len(attrIDs) == 0 {
-		return OriginUnknown
-	}
-	v, _ := delivering.Load(&attrIDs[0])
-	o, _ := v.(Origin) // only DeliverChange stores, always an Origin; absent is OriginUnknown
-	return o
 }

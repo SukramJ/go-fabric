@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -437,7 +438,7 @@ func TestHostSet(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, onoff.FeatureLT, map[uint32]any{onoff.AttrOffWaitTime: uint16(30)})
 	var changed []uint32
-	f.srv.OnMatterAttributesChanged(func(ids []uint32) { changed = append(changed, ids...) })
+	f.srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; changed = append(changed, ids...) })
 	f.srv.Set(true)
 	if !f.srv.OnOff() || len(f.sink.calls) != 0 {
 		t.Errorf("OnOff %t, sink %v", f.srv.OnOff(), f.sink.calls)

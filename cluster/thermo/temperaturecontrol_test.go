@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/paritytest"
 )
@@ -155,7 +156,7 @@ func TestTemperatureControlSetTemperature(t *testing.T) {
 	s := &setter{}
 	num := newTC(t, numberConfig(s))
 	var notes [][]uint32
-	num.OnMatterAttributesChanged(func(ids []uint32) { notes = append(notes, ids) })
+	num.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; notes = append(notes, ids) })
 	for _, c := range []struct {
 		name string
 		req  any

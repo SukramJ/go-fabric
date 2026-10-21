@@ -14,6 +14,7 @@ import (
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -257,7 +258,8 @@ func TestInboundSettersDoNotCallTheSink(t *testing.T) {
 	srv := newSinkHeatCool(sink)
 	var mu sync.Mutex
 	var reported []uint32
-	unsub := srv.OnMatterAttributesChanged(func(ids []uint32) {
+	unsub := srv.OnAttributeChange(func(change contract.Change) {
+		ids := change.Attributes
 		mu.Lock()
 		reported = append(reported, ids...)
 		mu.Unlock()

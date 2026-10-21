@@ -671,9 +671,15 @@ type ChangeNotifier interface {
 // the properties that changed, and ServerBehaviorBacking, which reports a
 // quieter property only when its QuietEvent emits.
 //
+// Each change carries the attributes that moved and where the change came
+// from ([Change], [Origin]) — the session matter.js hands every `$Changed`
+// observer (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476);
+// a server that cannot tell reports [OriginUnknown]. The ids are the
+// listener's own.
+//
 // Returns an unsubscribe closure; calling it more than once is a no-op.
 type AttributeChangeNotifier interface {
-	OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func())
+	OnAttributeChange(cb func(change Change)) (unsubscribe func())
 }
 
 // SelfReportedAttributeLister is the optional capability of an

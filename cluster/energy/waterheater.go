@@ -361,9 +361,9 @@ func (s *WaterHeaterManagementServer) SetMatterEventEmitter(emitter contract.Eve
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *WaterHeaterManagementServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
 
-// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *WaterHeaterManagementServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
-	return s.srv.OnMatterAttributesChanged(cb)
+// OnAttributeChange implements [contract.AttributeChangeNotifier].
+func (s *WaterHeaterManagementServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeChange(cb)
 }
 
 // MatterRead resolves an attribute.
