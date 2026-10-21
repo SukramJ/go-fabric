@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6154,
+  "entry_points": 6153,
   "entry_packages": [
     ".",
     "bdx",
@@ -228,8 +228,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14433,
-    "reachable": 9995,
+    "total_exported": 14431,
+    "reachable": 9993,
     "whitelisted": 4433,
     "unreachable": 5
   },
@@ -7315,21 +7315,21 @@
       "identifier": "TestEcosystemInformationAppliesChipBuilderRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ecosystem_information_test.go",
-      "line": 133
+      "line": 134
     },
     {
       "package": "cluster/core",
       "identifier": "TestEcosystemInformationDirectoryChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ecosystem_information_test.go",
-      "line": 190
+      "line": 191
     },
     {
       "package": "cluster/core",
       "identifier": "TestEcosystemInformationFiltersByFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ecosystem_information_test.go",
-      "line": 77
+      "line": 78
     },
     {
       "package": "cluster/core",
@@ -7469,7 +7469,7 @@
       "identifier": "TestOTARequestor_AnnouncementDuringQuery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1256
+      "line": 1257
     },
     {
       "package": "cluster/core",
@@ -7651,7 +7651,7 @@
       "identifier": "TestOtaRequestorBdxBlockSizeByChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
-      "line": 1232
+      "line": 1233
     },
     {
       "package": "cluster/core",
@@ -8575,7 +8575,7 @@
       "identifier": "TestCountdownTimeIsReportedAsAQuieterAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/countdown_internal_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "cluster/pump",
@@ -8757,14 +8757,14 @@
       "identifier": "HandleOn",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 252
+      "line": 249
     },
     {
       "package": "cluster/spec",
       "identifier": "HandlerOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 275
+      "line": 272
     },
     {
       "package": "cluster/spec",
@@ -8799,21 +8799,21 @@
       "identifier": "OnChangedAsyncOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 213
+      "line": 210
     },
     {
       "package": "cluster/spec",
       "identifier": "OnChangedOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 176
+      "line": 175
     },
     {
       "package": "cluster/spec",
       "identifier": "OnWriteOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 231
+      "line": 228
     },
     {
       "package": "cluster/spec",
