@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 )
 
@@ -23,24 +24,24 @@ func TestMRPParameters_RetransmitTimeoutsAreUint32OnTheWire(t *testing.T) {
 		InitiatorRandom:    bytes.Repeat([]byte{0x11}, spake2.PBKDFRandomSize),
 		ResponderRandom:    bytes.Repeat([]byte{0x22}, spake2.PBKDFRandomSize),
 		ResponderSessionID: 9,
-		ResponderMRPParams: &spake2.MRPParameters{
-			IdleRetransTimeoutMs:   &idle,
-			ActiveRetransTimeoutMs: &active,
-			ActiveThresholdTimeMs:  &thresh,
+		ResponderSessionParams: &sessionparams.Parameters{
+			SessionIdleInterval:    idle,
+			SessionActiveInterval:  active,
+			SessionActiveThreshold: thresh,
 		},
 	}
 	got, err := spake2.DecodePBKDFParamResponse(resp.Marshal())
 	if err != nil {
 		t.Fatalf("DecodePBKDFParamResponse: %v", err)
 	}
-	pm := got.ResponderMRPParams
-	if pm == nil || pm.IdleRetransTimeoutMs == nil || pm.ActiveRetransTimeoutMs == nil {
-		t.Fatalf("MRP params did not round-trip: %+v", pm)
+	pm := got.ResponderSessionParams
+	if pm == nil {
+		t.Fatalf("session params did not round-trip: %+v", pm)
 	}
-	if *pm.IdleRetransTimeoutMs != idle {
-		t.Errorf("idle = %d, want %d", *pm.IdleRetransTimeoutMs, idle)
+	if pm.SessionIdleInterval != idle {
+		t.Errorf("idle = %d, want %d", pm.SessionIdleInterval, idle)
 	}
-	if *pm.ActiveRetransTimeoutMs != active {
-		t.Errorf("active = %d, want %d", *pm.ActiveRetransTimeoutMs, active)
+	if pm.SessionActiveInterval != active {
+		t.Errorf("active = %d, want %d", pm.SessionActiveInterval, active)
 	}
 }
