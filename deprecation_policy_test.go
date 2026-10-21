@@ -170,24 +170,10 @@ func groupMembers(body string) []string {
 // TestDeprecatedConstGroupIsChecked holds the announcement check to a
 // deprecation written on a `const (` group: the marker documents the group,
 // so each of its names must reach CHANGELOG.md. The first such groups in
-// the module are ModeSelect's field tags (report L, question 5); before
-// this test the check read no identifier out of them.
+// the module were ModeSelect's field tags (report L, question 5), removed
+// by brief BZ; the synthetic source keeps the reader under test.
 func TestDeprecatedConstGroupIsChecked(t *testing.T) {
 	t.Parallel()
-
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), "cluster", "modeselect", "modeselect_server.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := deprecatedIdentifiers(string(src))
-	for _, want := range []string{
-		"ModeOptionFieldLabel", "ModeOptionFieldMode", "ModeOptionFieldSemanticTags",
-		"SemanticTagFieldMfgCode", "SemanticTagFieldValue",
-	} {
-		if !slices.Contains(got, want) {
-			t.Errorf("deprecatedIdentifiers misses %s in cluster/modeselect/modeselect_server.go (found %v)", want, got)
-		}
-	}
 
 	synthetic := "// Deprecated: gone.\nconst (\n\t// A is one.\n\tA uint8 = 0\n\n\tB, C = 1, 2\n\td = 3\n)\n\nconst E = 4\n" +
 		"const (\n\tF = 5\n\t// Deprecated: also gone.\n\tG = 6\n)\n// Deprecated: one.\nfunc H() {}\n" +

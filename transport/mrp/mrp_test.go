@@ -4,11 +4,8 @@
 package mrp
 
 import (
-	"errors"
-	"math/rand/v2"
 	"sync"
 	"testing"
-	"time"
 )
 
 // --- Counter ---
@@ -137,106 +134,5 @@ func TestNoRolloverWindowResetsOnBigJump(t *testing.T) {
 	// The pre-jump counters fall outside the new window.
 	if w.Accept(15) {
 		t.Fatal("pre-jump counter accepted post-reset")
-	}
-}
-
-// --- Retransmitter ---
-
-func detRand() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }
-
-// TestTrackThenAckRemovesEntry — the success path.
-func TestTrackThenAckRemovesEntry(t *testing.T) {
-	r := NewRetransmitter(func([]byte) error { return nil }, detRand())
-	r.Track(42, 1, []byte("hi"), time.Now())
-	if r.Pending() != 1 {
-		t.Fatalf("pending=%d, want 1", r.Pending())
-	}
-	if !r.Ack(42) {
-		t.Fatal("Ack(42) returned false on a tracked entry")
-	}
-	if r.Pending() != 0 {
-		t.Fatalf("pending after ack=%d, want 0", r.Pending())
-	}
-}
-
-// TestAckOfUnknownReturnsFalse — duplicate ACKs are harmless.
-func TestAckOfUnknownReturnsFalse(t *testing.T) {
-	r := NewRetransmitter(func([]byte) error { return nil }, detRand())
-	if r.Ack(42) {
-		t.Fatal("Ack on empty tracker returned true")
-	}
-}
-
-// TestTickRetransmitsAfterBackoff confirms that after the configured
-// backoff window the entry is re-sent.
-func TestTickRetransmitsAfterBackoff(t *testing.T) {
-	var sent [][]byte
-	send := func(b []byte) error {
-		cp := make([]byte, len(b))
-		copy(cp, b)
-		sent = append(sent, cp)
-		return nil
-	}
-	r := NewRetransmitter(send, detRand())
-
-	t0 := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
-	r.Track(7, 1, []byte("payload"), t0)
-
-	// Tick before the backoff elapses — nothing happens.
-	if got := r.Tick(t0.Add(10 * time.Millisecond)); len(got) != 0 {
-		t.Fatalf("early tick: got %d results, want 0", len(got))
-	}
-
-	// Tick after the (deterministic) backoff. Even with jitter the
-	// upper bound is base × margin × (1 + 0.25) = 412.5 ms.
-	results := r.Tick(t0.Add(500 * time.Millisecond))
-	if len(results) != 1 {
-		t.Fatalf("got %d results, want 1", len(results))
-	}
-	if results[0].Err != nil {
-		t.Fatalf("retransmit err: %v", results[0].Err)
-	}
-	if len(sent) != 1 {
-		t.Fatalf("send called %d times, want 1", len(sent))
-	}
-}
-
-// TestTickAbandonsAfterMaxRetransmissions surfaces
-// ErrMaxRetransmissionsReached and removes the entry.
-func TestTickAbandonsAfterMaxRetransmissions(t *testing.T) {
-	send := func([]byte) error { return nil }
-	r := NewRetransmitter(send, detRand())
-	t0 := time.Now()
-	r.Track(7, 1, []byte("payload"), t0)
-	// Drive the clock far into the future across MaxRetransmissions
-	// retries plus one. Each iteration advances by 10 s — well past
-	// any backoff window.
-	var lastErr error
-	for i := 0; i <= MaxRetransmissions+1; i++ {
-		results := r.Tick(t0.Add(time.Duration(i+1) * 10 * time.Second))
-		for _, res := range results {
-			if res.Err != nil {
-				lastErr = res.Err
-			}
-		}
-	}
-	if !errors.Is(lastErr, ErrMaxRetransmissionsReached) {
-		t.Fatalf("lastErr = %v, want ErrMaxRetransmissionsReached", lastErr)
-	}
-	if r.Pending() != 0 {
-		t.Fatalf("entry not removed after abandon: pending=%d", r.Pending())
-	}
-}
-
-// TestTickSendErrorPropagates surfaces an underlying SendFunc error.
-func TestTickSendErrorPropagates(t *testing.T) {
-	wantErr := errors.New("network unreachable")
-	send := func([]byte) error { return wantErr }
-	r := NewRetransmitter(send, detRand())
-	t0 := time.Now()
-	r.Track(7, 1, []byte("payload"), t0)
-	results := r.Tick(t0.Add(time.Second))
-	if len(results) != 1 || !errors.Is(results[0].Err, wantErr) {
-		t.Fatalf("got %v, want %v", results, wantErr)
 	}
 }

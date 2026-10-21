@@ -79,23 +79,6 @@ var instance, _ = spec.New(msdef.Definition, spec.Options{Features: featureMap})
 // sees before anyone reads the host's code.
 const DescriptionMaxBytes = 64
 
-// ModeOptionStruct field tags.
-//
-// Mirrors matter.js mode-select-cluster.element.ts:61-69: Label 0x0
-// string "M" max 64, Mode 0x1 uint8 "M", SemanticTags 0x2 list "M"
-// max 64. All three carry quality F.
-//
-// Deprecated: SupportedModes is encoded by the generated codec,
-// [msdef.ModeOptionStruct.EncodeTLV] in cluster/spec/modeselect, which
-// carries the field ids itself; nothing in this module reads these tags.
-// Marked in v0.3.0; removal is permissible from v0.5.0, the second minor
-// release after the marking one (README §API stability).
-const (
-	ModeOptionFieldLabel        uint8 = 0x00
-	ModeOptionFieldMode         uint8 = 0x01
-	ModeOptionFieldSemanticTags uint8 = 0x02
-)
-
 // The ModeSelect list and label bounds, from the model: the host's
 // [ModeSource.SupportedModes] must stay within them. They are not applied
 // by the server or the encoder — matter.js trims nothing either; its
@@ -118,22 +101,6 @@ const (
 // on the host's [ModeSource.SupportedModes], which the server returns as
 // given.
 const SupportedModesMaxEntries = 255
-
-// SemanticTagStruct field tags.
-//
-// Mirrors matter.js mode-select-cluster.element.ts:55-59: MfgCode 0x0
-// vendor-id "M", Value 0x1 uint16 "M". vendor-id is uint16
-// (matter.js vendor-id.element.ts:12).
-//
-// Deprecated: SupportedModes is encoded by the generated codec,
-// [msdef.SemanticTagStruct.EncodeTLV] in cluster/spec/modeselect, which
-// carries the field ids itself; nothing in this module reads these tags.
-// Marked in v0.3.0; removal is permissible from v0.5.0, the second minor
-// release after the marking one (README §API stability).
-const (
-	SemanticTagFieldMfgCode uint8 = 0x00
-	SemanticTagFieldValue   uint8 = 0x01
-)
 
 // ChangeToModeFieldNewMode is the context tag of the ChangeToMode
 // NewMode field (id 0x0, uint8, conformance M).
