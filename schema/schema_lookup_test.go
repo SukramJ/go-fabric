@@ -163,3 +163,23 @@ func TestDeviceTypeRequiresServerCluster(t *testing.T) {
 		}
 	}
 }
+
+// TestDeviceTypeIDOf pins the conversion of a Descriptor's 32-bit
+// devtype-id: a standard id converts, one with a vendor prefix does not.
+func TestDeviceTypeIDOf(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		in   uint32
+		want DeviceTypeID
+		ok   bool
+	}{
+		{in: 0x0100, want: 0x0100, ok: true},
+		{in: 0xFFFF, want: 0xFFFF, ok: true},
+		{in: 0x0001_0100, ok: false},
+	} {
+		got, ok := DeviceTypeIDOf(tc.in)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("DeviceTypeIDOf(%#x) = %#x, %v; want %#x, %v", tc.in, got, ok, tc.want, tc.ok)
+		}
+	}
+}

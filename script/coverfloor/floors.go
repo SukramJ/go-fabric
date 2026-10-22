@@ -207,6 +207,8 @@ var floors = []packageFloor{
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
 	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
+	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",
 		min: 0,
