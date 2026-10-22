@@ -866,7 +866,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 202,
+    "line": 204,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -875,7 +875,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 1080,
+    "line": 1082,
     "citation": "packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33",
     "resolved": "packages/types/src/datatype/CaseAuthenticatedTag.ts",
     "identifier": "getVersion",
@@ -947,7 +947,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 976,
+    "line": 978,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -1010,7 +1010,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 257,
+    "line": 259,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1019,7 +1019,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 353,
+    "line": 355,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1028,7 +1028,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1353,
+    "line": 1355,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1037,7 +1037,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1897,
+    "line": 1899,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1046,7 +1046,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1937,
+    "line": 1939,
     "citation": "Fabric.ts:557-559",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "PublicKeyError",
@@ -1055,7 +1055,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2061,
+    "line": 2063,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
@@ -1064,7 +1064,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 2252,
+    "line": 2254,
     "citation": "DeviceAdvertiser.ts:84-86",
     "resolved": "packages/protocol/src/protocol/DeviceAdvertiser.ts",
     "identifier": "cancelAll",

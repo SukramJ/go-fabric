@@ -39,6 +39,8 @@ import (
 // surface is purely informational; the FailSafe state machine
 // reflects what the spec mandates.
 type GeneralCommissioning struct {
+	// mu guards the fields below (the breadcrumb, the fail-safe and the
+	// regulatory values); clock and log are set once.
 	mu sync.RWMutex
 
 	clock clock.Clock

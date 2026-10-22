@@ -61,6 +61,8 @@ type OperationalCredentials struct {
 	// store cannot persist them (no [vidVerificationSettings]).
 	vid vidVerificationMemory
 
+	// mu guards the fields below: the pending trust root, CSR nonce and
+	// key of the running commissioning and the request's fabric.
 	mu                  sync.RWMutex
 	supportedFabrics    uint8             // from OpcredsConfig; default 254 (matter.js HEAD) when unset
 	pendingTrustRoot    []byte            // last AddTrustedRootCertificate decoded as the 65-byte EC-P256 pubkey; consumed by AddNOC for CASE lookups + CompressedFabricID HKDF

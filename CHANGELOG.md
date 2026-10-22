@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-22
+
 ### Added
 
 - Two guards as code (gate 2, ADR 0026 P11, brief BY-2): `golangci-lint`'s `forbidigo` refuses a method called on `slog.Default()` inline (the logger comes from the component's `logger()` accessor or its config), and `script/errprefix` holds every `errors.New`/`fmt.Errorf` literal to its package's prefix (a `%w` wrap, `package main` and the owner's security paths on a ratchet are the rules, not a file list); `script/docscheck` holds the docs' inline programs to their files and every in-repo `file:line` citation of `docs/` and the `node`, `device`, `fabrictest` package docs to a file and lines that exist.
@@ -103,6 +105,8 @@ pseudo-version of `main`.
 - Tests that bounded event-driven waits with wall time a loaded machine could outrun (`TestStartReaper_*` now on a fake clock, `TestDiagLogsBDX_Transfer`, `TestRegistryDecommission`, `TestLiveSustainedSurvivesRestart`, `TestNetworkLossAndDelay`) (G1-19).
 - `node.Node.SetCommissioningBlocked` no longer takes the node's lifecycle lock: called from a host callback that runs inside `Start` or `Stop` (the host's `Config.Topology` Snapshotter) it deadlocked (G1-16).
 - `Bridge.Stop` stops the commissioning window's expiry timer: an uncommissioned node's own window left a 48-hour timer armed on the node's clock after `Node.Stop` (G1-14).
+- `bridge`: the generated definition decodes first. A generated server for LevelControl, ColorControl, FanControl or one of the four mode clusters — the device kit's default before this release — received the hand-written decoder's `cluster/wire` struct, which its typed handler refused with INVALID_COMMAND (gate 1, G1-2).
+- `endpoint`: the dispatcher reads no status out of an error's text any more (gate 1, G1-8, brief BX1). A cluster server's write or invoke error answers the status it carries by type (`im.StatusCodeError`, `im.MatterClusterStatusError`), and any other error answers FAILURE; the string fallback that mapped "read-only", "unknown attribute", "resource exhausted", "constraint", "unknown command", "no commands" and "invalid command argument" to a status is gone. Every module error that reached a status by its wording carries it by type now (AccessControl's limit and entry checks, GroupKeyManagement, OperationalCredentials, Groupcast, BasicInformation, BridgedDeviceBasicInformation, Descriptor, the measurement servers, WindowCovering, DoorLock, ClosureControl, the `cluster/wire` Scenes and Schedules stubs), so no status on the wire moved. A host server that relied on its message's wording answers FAILURE now: return `spec.Errorf(status, …)` (or any `im.StatusCodeError`). `spec.Errorf` wraps a `%w` operand (`errors.Is`/`errors.As` reach it); `spec.ServerConfig.BeforeWrite`'s plain refusal is returned as given and answers FAILURE at the dispatcher, as before.
 
 ### Removed
 
@@ -121,11 +125,6 @@ pseudo-version of `main`.
 - `bridge`: the `GOFABRIC_DUMP_SUBSCRIBE` (and the deprecated `OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE`) debug dump, which wrote `/tmp/subscribe-init-sub…bin` and ran a strict TLV validation of each Subscribe-initial chunk; a byte dump belongs in a test, not in the library.
 - `bridge`: the two debug lines `matter.tx.sigma2resume.wire` and `matter.tx.sigma2.wire`, which logged the first 128 bytes of each Sigma2 reply in hex, and their helper; a wire dump belongs in a test, not in the library.
 - The `reference-controller` binary at the repository root, committed by mistake since #144; `/reference-controller` joins `/reference-bridge` in `.gitignore`.
-
-### Fixed
-
-- `bridge`: the generated definition decodes first. A generated server for LevelControl, ColorControl, FanControl or one of the four mode clusters — the device kit's default before this release — received the hand-written decoder's `cluster/wire` struct, which its typed handler refused with INVALID_COMMAND (gate 1, G1-2).
-- `endpoint`: the dispatcher reads no status out of an error's text any more (gate 1, G1-8, brief BX1). A cluster server's write or invoke error answers the status it carries by type (`im.StatusCodeError`, `im.MatterClusterStatusError`), and any other error answers FAILURE; the string fallback that mapped "read-only", "unknown attribute", "resource exhausted", "constraint", "unknown command", "no commands" and "invalid command argument" to a status is gone. Every module error that reached a status by its wording carries it by type now (AccessControl's limit and entry checks, GroupKeyManagement, OperationalCredentials, Groupcast, BasicInformation, BridgedDeviceBasicInformation, Descriptor, the measurement servers, WindowCovering, DoorLock, ClosureControl, the `cluster/wire` Scenes and Schedules stubs), so no status on the wire moved. A host server that relied on its message's wording answers FAILURE now: return `spec.Errorf(status, …)` (or any `im.StatusCodeError`). `spec.Errorf` wraps a `%w` operand (`errors.Is`/`errors.As` reach it); `spec.ServerConfig.BeforeWrite`'s plain refusal is returned as given and answers FAILURE at the dispatcher, as before.
 
 ## [0.9.1] — 2026-10-20
 
@@ -4545,7 +4544,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/SukramJ/go-fabric/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...v0.9.0
 [0.8.8]: https://github.com/SukramJ/go-fabric/compare/v0.8.7...v0.8.8
