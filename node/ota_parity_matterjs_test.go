@@ -469,9 +469,10 @@ func TestOtaParityMatterJS(t *testing.T) {
 		if got := s.versionsApplied(); !slices.Equal(got, []uint32{1}) {
 			t.Errorf("VersionApplied %v, want [1]", got)
 		}
-		if s.storedInProgress(t, s.req) {
-			t.Error("the update in progress stayed stored")
-		}
+		// The record is cleared after the outcome is reported, as matter.js
+		// sets updateInProgressDetails to null once #handlePreviousUpdateOnStart
+		// returned (OtaSoftwareUpdateRequestorServer.ts:241-244): wait for it.
+		s.eventually(t, "the update in progress cleared from storage", func() bool { return !s.storedInProgress(t, s.req) })
 	})
 
 	// :359-383.
@@ -487,9 +488,10 @@ func TestOtaParityMatterJS(t *testing.T) {
 		if slices.Contains(s.statuses.all(), mattercore.OTAUpdateDone) {
 			t.Error("the provider was told the update applied")
 		}
-		if s.storedInProgress(t, s.req) {
-			t.Error("the update in progress stayed stored")
-		}
+		// The record is cleared after the outcome is reported, as matter.js
+		// sets updateInProgressDetails to null once #handlePreviousUpdateOnStart
+		// returned (OtaSoftwareUpdateRequestorServer.ts:241-244): wait for it.
+		s.eventually(t, "the update in progress cleared from storage", func() bool { return !s.storedInProgress(t, s.req) })
 	})
 
 	// :385-458.

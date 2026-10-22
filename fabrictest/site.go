@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"runtime/metrics"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -91,11 +92,14 @@ type Site struct {
 	net  *Network
 	log  *slog.Logger
 
-	// inSyscall is the number of goroutines in a system call when the
-	// site was built: the process's standing ones (os/signal's loop, once
-	// a test of the binary called signal.Notify), which never leave it
-	// and are no work of the site.
-	inSyscall uint64
+	// inSyscall is the number of the process's standing goroutines in a
+	// system call (os/signal's loop, once a test of the binary called
+	// signal.Notify), which never leave it and are no work of the site:
+	// the fewest seen since the site was built. A count taken once would
+	// include another parallel test's passing system calls and hide this
+	// site's work once those end (the G2-16 flakes); the minimum only ever
+	// errs towards waiting longer.
+	inSyscall atomic.Uint64
 
 	// mu guards closers and nextIndex.
 	mu          sync.Mutex
@@ -129,7 +133,7 @@ func NewSite(tb testing.TB, opts Options) *Site {
 		s.net = newNetwork(s.clk, opts.Net)
 	}
 	s.dir = tb.TempDir()
-	s.inSyscall = goroutinesInSyscall()
+	s.inSyscall.Store(goroutinesInSyscall())
 	tb.Cleanup(s.Close)
 	return s
 }
@@ -256,7 +260,7 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 		if !until.IsZero() && !wall.Now().Before(until) {
 			return ErrWaited
 		}
-		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples, s.inSyscall) {
+		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples, &s.inSyscall) {
 			lastSent, since = sent, wall.Now()
 		} else if clock.Since(wall, since) >= s.opts.Settle {
 			return nil
@@ -277,17 +281,26 @@ var busyMetrics = []string{
 // handshake's cryptography, a store write. It is the Go reading of
 // MockTime's "the task queue is empty" — the process-wide count, so the
 // work of a parallel test in the same binary delays the step too. The
-// standing goroutines in a system call (standing, counted when the site
-// was built) are not work.
-func busy(samples []metrics.Sample, standing uint64) bool {
+// standing goroutines in a system call (standing, the fewest seen) are not
+// work; a reading below it lowers it.
+func busy(samples []metrics.Sample, standing *atomic.Uint64) bool {
 	metrics.Read(samples)
-	var n uint64
+	var n, inSyscall uint64
 	for i := range samples {
 		if samples[i].Value.Kind() == metrics.KindUint64 {
 			n += samples[i].Value.Uint64()
+			if samples[i].Name == "/sched/goroutines/not-in-go:goroutines" {
+				inSyscall = samples[i].Value.Uint64()
+			}
 		}
 	}
-	return n > 1+standing
+	for {
+		was := standing.Load()
+		if inSyscall >= was || standing.CompareAndSwap(was, inSyscall) {
+			break
+		}
+	}
+	return n > 1+standing.Load()
 }
 
 func (s *Site) sent() uint64 {
