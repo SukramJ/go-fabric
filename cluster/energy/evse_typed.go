@@ -8,6 +8,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // The typed server's optional interfaces of the self-held EnergyEvse
@@ -90,7 +91,7 @@ func (s *EvseServer) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	if recompute {
-		s.computeChargeLimitLocked()
+		s.computeChargeLimitLocked(contract.OriginHostSet)
 	}
 	return nil
 }

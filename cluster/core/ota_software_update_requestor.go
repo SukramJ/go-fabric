@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -495,9 +496,18 @@ func (r *OTASoftwareUpdateRequestor) MatterWrite(ctx context.Context, attrID uin
 		}
 	}
 	r.mu.Lock()
+	before := r.defaults
 	r.defaults = next
 	r.mu.Unlock()
-	r.changed(otadef.AttrDefaultOtaProviders)
+	// A write that changes nothing reports nothing and schedules nothing:
+	// matter.js reacts to defaultOtaProviders$Changed
+	// (OtaSoftwareUpdateRequestorServer.ts:188), which a commit emits only
+	// for a changed value (Datasource.ts:1440-1441).
+	if slices.Equal(before, next) {
+		return nil
+	}
+	r.dv.Bump()
+	r.NotifyFrom(contract.OriginControllerWrite, otadef.AttrDefaultOtaProviders)
 	r.handleUpdatedDefaultOtaProviders(ctx, fabric, entries)
 	return nil
 }

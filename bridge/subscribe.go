@@ -1323,7 +1323,9 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 // own. On a bridged endpoint a fire advances the cluster's endpoint-hosted
 // DataVersion once, before the named attributes are marked dirty, so the
 // report carries the post-change version (matter.js Datasource.ts
-// advanceVersion, then broadcastChanges for the changed properties only).
+// advanceVersion, then broadcastChanges for the changed properties only)
+// — but for a change from a controller's write, whose version the
+// dispatcher advanced already: one write, one advance.
 // A root or aggregator server is a persistent instance whose own tracker
 // is the DataVersion the dispatcher reports (endpoint/dispatcher.go
 // clusterDataVersionFor), so it bumps that itself before it fires and
@@ -1363,7 +1365,12 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				if len(attrIDs) == 0 {
 					return
 				}
-				if !persistent {
+				// A controller's write is one commit with one advance:
+				// the dispatcher's (endpoint/dispatcher.go WriteAuthorized),
+				// so the change the write itself reports does not advance
+				// it again (matter.js Datasource.ts:1440-1448,
+				// advanceVersion once per commit).
+				if !persistent && change.Origin != contract.OriginControllerWrite {
 					ep.BumpClusterDataVersion(clusterID)
 				}
 				for _, attr := range attrIDs {

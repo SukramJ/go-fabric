@@ -1282,3 +1282,30 @@ func TestOTARequestor_AnnouncementDuringQuery(t *testing.T) {
 		t.Fatalf("selected %+v, want the announced provider", h.r.selected)
 	}
 }
+
+// TestOTARequestor_DefaultProvidersWriteReportsAChange answers BY-1's
+// second question: the DefaultOTAProviders write reports the change from
+// OriginControllerWrite, once, and a write of the same list reports
+// nothing and advances no DataVersion (matter.js reacts to
+// defaultOtaProviders$Changed, OtaSoftwareUpdateRequestorServer.ts:188).
+func TestOTARequestor_DefaultProvidersWriteReportsAChange(t *testing.T) {
+	t.Parallel()
+	h := newOtaHarness(t, nil)
+	var changes []contract.Change
+	h.r.OnAttributeChange(func(c contract.Change) { changes = append(changes, c) })
+	list := spec.List[otadef.ProviderLocation]{{ProviderNodeId: testProvider}}
+	ctx := contract.WithOrigin(fabricCtx(1), contract.OriginControllerWrite)
+	if err := h.r.MatterWrite(ctx, otadef.AttrDefaultOtaProviders, list); err != nil {
+		t.Fatal(err)
+	}
+	if len(changes) != 1 || changes[0].Origin != contract.OriginControllerWrite || !slices.Equal(changes[0].Attributes, []uint32{otadef.AttrDefaultOtaProviders}) {
+		t.Fatalf("changes %+v, want one DefaultOTAProviders from the controller's write", changes)
+	}
+	dv := h.r.MatterDataVersion()
+	if err := h.r.MatterWrite(ctx, otadef.AttrDefaultOtaProviders, list); err != nil {
+		t.Fatal(err)
+	}
+	if len(changes) != 1 || h.r.MatterDataVersion() != dv {
+		t.Fatalf("the same list again: changes %+v, DataVersion %d → %d", changes, dv, h.r.MatterDataVersion())
+	}
+}
