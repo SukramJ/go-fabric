@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `device.HostServer(srv)`: the one declaration of a host's own server for a host whose servers are a list (#220). It resolves `srv.MatterClusterID()` to the generated `<cluster>def.Declare{HostServer: srv}` through a table `script/devicegen` writes (`device/hostserver_gen.go`, one line per generated cluster package) and mounts a cluster without a package — a manufacturer-specific one — as `WithServer` does. A host stating a port, an `Initial` patch or a feature selection keeps the typed `Declare`.
+
 ### Changed
 
 - `levelcontrol.NativeMover.MoveLevel` takes the generated `levelcontroldef.MoveRequest` (was `cluster/wire`'s `MoveRequest`), the request a `LevelSource`'s `Move` takes, so a host implementing it no longer imports `cluster/wire` (#222). It was the last exported port of a cluster server over a `cluster/wire` request; the `wire` level and fan-step requests stay as the engines' internal form.

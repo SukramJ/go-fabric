@@ -267,6 +267,7 @@ The device's other options:
 | Option | Effect |
 | --- | --- |
 | `WithServer(srv)` | your own server for a cluster without a generated package (a manufacturer-specific one); a cluster with a package takes its `Declare` |
+| `HostServer(srv)` | your own server for any cluster, when your servers are a list: the cluster's `Declare{HostServer: srv}` where it has a package, `WithServer`'s mount where it has none; a port, an `Initial` or a feature selection still takes the typed `Declare` |
 | `WithChangeNotifier(n)` | tells the bridge your model changed state its servers read |
 | `WithClientClusters(ids...)` | client clusters beyond the mandatory ones |
 
@@ -300,7 +301,7 @@ calls:
   `OnChanged` see every change at once. `Set` is safe from any goroutine,
   including from inside the sink.
 
-*Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `WithChangeNotifier`, `WithClientClusters`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
+*Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `HostServer`, `WithChangeNotifier`, `WithClientClusters`), `device/hostserver_gen.go`, `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 
 ## The Aggregator
 
