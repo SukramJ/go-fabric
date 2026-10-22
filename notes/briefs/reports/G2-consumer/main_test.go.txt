@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package main
+
+import (
+	"context"
+	"slices"
+	"testing"
+
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/tlv"
+)
+
+func attr(ep uint16, cluster, id uint32) im.ConcreteAttributePath {
+	return im.ConcreteAttributePath{Endpoint: ep, Cluster: cluster, Attribute: id, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+}
+
+// int16Value is a temperature for a write: no facade package offers a
+// scalar spec.Encodable.
+type int16Value int16
+
+func (v int16Value) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { enc.PutInt(tag, int64(v)) }
+
+func endpointOf(t *testing.T, d interface{ EndpointNumber() (uint16, bool) }, name string) uint16 {
+	t.Helper()
+	ep, ok := d.EndpointNumber()
+	if !ok {
+		t.Fatalf("%s has no endpoint number", name)
+	}
+	return ep
+}
+
+// TestBridgeOverTheWire commissions the four devices, reads each, moves the
+// level by a command, writes the setpoint and locks the lock — and asserts
+// what the host saw.
+func TestBridgeOverTheWire(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	b, err := newBridge()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: b.endpoints()}})
+	lightEP := endpointOf(t, b.light, "light")
+	doorEP := endpointOf(t, b.door, "door")
+	thermoEP := endpointOf(t, b.thermo, "thermostat")
+	lockEP := endpointOf(t, b.lock, "lock")
+
+	// The program's own dimming step, as the ticker would run it.
+	if err := pair.Device.Act(func(*node.Node) error { return b.stepLevel() }); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read all four.
+	onOff, err := fabrictest.Read(ctx, pair, attr(lightEP, onoffdef.ClusterID, onoffdef.AttrOnOff))
+	if err != nil || !onOff.Value.El.Bool {
+		t.Fatalf("OnOff = %+v, %v; want true", onOff.Value.El, err)
+	}
+	level, err := fabrictest.Read(ctx, pair, attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel))
+	if err != nil || level.Value.El.Uint != 20 {
+		t.Fatalf("CurrentLevel = %+v, %v; want the host's 20", level.Value.El, err)
+	}
+	door, err := fabrictest.Read(ctx, pair, attr(doorEP, booleanstatedef.ClusterID, booleanstatedef.AttrStateValue))
+	if err != nil || !door.Value.El.Bool {
+		t.Fatalf("StateValue = %+v, %v; want closed", door.Value.El, err)
+	}
+	sp, err := fabrictest.Read(ctx, pair, attr(thermoEP, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint))
+	if err != nil || sp.Value.El.Int != 2000 {
+		t.Fatalf("OccupiedHeatingSetpoint = %+v, %v; want the host's 2000", sp.Value.El, err)
+	}
+	ls, err := fabrictest.Read(ctx, pair, attr(lockEP, doorlockdef.ClusterID, doorlockdef.AttrLockState))
+	if err != nil || ls.Value.El.Uint != uint64(doorlockdef.LockStateUnlocked) {
+		t.Fatalf("LockState = %+v, %v; want unlocked", ls.Value.El, err)
+	}
+
+	// The host-side source moves the setpoint; the controller reads it.
+	if err := pair.Device.Act(func(*node.Node) error { return b.heatingChanged(2100) }); err != nil {
+		t.Fatal(err)
+	}
+	if sp, err := fabrictest.Read(ctx, pair, attr(thermoEP, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)); err != nil || sp.Value.El.Int != 2100 {
+		t.Fatalf("OccupiedHeatingSetpoint = %+v, %v; want the host's 2100", sp.Value.El, err)
+	}
+
+	// Move the level by a command.
+	move := im.ConcreteCommandPath{Endpoint: lightEP, Cluster: levelcontroldef.ClusterID, Command: levelcontroldef.CmdMoveToLevel}
+	if _, err := fabrictest.Invoke(ctx, pair, move, levelcontroldef.MoveToLevelRequest{Level: 200}); err != nil {
+		t.Fatal(err)
+	}
+	// What the docs promise (OnChanged with the origin) does not arrive
+	// for LevelControl (NOTES 1): the change log stays empty.
+	if levels := b.Levels(); len(levels) != 0 {
+		t.Logf("LevelControl OnChanged now reports: %v", levels)
+	}
+	if cmd := b.Commanded(); !slices.Equal(cmd, []levelSeen{{Level: 200, Origin: contract.OriginCommand}}) {
+		t.Errorf("the handler saw %v, want the controller's MoveToLevel 200 as a command", cmd)
+	}
+	if lv, err := fabrictest.Read(ctx, pair, attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel)); err != nil || lv.Value.El.Uint != 200 {
+		t.Fatalf("CurrentLevel = %+v, %v; want 200", lv.Value.El, err)
+	}
+
+	// Write the setpoint from the controller: it reaches the host's sink.
+	if err := fabrictest.Write(ctx, pair, attr(thermoEP, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint), int16Value(2250)); err != nil {
+		t.Fatal(err)
+	}
+	if seen := b.heat.Seen(); !slices.Contains(seen, setpointSeen{AttrID: thermostatdef.AttrOccupiedHeatingSetpoint, Value: 2250}) {
+		t.Errorf("the heating saw %v, want the controller's 2250", seen)
+	}
+	if got := b.thermo.Thermostat().Get().OccupiedHeatingSetpoint; got != 2250 {
+		t.Errorf("the thermostat serves %d after the write, want 2250", got)
+	}
+
+	// Lock the lock: LockDoor is a timed command.
+	lockCmd := im.ConcreteCommandPath{Endpoint: lockEP, Cluster: doorlockdef.ClusterID, Command: doorlockdef.CmdLockDoor}
+	if _, err := fabrictest.InvokeTimed(ctx, pair, lockCmd, doorlockdef.LockDoorRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if inv := b.bolt.Invoked(); !slices.Equal(inv, []uint32{doorlockdef.CmdLockDoor}) {
+		t.Errorf("the actuator ran %v, want one LockDoor", inv)
+	}
+	if ls, err := fabrictest.Read(ctx, pair, attr(lockEP, doorlockdef.ClusterID, doorlockdef.AttrLockState)); err != nil || ls.Value.El.Uint != uint64(doorlockdef.LockStateLocked) {
+		t.Fatalf("LockState = %+v, %v; want locked", ls.Value.El, err)
+	}
+
+	// The origins the host saw: its own setpoint and the lock's command.
+	// The controller's setpoint write is stored (above) and reached the
+	// sink, but OnChanged never reports it (NOTES 3) — the docs promise
+	// OriginControllerWrite here.
+	want := []changeSeen{
+		{thermostatdef.ClusterID, contract.OriginHostSet},
+		{doorlockdef.ClusterID, contract.OriginCommand},
+	}
+	if got := b.Changes(); !slices.Equal(got, want) {
+		t.Errorf("changes %v, want %v", got, want)
+	}
+}
