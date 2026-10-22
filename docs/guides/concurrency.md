@@ -50,7 +50,7 @@ in-memory network, and moves the clock only while no datagram is in flight
 and no goroutine of the process is working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:147-212`, `bridge/bridge.go:784-840`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:184-185`, `im/subscription/manager.go:229-235`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:223-227`, `secure/operational/manager.go:1145-1160`, `node/security.go:308-355`, `node/node.go:38-40`, `node/node.go:486-494`, `node/reannounce.go:15-31`, `node/config.go:175-179`, `bridge/securechannel.go:1268-1290`, `bridge/bdx_responder.go:93-110`, `binding/manager.go:238-244`, `node/client.go:96-106`, `node/node.go:95-108`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:415-462`, `node/node.go:37-39`, `node/node.go:567-575`, `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go:111-125`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
@@ -73,7 +73,7 @@ taken is dropped, and the peer's MRP retransmits it. Per session, at most
 Between sessions there is no ordering. Two controllers act on the same
 server concurrently.
 
-*Source: `bridge/session_order.go:14-69`, `transport/udp/ordered.go:13-110`, `transport/udp/listener.go:35-44`, `transport/udp/listener.go:196-210`, `transport/tcp/doc.go:24-35`.*
+*Source: `bridge/session_order.go:14-69`, `transport/udp/ordered.go:13-126`, `transport/udp/listener.go:38-47`, `transport/udp/listener.go:233-249`, `transport/tcp/doc.go:24-35`.*
 
 ## What a host callback may do
 
@@ -130,7 +130,7 @@ report to a channel.
 **`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:749-768`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
 
 ## Changing the topology
 
@@ -145,7 +145,7 @@ and `MarkComplete` from one goroutine, or serialise them yourself.
 The `Snapshotter` of a host with its own topology is called at `Start` and
 on every `Reassemble`, and its result is never cached.
 
-*Source: `node/aggregator.go:70-132`, `node/aggregator.go:172-178`, `bridge/bridge.go:868-893`, `bridge/bridge.go:217-231`.*
+*Source: `node/aggregator.go:95-262`, `node/aggregator.go:345-353`, `bridge/bridge.go:908-933`, `bridge/bridge.go:218-232`.*
 
 ## Contexts and shutdown
 
@@ -166,4 +166,4 @@ ends, so a server call can still return after `Stop` has. Close the
 database only after your own servers have returned, or make them tolerate
 a closed handle.
 
-*Source: `node/node.go:109-120`, `node/node.go:465-535`, `node/node.go:545-599`, `bridge/bridge.go:1541-1650`, `bridge/bridge.go:1805-1812`, `transport/udp/listener.go:147-212`.*
+*Source: `node/node.go:131-148`, `node/node.go:616-712`, `node/node.go:723-788`, `bridge/bridge.go:1695-1801`, `bridge/bridge.go:1995-2002`, `transport/udp/listener.go:178-251`.*

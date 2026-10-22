@@ -13,7 +13,7 @@
 // the host composing them.
 //
 // What the facade performs is the reference daemon's bring-up
-// (examples/reference-bridge/main.go:84-497), in the order
+// (examples/reference-bridge/main.go:84-497 at b4ea1f96^), in the order
 // bridge/bridge.go's package doc lists the ports, with every port wired:
 //
 //   - New: the stores (schemas applied on Config.Store.DB), the group

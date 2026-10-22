@@ -6,7 +6,7 @@ package node
 // The security wiring between an inbound datagram and a served Interaction
 // Model request — session lookup, MRP acknowledgement, subscriptions, PASE,
 // CASE (responder and the re-establishment initiator) — ported from the
-// reference daemon (examples/reference-bridge/wiring.go:398-940), which
+// reference daemon (examples/reference-bridge/wiring.go:398-940 at b4ea1f96^), which
 // brief R migrates onto this package.
 
 import (

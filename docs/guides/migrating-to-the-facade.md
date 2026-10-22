@@ -152,4 +152,4 @@ endpoints (or `Topology.Snapshotter` for its own assembler, and
 controller reading and writing them over CASE —
 [Testing in process](testing-in-process.md).
 
-*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go:45-75`, `fabrictest/site.go:84`, `fabrictest/controller.go:450`.*
+*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go:45-75`, `fabrictest/site.go:114`, `fabrictest/controller.go:496`.*

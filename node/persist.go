@@ -22,8 +22,8 @@ import (
 )
 
 // The settings keys the node keeps its state under. They are the
-// reference daemon's (examples/reference-bridge/persist.go:72-78,
-// wiring.go:944-976), so a database the daemon wrote keeps its labels,
+// reference daemon's (examples/reference-bridge/persist.go:72-78 at b4ea1f96^,
+// wiring.go:944-976 at b4ea1f96^), so a database the daemon wrote keeps its labels,
 // configuration versions, scene tables and counters under the facade.
 const (
 	rootNodeLabelKey              = "basic_information.node_label"
@@ -42,7 +42,7 @@ const (
 // the store's settings table: a bridged endpoint's NodeLabel and
 // ConfigurationVersion under its stable key, its scene table, and the
 // root's NodeLabel, Location and ConfigurationVersion — the daemon's
-// persistedLabels (persist.go:62-188). A stable key is persisted under
+// persistedLabels (persist.go:64-188 at b4ea1f96^). A stable key is persisted under
 // its String(), the identity the assembler keys endpoint numbers by —
 // an [endpoint.StringKey] under the string itself, so a database the
 // daemon wrote reads back; a host's own key type under what it prints.
@@ -246,7 +246,7 @@ func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, 
 // countBoot returns this boot's RebootCount and persists it: 0 on the
 // first boot of a database, one more on every boot after — matter.js
 // GeneralDiagnosticsServer.ts initialize(), as the daemon's countBoot
-// (wiring.go:951-971).
+// (wiring.go:951-971 at b4ea1f96^).
 func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
 	raw, ok, err := st.GetSetting(ctx, rebootCountSetting)
 	if err != nil {
@@ -268,7 +268,7 @@ func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
 
 // loadOperationalTime is the operational time earlier boots accumulated,
 // in milliseconds, or in whole hours under the legacy key
-// (wiring.go:984-1010).
+// (wiring.go:984-1010 at b4ea1f96^).
 func loadOperationalTime(ctx context.Context, st *store.Store) (time.Duration, error) {
 	raw, ok, err := st.GetSetting(ctx, operationalTimeSetting)
 	if err != nil {
@@ -299,7 +299,7 @@ func storeOperationalTime(ctx context.Context, st *store.Store, g *mattercore.Ge
 }
 
 // keepOperationalTime persists the operational time every interval until
-// ctx ends (wiring.go:1019-1036); Stop stores it once more.
+// ctx ends (wiring.go:1019-1036 at b4ea1f96^); Stop stores it once more.
 func keepOperationalTime(ctx context.Context, clk clock.Clock, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
 	tick := clock.Or(clk).NewTicker(interval)
 	defer tick.Stop()

@@ -39,7 +39,7 @@ type Groups = groups.Manager
 // keys its options by — `network`, `commissioning`, `productDescription`,
 // `basicInformation` (packages/node/src/node/ServerNode.ts:107-127) — for
 // the subset the reference daemon uses; the rest is what the daemon's
-// bring-up needs beyond them (examples/reference-bridge/main.go:84-497).
+// bring-up needs beyond them (examples/reference-bridge/main.go:84-497 at b4ea1f96^).
 type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
 	Network Network
@@ -108,7 +108,7 @@ type Config struct {
 	// assembles its endpoints itself (its own endpoint.Assembler over its
 	// own device model, one endpoint.Snapshot per scope, its own label and
 	// scene persistence) hands the bridge its Snapshotter here, as the
-	// reference daemon did before the facade (main.go:188, bridge.New's
+	// reference daemon did before the facade (main.go:188 at b4ea1f96^, bridge.New's
 	// first argument). The facade then builds no assembler and no
 	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
 	// endpoints' servers, the PartsList providers and every port stay the
@@ -122,7 +122,7 @@ type Config struct {
 	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
-	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
+	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345 at b4ea1f96^).
 	AggregatorServers []contract.ClusterServer
 	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
 	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
@@ -302,7 +302,7 @@ func (c *Config) rootDeviceConditions() []string {
 
 // Commissioning is matter.js `commissioning` (CommissioningServer.ts:
 // 370-380: passcode, discriminator) plus the SPAKE2+ PBKDF parameters the
-// daemon configures (main.go:91-92).
+// daemon configures (main.go:91-92 at b4ea1f96^).
 type Commissioning struct {
 	// Passcode is the setup passcode; it must pass setup.IsValidSetupPIN.
 	Passcode uint32
@@ -326,17 +326,17 @@ type Commissioning struct {
 // (ProductDescriptionServer.ts:70-90).
 type ProductDescription struct {
 	// Name is the advertised device name; empty is
-	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285).
+	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
 	Name string
 	// DeviceType is the advertised device type; 0 is RootNode (0x0016),
-	// as the daemon advertises (main.go:290).
+	// as the daemon advertises (main.go:290 at b4ea1f96^).
 	DeviceType uint16
 	// VendorID and ProductID are the node's identity; both mandatory.
 	VendorID, ProductID uint16
 }
 
 // BasicInformation is the root BasicInformation the daemon configures
-// (examples/reference-bridge/wiring.go:105-116, buildRootClusters), plus
+// (examples/reference-bridge/wiring.go:105-116 at b4ea1f96^, buildRootClusters), plus
 // ProductLabel from matter.js's example (BridgedDevicesNode.ts:29-65).
 type BasicInformation struct {
 	VendorName   string
@@ -366,7 +366,7 @@ type BasicInformation struct {
 
 // Store names the node's persistence. With DB the node applies both
 // schemas (store.Apply, sqlitestore.Apply) and opens the two stores on it,
-// as the daemon's openDB does (persist.go:45-60); the caller picks the
+// as the daemon's openDB does (persist.go:95-110); the caller picks the
 // SQLite driver and owns the handle. With Path the node opens that SQLite
 // file itself and treats it as DB. Credentials and Endpoints override the
 // stores built from DB or Path, or stand in for them when both are unset.
@@ -418,7 +418,7 @@ type OtaConfig struct {
 var ErrInvalidConfig = errors.New("node: invalid configuration")
 
 // setupPasscodeMax is the Matter §5.1.1.6 upper bound the daemon checks
-// (main.go:121-125).
+// (main.go:121-125 at b4ea1f96^).
 const setupPasscodeMax = 99999998
 
 // Fabric-table bounds: Matter §11.18.4.4 limits SupportedFabrics to 1..254
@@ -464,7 +464,7 @@ func checkPBKDF(iterations int64, saltLen int) []error {
 }
 
 // Validate holds the checks the daemon applies to its flags
-// (main.go:113-131): the discriminator's 12 bits, the passcode's range
+// (main.go:113-131 at b4ea1f96^): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
 // length the SPAKE2+ verifier needs, and the identity the bridge and the
 // assembler refuse to start without. The bounds are this package's

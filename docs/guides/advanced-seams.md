@@ -65,7 +65,7 @@ semantics, the persistence the facade threads through. A host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
-*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1504-1511` (`AttachACLLister` replaces), `bridge/bridge.go:909`, `:1866`, `:1887`, `:2248`, `bridge/receive.go:566`.*
+*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1515-1522` (`AttachACLLister` replaces), `bridge/bridge.go:920`, `:1866`, `:1887`, `:2248`, `bridge/receive.go:567`.*
 
 ## `endpoint`
 
@@ -123,7 +123,7 @@ discriminator need), the clock the node hands it and the re-announce loop
 work only if the host's advertiser provides them (`SetClock`,
 `mdns.Reannouncer`). `Node.Stop` closes it either way.
 
-*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go:40-60`, `mdns/zeroconf.go:133-160`.*
+*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go:40-61`, `mdns/zeroconf.go:137-164`.*
 
 ## `secure/…`
 
@@ -172,7 +172,7 @@ the one manager.
 subscriptions itself ends a controller's view without the controller's
 request.
 
-*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go:533`.*
+*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go:534`.*
 
 ## `diagevent`
 

@@ -27,11 +27,122 @@ every port, what skipping it costs, and whether the failure is visible.
 `Node.Bridge()` gives you the bridge for a port the facade does not cover
 without leaving the facade.
 
-*Source: `node/doc.go:4-43`, `node/config.go:94-103`, `bridge/bridge.go:29-47`, `node/node.go:601-603`.*
+*Source: `node/doc.go:4-43`, `node/config.go:107-116`, `bridge/bridge.go:29-47`, `node/node.go:790-792`.*
 
 ## The program
 
---8<-- "examples/quickstart-device/main.go"
+<!-- program: examples/quickstart-device/main.go -->
+```go
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+// Command quickstart-device is the smallest Matter bridge on go-fabric: one
+// on/off light under the node's Aggregator, its state in one SQLite file,
+// advertised over DNS-SD. docs/getting-started/device.md walks through it.
+// It pairs with the CSA test identity and is not a product.
+package main
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"slices"
+	"syscall"
+
+	_ "modernc.org/sqlite" // the host picks the SQLite driver
+
+	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/node"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx)
+	stop()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) error {
+	db, err := openDB("quickstart-device.db")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	// DNS-SD: the subtype responder answers the discriminator-filtered
+	// browse every commissioner sends for a QR or manual code.
+	zc := mdns.NewZeroconf()
+	if r, err := mdns.NewSubtypeResponder(slog.Default()); err == nil {
+		r.Start(ctx)
+		zc.AttachSubtypeResponder(r)
+		defer func() { _ = r.Close() }()
+	}
+
+	n, err := newNode(ctx, db, node.Network{}, zc)
+	if err != nil {
+		return err
+	}
+	qr, manual, err := n.PairingCodes()
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
+	}
+	fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	return n.Run(ctx) // Start, wait for ctx, Stop
+}
+
+// openDB opens the SQLite file; foreign_keys carries the store's
+// cascade-delete on fabric removal. node.New applies the schemas.
+func openDB(path string) (*sql.DB, error) {
+	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+}
+
+// newNode builds the node and adds the light, unstarted.
+func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Advertiser) (*node.Node, error) {
+	n, err := node.New(node.Config{ //nolint:contextcheck // the node's constructor takes no context
+		Network: network,
+		Commissioning: node.Commissioning{ // change all four for anything real
+			Passcode: 20202021, Discriminator: 3840,
+			PBKDFIterations: 1000, Salt: []byte("go-fabric-quickstart"),
+		},
+		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001}, // CSA test vendor
+		BasicInformation: node.BasicInformation{
+			VendorName: "quickstart", ProductName: "quickstart-device",
+			NodeLabel: "Quickstart bridge", SerialNumber: "QUICKSTART-0001",
+		},
+		Store:      node.Store{DB: db},
+		Advertiser: adv,
+	})
+	if err != nil {
+		return nil, err
+	}
+	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("light-1"), Name: "Desk lamp"})
+	if err == nil {
+		light.OnChanged(onoff.ClusterID, func(c contract.Change) {
+			if slices.Contains(c.Attributes, onoff.AttrOnOff) {
+				slog.Info("light", slog.Bool("on", light.OnOff().Get().OnOff)) // drive the real lamp here
+			}
+		})
+		err = n.Aggregator().Add(ctx, light)
+	}
+	if err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return nil, err
+	}
+	n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own; every device is added: stale endpoint numbers may go
+	return n, nil
+}
+```
 
 Run it, scan the QR code or enter the manual code in a commissioner, and the
 light appears under the bridge:
@@ -47,7 +158,7 @@ the device only through the subtype responder. Without the responder,
 `_matterc._udp` lists the instance, but the discriminator subtype query
 gets no answer.
 
-*Source: `examples/quickstart-device/main.go`, `examples/quickstart-device/main_test.go`, `examples/reference-bridge/main.go:178-201`, `node/config.go:144-145`.*
+*Source: `examples/quickstart-device/main.go`, `examples/quickstart-device/main_test.go`, `examples/reference-bridge/main.go:170-174`, `node/config.go:210-211`.*
 
 ## Configuration
 
@@ -93,7 +204,7 @@ Defaults worth knowing:
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
 
-*Source: `node/config.go:28-139`, `node/config.go:215-279`, `node/config.go:333-381`, `node/node.go:109-120`.*
+*Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go:131-148`.*
 
 ## Devices
 
@@ -231,7 +342,7 @@ while `err` is non-nil, and controllers that are already paired keep
 working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
-*Source: `node/node.go:691-712`, `node/node.go:526-534`, `node/commissioning.go:426-454`, `node/node.go:641-662`.*
+*Source: `node/node.go:900-907`, `node/node.go:692-711`, `node/commissioning.go:424-452`, `node/node.go:835-855`.*
 
 ## Persistence
 
@@ -277,7 +388,7 @@ new node on the same store.
 `Stop` on every node that `New` returned, including one you never started.
 The quickstart does this on its error paths.
 
-*Source: `node/node.go:34-36`, `node/node.go:538-599`, `node/node.go:95-108`, `bridge/bridge.go:1541-1556`.*
+*Source: `node/node.go:35-37`, `node/node.go:715-788`, `node/node.go:116-130`, `bridge/bridge.go:1695-1710`.*
 
 ## What the reference daemon adds
 

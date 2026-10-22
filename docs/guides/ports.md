@@ -60,7 +60,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `SwitchEventEmitter` | the module (`cluster/switch.Server`) | the press gestures a host narrates (InitialPress, ShortRelease, LongPress, LongRelease); handed to a source with `WireMatterSwitchHandler` | — |
 | `SwitchPositionSink` | the module (`cluster/switch.Server`) | the positions a host reports (`SetRawPosition` debounced, `SetCurrentPosition`); the server derives every Switch event, multi press included, as matter.js `SwitchServer.ts` does; handed to a source with `WireMatterSwitchPositions` | a source without either method reports no press |
 
-*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-440`, `contract/matter.go:572-830`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
+*Source: `contract/doc.go:4-18`, `contract/matter.go:21-260`, `contract/matter.go:299-441`, `contract/matter.go:573-871`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
 
 ## `node.Config`: the facade's ports
 
@@ -93,7 +93,7 @@ Setting a cluster hook that the facade wires itself, such as
 OperationalCredentials `SetOnFabricRemoved`, replaces the facade's wiring.
 Use `Observers` instead.
 
-*Source: `node/config.go:28-139`, `node/config.go:155-193`, `node/config.go:281-311`, `node/client.go:29-47`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-65`, `node/persist.go:55-75`, `node/root.go:336-347`, `node/root.go:477-481`, `node/doc.go:49-64`, `bridge/bridge.go:1975-1987`.*
+*Source: `node/config.go:37-205`, `node/config.go:221-281`, `node/config.go:367-415`, `node/client.go:29-51`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-71`, `node/persist.go:57-77`, `node/root.go:392-403`, `node/root.go:536-540`, `node/doc.go:49-64`, `bridge/bridge.go:2168-2180`.*
 
 ## `bridge`: the `Attach…` and `Set…` ports
 
@@ -144,7 +144,7 @@ the next `Reassemble`.
 | `SetOnReassembled`, `SetOnFabricAdded`, `SetOnFabricRemoved` | nil-safe observer hooks |
 | `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses; off judges only singleton placement |
 
-*Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:243-263`, `bridge/ackpump.go:36-58`.*
+*Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
 
 ## Optional interfaces of cluster ports
 
@@ -172,4 +172,4 @@ Host ports of the root servers, reached through `node.Config` or
 | `core.ActionsHost` | an Actions server's lists and commands |
 | `core.LogProvider` | DiagnosticLogs content. The facade serves its diagnostic event ring |
 
-*Source: `cluster/levelcontrol/native.go:15-70`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:164-179`, `cluster/onoff/server.go:54-72`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:171`, `cluster/core/ota_provider.go:93-135`, `cluster/core/commissioner_control.go:72-110`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:55-60`, `node/node.go:714-720`.*
+*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go:909-915`.*
