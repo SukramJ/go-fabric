@@ -3844,3 +3844,34 @@ needs its own origin for a concurrent `Set` serialises it with the
 command through `OnChangedAsync`'s per-device queue (phase 20c, brief
 BU-b).
 
+### BD-Matter-Quieter-ClockMovedBack — a quieter whose clock moved back reports at once
+
+matter.js's `QuietObservable` throttles on readings of one global clock:
+an emit goes out when `#lastEmitAt + minimumEmitInterval < Time.nowMs`
+(`packages/general/src/util/Observable.ts:1238-1244` at `862ad75f`), and
+TypeScript's `Time` never moves back. A device's servers in the module
+change clocks once: `Initial` is applied while the device still runs on
+the system clock, and the node's clock (a `clocktest.Fake` in tests at a
+fixed date) takes over at `Add` (`device/queue.go:103-118`), so a last
+report dated later than "now" would put the next report off by the
+difference (the gate-2 consumer saw a host `Set` never reach a
+subscriber, finding 2). `cluster.Quieter` therefore treats a last report
+later than now as long past and reports at once (`cluster/attribute_changes.go`
+`Changed`). Reasoning: the throttle exists to space reports, not to
+wait out a clock change; one comparison keeps the clock hand-off from
+becoming a silent report gap (brief BY-1).
+
+### BD-Matter-LevelControl-HandOffOrigin — on the hand-off path a change the host's port reports while a command is with it carries the command's origin
+
+matter.js has no hand-off path: a LevelControl behavior holds its state
+and every change commits in a transaction whose session is the origin
+(`packages/node/src/behavior/state/managed/Datasource.ts:1473-1476`). The
+module's `LevelSource` hand-off form keeps the level in the host's port
+and learns of a change through the port's `ChangeNotifier`, which carries
+no session; the server labels such a change `contract.OriginCommand`
+while a command is with the port and `contract.OriginHostSet` otherwise
+(`cluster/levelcontrol` `forwarding`, `sourceOrigin`). Reasoning: the call
+that is running is the best evidence of the cause the port has; a host
+that moves the level on its own during a command is the same race
+BD-Matter-CommandOrigin-PerServerFlag names (brief BY-1).
+
