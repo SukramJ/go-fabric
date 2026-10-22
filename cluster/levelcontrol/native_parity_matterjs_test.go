@@ -668,10 +668,12 @@ func TestNativeSourceSettlesBelowMinLevel(t *testing.T) {
 type moverDevice struct {
 	*rampDevice
 	moves int
+	last  lvldef.MoveRequest
 }
 
-func (m *moverDevice) MoveLevel(context.Context, wire.MoveRequest, bool) error {
+func (m *moverDevice) MoveLevel(_ context.Context, req lvldef.MoveRequest, _ bool) error {
 	m.moves++
+	m.last = req
 	return nil
 }
 
@@ -693,6 +695,11 @@ func TestNativeSourceMover(t *testing.T) {
 	}
 	if m.moves != 2 {
 		t.Errorf("MoveLevel called %d times, want 2", m.moves)
+	}
+	// The port takes the generated request (#222), the command's fields as
+	// they came: MoveMode Down, Rate 10.
+	if want := (lvldef.MoveRequest{MoveMode: lvldef.MoveModeDown, Rate: spec.Nullable[uint8]{Value: 10}}); m.last != want {
+		t.Errorf("MoveLevel got %+v, want %+v", m.last, want)
 	}
 	wantLog(t, d)
 	if !d.OnOff() {

@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `levelcontrol.NativeMover.MoveLevel` takes the generated `levelcontroldef.MoveRequest` (was `cluster/wire`'s `MoveRequest`), the request a `LevelSource`'s `Move` takes, so a host implementing it no longer imports `cluster/wire` (#222). It was the last exported port of a cluster server over a `cluster/wire` request; the `wire` level and fan-step requests stay as the engines' internal form.
+
 ### Fixed
 
 - The module builds for 32-bit targets again: `node.Commissioning.WindowCredentials` clamps the PBKDF iteration count through `int64`, so `math.MaxUint32` no longer overflows a 32-bit `int` on linux/arm and linux/386 (#225). A CI job `build (32-bit)` and `make build-32bit` (in `make ci`) compile the module for linux/armv7 and vet it for linux/386.
