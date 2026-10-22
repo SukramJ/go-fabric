@@ -658,8 +658,8 @@ type ChangeNotifier interface {
 // AttributeChangeNotifier is the optional capability of a [ClusterServer]
 // that holds its attribute state itself, as a matter.js behavior does,
 // and therefore knows exactly which of its attributes moved. It reports
-// every change at once, whoever made it — matter.js's `$Changed` event,
-// whose observers see each committed change
+// every change at once, whoever made it, as the matter.js Datasource
+// queues a notification for each committed change
 // (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476):
 // the host's OnChanged is subscribed here. The bridge subscribes to it at
 // reassembly for every bridged endpoint — to [AttributeReportNotifier]

@@ -1261,15 +1261,6 @@
     "occurrences": 1
   },
   {
-    "file": "cluster/light/colorcontrol_transitions.go",
-    "line": 209,
-    "citation": "Datasource.ts:1473-1476",
-    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
-    "identifier": "$Changed",
-    "nearest": 785,
-    "occurrences": 4
-  },
-  {
     "file": "cluster/matter_negative_write_parity_test.go",
     "line": 315,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
@@ -1349,24 +1340,6 @@
     "identifier": "addEnumMemberValidation",
     "nearest": 763,
     "occurrences": 2
-  },
-  {
-    "file": "cluster/spec/spectest/origin.go",
-    "line": 23,
-    "citation": "Datasource.ts:1473-1476",
-    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
-    "identifier": "$Changed",
-    "nearest": 785,
-    "occurrences": 4
-  },
-  {
-    "file": "cluster/thermo/thermostat_origin_test.go",
-    "line": 22,
-    "citation": "packages/node/src/behavior/state/managed/Datasource.ts:1473-1476",
-    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
-    "identifier": "$Changed",
-    "nearest": 785,
-    "occurrences": 4
   },
   {
     "file": "cluster/thermo/thermostat_parity_test.go",
@@ -1504,15 +1477,6 @@
     "identifier": "reactTo",
     "nearest": 480,
     "occurrences": 13
-  },
-  {
-    "file": "contract/matter.go",
-    "line": 663,
-    "citation": "packages/node/src/behavior/state/managed/Datasource.ts:1473-1476",
-    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
-    "identifier": "$Changed",
-    "nearest": 785,
-    "occurrences": 4
   },
   {
     "file": "controller/attestation/cert.go",
@@ -2137,15 +2101,6 @@
     "identifier": "network",
     "nearest": 239,
     "occurrences": 2
-  },
-  {
-    "file": "node/gate2_defects_test.go",
-    "line": 33,
-    "citation": "packages/node/src/behavior/state/managed/Datasource.ts:1473-1476",
-    "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
-    "identifier": "$Changed",
-    "nearest": 785,
-    "occurrences": 4
   },
   {
     "file": "node/observers.go",

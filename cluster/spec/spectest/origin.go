@@ -19,8 +19,9 @@ import (
 // no-op). Attributes are the attributes the reported changes must name;
 // a case whose Want is [contract.OriginControllerWrite] names the
 // attribute it writes — the written attribute reaches the listeners from
-// the write, as matter.js emits its `$Changed` on the write's commit
-// (Datasource.ts:1473-1476) — and [Write] builds such a case.
+// the write, as the matter.js Datasource queues a change notification
+// on the write's commit (Datasource.ts:1473-1476) — and [Write] builds
+// such a case.
 type OriginCase struct {
 	Name       string
 	Act        func(tb testing.TB, srv contract.ClusterServer)

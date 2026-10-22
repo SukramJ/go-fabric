@@ -18,8 +18,8 @@ import (
 // OriginHostSet, a SetpointRaiseLower OriginCommand, and a controller's
 // write of each writable attribute reaches the change listeners — the
 // host's OnChanged — as the written attribute from OriginControllerWrite,
-// as matter.js emits its `$Changed` on the write's commit
-// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476).
+// as the matter.js Datasource queues a change notification on the
+// write's commit (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476).
 func TestThermostatOrigins(t *testing.T) {
 	t.Parallel()
 	cfg := thermo.DefaultThermostatConfig()

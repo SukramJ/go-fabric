@@ -28,9 +28,9 @@ import (
 // NOTES.md on docs/gate2-consumer; brief BY-1), over fabrictest: a change
 // of CurrentLevel reaches the host's OnChanged whoever made it and a
 // subscriber's report, and a controller's write of a thermostat setpoint
-// reaches OnChanged from the write. matter.js emits each `$Changed` on the
-// commit of the state write (packages/node/src/behavior/state/managed/
-// Datasource.ts:1473-1476); the quieter ("Q") throttle stands in front of
+// reaches OnChanged from the write. The matter.js Datasource queues a
+// change notification on the commit of each state write
+// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476); the quieter ("Q") throttle stands in front of
 // the wire only (packages/node/src/behavior/Events.ts:267-297,
 // internal/ServerBehaviorBacking.ts:265-273).
 

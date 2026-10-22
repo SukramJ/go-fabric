@@ -205,9 +205,10 @@ func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWrite
 
 // report is the one place a change of the colour state is reported: the
 // attributes that differ between prev and next, from origin. The change
-// listeners see all of them at once, as every observer of matter.js's
-// `$Changed` events does (Datasource.ts:1473-1476; Events.ts:267-297 a
-// QuietEvent's own observers are not throttled); on the wire the "Q"
+// listeners see all of them at once, as matter.js's change observers do
+// — the Datasource queues each committed change's notification with its
+// session (Datasource.ts:1473-1476), and a QuietEvent's own observers are
+// not throttled (Events.ts:267-297); on the wire the "Q"
 // attributes follow their quieter rules (ServerBehaviorBacking.ts:265-273)
 // — a quieter report it defers carries the origin of the last change
 // before it — and the rest go at once.
