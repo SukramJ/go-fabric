@@ -49,9 +49,17 @@ func NewCommissioningCredentials() (Commissioning, error) {
 // node's own window default) — a fresh window secret is
 // NewCommissioningCredentials().WindowCredentials(timeout).
 func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredentials {
-	// Clamped to uint32's range; OpenBasicWindow refuses what lies
+	// Clamped to uint32's range through int64, so the bound is a valid
+	// constant on a 32-bit int too; OpenBasicWindow refuses what lies
 	// outside [PBKDFIterationsMin, PBKDFIterationsMax].
-	iterations := uint32(min(max(c.PBKDFIterations, 0), math.MaxUint32)) //nolint:gosec // clamped to uint32's range
+	v := int64(c.PBKDFIterations)
+	if v < 0 {
+		v = 0
+	}
+	if v > math.MaxUint32 {
+		v = math.MaxUint32
+	}
+	iterations := uint32(v)
 	return WindowCredentials{
 		Discriminator: c.Discriminator,
 		Passcode:      c.Passcode,

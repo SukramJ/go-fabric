@@ -81,6 +81,8 @@ the existing layer stays for it beside the device kit
 ([ADR 0018](../adr/0018-device-layer-and-node-facade.md)). It hands the
 facade's group state (`Node.Groups`) and endpoint persistence
 (`Node.Persistence`, or `node.NewEndpointPersistence`) to that assembler.
+A sensor built from a classified measurement source does not need the
+seam: `device.Measurement(src)` mounts it on a device of the kit.
 
 **Costs.** With `Config.Topology` the node builds no assembler and no
 `Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, the
@@ -102,13 +104,20 @@ node a store it built on a shared handle (`Config.Store.Credentials`), or
 a host whose migration tool applies the schema itself (`store.Schema`).
 A store of the host's own design behind a port is milestone 4, phase 21.
 
+A host that carries the schema in its own migrations follows the
+store's: since `v0.6.0` it gained `matter_thermostat_presets` (schema
+version 5, `v0.8.3`, the Thermostat presets) and `matter_doorlock_users`,
+`matter_doorlock_credentials` and `matter_doorlock_schedules` (version 6,
+`v0.8.4`, the DoorLock server's users, credentials and schedules);
+`store/migrations/v5.up.sql` and `v6.up.sql` hold the statements.
+
 **Costs.** The node writes the same tables. A host that writes a fabric,
 an ACL row or a group key directly bypasses the fan-out the node runs for
 the command that writes it (the CASE identity, the operational record,
 the sessions and subscriptions, the group routing). Read; write only
 settings of the host's own.
 
-*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `examples/reference-bridge/persist.go`.*
+*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql`, `v6.up.sql`), `examples/reference-bridge/persist.go`.*
 
 ## `mdns`
 
@@ -138,6 +147,18 @@ in an HSM — builds an `attestation.Chain` and sets
 `Config.Attestation.Chain`. A host that prints a payload for a node it
 does not run encodes it with `secure/setup`.
 
+A validator that runs without a node — a configuration package, a CLI
+that checks a configuration file — imports the bounds from the two leaf
+packages directly: `secure/setup` (`IsValidSetupPIN`, `MaxDiscriminator`)
+and `secure/spake2` (`IterationsMin`, `IterationsMax`,
+`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), which link no stack behind them
+(`secure/sessionparams` and `tlv` only). `node`'s re-exports
+(`node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`
+and the rest) are for the host that builds the node: importing `node` for
+them links the whole facade, which grew the reference consumer's CLI that
+imports its configuration package but no Matter code from 18.4 MB to
+32.4 MB (#223).
+
 **Costs.** Everything else in `secure/` is the node's: the session table,
 the CASE and PASE responders, the verifier of the commissioning window.
 A host that touches them takes the security of the node's commissioning
@@ -145,7 +166,7 @@ and sessions into its own hands; the facade's accessors
 (`Node.Sessions`, `Node.Subscriptions`) are for reading, and closing is
 the node's.
 
-*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `secure/attestation/files.go:77`.*
+*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
 
 ## `groups`
 

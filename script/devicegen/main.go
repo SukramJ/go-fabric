@@ -175,7 +175,11 @@ func (g *generator) all() ([]*output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(files, reg, test, doc), nil
+	hosts, err := g.generateHostServers()
+	if err != nil {
+		return nil, err
+	}
+	return append(files, reg, test, doc, hosts), nil
 }
 
 // write puts one file in place, touching it only when its content changed.

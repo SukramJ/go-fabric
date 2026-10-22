@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -50,9 +51,10 @@ type NativeRamp interface {
 // moveLogic skips transition and its couple (:529-550). A device for
 // which a jump to the bound is no reading of a continuous move — a
 // speaker's volume — returns nil and keeps its level. Stop and
-// StopWithOnOff are unaffected.
+// StopWithOnOff are unaffected. The request is the generated
+// [lvldef.MoveRequest], the form a host's [LevelSource] takes too.
 type NativeMover interface {
-	MoveLevel(ctx context.Context, req wire.MoveRequest, withOnOff bool) error
+	MoveLevel(ctx context.Context, req lvldef.MoveRequest, withOnOff bool) error
 }
 
 // NativeSwitcher is an optional interface of a [NativeRamp] whose On/Off
@@ -285,7 +287,7 @@ func (n *NativeSource) moveWithOnOffWire(ctx context.Context, req wire.MoveReque
 func (n *NativeSource) move(ctx context.Context, req wire.MoveRequest, withOnOff bool) error {
 	if m, ok := n.dev.(NativeMover); ok {
 		n.cancelOff()
-		return m.MoveLevel(ctx, req, withOnOff)
+		return m.MoveLevel(ctx, moveOf(req), withOnOff)
 	}
 	target := LevelMax
 	if req.MoveMode == MoveModeDown {

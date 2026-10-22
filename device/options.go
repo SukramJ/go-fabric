@@ -115,6 +115,8 @@ type settings struct {
 	// clients are the client clusters [WithClientClusters] declared, in
 	// call order.
 	clients []uint32
+	// measurements are the [Measurement] sources, in call order.
+	measurements []contract.MeasurementSource
 	// clock is the device's clock, for the servers the device builds.
 	clock clock.Clock
 	// typed are the clusters a generated Declare declared; attach their
@@ -155,7 +157,7 @@ func (s *settings) declare(d Declaration) error {
 				return fmt.Errorf("%w: WithServer(nil)", ErrConfiguration)
 			}
 			if def := spec.Lookup(o.decl.Cluster); def != nil {
-				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …}",
+				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …} or device.HostServer(srv)",
 					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
 			}
 		}
@@ -262,12 +264,34 @@ func (s *settings) merge(decl spec.ClusterDeclaration, mount bool) {
 // (packages/node/src/endpoint/type/MutableEndpoint.ts:95-110,
 // SupportedBehaviors.extend). A cluster with a generated package is
 // declared, its own server as the declaration's HostServer
-// (<cluster>def.Declare{HostServer: srv}); WithServer refuses it.
+// (<cluster>def.Declare{HostServer: srv}, or [HostServer] for a server
+// known only as a [contract.ClusterServer]); WithServer refuses it.
 func WithServer(srv contract.ClusterServer) Option {
 	if srv == nil {
 		return clusterOption{undeclared: true}
 	}
 	return clusterOption{decl: spec.ClusterDeclaration{Cluster: srv.MatterClusterID(), Server: srv}, undeclared: true}
+}
+
+// HostServer declares srv as the host's own server for its cluster
+// (srv.MatterClusterID()), the one form for a host whose servers are a
+// list: for a cluster with a generated package it is that package's
+// <cluster>def.Declare{HostServer: srv}, resolved through the table
+// script/devicegen writes (hostserver_gen.go); for any other cluster — a
+// manufacturer-specific one — it is [WithServer]'s mount. A host that
+// states more about the cluster than its server — a host port, an
+// Initial patch, a feature selection, a command handler or a write veto —
+// writes the typed <cluster>def.Declare instead, whose fields say so; a
+// cluster is declared once either way. A nil srv is refused when the
+// device is built.
+func HostServer(srv contract.ClusterServer) Declaration {
+	if srv == nil {
+		return WithServer(nil)
+	}
+	if declare, ok := hostServers[srv.MatterClusterID()]; ok {
+		return declare(srv)
+	}
+	return WithServer(srv)
 }
 
 // WithChangeNotifier makes the device's endpoint source a

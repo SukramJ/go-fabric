@@ -62,6 +62,13 @@ build: ## compile every package (library module — no binaries)
 vet: ## run go vet
 	$(GO) vet ./...
 
+.PHONY: build-32bit
+build-32bit: ## compile for linux/armv7 and vet for linux/386 — an int is 32 bits there
+	@# -gcflags=-e reports every type error, not the first ten; vet on 386
+	@# type-checks the test files as well.
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GO) build -gcflags=-e ./...
+	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GO) vet ./...
+
 .PHONY: archcheck
 archcheck: ## layers and dependency direction (ADR 0026)
 	$(GO) test -count=1 ./script/archcheck/...
@@ -363,4 +370,4 @@ bluez-check: ## the ble/bluez sub-module: build (Linux and the stub), vet, test,
 	cd $(BLUEZ_DIR) && $(GO) mod verify
 
 .PHONY: ci
-ci: build vet archcheck test lint cover-check bluez-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck test lint cover-check bluez-check ## everything the pipeline runs
