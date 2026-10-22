@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-10-22
+
 ### Added
 
 - `device.HostServer(srv)`: the one declaration of a host's own server for a host whose servers are a list (#220). It resolves `srv.MatterClusterID()` to the generated `<cluster>def.Declare{HostServer: srv}` through a table `script/devicegen` writes (`device/hostserver_gen.go`, one line per generated cluster package) and mounts a cluster without a package — a manufacturer-specific one — as `WithServer` does. A host stating a port, an `Initial` patch or a feature selection keeps the typed `Declare`.
@@ -4558,7 +4560,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/SukramJ/go-fabric/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SukramJ/go-fabric/compare/v0.8.8...v0.9.0
