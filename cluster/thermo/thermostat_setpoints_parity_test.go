@@ -102,8 +102,10 @@ func TestParityMatterJS_Thermostat_SetpointLimitWrites(t *testing.T) {
 		if got := readInt16(t, s, attrOccupiedCooling); got != 2700 {
 			t.Errorf("OccupiedCoolingSetpoint = %d, want 2700 (2500 + deadband)", got)
 		}
-		if len(reported) != 1 || !slices.Equal(reported[0], []uint32{attrOccupiedCooling}) {
-			t.Errorf("reported %v, want the pushed OccupiedCoolingSetpoint once", reported)
+		// One change from the write: the written OccupiedHeatingSetpoint
+		// and the pushed OccupiedCoolingSetpoint (gate-2 consumer, defect 3).
+		if len(reported) != 1 || !slices.Equal(reported[0], []uint32{attrOccupiedCooling, attrOccupiedHeating}) {
+			t.Errorf("reported %v, want the written OccupiedHeatingSetpoint and the pushed OccupiedCoolingSetpoint once", reported)
 		}
 	})
 

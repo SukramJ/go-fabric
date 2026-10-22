@@ -252,7 +252,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s := &Server{Instance: inst, ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
 	s.hooks.Init(inst)
-	s.quiet = &cluster.Quieter{Report: func() { s.changed(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
+	s.quiet = &cluster.Quieter{Report: func() { s.reported(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
 	if len(cfg.SupportedMaps) > 0 && !s.Serves(sa.AttrSupportedMaps) {
 		return nil, fmt.Errorf("%w: SupportedMaps without MAPS", ErrConfig)
 	}
@@ -467,12 +467,26 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 // changed bumps the data version and reports attrIDs: a change a command
 // makes is the command's, any other the device's own.
 func (s *Server) changed(attrIDs ...uint32) {
-	origin := contract.OriginHostSet
-	if c := s.cause.Load(); c != 0 {
-		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
-	}
 	s.tracker().Bump()
-	s.NotifyFrom(origin, attrIDs...)
+	s.NotifyFrom(s.origin(), attrIDs...)
+}
+
+// reported is the wire report of a quieter attribute when its throttle
+// emits: the data version advances and the report listeners are told; the
+// change listeners saw the change when it happened
+// ([Server.SetEstimatedEndTime]).
+func (s *Server) reported(attrIDs ...uint32) {
+	s.tracker().Bump()
+	s.ReportFrom(s.origin(), attrIDs...)
+}
+
+// origin is where the change being reported comes from: a command's
+// while it runs, the device's own otherwise.
+func (s *Server) origin() contract.Origin {
+	if c := s.cause.Load(); c != 0 {
+		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
+	return contract.OriginHostSet
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -705,6 +719,7 @@ func (s *Server) SetCurrentArea(id *uint32) error {
 
 // SetEstimatedEndTime records when the device expects to finish the
 // current area, in seconds since the Unix epoch; nil is null. The change
+// listeners (the host's OnChanged) see the change at once; on the wire it
 // is reported per matter.js's shouldEmit: at once to or from null or 0 or
 // when it decreases, otherwise through the quiet throttle.
 func (s *Server) SetEstimatedEndTime(t *uint32) error {
@@ -720,6 +735,7 @@ func (s *Server) SetEstimatedEndTime(t *uint32) error {
 	s.endTime = clonePtr(t)
 	s.mu.Unlock()
 	now := old == nil || *old == 0 || t == nil || *t == 0 || *t < *old
+	s.ChangedFrom(s.origin(), sa.AttrEstimatedEndTime)
 	// Quieter reports at once for a change from or to null; "now" covers
 	// 0 and a decrease as well.
 	s.quiet.Changed(now, t == nil)

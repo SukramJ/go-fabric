@@ -178,8 +178,12 @@ calls:
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
   `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored
-  and reported to subscribers, and the sink is not called. `Set` is safe
-  from any goroutine, including from inside the sink.
+  and reported to subscribers, and the sink is not called. An attribute
+  Matter marks quieter — LevelControl's `CurrentLevel`, ColorControl's
+  current colour — is reported at most once a second with its latest
+  value, at once from or to null, as matter.js throttles it; a read and
+  `OnChanged` see every change at once. `Set` is safe from any goroutine,
+  including from inside the sink.
 
 *Source: `device/doc_gen.go`, `device/defaults.go`, `device/options.go` (`Options`, `WithServer`, `WithChangeNotifier`, `WithClientClusters`), `device/device.go`, `cluster/spec/onoff/server_gen.go` (`Declare`, `OnChanged`, `OnChangedAsync`), `contract/` (`Change`, `Origin`), `cluster/onoff/server.go` (`Set`, `SetAttributes`, `Handle`).*
 

@@ -95,11 +95,12 @@ func newServer(t *testing.T, cfg servicearea.Config) *servicearea.Server {
 	return srv
 }
 
-// notifications records the attribute changes a server reports.
+// notifications records the attribute changes a server reports on the
+// wire (contract.AttributeReportNotifier).
 func notifications(srv *servicearea.Server) *[]uint32 {
 	var mu sync.Mutex
 	seen := &[]uint32{}
-	srv.OnAttributeChange(func(change contract.Change) {
+	srv.OnAttributeReport(func(change contract.Change) {
 		ids := change.Attributes
 		mu.Lock()
 		*seen = append(*seen, ids...)

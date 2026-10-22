@@ -1181,7 +1181,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 755,
+    "line": 764,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1406,7 +1406,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 799,
+    "line": 809,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1416,7 +1416,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1029,
+    "line": 1030,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1425,7 +1425,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1161,
+    "line": 1162,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1435,7 +1435,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1325,
+    "line": 1332,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",

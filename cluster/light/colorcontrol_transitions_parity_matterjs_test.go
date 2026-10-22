@@ -62,7 +62,7 @@ func managedCT(on bool) (*light.ColorControlServer, *ctReports, *onOff) {
 		MinMireds: 153, MaxMireds: 370, InitialMireds: 250, ManageTransitions: true, OnOff: o,
 	})
 	r := &ctReports{}
-	srv.OnAttributeChange(func(change contract.Change) {
+	srv.OnAttributeReport(func(change contract.Change) { // the wire's view
 		ids := change.Attributes
 		for _, id := range ids {
 			v, _ := srv.MatterRead(id)

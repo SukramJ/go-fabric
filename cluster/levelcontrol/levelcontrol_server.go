@@ -405,6 +405,10 @@ type Server struct {
 	// levelOrigin is the contract.Origin of the last level change, for the
 	// quieter's report of it.
 	levelOrigin atomic.Uint32
+	// forwarding counts the commands being forwarded to the port on the
+	// hand-off path and the levels the engine is handing it, so a change
+	// the host's notifier reports meanwhile is the command's.
+	forwarding atomic.Int32
 
 	// mu guards startUp.
 	mu sync.Mutex
@@ -433,6 +437,7 @@ var (
 	_ contract.ClusterAttributeWritePrivilege = (*Server)(nil)
 	_ contract.ChangeNotifier                 = (*Server)(nil)
 	_ contract.AttributeChangeNotifier        = (*Server)(nil)
+	_ contract.AttributeReportNotifier        = (*Server)(nil)
 	_ contract.SelfReportedAttributeLister    = (*Server)(nil)
 	_ contract.ClusterQuiescer                = (*Server)(nil)
 )
@@ -449,6 +454,8 @@ func NewServer(cfg Config) *Server {
 	s := newServer(sourceOf(cfg.Source), cfg.DataVersion, features)
 	if cfg.Transitions != nil {
 		s.initEngine(*cfg.Transitions, true)
+	} else if s.src != nil {
+		s.level, s.levelKnown = s.src.CurrentLevel()
 	}
 	return s
 }
@@ -626,12 +633,22 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	case AttrOnLevel:
 		return s.writeOnLevel(ctx, nullableUint8Of(v))
 	default: // AttrStartUpCurrentLevel, the last writable attribute
+		next := nullableUint8Of(v)
 		s.mu.Lock()
-		s.startUp = nullableUint8Of(v)
+		changed := !equalLevel(s.startUp, next)
+		s.startUp = next
 		s.mu.Unlock()
 		s.tracker().Bump()
+		if changed {
+			s.changes.NotifyFrom(contract.OriginControllerWrite, AttrStartUpCurrentLevel)
+		}
 		return nil
 	}
+}
+
+// equalLevel reports whether two nullable levels are the same value.
+func equalLevel(a, b *uint8) bool {
+	return (a == nil) == (b == nil) && (a == nil || *a == *b)
 }
 
 // peer resolves the MinLevel and MaxLevel bounds of OnLevel's
@@ -759,7 +776,7 @@ func (s *Server) invokeMoveToLevel(ctx context.Context, cmdID uint32, fields any
 	if cmdID == CmdMoveToLevelWithOnOff {
 		call = s.src.MoveToLevelWithOnOff
 	}
-	return s.finish(name, call(ctx, req))
+	return s.forward(name, func() error { return call(ctx, req) })
 }
 
 // invokeMove handles Move (0x1) and MoveWithOnOff (0x5), which share a
@@ -788,7 +805,7 @@ func (s *Server) invokeMove(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdMoveWithOnOff {
 		call = s.src.MoveWithOnOff
 	}
-	return s.finish(name, call(ctx, req))
+	return s.forward(name, func() error { return call(ctx, req) })
 }
 
 // invokeStep handles Step (0x2) and StepWithOnOff (0x6), which share a
@@ -812,7 +829,7 @@ func (s *Server) invokeStep(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdStepWithOnOff {
 		call = s.src.StepWithOnOff
 	}
-	return s.finish(name, call(ctx, req))
+	return s.forward(name, func() error { return call(ctx, req) })
 }
 
 // invokeStop handles Stop (0x3) and StopWithOnOff (0x7), which share a
@@ -833,7 +850,21 @@ func (s *Server) invokeStop(ctx context.Context, cmdID uint32, fields any) (any,
 	if cmdID == CmdStopWithOnOff {
 		call = s.src.StopWithOnOff
 	}
-	return s.finish(name, call(ctx, req))
+	return s.forward(name, func() error { return call(ctx, req) })
+}
+
+// forward runs a command on the hand-off path — call hands it to the
+// port — and reports the level the port moved, from the command
+// ([Server.observeLevel]); a change the host's notifier reports while
+// call runs is the command's too.
+func (s *Server) forward(name string, call func() error) (any, error) {
+	s.forwarding.Add(1)
+	err := call()
+	s.forwarding.Add(-1)
+	if err == nil {
+		s.observeLevel(contract.OriginCommand)
+	}
+	return s.finish(name, err)
 }
 
 // finish turns a port result into the (response, error) pair the

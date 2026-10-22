@@ -55,7 +55,9 @@ it.
 owns: `true` is closed. The declaration states the value at start.
 
 `light.OnOff().OnChanged` sees every change of the light's OnOff, with the
-new state and a `contract.Change`. `Change.Origin` says who made it:
+new state and a `contract.Change` — the same for every kit server, a
+quieter attribute such as LevelControl's `CurrentLevel` included, whose
+subscribers are reported at most once a second. `Change.Origin` says who made it:
 `contract.OriginHostSet` for the host's own `Set`,
 `OriginControllerWrite` for a controller's attribute write,
 `OriginCommand` for a command (On, Off, Toggle, …). The program forwards only what did not come from the

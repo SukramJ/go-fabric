@@ -26,7 +26,7 @@ func TestCountdownTimeIsReportedAsAQuieterAttribute(t *testing.T) {
 	clk := clocktest.New(time.Unix(5000, 0))
 	srv.quiet.Clock = clk
 	var reports [][]uint32
-	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; reports = append(reports, ids) })
+	srv.OnAttributeReport(func(change contract.Change) { ids := change.Attributes; reports = append(reports, ids) })
 	set := func(v *uint32) {
 		t.Helper()
 		if err := srv.SetCountdownTime(v); err != nil {

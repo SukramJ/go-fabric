@@ -72,7 +72,7 @@ func setupColorNode(t *testing.T) *colorNode {
 		t.Fatal(err)
 	}
 	c := &colorNode{site: site, srv: srv}
-	srv.OnAttributeChange(func(change contract.Change) {
+	srv.OnAttributeReport(func(change contract.Change) { // the wire's view
 		ids := change.Attributes
 		if !slices.Contains(ids, ccdef.AttrRemainingTime) {
 			return

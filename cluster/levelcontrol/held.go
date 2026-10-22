@@ -187,7 +187,9 @@ var _ source = (*heldLevel)(nil)
 
 // followOnOff is matter.js initializeOnOff (:253-255): a held server
 // reacts to the On/Off cluster's OnOff turning on with handleOnOffChange
-// (:658-670) — a non-null OnLevel becomes CurrentLevel. The coupling of a
+// (:658-670) — a non-null OnLevel becomes CurrentLevel, a change from the
+// origin of the OnOff change it follows (matter.js reacts within the
+// session that changed OnOff). The coupling of a
 // "with On/Off" command switches the device on itself and moves to
 // OnLevel in the same step (#turnOnForLevel, :597-617), which this
 // reaction is then, as matter.js's blockOnOffCouplingOnce makes its own,
@@ -196,7 +198,7 @@ func (s *Server) followOnOff(n contract.AttributeChangeNotifier) {
 	s.mu.Lock()
 	s.wasOn = s.onOff.OnOff()
 	s.mu.Unlock()
-	n.OnAttributeChange(func(contract.Change) {
+	n.OnAttributeChange(func(c contract.Change) {
 		on := s.onOff.OnOff()
 		s.mu.Lock()
 		turnedOn := on && !s.wasOn
@@ -207,7 +209,7 @@ func (s *Server) followOnOff(n contract.AttributeChangeNotifier) {
 		}
 		if onLevel, known := s.held.OnLevel(); known {
 			s.held.setLevel(&onLevel)
-			s.observeLevel(contract.OriginCommand)
+			s.observeLevel(c.Origin)
 		}
 	})
 }

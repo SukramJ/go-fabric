@@ -97,7 +97,7 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if level {
-		s.observeLevel(contract.OriginHostSet)
+		s.observeLevel(contract.OriginHostSet) // the one place CurrentLevel is reported
 	}
 	return nil
 }
