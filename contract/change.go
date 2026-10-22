@@ -23,7 +23,10 @@ const (
 	// [ChangeNotifier].
 	OriginUnknown Origin = iota
 	// OriginHostSet: the host set the state (the server's SetAttributes,
-	// a typed server's Set), a command handler of the host's included.
+	// a typed server's Set) outside a command. A Set while the server runs
+	// a command — the host's own handler included — is reported as
+	// [OriginCommand], as matter.js commits a handler's state write with
+	// the command's transaction (BD-Matter-CommandOrigin-PerServerFlag).
 	OriginHostSet
 	// OriginControllerWrite: a controller wrote the attribute.
 	OriginControllerWrite
