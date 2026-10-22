@@ -140,6 +140,18 @@ in an HSM — builds an `attestation.Chain` and sets
 `Config.Attestation.Chain`. A host that prints a payload for a node it
 does not run encodes it with `secure/setup`.
 
+A validator that runs without a node — a configuration package, a CLI
+that checks a configuration file — imports the bounds from the two leaf
+packages directly: `secure/setup` (`IsValidSetupPIN`, `MaxDiscriminator`)
+and `secure/spake2` (`IterationsMin`, `IterationsMax`,
+`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), which link no stack behind them
+(`secure/sessionparams` and `tlv` only). `node`'s re-exports
+(`node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`
+and the rest) are for the host that builds the node: importing `node` for
+them links the whole facade, which grew the reference consumer's CLI that
+imports its configuration package but no Matter code from 18.4 MB to
+32.4 MB (#223).
+
 **Costs.** Everything else in `secure/` is the node's: the session table,
 the CASE and PASE responders, the verifier of the commissioning window.
 A host that touches them takes the security of the node's commissioning
@@ -147,7 +159,7 @@ and sessions into its own hands; the facade's accessors
 (`Node.Sessions`, `Node.Subscriptions`) are for reading, and closing is
 the node's.
 
-*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `secure/attestation/files.go:77`.*
+*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (the PBKDF bounds), `secure/attestation/files.go:77`.*
 
 ## `groups`
 
