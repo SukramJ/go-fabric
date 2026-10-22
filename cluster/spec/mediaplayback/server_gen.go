@@ -188,91 +188,106 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandlePlay registers fn for the Play command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePlay is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePlay(fn func(ctx context.Context, req PlayRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPlay, fn)
 }
 
 // HandlePause registers fn for the Pause command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePause is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPause, fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleStartOver registers fn for the StartOver command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartOver is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartOver(fn func(ctx context.Context, req StartOverRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartOver, fn)
 }
 
 // HandlePrevious registers fn for the Previous command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePrevious is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePrevious(fn func(ctx context.Context, req PreviousRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPrevious, fn)
 }
 
 // HandleNext registers fn for the Next command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleNext is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleNext(fn func(ctx context.Context, req NextRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdNext, fn)
 }
 
 // HandleRewind registers fn for the Rewind command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRewind is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRewind(fn func(ctx context.Context, req RewindRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRewind, fn)
 }
 
 // HandleFastForward registers fn for the FastForward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleFastForward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleFastForward(fn func(ctx context.Context, req FastForwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdFastForward, fn)
 }
 
 // HandleSkipForward registers fn for the SkipForward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipForward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipForward(fn func(ctx context.Context, req SkipForwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipForward, fn)
 }
 
 // HandleSkipBackward registers fn for the SkipBackward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipBackward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipBackward(fn func(ctx context.Context, req SkipBackwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipBackward, fn)
 }
 
 // HandleSeek registers fn for the Seek command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSeek is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSeek(fn func(ctx context.Context, req SeekRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSeek, fn)
 }
 
 // HandleActivateAudioTrack registers fn for the ActivateAudioTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleActivateAudioTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleActivateAudioTrack(fn func(ctx context.Context, req ActivateAudioTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdActivateAudioTrack, fn)
 }
 
 // HandleActivateTextTrack registers fn for the ActivateTextTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleActivateTextTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleActivateTextTrack(fn func(ctx context.Context, req ActivateTextTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdActivateTextTrack, fn)
 }
 
 // HandleDeactivateTextTrack registers fn for the DeactivateTextTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDeactivateTextTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDeactivateTextTrack(fn func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDeactivateTextTrack, fn)
 }

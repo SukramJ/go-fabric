@@ -516,121 +516,141 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleMoveToHue registers fn for the MoveToHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToHue(fn func(ctx context.Context, req MoveToHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToHue, fn)
 }
 
 // HandleMoveHue registers fn for the MoveHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveHue(fn func(ctx context.Context, req MoveHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveHue, fn)
 }
 
 // HandleStepHue registers fn for the StepHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepHue(fn func(ctx context.Context, req StepHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepHue, fn)
 }
 
 // HandleMoveToSaturation registers fn for the MoveToSaturation command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToSaturation is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToSaturation(fn func(ctx context.Context, req MoveToSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToSaturation, fn)
 }
 
 // HandleMoveSaturation registers fn for the MoveSaturation command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveSaturation is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveSaturation(fn func(ctx context.Context, req MoveSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveSaturation, fn)
 }
 
 // HandleStepSaturation registers fn for the StepSaturation command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepSaturation is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepSaturation(fn func(ctx context.Context, req StepSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepSaturation, fn)
 }
 
 // HandleMoveToHueAndSaturation registers fn for the MoveToHueAndSaturation command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToHueAndSaturation is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToHueAndSaturation(fn func(ctx context.Context, req MoveToHueAndSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToHueAndSaturation, fn)
 }
 
 // HandleMoveToColor registers fn for the MoveToColor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToColor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToColor(fn func(ctx context.Context, req MoveToColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToColor, fn)
 }
 
 // HandleMoveColor registers fn for the MoveColor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveColor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveColor(fn func(ctx context.Context, req MoveColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveColor, fn)
 }
 
 // HandleStepColor registers fn for the StepColor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepColor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepColor(fn func(ctx context.Context, req StepColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepColor, fn)
 }
 
 // HandleMoveToColorTemperature registers fn for the MoveToColorTemperature command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToColorTemperature is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToColorTemperature(fn func(ctx context.Context, req MoveToColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToColorTemperature, fn)
 }
 
 // HandleEnhancedMoveToHue registers fn for the EnhancedMoveToHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveToHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveToHue(fn func(ctx context.Context, req EnhancedMoveToHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHue, fn)
 }
 
 // HandleEnhancedMoveHue registers fn for the EnhancedMoveHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveHue(fn func(ctx context.Context, req EnhancedMoveHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveHue, fn)
 }
 
 // HandleEnhancedStepHue registers fn for the EnhancedStepHue command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedStepHue is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedStepHue(fn func(ctx context.Context, req EnhancedStepHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedStepHue, fn)
 }
 
 // HandleEnhancedMoveToHueAndSaturation registers fn for the EnhancedMoveToHueAndSaturation command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveToHueAndSaturation is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveToHueAndSaturation(fn func(ctx context.Context, req EnhancedMoveToHueAndSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHueAndSaturation, fn)
 }
 
 // HandleColorLoopSet registers fn for the ColorLoopSet command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleColorLoopSet is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleColorLoopSet(fn func(ctx context.Context, req ColorLoopSetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdColorLoopSet, fn)
 }
 
 // HandleStopMoveStep registers fn for the StopMoveStep command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopMoveStep is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopMoveStep(fn func(ctx context.Context, req StopMoveStepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopMoveStep, fn)
 }
 
 // HandleMoveColorTemperature registers fn for the MoveColorTemperature command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveColorTemperature is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveColorTemperature(fn func(ctx context.Context, req MoveColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveColorTemperature, fn)
 }
 
 // HandleStepColorTemperature registers fn for the StepColorTemperature command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepColorTemperature is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepColorTemperature, fn)
 }

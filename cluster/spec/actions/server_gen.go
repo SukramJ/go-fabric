@@ -119,79 +119,92 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleInstantAction registers fn for the InstantAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleInstantAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleInstantAction(fn func(ctx context.Context, req InstantActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdInstantAction, fn)
 }
 
 // HandleInstantActionWithTransition registers fn for the InstantActionWithTransition command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleInstantActionWithTransition is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleInstantActionWithTransition(fn func(ctx context.Context, req InstantActionWithTransitionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdInstantActionWithTransition, fn)
 }
 
 // HandleStartAction registers fn for the StartAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartAction(fn func(ctx context.Context, req StartActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartAction, fn)
 }
 
 // HandleStartActionWithDuration registers fn for the StartActionWithDuration command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartActionWithDuration is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartActionWithDuration(fn func(ctx context.Context, req StartActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartActionWithDuration, fn)
 }
 
 // HandleStopAction registers fn for the StopAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopAction(fn func(ctx context.Context, req StopActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopAction, fn)
 }
 
 // HandlePauseAction registers fn for the PauseAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseAction(fn func(ctx context.Context, req PauseActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseAction, fn)
 }
 
 // HandlePauseActionWithDuration registers fn for the PauseActionWithDuration command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseActionWithDuration is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseActionWithDuration(fn func(ctx context.Context, req PauseActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseActionWithDuration, fn)
 }
 
 // HandleResumeAction registers fn for the ResumeAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResumeAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResumeAction(fn func(ctx context.Context, req ResumeActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResumeAction, fn)
 }
 
 // HandleEnableAction registers fn for the EnableAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableAction(fn func(ctx context.Context, req EnableActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableAction, fn)
 }
 
 // HandleEnableActionWithDuration registers fn for the EnableActionWithDuration command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableActionWithDuration is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableActionWithDuration(fn func(ctx context.Context, req EnableActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableActionWithDuration, fn)
 }
 
 // HandleDisableAction registers fn for the DisableAction command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDisableAction is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisableAction(fn func(ctx context.Context, req DisableActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisableAction, fn)
 }
 
 // HandleDisableActionWithDuration registers fn for the DisableActionWithDuration command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDisableActionWithDuration is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisableActionWithDuration(fn func(ctx context.Context, req DisableActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisableActionWithDuration, fn)
 }

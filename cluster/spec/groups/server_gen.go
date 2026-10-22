@@ -103,43 +103,50 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleAddGroup registers fn for the AddGroup command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroup is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroup(fn func(ctx context.Context, req AddGroupRequest) (AddGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroup, fn)
 }
 
 // HandleViewGroup registers fn for the ViewGroup command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleViewGroup is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleViewGroup(fn func(ctx context.Context, req ViewGroupRequest) (ViewGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdViewGroup, fn)
 }
 
 // HandleGetGroupMembership registers fn for the GetGroupMembership command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetGroupMembership is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetGroupMembership(fn func(ctx context.Context, req GetGroupMembershipRequest) (GetGroupMembershipResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetGroupMembership, fn)
 }
 
 // HandleRemoveGroup registers fn for the RemoveGroup command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveGroup is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveGroup(fn func(ctx context.Context, req RemoveGroupRequest) (RemoveGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveGroup, fn)
 }
 
 // HandleRemoveAllGroups registers fn for the RemoveAllGroups command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAllGroups is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAllGroups(fn func(ctx context.Context, req RemoveAllGroupsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveAllGroups, fn)
 }
 
 // HandleAddGroupIfIdentifying registers fn for the AddGroupIfIdentifying command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroupIfIdentifying is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroupIfIdentifying(fn func(ctx context.Context, req AddGroupIfIdentifyingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroupIfIdentifying, fn)
 }

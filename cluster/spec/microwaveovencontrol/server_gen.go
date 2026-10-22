@@ -167,19 +167,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetCookingParameters registers fn for the SetCookingParameters command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetCookingParameters is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetCookingParameters(fn func(ctx context.Context, req SetCookingParametersRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetCookingParameters, fn)
 }
 
 // HandleAddMoreTime registers fn for the AddMoreTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddMoreTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddMoreTime(fn func(ctx context.Context, req AddMoreTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddMoreTime, fn)
 }

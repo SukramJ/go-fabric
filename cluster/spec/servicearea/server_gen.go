@@ -148,19 +148,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSelectAreas registers fn for the SelectAreas command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSelectAreas is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSelectAreas(fn func(ctx context.Context, req SelectAreasRequest) (SelectAreasResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSelectAreas, fn)
 }
 
 // HandleSkipArea registers fn for the SkipArea command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipArea is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipArea(fn func(ctx context.Context, req SkipAreaRequest) (SkipAreaResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipArea, fn)
 }

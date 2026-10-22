@@ -111,31 +111,36 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSelectInput registers fn for the SelectInput command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSelectInput is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSelectInput(fn func(ctx context.Context, req SelectInputRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSelectInput, fn)
 }
 
 // HandleShowInputStatus registers fn for the ShowInputStatus command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleShowInputStatus is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleShowInputStatus(fn func(ctx context.Context, req ShowInputStatusRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdShowInputStatus, fn)
 }
 
 // HandleHideInputStatus registers fn for the HideInputStatus command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleHideInputStatus is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleHideInputStatus(fn func(ctx context.Context, req HideInputStatusRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdHideInputStatus, fn)
 }
 
 // HandleRenameInput registers fn for the RenameInput command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRenameInput is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRenameInput(fn func(ctx context.Context, req RenameInputRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRenameInput, fn)
 }

@@ -116,25 +116,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleLaunchApp registers fn for the LaunchApp command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleLaunchApp is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLaunchApp(fn func(ctx context.Context, req LaunchAppRequest) (LauncherResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLaunchApp, fn)
 }
 
 // HandleStopApp registers fn for the StopApp command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopApp is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopApp(fn func(ctx context.Context, req StopAppRequest) (LauncherResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopApp, fn)
 }
 
 // HandleHideApp registers fn for the HideApp command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleHideApp is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleHideApp(fn func(ctx context.Context, req HideAppRequest) (LauncherResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdHideApp, fn)
 }

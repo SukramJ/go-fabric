@@ -132,19 +132,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleGetDetailedPriceRequest registers fn for the GetDetailedPriceRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetDetailedPriceRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetDetailedPriceRequest(fn func(ctx context.Context, req GetDetailedPriceRequestRequest) (GetDetailedPriceResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetDetailedPriceRequest, fn)
 }
 
 // HandleGetDetailedForecastRequest registers fn for the GetDetailedForecastRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetDetailedForecastRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetDetailedForecastRequest(fn func(ctx context.Context, req GetDetailedForecastRequestRequest) (GetDetailedForecastResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetDetailedForecastRequest, fn)
 }

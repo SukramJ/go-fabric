@@ -249,6 +249,10 @@ cluster is declared with `<cluster>def.Declare` of its generated package
 | a host port (`Sink`, `LevelSource`, `Mover`, …) | the device the kit's server drives |
 | `HostServer` | your own server for the cluster, replacing the kit's |
 
+The declaration is construction; the typed server's setters of the same
+name (`Server.OnWrite`, `Server.Handle<Command>`) are the change at run
+time, for a host that installs or removes a hook after the device runs.
+
 Declaring an optional cluster of the device type mounts it, even an empty
 `<cluster>def.Declare{}`; Groups and ScenesManagement are then the
 assembler's. A sensor's measurement cluster is declared the same way —

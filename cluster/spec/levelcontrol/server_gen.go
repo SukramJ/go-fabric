@@ -212,61 +212,71 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleMoveToLevel registers fn for the MoveToLevel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevel(fn func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevel, fn)
 }
 
 // HandleMove registers fn for the Move command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMove is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMove(fn func(ctx context.Context, req MoveRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMove, fn)
 }
 
 // HandleStep registers fn for the Step command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStep is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevelWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevelWithOnOff(fn func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevelWithOnOff, fn)
 }
 
 // HandleMoveWithOnOff registers fn for the MoveWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveWithOnOff(fn func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveWithOnOff, fn)
 }
 
 // HandleStepWithOnOff registers fn for the StepWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepWithOnOff(fn func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepWithOnOff, fn)
 }
 
 // HandleStopWithOnOff registers fn for the StopWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopWithOnOff, fn)
 }
 
 // HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToClosestFrequency is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToClosestFrequency, fn)
 }

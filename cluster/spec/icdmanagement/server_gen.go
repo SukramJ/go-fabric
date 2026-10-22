@@ -170,25 +170,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleRegisterClient registers fn for the RegisterClient command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRegisterClient is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRegisterClient(fn func(ctx context.Context, req RegisterClientRequest) (RegisterClientResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRegisterClient, fn)
 }
 
 // HandleUnregisterClient registers fn for the UnregisterClient command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUnregisterClient is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnregisterClient(fn func(ctx context.Context, req UnregisterClientRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnregisterClient, fn)
 }
 
 // HandleStayActiveRequest registers fn for the StayActiveRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStayActiveRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStayActiveRequest(fn func(ctx context.Context, req StayActiveRequestRequest) (StayActiveResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStayActiveRequest, fn)
 }

@@ -284,49 +284,57 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleDisable registers fn for the Disable command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDisable is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
 // HandleEnableCharging registers fn for the EnableCharging command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableCharging is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableCharging(fn func(ctx context.Context, req EnableChargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableCharging, fn)
 }
 
 // HandleEnableDischarging registers fn for the EnableDischarging command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableDischarging is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableDischarging(fn func(ctx context.Context, req EnableDischargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableDischarging, fn)
 }
 
 // HandleStartDiagnostics registers fn for the StartDiagnostics command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartDiagnostics is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartDiagnostics(fn func(ctx context.Context, req StartDiagnosticsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartDiagnostics, fn)
 }
 
 // HandleSetTargets registers fn for the SetTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTargets(fn func(ctx context.Context, req SetTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTargets, fn)
 }
 
 // HandleGetTargets registers fn for the GetTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetTargets(fn func(ctx context.Context, req GetTargetsRequest) (GetTargetsResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetTargets, fn)
 }
 
 // HandleClearTargets registers fn for the ClearTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearTargets(fn func(ctx context.Context, req ClearTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearTargets, fn)
 }

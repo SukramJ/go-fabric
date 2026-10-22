@@ -148,37 +148,43 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandlePause registers fn for the Pause command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePause is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPause, fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleStart registers fn for the Start command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStart is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStart(fn func(ctx context.Context, req StartRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStart, fn)
 }
 
 // HandleResume registers fn for the Resume command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResume is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResume(fn func(ctx context.Context, req ResumeRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResume, fn)
 }
 
 // HandleGoHome registers fn for the GoHome command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGoHome is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGoHome(fn func(ctx context.Context, req GoHomeRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGoHome, fn)
 }

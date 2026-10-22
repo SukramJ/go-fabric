@@ -124,43 +124,50 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleChangeChannel registers fn for the ChangeChannel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannel(fn func(ctx context.Context, req ChangeChannelRequest) (ChangeChannelResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannel, fn)
 }
 
 // HandleChangeChannelByNumber registers fn for the ChangeChannelByNumber command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannelByNumber is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannelByNumber(fn func(ctx context.Context, req ChangeChannelByNumberRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannelByNumber, fn)
 }
 
 // HandleSkipChannel registers fn for the SkipChannel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipChannel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipChannel(fn func(ctx context.Context, req SkipChannelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipChannel, fn)
 }
 
 // HandleGetProgramGuide registers fn for the GetProgramGuide command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetProgramGuide is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetProgramGuide(fn func(ctx context.Context, req GetProgramGuideRequest) (ProgramGuideResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetProgramGuide, fn)
 }
 
 // HandleRecordProgram registers fn for the RecordProgram command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRecordProgram is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRecordProgram(fn func(ctx context.Context, req RecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRecordProgram, fn)
 }
 
 // HandleCancelRecordProgram registers fn for the CancelRecordProgram command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelRecordProgram is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelRecordProgram, fn)
 }

@@ -188,43 +188,50 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleScanNetworks registers fn for the ScanNetworks command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleScanNetworks is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleScanNetworks(fn func(ctx context.Context, req ScanNetworksRequest) (ScanNetworksResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdScanNetworks, fn)
 }
 
 // HandleAddOrUpdateWiFiNetwork registers fn for the AddOrUpdateWiFiNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateWiFiNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateWiFiNetwork(fn func(ctx context.Context, req AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateWiFiNetwork, fn)
 }
 
 // HandleAddOrUpdateThreadNetwork registers fn for the AddOrUpdateThreadNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateThreadNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateThreadNetwork(fn func(ctx context.Context, req AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateThreadNetwork, fn)
 }
 
 // HandleRemoveNetwork registers fn for the RemoveNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveNetwork(fn func(ctx context.Context, req RemoveNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveNetwork, fn)
 }
 
 // HandleConnectNetwork registers fn for the ConnectNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleConnectNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleConnectNetwork(fn func(ctx context.Context, req ConnectNetworkRequest) (ConnectNetworkResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdConnectNetwork, fn)
 }
 
 // HandleReorderNetwork registers fn for the ReorderNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleReorderNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleReorderNetwork(fn func(ctx context.Context, req ReorderNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdReorderNetwork, fn)
 }

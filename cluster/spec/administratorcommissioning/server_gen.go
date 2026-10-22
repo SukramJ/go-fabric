@@ -124,25 +124,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleOpenCommissioningWindow registers fn for the OpenCommissioningWindow command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleOpenCommissioningWindow is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOpenCommissioningWindow(fn func(ctx context.Context, req OpenCommissioningWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOpenCommissioningWindow, fn)
 }
 
 // HandleOpenBasicCommissioningWindow registers fn for the OpenBasicCommissioningWindow command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleOpenBasicCommissioningWindow is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOpenBasicCommissioningWindow(fn func(ctx context.Context, req OpenBasicCommissioningWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOpenBasicCommissioningWindow, fn)
 }
 
 // HandleRevokeCommissioning registers fn for the RevokeCommissioning command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRevokeCommissioning is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRevokeCommissioning(fn func(ctx context.Context, req RevokeCommissioningRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRevokeCommissioning, fn)
 }

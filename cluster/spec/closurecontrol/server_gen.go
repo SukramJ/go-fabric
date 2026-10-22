@@ -148,25 +148,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleMoveTo registers fn for the MoveTo command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveTo is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveTo(fn func(ctx context.Context, req MoveToRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveTo, fn)
 }
 
 // HandleCalibrate registers fn for the Calibrate command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCalibrate is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCalibrate(fn func(ctx context.Context, req CalibrateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCalibrate, fn)
 }

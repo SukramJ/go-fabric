@@ -347,6 +347,14 @@ file controls every node paired to it.
   fabric has.
 - `AutoSubscribe`: nil or true keeps the node live through one sustained
   wildcard subscription. The quickstart turns it off because it exits.
+  It is the default subscription, narrowed by `DefaultSubscription`
+  (`client.SubscribeOptions`); `Node.Subscribe` is a custom one beside it
+  — the default for a host that wants the node's whole image kept,
+  `Node.Subscribe` for paths of its own with its own `Updated`, or both.
+  Both together need `DefaultSubscription.KeepSubscriptions`: without it
+  the default subscription asks the node to drop the controller's other
+  subscriptions each time it is (re-)established, and a custom one
+  established with `ReplaceSubscriptions` drops the default.
 - `NoInitialRead`: skips the initial read after commissioning.
 
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.

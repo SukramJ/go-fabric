@@ -204,37 +204,43 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetUtcTime registers fn for the SetUtcTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetUtcTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetUtcTime(fn func(ctx context.Context, req SetUtcTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetUtcTime, fn)
 }
 
 // HandleSetTrustedTimeSource registers fn for the SetTrustedTimeSource command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTrustedTimeSource is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTrustedTimeSource(fn func(ctx context.Context, req SetTrustedTimeSourceRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTrustedTimeSource, fn)
 }
 
 // HandleSetTimeZone registers fn for the SetTimeZone command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTimeZone is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTimeZone(fn func(ctx context.Context, req SetTimeZoneRequest) (SetTimeZoneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTimeZone, fn)
 }
 
 // HandleSetDstOffset registers fn for the SetDstOffset command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetDstOffset is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetDstOffset(fn func(ctx context.Context, req SetDstOffsetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetDstOffset, fn)
 }
 
 // HandleSetDefaultNtp registers fn for the SetDefaultNtp command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetDefaultNtp is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetDefaultNtp(fn func(ctx context.Context, req SetDefaultNtpRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetDefaultNtp, fn)
 }

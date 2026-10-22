@@ -464,139 +464,162 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleLockDoor registers fn for the LockDoor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleLockDoor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLockDoor(fn func(ctx context.Context, req LockDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLockDoor, fn)
 }
 
 // HandleUnlockDoor registers fn for the UnlockDoor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUnlockDoor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnlockDoor(fn func(ctx context.Context, req UnlockDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnlockDoor, fn)
 }
 
 // HandleToggle registers fn for the Toggle command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleToggle is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleToggle(fn func(ctx context.Context, req ToggleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdToggle, fn)
 }
 
 // HandleUnlockWithTimeout registers fn for the UnlockWithTimeout command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUnlockWithTimeout is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnlockWithTimeout(fn func(ctx context.Context, req UnlockWithTimeoutRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnlockWithTimeout, fn)
 }
 
 // HandleSetWeekDaySchedule registers fn for the SetWeekDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetWeekDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetWeekDaySchedule(fn func(ctx context.Context, req SetWeekDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetWeekDaySchedule, fn)
 }
 
 // HandleGetWeekDaySchedule registers fn for the GetWeekDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetWeekDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetWeekDaySchedule(fn func(ctx context.Context, req GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetWeekDaySchedule, fn)
 }
 
 // HandleClearWeekDaySchedule registers fn for the ClearWeekDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearWeekDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearWeekDaySchedule(fn func(ctx context.Context, req ClearWeekDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearWeekDaySchedule, fn)
 }
 
 // HandleSetYearDaySchedule registers fn for the SetYearDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetYearDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetYearDaySchedule(fn func(ctx context.Context, req SetYearDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetYearDaySchedule, fn)
 }
 
 // HandleGetYearDaySchedule registers fn for the GetYearDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetYearDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetYearDaySchedule(fn func(ctx context.Context, req GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetYearDaySchedule, fn)
 }
 
 // HandleClearYearDaySchedule registers fn for the ClearYearDaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearYearDaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearYearDaySchedule(fn func(ctx context.Context, req ClearYearDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearYearDaySchedule, fn)
 }
 
 // HandleSetHolidaySchedule registers fn for the SetHolidaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetHolidaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetHolidaySchedule(fn func(ctx context.Context, req SetHolidayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetHolidaySchedule, fn)
 }
 
 // HandleGetHolidaySchedule registers fn for the GetHolidaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetHolidaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetHolidaySchedule(fn func(ctx context.Context, req GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetHolidaySchedule, fn)
 }
 
 // HandleClearHolidaySchedule registers fn for the ClearHolidaySchedule command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearHolidaySchedule is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearHolidaySchedule(fn func(ctx context.Context, req ClearHolidayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearHolidaySchedule, fn)
 }
 
 // HandleSetUser registers fn for the SetUser command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetUser is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetUser(fn func(ctx context.Context, req SetUserRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetUser, fn)
 }
 
 // HandleGetUser registers fn for the GetUser command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetUser is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetUser(fn func(ctx context.Context, req GetUserRequest) (GetUserResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetUser, fn)
 }
 
 // HandleClearUser registers fn for the ClearUser command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearUser is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearUser(fn func(ctx context.Context, req ClearUserRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearUser, fn)
 }
 
 // HandleSetCredential registers fn for the SetCredential command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetCredential is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetCredential(fn func(ctx context.Context, req SetCredentialRequest) (SetCredentialResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetCredential, fn)
 }
 
 // HandleGetCredentialStatus registers fn for the GetCredentialStatus command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetCredentialStatus is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetCredentialStatus(fn func(ctx context.Context, req GetCredentialStatusRequest) (GetCredentialStatusResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetCredentialStatus, fn)
 }
 
 // HandleClearCredential registers fn for the ClearCredential command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearCredential is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearCredential(fn func(ctx context.Context, req ClearCredentialRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearCredential, fn)
 }
 
 // HandleUnboltDoor registers fn for the UnboltDoor command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUnboltDoor is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnboltDoor(fn func(ctx context.Context, req UnboltDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnboltDoor, fn)
 }
 
 // HandleSetAliroReaderConfig registers fn for the SetAliroReaderConfig command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetAliroReaderConfig is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetAliroReaderConfig(fn func(ctx context.Context, req SetAliroReaderConfigRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetAliroReaderConfig, fn)
 }
 
 // HandleClearAliroReaderConfig registers fn for the ClearAliroReaderConfig command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearAliroReaderConfig is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearAliroReaderConfig(fn func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearAliroReaderConfig, fn)
 }
@@ -634,7 +657,11 @@ func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) e
 // StateSource is the lock's actuator: it reports whether the bolt is
 // jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor
 // (cmdID) the kit's DoorLock server admitted (cluster/lock
-// StateSource). Without one the server keeps its own lock state.
+// StateSource). The server reads LockState from it at every read and
+// stores none: IsJammed true is NotFullyLocked, IsLocked's observed
+// false (the lock's state is not known) is a null LockState, else
+// locked is Locked or Unlocked; after LockInvoke the next read asks
+// IsLocked again. Without one the server keeps its own lock state.
 type StateSource interface {
 	IsJammed() bool
 	IsLocked() (locked, observed bool)

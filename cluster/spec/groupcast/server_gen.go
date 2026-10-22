@@ -130,37 +130,43 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleJoinGroup registers fn for the JoinGroup command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleJoinGroup is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleJoinGroup(fn func(ctx context.Context, req JoinGroupRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdJoinGroup, fn)
 }
 
 // HandleLeaveGroup registers fn for the LeaveGroup command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleLeaveGroup is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLeaveGroup(fn func(ctx context.Context, req LeaveGroupRequest) (LeaveGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLeaveGroup, fn)
 }
 
 // HandleUpdateGroupKey registers fn for the UpdateGroupKey command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateGroupKey is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateGroupKey(fn func(ctx context.Context, req UpdateGroupKeyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateGroupKey, fn)
 }
 
 // HandleConfigureAuxiliaryAcl registers fn for the ConfigureAuxiliaryAcl command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleConfigureAuxiliaryAcl is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleConfigureAuxiliaryAcl(fn func(ctx context.Context, req ConfigureAuxiliaryAclRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdConfigureAuxiliaryAcl, fn)
 }
 
 // HandleGroupcastTesting registers fn for the GroupcastTesting command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGroupcastTesting is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGroupcastTesting(fn func(ctx context.Context, req GroupcastTestingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGroupcastTesting, fn)
 }

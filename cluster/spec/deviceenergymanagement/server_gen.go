@@ -164,55 +164,64 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandlePowerAdjustRequest registers fn for the PowerAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePowerAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePowerAdjustRequest(fn func(ctx context.Context, req PowerAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPowerAdjustRequest, fn)
 }
 
 // HandleCancelPowerAdjustRequest registers fn for the CancelPowerAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelPowerAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelPowerAdjustRequest(fn func(ctx context.Context, req CancelPowerAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelPowerAdjustRequest, fn)
 }
 
 // HandleStartTimeAdjustRequest registers fn for the StartTimeAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartTimeAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartTimeAdjustRequest(fn func(ctx context.Context, req StartTimeAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartTimeAdjustRequest, fn)
 }
 
 // HandlePauseRequest registers fn for the PauseRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseRequest(fn func(ctx context.Context, req PauseRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseRequest, fn)
 }
 
 // HandleResumeRequest registers fn for the ResumeRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResumeRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResumeRequest(fn func(ctx context.Context, req ResumeRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResumeRequest, fn)
 }
 
 // HandleModifyForecastRequest registers fn for the ModifyForecastRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleModifyForecastRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleModifyForecastRequest(fn func(ctx context.Context, req ModifyForecastRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdModifyForecastRequest, fn)
 }
 
 // HandleRequestConstraintBasedForecast registers fn for the RequestConstraintBasedForecast command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRequestConstraintBasedForecast is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRequestConstraintBasedForecast(fn func(ctx context.Context, req RequestConstraintBasedForecastRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRequestConstraintBasedForecast, fn)
 }
 
 // HandleCancelRequest registers fn for the CancelRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelRequest(fn func(ctx context.Context, req CancelRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelRequest, fn)
 }

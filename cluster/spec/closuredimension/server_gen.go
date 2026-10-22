@@ -196,19 +196,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetTarget registers fn for the SetTarget command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTarget is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTarget(fn func(ctx context.Context, req SetTargetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTarget, fn)
 }
 
 // HandleStep registers fn for the Step command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStep is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }

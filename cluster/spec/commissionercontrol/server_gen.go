@@ -103,19 +103,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleRequestCommissioningApproval registers fn for the RequestCommissioningApproval command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRequestCommissioningApproval is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRequestCommissioningApproval(fn func(ctx context.Context, req RequestCommissioningApprovalRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRequestCommissioningApproval, fn)
 }
 
 // HandleCommissionNode registers fn for the CommissionNode command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCommissionNode is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCommissionNode(fn func(ctx context.Context, req CommissionNodeRequest) (ReverseOpenCommissioningWindowResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCommissionNode, fn)
 }

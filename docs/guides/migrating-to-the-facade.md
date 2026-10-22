@@ -57,6 +57,7 @@ deprecated, while loom is the only consumer.
 | `levelcontrol.LevelSource` over `cluster/wire` requests, `levelcontrol.MoveToLevelRequest`, `MoveRequest`, `StepRequest`, `StopRequest` | `levelcontrol.LevelSource` is `levelcontroldef.LevelSource`, over the generated requests: `MoveToLevel(ctx, req levelcontroldef.MoveToLevelRequest) error`, `MoveToLevelWithOnOff(ctx, req levelcontroldef.MoveToLevelWithOnOffRequest) error`, …, `Options() levelcontroldef.OptionsBitmap`; a nullable field is `spec.Nullable` (`req.TransitionTime.Null`, `.Value`); declared as `levelcontroldef.Declare{LevelSource: …}` |
 | `fan.Stepper` over `wire.FanStepRequest` | `fan.Stepper` is `fancontroldef.Stepper`: `Step(ctx, req fancontroldef.StepRequest) error` |
 | `contract.AttributeChangeNotifier.OnMatterAttributesChanged(func([]uint32))` | `OnAttributeChange(func(contract.Change))` — `cb(contract.Change{Attributes: ids, Origin: contract.OriginUnknown})` from a host server that cannot tell the origin |
+| `OnMatterAttributesChanged(func([]uint32))` on every server that had it (`cluster.AttributeChanges`, `alarmbase.Server`, the `appliance` servers, `boolcfg.Server`, `core.ScenesManagement`, `cover.WindowCoveringServer`, the `energy` servers, `filter.Server`, `levelcontrol.Server`, `light.ColorControlServer`, `onoff.Server`, `thermo.ThermostatServer`) | `OnAttributeChange(func(contract.Change))` on the same server — `c.Attributes` are the ids |
 | `OnChanged(func(State, []uint32))`, `Device.OnChanged(id, func([]uint32))` | `OnChanged(func(State, contract.Change))`, `Device.OnChanged(id, func(contract.Change))` — `c.Attributes` are the ids, `c.Origin` tells a host `Set` from a controller's write and a command |
 | `device.WithMeasurement(src)` | the sensor's cluster declared and set: `tmdef.Declare{Initial: tmdef.Patch{MeasuredValue: &v, …}}` on `device.NewTemperatureSensor`, then the device's typed server `d.TemperatureMeasurement().Set(tmdef.Patch{MeasuredValue: &v})` on every reading (`examples/reference-bridge/fleet_sensors.go`); a BooleanState with StateChange is `bsdef.Declare{Features: bsdef.FeatureChangeEvent}` |
 | `device.WithChangeNotifier(src)` beside a port | none for a pull server: the valve's, pump's, fan's, lock's, ModeSelect's and SmokeCoAlarm's server is a `contract.ChangeNotifier` over its port's, so a port that notifies reaches the subscriber |
@@ -66,6 +67,30 @@ deprecated, while loom is the only consumer.
 | `valve.OpenRequest.HasOpenDuration`, `OpenDuration *uint32` | `OpenDuration *spec.Nullable[uint32]`: nil is absent, `Null` the null the controller sent (`valvedef.OpenRequest`) |
 | `media.PlaybackState.AvailableAudioTracks`, `AvailableTextTracks []TrackStruct` | `*[]TrackStruct`: nil is "not reported", the generated `mediaplaybackdef.State`'s form |
 | the hand-written port and value types of `cluster/light` (`Color`, `ColorMode`, the writers), `cluster/media`, `cluster/pump`, `cluster/thermo`, `cluster/energy`, `cluster/valve`, `cluster/servicearea`, `cluster/lock`, `cluster/boolcfg`, `cluster/appliance`, `cluster/modeselect` | the same names, now aliases of the generated `<cluster>def` types with the same members: code that names them compiles; code that reflects on the type's package does not |
+
+## Changed in v0.10.0: one shape (gate 2)
+
+Gate 2 (`notes/briefs/reports/G2.md`) found one hook with three
+signatures, an option beside the facade's own route and a device type id
+without a type; each has one form now.
+
+| Removed or changed | Route |
+| --- | --- |
+| `<cluster>def.Server.OnChangedAsync(fn) (unsubscribe, error)`, `spec.OnChangedAsyncOf(w, fn) (unsubscribe, error)`, `spec.ErrNoQueue` | `OnChangedAsync(fn) (unsubscribe func())`, as `OnChanged` and `Device.OnChangedAsync`: a server wrapped outside a device has no queue and delivers nothing, as a device not added delivers nothing |
+| `device.Options.NodeLabel` | `Device.Rename(ctx, name)`: the node persists the label a controller or `Rename` set and restores it itself |
+| `device.Spec.Type uint16`, the device-type constants (`device.DimmableLightID`, …) as `uint16`, `device.Type.ID uint16`, `device.TypeByID(uint16)` | `schema.DeviceTypeID` (a named `uint16`) for all of them; an untyped constant (`0x0101`) still fits, a `uint16` variable converts: `schema.DeviceTypeID(v)` |
+| `schema.DeviceTypeRevision`, `DeviceTypeName`, `DeviceTypeAllowsServerCluster`, `DeviceTypeRequiresServerCluster`, `DeviceTypeDefinitionOf`, `DeviceTypeConditions`, `DeviceTypeConditionScope`, `DeviceTypeClusterRequirement`, `DeviceTypeElementRequirements` and the `DeviceType*` tables over `uint32` | the same over `schema.DeviceTypeID`; a Descriptor's 32-bit devtype-id converts with `schema.DeviceTypeIDOf(id)` (false for a manufacturer-specific one) |
+| `spec.PatchValues(patch any)` | `Patch.AttributeValues()` (the generated `spec.PatchValuer`); `spec.SetPatch` takes a `spec.PatchValuer` |
+| `spec.StateOf[S]`, `OnChangedOf`, `OnChangedAsyncOf`, `OnWriteOf` over any struct with `matter` tags | the same over a generated `State` (its `FromAttributeValues`, the `spec.StateReader` the generator writes per field); a call with a generated type compiles unchanged, a hand-written struct writes its own `FromAttributeValues`. The generated `State` and `Patch` carry no `matter` struct tags any more |
+
+Not a break: `node.Config.Groups` is `*node.Groups` and
+`node.Config.Advertiser` is `node.Advertiser` — owned aliases of
+`groups.Manager` and `mdns.Advertiser`, so a value of either name is the
+other and code written against the old names compiles.
+
+`fabrictest.Site.Eventually` and `Settle` on a context without a deadline
+now end after `Options.Wait` (default `fabrictest.DefaultWait`, 30 s on the
+wall clock) with `fabrictest.ErrWaited` instead of waiting forever.
 
 ## Removed in v0.10.0: the deprecated surface
 
@@ -132,7 +157,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
    responder. A host that relied on the old default sets
    `Network.MDNS.Disabled`.
 3. **Accessor return types** of the typed cluster layer change, landing in
-   `v0.9.2`.
+   `v0.10.0`.
 
 ## Verify
 
