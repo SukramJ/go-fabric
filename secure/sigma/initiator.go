@@ -39,6 +39,8 @@ var ErrUnexpectedSigma2Resume = errors.New("sigma: unexpected Sigma2_Resume")
 //
 // Mirrors matter.js packages/protocol/src/session/case/CaseClient.ts:pair.
 type Initiator struct {
+	// mu guards the handshake state below: the ephemeral key, the session
+	// id and what Sigma1–Sigma3 accumulate.
 	mu sync.Mutex
 
 	identity    *Identity

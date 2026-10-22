@@ -43,6 +43,8 @@ type AccessControl struct {
 	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
 	log atomic.Pointer[slog.Logger]
 
+	// mu guards the fields below: the request's fabric and the cached
+	// ACL state the handlers read; the store is not called under it.
 	mu            sync.RWMutex
 	currentFabric uint8
 

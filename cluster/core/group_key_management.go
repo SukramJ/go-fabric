@@ -35,6 +35,8 @@ type GroupKeyManagement struct {
 	// leaves the cluster a pure store facade with an empty GroupTable.
 	groups *groups.Manager
 
+	// mu guards the fields below: the request's fabric, the limits and
+	// the cached key-set state.
 	mu                    sync.RWMutex
 	currentFabric         uint8
 	maxGroupsPerFabric    uint16
