@@ -5,6 +5,7 @@ package fabrictest
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync/atomic"
 	"testing"
@@ -38,5 +39,39 @@ func TestSettleMeasuresOnTheInjectedWallClock(t *testing.T) {
 	}
 	if wall.reads.Load() == 0 {
 		t.Fatal("Settle never read the injected wall clock")
+	}
+}
+
+// racingWall is the system clock running a second ahead at every reading.
+type racingWall struct {
+	clock.System
+	ahead atomic.Int64
+}
+
+func (w *racingWall) Now() time.Time {
+	return w.System.Now().Add(time.Duration(w.ahead.Add(1)) * time.Second)
+}
+
+// TestEventuallyWithoutDeadlineEnds pins G2-11: Eventually on a context
+// without a deadline gives up once the site's wait (DefaultWait on the
+// wall clock) has passed, with ErrWaited, instead of hanging the test.
+func TestEventuallyWithoutDeadlineEnds(t *testing.T) {
+	t.Parallel()
+	wall := &racingWall{}
+	site := NewSite(t, Options{Logger: slog.New(slog.DiscardHandler), Wall: wall})
+	if site.opts.Wait != DefaultWait {
+		t.Fatalf("the default wait is %v, want %v", site.opts.Wait, DefaultWait)
+	}
+	start := wall.Now()
+	err := site.Eventually(context.Background(), "a condition that never holds", func() bool { return false })
+	if !errors.Is(err, ErrWaited) {
+		t.Fatalf("Eventually: %v, want ErrWaited", err)
+	}
+	if waited := wall.Now().Sub(start); waited < DefaultWait {
+		t.Errorf("gave up after %v on the wall clock, before the default wait %v", waited, DefaultWait)
+	}
+	short := NewSite(t, Options{Logger: slog.New(slog.DiscardHandler), Wait: time.Millisecond})
+	if err := short.Eventually(context.Background(), "never", func() bool { return false }); !errors.Is(err, ErrWaited) {
+		t.Fatalf("Eventually with Options.Wait: %v, want ErrWaited", err)
 	}
 }

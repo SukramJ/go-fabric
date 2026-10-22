@@ -26,7 +26,9 @@ func mustInstance(def *spec.Cluster, opts spec.Options) *spec.Instance {
 // refusedWrite is a write the definition refuses (status: UNSUPPORTED_WRITE
 // for a served read-only attribute, UNSUPPORTED_ATTRIBUTE otherwise, as
 // matter.js AttributeWriteResponse answers them) with the server's own
-// sentinel kept as the error it unwraps to.
+// sentinel kept as the error it unwraps to. A refusal the definition does
+// not judge (no status) is the server's "read-only": UNSUPPORTED_WRITE,
+// never FAILURE.
 type refusedWrite struct {
 	sentinel error
 	status   error
@@ -46,5 +48,5 @@ func (e refusedWrite) MatterStatusCode() im.StatusCode {
 	if sce, ok := errors.AsType[im.StatusCodeError](e.status); ok {
 		return sce.MatterStatusCode()
 	}
-	return im.StatusFailure
+	return im.StatusUnsupportedWrite
 }

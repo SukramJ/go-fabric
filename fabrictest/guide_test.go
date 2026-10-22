@@ -6,6 +6,7 @@ package fabrictest_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
@@ -30,7 +31,10 @@ func TestPlugToggles(t *testing.T) {
 		Device: fabrictest.Topology{Bridged: []node.Endpoint{plug}},
 	})
 	ep, _ := plug.EndpointNumber()
-	ctx := context.Background()
+	// A deadline of the test's own: a wait without one ends after the
+	// site's (Options.Wait, 30 s on the wall clock) with ErrWaited.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
 	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {

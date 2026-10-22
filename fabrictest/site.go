@@ -5,6 +5,7 @@ package fabrictest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/metrics"
@@ -24,6 +25,16 @@ var DefaultStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // DefaultSettle is the quiet period of [Site.Settle], and of [Site.Run]
 // before it moves a fake clock to its next deadline.
 const DefaultSettle = 10 * time.Millisecond
+
+// DefaultWait is how long [Site.Eventually] and [Site.Settle] wait, on the
+// site's wall clock ([Options].Wall), when their context has no deadline
+// of its own: a condition that never holds ends the test with an error
+// instead of hanging it until go test's timeout.
+const DefaultWait = 30 * time.Second
+
+// ErrWaited is the error of a wait without a context deadline that ran
+// out of the site's own ([Options].Wait).
+var ErrWaited = errors.New("fabrictest: the site's wait ran out (Options.Wait; the context had no deadline)")
 
 // closeTimeout bounds the site's teardown of one host.
 const closeTimeout = 10 * time.Second
@@ -45,6 +56,10 @@ type Options struct {
 	Loopback bool
 	// Settle is the quiet period of [Site.Settle]; 0 is [DefaultSettle].
 	Settle time.Duration
+	// Wait bounds [Site.Eventually] and [Site.Settle] on the Wall clock
+	// when their context has no deadline; 0 is [DefaultWait]. A context
+	// with a deadline is waited on as it is.
+	Wait time.Duration
 	// Wall is the clock the quiet period is measured on and the quiet
 	// check paces itself by — the machine's time, whatever Clock the hosts
 	// run on, since "nothing ran for 10 ms" is a statement about the
@@ -102,6 +117,9 @@ func NewSite(tb testing.TB, opts Options) *Site {
 	}
 	if s.log == nil {
 		s.log = slog.New(slog.DiscardHandler)
+	}
+	if s.opts.Wait <= 0 {
+		s.opts.Wait = DefaultWait
 	}
 	if s.opts.Settle <= 0 {
 		s.opts.Settle = DefaultSettle
@@ -203,10 +221,22 @@ func (s *Site) listen(index int) (*udp.Listener, error) {
 // ([Options].Settle): no datagram sent and none queued unread on the
 // in-memory network, and no goroutine of the test process runnable,
 // running (but the one waiting) or in a system call. It moves no clock.
-func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil) }
+// A ctx without a deadline is bounded by [Options].Wait ([ErrWaited]).
+func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil, s.waitUntil(ctx)) }
 
-// quiet is Settle that also returns, with nil, once done is closed.
-func (s *Site) quiet(ctx context.Context, done <-chan struct{}) error {
+// waitUntil is the wall-clock instant a wait on ctx gives up at: the zero
+// time for a ctx with a deadline (ctx bounds it), now plus [Options].Wait
+// otherwise.
+func (s *Site) waitUntil(ctx context.Context) time.Time {
+	if _, ok := ctx.Deadline(); ok {
+		return time.Time{}
+	}
+	return s.wall.Now().Add(s.opts.Wait)
+}
+
+// quiet is Settle that also returns, with nil, once done is closed, and
+// with [ErrWaited] once the wall clock passes until (none when zero).
+func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time) error {
 	wall := s.wall
 	since := wall.Now()
 	lastSent := s.sent()
@@ -221,6 +251,9 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+		}
+		if !until.IsZero() && !wall.Now().Before(until) {
+			return ErrWaited
 		}
 		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples, s.inSyscall) {
 			lastSent, since = sent, wall.Now()
@@ -292,7 +325,7 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 		result = fn(ctx)
 	}()
 	for {
-		if err := s.quiet(ctx, finished); err != nil {
+		if err := s.quiet(ctx, finished, time.Time{}); err != nil {
 			return err
 		}
 		select {
@@ -307,11 +340,14 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 }
 
 // Eventually runs [Site.Run] until cond holds and returns an error naming
-// what when ctx ends first. A test waits for the effect of a change — a
-// report that reached the controller, a session that closed — with it.
+// what when ctx ends first — or, for a ctx without a deadline, once
+// [Options].Wait has passed on the wall clock ([ErrWaited]). A test waits
+// for the effect of a change — a report that reached the controller, a
+// session that closed — with it.
 func (s *Site) Eventually(ctx context.Context, what string, cond func() bool) error {
+	until := s.waitUntil(ctx)
 	for !cond() {
-		if err := s.quiet(ctx, nil); err != nil {
+		if err := s.quiet(ctx, nil, until); err != nil {
 			return fmt.Errorf("fabrictest: waiting for %s: %w", what, err)
 		}
 		if cond() {
