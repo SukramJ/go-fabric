@@ -48,7 +48,7 @@ type boolReading struct {
 }
 
 func (r boolReading) MatterMeasurementClass() contract.MeasurementClass { return r.class }
-func (r boolReading) MatterBoolValue() (bool, bool)                     { return r.value, true }
+func (r boolReading) MatterBoolValue() (value, observed bool)           { return r.value, true }
 
 type electricalReading struct{ floatReading }
 
@@ -93,7 +93,7 @@ func measurementCases() []measurementCase {
 		k, _ := contract.MeasurementKindFor(class)
 		return k.ClusterID
 	}
-	var cases []measurementCase
+	cases := make([]measurementCase, 0, 21)
 	for _, c := range []struct {
 		name  string
 		class contract.MeasurementClass
@@ -138,7 +138,7 @@ func measurementCases() []measurementCase {
 // its PowerSource, its EndpointList naming the device's endpoint.
 func TestMeasurementServesEveryBuiltinClassOverTheWire(t *testing.T) {
 	cases := measurementCases()
-	var bridged []node.Endpoint
+	bridged := make([]node.Endpoint, 0, len(cases)+1)
 	devices := make([]*device.Device, len(cases))
 	for i, c := range cases {
 		typ, ok := device.TypeByID(schema.DeviceTypeID(contract.MeasurementClassDeviceType(c.src.MatterMeasurementClass())))
@@ -225,7 +225,7 @@ func TestMeasurementServesEveryBuiltinClassOverTheWire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EndpointList: %v", err)
 	}
-	var list []uint64
+	list := make([]uint64, 0, len(got.Children))
 	for _, n := range got.Children {
 		list = append(list, n.El.Uint)
 	}
@@ -264,7 +264,7 @@ func sameScalar(want any, got spec.Node) error {
 		}
 		rv = rv.Elem()
 	}
-	ok := false
+	var ok bool
 	switch rv.Kind() {
 	case reflect.Bool:
 		ok = got.El.Bool == rv.Bool()
