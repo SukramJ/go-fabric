@@ -11,7 +11,6 @@ import (
 	"bufio"
 	"bytes"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -275,7 +274,7 @@ func docPages(t *testing.T) []string {
 	}
 	sort.Strings(out)
 	if len(out) == 0 {
-		t.Fatal(fmt.Errorf("no page under docs/"))
+		t.Fatal("no page under docs/")
 	}
 	return out
 }

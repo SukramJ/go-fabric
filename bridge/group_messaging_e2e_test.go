@@ -552,8 +552,10 @@ type lockingMember struct {
 }
 
 func (m lockingMember) LeaveGroup(ip net.IP) error {
-	m.b.groupNetMu.Lock()
-	m.b.groupNetMu.Unlock() //nolint:staticcheck // taking the lock is the test
+	func() { // taking the lock is the test
+		m.b.groupNetMu.Lock()
+		defer m.b.groupNetMu.Unlock()
+	}()
 	return m.fakeMulticastMember.LeaveGroup(ip)
 }
 

@@ -455,9 +455,10 @@ func printTopology(n *node.Node) {
 // propagates here without an edit. A device type absent from the snapshot is
 // a programming error in this file, not a runtime condition.
 func deviceTypeRevision(id uint32) uint16 {
-	rev, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(id))
-	if !ok {
-		panic(fmt.Sprintf("device type %#06x is not in the matter.js schema snapshot", id))
+	if dt, ok := schema.DeviceTypeIDOf(id); ok {
+		if rev, ok := schema.DeviceTypeRevision(dt); ok {
+			return rev
+		}
 	}
-	return rev
+	panic(fmt.Sprintf("device type %#06x is not in the matter.js schema snapshot", id))
 }

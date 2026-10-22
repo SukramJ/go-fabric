@@ -523,7 +523,7 @@ func composes(owner, part *Type) bool {
 	seen := map[string]bool{}
 	for t := owner; t != nil && !seen[t.Name]; t = typeByName(t.Base) {
 		seen[t.Name] = true
-		dt, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(t.ID))
+		dt, ok := schema.DeviceTypeDefinitionOf(t.ID)
 		if !ok {
 			continue
 		}
