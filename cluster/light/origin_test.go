@@ -6,6 +6,7 @@ package light_test
 import (
 	"context"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -68,11 +69,11 @@ func TestColorControlHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 		if !ok {
 			t.Fatal("not a ColorControlServer")
 		}
-		count := func(subscribe func(func(contract.Change)) func()) *int {
-			n := new(int)
+		count := func(subscribe func(func(contract.Change)) func()) *atomic.Int32 {
+			n := new(atomic.Int32) // the quieter's deferred report runs on its timer's goroutine
 			subscribe(func(c contract.Change) {
 				if slices.Contains(c.Attributes, ccdef.AttrColorTemperatureMireds) {
-					*n++
+					n.Add(1)
 				}
 			})
 			return n
@@ -83,13 +84,13 @@ func TestColorControlHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if *host != 3 || *onWire != 1 {
-			t.Errorf("host %d, wire %d changes at once; want 3 and 1", *host, *onWire)
+		if host.Load() != 3 || onWire.Load() != 1 {
+			t.Errorf("host %d, wire %d changes at once; want 3 and 1", host.Load(), onWire.Load())
 		}
 		time.Sleep(2 * time.Second)
 		synctest.Wait()
-		if *onWire != 2 {
-			t.Errorf("wire %d reports after the interval, want 2", *onWire)
+		if onWire.Load() != 2 {
+			t.Errorf("wire %d reports after the interval, want 2", onWire.Load())
 		}
 	})
 }
