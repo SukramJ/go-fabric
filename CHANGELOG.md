@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- The module builds for 32-bit targets again: `node.Commissioning.WindowCredentials` clamps the PBKDF iteration count through `int64`, so `math.MaxUint32` no longer overflows a 32-bit `int` on linux/arm and linux/386 (#225). A CI job `build (32-bit)` and `make build-32bit` (in `make ci`) compile the module for linux/armv7 and vet it for linux/386.
+
 ## [0.10.0] — 2026-10-22
 
 ### Added

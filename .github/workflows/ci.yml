@@ -44,6 +44,21 @@ jobs:
       - name: go build
         run: make build
 
+  build-32bit:
+    name: build (32-bit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # An int is 32 bits on arm and 386, so an untyped constant past
+      # math.MaxInt32 that converts to int compiles on amd64 and fails here
+      # (#225). The armv7 build is the consumer's cross-compile; vet on 386
+      # type-checks the test files too.
+      - name: go build (linux/armv7), go vet (linux/386)
+        run: make build-32bit
   vet:
     name: vet
     runs-on: ubuntu-latest
