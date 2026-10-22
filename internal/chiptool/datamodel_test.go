@@ -120,6 +120,17 @@ func loadSchemaClusters(t *testing.T) map[uint32]*schemaCluster {
 	return out
 }
 
+// deviceTypeName is the snapshot's name of a DeviceTypeList entry's
+// 32-bit devtype-id, empty when the snapshot has none.
+func deviceTypeName(dt uint32) string {
+	id, ok := schema.DeviceTypeIDOf(dt)
+	if !ok {
+		return ""
+	}
+	name, _ := schema.DeviceTypeName(id)
+	return name
+}
+
 // deviceTypeRequirements caches the snapshot's device-type requirement rows.
 var deviceTypeRequirements map[uint32]map[uint32]string
 
@@ -422,7 +433,11 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		t.Fatal("DeviceTypeList is empty")
 	}
 	for dt, rev := range ep.deviceTypes {
-		want, ok := schema.DeviceTypeRevision(dt)
+		id, ok := schema.DeviceTypeIDOf(dt)
+		var want uint16
+		if ok {
+			want, ok = schema.DeviceTypeRevision(id)
+		}
 		if !ok {
 			t.Errorf("device type 0x%04X is not in the matter.js schema", dt)
 			continue
@@ -430,10 +445,10 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		if rev != want {
 			t.Errorf("device type 0x%04X revision %d, schema says %d", dt, rev, want)
 		}
-		for _, cl := range schema.DeviceTypeMandatoryServerClusters[dt] {
+		for _, cl := range schema.DeviceTypeMandatoryServerClusters[id] {
 			if !ep.has(cl) {
 				name, _ := schema.ClusterName(cl)
-				dtName, _ := schema.DeviceTypeName(dt)
+				dtName, _ := schema.DeviceTypeName(id)
 				t.Errorf("device type %s (0x%04X) mandates server cluster %s (0x%04X); ServerList lacks it",
 					dtName, dt, name, cl)
 			}
@@ -448,7 +463,7 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		for dt := range ep.deviceTypes {
 			if deviceTypeForbids(t, dt, cl) {
 				name, _ := schema.ClusterName(cl)
-				dtName, _ := schema.DeviceTypeName(dt)
+				dtName := deviceTypeName(dt)
 				t.Errorf("cluster %s (0x%04X) is served, but device type %s (0x%04X) marks it X (disallowed)",
 					name, cl, dtName, dt)
 			}
