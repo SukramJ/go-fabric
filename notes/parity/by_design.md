@@ -3820,3 +3820,27 @@ delivered to the queued callbacks (`device/lifecycle.go` `OnChangedAsync`).
 Reasoning: a queue without an owner that stops it is a goroutine leak; a
 change before the device is part of a node has no controller and no
 report, and the inline `OnChanged` still sees it (phase 20c, brief BU-a).
+
+### BD-Matter-CommandOrigin-PerServerFlag — a change made while a server runs a command is reported as the command's, a concurrent host `Set` included
+
+matter.js knows a change's origin from the transaction that commits it:
+a command runs under an `ActionContext` that carries the transaction
+every state change needs (`packages/node/src/behavior/context/ActionContext.ts:25`
+at `862ad75f`), and the `$Changed` notification is pushed with that
+transaction's session (`behavior/state/managed/Datasource.ts:1473-1476`),
+so a host's handler override writes state as the command, and a write
+from elsewhere commits in its own transaction with its own session. The
+module's setter path has no ambient context: a self-held server marks
+the command's origin in a per-server flag held while the handler runs
+(the `cause` field of `cluster/opstate/typed.go`, `cluster/modebase`,
+`cluster/energy`, …; the dispatcher stamps `contract.OriginCommand` on
+the context, `endpoint/dispatcher.go`), and every change reported while
+the flag is set — the handler's own `Set`, which matter.js reports the
+same way, and a host `Set` racing the command from another goroutine,
+which matter.js would report as the host's — carries
+`contract.OriginCommand`. Reasoning: the alternative is a context
+parameter on every setter of the facade for one racing case; a host that
+needs its own origin for a concurrent `Set` serialises it with the
+command through `OnChangedAsync`'s per-device queue (phase 20c, brief
+BU-b).
+
