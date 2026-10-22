@@ -39,6 +39,9 @@ import (
 //     changes meaningfully (e.g. firmware update changes endpoint
 //     topology).
 type BasicInformation struct {
+	// mu guards the fields that change after construction: nodeLabel,
+	// location, softwareVersion, softwareString, onPersistentWrite, endpoint
+	// and emitter. ReadAttribute reads the fixed fields under it as well.
 	mu sync.RWMutex
 
 	// log is the cluster's logger ([Config.Logger]; slog.Default() when nil).

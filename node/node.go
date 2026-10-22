@@ -37,11 +37,11 @@ import (
 var ErrStopped = errors.New("node: stopped")
 
 // operationalTimeInterval is how often the operational time is persisted
-// while the node runs (the daemon's time.Minute, main.go:430).
+// while the node runs (the daemon's time.Minute, main.go:430 at b4ea1f96^).
 const operationalTimeInterval = time.Minute
 
 // stopTimeout bounds the Stop [Node.Run] performs once its context ends
-// (the daemon's 5 s, main.go:432).
+// (the daemon's 5 s, main.go:432 at b4ea1f96^).
 const stopTimeout = 5 * time.Second
 
 // Node is a Matter node: the bridge, its root and Aggregator endpoints and
@@ -114,7 +114,7 @@ type Node struct {
 }
 
 // New builds the node: everything the reference daemon builds before
-// bridge.Start (examples/reference-bridge/main.go:135-397), with every
+// bridge.Start (examples/reference-bridge/main.go:135-397 at b4ea1f96^), with every
 // port of bridge/bridge.go's package doc attached in its documented order.
 //
 // Nothing is left as a noop except what the configuration omits on
@@ -166,7 +166,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		a.SetClock(n.cfg.Clock)
 	}
 
-	// --- persistence (main.go:146-165, persist.go openDB) ---------------
+	// --- persistence (main.go:146-165 at b4ea1f96^, persist.go openDB) ---------------
 	if err := n.openStores(ctx); err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		n.groups.SetClock(n.cfg.Clock)
 	}
 
-	// --- the topology assembler and the Aggregator (main.go:167-186) ----
+	// --- the topology assembler and the Aggregator (main.go:167-186 at b4ea1f96^) ----
 	// A host with its own assembler supplies the bridge's Snapshotter
 	// instead (Config.Topology), as the daemon did before the facade.
 	pd, bi := cfg.ProductDescription, cfg.BasicInformation
@@ -216,7 +216,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// The binding manager reads the topology the bridge serves.
 	snapshotter = n.observeTopology(snapshotter)
 
-	// --- the bridge (main.go:188-228) -----------------------------------
+	// --- the bridge (main.go:188-228 at b4ea1f96^) -----------------------------------
 	n.br, err = bridge.New(snapshotter, n.advertiser, bridge.Config{
 		Listen:        cfg.Network.Listen,
 		PreferIPv4:    cfg.Network.PreferIPv4,
@@ -235,22 +235,22 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.br.SetDeviceTypeValidation(cfg.DeviceTypeValidation)
 
 	// Access control fails closed without a lister; the stored ACL is what
-	// a commissioner writes (main.go:230-233).
+	// a commissioner writes (main.go:230-233 at b4ea1f96^).
 	n.br.AttachACLLister(n.st)
 	// Group messaging and the auxiliary ACL, over the restored group state
-	// (main.go:234-246).
+	// (main.go:234-246 at b4ea1f96^).
 	if err := n.groups.Load(ctx); err != nil {
 		return nil, fmt.Errorf("node: group state: %w", err)
 	}
 	n.br.AttachGroupMessaging(n.groups)
 	n.br.AttachAuxiliaryACL(n.groups)
 	// A bounded trace of the moments that explain a failed pairing
-	// (main.go:247-251).
+	// (main.go:247-251 at b4ea1f96^).
 	n.diagRing = diagevent.NewRing(256)
 	n.diagRing.SetClock(n.cfg.Clock)
 	n.br.AttachDiagnosticEvents(n.diagRing)
 
-	// --- root + Aggregator endpoints (main.go:253-321) ------------------
+	// --- root + Aggregator endpoints (main.go:253-321 at b4ea1f96^) ------------------
 	// UniqueID is pinned before the root is built: the host's value, or
 	// the one the store keeps (persist.go uniqueID).
 	if n.cfg.BasicInformation.UniqueID == "" {
@@ -299,13 +299,13 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		return nil, err
 	}
 
-	// --- sessions, PASE, CASE (main.go:323-328) -------------------------
+	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), n.logger)
 
-	// --- the commissioning window (main.go:329-360) ---------------------
+	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
 	advert, err := n.advertisement()
 	if err != nil {
 		return nil, err
@@ -317,13 +317,13 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	wireCommissioningWindow(n.life, n.window, n.st)
 
-	// --- fabric hooks (main.go:362-414) ---------------------------------
+	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
 	// The host's observers run after each (observers.go).
 	n.root.OperationalCredentials.SetOnFabricRemoved(n.observedFabricRemoved)
 	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
-	// Event numbers continue across a reboot (main.go:416-426).
+	// Event numbers continue across a reboot (main.go:416-426 at b4ea1f96^).
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
 		n.br.EventLog().SeedNumber(ceiling)
 	}
@@ -362,7 +362,7 @@ func (n *Node) blockOnAttestationError(ctx context.Context) {
 }
 
 // openStores resolves cfg.Store: the overrides, or the two stores on DB
-// with their schemas applied (persist.go:45-60).
+// with their schemas applied (persist.go:95-110).
 func (n *Node) openStores(ctx context.Context) error {
 	if path := n.cfg.Store.Path; path != "" {
 		db, err := openStorePath(path)
@@ -413,7 +413,7 @@ func (n *Node) closeOwnedDB() {
 }
 
 // advertisement is the commissionable record of the node's own window
-// (main.go:329-347): CM=1, the configured discriminator, the product
+// (main.go:329-347 at b4ea1f96^): CM=1, the configured discriminator, the product
 // description's name and device type.
 func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	var instanceID [8]byte
@@ -446,7 +446,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 // fabricInstalled is OperationalCredentials' OnFabricInstalled: the CASE
 // identity is rebuilt from the new fabric and its operational record
 // published — the only publish a freshly commissioned fabric gets
-// (main.go:263-289).
+// (main.go:263-289 at b4ea1f96^).
 func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
 		n.logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
@@ -461,7 +461,7 @@ func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint
 }
 
 // fabricRemoved is OperationalCredentials' OnFabricRemoved
-// (main.go:362-385): Leave, the OTA providers, the CASE identity and
+// (main.go:362-385 at b4ea1f96^): Leave, the OTA providers, the CASE identity and
 // record, the sessions, and the node's own window once the last fabric
 // is gone.
 func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
@@ -520,7 +520,7 @@ func (n *Node) reopenWhenIdle() {
 }
 
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
-// (main.go:387-406): UpdateNOC moves the CASE identity and the
+// (main.go:387-406 at b4ea1f96^): UpdateNOC moves the CASE identity and the
 // operational record, and ends the fabric's other sessions, each told
 // with a CloseSession (Bridge.CloseFabricSessionsExcept).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
@@ -606,7 +606,7 @@ func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 }
 
 // Start brings the node online: the bridge starts, and the daemon's
-// post-start sequence runs (main.go:428-489) — the diagnostic-log
+// post-start sequence runs (main.go:428-489 at b4ea1f96^) — the diagnostic-log
 // provider, the StartUp and BootReason events, the operational-time
 // keeper, the PartsList providers, the CASE identities of the fabrics a
 // previous run installed, the re-establishment of their subscriptions,
@@ -648,7 +648,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
-	// order matter.js emits them in (main.go:439-444).
+	// order matter.js emits them in (main.go:439-444 at b4ea1f96^).
 	n.root.BasicInformation.EmitStartUp()
 	n.root.GeneralDiagnostics.EmitBootReason()
 	n.keeperWG.Add(1)
@@ -664,7 +664,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	// Fabrics of a previous run: their CASE identities, the subscriptions
 	// their controllers held, then their operational records — matter.js
-	// re-establishes before entering operational mode (main.go:461-489).
+	// re-establishes before entering operational mode (main.go:461-489 at b4ea1f96^).
 	fabrics, err := n.st.ListFabrics(ctx)
 	if err != nil {
 		n.logger.Warn("fabrics.list_failed", slog.String("err", err.Error()))
@@ -691,7 +691,7 @@ func (n *Node) Start(ctx context.Context) error {
 	// and its CASE identities are loaded (BindingManager.ts:65-78: the
 	// queue flushes on the node's online event).
 	n.startBindings()
-	// An uncommissioned node opens its own window (main.go:491-501;
+	// An uncommissioned node opens its own window (main.go:491-501 at b4ea1f96^;
 	// matter.js CommissioningServer enterCommissionableMode, which asks
 	// whether the fabric table is empty — not whether its identities
 	// loaded). A node with stored fabrics none of which loaded is a broken
@@ -713,7 +713,7 @@ func (n *Node) Start(ctx context.Context) error {
 }
 
 // Stop takes the node offline and releases what New and Start began, in
-// the daemon's shutdown order (main.go:430-450): the OTA requestor, the
+// the daemon's shutdown order (main.go:430-450 at b4ea1f96^): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the session
 // table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
@@ -895,12 +895,12 @@ func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 // binds it into its assembler (endpoint.Config.Groups), so the endpoints'
 // Groups servers, the bridge's group-message routing and the root's
 // GroupKeyManagement share one state.
-func (n *Node) Groups() *groups.Manager { return n.groups }
+func (n *Node) Groups() *Groups { return n.groups }
 
 // PairingCodes returns the QR code payload and the manual pairing code of
 // the configured passcode and discriminator — matter.js
 // `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
-// daemon prints them (main.go:504-518).
+// daemon prints them (main.go:504-518 at b4ea1f96^).
 func (n *Node) PairingCodes() (qr, manual string, err error) {
 	cm := n.cfg.Commissioning
 	return pairingCodes(n.cfg.ProductDescription, cm.Discriminator, cm.Passcode)

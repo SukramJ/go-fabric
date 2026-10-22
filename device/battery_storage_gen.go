@@ -12,8 +12,8 @@ import (
 
 // BatteryStorage device type identity: 0x0018, revision 2.
 const (
-	BatteryStorageID       uint16 = 0x0018
-	BatteryStorageRevision uint16 = 2
+	BatteryStorageID       schema.DeviceTypeID = 0x0018
+	BatteryStorageRevision uint16              = 2
 )
 
 // BatteryStorageType is the BatteryStorage device type, matter.js's packages/node/src/devices/battery-storage.ts;

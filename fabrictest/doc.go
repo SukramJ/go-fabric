@@ -23,7 +23,8 @@
 //		Device: fabrictest.Topology{Bridged: []node.Endpoint{myPlug}},
 //	})
 //	ep, _ := pair.Device.EndpointOf("plug:1")
-//	res, err := fabrictest.Invoke(ctx, pair, im.ConcreteCommandPath{Endpoint: ep, Cluster: onoff.ClusterID, Command: onoff.CmdToggle}, nil)
+//	// onoffdef is github.com/SukramJ/go-fabric/cluster/spec/onoff
+//	res, err := fabrictest.Invoke(ctx, pair, im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}, nil)
 //
 // What runs:
 //

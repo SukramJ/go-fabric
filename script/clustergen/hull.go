@@ -181,7 +181,7 @@ func (g *generator) server() ([]byte, error) {
 	}
 	w.p("type State struct {")
 	for _, f := range fields {
-		w.p("\t%s %s `matter:\"0x%04X\"` // attribute 0x%04X: %s", f.goName, f.goType, f.a.ID, f.a.ID, describe(&f.a.Effective.value))
+		w.p("\t%s %s // attribute 0x%04X: %s", f.goName, f.goType, f.a.ID, describe(&f.a.Effective.value))
 	}
 	w.p("}")
 	w.p("")
@@ -193,13 +193,14 @@ func (g *generator) server() ([]byte, error) {
 	}
 	w.p("type Patch struct {")
 	for _, f := range fields {
-		w.p("\t%s *%s `matter:\"0x%04X\"` // attribute 0x%04X", f.goName, f.base, f.a.ID, f.a.ID)
+		w.p("\t%s *%s // attribute 0x%04X", f.goName, f.base, f.a.ID)
 	}
 	if nullable {
 		w.p("\tNull []uint32 // attribute ids set to null")
 	}
 	w.p("}")
 	w.p("")
+	g.stateValues(w, fields)
 	g.patchValues(w, fields, nullable)
 
 	w.p("// Server is the typed %s server over the cluster's server — the", c.Name)
@@ -244,9 +245,11 @@ func (g *generator) server() ([]byte, error) {
 	w.p("")
 	w.p("// OnChangedAsync is OnChanged with fn queued: the state and the change")
 	w.p("// are taken when the server reports it, and fn runs later on the")
-	w.p("// device's goroutine, one call after the other. spec.ErrNoQueue for a")
-	w.p("// server wrapped outside a device (Wrap).")
-	w.p("func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {")
+	w.p("// device's goroutine, one call after the other. A server wrapped")
+	w.p("// outside a device (Wrap) has no queue and delivers nothing, as a")
+	w.p("// device not added delivers nothing. It returns the unsubscribe")
+	w.p("// function.")
+	w.p("func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {")
 	w.p("\treturn spec.OnChangedAsyncOf(s.Wrapper, fn)")
 	w.p("}")
 	w.p("")
@@ -255,14 +258,16 @@ func (g *generator) server() ([]byte, error) {
 	w.p("// value in place, attrID the attribute written. An error refuses the")
 	w.p("// write — with the IM status it carries, FAILURE otherwise — and nothing")
 	w.p("// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server")
-	w.p("// that takes none.")
+	w.p("// that takes none. Declare.OnWrite is the veto at construction; this")
+	w.p("// setter changes it at run time.")
 	w.p("func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {")
 	w.p("\treturn spec.OnWriteOf(s.Underlying(), fn)")
 	w.p("}")
 	for _, hc := range cmds {
 		w.p("")
 		w.p("// %s registers fn for the %s command; nil removes the handler;", hc.method, strings.TrimPrefix(hc.cmdID, "Cmd"))
-		w.p("// spec.ErrNoHandlers for a server that takes none.")
+		w.p("// spec.ErrNoHandlers for a server that takes none. Declare.%s is", hc.method)
+		w.p("// the handler at construction; this setter changes it at run time.")
 		w.p("func (s *Server) %s(fn func(ctx context.Context, req %s) (%s, error)) error {", hc.method, hc.request, hc.response)
 		w.p("\treturn spec.HandleOn(s.Underlying(), %s, fn)", hc.cmdID)
 		w.p("}")
@@ -312,9 +317,7 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("\t_ = s.Get()")
 	g.patchValuesTest(w)
 	w.p("\ts.OnChanged(func(State, contract.Change) {})()")
-	w.p("\tif _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {")
-	w.p("\t\tt.Errorf(\"OnChangedAsync without a queue: %%v, want spec.ErrNoQueue\", err)")
-	w.p("\t}")
+	w.p("\ts.OnChangedAsync(func(State, contract.Change) { t.Error(\"OnChangedAsync without a queue delivered\") })()")
 	w.p("\tif err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {")
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
@@ -379,6 +382,30 @@ func (g *generator) hullEvents() []hullEvent {
 	return out
 }
 
+// stateValues renders State.FromAttributeValues: each field from the
+// value read answers for its attribute, converted to the field's type
+// (spec.Assign) — written per field, as Patch.AttributeValues is, so
+// spec.StateOf walks no struct by reflection.
+func (g *generator) stateValues(w *writer, fields []hullField) {
+	w.p("// FromAttributeValues implements spec.StateReader: each field the value")
+	w.p("// read answers for its attribute, converted to the field's type; an")
+	w.p("// attribute read does not answer, or answers with a value the field")
+	w.p("// cannot hold, leaves the field as it is.")
+	if len(fields) == 0 {
+		w.p("func (st *State) FromAttributeValues(func(attrID uint32) (any, bool)) {}")
+		w.p("")
+		return
+	}
+	w.p("func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {")
+	for _, f := range fields {
+		w.p("	if v, ok := read(Attr%s); ok {", f.goName)
+		w.p("		spec.Assign(&st.%s, v)", f.goName)
+		w.p("	}")
+	}
+	w.p("}")
+	w.p("")
+}
+
 // patchValues renders Patch.AttributeValues: the patch as attribute
 // values, a list of a generated struct as its spec.List — the stored form
 // the attribute writer encodes, set where the entry type is known rather
@@ -434,6 +461,9 @@ func (g *generator) patchValuesTest(w *writer) {
 	}
 	w.p("\t}")
 	w.p("\tvalues := full.AttributeValues()")
+	w.p("\t// The stored values read back into a State, field by field.")
+	w.p("\tvar back State")
+	w.p("\tback.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })")
 	w.p("\tif len(values) != %d {", want)
 	w.p("\t\tt.Errorf(\"a patch of every field sets %%d values, want %d\", len(values))", want)
 	w.p("\t}")

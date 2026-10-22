@@ -18,39 +18,85 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Breadcrumb                   uint64                     `matter:"0x0000"` // attribute 0x0000: uint64, M, RW VA
-	BasicCommissioningInfo       BasicCommissioningInfo     `matter:"0x0001"` // attribute 0x0001: BasicCommissioningInfo, M, R V, F
-	RegulatoryConfig             RegulatoryLocationTypeEnum `matter:"0x0002"` // attribute 0x0002: RegulatoryLocationTypeEnum, M, R V
-	LocationCapability           RegulatoryLocationTypeEnum `matter:"0x0003"` // attribute 0x0003: RegulatoryLocationTypeEnum, M, R V, F
-	SupportsConcurrentConnection bool                       `matter:"0x0004"` // attribute 0x0004: bool, M, R V, F
-	TcAcceptedVersion            uint16                     `matter:"0x0005"` // attribute 0x0005: uint16, TC, R A, N
-	TcMinRequiredVersion         uint16                     `matter:"0x0006"` // attribute 0x0006: uint16, TC, R A, N
-	TcAcknowledgements           uint16                     `matter:"0x0007"` // attribute 0x0007: map16, TC, R A, N
-	TcAcknowledgementsRequired   bool                       `matter:"0x0008"` // attribute 0x0008: bool, TC, R A, N
-	TcUpdateDeadline             *uint32                    `matter:"0x0009"` // attribute 0x0009: uint32, TC, R A, X N
-	RecoveryIdentifier           []byte                     `matter:"0x000A"` // attribute 0x000A: octstr, P, NR, R M, N
-	NetworkRecoveryReason        *NetworkRecoveryReasonEnum `matter:"0x000B"` // attribute 0x000B: NetworkRecoveryReasonEnum, P, NR, R M, X
-	IsCommissioningWithoutPower  bool                       `matter:"0x000C"` // attribute 0x000C: bool, O, R V
+	Breadcrumb                   uint64                     // attribute 0x0000: uint64, M, RW VA
+	BasicCommissioningInfo       BasicCommissioningInfo     // attribute 0x0001: BasicCommissioningInfo, M, R V, F
+	RegulatoryConfig             RegulatoryLocationTypeEnum // attribute 0x0002: RegulatoryLocationTypeEnum, M, R V
+	LocationCapability           RegulatoryLocationTypeEnum // attribute 0x0003: RegulatoryLocationTypeEnum, M, R V, F
+	SupportsConcurrentConnection bool                       // attribute 0x0004: bool, M, R V, F
+	TcAcceptedVersion            uint16                     // attribute 0x0005: uint16, TC, R A, N
+	TcMinRequiredVersion         uint16                     // attribute 0x0006: uint16, TC, R A, N
+	TcAcknowledgements           uint16                     // attribute 0x0007: map16, TC, R A, N
+	TcAcknowledgementsRequired   bool                       // attribute 0x0008: bool, TC, R A, N
+	TcUpdateDeadline             *uint32                    // attribute 0x0009: uint32, TC, R A, X N
+	RecoveryIdentifier           []byte                     // attribute 0x000A: octstr, P, NR, R M, N
+	NetworkRecoveryReason        *NetworkRecoveryReasonEnum // attribute 0x000B: NetworkRecoveryReasonEnum, P, NR, R M, X
+	IsCommissioningWithoutPower  bool                       // attribute 0x000C: bool, O, R V
 }
 
 // Patch is a change to the GeneralCommissioning state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Breadcrumb                   *uint64                     `matter:"0x0000"` // attribute 0x0000
-	BasicCommissioningInfo       *BasicCommissioningInfo     `matter:"0x0001"` // attribute 0x0001
-	RegulatoryConfig             *RegulatoryLocationTypeEnum `matter:"0x0002"` // attribute 0x0002
-	LocationCapability           *RegulatoryLocationTypeEnum `matter:"0x0003"` // attribute 0x0003
-	SupportsConcurrentConnection *bool                       `matter:"0x0004"` // attribute 0x0004
-	TcAcceptedVersion            *uint16                     `matter:"0x0005"` // attribute 0x0005
-	TcMinRequiredVersion         *uint16                     `matter:"0x0006"` // attribute 0x0006
-	TcAcknowledgements           *uint16                     `matter:"0x0007"` // attribute 0x0007
-	TcAcknowledgementsRequired   *bool                       `matter:"0x0008"` // attribute 0x0008
-	TcUpdateDeadline             *uint32                     `matter:"0x0009"` // attribute 0x0009
-	RecoveryIdentifier           *[]byte                     `matter:"0x000A"` // attribute 0x000A
-	NetworkRecoveryReason        *NetworkRecoveryReasonEnum  `matter:"0x000B"` // attribute 0x000B
-	IsCommissioningWithoutPower  *bool                       `matter:"0x000C"` // attribute 0x000C
+	Breadcrumb                   *uint64                     // attribute 0x0000
+	BasicCommissioningInfo       *BasicCommissioningInfo     // attribute 0x0001
+	RegulatoryConfig             *RegulatoryLocationTypeEnum // attribute 0x0002
+	LocationCapability           *RegulatoryLocationTypeEnum // attribute 0x0003
+	SupportsConcurrentConnection *bool                       // attribute 0x0004
+	TcAcceptedVersion            *uint16                     // attribute 0x0005
+	TcMinRequiredVersion         *uint16                     // attribute 0x0006
+	TcAcknowledgements           *uint16                     // attribute 0x0007
+	TcAcknowledgementsRequired   *bool                       // attribute 0x0008
+	TcUpdateDeadline             *uint32                     // attribute 0x0009
+	RecoveryIdentifier           *[]byte                     // attribute 0x000A
+	NetworkRecoveryReason        *NetworkRecoveryReasonEnum  // attribute 0x000B
+	IsCommissioningWithoutPower  *bool                       // attribute 0x000C
 	Null                         []uint32                    // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrBreadcrumb); ok {
+		spec.Assign(&st.Breadcrumb, v)
+	}
+	if v, ok := read(AttrBasicCommissioningInfo); ok {
+		spec.Assign(&st.BasicCommissioningInfo, v)
+	}
+	if v, ok := read(AttrRegulatoryConfig); ok {
+		spec.Assign(&st.RegulatoryConfig, v)
+	}
+	if v, ok := read(AttrLocationCapability); ok {
+		spec.Assign(&st.LocationCapability, v)
+	}
+	if v, ok := read(AttrSupportsConcurrentConnection); ok {
+		spec.Assign(&st.SupportsConcurrentConnection, v)
+	}
+	if v, ok := read(AttrTcAcceptedVersion); ok {
+		spec.Assign(&st.TcAcceptedVersion, v)
+	}
+	if v, ok := read(AttrTcMinRequiredVersion); ok {
+		spec.Assign(&st.TcMinRequiredVersion, v)
+	}
+	if v, ok := read(AttrTcAcknowledgements); ok {
+		spec.Assign(&st.TcAcknowledgements, v)
+	}
+	if v, ok := read(AttrTcAcknowledgementsRequired); ok {
+		spec.Assign(&st.TcAcknowledgementsRequired, v)
+	}
+	if v, ok := read(AttrTcUpdateDeadline); ok {
+		spec.Assign(&st.TcUpdateDeadline, v)
+	}
+	if v, ok := read(AttrRecoveryIdentifier); ok {
+		spec.Assign(&st.RecoveryIdentifier, v)
+	}
+	if v, ok := read(AttrNetworkRecoveryReason); ok {
+		spec.Assign(&st.NetworkRecoveryReason, v)
+	}
+	if v, ok := read(AttrIsCommissioningWithoutPower); ok {
+		spec.Assign(&st.IsCommissioningWithoutPower, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -145,9 +191,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -156,31 +204,36 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleArmFailSafe registers fn for the ArmFailSafe command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleArmFailSafe is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleArmFailSafe(fn func(ctx context.Context, req ArmFailSafeRequest) (ArmFailSafeResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdArmFailSafe, fn)
 }
 
 // HandleSetRegulatoryConfig registers fn for the SetRegulatoryConfig command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetRegulatoryConfig is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetRegulatoryConfig(fn func(ctx context.Context, req SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetRegulatoryConfig, fn)
 }
 
 // HandleCommissioningComplete registers fn for the CommissioningComplete command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCommissioningComplete is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCommissioningComplete(fn func(ctx context.Context, req CommissioningCompleteRequest) (CommissioningCompleteResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCommissioningComplete, fn)
 }
 
 // HandleSetTcAcknowledgements registers fn for the SetTcAcknowledgements command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTcAcknowledgements is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTcAcknowledgements(fn func(ctx context.Context, req SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTcAcknowledgements, fn)
 }
@@ -228,7 +281,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

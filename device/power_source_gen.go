@@ -12,8 +12,8 @@ import (
 
 // PowerSource device type identity: 0x0011, revision 1.
 const (
-	PowerSourceID       uint16 = 0x0011
-	PowerSourceRevision uint16 = 1
+	PowerSourceID       schema.DeviceTypeID = 0x0011
+	PowerSourceRevision uint16              = 1
 )
 
 // PowerSourceType is the PowerSource device type, matter.js's packages/node/src/endpoints/power-source.ts;

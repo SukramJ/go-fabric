@@ -542,3 +542,48 @@ func TestGroupMessageArrivesOverRealMulticast(t *testing.T) {
 		t.Fatalf("lamp received %v over multicast, want one Toggle", got)
 	}
 }
+
+// lockingMember is a member whose LeaveGroup takes the bridge's
+// group-networking lock, as a socket implementation calling back into the
+// bridge would.
+type lockingMember struct {
+	*fakeMulticastMember
+	b *Bridge
+}
+
+func (m lockingMember) LeaveGroup(ip net.IP) error {
+	func() { // taking the lock is the test
+		m.b.groupNetMu.Lock()
+		defer m.b.groupNetMu.Unlock()
+	}()
+	return m.fakeMulticastMember.LeaveGroup(ip)
+}
+
+// TestStopGroupNetworkingLeavesWithoutTheLock pins G2-13 (ADR 0026 P6):
+// stop takes the joined set under groupNetMu and leaves the addresses on
+// the network after releasing it, so a member that takes the lock does not
+// deadlock.
+func TestStopGroupNetworkingLeavesWithoutTheLock(t *testing.T) {
+	t.Parallel()
+	gh := newGroupsHarness(t, 1)
+	fake := &fakeMulticastMember{joined: map[string]bool{}}
+	gh.bridge.startGroupNetworking(lockingMember{fake, gh.bridge})
+	gh.bridge.AttachGroupMessaging(gh.groups)
+	gh.provisionGroup(t, 0x01A1, bytes.Repeat([]byte{0xA1}, 16), 0x0101, "", gh.lampIDs()...)
+	if got := fake.addresses(); len(got) != 1 {
+		t.Fatalf("joined %v, want the kitchen address", got)
+	}
+	done := make(chan struct{})
+	go func() {
+		gh.bridge.stopGroupNetworking()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stopGroupNetworking deadlocked: LeaveGroup ran under groupNetMu")
+	}
+	if got := fake.addresses(); len(got) != 0 {
+		t.Fatalf("stop left %v joined", got)
+	}
+}

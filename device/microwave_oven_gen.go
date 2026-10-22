@@ -16,8 +16,8 @@ import (
 
 // MicrowaveOven device type identity: 0x0079, revision 2.
 const (
-	MicrowaveOvenID       uint16 = 0x0079
-	MicrowaveOvenRevision uint16 = 2
+	MicrowaveOvenID       schema.DeviceTypeID = 0x0079
+	MicrowaveOvenRevision uint16              = 2
 )
 
 // MicrowaveOvenType is the MicrowaveOven device type, matter.js's packages/node/src/devices/microwave-oven.ts;

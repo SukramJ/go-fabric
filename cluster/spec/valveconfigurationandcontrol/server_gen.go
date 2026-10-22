@@ -18,35 +18,75 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	OpenDuration        *uint32          `matter:"0x0000"` // attribute 0x0000: elapsed-s, M, R V, X
-	DefaultOpenDuration *uint32          `matter:"0x0001"` // attribute 0x0001: elapsed-s, M, RW VO, X N
-	AutoCloseTime       *uint64          `matter:"0x0002"` // attribute 0x0002: epoch-us, TS, R V, X
-	RemainingDuration   *uint32          `matter:"0x0003"` // attribute 0x0003: elapsed-s, M, R V, X Q
-	CurrentState        *ValveStateEnum  `matter:"0x0004"` // attribute 0x0004: ValveStateEnum, M, R V, X
-	TargetState         *ValveStateEnum  `matter:"0x0005"` // attribute 0x0005: ValveStateEnum, M, R V, X
-	CurrentLevel        *uint8           `matter:"0x0006"` // attribute 0x0006: percent, LVL, R V, X
-	TargetLevel         *uint8           `matter:"0x0007"` // attribute 0x0007: percent, LVL, R V, X
-	DefaultOpenLevel    uint8            `matter:"0x0008"` // attribute 0x0008: percent, [LVL], RW VO, N
-	ValveFault          ValveFaultBitmap `matter:"0x0009"` // attribute 0x0009: ValveFaultBitmap, O, R V
-	LevelStep           uint8            `matter:"0x000A"` // attribute 0x000A: uint8, [LVL], R V, F
+	OpenDuration        *uint32          // attribute 0x0000: elapsed-s, M, R V, X
+	DefaultOpenDuration *uint32          // attribute 0x0001: elapsed-s, M, RW VO, X N
+	AutoCloseTime       *uint64          // attribute 0x0002: epoch-us, TS, R V, X
+	RemainingDuration   *uint32          // attribute 0x0003: elapsed-s, M, R V, X Q
+	CurrentState        *ValveStateEnum  // attribute 0x0004: ValveStateEnum, M, R V, X
+	TargetState         *ValveStateEnum  // attribute 0x0005: ValveStateEnum, M, R V, X
+	CurrentLevel        *uint8           // attribute 0x0006: percent, LVL, R V, X
+	TargetLevel         *uint8           // attribute 0x0007: percent, LVL, R V, X
+	DefaultOpenLevel    uint8            // attribute 0x0008: percent, [LVL], RW VO, N
+	ValveFault          ValveFaultBitmap // attribute 0x0009: ValveFaultBitmap, O, R V
+	LevelStep           uint8            // attribute 0x000A: uint8, [LVL], R V, F
 }
 
 // Patch is a change to the ValveConfigurationAndControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	OpenDuration        *uint32           `matter:"0x0000"` // attribute 0x0000
-	DefaultOpenDuration *uint32           `matter:"0x0001"` // attribute 0x0001
-	AutoCloseTime       *uint64           `matter:"0x0002"` // attribute 0x0002
-	RemainingDuration   *uint32           `matter:"0x0003"` // attribute 0x0003
-	CurrentState        *ValveStateEnum   `matter:"0x0004"` // attribute 0x0004
-	TargetState         *ValveStateEnum   `matter:"0x0005"` // attribute 0x0005
-	CurrentLevel        *uint8            `matter:"0x0006"` // attribute 0x0006
-	TargetLevel         *uint8            `matter:"0x0007"` // attribute 0x0007
-	DefaultOpenLevel    *uint8            `matter:"0x0008"` // attribute 0x0008
-	ValveFault          *ValveFaultBitmap `matter:"0x0009"` // attribute 0x0009
-	LevelStep           *uint8            `matter:"0x000A"` // attribute 0x000A
+	OpenDuration        *uint32           // attribute 0x0000
+	DefaultOpenDuration *uint32           // attribute 0x0001
+	AutoCloseTime       *uint64           // attribute 0x0002
+	RemainingDuration   *uint32           // attribute 0x0003
+	CurrentState        *ValveStateEnum   // attribute 0x0004
+	TargetState         *ValveStateEnum   // attribute 0x0005
+	CurrentLevel        *uint8            // attribute 0x0006
+	TargetLevel         *uint8            // attribute 0x0007
+	DefaultOpenLevel    *uint8            // attribute 0x0008
+	ValveFault          *ValveFaultBitmap // attribute 0x0009
+	LevelStep           *uint8            // attribute 0x000A
 	Null                []uint32          // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrOpenDuration); ok {
+		spec.Assign(&st.OpenDuration, v)
+	}
+	if v, ok := read(AttrDefaultOpenDuration); ok {
+		spec.Assign(&st.DefaultOpenDuration, v)
+	}
+	if v, ok := read(AttrAutoCloseTime); ok {
+		spec.Assign(&st.AutoCloseTime, v)
+	}
+	if v, ok := read(AttrRemainingDuration); ok {
+		spec.Assign(&st.RemainingDuration, v)
+	}
+	if v, ok := read(AttrCurrentState); ok {
+		spec.Assign(&st.CurrentState, v)
+	}
+	if v, ok := read(AttrTargetState); ok {
+		spec.Assign(&st.TargetState, v)
+	}
+	if v, ok := read(AttrCurrentLevel); ok {
+		spec.Assign(&st.CurrentLevel, v)
+	}
+	if v, ok := read(AttrTargetLevel); ok {
+		spec.Assign(&st.TargetLevel, v)
+	}
+	if v, ok := read(AttrDefaultOpenLevel); ok {
+		spec.Assign(&st.DefaultOpenLevel, v)
+	}
+	if v, ok := read(AttrValveFault); ok {
+		spec.Assign(&st.ValveFault, v)
+	}
+	if v, ok := read(AttrLevelStep); ok {
+		spec.Assign(&st.LevelStep, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -135,9 +175,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -146,19 +188,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleOpen registers fn for the Open command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleOpen is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOpen(fn func(ctx context.Context, req OpenRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOpen, fn)
 }
 
 // HandleClose registers fn for the Close command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClose is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClose(fn func(ctx context.Context, req CloseRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClose, fn)
 }
@@ -241,7 +286,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

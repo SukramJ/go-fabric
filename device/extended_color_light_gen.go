@@ -17,8 +17,8 @@ import (
 
 // ExtendedColorLight device type identity: 0x010D, revision 5.
 const (
-	ExtendedColorLightID       uint16 = 0x010D
-	ExtendedColorLightRevision uint16 = 5
+	ExtendedColorLightID       schema.DeviceTypeID = 0x010D
+	ExtendedColorLightRevision uint16              = 5
 )
 
 // ExtendedColorLightType is the ExtendedColorLight device type, matter.js's packages/node/src/devices/extended-color-light.ts;

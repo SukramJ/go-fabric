@@ -211,6 +211,8 @@ func (n *Node) newBindings() (*binding.Manager, error) {
 // bindingSync attaches the Binding servers of the topology the bridge
 // serves to the binding manager once the node runs.
 type bindingSync struct {
+	// mu guards topo and running. It is released before the topology is
+	// synced to the binding manager.
 	mu      sync.Mutex
 	topo    *endpoint.Topology
 	running bool

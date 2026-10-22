@@ -6,7 +6,6 @@ package wire
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -158,7 +157,7 @@ func (s *SchedulesServer) MatterWrite(_ context.Context, attrID uint32, _ any) e
 // MatterInvoke implements [contract.ClusterServer]. All invocations
 // are rejected: the Schedules cluster exposes no commands in the v1.1 bridge.
 func (s *SchedulesServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, fmt.Errorf("%w: command 0x%02X", ErrSchedulesReadOnly, cmdID)
+	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: command 0x%02X", ErrSchedulesReadOnly, cmdID)
 }
 
 // MatterReportable implements [contract.ClusterServer]. Only the

@@ -452,7 +452,7 @@ func decodeSessionParameters(b []byte) (sessionparams.Parameters, error) {
 		return sessionparams.Parameters{}, err
 	}
 	if el.Type != tlv.TypeStructure {
-		return sessionparams.Parameters{}, fmt.Errorf("session parameters: %v, want a structure", el.Type)
+		return sessionparams.Parameters{}, fmt.Errorf("client: session parameters: %v, want a structure", el.Type)
 	}
 	return sessionparams.DecodeFields(dec)
 }

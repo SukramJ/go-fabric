@@ -77,6 +77,9 @@ const (
 // itself does not surface hardware-fault events to Matter); UpTime
 // and TotalOperationalHours come from a monotonic clock.
 type GeneralDiagnostics struct {
+	// mu guards clock, startTime, rebootCount, baseOperationalTime,
+	// persistedSeeded, testEnableKey, testTrigger, deviceLoad, utcClock,
+	// endpoint and emitter. opMu is taken after it.
 	mu sync.RWMutex
 
 	// log is the server's logger, set by [GeneralDiagnostics.SetLogger].

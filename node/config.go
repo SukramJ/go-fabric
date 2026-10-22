@@ -23,12 +23,23 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
+// Advertiser is the type of [Config].Advertiser: what publishes the node
+// over DNS-SD ([mdns.Advertiser]). An owned name for the seam; the two
+// names are one type, so a value of either is the other.
+type Advertiser = mdns.Advertiser
+
+// Groups is the type of [Config].Groups and of what [Node.Groups]
+// returns: the group state one node shares between its Groups,
+// GroupKeyManagement and Groupcast servers and its group messaging
+// ([groups.Manager]). An owned name for the seam, as [Advertiser] is.
+type Groups = groups.Manager
+
 // Config is the node's configuration, code-first (ADR 0018 decision 5).
 // Its groups are the behaviour ids matter.js's ServerNode.Configuration
 // keys its options by — `network`, `commissioning`, `productDescription`,
 // `basicInformation` (packages/node/src/node/ServerNode.ts:107-127) — for
 // the subset the reference daemon uses; the rest is what the daemon's
-// bring-up needs beyond them (examples/reference-bridge/main.go:84-497).
+// bring-up needs beyond them (examples/reference-bridge/main.go:84-497 at b4ea1f96^).
 type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
 	Network Network
@@ -49,7 +60,7 @@ type Config struct {
 	// mdns.Zeroconf with the subtype responder, configured by
 	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
 	// closes it, the host's as the node's.
-	Advertiser mdns.Advertiser
+	Advertiser Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
 	// warn mode.
@@ -92,12 +103,12 @@ type Config struct {
 	// [Node.Groups] returns for a host that binds its assembler after New.
 	// An advanced seam (docs/guides/advanced-seams.md): a host with the
 	// facade's own assembler leaves it nil.
-	Groups *groups.Manager
+	Groups *Groups
 	// Topology, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
 	// own device model, one endpoint.Snapshot per scope, its own label and
 	// scene persistence) hands the bridge its Snapshotter here, as the
-	// reference daemon did before the facade (main.go:188, bridge.New's
+	// reference daemon did before the facade (main.go:188 at b4ea1f96^, bridge.New's
 	// first argument). The facade then builds no assembler and no
 	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
 	// endpoints' servers, the PartsList providers and every port stay the
@@ -111,7 +122,7 @@ type Config struct {
 	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
-	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
+	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345 at b4ea1f96^).
 	AggregatorServers []contract.ClusterServer
 	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
 	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
@@ -291,7 +302,7 @@ func (c *Config) rootDeviceConditions() []string {
 
 // Commissioning is matter.js `commissioning` (CommissioningServer.ts:
 // 370-380: passcode, discriminator) plus the SPAKE2+ PBKDF parameters the
-// daemon configures (main.go:91-92).
+// daemon configures (main.go:91-92 at b4ea1f96^).
 type Commissioning struct {
 	// Passcode is the setup passcode; it must pass setup.IsValidSetupPIN.
 	Passcode uint32
@@ -315,17 +326,17 @@ type Commissioning struct {
 // (ProductDescriptionServer.ts:70-90).
 type ProductDescription struct {
 	// Name is the advertised device name; empty is
-	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285).
+	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
 	Name string
 	// DeviceType is the advertised device type; 0 is RootNode (0x0016),
-	// as the daemon advertises (main.go:290).
+	// as the daemon advertises (main.go:290 at b4ea1f96^).
 	DeviceType uint16
 	// VendorID and ProductID are the node's identity; both mandatory.
 	VendorID, ProductID uint16
 }
 
 // BasicInformation is the root BasicInformation the daemon configures
-// (examples/reference-bridge/wiring.go:105-116, buildRootClusters), plus
+// (examples/reference-bridge/wiring.go:105-116 at b4ea1f96^, buildRootClusters), plus
 // ProductLabel from matter.js's example (BridgedDevicesNode.ts:29-65).
 type BasicInformation struct {
 	VendorName   string
@@ -355,7 +366,7 @@ type BasicInformation struct {
 
 // Store names the node's persistence. With DB the node applies both
 // schemas (store.Apply, sqlitestore.Apply) and opens the two stores on it,
-// as the daemon's openDB does (persist.go:45-60); the caller picks the
+// as the daemon's openDB does (persist.go:95-110); the caller picks the
 // SQLite driver and owns the handle. With Path the node opens that SQLite
 // file itself and treats it as DB. Credentials and Endpoints override the
 // stores built from DB or Path, or stand in for them when both are unset.
@@ -407,7 +418,7 @@ type OtaConfig struct {
 var ErrInvalidConfig = errors.New("node: invalid configuration")
 
 // setupPasscodeMax is the Matter §5.1.1.6 upper bound the daemon checks
-// (main.go:121-125).
+// (main.go:121-125 at b4ea1f96^).
 const setupPasscodeMax = 99999998
 
 // Fabric-table bounds: Matter §11.18.4.4 limits SupportedFabrics to 1..254
@@ -429,14 +440,14 @@ func validSetupPIN(pin uint32) bool { return pin <= setupPasscodeMax && setup.Is
 
 // errSetupPIN is the failure every passcode check reports.
 func errSetupPIN(pin uint32) error {
-	return fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", pin)
+	return fmt.Errorf("node: passcode %d is invalid or on the trivially-guessable list", pin)
 }
 
 // The checks [Config.Validate] and [Node.OpenBasicWindow] share, against
 // the bounds above.
 func checkDiscriminator(d uint16) error {
 	if d > MaxDiscriminator {
-		return fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
+		return fmt.Errorf("node: discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
 	}
 	return nil
 }
@@ -444,16 +455,16 @@ func checkDiscriminator(d uint16) error {
 func checkPBKDF(iterations int64, saltLen int) []error {
 	var errs []error
 	if iterations < PBKDFIterationsMin || iterations > PBKDFIterationsMax {
-		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
+		errs = append(errs, fmt.Errorf("node: PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
 	}
 	if saltLen < PBKDFSaltMin || saltLen > PBKDFSaltMax {
-		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
+		errs = append(errs, fmt.Errorf("node: PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
 	}
 	return errs
 }
 
 // Validate holds the checks the daemon applies to its flags
-// (main.go:113-131): the discriminator's 12 bits, the passcode's range
+// (main.go:113-131 at b4ea1f96^): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
 // length the SPAKE2+ verifier needs, and the identity the bridge and the
 // assembler refuse to start without. The bounds are this package's
@@ -484,13 +495,13 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
-		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
+		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
 	}
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
-		errs = append(errs, fmt.Errorf("BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
+		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
-		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
@@ -498,10 +509,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
 	if c.Health.Interval < 0 {
-		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
+		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
 	if c.Network.ReannounceInterval < 0 {
-		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
+		errs = append(errs, fmt.Errorf("node: Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))

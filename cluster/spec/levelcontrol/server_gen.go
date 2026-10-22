@@ -18,41 +18,90 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentLevel        *uint8        `matter:"0x0000"` // attribute 0x0000: uint8, M, R V, X N S Q
-	RemainingTime       uint16        `matter:"0x0001"` // attribute 0x0001: uint16, LT, R V, Q
-	MinLevel            uint8         `matter:"0x0002"` // attribute 0x0002: uint8, Rev >= v7, O, R V, F
-	MaxLevel            uint8         `matter:"0x0003"` // attribute 0x0003: uint8, Rev >= v7, O, R V, F
-	CurrentFrequency    uint16        `matter:"0x0004"` // attribute 0x0004: uint16, FQ, R V, S Q
-	MinFrequency        uint16        `matter:"0x0005"` // attribute 0x0005: uint16, FQ, R V
-	MaxFrequency        uint16        `matter:"0x0006"` // attribute 0x0006: uint16, FQ, R V
-	Options             OptionsBitmap `matter:"0x000F"` // attribute 0x000F: OptionsBitmap, M, RW VO
-	OnOffTransitionTime uint16        `matter:"0x0010"` // attribute 0x0010: uint16, O, RW VO
-	OnLevel             *uint8        `matter:"0x0011"` // attribute 0x0011: uint8, M, RW VO, X
-	OnTransitionTime    *uint16       `matter:"0x0012"` // attribute 0x0012: uint16, O, RW VO, X
-	OffTransitionTime   *uint16       `matter:"0x0013"` // attribute 0x0013: uint16, O, RW VO, X
-	DefaultMoveRate     *uint8        `matter:"0x0014"` // attribute 0x0014: uint8, O, RW VO, X
-	StartUpCurrentLevel *uint8        `matter:"0x4000"` // attribute 0x4000: uint8, LT, RW VM, X N
+	CurrentLevel        *uint8        // attribute 0x0000: uint8, M, R V, X N S Q
+	RemainingTime       uint16        // attribute 0x0001: uint16, LT, R V, Q
+	MinLevel            uint8         // attribute 0x0002: uint8, Rev >= v7, O, R V, F
+	MaxLevel            uint8         // attribute 0x0003: uint8, Rev >= v7, O, R V, F
+	CurrentFrequency    uint16        // attribute 0x0004: uint16, FQ, R V, S Q
+	MinFrequency        uint16        // attribute 0x0005: uint16, FQ, R V
+	MaxFrequency        uint16        // attribute 0x0006: uint16, FQ, R V
+	Options             OptionsBitmap // attribute 0x000F: OptionsBitmap, M, RW VO
+	OnOffTransitionTime uint16        // attribute 0x0010: uint16, O, RW VO
+	OnLevel             *uint8        // attribute 0x0011: uint8, M, RW VO, X
+	OnTransitionTime    *uint16       // attribute 0x0012: uint16, O, RW VO, X
+	OffTransitionTime   *uint16       // attribute 0x0013: uint16, O, RW VO, X
+	DefaultMoveRate     *uint8        // attribute 0x0014: uint8, O, RW VO, X
+	StartUpCurrentLevel *uint8        // attribute 0x4000: uint8, LT, RW VM, X N
 }
 
 // Patch is a change to the LevelControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	CurrentLevel        *uint8         `matter:"0x0000"` // attribute 0x0000
-	RemainingTime       *uint16        `matter:"0x0001"` // attribute 0x0001
-	MinLevel            *uint8         `matter:"0x0002"` // attribute 0x0002
-	MaxLevel            *uint8         `matter:"0x0003"` // attribute 0x0003
-	CurrentFrequency    *uint16        `matter:"0x0004"` // attribute 0x0004
-	MinFrequency        *uint16        `matter:"0x0005"` // attribute 0x0005
-	MaxFrequency        *uint16        `matter:"0x0006"` // attribute 0x0006
-	Options             *OptionsBitmap `matter:"0x000F"` // attribute 0x000F
-	OnOffTransitionTime *uint16        `matter:"0x0010"` // attribute 0x0010
-	OnLevel             *uint8         `matter:"0x0011"` // attribute 0x0011
-	OnTransitionTime    *uint16        `matter:"0x0012"` // attribute 0x0012
-	OffTransitionTime   *uint16        `matter:"0x0013"` // attribute 0x0013
-	DefaultMoveRate     *uint8         `matter:"0x0014"` // attribute 0x0014
-	StartUpCurrentLevel *uint8         `matter:"0x4000"` // attribute 0x4000
+	CurrentLevel        *uint8         // attribute 0x0000
+	RemainingTime       *uint16        // attribute 0x0001
+	MinLevel            *uint8         // attribute 0x0002
+	MaxLevel            *uint8         // attribute 0x0003
+	CurrentFrequency    *uint16        // attribute 0x0004
+	MinFrequency        *uint16        // attribute 0x0005
+	MaxFrequency        *uint16        // attribute 0x0006
+	Options             *OptionsBitmap // attribute 0x000F
+	OnOffTransitionTime *uint16        // attribute 0x0010
+	OnLevel             *uint8         // attribute 0x0011
+	OnTransitionTime    *uint16        // attribute 0x0012
+	OffTransitionTime   *uint16        // attribute 0x0013
+	DefaultMoveRate     *uint8         // attribute 0x0014
+	StartUpCurrentLevel *uint8         // attribute 0x4000
 	Null                []uint32       // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentLevel); ok {
+		spec.Assign(&st.CurrentLevel, v)
+	}
+	if v, ok := read(AttrRemainingTime); ok {
+		spec.Assign(&st.RemainingTime, v)
+	}
+	if v, ok := read(AttrMinLevel); ok {
+		spec.Assign(&st.MinLevel, v)
+	}
+	if v, ok := read(AttrMaxLevel); ok {
+		spec.Assign(&st.MaxLevel, v)
+	}
+	if v, ok := read(AttrCurrentFrequency); ok {
+		spec.Assign(&st.CurrentFrequency, v)
+	}
+	if v, ok := read(AttrMinFrequency); ok {
+		spec.Assign(&st.MinFrequency, v)
+	}
+	if v, ok := read(AttrMaxFrequency); ok {
+		spec.Assign(&st.MaxFrequency, v)
+	}
+	if v, ok := read(AttrOptions); ok {
+		spec.Assign(&st.Options, v)
+	}
+	if v, ok := read(AttrOnOffTransitionTime); ok {
+		spec.Assign(&st.OnOffTransitionTime, v)
+	}
+	if v, ok := read(AttrOnLevel); ok {
+		spec.Assign(&st.OnLevel, v)
+	}
+	if v, ok := read(AttrOnTransitionTime); ok {
+		spec.Assign(&st.OnTransitionTime, v)
+	}
+	if v, ok := read(AttrOffTransitionTime); ok {
+		spec.Assign(&st.OffTransitionTime, v)
+	}
+	if v, ok := read(AttrDefaultMoveRate); ok {
+		spec.Assign(&st.DefaultMoveRate, v)
+	}
+	if v, ok := read(AttrStartUpCurrentLevel); ok {
+		spec.Assign(&st.StartUpCurrentLevel, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -150,9 +199,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -161,61 +212,71 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleMoveToLevel registers fn for the MoveToLevel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevel(fn func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevel, fn)
 }
 
 // HandleMove registers fn for the Move command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMove is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMove(fn func(ctx context.Context, req MoveRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMove, fn)
 }
 
 // HandleStep registers fn for the Step command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStep is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevelWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevelWithOnOff(fn func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevelWithOnOff, fn)
 }
 
 // HandleMoveWithOnOff registers fn for the MoveWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveWithOnOff(fn func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveWithOnOff, fn)
 }
 
 // HandleStepWithOnOff registers fn for the StepWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStepWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepWithOnOff(fn func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepWithOnOff, fn)
 }
 
 // HandleStopWithOnOff registers fn for the StopWithOnOff command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopWithOnOff is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopWithOnOff, fn)
 }
 
 // HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToClosestFrequency is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToClosestFrequency, fn)
 }
@@ -303,7 +364,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

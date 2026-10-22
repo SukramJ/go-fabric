@@ -22,8 +22,8 @@ import (
 
 // BasicVideoPlayer device type identity: 0x0028, revision 2.
 const (
-	BasicVideoPlayerID       uint16 = 0x0028
-	BasicVideoPlayerRevision uint16 = 2
+	BasicVideoPlayerID       schema.DeviceTypeID = 0x0028
+	BasicVideoPlayerRevision uint16              = 2
 )
 
 // BasicVideoPlayerType is the BasicVideoPlayer device type, matter.js's packages/node/src/devices/basic-video-player.ts;

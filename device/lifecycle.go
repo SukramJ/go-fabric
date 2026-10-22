@@ -137,7 +137,6 @@ func (d *Device) available() bool {
 func (d *Device) Rename(ctx context.Context, name string) {
 	d.mu.Lock()
 	d.opts.Name = name
-	d.opts.NodeLabel = ""
 	h := d.host
 	d.mu.Unlock()
 	if h != nil {
@@ -155,8 +154,8 @@ func (d *Device) Rename(ctx context.Context, name string) {
 // command or Set that made it returns; [Device.OnChangedAsync] queues it.
 // It is the untyped form of the typed accessor's OnChanged — one hook, two
 // signatures. It returns the unsubscribe function. A cluster the device
-// does not mount never calls fn, nor does Binding, whose server reports
-// its changes through core.Binding.OnChange instead; a server that reads
+// does not mount never calls fn (Binding reports each change of its list,
+// the per-fabric entries through core.Binding.OnChange); a server that reads
 // its state from a host port ([contract.ChangeNotifier] only — valve,
 // fan, pump, SmokeCoAlarm, ModeSelect) calls fn when that port notifies,
 // with [contract.OriginUnknown].

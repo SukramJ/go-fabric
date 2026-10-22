@@ -174,7 +174,7 @@ func TestAggregatorReplaceAndTopology(t *testing.T) {
 	if got := keys(); !slices.Equal(got, []string{"lamp"}) {
 		t.Errorf("Topology after Remove: %v, want [lamp]", got)
 	}
-	if d := n.Topology().Devices[0]; d.Added != node.Endpoint(dimmer) || d.DeviceType != device.DimmableLightID {
+	if d := n.Topology().Devices[0]; d.Added != node.Endpoint(dimmer) || d.DeviceType != uint16(device.DimmableLightID) {
 		t.Errorf("Topology's device %+v, want the replacement", d)
 	}
 }

@@ -1374,7 +1374,7 @@ func TestDeviceTypeRevision_KnownType(t *testing.T) {
 	// OnOffLight = 0x0100 — always present in the generated schema.
 	id := uint16(0x0100)
 	got := deviceTypeRevision(id)
-	want, ok := schema.DeviceTypeRevision(uint32(id))
+	want, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(id))
 	if !ok {
 		t.Skip("0x0100 not in schema — skipping")
 	}

@@ -12,8 +12,8 @@ import (
 
 // Oven device type identity: 0x007B, revision 2.
 const (
-	OvenID       uint16 = 0x007B
-	OvenRevision uint16 = 2
+	OvenID       schema.DeviceTypeID = 0x007B
+	OvenRevision uint16              = 2
 )
 
 // OvenType is the Oven device type, matter.js's packages/node/src/devices/oven.ts;

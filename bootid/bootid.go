@@ -31,7 +31,9 @@ var (
 	once            sync.Once
 	salt            [16]byte
 	rotationEnabled bool
-	rotationGuard   sync.Mutex
+	// rotationGuard guards rotationEnabled. The salt is not under it: ensure
+	// fills it once (SetForTest pins it).
+	rotationGuard sync.Mutex
 )
 
 func ensure() {

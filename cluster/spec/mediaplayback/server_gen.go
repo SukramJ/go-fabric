@@ -18,35 +18,75 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentState         PlaybackStateEnum       `matter:"0x0000"` // attribute 0x0000: PlaybackStateEnum, M, R V
-	StartTime            *uint64                 `matter:"0x0001"` // attribute 0x0001: epoch-us, AS, R V, X
-	Duration             *uint64                 `matter:"0x0002"` // attribute 0x0002: uint64, AS, R V, X
-	SampledPosition      *PlaybackPositionStruct `matter:"0x0003"` // attribute 0x0003: PlaybackPositionStruct, AS, R V, X
-	PlaybackSpeed        float32                 `matter:"0x0004"` // attribute 0x0004: single, AS, R V
-	SeekRangeEnd         *uint64                 `matter:"0x0005"` // attribute 0x0005: uint64, AS, R V, X
-	SeekRangeStart       *uint64                 `matter:"0x0006"` // attribute 0x0006: uint64, AS, R V, X
-	ActiveAudioTrack     *TrackStruct            `matter:"0x0007"` // attribute 0x0007: TrackStruct, AT, R V, X
-	AvailableAudioTracks *[]TrackStruct          `matter:"0x0008"` // attribute 0x0008: list[TrackStruct], AT, R V, X
-	ActiveTextTrack      *TrackStruct            `matter:"0x0009"` // attribute 0x0009: TrackStruct, TT, R V, X
-	AvailableTextTracks  *[]TrackStruct          `matter:"0x000A"` // attribute 0x000A: list[TrackStruct], TT, R V, X
+	CurrentState         PlaybackStateEnum       // attribute 0x0000: PlaybackStateEnum, M, R V
+	StartTime            *uint64                 // attribute 0x0001: epoch-us, AS, R V, X
+	Duration             *uint64                 // attribute 0x0002: uint64, AS, R V, X
+	SampledPosition      *PlaybackPositionStruct // attribute 0x0003: PlaybackPositionStruct, AS, R V, X
+	PlaybackSpeed        float32                 // attribute 0x0004: single, AS, R V
+	SeekRangeEnd         *uint64                 // attribute 0x0005: uint64, AS, R V, X
+	SeekRangeStart       *uint64                 // attribute 0x0006: uint64, AS, R V, X
+	ActiveAudioTrack     *TrackStruct            // attribute 0x0007: TrackStruct, AT, R V, X
+	AvailableAudioTracks *[]TrackStruct          // attribute 0x0008: list[TrackStruct], AT, R V, X
+	ActiveTextTrack      *TrackStruct            // attribute 0x0009: TrackStruct, TT, R V, X
+	AvailableTextTracks  *[]TrackStruct          // attribute 0x000A: list[TrackStruct], TT, R V, X
 }
 
 // Patch is a change to the MediaPlayback state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	CurrentState         *PlaybackStateEnum      `matter:"0x0000"` // attribute 0x0000
-	StartTime            *uint64                 `matter:"0x0001"` // attribute 0x0001
-	Duration             *uint64                 `matter:"0x0002"` // attribute 0x0002
-	SampledPosition      *PlaybackPositionStruct `matter:"0x0003"` // attribute 0x0003
-	PlaybackSpeed        *float32                `matter:"0x0004"` // attribute 0x0004
-	SeekRangeEnd         *uint64                 `matter:"0x0005"` // attribute 0x0005
-	SeekRangeStart       *uint64                 `matter:"0x0006"` // attribute 0x0006
-	ActiveAudioTrack     *TrackStruct            `matter:"0x0007"` // attribute 0x0007
-	AvailableAudioTracks *[]TrackStruct          `matter:"0x0008"` // attribute 0x0008
-	ActiveTextTrack      *TrackStruct            `matter:"0x0009"` // attribute 0x0009
-	AvailableTextTracks  *[]TrackStruct          `matter:"0x000A"` // attribute 0x000A
+	CurrentState         *PlaybackStateEnum      // attribute 0x0000
+	StartTime            *uint64                 // attribute 0x0001
+	Duration             *uint64                 // attribute 0x0002
+	SampledPosition      *PlaybackPositionStruct // attribute 0x0003
+	PlaybackSpeed        *float32                // attribute 0x0004
+	SeekRangeEnd         *uint64                 // attribute 0x0005
+	SeekRangeStart       *uint64                 // attribute 0x0006
+	ActiveAudioTrack     *TrackStruct            // attribute 0x0007
+	AvailableAudioTracks *[]TrackStruct          // attribute 0x0008
+	ActiveTextTrack      *TrackStruct            // attribute 0x0009
+	AvailableTextTracks  *[]TrackStruct          // attribute 0x000A
 	Null                 []uint32                // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentState); ok {
+		spec.Assign(&st.CurrentState, v)
+	}
+	if v, ok := read(AttrStartTime); ok {
+		spec.Assign(&st.StartTime, v)
+	}
+	if v, ok := read(AttrDuration); ok {
+		spec.Assign(&st.Duration, v)
+	}
+	if v, ok := read(AttrSampledPosition); ok {
+		spec.Assign(&st.SampledPosition, v)
+	}
+	if v, ok := read(AttrPlaybackSpeed); ok {
+		spec.Assign(&st.PlaybackSpeed, v)
+	}
+	if v, ok := read(AttrSeekRangeEnd); ok {
+		spec.Assign(&st.SeekRangeEnd, v)
+	}
+	if v, ok := read(AttrSeekRangeStart); ok {
+		spec.Assign(&st.SeekRangeStart, v)
+	}
+	if v, ok := read(AttrActiveAudioTrack); ok {
+		spec.Assign(&st.ActiveAudioTrack, v)
+	}
+	if v, ok := read(AttrAvailableAudioTracks); ok {
+		spec.Assign(&st.AvailableAudioTracks, v)
+	}
+	if v, ok := read(AttrActiveTextTrack); ok {
+		spec.Assign(&st.ActiveTextTrack, v)
+	}
+	if v, ok := read(AttrAvailableTextTracks); ok {
+		spec.Assign(&st.AvailableTextTracks, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -135,9 +175,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -146,91 +188,106 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandlePlay registers fn for the Play command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePlay is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePlay(fn func(ctx context.Context, req PlayRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPlay, fn)
 }
 
 // HandlePause registers fn for the Pause command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePause is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPause, fn)
 }
 
 // HandleStop registers fn for the Stop command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
 // HandleStartOver registers fn for the StartOver command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartOver is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartOver(fn func(ctx context.Context, req StartOverRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartOver, fn)
 }
 
 // HandlePrevious registers fn for the Previous command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePrevious is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePrevious(fn func(ctx context.Context, req PreviousRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPrevious, fn)
 }
 
 // HandleNext registers fn for the Next command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleNext is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleNext(fn func(ctx context.Context, req NextRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdNext, fn)
 }
 
 // HandleRewind registers fn for the Rewind command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRewind is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRewind(fn func(ctx context.Context, req RewindRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRewind, fn)
 }
 
 // HandleFastForward registers fn for the FastForward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleFastForward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleFastForward(fn func(ctx context.Context, req FastForwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdFastForward, fn)
 }
 
 // HandleSkipForward registers fn for the SkipForward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipForward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipForward(fn func(ctx context.Context, req SkipForwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipForward, fn)
 }
 
 // HandleSkipBackward registers fn for the SkipBackward command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipBackward is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipBackward(fn func(ctx context.Context, req SkipBackwardRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipBackward, fn)
 }
 
 // HandleSeek registers fn for the Seek command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSeek is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSeek(fn func(ctx context.Context, req SeekRequest) (PlaybackResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSeek, fn)
 }
 
 // HandleActivateAudioTrack registers fn for the ActivateAudioTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleActivateAudioTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleActivateAudioTrack(fn func(ctx context.Context, req ActivateAudioTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdActivateAudioTrack, fn)
 }
 
 // HandleActivateTextTrack registers fn for the ActivateTextTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleActivateTextTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleActivateTextTrack(fn func(ctx context.Context, req ActivateTextTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdActivateTextTrack, fn)
 }
 
 // HandleDeactivateTextTrack registers fn for the DeactivateTextTrack command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDeactivateTextTrack is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDeactivateTextTrack(fn func(ctx context.Context, req DeactivateTextTrackRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDeactivateTextTrack, fn)
 }
@@ -379,7 +436,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

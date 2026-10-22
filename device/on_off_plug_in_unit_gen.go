@@ -16,8 +16,8 @@ import (
 
 // OnOffPlugInUnit device type identity: 0x010A, revision 5.
 const (
-	OnOffPlugInUnitID       uint16 = 0x010A
-	OnOffPlugInUnitRevision uint16 = 5
+	OnOffPlugInUnitID       schema.DeviceTypeID = 0x010A
+	OnOffPlugInUnitRevision uint16              = 5
 )
 
 // OnOffPlugInUnitType is the OnOffPlugInUnit device type, matter.js's packages/node/src/devices/on-off-plug-in-unit.ts;

@@ -7,7 +7,6 @@ package chime
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -58,6 +57,9 @@ func TestTypedServer(t *testing.T) {
 		Enabled:              new(bool),
 	}
 	values := full.AttributeValues()
+	// The stored values read back into a State, field by field.
+	var back State
+	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
 	if len(values) != 3 {
 		t.Errorf("a patch of every field sets %d values, want 3", len(values))
 	}
@@ -65,9 +67,7 @@ func TestTypedServer(t *testing.T) {
 		t.Errorf("InstalledChimeSounds is stored as %T, want its spec.List", values[AttrInstalledChimeSounds])
 	}
 	s.OnChanged(func(State, contract.Change) {})()
-	if _, err := s.OnChangedAsync(func(State, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
-		t.Errorf("OnChangedAsync without a queue: %v, want spec.ErrNoQueue", err)
-	}
+	s.OnChangedAsync(func(State, contract.Change) { t.Error("OnChangedAsync without a queue delivered") })()
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}

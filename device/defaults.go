@@ -493,22 +493,22 @@ func applyInitial(name string, srv contract.ClusterServer, initial map[uint32]an
 func checkSelection(name string, srv contract.ClusterServer, opts spec.Options) error {
 	if fm, ok := srv.MatterRead(spec.AttrFeatureMap); ok {
 		if got, _ := fm.(uint32); got != opts.Features {
-			return notServed(fmt.Errorf("%s: the server advertises FeatureMap 0x%X, the selection is 0x%X", name, got, opts.Features))
+			return notServed(fmt.Errorf("device: %s: the server advertises FeatureMap 0x%X, the selection is 0x%X", name, got, opts.Features))
 		}
 	}
 	if l, ok := srv.(contract.ClusterAttributeLister); ok {
 		if missing := absent(opts.Attributes, l.MatterAttributes()); len(missing) > 0 {
-			return notServed(fmt.Errorf("%s: the server does not serve attributes %v the selection mandates", name, missing))
+			return notServed(fmt.Errorf("device: %s: the server does not serve attributes %v the selection mandates", name, missing))
 		}
 	}
 	if l, ok := srv.(contract.ClusterCommandLister); ok {
 		if missing := absent(opts.Commands, l.MatterAcceptedCommands()); len(missing) > 0 {
-			return notServed(fmt.Errorf("%s: the server does not accept commands %v the selection mandates", name, missing))
+			return notServed(fmt.Errorf("device: %s: the server does not accept commands %v the selection mandates", name, missing))
 		}
 	}
 	if l, ok := srv.(contract.ClusterEventLister); ok {
 		if missing := absent(opts.Events, l.MatterEvents()); len(missing) > 0 {
-			return notServed(fmt.Errorf("%s: the server does not emit events %v the selection mandates", name, missing))
+			return notServed(fmt.Errorf("device: %s: the server does not emit events %v the selection mandates", name, missing))
 		}
 	}
 	return nil

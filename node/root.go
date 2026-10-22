@@ -36,7 +36,7 @@ const (
 )
 
 // Settings keys of the root's and the Aggregator's UserLabel lists, the
-// daemon's (root_optional.go:20-26), so a database the daemon wrote keeps
+// daemon's (root_optional.go:20-26 at b4ea1f96^), so a database the daemon wrote keeps
 // its labels under the facade.
 const (
 	rootUserLabelsKey       = "user_label.root"
@@ -46,14 +46,14 @@ const (
 // deviceTypeRevision reads a device type's revision from the generated
 // matter.js snapshot (schema.DeviceTypeRevision), so a regeneration
 // propagates without an edit.
-func deviceTypeRevision(id uint32) uint16 {
+func deviceTypeRevision(id schema.DeviceTypeID) uint16 {
 	rev, _ := schema.DeviceTypeRevision(id) // both system types are in every snapshot
 	return rev
 }
 
 // RootClusters is endpoint 0's server set: matter.js's root endpoint
 // composition (ServerNode.ts:274-309) as the reference daemon builds it
-// (examples/reference-bridge/wiring.go:93-299, buildRootClusters, and
+// (examples/reference-bridge/wiring.go:93-299 at b4ea1f96^, buildRootClusters, and
 // root_optional.go). The fields are the servers a host may need a hook
 // on; [RootClusters.Servers] is the mounted set in mount order.
 type RootClusters struct {
@@ -108,7 +108,7 @@ type rootDeps struct {
 
 // buildRoot constructs endpoint 0's cluster surface and cross-wires the
 // fail-safe hooks, as the daemon's buildRootClusters does
-// (wiring.go:93-299).
+// (wiring.go:93-299 at b4ea1f96^).
 func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolint:funlen // one pass over the root's servers, as buildRootClusters
 	cfg := d.cfg
 	bi := cfg.BasicInformation
@@ -138,7 +138,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.BasicInformation = basicInfo
 
 	// RebootCount and the operational time carry over from the previous
-	// boots (wiring.go:118-128).
+	// boots (wiring.go:118-128 at b4ea1f96^).
 	if f := cfg.GeneralDiagnosticsFeatures; f != nil {
 		r.GeneralDiagnostics = mattercore.NewGeneralDiagnosticsWith(d.bootReason, *f)
 	} else {
@@ -184,11 +184,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		PAI:                      chain.PAI,
 		CertificationDeclaration: cd,
 		// The CASE identity is rebuilt from the freshly written fabric
-		// (wiring.go:166-170).
+		// (wiring.go:166-170 at b4ea1f96^).
 		OnFabricInstalled: d.onFabricInstalled,
 		IsFailSafeArmed:   generalCom.FailSafeArmed,
 		// A successful AddNOC re-arms the fail-safe onto its fabric, Matter
-		// §11.18.6.16 (wiring.go:172-178).
+		// §11.18.6.16 (wiring.go:172-178 at b4ea1f96^).
 		RearmFailSafeForFabric: generalCom.SetCurrentFabric,
 	})
 	if err != nil {
@@ -196,11 +196,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	opCreds := r.OperationalCredentials
 
-	// The fail-safe hooks between the two clusters (wiring.go:184-200).
+	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
 	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() })
 	generalCom.SetOnFailSafeExpired(opCreds.OnFailSafeExpiry)
 
-	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(deviceTypeRootNode)}}
+	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeRootNode))}}
 	if cfg.OTA != nil {
 		r.OTARequestor, r.otaApplier, err = buildOtaRequestor(cfg, d.connector, basicInfo)
 		if err != nil {
@@ -213,7 +213,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	commissioned := func(ctx context.Context, fabricIndex uint8) {
 		opCreds.ClearPendingState()
 		if otaRequestor != nil {
-			// A query 30 s after a commissioning (wiring.go:210-215).
+			// A query 30 s after a commissioning (wiring.go:210-215 at b4ea1f96^).
 			otaRequestor.Commissioned()
 		}
 		if observer != nil {
@@ -305,7 +305,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	optional = append(optional, r.PowerSourceConfiguration)
 
-	// The daemon's mount order (wiring.go:281-296).
+	// The daemon's mount order (wiring.go:281-296 at b4ea1f96^).
 	servers := []contract.ClusterServer{
 		basicInfo,
 		r.AccessControl,
@@ -334,7 +334,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 }
 
 // attestationMaterial returns the configured chain and CD, or the CSA
-// test material for the vendor and product (wiring.go:132-163).
+// test material for the vendor and product (wiring.go:132-163 at b4ea1f96^).
 func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 	pd := cfg.ProductDescription
 	chain := cfg.Attestation.Chain
@@ -355,7 +355,7 @@ func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 }
 
 // buildRootOptional constructs the root's optional label, localization
-// and diagnostics clusters as the daemon does (root_optional.go:28-91):
+// and diagnostics clusters as the daemon does (root_optional.go:28-91 at b4ea1f96^):
 // FixedLabel, UserLabel (persisted), LocalizationConfiguration (locales,
 // nil is en-US alone),
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
@@ -408,7 +408,7 @@ func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeld
 }
 
 // buildLabels constructs one endpoint's FixedLabel and UserLabel, the
-// latter restored from and persisted under key (root_optional.go:93-127).
+// latter restored from and persisted under key (root_optional.go:93-127 at b4ea1f96^).
 func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
 	fixedLabel, err = mattercore.NewFixedLabel(fixed)
 	if err != nil {
@@ -438,11 +438,11 @@ func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixed
 
 // buildAggregatorClusters constructs endpoint 1, the Aggregator: Identify,
 // Descriptor, FixedLabel ("role" "aggregator"), UserLabel and the host's
-// extra servers (wiring.go:332-345). Identify counts down on clk, the
+// extra servers (wiring.go:332-345 at b4ea1f96^). Identify counts down on clk, the
 // node's clock.
 func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
-		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(deviceTypeAggregator)}},
+		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeAggregator))}},
 		nil, nil, nil,
 	)
 	if err != nil {
@@ -462,7 +462,7 @@ func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contr
 }
 
 // clusterIDsOf returns a provider over the cluster ids of the mounted
-// set, deduplicated and in mount order (wiring.go:348-363).
+// set, deduplicated and in mount order (wiring.go:348-363 at b4ea1f96^).
 func clusterIDsOf(servers []contract.ClusterServer) func() []uint32 {
 	return func() []uint32 {
 		ids := make([]uint32, 0, len(servers))
@@ -480,7 +480,7 @@ func clusterIDsOf(servers []contract.ClusterServer) func() []uint32 {
 }
 
 // attachPartsListProviders installs the two live PartsList providers,
-// both full-family (wiring.go:301-327; matter.js DescriptorServer.ts
+// both full-family (wiring.go:301-327 at b4ea1f96^; matter.js DescriptorServer.ts
 // #updatePartsList for the full-family RootNode and Aggregator).
 func attachPartsListProviders(br *bridge.Bridge) error {
 	if !br.AttachRootPartsListProvider(func() []uint16 {
@@ -515,7 +515,7 @@ func endpointIDs(br *bridge.Bridge, keep func(*endpoint.Endpoint) bool) []uint16
 	return ids
 }
 
-// runtimeHeap reports the Go heap (root_optional.go:129-144).
+// runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^).
 type runtimeHeap struct{}
 
 func (runtimeHeap) read() runtime.MemStats {

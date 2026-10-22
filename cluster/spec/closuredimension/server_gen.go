@@ -18,37 +18,80 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentState         *DimensionStateStruct    `matter:"0x0000"` // attribute 0x0000: DimensionStateStruct, M, R V, X Q
-	TargetState          *DimensionStateStruct    `matter:"0x0001"` // attribute 0x0001: DimensionStateStruct, M, R V, X
-	Resolution           uint16                   `matter:"0x0002"` // attribute 0x0002: percent100ths, PS, R V, F
-	StepValue            uint16                   `matter:"0x0003"` // attribute 0x0003: percent100ths, PS, R V, F
-	Unit                 ClosureUnitEnum          `matter:"0x0004"` // attribute 0x0004: ClosureUnitEnum, UT, R V, F
-	UnitRange            *UnitRangeStruct         `matter:"0x0005"` // attribute 0x0005: UnitRangeStruct, UT, R V, X
-	LimitRange           RangePercent100thsStruct `matter:"0x0006"` // attribute 0x0006: RangePercent100thsStruct, LM, R V
-	TranslationDirection TranslationDirectionEnum `matter:"0x0007"` // attribute 0x0007: TranslationDirectionEnum, TR, R V, F
-	RotationAxis         RotationAxisEnum         `matter:"0x0008"` // attribute 0x0008: RotationAxisEnum, RO, R V, F
-	Overflow             OverflowEnum             `matter:"0x0009"` // attribute 0x0009: OverflowEnum, RO, R V, F
-	ModulationType       ModulationTypeEnum       `matter:"0x000A"` // attribute 0x000A: ModulationTypeEnum, MD, R V, F
-	LatchControlModes    LatchControlModesBitmap  `matter:"0x000B"` // attribute 0x000B: LatchControlModesBitmap, LT, R V, F
+	CurrentState         *DimensionStateStruct    // attribute 0x0000: DimensionStateStruct, M, R V, X Q
+	TargetState          *DimensionStateStruct    // attribute 0x0001: DimensionStateStruct, M, R V, X
+	Resolution           uint16                   // attribute 0x0002: percent100ths, PS, R V, F
+	StepValue            uint16                   // attribute 0x0003: percent100ths, PS, R V, F
+	Unit                 ClosureUnitEnum          // attribute 0x0004: ClosureUnitEnum, UT, R V, F
+	UnitRange            *UnitRangeStruct         // attribute 0x0005: UnitRangeStruct, UT, R V, X
+	LimitRange           RangePercent100thsStruct // attribute 0x0006: RangePercent100thsStruct, LM, R V
+	TranslationDirection TranslationDirectionEnum // attribute 0x0007: TranslationDirectionEnum, TR, R V, F
+	RotationAxis         RotationAxisEnum         // attribute 0x0008: RotationAxisEnum, RO, R V, F
+	Overflow             OverflowEnum             // attribute 0x0009: OverflowEnum, RO, R V, F
+	ModulationType       ModulationTypeEnum       // attribute 0x000A: ModulationTypeEnum, MD, R V, F
+	LatchControlModes    LatchControlModesBitmap  // attribute 0x000B: LatchControlModesBitmap, LT, R V, F
 }
 
 // Patch is a change to the ClosureDimension state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	CurrentState         *DimensionStateStruct     `matter:"0x0000"` // attribute 0x0000
-	TargetState          *DimensionStateStruct     `matter:"0x0001"` // attribute 0x0001
-	Resolution           *uint16                   `matter:"0x0002"` // attribute 0x0002
-	StepValue            *uint16                   `matter:"0x0003"` // attribute 0x0003
-	Unit                 *ClosureUnitEnum          `matter:"0x0004"` // attribute 0x0004
-	UnitRange            *UnitRangeStruct          `matter:"0x0005"` // attribute 0x0005
-	LimitRange           *RangePercent100thsStruct `matter:"0x0006"` // attribute 0x0006
-	TranslationDirection *TranslationDirectionEnum `matter:"0x0007"` // attribute 0x0007
-	RotationAxis         *RotationAxisEnum         `matter:"0x0008"` // attribute 0x0008
-	Overflow             *OverflowEnum             `matter:"0x0009"` // attribute 0x0009
-	ModulationType       *ModulationTypeEnum       `matter:"0x000A"` // attribute 0x000A
-	LatchControlModes    *LatchControlModesBitmap  `matter:"0x000B"` // attribute 0x000B
+	CurrentState         *DimensionStateStruct     // attribute 0x0000
+	TargetState          *DimensionStateStruct     // attribute 0x0001
+	Resolution           *uint16                   // attribute 0x0002
+	StepValue            *uint16                   // attribute 0x0003
+	Unit                 *ClosureUnitEnum          // attribute 0x0004
+	UnitRange            *UnitRangeStruct          // attribute 0x0005
+	LimitRange           *RangePercent100thsStruct // attribute 0x0006
+	TranslationDirection *TranslationDirectionEnum // attribute 0x0007
+	RotationAxis         *RotationAxisEnum         // attribute 0x0008
+	Overflow             *OverflowEnum             // attribute 0x0009
+	ModulationType       *ModulationTypeEnum       // attribute 0x000A
+	LatchControlModes    *LatchControlModesBitmap  // attribute 0x000B
 	Null                 []uint32                  // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentState); ok {
+		spec.Assign(&st.CurrentState, v)
+	}
+	if v, ok := read(AttrTargetState); ok {
+		spec.Assign(&st.TargetState, v)
+	}
+	if v, ok := read(AttrResolution); ok {
+		spec.Assign(&st.Resolution, v)
+	}
+	if v, ok := read(AttrStepValue); ok {
+		spec.Assign(&st.StepValue, v)
+	}
+	if v, ok := read(AttrUnit); ok {
+		spec.Assign(&st.Unit, v)
+	}
+	if v, ok := read(AttrUnitRange); ok {
+		spec.Assign(&st.UnitRange, v)
+	}
+	if v, ok := read(AttrLimitRange); ok {
+		spec.Assign(&st.LimitRange, v)
+	}
+	if v, ok := read(AttrTranslationDirection); ok {
+		spec.Assign(&st.TranslationDirection, v)
+	}
+	if v, ok := read(AttrRotationAxis); ok {
+		spec.Assign(&st.RotationAxis, v)
+	}
+	if v, ok := read(AttrOverflow); ok {
+		spec.Assign(&st.Overflow, v)
+	}
+	if v, ok := read(AttrModulationType); ok {
+		spec.Assign(&st.ModulationType, v)
+	}
+	if v, ok := read(AttrLatchControlModes); ok {
+		spec.Assign(&st.LatchControlModes, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -140,9 +183,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -151,19 +196,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetTarget registers fn for the SetTarget command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTarget is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTarget(fn func(ctx context.Context, req SetTargetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTarget, fn)
 }
 
 // HandleStep registers fn for the Step command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStep is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
@@ -218,7 +266,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

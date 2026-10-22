@@ -13,8 +13,8 @@ import (
 
 // Speaker device type identity: 0x0022, revision 1.
 const (
-	SpeakerID       uint16 = 0x0022
-	SpeakerRevision uint16 = 1
+	SpeakerID       schema.DeviceTypeID = 0x0022
+	SpeakerRevision uint16              = 1
 )
 
 // SpeakerType is the Speaker device type, matter.js's packages/node/src/devices/speaker.ts;

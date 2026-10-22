@@ -77,10 +77,10 @@ const (
 
 // Command ids.
 const (
-	CmdLockDoor                    uint32 = 0x00 // request → status, M
-	CmdUnlockDoor                  uint32 = 0x01 // request → status, M
-	CmdToggle                      uint32 = 0x02 // request → status, X
-	CmdUnlockWithTimeout           uint32 = 0x03 // request → status, O
+	CmdLockDoor                    uint32 = 0x00 // request → status, timed, M
+	CmdUnlockDoor                  uint32 = 0x01 // request → status, timed, M
+	CmdToggle                      uint32 = 0x02 // request → status, timed, X
+	CmdUnlockWithTimeout           uint32 = 0x03 // request → status, timed, O
 	CmdSetWeekDaySchedule          uint32 = 0x0B // request → status, WDSCH
 	CmdGetWeekDaySchedule          uint32 = 0x0C // request → GetWeekDayScheduleResponse, WDSCH
 	CmdGetWeekDayScheduleResponse  uint32 = 0x0C // response, WDSCH
@@ -93,18 +93,18 @@ const (
 	CmdGetHolidaySchedule          uint32 = 0x12 // request → GetHolidayScheduleResponse, HDSCH
 	CmdGetHolidayScheduleResponse  uint32 = 0x12 // response, HDSCH
 	CmdClearHolidaySchedule        uint32 = 0x13 // request → status, HDSCH
-	CmdSetUser                     uint32 = 0x1A // request → status, USR
+	CmdSetUser                     uint32 = 0x1A // request → status, timed, USR
 	CmdGetUser                     uint32 = 0x1B // request → GetUserResponse, USR
 	CmdGetUserResponse             uint32 = 0x1C // response, USR
-	CmdClearUser                   uint32 = 0x1D // request → status, USR
-	CmdSetCredential               uint32 = 0x22 // request → SetCredentialResponse, USR
+	CmdClearUser                   uint32 = 0x1D // request → status, timed, USR
+	CmdSetCredential               uint32 = 0x22 // request → SetCredentialResponse, timed, USR
 	CmdSetCredentialResponse       uint32 = 0x23 // response, USR
 	CmdGetCredentialStatus         uint32 = 0x24 // request → GetCredentialStatusResponse, USR
 	CmdGetCredentialStatusResponse uint32 = 0x25 // response, USR
-	CmdClearCredential             uint32 = 0x26 // request → status, USR
-	CmdUnboltDoor                  uint32 = 0x27 // request → status, UBOLT
-	CmdSetAliroReaderConfig        uint32 = 0x28 // request → status, ALIRO
-	CmdClearAliroReaderConfig      uint32 = 0x29 // request → status, ALIRO
+	CmdClearCredential             uint32 = 0x26 // request → status, timed, USR
+	CmdUnboltDoor                  uint32 = 0x27 // request → status, timed, UBOLT
+	CmdSetAliroReaderConfig        uint32 = 0x28 // request → status, timed, ALIRO
+	CmdClearAliroReaderConfig      uint32 = 0x29 // request → status, timed, ALIRO
 )
 
 // Event ids.

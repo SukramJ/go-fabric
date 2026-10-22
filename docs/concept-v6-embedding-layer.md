@@ -42,11 +42,11 @@ der Einbettung gibt es keinen Goldstandard, dort gilt die Roadmap-Formel
   `node/config.go`, `node/node.go`), `device/` 567 (generiert, 80
   Dateien, 79 Konstruktoren), `contract/` 49. Die generierten Gerätetypen
   tragen schon 219 Accessoren (ADR 0018, Entscheidung 3), aber nur drei
-  Cluster haben einen typisierten Server (`script/devicegen/servers.go:26-30`:
+  Cluster haben einen typisierten Server (`script/devicegen/servers.go:24-25`:
   OnOff, Binding, EcosystemInformation); jeder andere Accessor liefert
   `*spec.Server` mit `Set(attrID uint32, value any)` und
-  `Handle(cmdID uint32, fn CommandHandler)` (`cluster/spec/server.go:295`,
-  `:404`; `device/on_off_light_gen.go:90-93`).
+  `Handle(cmdID uint32, fn CommandHandler)` (`cluster/spec/server.go:331`,
+  `:404`; `device/on_off_light_gen.go:92-95`).
 - **Loom.** OpenCCU-Loom pinnt `v0.6.0` (`openccu-loom/go.mod:36`) und
   importiert 45 go-fabric-Pakete, 32 im Produktcode (Read-Map §1; die
   Roadmap-Zeile 32 sagt 20 und wird korrigiert). Davon unterhalb der Facade:
@@ -95,19 +95,19 @@ wofür, und was es kostet).
 | --- | --- |
 | `bridge.StartHealthProbe`, `HealthSample`, `DefaultProbeInterval` | `node.Config.Health{Interval, OnSample}`; `Node.Health()` liefert die letzte Probe. |
 | `bridge.RandomPasscode`, `RandomSalt`, `RandomDiscriminator` | `node.NewCommissioningCredentials()` (Passcode nach den Regeln von `secure/setup`, Salt, Diskriminator) — ein Aufruf, kein `secure/*`-Import. |
-| `bridge.ErrCommissioningWindow*`, `ErrAdministratorWindowOpen` | die Fehler in `node` (einer existiert: `node/commissioning.go:213`); loom vergleicht mit `errors.Is`. |
+| `bridge.ErrCommissioningWindow*`, `ErrAdministratorWindowOpen` | die Fehler in `node` (einer existiert: `node/commissioning.go:215`); loom vergleicht mit `errors.Is`. |
 | `bridge.Snapshotter`, `bridge.TCPConfig` (Felder von `node.Config`) | Typ-Aliase `node.Snapshotter`, `node.TCPConfig`; der Host importiert `bridge` nicht mehr für einen Feldtyp. |
 | `store.New`, `store.Store`, `store.FabricRecord` (`handlers/matter.go:231`) | `node.Config.Store.Path` öffnet den SQLite-Store; `Node.Fabrics()` liefert `[]node.FabricInfo` mit den Feldern, die loom aus `FabricRecord` liest (Rückgabetyp-Änderung: `v0.10.0`, apidiff meldet sie, Fenster nach README). `store` bleibt advanced seam für einen Host mit eigenem Store (Phase 21). |
-| `secure/setup.IsValidSetupPIN`, `MaxDiscriminator`, `Payload`/`QRCode`/`ManualCode`, `DiscoveryOnIP` | `node.Config.Validate()` prüft Passcode und Diskriminator (existiert, `node/config.go:388`); `Node.PairingCodes()` liefert QR und manuellen Code (existiert, `node/node.go:789`). Die Konstanten `node.MaxDiscriminator`, `node.ValidateSetupPIN` für eine Konfigurationsprüfung vor `New`. |
+| `secure/setup.IsValidSetupPIN`, `MaxDiscriminator`, `Payload`/`QRCode`/`ManualCode`, `DiscoveryOnIP` | `node.Config.Validate()` prüft Passcode und Diskriminator (existiert, `node/config.go:475`); `Node.PairingCodes()` liefert QR und manuellen Code (existiert, `node/node.go:889`). Die Konstanten `node.MaxDiscriminator`, `node.ValidateSetupPIN` für eine Konfigurationsprüfung vor `New`. |
 | `secure/spake2.IterationsMin/Max`, `PBKDFMin/MaxSaltSize` | `node.Config.Validate()`; die Grenzen als `node.PBKDF…`-Konstanten. |
 | `secure/operational.Manager`, `im/subscription.Manager` (Typen der Accessoren `Sessions()`, `Subscriptions()`) | Interfaces `node.Sessions`, `node.Subscriptions` mit dem, was loom liest (Zähler, Liste); die konkreten Manager bleiben advanced seam über `Node.Bridge()`. |
 | `secure/attestation.LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` | `node.Attestation{Files: ChainFiles}` — die Facade lädt; `Config.Attestation.Chain` bleibt für einen Host mit eigener Kette. |
 | `mdns.NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `IsEnabled`, `Diagnose` | `node.Config.Advertiser == nil` baut Zeroconf mit Subtype-Responder (heute dokumentiert `config.go:51-53` nur Noop); `node.Config.Network.MDNS{Disabled}`; `Node.DiagnoseMDNS()`. `mdns` bleibt advanced seam für einen eigenen Advertiser. |
-| `endpoint.*` (Assembler, Spec, Topology, SourceKey, Record, Store, ErrNotFound, ComposeNodeLabel, ScenesStore), `endpoint/sqlitestore` | Das Device-Kit (A.3) ersetzt looms eigenen Assembler; `device.Options.StableKey` und `Reachable` bekommen Aliase (`device.SourceKey`, `device.AvailabilityProbe`); Endpoint-Persistenz ist `node.NewEndpointPersistence` (existiert, `node/persist.go:81`). `endpoint` bleibt advanced seam („die Matter-nahe Ebene", ADR 0018) für die Migration; looms Umstieg ist looms Arbeit (A.6). |
+| `endpoint.*` (Assembler, Spec, Topology, SourceKey, Record, Store, ErrNotFound, ComposeNodeLabel, ScenesStore), `endpoint/sqlitestore` | Das Device-Kit (A.3) ersetzt looms eigenen Assembler; `device.Options.StableKey` und `Reachable` bekommen Aliase (`device.SourceKey`, `device.AvailabilityProbe`); Endpoint-Persistenz ist `node.NewEndpointPersistence` (existiert, `node/persist.go:82`). `endpoint` bleibt advanced seam („die Matter-nahe Ebene", ADR 0018) für die Migration; looms Umstieg ist looms Arbeit (A.6). |
 | `groups.NewManager` (`node.Config.Groups`) | `nil` baut den Manager (Prüfung in der Welle: ob `node.New` das schon tut); das Feld bleibt advanced seam. |
 | `bootid.EnableRotation` | `node.Config.BootID.Rotate bool` (Semantik in der Welle lesen: `bootid/`). |
 | `diagevent.Event` (REST-Handler) | `node.DiagnosticEvent` als Alias; der Ring selbst ist Phase 21 („diagnostic event ring"). |
-| `cluster/core.{BasicInformation, OperationalCredentials, RegulatoryIndoorOutdoor, SoftwareVersionFromString}` | `node.RootClusters` existiert (`node/root.go:58`); `node.Config.Commissioning.Regulatory…` und `node.SoftwareVersionFromString`. |
+| `cluster/core.{BasicInformation, OperationalCredentials, RegulatoryIndoorOutdoor, SoftwareVersionFromString}` | `node.RootClusters` existiert (`node/root.go:59`); `node.Config.Commissioning.Regulatory…` und `node.SoftwareVersionFromString`. |
 | `schema.*`, `eligibility.*`, `cluster/<server>` | erlaubt; dokumentiert als Teil der typisierten Oberfläche (A.3). |
 
 Was die Facade nicht wird: ein zweiter Zugang zu `bridge`'s
@@ -141,7 +141,7 @@ Verstößen ab (`node/server/DeviceTypeConformanceService.ts:80-95`).
    und ergänzt: `Set(ctx, Patch) error`, `Get() State`,
    `OnChanged(func(State, changed []uint32)) (unsubscribe func())`
    (über `contract.AttributeChangeNotifier`, wie `device.Device.OnChanged`
-   heute, `device/device.go:657`), und je Command
+   heute, `device/device.go:595`), und je Command
    `Handle<Command>(func(ctx, <Command>Request) (<Command>Response, error))`
    über `spec.Server.Handle`. Die Request-/Response-Structs existieren
    (`cluster/spec/<cluster>`). Für die selbstgehaltenen Server (`onoff`,
@@ -213,7 +213,7 @@ Sicherheitspfad und mein Lesen).
   für jedes öffentliche Paket (alles außer `internal/`, `examples/`,
   `script/`, `conformance/` — README §„What public API means"), dann der
   Vergleich. Kein kommittiertes Artefakt.
-- Die Regel des Guards folgt README §Pre-1.0 (`README.md:178-200`): eine
+- Die Regel des Guards folgt README §Pre-1.0 (`README.md:176-199`): eine
   inkompatible Änderung ist erlaubt, wenn `CHANGELOG.md` unter
   `[Unreleased]` den Bezeichner unter `### Changed`, `### Removed` oder
   `### Deprecated` nennt (oder der Eintrag eine Paritätskorrektur oder

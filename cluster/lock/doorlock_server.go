@@ -113,7 +113,10 @@ var errUnknownCommand = errors.New("lock: unknown command")
 //
 // IsJammed returns true when ERROR_JAMMED is asserted.
 // IsLocked returns (locked=true, observed=true) when the lock state is known
-// and the lock is in the locked position.
+// and the lock is in the locked position; observed=false (the state is not
+// known) reads as a null LockState. The server stores no LockState: it asks
+// IsJammed (NotFullyLocked) and IsLocked at every read, so the state after
+// a LockInvoke is the one IsLocked then reports.
 // LockInvoke dispatches LockDoor / UnlockDoor / UnboltDoor commands to the
 // CCU. cmdID is one of the [wire.DoorLockCmd*] constants; UnlockWithTimeout
 // and an auto-relock arrive as UnlockDoor and LockDoor. A returned error

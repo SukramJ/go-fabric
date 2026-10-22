@@ -167,7 +167,7 @@ func TestDeviceTypeRevisionLookup(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		rev, ok := schema.DeviceTypeRevision(c.id)
+		rev, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(c.id))
 		if !ok {
 			t.Errorf("device type 0x%04X (%s) not found in generated schema", c.id, c.name)
 			continue

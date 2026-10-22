@@ -26,6 +26,9 @@ const rootNodeDeviceType uint32 = 0x0016
 // ClientNode with its EndpointStructure (ClientStructure.ts:1607-1611). Its
 // methods are safe for concurrent use.
 type Endpoint struct {
+	// mu is the owning Node's lock (Node.mu), shared by the structure and
+	// every Endpoint and Cluster of the image; it guards this endpoint's
+	// fields.
 	mu     *sync.RWMutex
 	number uint16
 

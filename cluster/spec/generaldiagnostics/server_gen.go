@@ -21,31 +21,68 @@ import (
 // Not in State, and set only untyped (spec.Server.Set):
 //   - DoNotUse (0x0009): its type is one the generator maps to any.
 type State struct {
-	NetworkInterfaces        []NetworkInterface  `matter:"0x0000"` // attribute 0x0000: list[NetworkInterface], M, R V
-	RebootCount              uint16              `matter:"0x0001"` // attribute 0x0001: uint16, M, R V, N
-	UpTime                   uint64              `matter:"0x0002"` // attribute 0x0002: uint64, M, R V, C
-	TotalOperationalHours    uint32              `matter:"0x0003"` // attribute 0x0003: uint32, O, R V, N C
-	BootReason               BootReasonEnum      `matter:"0x0004"` // attribute 0x0004: BootReasonEnum, O, R V
-	ActiveHardwareFaults     []HardwareFaultEnum `matter:"0x0005"` // attribute 0x0005: list[HardwareFaultEnum], O, R V
-	ActiveRadioFaults        []RadioFaultEnum    `matter:"0x0006"` // attribute 0x0006: list[RadioFaultEnum], O, R V
-	ActiveNetworkFaults      []NetworkFaultEnum  `matter:"0x0007"` // attribute 0x0007: list[NetworkFaultEnum], O, R V
-	TestEventTriggersEnabled bool                `matter:"0x0008"` // attribute 0x0008: bool, M, R V
-	DeviceLoadStatus         DeviceLoadStruct    `matter:"0x000A"` // attribute 0x000A: DeviceLoadStruct, Rev >= v3, R V, C
+	NetworkInterfaces        []NetworkInterface  // attribute 0x0000: list[NetworkInterface], M, R V
+	RebootCount              uint16              // attribute 0x0001: uint16, M, R V, N
+	UpTime                   uint64              // attribute 0x0002: uint64, M, R V, C
+	TotalOperationalHours    uint32              // attribute 0x0003: uint32, O, R V, N C
+	BootReason               BootReasonEnum      // attribute 0x0004: BootReasonEnum, O, R V
+	ActiveHardwareFaults     []HardwareFaultEnum // attribute 0x0005: list[HardwareFaultEnum], O, R V
+	ActiveRadioFaults        []RadioFaultEnum    // attribute 0x0006: list[RadioFaultEnum], O, R V
+	ActiveNetworkFaults      []NetworkFaultEnum  // attribute 0x0007: list[NetworkFaultEnum], O, R V
+	TestEventTriggersEnabled bool                // attribute 0x0008: bool, M, R V
+	DeviceLoadStatus         DeviceLoadStruct    // attribute 0x000A: DeviceLoadStruct, Rev >= v3, R V, C
 }
 
 // Patch is a change to the GeneralDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	NetworkInterfaces        *[]NetworkInterface  `matter:"0x0000"` // attribute 0x0000
-	RebootCount              *uint16              `matter:"0x0001"` // attribute 0x0001
-	UpTime                   *uint64              `matter:"0x0002"` // attribute 0x0002
-	TotalOperationalHours    *uint32              `matter:"0x0003"` // attribute 0x0003
-	BootReason               *BootReasonEnum      `matter:"0x0004"` // attribute 0x0004
-	ActiveHardwareFaults     *[]HardwareFaultEnum `matter:"0x0005"` // attribute 0x0005
-	ActiveRadioFaults        *[]RadioFaultEnum    `matter:"0x0006"` // attribute 0x0006
-	ActiveNetworkFaults      *[]NetworkFaultEnum  `matter:"0x0007"` // attribute 0x0007
-	TestEventTriggersEnabled *bool                `matter:"0x0008"` // attribute 0x0008
-	DeviceLoadStatus         *DeviceLoadStruct    `matter:"0x000A"` // attribute 0x000A
+	NetworkInterfaces        *[]NetworkInterface  // attribute 0x0000
+	RebootCount              *uint16              // attribute 0x0001
+	UpTime                   *uint64              // attribute 0x0002
+	TotalOperationalHours    *uint32              // attribute 0x0003
+	BootReason               *BootReasonEnum      // attribute 0x0004
+	ActiveHardwareFaults     *[]HardwareFaultEnum // attribute 0x0005
+	ActiveRadioFaults        *[]RadioFaultEnum    // attribute 0x0006
+	ActiveNetworkFaults      *[]NetworkFaultEnum  // attribute 0x0007
+	TestEventTriggersEnabled *bool                // attribute 0x0008
+	DeviceLoadStatus         *DeviceLoadStruct    // attribute 0x000A
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrNetworkInterfaces); ok {
+		spec.Assign(&st.NetworkInterfaces, v)
+	}
+	if v, ok := read(AttrRebootCount); ok {
+		spec.Assign(&st.RebootCount, v)
+	}
+	if v, ok := read(AttrUpTime); ok {
+		spec.Assign(&st.UpTime, v)
+	}
+	if v, ok := read(AttrTotalOperationalHours); ok {
+		spec.Assign(&st.TotalOperationalHours, v)
+	}
+	if v, ok := read(AttrBootReason); ok {
+		spec.Assign(&st.BootReason, v)
+	}
+	if v, ok := read(AttrActiveHardwareFaults); ok {
+		spec.Assign(&st.ActiveHardwareFaults, v)
+	}
+	if v, ok := read(AttrActiveRadioFaults); ok {
+		spec.Assign(&st.ActiveRadioFaults, v)
+	}
+	if v, ok := read(AttrActiveNetworkFaults); ok {
+		spec.Assign(&st.ActiveNetworkFaults, v)
+	}
+	if v, ok := read(AttrTestEventTriggersEnabled); ok {
+		spec.Assign(&st.TestEventTriggersEnabled, v)
+	}
+	if v, ok := read(AttrDeviceLoadStatus); ok {
+		spec.Assign(&st.DeviceLoadStatus, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -128,9 +165,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -139,25 +178,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleTestEventTrigger registers fn for the TestEventTrigger command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleTestEventTrigger is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTestEventTrigger(fn func(ctx context.Context, req TestEventTriggerRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTestEventTrigger, fn)
 }
 
 // HandleTimeSnapshot registers fn for the TimeSnapshot command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleTimeSnapshot is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTimeSnapshot(fn func(ctx context.Context, req TimeSnapshotRequest) (TimeSnapshotResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTimeSnapshot, fn)
 }
 
 // HandlePayloadTestRequest registers fn for the PayloadTestRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePayloadTestRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePayloadTestRequest(fn func(ctx context.Context, req PayloadTestRequestRequest) (PayloadTestResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPayloadTestRequest, fn)
 }
@@ -229,7 +272,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

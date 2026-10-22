@@ -156,13 +156,13 @@ func TestParityMatterJS_FlowMeasurementConstraints(t *testing.T) {
 func TestParityMatterJS_FlowSensorDeviceType(t *testing.T) {
 	t.Parallel()
 	dt := contract.MeasurementClassDeviceType(contract.MeasurementFlow)
-	if name, _ := schema.DeviceTypeName(uint32(dt)); name != "FlowSensor" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(dt)); name != "FlowSensor" {
 		t.Errorf("MeasurementFlow device type 0x%04X is %q in matter.js, want FlowSensor", dt, name)
 	}
 	if contract.MeasurementClassClusterID(contract.MeasurementFlow) != ClusterFlowMeasurement {
 		t.Error("MeasurementFlow does not project to FlowMeasurement")
 	}
-	if !schema.DeviceTypeRequiresServerCluster(uint32(dt), ClusterFlowMeasurement) {
+	if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(dt), ClusterFlowMeasurement) {
 		t.Error("FlowSensor does not mandate FlowMeasurement in the snapshot")
 	}
 }

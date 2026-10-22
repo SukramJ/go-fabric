@@ -48,14 +48,14 @@ const otaProviderKey = endpoint.StringKey("go-fabric:ota-provider")
 // OtaSoftwareUpdateProvider server).
 type otaProviderEndpoint struct{ p *mattercore.OTAProvider }
 
-func (e otaProviderEndpoint) MatterDeviceType() uint16 { return device.OtaProviderID }
+func (e otaProviderEndpoint) MatterDeviceType() uint16 { return uint16(device.OtaProviderID) }
 
 func (e otaProviderEndpoint) MatterClusterServers() []contract.ClusterServer {
 	return []contract.ClusterServer{e.p}
 }
 
 func (e otaProviderEndpoint) spec() endpoint.Spec {
-	return endpoint.Spec{StableKey: otaProviderKey, DeviceType: device.OtaProviderID, Source: e}
+	return endpoint.Spec{StableKey: otaProviderKey, DeviceType: uint16(device.OtaProviderID), Source: e}
 }
 
 // buildOTAProvider builds the provider and the BDX responder it serves its

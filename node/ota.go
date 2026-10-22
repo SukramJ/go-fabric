@@ -21,7 +21,7 @@ import (
 )
 
 // otaApplier is the default [OTAApplier], the reference daemon's
-// (examples/reference-bridge/ota.go:36-214).
+// (examples/reference-bridge/ota.go:36-214 at b4ea1f96^).
 //
 // A product applies an image by installing it and restarting into it; the
 // requestor then reports the update at the next start (matter.js
@@ -52,8 +52,9 @@ type otaApplier struct {
 	// life bounds the in-place restart (restartedWhenIdle); stop cancels
 	// it. mu guards stopped; work is the restart's goroutine, added under
 	// mu while not stopped and waited for by [otaApplier.close].
-	life    context.Context //nolint:containedctx // the applier's lifetime, cancelled by close
-	stop    context.CancelFunc
+	life context.Context //nolint:containedctx // the applier's lifetime, cancelled by close
+	stop context.CancelFunc
+	// mu guards life, stopped and work.
 	mu      sync.Mutex
 	stopped bool
 	work    sync.WaitGroup
@@ -145,7 +146,7 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 
 // otaHarnessApplyHold is how long the in-place apply of --ota-harness stays
 // in Applying: eight ticks of the subscription engine (250 ms,
-// im/subscription/manager.go:185), so the state is reported before the
+// im/subscription/manager.go:190), so the state is reported before the
 // requestor returns to Idle.
 const otaHarnessApplyHold = 2 * time.Second
 
@@ -178,13 +179,13 @@ func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error
 	}
 	switch {
 	case h.SoftwareVersion != version:
-		return h, fmt.Errorf("ota: image is version %d but the provider announced %d", h.SoftwareVersion, version)
+		return h, fmt.Errorf("node: ota: image is version %d but the provider announced %d", h.SoftwareVersion, version)
 	case h.PayloadSize == 0:
 		return h, errors.New("node: ota: image carries no payload")
 	case h.VendorID != 0 && h.VendorID != a.vendorID:
-		return h, fmt.Errorf("ota: image is for vendor 0x%04x, this node is 0x%04x", h.VendorID, a.vendorID)
+		return h, fmt.Errorf("node: ota: image is for vendor 0x%04x, this node is 0x%04x", h.VendorID, a.vendorID)
 	case h.ProductID != 0 && h.ProductID != a.productID:
-		return h, fmt.Errorf("ota: image is for product 0x%04x, this node is 0x%04x", h.ProductID, a.productID)
+		return h, fmt.Errorf("node: ota: image is for product 0x%04x, this node is 0x%04x", h.ProductID, a.productID)
 	}
 	return h, nil
 }
@@ -213,7 +214,7 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 }
 
 // buildOtaRequestor builds the root's OTA Software Update Requestor
-// (ota.go:183-216): the configured applier, or the default one.
+// (ota.go:183-216 at b4ea1f96^): the configured applier, or the default one.
 //
 // The default applier is returned too, for Node.Stop to close; nil with
 // the host's own.

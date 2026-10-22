@@ -85,6 +85,7 @@ type Device struct {
 	// actMu serialises Act with Start, Stop and Restart.
 	actMu sync.Mutex
 
+	// mu guards addr, adv, cfg, n, names and running.
 	mu      sync.Mutex
 	n       *node.Node
 	adv     mdns.Advertiser

@@ -18,35 +18,75 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MeasuredValue              *float32              `matter:"0x0000"` // attribute 0x0000: single, MEA, R V, X
-	MinMeasuredValue           *float32              `matter:"0x0001"` // attribute 0x0001: single, MEA, R V, X F
-	MaxMeasuredValue           *float32              `matter:"0x0002"` // attribute 0x0002: single, MEA, R V, X F
-	PeakMeasuredValue          *float32              `matter:"0x0003"` // attribute 0x0003: single, PEA, R V, X
-	PeakMeasuredValueWindow    uint32                `matter:"0x0004"` // attribute 0x0004: elapsed-s, PEA, R V
-	AverageMeasuredValue       *float32              `matter:"0x0005"` // attribute 0x0005: single, AVG, R V, X
-	AverageMeasuredValueWindow uint32                `matter:"0x0006"` // attribute 0x0006: elapsed-s, AVG, R V
-	Uncertainty                float32               `matter:"0x0007"` // attribute 0x0007: single, [MEA], R V, F
-	MeasurementUnit            MeasurementUnitEnum   `matter:"0x0008"` // attribute 0x0008: MeasurementUnitEnum, MEA, R V, F
-	MeasurementMedium          MeasurementMediumEnum `matter:"0x0009"` // attribute 0x0009: MeasurementMediumEnum, M, R V, F
-	LevelValue                 LevelValueEnum        `matter:"0x000A"` // attribute 0x000A: LevelValueEnum, LEV, R V
+	MeasuredValue              *float32              // attribute 0x0000: single, MEA, R V, X
+	MinMeasuredValue           *float32              // attribute 0x0001: single, MEA, R V, X F
+	MaxMeasuredValue           *float32              // attribute 0x0002: single, MEA, R V, X F
+	PeakMeasuredValue          *float32              // attribute 0x0003: single, PEA, R V, X
+	PeakMeasuredValueWindow    uint32                // attribute 0x0004: elapsed-s, PEA, R V
+	AverageMeasuredValue       *float32              // attribute 0x0005: single, AVG, R V, X
+	AverageMeasuredValueWindow uint32                // attribute 0x0006: elapsed-s, AVG, R V
+	Uncertainty                float32               // attribute 0x0007: single, [MEA], R V, F
+	MeasurementUnit            MeasurementUnitEnum   // attribute 0x0008: MeasurementUnitEnum, MEA, R V, F
+	MeasurementMedium          MeasurementMediumEnum // attribute 0x0009: MeasurementMediumEnum, M, R V, F
+	LevelValue                 LevelValueEnum        // attribute 0x000A: LevelValueEnum, LEV, R V
 }
 
 // Patch is a change to the RadonConcentrationMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MeasuredValue              *float32               `matter:"0x0000"` // attribute 0x0000
-	MinMeasuredValue           *float32               `matter:"0x0001"` // attribute 0x0001
-	MaxMeasuredValue           *float32               `matter:"0x0002"` // attribute 0x0002
-	PeakMeasuredValue          *float32               `matter:"0x0003"` // attribute 0x0003
-	PeakMeasuredValueWindow    *uint32                `matter:"0x0004"` // attribute 0x0004
-	AverageMeasuredValue       *float32               `matter:"0x0005"` // attribute 0x0005
-	AverageMeasuredValueWindow *uint32                `matter:"0x0006"` // attribute 0x0006
-	Uncertainty                *float32               `matter:"0x0007"` // attribute 0x0007
-	MeasurementUnit            *MeasurementUnitEnum   `matter:"0x0008"` // attribute 0x0008
-	MeasurementMedium          *MeasurementMediumEnum `matter:"0x0009"` // attribute 0x0009
-	LevelValue                 *LevelValueEnum        `matter:"0x000A"` // attribute 0x000A
+	MeasuredValue              *float32               // attribute 0x0000
+	MinMeasuredValue           *float32               // attribute 0x0001
+	MaxMeasuredValue           *float32               // attribute 0x0002
+	PeakMeasuredValue          *float32               // attribute 0x0003
+	PeakMeasuredValueWindow    *uint32                // attribute 0x0004
+	AverageMeasuredValue       *float32               // attribute 0x0005
+	AverageMeasuredValueWindow *uint32                // attribute 0x0006
+	Uncertainty                *float32               // attribute 0x0007
+	MeasurementUnit            *MeasurementUnitEnum   // attribute 0x0008
+	MeasurementMedium          *MeasurementMediumEnum // attribute 0x0009
+	LevelValue                 *LevelValueEnum        // attribute 0x000A
 	Null                       []uint32               // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMeasuredValue); ok {
+		spec.Assign(&st.MeasuredValue, v)
+	}
+	if v, ok := read(AttrMinMeasuredValue); ok {
+		spec.Assign(&st.MinMeasuredValue, v)
+	}
+	if v, ok := read(AttrMaxMeasuredValue); ok {
+		spec.Assign(&st.MaxMeasuredValue, v)
+	}
+	if v, ok := read(AttrPeakMeasuredValue); ok {
+		spec.Assign(&st.PeakMeasuredValue, v)
+	}
+	if v, ok := read(AttrPeakMeasuredValueWindow); ok {
+		spec.Assign(&st.PeakMeasuredValueWindow, v)
+	}
+	if v, ok := read(AttrAverageMeasuredValue); ok {
+		spec.Assign(&st.AverageMeasuredValue, v)
+	}
+	if v, ok := read(AttrAverageMeasuredValueWindow); ok {
+		spec.Assign(&st.AverageMeasuredValueWindow, v)
+	}
+	if v, ok := read(AttrUncertainty); ok {
+		spec.Assign(&st.Uncertainty, v)
+	}
+	if v, ok := read(AttrMeasurementUnit); ok {
+		spec.Assign(&st.MeasurementUnit, v)
+	}
+	if v, ok := read(AttrMeasurementMedium); ok {
+		spec.Assign(&st.MeasurementMedium, v)
+	}
+	if v, ok := read(AttrLevelValue); ok {
+		spec.Assign(&st.LevelValue, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -135,9 +175,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -146,7 +188,8 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
@@ -178,7 +221,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

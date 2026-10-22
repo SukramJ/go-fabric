@@ -83,7 +83,7 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 	servers := ClusterServers(ep)
 	mounted := clusterIDs(servers)
 
-	mandatory, known := schema.DeviceTypeMandatoryServerClusters[uint32(deviceType)]
+	mandatory, known := schema.DeviceTypeMandatoryServerClusters[schema.DeviceTypeID(deviceType)]
 	if !known {
 		t.Fatalf("device type 0x%04X has no mandatory-cluster entry in the snapshot", deviceType)
 	}
@@ -98,7 +98,7 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 		if id == mattercore.BridgedDeviceBasicInformationClusterID {
 			continue
 		}
-		if ok, _ := schema.DeviceTypeAllowsServerCluster(uint32(deviceType), id); !ok {
+		if ok, _ := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(deviceType), id); !ok {
 			t.Errorf("device type 0x%04X: cluster 0x%04X is mounted but not a server cluster of the type", deviceType, id)
 		}
 	}
@@ -126,7 +126,7 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 	}
 	v, _ = desc.MatterRead(0x0000) // DeviceTypeList
 	types, _ := v.([]mattercore.DeviceTypeStruct)
-	wantRev, _ := schema.DeviceTypeRevision(uint32(deviceType))
+	wantRev, _ := schema.DeviceTypeRevision(schema.DeviceTypeID(deviceType))
 	if len(types) == 0 || types[0].DeviceType != uint32(deviceType) || types[0].Revision != wantRev {
 		t.Errorf("DeviceTypeList = %+v, want the primary 0x%04X rev %d first", types, deviceType, wantRev)
 	}

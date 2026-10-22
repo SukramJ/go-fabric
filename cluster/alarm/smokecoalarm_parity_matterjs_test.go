@@ -211,10 +211,10 @@ func TestParityMatterJS_SmokeCoAlarmEventPriorities(t *testing.T) {
 // server is mounted on: SmokeCoAlarm (0x0076) mandates the cluster.
 func TestParityMatterJS_SmokeCoAlarmDeviceType(t *testing.T) {
 	t.Parallel()
-	if name, _ := schema.DeviceTypeName(uint32(alarm.DeviceTypeSmokeCoAlarm)); name != "SmokeCoAlarm" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(alarm.DeviceTypeSmokeCoAlarm)); name != "SmokeCoAlarm" {
 		t.Errorf("device type 0x%04X is %q", alarm.DeviceTypeSmokeCoAlarm, name)
 	}
-	if !schema.DeviceTypeRequiresServerCluster(uint32(alarm.DeviceTypeSmokeCoAlarm), alarm.ClusterID) {
+	if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(alarm.DeviceTypeSmokeCoAlarm), alarm.ClusterID) {
 		t.Error("SmokeCoAlarm does not mandate the SmokeCoAlarm cluster in the snapshot")
 	}
 }

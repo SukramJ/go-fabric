@@ -14,8 +14,8 @@ import (
 
 // SecondaryNetworkInterface device type identity: 0x0019, revision 1.
 const (
-	SecondaryNetworkInterfaceID       uint16 = 0x0019
-	SecondaryNetworkInterfaceRevision uint16 = 1
+	SecondaryNetworkInterfaceID       schema.DeviceTypeID = 0x0019
+	SecondaryNetworkInterfaceRevision uint16              = 1
 )
 
 // SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, matter.js's packages/node/src/endpoints/secondary-network-interface.ts;

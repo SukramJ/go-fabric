@@ -118,8 +118,13 @@ func TestWiFiNetworkCommissioningAttributes(t *testing.T) {
 	if err := w.MatterWrite(context.Background(), netcommAttrInterfaceEnabled, 1); err == nil {
 		t.Fatal("a non-bool write accepted")
 	}
-	if err := w.MatterWrite(context.Background(), netcommAttrMaxNetworks, uint8(2)); err == nil {
-		t.Fatal("MaxNetworks written")
+	if err := w.MatterWrite(context.Background(), netcommAttrMaxNetworks, uint8(2)); wifiStatusOf(t, err) != im.StatusUnsupportedWrite {
+		t.Fatalf("MaxNetworks written: %v, want UNSUPPORTED_WRITE", err)
+	}
+	// A refusal the definition does not judge is still the server's
+	// "read-only" (G2-10): UNSUPPORTED_WRITE, never FAILURE.
+	if got := (refusedWrite{sentinel: errors.New("core: read-only")}).MatterStatusCode(); got != im.StatusUnsupportedWrite {
+		t.Fatalf("an unjudged refusal answers %v, want UNSUPPORTED_WRITE", got)
 	}
 	if w.MinReadPrivilege(netcommAttrNetworks) != 5 || w.MinWritePrivilege(netcommAttrInterfaceEnabled) != 5 {
 		t.Fatal("attribute privileges")

@@ -141,7 +141,11 @@ var ports = map[string]portSet{
 			"StateSource is the lock's actuator: it reports whether the bolt is",
 			"jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor",
 			"(cmdID) the kit's DoorLock server admitted (cluster/lock",
-			"StateSource). Without one the server keeps its own lock state.",
+			"StateSource). The server reads LockState from it at every read and",
+			"stores none: IsJammed true is NotFullyLocked, IsLocked's observed",
+			"false (the lock's state is not known) is a null LockState, else",
+			"locked is Locked or Unlocked; after LockInvoke the next read asks",
+			"IsLocked again. Without one the server keeps its own lock state.",
 		},
 		methods: []string{
 			"IsJammed() bool",
@@ -301,7 +305,7 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	w.p("// ClusterDeclaration implements device.Declaration: the declaration in")
 	w.p("// the form the device kit applies it.")
 	w.p("func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {")
-	w.p("\tdecl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}")
+	w.p("\tdecl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}")
 	w.p("\tif d.OnWrite != nil {")
 	w.p("\t\tdecl.Attach = d.attach")
 	w.p("\t}")

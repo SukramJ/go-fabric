@@ -17,8 +17,8 @@ import (
 
 // LaundryDryer device type identity: 0x007C, revision 2.
 const (
-	LaundryDryerID       uint16 = 0x007C
-	LaundryDryerRevision uint16 = 2
+	LaundryDryerID       schema.DeviceTypeID = 0x007C
+	LaundryDryerRevision uint16              = 2
 )
 
 // LaundryDryerType is the LaundryDryer device type, matter.js's packages/node/src/devices/laundry-dryer.ts;

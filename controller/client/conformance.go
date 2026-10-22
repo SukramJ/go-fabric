@@ -238,8 +238,12 @@ func rawIDList(n spec.Node) []uint32 {
 // modelled reports whether a device type the endpoint lists is in the
 // model — what the validator can judge it by.
 func (s *imageSubject) modelled() bool {
-	return slices.ContainsFunc(s.types, func(id uint32) bool {
-		_, ok := schema.DeviceTypeDefinitionOf(id)
+	return slices.ContainsFunc(s.types, func(devtype uint32) bool {
+		id, ok := schema.DeviceTypeIDOf(devtype)
+		if !ok {
+			return false
+		}
+		_, ok = schema.DeviceTypeDefinitionOf(id)
 		return ok
 	})
 }

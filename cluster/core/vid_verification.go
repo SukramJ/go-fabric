@@ -56,6 +56,8 @@ type vidData struct {
 }
 
 type vidVerificationMemory struct {
+	// mu guards fabric, the VID verification data kept in memory when the
+	// store keeps no settings.
 	mu     sync.Mutex
 	fabric map[uint8]vidData
 }

@@ -29,7 +29,10 @@ func TestPlugToggles(t *testing.T) {
 		Device: fabrictest.Topology{Bridged: []node.Endpoint{plug}},
 	})
 	ep, _ := plug.EndpointNumber()
-	ctx := context.Background()
+	// A deadline of the test's own: a wait without one ends after the
+	// site's (Options.Wait, 30 s on the wall clock) with ErrWaited.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
 	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {
@@ -153,6 +156,11 @@ the site has been quiet for the settle period (`Options.Settle`, default
 test process runnable, running or in a system call. A timer the work waits
 on — a standalone acknowledgement, a retransmission, a report interval —
 then fires; a computation in progress does not see time move under it.
+`Eventually` and `Settle` wait as long as their context allows; a context
+without a deadline is bounded by the site's own, `Options.Wait` (default
+`fabrictest.DefaultWait`, 30 s on the wall clock), after which they return
+`fabrictest.ErrWaited` — a condition that never holds fails the test
+instead of hanging it.
 
 ```go
 // A change made locally reaches the subscriber once the clock passes the

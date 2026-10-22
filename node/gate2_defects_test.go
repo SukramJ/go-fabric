@@ -180,13 +180,11 @@ func newDimmable(t *testing.T, src *heldLevelSource, transitions bool) *dimmable
 			d.untyped.add(*l, c.Origin)
 		}
 	})
-	if _, err := light.LevelControl().OnChangedAsync(func(s levelcontroldef.State, c contract.Change) {
+	light.LevelControl().OnChangedAsync(func(s levelcontroldef.State, c contract.Change) {
 		if s.CurrentLevel != nil && slices.Contains(c.Attributes, levelcontroldef.AttrCurrentLevel) {
 			d.as.add(*s.CurrentLevel, c.Origin)
 		}
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 	return d
 }
 

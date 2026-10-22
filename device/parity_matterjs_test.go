@@ -71,7 +71,7 @@ func TestDeviceRequirementsParityMatterJS(t *testing.T) {
 		},
 	} {
 		ty := want.ty
-		if ty.ID != want.id || ty.Revision != want.revision {
+		if uint16(ty.ID) != want.id || ty.Revision != want.revision {
 			t.Errorf("%s: 0x%04X rev %d, want 0x%04X rev %d", ty.Name, ty.ID, ty.Revision, want.id, want.revision)
 		}
 		var mand, opt []string

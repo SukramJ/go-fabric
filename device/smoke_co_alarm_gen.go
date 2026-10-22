@@ -17,8 +17,8 @@ import (
 
 // SmokeCoAlarm device type identity: 0x0076, revision 2.
 const (
-	SmokeCoAlarmID       uint16 = 0x0076
-	SmokeCoAlarmRevision uint16 = 2
+	SmokeCoAlarmID       schema.DeviceTypeID = 0x0076
+	SmokeCoAlarmRevision uint16              = 2
 )
 
 // SmokeCoAlarmType is the SmokeCoAlarm device type, matter.js's packages/node/src/devices/smoke-co-alarm.ts;

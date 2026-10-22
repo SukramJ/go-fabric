@@ -10,6 +10,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
+	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
@@ -149,5 +150,37 @@ func TestEnergyPreferenceOrigins(t *testing.T) {
 			}
 		}},
 		spectest.Write(ep.AttrCurrentEnergyBalance, uint8(2)),
+	)
+}
+
+// TestEvseOrigins is the origin audit of the EnergyEvse server's
+// UserMaximumChargeCurrent write (BY-1 Left out, BY-2 §6): the charge
+// limit the write moves (EvseDelegate.cpp:1565-1571,
+// ComputeMaxChargeCurrentLimit) is the write's consequence and reaches
+// the listeners from OriginControllerWrite with the written attribute; a
+// host's circuit capacity moves it from OriginHostSet.
+func TestEvseOrigins(t *testing.T) {
+	t.Parallel()
+	spectest.CheckOrigins(t, func(tb testing.TB) contract.ClusterServer {
+		tb.Helper()
+		srv, _, _ := newEvse(t, energy.EvseFeatureChargingPreferences)
+		basicFunctionality(t, srv)
+		pluggedIn(t, srv)
+		enableCharging(t, srv, nil, 6000, 12000)
+		return srv
+	},
+		spectest.OriginCase{Name: "host set", Want: contract.OriginHostSet, Attributes: []uint32{evse.AttrMaximumChargeCurrent}, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
+			if err := srv.(*energy.EvseServer).SetCircuitCapacity(10000); err != nil {
+				tb.Fatal(err)
+			}
+		}},
+		spectest.OriginCase{Name: "controller write", Want: contract.OriginControllerWrite, Attributes: []uint32{evse.AttrUserMaximumChargeCurrent, evse.AttrMaximumChargeCurrent}, Act: func(tb testing.TB, srv contract.ClusterServer) {
+			tb.Helper()
+			ctx := contract.WithOrigin(context.Background(), contract.OriginControllerWrite)
+			if err := srv.MatterWrite(ctx, evse.AttrUserMaximumChargeCurrent, int64(6000)); err != nil {
+				tb.Fatal(err)
+			}
+		}},
 	)
 }

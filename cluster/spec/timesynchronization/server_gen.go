@@ -18,39 +18,85 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	UtcTime              *uint64                  `matter:"0x0000"` // attribute 0x0000: epoch-us, M, R V, X C
-	Granularity          GranularityEnum          `matter:"0x0001"` // attribute 0x0001: GranularityEnum, M, R V
-	TimeSource           TimeSourceEnum           `matter:"0x0002"` // attribute 0x0002: TimeSourceEnum, O, R V
-	TrustedTimeSource    *TrustedTimeSourceStruct `matter:"0x0003"` // attribute 0x0003: TrustedTimeSourceStruct, TSC, R V, X N
-	DefaultNtp           *string                  `matter:"0x0004"` // attribute 0x0004: string, NTPC, R V, X N
-	TimeZone             []TimeZoneStruct         `matter:"0x0005"` // attribute 0x0005: list[TimeZoneStruct], TZ, R V, N
-	DstOffset            []DSTOffsetStruct        `matter:"0x0006"` // attribute 0x0006: list[DSTOffsetStruct], TZ, R V, N
-	LocalTime            *uint64                  `matter:"0x0007"` // attribute 0x0007: epoch-us, TZ, R V, X C
-	TimeZoneDatabase     TimeZoneDatabaseEnum     `matter:"0x0008"` // attribute 0x0008: TimeZoneDatabaseEnum, TZ, R V, F
-	NtpServerAvailable   bool                     `matter:"0x0009"` // attribute 0x0009: bool, NTPS, R V
-	TimeZoneListMaxSize  uint8                    `matter:"0x000A"` // attribute 0x000A: uint8, TZ, R V, F
-	DstOffsetListMaxSize uint8                    `matter:"0x000B"` // attribute 0x000B: uint8, TZ, R V, F
-	SupportsDnsResolve   bool                     `matter:"0x000C"` // attribute 0x000C: bool, NTPC, R V, F
+	UtcTime              *uint64                  // attribute 0x0000: epoch-us, M, R V, X C
+	Granularity          GranularityEnum          // attribute 0x0001: GranularityEnum, M, R V
+	TimeSource           TimeSourceEnum           // attribute 0x0002: TimeSourceEnum, O, R V
+	TrustedTimeSource    *TrustedTimeSourceStruct // attribute 0x0003: TrustedTimeSourceStruct, TSC, R V, X N
+	DefaultNtp           *string                  // attribute 0x0004: string, NTPC, R V, X N
+	TimeZone             []TimeZoneStruct         // attribute 0x0005: list[TimeZoneStruct], TZ, R V, N
+	DstOffset            []DSTOffsetStruct        // attribute 0x0006: list[DSTOffsetStruct], TZ, R V, N
+	LocalTime            *uint64                  // attribute 0x0007: epoch-us, TZ, R V, X C
+	TimeZoneDatabase     TimeZoneDatabaseEnum     // attribute 0x0008: TimeZoneDatabaseEnum, TZ, R V, F
+	NtpServerAvailable   bool                     // attribute 0x0009: bool, NTPS, R V
+	TimeZoneListMaxSize  uint8                    // attribute 0x000A: uint8, TZ, R V, F
+	DstOffsetListMaxSize uint8                    // attribute 0x000B: uint8, TZ, R V, F
+	SupportsDnsResolve   bool                     // attribute 0x000C: bool, NTPC, R V, F
 }
 
 // Patch is a change to the TimeSynchronization state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	UtcTime              *uint64                  `matter:"0x0000"` // attribute 0x0000
-	Granularity          *GranularityEnum         `matter:"0x0001"` // attribute 0x0001
-	TimeSource           *TimeSourceEnum          `matter:"0x0002"` // attribute 0x0002
-	TrustedTimeSource    *TrustedTimeSourceStruct `matter:"0x0003"` // attribute 0x0003
-	DefaultNtp           *string                  `matter:"0x0004"` // attribute 0x0004
-	TimeZone             *[]TimeZoneStruct        `matter:"0x0005"` // attribute 0x0005
-	DstOffset            *[]DSTOffsetStruct       `matter:"0x0006"` // attribute 0x0006
-	LocalTime            *uint64                  `matter:"0x0007"` // attribute 0x0007
-	TimeZoneDatabase     *TimeZoneDatabaseEnum    `matter:"0x0008"` // attribute 0x0008
-	NtpServerAvailable   *bool                    `matter:"0x0009"` // attribute 0x0009
-	TimeZoneListMaxSize  *uint8                   `matter:"0x000A"` // attribute 0x000A
-	DstOffsetListMaxSize *uint8                   `matter:"0x000B"` // attribute 0x000B
-	SupportsDnsResolve   *bool                    `matter:"0x000C"` // attribute 0x000C
+	UtcTime              *uint64                  // attribute 0x0000
+	Granularity          *GranularityEnum         // attribute 0x0001
+	TimeSource           *TimeSourceEnum          // attribute 0x0002
+	TrustedTimeSource    *TrustedTimeSourceStruct // attribute 0x0003
+	DefaultNtp           *string                  // attribute 0x0004
+	TimeZone             *[]TimeZoneStruct        // attribute 0x0005
+	DstOffset            *[]DSTOffsetStruct       // attribute 0x0006
+	LocalTime            *uint64                  // attribute 0x0007
+	TimeZoneDatabase     *TimeZoneDatabaseEnum    // attribute 0x0008
+	NtpServerAvailable   *bool                    // attribute 0x0009
+	TimeZoneListMaxSize  *uint8                   // attribute 0x000A
+	DstOffsetListMaxSize *uint8                   // attribute 0x000B
+	SupportsDnsResolve   *bool                    // attribute 0x000C
 	Null                 []uint32                 // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrUtcTime); ok {
+		spec.Assign(&st.UtcTime, v)
+	}
+	if v, ok := read(AttrGranularity); ok {
+		spec.Assign(&st.Granularity, v)
+	}
+	if v, ok := read(AttrTimeSource); ok {
+		spec.Assign(&st.TimeSource, v)
+	}
+	if v, ok := read(AttrTrustedTimeSource); ok {
+		spec.Assign(&st.TrustedTimeSource, v)
+	}
+	if v, ok := read(AttrDefaultNtp); ok {
+		spec.Assign(&st.DefaultNtp, v)
+	}
+	if v, ok := read(AttrTimeZone); ok {
+		spec.Assign(&st.TimeZone, v)
+	}
+	if v, ok := read(AttrDstOffset); ok {
+		spec.Assign(&st.DstOffset, v)
+	}
+	if v, ok := read(AttrLocalTime); ok {
+		spec.Assign(&st.LocalTime, v)
+	}
+	if v, ok := read(AttrTimeZoneDatabase); ok {
+		spec.Assign(&st.TimeZoneDatabase, v)
+	}
+	if v, ok := read(AttrNtpServerAvailable); ok {
+		spec.Assign(&st.NtpServerAvailable, v)
+	}
+	if v, ok := read(AttrTimeZoneListMaxSize); ok {
+		spec.Assign(&st.TimeZoneListMaxSize, v)
+	}
+	if v, ok := read(AttrDstOffsetListMaxSize); ok {
+		spec.Assign(&st.DstOffsetListMaxSize, v)
+	}
+	if v, ok := read(AttrSupportsDnsResolve); ok {
+		spec.Assign(&st.SupportsDnsResolve, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -145,9 +191,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -156,37 +204,43 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetUtcTime registers fn for the SetUtcTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetUtcTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetUtcTime(fn func(ctx context.Context, req SetUtcTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetUtcTime, fn)
 }
 
 // HandleSetTrustedTimeSource registers fn for the SetTrustedTimeSource command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTrustedTimeSource is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTrustedTimeSource(fn func(ctx context.Context, req SetTrustedTimeSourceRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTrustedTimeSource, fn)
 }
 
 // HandleSetTimeZone registers fn for the SetTimeZone command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTimeZone is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTimeZone(fn func(ctx context.Context, req SetTimeZoneRequest) (SetTimeZoneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTimeZone, fn)
 }
 
 // HandleSetDstOffset registers fn for the SetDstOffset command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetDstOffset is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetDstOffset(fn func(ctx context.Context, req SetDstOffsetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetDstOffset, fn)
 }
 
 // HandleSetDefaultNtp registers fn for the SetDefaultNtp command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetDefaultNtp is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetDefaultNtp(fn func(ctx context.Context, req SetDefaultNtpRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetDefaultNtp, fn)
 }
@@ -270,7 +324,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

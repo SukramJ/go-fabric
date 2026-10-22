@@ -515,7 +515,7 @@ func (r *OTASoftwareUpdateRequestor) handleDownload(ctx context.Context, sess Ot
 	if !strings.HasPrefix(uri, "bdx://") {
 		// HTTPS (:1094-1104) is not ported; any other scheme is refused
 		// as matter.js refuses it (:1106).
-		return "", fmt.Errorf("unsupported download URI: %s", uri)
+		return "", fmt.Errorf("core: unsupported download URI: %s", uri)
 	}
 	v := version
 	r.updateState(otadef.UpdateStateDownloading, otadef.ChangeReasonSuccess, &v)

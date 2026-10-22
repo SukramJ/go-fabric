@@ -18,19 +18,35 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	ChannelList    []ChannelInfoStruct `matter:"0x0000"` // attribute 0x0000: list[ChannelInfoStruct], CL, R V
-	Lineup         *LineupInfoStruct   `matter:"0x0001"` // attribute 0x0001: LineupInfoStruct, LI, R V, X
-	CurrentChannel *ChannelInfoStruct  `matter:"0x0002"` // attribute 0x0002: ChannelInfoStruct, O, R V, X
+	ChannelList    []ChannelInfoStruct // attribute 0x0000: list[ChannelInfoStruct], CL, R V
+	Lineup         *LineupInfoStruct   // attribute 0x0001: LineupInfoStruct, LI, R V, X
+	CurrentChannel *ChannelInfoStruct  // attribute 0x0002: ChannelInfoStruct, O, R V, X
 }
 
 // Patch is a change to the Channel state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	ChannelList    *[]ChannelInfoStruct `matter:"0x0000"` // attribute 0x0000
-	Lineup         *LineupInfoStruct    `matter:"0x0001"` // attribute 0x0001
-	CurrentChannel *ChannelInfoStruct   `matter:"0x0002"` // attribute 0x0002
+	ChannelList    *[]ChannelInfoStruct // attribute 0x0000
+	Lineup         *LineupInfoStruct    // attribute 0x0001
+	CurrentChannel *ChannelInfoStruct   // attribute 0x0002
 	Null           []uint32             // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrChannelList); ok {
+		spec.Assign(&st.ChannelList, v)
+	}
+	if v, ok := read(AttrLineup); ok {
+		spec.Assign(&st.Lineup, v)
+	}
+	if v, ok := read(AttrCurrentChannel); ok {
+		spec.Assign(&st.CurrentChannel, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -95,9 +111,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -106,43 +124,50 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleChangeChannel registers fn for the ChangeChannel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannel(fn func(ctx context.Context, req ChangeChannelRequest) (ChangeChannelResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannel, fn)
 }
 
 // HandleChangeChannelByNumber registers fn for the ChangeChannelByNumber command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannelByNumber is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannelByNumber(fn func(ctx context.Context, req ChangeChannelByNumberRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannelByNumber, fn)
 }
 
 // HandleSkipChannel registers fn for the SkipChannel command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipChannel is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipChannel(fn func(ctx context.Context, req SkipChannelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipChannel, fn)
 }
 
 // HandleGetProgramGuide registers fn for the GetProgramGuide command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetProgramGuide is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetProgramGuide(fn func(ctx context.Context, req GetProgramGuideRequest) (ProgramGuideResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetProgramGuide, fn)
 }
 
 // HandleRecordProgram registers fn for the RecordProgram command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRecordProgram is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRecordProgram(fn func(ctx context.Context, req RecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRecordProgram, fn)
 }
 
 // HandleCancelRecordProgram registers fn for the CancelRecordProgram command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelRecordProgram is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelRecordProgram, fn)
 }
@@ -223,7 +248,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -80,7 +80,7 @@ func TestParityMatterJS_CommodityServers(t *testing.T) {
 		{0x0514, energy.ClusterIDCommodityMetering},
 		{0x0514, energy.ClusterIDCommodityPrice},
 	} {
-		if allowed, known := schema.DeviceTypeAllowsServerCluster(c.deviceType, c.cluster); !allowed || !known {
+		if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.deviceType), c.cluster); !allowed || !known {
 			t.Errorf("device type 0x%04X does not offer cluster 0x%04X", c.deviceType, c.cluster)
 		}
 	}

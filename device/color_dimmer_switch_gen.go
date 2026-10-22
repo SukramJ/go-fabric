@@ -13,8 +13,8 @@ import (
 
 // ColorDimmerSwitch device type identity: 0x0105, revision 4.
 const (
-	ColorDimmerSwitchID       uint16 = 0x0105
-	ColorDimmerSwitchRevision uint16 = 4
+	ColorDimmerSwitchID       schema.DeviceTypeID = 0x0105
+	ColorDimmerSwitchRevision uint16              = 4
 )
 
 // ColorDimmerSwitchType is the ColorDimmerSwitch device type, matter.js's packages/node/src/devices/color-dimmer-switch.ts;

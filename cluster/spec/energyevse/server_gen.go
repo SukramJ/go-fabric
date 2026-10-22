@@ -18,59 +18,135 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	State                    *StateEnum      `matter:"0x0000"` // attribute 0x0000: StateEnum, M, R V, X
-	SupplyState              SupplyStateEnum `matter:"0x0001"` // attribute 0x0001: SupplyStateEnum, M, R V
-	FaultState               FaultStateEnum  `matter:"0x0002"` // attribute 0x0002: FaultStateEnum, M, R V
-	ChargingEnabledUntil     *uint32         `matter:"0x0003"` // attribute 0x0003: epoch-s, M, R V, X N
-	DischargingEnabledUntil  *uint32         `matter:"0x0004"` // attribute 0x0004: epoch-s, V2X, R V, X N
-	CircuitCapacity          int64           `matter:"0x0005"` // attribute 0x0005: amperage-mA, M, R V, N
-	MinimumChargeCurrent     int64           `matter:"0x0006"` // attribute 0x0006: amperage-mA, M, R V, N
-	MaximumChargeCurrent     int64           `matter:"0x0007"` // attribute 0x0007: amperage-mA, M, R V, N
-	MaximumDischargeCurrent  int64           `matter:"0x0008"` // attribute 0x0008: amperage-mA, V2X, R V, N
-	UserMaximumChargeCurrent int64           `matter:"0x0009"` // attribute 0x0009: amperage-mA, O, RW VM, N
-	RandomizationDelayWindow uint32          `matter:"0x000A"` // attribute 0x000A: elapsed-s, O, RW VM, N
-	NextChargeStartTime      *uint32         `matter:"0x0023"` // attribute 0x0023: epoch-s, PREF, R V, X
-	NextChargeTargetTime     *uint32         `matter:"0x0024"` // attribute 0x0024: epoch-s, PREF, R V, X
-	NextChargeRequiredEnergy *int64          `matter:"0x0025"` // attribute 0x0025: energy-mWh, PREF, R V, X
-	NextChargeTargetSoC      *uint8          `matter:"0x0026"` // attribute 0x0026: percent, PREF, R V, X
-	ApproximateEvEfficiency  *uint16         `matter:"0x0027"` // attribute 0x0027: uint16, [PREF], RW VM, X N
-	StateOfCharge            *uint8          `matter:"0x0030"` // attribute 0x0030: percent, SOC, R V, X
-	BatteryCapacity          *int64          `matter:"0x0031"` // attribute 0x0031: energy-mWh, SOC, R V, X
-	VehicleId                *string         `matter:"0x0032"` // attribute 0x0032: string, PNC, R V, X
-	SessionId                *uint32         `matter:"0x0040"` // attribute 0x0040: uint32, M, R V, X N
-	SessionDuration          *uint32         `matter:"0x0041"` // attribute 0x0041: elapsed-s, M, R V, X N Q
-	SessionEnergyCharged     *int64          `matter:"0x0042"` // attribute 0x0042: energy-mWh, M, R V, X N Q
-	SessionEnergyDischarged  *int64          `matter:"0x0043"` // attribute 0x0043: energy-mWh, V2X, R V, X N Q
+	State                    *StateEnum      // attribute 0x0000: StateEnum, M, R V, X
+	SupplyState              SupplyStateEnum // attribute 0x0001: SupplyStateEnum, M, R V
+	FaultState               FaultStateEnum  // attribute 0x0002: FaultStateEnum, M, R V
+	ChargingEnabledUntil     *uint32         // attribute 0x0003: epoch-s, M, R V, X N
+	DischargingEnabledUntil  *uint32         // attribute 0x0004: epoch-s, V2X, R V, X N
+	CircuitCapacity          int64           // attribute 0x0005: amperage-mA, M, R V, N
+	MinimumChargeCurrent     int64           // attribute 0x0006: amperage-mA, M, R V, N
+	MaximumChargeCurrent     int64           // attribute 0x0007: amperage-mA, M, R V, N
+	MaximumDischargeCurrent  int64           // attribute 0x0008: amperage-mA, V2X, R V, N
+	UserMaximumChargeCurrent int64           // attribute 0x0009: amperage-mA, O, RW VM, N
+	RandomizationDelayWindow uint32          // attribute 0x000A: elapsed-s, O, RW VM, N
+	NextChargeStartTime      *uint32         // attribute 0x0023: epoch-s, PREF, R V, X
+	NextChargeTargetTime     *uint32         // attribute 0x0024: epoch-s, PREF, R V, X
+	NextChargeRequiredEnergy *int64          // attribute 0x0025: energy-mWh, PREF, R V, X
+	NextChargeTargetSoC      *uint8          // attribute 0x0026: percent, PREF, R V, X
+	ApproximateEvEfficiency  *uint16         // attribute 0x0027: uint16, [PREF], RW VM, X N
+	StateOfCharge            *uint8          // attribute 0x0030: percent, SOC, R V, X
+	BatteryCapacity          *int64          // attribute 0x0031: energy-mWh, SOC, R V, X
+	VehicleId                *string         // attribute 0x0032: string, PNC, R V, X
+	SessionId                *uint32         // attribute 0x0040: uint32, M, R V, X N
+	SessionDuration          *uint32         // attribute 0x0041: elapsed-s, M, R V, X N Q
+	SessionEnergyCharged     *int64          // attribute 0x0042: energy-mWh, M, R V, X N Q
+	SessionEnergyDischarged  *int64          // attribute 0x0043: energy-mWh, V2X, R V, X N Q
 }
 
 // Patch is a change to the EnergyEvse state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	State                    *StateEnum       `matter:"0x0000"` // attribute 0x0000
-	SupplyState              *SupplyStateEnum `matter:"0x0001"` // attribute 0x0001
-	FaultState               *FaultStateEnum  `matter:"0x0002"` // attribute 0x0002
-	ChargingEnabledUntil     *uint32          `matter:"0x0003"` // attribute 0x0003
-	DischargingEnabledUntil  *uint32          `matter:"0x0004"` // attribute 0x0004
-	CircuitCapacity          *int64           `matter:"0x0005"` // attribute 0x0005
-	MinimumChargeCurrent     *int64           `matter:"0x0006"` // attribute 0x0006
-	MaximumChargeCurrent     *int64           `matter:"0x0007"` // attribute 0x0007
-	MaximumDischargeCurrent  *int64           `matter:"0x0008"` // attribute 0x0008
-	UserMaximumChargeCurrent *int64           `matter:"0x0009"` // attribute 0x0009
-	RandomizationDelayWindow *uint32          `matter:"0x000A"` // attribute 0x000A
-	NextChargeStartTime      *uint32          `matter:"0x0023"` // attribute 0x0023
-	NextChargeTargetTime     *uint32          `matter:"0x0024"` // attribute 0x0024
-	NextChargeRequiredEnergy *int64           `matter:"0x0025"` // attribute 0x0025
-	NextChargeTargetSoC      *uint8           `matter:"0x0026"` // attribute 0x0026
-	ApproximateEvEfficiency  *uint16          `matter:"0x0027"` // attribute 0x0027
-	StateOfCharge            *uint8           `matter:"0x0030"` // attribute 0x0030
-	BatteryCapacity          *int64           `matter:"0x0031"` // attribute 0x0031
-	VehicleId                *string          `matter:"0x0032"` // attribute 0x0032
-	SessionId                *uint32          `matter:"0x0040"` // attribute 0x0040
-	SessionDuration          *uint32          `matter:"0x0041"` // attribute 0x0041
-	SessionEnergyCharged     *int64           `matter:"0x0042"` // attribute 0x0042
-	SessionEnergyDischarged  *int64           `matter:"0x0043"` // attribute 0x0043
+	State                    *StateEnum       // attribute 0x0000
+	SupplyState              *SupplyStateEnum // attribute 0x0001
+	FaultState               *FaultStateEnum  // attribute 0x0002
+	ChargingEnabledUntil     *uint32          // attribute 0x0003
+	DischargingEnabledUntil  *uint32          // attribute 0x0004
+	CircuitCapacity          *int64           // attribute 0x0005
+	MinimumChargeCurrent     *int64           // attribute 0x0006
+	MaximumChargeCurrent     *int64           // attribute 0x0007
+	MaximumDischargeCurrent  *int64           // attribute 0x0008
+	UserMaximumChargeCurrent *int64           // attribute 0x0009
+	RandomizationDelayWindow *uint32          // attribute 0x000A
+	NextChargeStartTime      *uint32          // attribute 0x0023
+	NextChargeTargetTime     *uint32          // attribute 0x0024
+	NextChargeRequiredEnergy *int64           // attribute 0x0025
+	NextChargeTargetSoC      *uint8           // attribute 0x0026
+	ApproximateEvEfficiency  *uint16          // attribute 0x0027
+	StateOfCharge            *uint8           // attribute 0x0030
+	BatteryCapacity          *int64           // attribute 0x0031
+	VehicleId                *string          // attribute 0x0032
+	SessionId                *uint32          // attribute 0x0040
+	SessionDuration          *uint32          // attribute 0x0041
+	SessionEnergyCharged     *int64           // attribute 0x0042
+	SessionEnergyDischarged  *int64           // attribute 0x0043
 	Null                     []uint32         // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrState); ok {
+		spec.Assign(&st.State, v)
+	}
+	if v, ok := read(AttrSupplyState); ok {
+		spec.Assign(&st.SupplyState, v)
+	}
+	if v, ok := read(AttrFaultState); ok {
+		spec.Assign(&st.FaultState, v)
+	}
+	if v, ok := read(AttrChargingEnabledUntil); ok {
+		spec.Assign(&st.ChargingEnabledUntil, v)
+	}
+	if v, ok := read(AttrDischargingEnabledUntil); ok {
+		spec.Assign(&st.DischargingEnabledUntil, v)
+	}
+	if v, ok := read(AttrCircuitCapacity); ok {
+		spec.Assign(&st.CircuitCapacity, v)
+	}
+	if v, ok := read(AttrMinimumChargeCurrent); ok {
+		spec.Assign(&st.MinimumChargeCurrent, v)
+	}
+	if v, ok := read(AttrMaximumChargeCurrent); ok {
+		spec.Assign(&st.MaximumChargeCurrent, v)
+	}
+	if v, ok := read(AttrMaximumDischargeCurrent); ok {
+		spec.Assign(&st.MaximumDischargeCurrent, v)
+	}
+	if v, ok := read(AttrUserMaximumChargeCurrent); ok {
+		spec.Assign(&st.UserMaximumChargeCurrent, v)
+	}
+	if v, ok := read(AttrRandomizationDelayWindow); ok {
+		spec.Assign(&st.RandomizationDelayWindow, v)
+	}
+	if v, ok := read(AttrNextChargeStartTime); ok {
+		spec.Assign(&st.NextChargeStartTime, v)
+	}
+	if v, ok := read(AttrNextChargeTargetTime); ok {
+		spec.Assign(&st.NextChargeTargetTime, v)
+	}
+	if v, ok := read(AttrNextChargeRequiredEnergy); ok {
+		spec.Assign(&st.NextChargeRequiredEnergy, v)
+	}
+	if v, ok := read(AttrNextChargeTargetSoC); ok {
+		spec.Assign(&st.NextChargeTargetSoC, v)
+	}
+	if v, ok := read(AttrApproximateEvEfficiency); ok {
+		spec.Assign(&st.ApproximateEvEfficiency, v)
+	}
+	if v, ok := read(AttrStateOfCharge); ok {
+		spec.Assign(&st.StateOfCharge, v)
+	}
+	if v, ok := read(AttrBatteryCapacity); ok {
+		spec.Assign(&st.BatteryCapacity, v)
+	}
+	if v, ok := read(AttrVehicleId); ok {
+		spec.Assign(&st.VehicleId, v)
+	}
+	if v, ok := read(AttrSessionId); ok {
+		spec.Assign(&st.SessionId, v)
+	}
+	if v, ok := read(AttrSessionDuration); ok {
+		spec.Assign(&st.SessionDuration, v)
+	}
+	if v, ok := read(AttrSessionEnergyCharged); ok {
+		spec.Assign(&st.SessionEnergyCharged, v)
+	}
+	if v, ok := read(AttrSessionEnergyDischarged); ok {
+		spec.Assign(&st.SessionEnergyDischarged, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -195,9 +271,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -206,49 +284,57 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleDisable registers fn for the Disable command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDisable is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
 // HandleEnableCharging registers fn for the EnableCharging command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableCharging is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableCharging(fn func(ctx context.Context, req EnableChargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableCharging, fn)
 }
 
 // HandleEnableDischarging registers fn for the EnableDischarging command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableDischarging is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableDischarging(fn func(ctx context.Context, req EnableDischargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableDischarging, fn)
 }
 
 // HandleStartDiagnostics registers fn for the StartDiagnostics command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartDiagnostics is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartDiagnostics(fn func(ctx context.Context, req StartDiagnosticsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartDiagnostics, fn)
 }
 
 // HandleSetTargets registers fn for the SetTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTargets(fn func(ctx context.Context, req SetTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTargets, fn)
 }
 
 // HandleGetTargets registers fn for the GetTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetTargets(fn func(ctx context.Context, req GetTargetsRequest) (GetTargetsResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetTargets, fn)
 }
 
 // HandleClearTargets registers fn for the ClearTargets command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleClearTargets is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearTargets(fn func(ctx context.Context, req ClearTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearTargets, fn)
 }
@@ -344,7 +430,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

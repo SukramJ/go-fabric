@@ -25,8 +25,8 @@ import (
 
 // AirQualitySensor device type identity: 0x002C, revision 1.
 const (
-	AirQualitySensorID       uint16 = 0x002C
-	AirQualitySensorRevision uint16 = 1
+	AirQualitySensorID       schema.DeviceTypeID = 0x002C
+	AirQualitySensorRevision uint16              = 1
 )
 
 // AirQualitySensorType is the AirQualitySensor device type, matter.js's packages/node/src/devices/air-quality-sensor.ts;

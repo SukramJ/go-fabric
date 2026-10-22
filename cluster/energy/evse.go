@@ -363,10 +363,15 @@ func (s *EvseServer) nullU8(attrID uint32) *uint8 {
 // on an EVSE without it — is skipped, as chip keeps the member but never
 // serves it.
 func (s *EvseServer) setLocked(attrID uint32, v any) error {
+	return s.setLockedFrom(contract.OriginHostSet, attrID, v)
+}
+
+// setLockedFrom is setLocked with the change's origin.
+func (s *EvseServer) setLockedFrom(origin contract.Origin, attrID uint32, v any) error {
 	if !s.Serves(attrID) {
 		return nil
 	}
-	if err := s.srv.Set(attrID, v); err != nil {
+	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{attrID: v}); err != nil {
 		return fmt.Errorf("energy: EnergyEvse: %w", err)
 	}
 	return nil
@@ -525,7 +530,7 @@ func (s *EvseServer) SetMaxHardwareChargeCurrent(mA int64) error {
 		return demConstraint("hardware charge limit %d mA", mA)
 	}
 	s.maxHwCharge = mA
-	s.computeChargeLimitLocked()
+	s.computeChargeLimitLocked(contract.OriginHostSet)
 	return nil
 }
 
@@ -562,7 +567,7 @@ func (s *EvseServer) SetCircuitCapacity(mA int64) error {
 		return demConstraint("circuit capacity %d mA", mA)
 	}
 	_ = s.setLocked(evse.AttrCircuitCapacity, mA)
-	s.computeChargeLimitLocked()
+	s.computeChargeLimitLocked(contract.OriginHostSet)
 	return nil
 }
 
@@ -575,7 +580,7 @@ func (s *EvseServer) SetCableAssemblyLimit(mA int64) error {
 		return demConstraint("cable limit %d mA", mA)
 	}
 	s.cableLimit = mA
-	s.computeChargeLimitLocked()
+	s.computeChargeLimitLocked(contract.OriginHostSet)
 	return nil
 }
 
@@ -594,7 +599,7 @@ func (s *EvseServer) SetUserMaximumChargeCurrent(mA int64) error {
 	}
 	s.userMaxCharge = mA
 	_ = s.setLocked(evse.AttrUserMaximumChargeCurrent, mA)
-	s.computeChargeLimitLocked()
+	s.computeChargeLimitLocked(contract.OriginHostSet)
 	return nil
 }
 
@@ -799,7 +804,7 @@ func (s *EvseServer) evNoDemandLocked() {
 func (s *EvseServer) evDemandLocked() {
 	switch s.SupplyState() {
 	case SupplyChargingEnabled:
-		s.computeChargeLimitLocked()
+		s.computeChargeLimitLocked(contract.OriginHostSet)
 		s.setStateLocked(EvsePluggedInCharging)
 		s.energyTransferStartedLocked()
 	case SupplyDischargingEnabled:
@@ -807,7 +812,7 @@ func (s *EvseServer) evDemandLocked() {
 		s.setStateLocked(EvsePluggedInDischarging)
 		s.energyTransferStartedLocked()
 	case SupplyEnabled:
-		s.computeChargeLimitLocked()
+		s.computeChargeLimitLocked(contract.OriginHostSet)
 		s.computeDischargeLimitLocked()
 		s.setStateLocked(EvsePluggedInCharging)
 		s.energyTransferStartedLocked()
@@ -840,7 +845,7 @@ func (s *EvseServer) chargingEnabledLocked() error {
 	default: // ChargingEnabled, Enabled, DisabledError, DisabledDiagnostics stay (:1028-1040)
 	}
 	if s.State() == EvsePluggedInDemand {
-		s.computeChargeLimitLocked()
+		s.computeChargeLimitLocked(contract.OriginHostSet)
 		s.setStateLocked(EvsePluggedInCharging)
 		s.energyTransferStartedLocked()
 	}
@@ -909,12 +914,13 @@ func (s *EvseServer) faultClearedLocked() error {
 
 // computeChargeLimitLocked is ComputeMaxChargeCurrentLimit (:1227-1247):
 // the least of the hardware, circuit, cable, command and user limits;
-// MaximumChargeCurrent changes, and is reported, only when it moved.
-func (s *EvseServer) computeChargeLimitLocked() {
+// MaximumChargeCurrent changes, and is reported from origin, only when it
+// moved.
+func (s *EvseServer) computeChargeLimitLocked(origin contract.Origin) {
 	old := s.actualCharge
 	s.actualCharge = min(s.maxHwCharge, s.CircuitCapacity(), s.cableLimit, s.chargeFromCommand, s.userMaxCharge)
 	if old != s.actualCharge {
-		_ = s.setLocked(evse.AttrMaximumChargeCurrent, s.actualCharge)
+		_ = s.setLockedFrom(origin, evse.AttrMaximumChargeCurrent, s.actualCharge)
 		s.notifyLocked(EvseChargeCurrentChanged)
 	}
 }
@@ -1078,7 +1084,7 @@ func (s *EvseServer) enabledStateExpirationLocked(now uint32) {
 		_ = s.setLocked(evse.AttrChargingEnabledUntil, zero)
 		s.setMinimumChargeCurrentLocked(0)
 		s.chargeFromCommand = 0
-		s.computeChargeLimitLocked()
+		s.computeChargeLimitLocked(contract.OriginHostSet)
 		if !discharging {
 			s.setSupplyStateLocked(SupplyDischargingEnabled)
 		} else {
@@ -1127,7 +1133,7 @@ func (s *EvseServer) disableLocked() error {
 	_ = s.setLocked(evse.AttrDischargingEnabledUntil, zero) // :50
 	s.setMinimumChargeCurrentLocked(0)                      // :53
 	s.chargeFromCommand = 0                                 // :55
-	s.computeChargeLimitLocked()
+	s.computeChargeLimitLocked(contract.OriginHostSet)
 	s.dischargeFromCmd = 0 // :59
 	s.computeDischargeLimitLocked()
 	return s.disabledLocked() // :62
@@ -1155,7 +1161,7 @@ func (s *EvseServer) enableCharging(_ context.Context, fields any) (any, error) 
 	_ = s.setLocked(evse.AttrChargingEnabledUntil, until)
 	s.chargeFromCommand = r.MaximumChargeCurrent            // :110
 	s.setMinimumChargeCurrentLocked(r.MinimumChargeCurrent) // :111
-	s.computeChargeLimitLocked()                            // :114
+	s.computeChargeLimitLocked(contract.OriginHostSet)      // :114
 	return nil, s.chargingEnabledLocked()                   // :116
 }
 
@@ -1329,7 +1335,9 @@ func (s *EvseServer) MatterWriteAttribute(_ context.Context, attrID uint32, valu
 		return nil
 	}
 	s.userMaxCharge = mA
-	s.computeChargeLimitLocked()
+	// The charge limit the write moves is the write's consequence: one
+	// change, from the controller's write.
+	s.computeChargeLimitLocked(contract.OriginControllerWrite)
 	return nil
 }
 

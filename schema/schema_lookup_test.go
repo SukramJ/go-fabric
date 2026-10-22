@@ -88,7 +88,7 @@ func TestDeviceTypeName_KnownDeviceType(t *testing.T) {
 // TestDeviceTypeName_UnknownDeviceType verifies ("", false) for unknown IDs.
 func TestDeviceTypeName_UnknownDeviceType(t *testing.T) {
 	t.Parallel()
-	name, ok := DeviceTypeName(0xFFFF_FFFF)
+	name, ok := DeviceTypeName(0xFFFF)
 	if ok {
 		t.Fatalf("DeviceTypeName(unknown) returned ok=true (name=%q), want false", name)
 	}
@@ -109,7 +109,7 @@ func TestDeviceTypeRevision_KnownDeviceTypes(t *testing.T) {
 	for _, id := range cases {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			rev, ok := DeviceTypeRevision(id)
+			rev, ok := DeviceTypeRevision(DeviceTypeID(id))
 			if !ok {
 				t.Fatalf("DeviceTypeRevision(0x%04X) ok=false", id)
 			}
@@ -123,7 +123,7 @@ func TestDeviceTypeRevision_KnownDeviceTypes(t *testing.T) {
 // TestDeviceTypeRevision_Unknown verifies (0, false) for unknown device type.
 func TestDeviceTypeRevision_Unknown(t *testing.T) {
 	t.Parallel()
-	rev, ok := DeviceTypeRevision(0xFFFF_FFFF)
+	rev, ok := DeviceTypeRevision(0xFFFF)
 	if ok {
 		t.Fatalf("DeviceTypeRevision(unknown) returned ok=true (rev=%d)", rev)
 	}
@@ -158,8 +158,28 @@ func TestDeviceTypeRequiresServerCluster(t *testing.T) {
 		{0xFFFF, 0x0004, false}, // unknown device type
 	}
 	for _, c := range cases {
-		if got := DeviceTypeRequiresServerCluster(c.dt, c.cluster); got != c.want {
+		if got := DeviceTypeRequiresServerCluster(DeviceTypeID(c.dt), c.cluster); got != c.want {
 			t.Errorf("DeviceTypeRequiresServerCluster(0x%04X, 0x%04X) = %v, want %v", c.dt, c.cluster, got, c.want)
+		}
+	}
+}
+
+// TestDeviceTypeIDOf pins the conversion of a Descriptor's 32-bit
+// devtype-id: a standard id converts, one with a vendor prefix does not.
+func TestDeviceTypeIDOf(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		in   uint32
+		want DeviceTypeID
+		ok   bool
+	}{
+		{in: 0x0100, want: 0x0100, ok: true},
+		{in: 0xFFFF, want: 0xFFFF, ok: true},
+		{in: 0x0001_0100, ok: false},
+	} {
+		got, ok := DeviceTypeIDOf(tc.in)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("DeviceTypeIDOf(%#x) = %#x, %v; want %#x, %v", tc.in, got, ok, tc.want, tc.ok)
 		}
 	}
 }

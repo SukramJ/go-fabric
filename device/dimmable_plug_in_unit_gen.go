@@ -16,8 +16,8 @@ import (
 
 // DimmablePlugInUnit device type identity: 0x010B, revision 6.
 const (
-	DimmablePlugInUnitID       uint16 = 0x010B
-	DimmablePlugInUnitRevision uint16 = 6
+	DimmablePlugInUnitID       schema.DeviceTypeID = 0x010B
+	DimmablePlugInUnitRevision uint16              = 6
 )
 
 // DimmablePlugInUnitType is the DimmablePlugInUnit device type, matter.js's packages/node/src/devices/dimmable-plug-in-unit.ts;

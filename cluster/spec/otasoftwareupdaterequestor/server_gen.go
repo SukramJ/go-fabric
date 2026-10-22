@@ -21,19 +21,35 @@ import (
 // Not in State, and set only untyped (spec.Server.Set):
 //   - DefaultOtaProviders (0x0000): fabric-scoped: spec.NewServer refuses to serve it.
 type State struct {
-	UpdatePossible      bool            `matter:"0x0001"` // attribute 0x0001: bool, M, R V
-	UpdateState         UpdateStateEnum `matter:"0x0002"` // attribute 0x0002: UpdateStateEnum, M, R V
-	UpdateStateProgress *uint8          `matter:"0x0003"` // attribute 0x0003: uint8, M, R V, X Q
+	UpdatePossible      bool            // attribute 0x0001: bool, M, R V
+	UpdateState         UpdateStateEnum // attribute 0x0002: UpdateStateEnum, M, R V
+	UpdateStateProgress *uint8          // attribute 0x0003: uint8, M, R V, X Q
 }
 
 // Patch is a change to the OtaSoftwareUpdateRequestor state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	UpdatePossible      *bool            `matter:"0x0001"` // attribute 0x0001
-	UpdateState         *UpdateStateEnum `matter:"0x0002"` // attribute 0x0002
-	UpdateStateProgress *uint8           `matter:"0x0003"` // attribute 0x0003
+	UpdatePossible      *bool            // attribute 0x0001
+	UpdateState         *UpdateStateEnum // attribute 0x0002
+	UpdateStateProgress *uint8           // attribute 0x0003
 	Null                []uint32         // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrUpdatePossible); ok {
+		spec.Assign(&st.UpdatePossible, v)
+	}
+	if v, ok := read(AttrUpdateState); ok {
+		spec.Assign(&st.UpdateState, v)
+	}
+	if v, ok := read(AttrUpdateStateProgress); ok {
+		spec.Assign(&st.UpdateStateProgress, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -98,9 +114,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -109,13 +127,15 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleAnnounceOtaProvider registers fn for the AnnounceOtaProvider command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAnnounceOtaProvider is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAnnounceOtaProvider(fn func(ctx context.Context, req AnnounceOtaProviderRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAnnounceOtaProvider, fn)
 }
@@ -173,7 +193,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

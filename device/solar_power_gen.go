@@ -12,8 +12,8 @@ import (
 
 // SolarPower device type identity: 0x0017, revision 1.
 const (
-	SolarPowerID       uint16 = 0x0017
-	SolarPowerRevision uint16 = 1
+	SolarPowerID       schema.DeviceTypeID = 0x0017
+	SolarPowerRevision uint16              = 1
 )
 
 // SolarPowerType is the SolarPower device type, matter.js's packages/node/src/devices/solar-power.ts;

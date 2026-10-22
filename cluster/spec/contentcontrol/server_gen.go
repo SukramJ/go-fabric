@@ -18,33 +18,73 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Enabled                         bool                 `matter:"0x0000"` // attribute 0x0000: bool, M, R V
-	OnDemandRatings                 []RatingNameStruct   `matter:"0x0001"` // attribute 0x0001: list[RatingNameStruct], OCR, R V
-	OnDemandRatingThreshold         string               `matter:"0x0002"` // attribute 0x0002: string, OCR, R V
-	ScheduledContentRatings         []RatingNameStruct   `matter:"0x0003"` // attribute 0x0003: list[RatingNameStruct], SCR, R V
-	ScheduledContentRatingThreshold string               `matter:"0x0004"` // attribute 0x0004: string, SCR, R V
-	ScreenDailyTime                 uint32               `matter:"0x0005"` // attribute 0x0005: elapsed-s, ST, R V
-	RemainingScreenTime             uint32               `matter:"0x0006"` // attribute 0x0006: elapsed-s, ST, R V
-	BlockUnrated                    bool                 `matter:"0x0007"` // attribute 0x0007: bool, BU, R V
-	BlockChannelList                []BlockChannelStruct `matter:"0x0008"` // attribute 0x0008: list[BlockChannelStruct], BC, R V
-	BlockApplicationList            []AppInfoStruct      `matter:"0x0009"` // attribute 0x0009: list[AppInfoStruct], BA, R V
-	BlockContentTimeWindow          []TimeWindowStruct   `matter:"0x000A"` // attribute 0x000A: list[TimeWindowStruct], BTW, R V
+	Enabled                         bool                 // attribute 0x0000: bool, M, R V
+	OnDemandRatings                 []RatingNameStruct   // attribute 0x0001: list[RatingNameStruct], OCR, R V
+	OnDemandRatingThreshold         string               // attribute 0x0002: string, OCR, R V
+	ScheduledContentRatings         []RatingNameStruct   // attribute 0x0003: list[RatingNameStruct], SCR, R V
+	ScheduledContentRatingThreshold string               // attribute 0x0004: string, SCR, R V
+	ScreenDailyTime                 uint32               // attribute 0x0005: elapsed-s, ST, R V
+	RemainingScreenTime             uint32               // attribute 0x0006: elapsed-s, ST, R V
+	BlockUnrated                    bool                 // attribute 0x0007: bool, BU, R V
+	BlockChannelList                []BlockChannelStruct // attribute 0x0008: list[BlockChannelStruct], BC, R V
+	BlockApplicationList            []AppInfoStruct      // attribute 0x0009: list[AppInfoStruct], BA, R V
+	BlockContentTimeWindow          []TimeWindowStruct   // attribute 0x000A: list[TimeWindowStruct], BTW, R V
 }
 
 // Patch is a change to the ContentControl state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	Enabled                         *bool                 `matter:"0x0000"` // attribute 0x0000
-	OnDemandRatings                 *[]RatingNameStruct   `matter:"0x0001"` // attribute 0x0001
-	OnDemandRatingThreshold         *string               `matter:"0x0002"` // attribute 0x0002
-	ScheduledContentRatings         *[]RatingNameStruct   `matter:"0x0003"` // attribute 0x0003
-	ScheduledContentRatingThreshold *string               `matter:"0x0004"` // attribute 0x0004
-	ScreenDailyTime                 *uint32               `matter:"0x0005"` // attribute 0x0005
-	RemainingScreenTime             *uint32               `matter:"0x0006"` // attribute 0x0006
-	BlockUnrated                    *bool                 `matter:"0x0007"` // attribute 0x0007
-	BlockChannelList                *[]BlockChannelStruct `matter:"0x0008"` // attribute 0x0008
-	BlockApplicationList            *[]AppInfoStruct      `matter:"0x0009"` // attribute 0x0009
-	BlockContentTimeWindow          *[]TimeWindowStruct   `matter:"0x000A"` // attribute 0x000A
+	Enabled                         *bool                 // attribute 0x0000
+	OnDemandRatings                 *[]RatingNameStruct   // attribute 0x0001
+	OnDemandRatingThreshold         *string               // attribute 0x0002
+	ScheduledContentRatings         *[]RatingNameStruct   // attribute 0x0003
+	ScheduledContentRatingThreshold *string               // attribute 0x0004
+	ScreenDailyTime                 *uint32               // attribute 0x0005
+	RemainingScreenTime             *uint32               // attribute 0x0006
+	BlockUnrated                    *bool                 // attribute 0x0007
+	BlockChannelList                *[]BlockChannelStruct // attribute 0x0008
+	BlockApplicationList            *[]AppInfoStruct      // attribute 0x0009
+	BlockContentTimeWindow          *[]TimeWindowStruct   // attribute 0x000A
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrEnabled); ok {
+		spec.Assign(&st.Enabled, v)
+	}
+	if v, ok := read(AttrOnDemandRatings); ok {
+		spec.Assign(&st.OnDemandRatings, v)
+	}
+	if v, ok := read(AttrOnDemandRatingThreshold); ok {
+		spec.Assign(&st.OnDemandRatingThreshold, v)
+	}
+	if v, ok := read(AttrScheduledContentRatings); ok {
+		spec.Assign(&st.ScheduledContentRatings, v)
+	}
+	if v, ok := read(AttrScheduledContentRatingThreshold); ok {
+		spec.Assign(&st.ScheduledContentRatingThreshold, v)
+	}
+	if v, ok := read(AttrScreenDailyTime); ok {
+		spec.Assign(&st.ScreenDailyTime, v)
+	}
+	if v, ok := read(AttrRemainingScreenTime); ok {
+		spec.Assign(&st.RemainingScreenTime, v)
+	}
+	if v, ok := read(AttrBlockUnrated); ok {
+		spec.Assign(&st.BlockUnrated, v)
+	}
+	if v, ok := read(AttrBlockChannelList); ok {
+		spec.Assign(&st.BlockChannelList, v)
+	}
+	if v, ok := read(AttrBlockApplicationList); ok {
+		spec.Assign(&st.BlockApplicationList, v)
+	}
+	if v, ok := read(AttrBlockContentTimeWindow); ok {
+		spec.Assign(&st.BlockContentTimeWindow, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -130,9 +170,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -141,103 +183,120 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleUpdatePin registers fn for the UpdatePin command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdatePin is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdatePin(fn func(ctx context.Context, req UpdatePinRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdatePin, fn)
 }
 
 // HandleResetPin registers fn for the ResetPin command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResetPin is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResetPin(fn func(ctx context.Context, req ResetPinRequest) (ResetPinResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResetPin, fn)
 }
 
 // HandleEnable registers fn for the Enable command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleEnable is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnable(fn func(ctx context.Context, req EnableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnable, fn)
 }
 
 // HandleDisable registers fn for the Disable command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDisable is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
 // HandleAddBonusTime registers fn for the AddBonusTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBonusTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBonusTime(fn func(ctx context.Context, req AddBonusTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBonusTime, fn)
 }
 
 // HandleSetScreenDailyTime registers fn for the SetScreenDailyTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetScreenDailyTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetScreenDailyTime(fn func(ctx context.Context, req SetScreenDailyTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetScreenDailyTime, fn)
 }
 
 // HandleBlockUnratedContent registers fn for the BlockUnratedContent command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleBlockUnratedContent is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleBlockUnratedContent(fn func(ctx context.Context, req BlockUnratedContentRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdBlockUnratedContent, fn)
 }
 
 // HandleUnblockUnratedContent registers fn for the UnblockUnratedContent command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUnblockUnratedContent is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnblockUnratedContent(fn func(ctx context.Context, req UnblockUnratedContentRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnblockUnratedContent, fn)
 }
 
 // HandleSetOnDemandRatingThreshold registers fn for the SetOnDemandRatingThreshold command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetOnDemandRatingThreshold is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetOnDemandRatingThreshold(fn func(ctx context.Context, req SetOnDemandRatingThresholdRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetOnDemandRatingThreshold, fn)
 }
 
 // HandleSetScheduledContentRatingThreshold registers fn for the SetScheduledContentRatingThreshold command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetScheduledContentRatingThreshold is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetScheduledContentRatingThreshold(fn func(ctx context.Context, req SetScheduledContentRatingThresholdRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetScheduledContentRatingThreshold, fn)
 }
 
 // HandleAddBlockChannels registers fn for the AddBlockChannels command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBlockChannels is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBlockChannels(fn func(ctx context.Context, req AddBlockChannelsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBlockChannels, fn)
 }
 
 // HandleRemoveBlockChannels registers fn for the RemoveBlockChannels command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockChannels is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockChannels(fn func(ctx context.Context, req RemoveBlockChannelsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockChannels, fn)
 }
 
 // HandleAddBlockApplications registers fn for the AddBlockApplications command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBlockApplications is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBlockApplications(fn func(ctx context.Context, req AddBlockApplicationsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBlockApplications, fn)
 }
 
 // HandleRemoveBlockApplications registers fn for the RemoveBlockApplications command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockApplications is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockApplications(fn func(ctx context.Context, req RemoveBlockApplicationsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockApplications, fn)
 }
 
 // HandleSetBlockContentTimeWindow registers fn for the SetBlockContentTimeWindow command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetBlockContentTimeWindow is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetBlockContentTimeWindow(fn func(ctx context.Context, req SetBlockContentTimeWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetBlockContentTimeWindow, fn)
 }
 
 // HandleRemoveBlockContentTimeWindow registers fn for the RemoveBlockContentTimeWindow command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockContentTimeWindow is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockContentTimeWindow(fn func(ctx context.Context, req RemoveBlockContentTimeWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockContentTimeWindow, fn)
 }
@@ -336,7 +395,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

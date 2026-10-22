@@ -22,8 +22,8 @@ import (
 
 // RoomAirConditioner device type identity: 0x0072, revision 4.
 const (
-	RoomAirConditionerID       uint16 = 0x0072
-	RoomAirConditionerRevision uint16 = 4
+	RoomAirConditionerID       schema.DeviceTypeID = 0x0072
+	RoomAirConditionerRevision uint16              = 4
 )
 
 // RoomAirConditionerType is the RoomAirConditioner device type, matter.js's packages/node/src/devices/room-air-conditioner.ts;

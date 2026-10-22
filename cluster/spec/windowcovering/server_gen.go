@@ -18,41 +18,90 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Type                             TypeEnum                `matter:"0x0000"` // attribute 0x0000: TypeEnum, M, R V, F
-	NumberOfActuationsLift           uint16                  `matter:"0x0005"` // attribute 0x0005: uint16, [LF], R V, N
-	NumberOfActuationsTilt           uint16                  `matter:"0x0006"` // attribute 0x0006: uint16, [TL], R V, N
-	ConfigStatus                     ConfigStatusBitmap      `matter:"0x0007"` // attribute 0x0007: ConfigStatusBitmap, M, R V, N
-	CurrentPositionLiftPercentage    *uint8                  `matter:"0x0008"` // attribute 0x0008: percent, [LF & PA_LF], R V, X N
-	CurrentPositionTiltPercentage    *uint8                  `matter:"0x0009"` // attribute 0x0009: percent, [TL & PA_TL], R V, X N
-	OperationalStatus                OperationalStatusBitmap `matter:"0x000A"` // attribute 0x000A: OperationalStatusBitmap, M, R V
-	TargetPositionLiftPercent100ths  *uint16                 `matter:"0x000B"` // attribute 0x000B: percent100ths, LF & PA_LF, R V, X
-	TargetPositionTiltPercent100ths  *uint16                 `matter:"0x000C"` // attribute 0x000C: percent100ths, TL & PA_TL, R V, X
-	EndProductType                   EndProductTypeEnum      `matter:"0x000D"` // attribute 0x000D: EndProductTypeEnum, M, R V, F
-	CurrentPositionLiftPercent100ths *uint16                 `matter:"0x000E"` // attribute 0x000E: percent100ths, LF & PA_LF, R V, X N
-	CurrentPositionTiltPercent100ths *uint16                 `matter:"0x000F"` // attribute 0x000F: percent100ths, TL & PA_TL, R V, X N
-	Mode                             ModeBitmap              `matter:"0x0017"` // attribute 0x0017: ModeBitmap, M, RW VM, N
-	SafetyStatus                     SafetyStatusBitmap      `matter:"0x001A"` // attribute 0x001A: SafetyStatusBitmap, O, R V
+	Type                             TypeEnum                // attribute 0x0000: TypeEnum, M, R V, F
+	NumberOfActuationsLift           uint16                  // attribute 0x0005: uint16, [LF], R V, N
+	NumberOfActuationsTilt           uint16                  // attribute 0x0006: uint16, [TL], R V, N
+	ConfigStatus                     ConfigStatusBitmap      // attribute 0x0007: ConfigStatusBitmap, M, R V, N
+	CurrentPositionLiftPercentage    *uint8                  // attribute 0x0008: percent, [LF & PA_LF], R V, X N
+	CurrentPositionTiltPercentage    *uint8                  // attribute 0x0009: percent, [TL & PA_TL], R V, X N
+	OperationalStatus                OperationalStatusBitmap // attribute 0x000A: OperationalStatusBitmap, M, R V
+	TargetPositionLiftPercent100ths  *uint16                 // attribute 0x000B: percent100ths, LF & PA_LF, R V, X
+	TargetPositionTiltPercent100ths  *uint16                 // attribute 0x000C: percent100ths, TL & PA_TL, R V, X
+	EndProductType                   EndProductTypeEnum      // attribute 0x000D: EndProductTypeEnum, M, R V, F
+	CurrentPositionLiftPercent100ths *uint16                 // attribute 0x000E: percent100ths, LF & PA_LF, R V, X N
+	CurrentPositionTiltPercent100ths *uint16                 // attribute 0x000F: percent100ths, TL & PA_TL, R V, X N
+	Mode                             ModeBitmap              // attribute 0x0017: ModeBitmap, M, RW VM, N
+	SafetyStatus                     SafetyStatusBitmap      // attribute 0x001A: SafetyStatusBitmap, O, R V
 }
 
 // Patch is a change to the WindowCovering state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Type                             *TypeEnum                `matter:"0x0000"` // attribute 0x0000
-	NumberOfActuationsLift           *uint16                  `matter:"0x0005"` // attribute 0x0005
-	NumberOfActuationsTilt           *uint16                  `matter:"0x0006"` // attribute 0x0006
-	ConfigStatus                     *ConfigStatusBitmap      `matter:"0x0007"` // attribute 0x0007
-	CurrentPositionLiftPercentage    *uint8                   `matter:"0x0008"` // attribute 0x0008
-	CurrentPositionTiltPercentage    *uint8                   `matter:"0x0009"` // attribute 0x0009
-	OperationalStatus                *OperationalStatusBitmap `matter:"0x000A"` // attribute 0x000A
-	TargetPositionLiftPercent100ths  *uint16                  `matter:"0x000B"` // attribute 0x000B
-	TargetPositionTiltPercent100ths  *uint16                  `matter:"0x000C"` // attribute 0x000C
-	EndProductType                   *EndProductTypeEnum      `matter:"0x000D"` // attribute 0x000D
-	CurrentPositionLiftPercent100ths *uint16                  `matter:"0x000E"` // attribute 0x000E
-	CurrentPositionTiltPercent100ths *uint16                  `matter:"0x000F"` // attribute 0x000F
-	Mode                             *ModeBitmap              `matter:"0x0017"` // attribute 0x0017
-	SafetyStatus                     *SafetyStatusBitmap      `matter:"0x001A"` // attribute 0x001A
+	Type                             *TypeEnum                // attribute 0x0000
+	NumberOfActuationsLift           *uint16                  // attribute 0x0005
+	NumberOfActuationsTilt           *uint16                  // attribute 0x0006
+	ConfigStatus                     *ConfigStatusBitmap      // attribute 0x0007
+	CurrentPositionLiftPercentage    *uint8                   // attribute 0x0008
+	CurrentPositionTiltPercentage    *uint8                   // attribute 0x0009
+	OperationalStatus                *OperationalStatusBitmap // attribute 0x000A
+	TargetPositionLiftPercent100ths  *uint16                  // attribute 0x000B
+	TargetPositionTiltPercent100ths  *uint16                  // attribute 0x000C
+	EndProductType                   *EndProductTypeEnum      // attribute 0x000D
+	CurrentPositionLiftPercent100ths *uint16                  // attribute 0x000E
+	CurrentPositionTiltPercent100ths *uint16                  // attribute 0x000F
+	Mode                             *ModeBitmap              // attribute 0x0017
+	SafetyStatus                     *SafetyStatusBitmap      // attribute 0x001A
 	Null                             []uint32                 // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrType); ok {
+		spec.Assign(&st.Type, v)
+	}
+	if v, ok := read(AttrNumberOfActuationsLift); ok {
+		spec.Assign(&st.NumberOfActuationsLift, v)
+	}
+	if v, ok := read(AttrNumberOfActuationsTilt); ok {
+		spec.Assign(&st.NumberOfActuationsTilt, v)
+	}
+	if v, ok := read(AttrConfigStatus); ok {
+		spec.Assign(&st.ConfigStatus, v)
+	}
+	if v, ok := read(AttrCurrentPositionLiftPercentage); ok {
+		spec.Assign(&st.CurrentPositionLiftPercentage, v)
+	}
+	if v, ok := read(AttrCurrentPositionTiltPercentage); ok {
+		spec.Assign(&st.CurrentPositionTiltPercentage, v)
+	}
+	if v, ok := read(AttrOperationalStatus); ok {
+		spec.Assign(&st.OperationalStatus, v)
+	}
+	if v, ok := read(AttrTargetPositionLiftPercent100ths); ok {
+		spec.Assign(&st.TargetPositionLiftPercent100ths, v)
+	}
+	if v, ok := read(AttrTargetPositionTiltPercent100ths); ok {
+		spec.Assign(&st.TargetPositionTiltPercent100ths, v)
+	}
+	if v, ok := read(AttrEndProductType); ok {
+		spec.Assign(&st.EndProductType, v)
+	}
+	if v, ok := read(AttrCurrentPositionLiftPercent100ths); ok {
+		spec.Assign(&st.CurrentPositionLiftPercent100ths, v)
+	}
+	if v, ok := read(AttrCurrentPositionTiltPercent100ths); ok {
+		spec.Assign(&st.CurrentPositionTiltPercent100ths, v)
+	}
+	if v, ok := read(AttrMode); ok {
+		spec.Assign(&st.Mode, v)
+	}
+	if v, ok := read(AttrSafetyStatus); ok {
+		spec.Assign(&st.SafetyStatus, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -150,9 +199,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -161,37 +212,43 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleUpOrOpen registers fn for the UpOrOpen command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleUpOrOpen is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpOrOpen(fn func(ctx context.Context, req UpOrOpenRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpOrOpen, fn)
 }
 
 // HandleDownOrClose registers fn for the DownOrClose command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleDownOrClose is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDownOrClose(fn func(ctx context.Context, req DownOrCloseRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDownOrClose, fn)
 }
 
 // HandleStopMotion registers fn for the StopMotion command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStopMotion is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopMotion(fn func(ctx context.Context, req StopMotionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopMotion, fn)
 }
 
 // HandleGoToLiftPercentage registers fn for the GoToLiftPercentage command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGoToLiftPercentage is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGoToLiftPercentage(fn func(ctx context.Context, req GoToLiftPercentageRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGoToLiftPercentage, fn)
 }
 
 // HandleGoToTiltPercentage registers fn for the GoToTiltPercentage command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGoToTiltPercentage is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGoToTiltPercentage(fn func(ctx context.Context, req GoToTiltPercentageRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGoToTiltPercentage, fn)
 }
@@ -260,7 +317,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -25,7 +25,7 @@ import (
 // OvenCavityOperationalState and TemperatureControl (TN); the device-type
 // validator reports nothing for either endpoint.
 func TestOvenHasItsHeatingCavityPart(t *testing.T) {
-	if name, _ := schema.DeviceTypeName(uint32(deviceTypeOven)); name != "Oven" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(deviceTypeOven)); name != "Oven" {
 		t.Errorf("device type 0x%04X is %q in the snapshot", deviceTypeOven, name)
 	}
 	_, br := startFleetBridge(t)

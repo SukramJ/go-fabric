@@ -27,10 +27,10 @@ const (
 
 // Command ids.
 const (
-	CmdGetSetupPin         uint32 = 0x00 // request → GetSetupPinResponse, M
+	CmdGetSetupPin         uint32 = 0x00 // request → GetSetupPinResponse, timed, M
 	CmdGetSetupPinResponse uint32 = 0x01 // response, M
-	CmdLogin               uint32 = 0x02 // request → status, M
-	CmdLogout              uint32 = 0x03 // request → status, M
+	CmdLogin               uint32 = 0x02 // request → status, timed, M
+	CmdLogout              uint32 = 0x03 // request → status, timed, M
 )
 
 // Event ids.

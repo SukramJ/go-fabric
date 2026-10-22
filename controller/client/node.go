@@ -30,6 +30,9 @@ type Node struct {
 	persist *persister
 	s       *structure
 
+	// mu guards the node's mutable state, every field below it, and the
+	// image: the structure, its Endpoints and Clusters all share this lock.
+	// What the structure emits is delivered after it is released.
 	mu        sync.RWMutex
 	settings  settings
 	record    Record

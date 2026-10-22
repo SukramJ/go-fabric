@@ -147,6 +147,7 @@ type Commissioner struct {
 	server   *handshake.CASEServer
 	cfid     [8]byte
 
+	// mu guards identities, minted, sessions and fabricIndex.
 	mu          sync.Mutex
 	identities  map[uint64]*sigma.Identity
 	minted      []uint64 // identity node ids in minting order

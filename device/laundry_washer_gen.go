@@ -17,8 +17,8 @@ import (
 
 // LaundryWasher device type identity: 0x0073, revision 2.
 const (
-	LaundryWasherID       uint16 = 0x0073
-	LaundryWasherRevision uint16 = 2
+	LaundryWasherID       schema.DeviceTypeID = 0x0073
+	LaundryWasherRevision uint16              = 2
 )
 
 // LaundryWasherType is the LaundryWasher device type, matter.js's packages/node/src/devices/laundry-washer.ts;

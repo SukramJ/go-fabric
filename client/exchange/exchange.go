@@ -163,6 +163,10 @@ type Exchange struct {
 	index            uint32
 	done             chan struct{}
 
+	// mu guards the exchange's state: every field below it except
+	// addressOverride, which newExchange fixes and dest reads without it.
+	// It covers the delivery queue, the acknowledgement and retransmission
+	// state, the close state and the activity times.
 	mu              sync.Mutex
 	addressOverride *net.UDPAddr
 	onSend          func(retransmission int)

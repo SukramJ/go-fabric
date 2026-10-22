@@ -61,7 +61,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-280`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:50-55`, `endpoint/sqlitestore/schema.sql:13-60`.*
+*Source: `store/schema.sql:18-280`, `store/migrations.go:43-54`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-60`.*
 
 ### Settings keys
 
@@ -93,7 +93,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-48`, `node/persist.go:22-36`, `node/persist.go:55-75`, `node/persist.go:250-305`, `node/persist.go:323-332`, `node/root.go:39-40`, `store/ota.go:25`, `cluster/core/access_control.go:290-292`, `cluster/core/vid_verification.go:63-65`, `examples/reference-bridge/persist.go:62-86`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `examples/reference-bridge/persist.go:21-44`.*
 
 ## What survives a restart
 
@@ -109,7 +109,7 @@ above use.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go:272-281`, `node/node.go:500-535`, `store/schema.sql:250-256`, `node/security.go:256`, `node/security.go:364`, `bridge/bridge.go:85-94`, `node/config.go:259-274`.*
+*Source: `node/node.go:326-335`, `node/node.go:665-712`, `store/schema.sql:250-256`, `node/security.go:366`, `node/security.go:477`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 
@@ -129,7 +129,7 @@ The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. Controller-side CASE resumption records are kept in
 memory only, so the first command of a run makes a full CASE handshake.
 
-*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:35-41`, `examples/reference-controller/README.md` (The database), `node/client.go:96-101`.*
+*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:35-41`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
 
 ## Schema changes
 
@@ -158,7 +158,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-90`, `store/migrations.go:22-120`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-90`, `store/migrations.go:22-123`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
@@ -175,5 +175,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-40`, `store/schema.sql:48-57`, `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-39`, `store/schema.sql:48-57`, `examples/reference-controller/README.md` (The database).*
 

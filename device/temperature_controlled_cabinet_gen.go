@@ -17,8 +17,8 @@ import (
 
 // TemperatureControlledCabinet device type identity: 0x0071, revision 6.
 const (
-	TemperatureControlledCabinetID       uint16 = 0x0071
-	TemperatureControlledCabinetRevision uint16 = 6
+	TemperatureControlledCabinetID       schema.DeviceTypeID = 0x0071
+	TemperatureControlledCabinetRevision uint16              = 6
 )
 
 // TemperatureControlledCabinetType is the TemperatureControlledCabinet device type, matter.js's packages/node/src/devices/temperature-controlled-cabinet.ts;

@@ -203,11 +203,11 @@ func TestParityMatterJS_PumpEventsAndPriorities(t *testing.T) {
 // cluster and OnOff.
 func TestParityMatterJS_PumpDeviceType(t *testing.T) {
 	t.Parallel()
-	if name, _ := schema.DeviceTypeName(uint32(pump.DeviceTypePump)); name != "Pump" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(pump.DeviceTypePump)); name != "Pump" {
 		t.Errorf("device type 0x%04X is %q", pump.DeviceTypePump, name)
 	}
 	for _, c := range []uint32{pump.ClusterID, 0x0006} {
-		if !schema.DeviceTypeRequiresServerCluster(uint32(pump.DeviceTypePump), c) {
+		if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(pump.DeviceTypePump), c) {
 			t.Errorf("Pump does not mandate 0x%04X in the snapshot", c)
 		}
 	}

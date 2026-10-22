@@ -12,8 +12,8 @@ import (
 
 // OtaRequestor device type identity: 0x0012, revision 1.
 const (
-	OtaRequestorID       uint16 = 0x0012
-	OtaRequestorRevision uint16 = 1
+	OtaRequestorID       schema.DeviceTypeID = 0x0012
+	OtaRequestorRevision uint16              = 1
 )
 
 // OtaRequestorType is the OtaRequestor device type, matter.js's packages/node/src/endpoints/ota-requestor.ts;

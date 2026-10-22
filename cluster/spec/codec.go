@@ -279,7 +279,10 @@ func DecodeOptional[T any](d Decoder[T]) Decoder[*T] {
 	}
 }
 
-// Nullable is a value that may be null.
+// Nullable is a value that may be null: Null true is the null, Null false
+// the Value. The zero value is not null — it is the zero T (a
+// Nullable[uint16]{} encodes 0, not null); [NullOf] is the null and
+// [ValueOf] a value.
 // fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Nullable[T any] struct {
 	Value T

@@ -16,8 +16,8 @@ import (
 
 // Thermostat device type identity: 0x0301, revision 7.
 const (
-	ThermostatID       uint16 = 0x0301
-	ThermostatRevision uint16 = 7
+	ThermostatID       schema.DeviceTypeID = 0x0301
+	ThermostatRevision uint16              = 7
 )
 
 // ThermostatType is the Thermostat device type, matter.js's packages/node/src/devices/thermostat.ts;

@@ -16,8 +16,8 @@ import (
 
 // MountedDimmableLoadControl device type identity: 0x0110, revision 3.
 const (
-	MountedDimmableLoadControlID       uint16 = 0x0110
-	MountedDimmableLoadControlRevision uint16 = 3
+	MountedDimmableLoadControlID       schema.DeviceTypeID = 0x0110
+	MountedDimmableLoadControlRevision uint16              = 3
 )
 
 // MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, matter.js's packages/node/src/devices/mounted-dimmable-load-control.ts;

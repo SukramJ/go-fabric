@@ -65,6 +65,7 @@ func CheckOrigins(tb testing.TB, srv func(tb testing.TB) contract.ClusterServer,
 			tb.Fatalf("%T reports no attribute change", s)
 		}
 		var (
+			// mu guards seen, which the listener appends the server's changes to.
 			mu   sync.Mutex
 			seen []contract.Change
 		)

@@ -14,8 +14,8 @@ import (
 
 // SoilSensor device type identity: 0x0045, revision 1.
 const (
-	SoilSensorID       uint16 = 0x0045
-	SoilSensorRevision uint16 = 1
+	SoilSensorID       schema.DeviceTypeID = 0x0045
+	SoilSensorRevision uint16              = 1
 )
 
 // SoilSensorType is the SoilSensor device type, matter.js's packages/node/src/devices/soil-sensor.ts;

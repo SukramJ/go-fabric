@@ -12,7 +12,7 @@ package schema
 // declaration order, the conditions it declares, its composition and the
 // device type it derives from. Generated from the device types'
 // "effective" layer in parity/schema.json.
-var deviceTypeDefinitions = map[uint32]*DeviceTypeDefinition{
+var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{
 	0x000A: {
 		ID: 0x000A, Name: "DoorLock", Classification: "simple", Revision: 4, Composition: "tree",
 		Requirements: []DeviceTypeRequirement{

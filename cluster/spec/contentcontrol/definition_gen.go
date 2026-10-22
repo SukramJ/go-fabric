@@ -42,11 +42,11 @@ const (
 
 // Command ids.
 const (
-	CmdUpdatePin                          uint32 = 0x00 // request → status, PM
-	CmdResetPin                           uint32 = 0x01 // request → ResetPinResponse, PM
+	CmdUpdatePin                          uint32 = 0x00 // request → status, timed, PM
+	CmdResetPin                           uint32 = 0x01 // request → ResetPinResponse, timed, PM
 	CmdResetPinResponse                   uint32 = 0x02 // response, PM
-	CmdEnable                             uint32 = 0x03 // request → status, M
-	CmdDisable                            uint32 = 0x04 // request → status, M
+	CmdEnable                             uint32 = 0x03 // request → status, timed, M
+	CmdDisable                            uint32 = 0x04 // request → status, timed, M
 	CmdAddBonusTime                       uint32 = 0x05 // request → status, ST
 	CmdSetScreenDailyTime                 uint32 = 0x06 // request → status, ST
 	CmdBlockUnratedContent                uint32 = 0x07 // request → status, BU

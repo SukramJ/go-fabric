@@ -125,10 +125,10 @@ func TestControllerDeviceTypesParity(t *testing.T) {
 		ty := c.ty
 		t.Run(ty.Name, func(t *testing.T) {
 			t.Parallel()
-			if ty.ID != c.id || ty.Revision != c.revision {
+			if uint16(ty.ID) != c.id || ty.Revision != c.revision {
 				t.Errorf("identity 0x%04X r%d, want 0x%04X r%d", ty.ID, ty.Revision, c.id, c.revision)
 			}
-			if got, ok := TypeByID(c.id); !ok || got != ty {
+			if got, ok := TypeByID(schema.DeviceTypeID(c.id)); !ok || got != ty {
 				t.Error("not in the registry")
 			}
 			sm, so := splitNames(ty.Servers)
@@ -139,7 +139,7 @@ func TestControllerDeviceTypesParity(t *testing.T) {
 			if !slices.Equal(cm, c.clientMandatory) || !slices.Equal(co, c.clientOptional) {
 				t.Errorf("clients %v / %v, want %v / %v", cm, co, c.clientMandatory, c.clientOptional)
 			}
-			def, ok := schema.DeviceTypeDefinitionOf(uint32(c.id))
+			def, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(c.id))
 			if !ok {
 				t.Fatal("not in the snapshot")
 			}

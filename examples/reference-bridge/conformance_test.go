@@ -69,7 +69,7 @@ func TestBridgedEndpointsMeetTheirDeviceTypeConformance(t *testing.T) {
 			mounted = append(mounted, srv.MatterClusterID())
 		}
 		deviceType := uint32(ep.DeviceType)
-		name, _ := schema.DeviceTypeName(deviceType)
+		name, _ := schema.DeviceTypeName(schema.DeviceTypeID(deviceType))
 		want, known := mandatory[deviceType]
 		if !known {
 			t.Errorf("%s (endpoint %d) advertises device type %#06x, which the schema snapshot does not know", ep.DeviceAddress, ep.ID, deviceType)
@@ -391,7 +391,7 @@ func TestValveTravelsThroughATarget(t *testing.T) {
 // validator reports nothing for either endpoint.
 func TestFridgeHasItsCoolingCabinetPart(t *testing.T) {
 	for id, want := range map[uint16]string{deviceTypeRefrigerator: "Refrigerator", deviceTypeTemperatureControlledCabinet: "TemperatureControlledCabinet"} {
-		if name, _ := schema.DeviceTypeName(uint32(id)); name != want {
+		if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(id)); name != want {
 			t.Errorf("device type 0x%04X is %q in the snapshot, want %q", id, name, want)
 		}
 	}
@@ -443,7 +443,7 @@ func TestFridgeHasItsCoolingCabinetPart(t *testing.T) {
 // the root's system clusters are the bridge's, not the assembled
 // topology's, so the whole topology is not what this test judges.
 func TestWaterHeaterAndThermostatEnergyPreference(t *testing.T) {
-	if name, _ := schema.DeviceTypeName(uint32(deviceTypeWaterHeater)); name != "WaterHeater" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(deviceTypeWaterHeater)); name != "WaterHeater" {
 		t.Errorf("device type 0x%04X is %q in the snapshot", deviceTypeWaterHeater, name)
 	}
 	_, br := startFleetBridge(t)

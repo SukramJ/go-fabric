@@ -13,8 +13,8 @@ import (
 
 // GenericSwitch device type identity: 0x000F, revision 3.
 const (
-	GenericSwitchID       uint16 = 0x000F
-	GenericSwitchRevision uint16 = 3
+	GenericSwitchID       schema.DeviceTypeID = 0x000F
+	GenericSwitchRevision uint16              = 3
 )
 
 // GenericSwitchType is the GenericSwitch device type, matter.js's packages/node/src/devices/generic-switch.ts;

@@ -124,6 +124,8 @@ func (s *Session) Subscribe(ctx context.Context, minInterval, maxInterval uint16
 		return nil, ErrSessionClosed
 	}
 	var (
+		// mu guards priming and primed: the priming report reaches Updated
+		// before Subscribe returns.
 		mu      sync.Mutex
 		priming *Report
 		primed  bool

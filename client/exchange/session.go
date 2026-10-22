@@ -49,6 +49,10 @@ type Session struct {
 	// messages name it as their destination.
 	inbound bool
 
+	// mu guards the session's mutable state: every field below it (address,
+	// parameters, timestamps, the open exchanges, closed, peerLost and
+	// deferredClose). It is released before an exchange is aborted or the
+	// manager is told.
 	mu              sync.Mutex
 	addr            *net.UDPAddr
 	params          sessionparams.Parameters

@@ -110,24 +110,19 @@ func TestWrapperOnAQueueRunsTheAsynchronousCallbacks(t *testing.T) {
 	srv := hepaServer(t, spec.ServerConfig{})
 	var states []hepaState
 
-	if _, err := spec.OnChangedAsyncOf(spec.NewWrapper(srv), func(hepaState, contract.Change) {}); !errors.Is(err, spec.ErrNoQueue) {
-		t.Errorf("without a queue: %v, want ErrNoQueue", err)
-	}
+	spec.OnChangedAsyncOf(spec.NewWrapper(srv), func(hepaState, contract.Change) { t.Error("delivered without a queue") })()
 	q := &inlineQueue{}
 	w := spec.NewWrapperOn(srv, q)
 	if w.Underlying() != contract.ClusterServer(srv) {
 		t.Error("the wrapper does not hold its server")
 	}
-	unsub, err := spec.OnChangedAsyncOf[hepaState](w, nil)
-	if err != nil || unsub == nil {
-		t.Fatalf("nil callback: unsubscribe %v, err %v", unsub != nil, err)
+	unsub := spec.OnChangedAsyncOf[hepaState](w, nil)
+	if unsub == nil {
+		t.Fatal("nil callback: no unsubscribe")
 	}
 	unsub()
 
-	unsub, err = spec.OnChangedAsyncOf(w, func(s hepaState, _ contract.Change) { states = append(states, s) })
-	if err != nil {
-		t.Fatal(err)
-	}
+	unsub = spec.OnChangedAsyncOf(w, func(s hepaState, _ contract.Change) { states = append(states, s) })
 	if err := srv.Set(hepa.AttrCondition, uint8(9)); err != nil {
 		t.Fatal(err)
 	}

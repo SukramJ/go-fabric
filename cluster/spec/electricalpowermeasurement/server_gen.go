@@ -18,51 +18,115 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	PowerMode                PowerModeEnum                `matter:"0x0000"` // attribute 0x0000: PowerModeEnum, M, R V
-	NumberOfMeasurementTypes uint8                        `matter:"0x0001"` // attribute 0x0001: uint8, M, R V, F
-	Accuracy                 []MeasurementAccuracyStruct  `matter:"0x0002"` // attribute 0x0002: list[MeasurementAccuracyStruct], M, R V, F
-	Ranges                   []MeasurementRangeStruct     `matter:"0x0003"` // attribute 0x0003: list[MeasurementRangeStruct], O, R V, Q
-	Voltage                  *int64                       `matter:"0x0004"` // attribute 0x0004: voltage-mV, O, R V, X Q
-	ActiveCurrent            *int64                       `matter:"0x0005"` // attribute 0x0005: amperage-mA, O, R V, X Q
-	ReactiveCurrent          *int64                       `matter:"0x0006"` // attribute 0x0006: amperage-mA, [ALTC], R V, X Q
-	ApparentCurrent          *int64                       `matter:"0x0007"` // attribute 0x0007: amperage-mA, [ALTC], R V, X Q
-	ActivePower              *int64                       `matter:"0x0008"` // attribute 0x0008: power-mW, M, R V, X Q
-	ReactivePower            *int64                       `matter:"0x0009"` // attribute 0x0009: power-mVAR, [ALTC], R V, X Q
-	ApparentPower            *int64                       `matter:"0x000A"` // attribute 0x000A: power-mVA, [ALTC], R V, X Q
-	RmsVoltage               *int64                       `matter:"0x000B"` // attribute 0x000B: voltage-mV, [ALTC], R V, X Q
-	RmsCurrent               *int64                       `matter:"0x000C"` // attribute 0x000C: amperage-mA, [ALTC], R V, X Q
-	RmsPower                 *int64                       `matter:"0x000D"` // attribute 0x000D: power-mW, [ALTC], R V, X Q
-	Frequency                *int64                       `matter:"0x000E"` // attribute 0x000E: int64, [ALTC], R V, X Q
-	HarmonicCurrents         *[]HarmonicMeasurementStruct `matter:"0x000F"` // attribute 0x000F: list[HarmonicMeasurementStruct], HARM, R V, X Q
-	HarmonicPhases           *[]HarmonicMeasurementStruct `matter:"0x0010"` // attribute 0x0010: list[HarmonicMeasurementStruct], PWRQ, R V, X Q
-	PowerFactor              *int64                       `matter:"0x0011"` // attribute 0x0011: int64, [ALTC], R V, X Q
-	NeutralCurrent           *int64                       `matter:"0x0012"` // attribute 0x0012: amperage-mA, [POLY], R V, X Q
+	PowerMode                PowerModeEnum                // attribute 0x0000: PowerModeEnum, M, R V
+	NumberOfMeasurementTypes uint8                        // attribute 0x0001: uint8, M, R V, F
+	Accuracy                 []MeasurementAccuracyStruct  // attribute 0x0002: list[MeasurementAccuracyStruct], M, R V, F
+	Ranges                   []MeasurementRangeStruct     // attribute 0x0003: list[MeasurementRangeStruct], O, R V, Q
+	Voltage                  *int64                       // attribute 0x0004: voltage-mV, O, R V, X Q
+	ActiveCurrent            *int64                       // attribute 0x0005: amperage-mA, O, R V, X Q
+	ReactiveCurrent          *int64                       // attribute 0x0006: amperage-mA, [ALTC], R V, X Q
+	ApparentCurrent          *int64                       // attribute 0x0007: amperage-mA, [ALTC], R V, X Q
+	ActivePower              *int64                       // attribute 0x0008: power-mW, M, R V, X Q
+	ReactivePower            *int64                       // attribute 0x0009: power-mVAR, [ALTC], R V, X Q
+	ApparentPower            *int64                       // attribute 0x000A: power-mVA, [ALTC], R V, X Q
+	RmsVoltage               *int64                       // attribute 0x000B: voltage-mV, [ALTC], R V, X Q
+	RmsCurrent               *int64                       // attribute 0x000C: amperage-mA, [ALTC], R V, X Q
+	RmsPower                 *int64                       // attribute 0x000D: power-mW, [ALTC], R V, X Q
+	Frequency                *int64                       // attribute 0x000E: int64, [ALTC], R V, X Q
+	HarmonicCurrents         *[]HarmonicMeasurementStruct // attribute 0x000F: list[HarmonicMeasurementStruct], HARM, R V, X Q
+	HarmonicPhases           *[]HarmonicMeasurementStruct // attribute 0x0010: list[HarmonicMeasurementStruct], PWRQ, R V, X Q
+	PowerFactor              *int64                       // attribute 0x0011: int64, [ALTC], R V, X Q
+	NeutralCurrent           *int64                       // attribute 0x0012: amperage-mA, [POLY], R V, X Q
 }
 
 // Patch is a change to the ElectricalPowerMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	PowerMode                *PowerModeEnum               `matter:"0x0000"` // attribute 0x0000
-	NumberOfMeasurementTypes *uint8                       `matter:"0x0001"` // attribute 0x0001
-	Accuracy                 *[]MeasurementAccuracyStruct `matter:"0x0002"` // attribute 0x0002
-	Ranges                   *[]MeasurementRangeStruct    `matter:"0x0003"` // attribute 0x0003
-	Voltage                  *int64                       `matter:"0x0004"` // attribute 0x0004
-	ActiveCurrent            *int64                       `matter:"0x0005"` // attribute 0x0005
-	ReactiveCurrent          *int64                       `matter:"0x0006"` // attribute 0x0006
-	ApparentCurrent          *int64                       `matter:"0x0007"` // attribute 0x0007
-	ActivePower              *int64                       `matter:"0x0008"` // attribute 0x0008
-	ReactivePower            *int64                       `matter:"0x0009"` // attribute 0x0009
-	ApparentPower            *int64                       `matter:"0x000A"` // attribute 0x000A
-	RmsVoltage               *int64                       `matter:"0x000B"` // attribute 0x000B
-	RmsCurrent               *int64                       `matter:"0x000C"` // attribute 0x000C
-	RmsPower                 *int64                       `matter:"0x000D"` // attribute 0x000D
-	Frequency                *int64                       `matter:"0x000E"` // attribute 0x000E
-	HarmonicCurrents         *[]HarmonicMeasurementStruct `matter:"0x000F"` // attribute 0x000F
-	HarmonicPhases           *[]HarmonicMeasurementStruct `matter:"0x0010"` // attribute 0x0010
-	PowerFactor              *int64                       `matter:"0x0011"` // attribute 0x0011
-	NeutralCurrent           *int64                       `matter:"0x0012"` // attribute 0x0012
+	PowerMode                *PowerModeEnum               // attribute 0x0000
+	NumberOfMeasurementTypes *uint8                       // attribute 0x0001
+	Accuracy                 *[]MeasurementAccuracyStruct // attribute 0x0002
+	Ranges                   *[]MeasurementRangeStruct    // attribute 0x0003
+	Voltage                  *int64                       // attribute 0x0004
+	ActiveCurrent            *int64                       // attribute 0x0005
+	ReactiveCurrent          *int64                       // attribute 0x0006
+	ApparentCurrent          *int64                       // attribute 0x0007
+	ActivePower              *int64                       // attribute 0x0008
+	ReactivePower            *int64                       // attribute 0x0009
+	ApparentPower            *int64                       // attribute 0x000A
+	RmsVoltage               *int64                       // attribute 0x000B
+	RmsCurrent               *int64                       // attribute 0x000C
+	RmsPower                 *int64                       // attribute 0x000D
+	Frequency                *int64                       // attribute 0x000E
+	HarmonicCurrents         *[]HarmonicMeasurementStruct // attribute 0x000F
+	HarmonicPhases           *[]HarmonicMeasurementStruct // attribute 0x0010
+	PowerFactor              *int64                       // attribute 0x0011
+	NeutralCurrent           *int64                       // attribute 0x0012
 	Null                     []uint32                     // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrPowerMode); ok {
+		spec.Assign(&st.PowerMode, v)
+	}
+	if v, ok := read(AttrNumberOfMeasurementTypes); ok {
+		spec.Assign(&st.NumberOfMeasurementTypes, v)
+	}
+	if v, ok := read(AttrAccuracy); ok {
+		spec.Assign(&st.Accuracy, v)
+	}
+	if v, ok := read(AttrRanges); ok {
+		spec.Assign(&st.Ranges, v)
+	}
+	if v, ok := read(AttrVoltage); ok {
+		spec.Assign(&st.Voltage, v)
+	}
+	if v, ok := read(AttrActiveCurrent); ok {
+		spec.Assign(&st.ActiveCurrent, v)
+	}
+	if v, ok := read(AttrReactiveCurrent); ok {
+		spec.Assign(&st.ReactiveCurrent, v)
+	}
+	if v, ok := read(AttrApparentCurrent); ok {
+		spec.Assign(&st.ApparentCurrent, v)
+	}
+	if v, ok := read(AttrActivePower); ok {
+		spec.Assign(&st.ActivePower, v)
+	}
+	if v, ok := read(AttrReactivePower); ok {
+		spec.Assign(&st.ReactivePower, v)
+	}
+	if v, ok := read(AttrApparentPower); ok {
+		spec.Assign(&st.ApparentPower, v)
+	}
+	if v, ok := read(AttrRmsVoltage); ok {
+		spec.Assign(&st.RmsVoltage, v)
+	}
+	if v, ok := read(AttrRmsCurrent); ok {
+		spec.Assign(&st.RmsCurrent, v)
+	}
+	if v, ok := read(AttrRmsPower); ok {
+		spec.Assign(&st.RmsPower, v)
+	}
+	if v, ok := read(AttrFrequency); ok {
+		spec.Assign(&st.Frequency, v)
+	}
+	if v, ok := read(AttrHarmonicCurrents); ok {
+		spec.Assign(&st.HarmonicCurrents, v)
+	}
+	if v, ok := read(AttrHarmonicPhases); ok {
+		spec.Assign(&st.HarmonicPhases, v)
+	}
+	if v, ok := read(AttrPowerFactor); ok {
+		spec.Assign(&st.PowerFactor, v)
+	}
+	if v, ok := read(AttrNeutralCurrent); ok {
+		spec.Assign(&st.NeutralCurrent, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -175,9 +239,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -186,7 +252,8 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
@@ -227,7 +294,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

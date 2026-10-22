@@ -191,6 +191,7 @@ type WindowCoveringServer struct {
 	// restoring its target never races another; mu guards the values and
 	// is not held while the Mover runs.
 	op sync.Mutex
+	// mu guards lift, operationalStatus, tilt and wcMode.
 	mu sync.RWMutex
 
 	mover Mover

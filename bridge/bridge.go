@@ -352,6 +352,13 @@ type Bridge struct {
 	logger      *slog.Logger
 	advertiser  mdns.Advertiser
 
+	// mu guards the bridge's mutable state: the listener, topology and
+	// dispatcher, the attached collaborators and cluster servers, the
+	// unsubscribe lists, the serve and pump lifecycle (started and the
+	// cancel/done pairs), the PASE lockout and in-flight handshake, the
+	// commissioning window and its instance name, deviceTypes, groupMessaging
+	// and the onReassembled / onFabricAdded / onFabricRemoved hooks. Start
+	// takes it only to commit, so readers do not wait for the listener's bind.
 	mu         sync.RWMutex
 	listener   *udp.Listener
 	topology   *endpoint.Topology

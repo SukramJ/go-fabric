@@ -135,7 +135,7 @@ func TestParityMatterJS_EvseDemSnapshot(t *testing.T) {
 		{0x050C, 0x009D}, // EnergyEvseMode
 		{0x050D, energy.ClusterIDDeviceEnergyManagement},
 	} {
-		if !schema.DeviceTypeRequiresServerCluster(c.deviceType, c.cluster) {
+		if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(c.deviceType), c.cluster) {
 			t.Errorf("device type 0x%04X does not require 0x%04X", c.deviceType, c.cluster)
 		}
 	}

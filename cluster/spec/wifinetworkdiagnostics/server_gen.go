@@ -18,39 +18,85 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Bssid                  *[]byte           `matter:"0x0000"` // attribute 0x0000: octstr, M, R V, X
-	SecurityType           *SecurityTypeEnum `matter:"0x0001"` // attribute 0x0001: SecurityTypeEnum, M, R V, X
-	WiFiVersion            *WiFiVersionEnum  `matter:"0x0002"` // attribute 0x0002: WiFiVersionEnum, M, R V, X
-	ChannelNumber          *uint16           `matter:"0x0003"` // attribute 0x0003: uint16, M, R V, X
-	Rssi                   *int8             `matter:"0x0004"` // attribute 0x0004: int8, M, R V, X C
-	BeaconLostCount        *uint32           `matter:"0x0005"` // attribute 0x0005: uint32, ERRCNT, R V, X C
-	BeaconRxCount          *uint32           `matter:"0x0006"` // attribute 0x0006: uint32, PKTCNT, R V, X C
-	PacketMulticastRxCount *uint32           `matter:"0x0007"` // attribute 0x0007: uint32, PKTCNT, R V, X C
-	PacketMulticastTxCount *uint32           `matter:"0x0008"` // attribute 0x0008: uint32, PKTCNT, R V, X C
-	PacketUnicastRxCount   *uint32           `matter:"0x0009"` // attribute 0x0009: uint32, PKTCNT, R V, X C
-	PacketUnicastTxCount   *uint32           `matter:"0x000A"` // attribute 0x000A: uint32, PKTCNT, R V, X C
-	CurrentMaxRate         *uint64           `matter:"0x000B"` // attribute 0x000B: uint64, O, R V, X C
-	OverrunCount           *uint64           `matter:"0x000C"` // attribute 0x000C: uint64, ERRCNT, R V, X C
+	Bssid                  *[]byte           // attribute 0x0000: octstr, M, R V, X
+	SecurityType           *SecurityTypeEnum // attribute 0x0001: SecurityTypeEnum, M, R V, X
+	WiFiVersion            *WiFiVersionEnum  // attribute 0x0002: WiFiVersionEnum, M, R V, X
+	ChannelNumber          *uint16           // attribute 0x0003: uint16, M, R V, X
+	Rssi                   *int8             // attribute 0x0004: int8, M, R V, X C
+	BeaconLostCount        *uint32           // attribute 0x0005: uint32, ERRCNT, R V, X C
+	BeaconRxCount          *uint32           // attribute 0x0006: uint32, PKTCNT, R V, X C
+	PacketMulticastRxCount *uint32           // attribute 0x0007: uint32, PKTCNT, R V, X C
+	PacketMulticastTxCount *uint32           // attribute 0x0008: uint32, PKTCNT, R V, X C
+	PacketUnicastRxCount   *uint32           // attribute 0x0009: uint32, PKTCNT, R V, X C
+	PacketUnicastTxCount   *uint32           // attribute 0x000A: uint32, PKTCNT, R V, X C
+	CurrentMaxRate         *uint64           // attribute 0x000B: uint64, O, R V, X C
+	OverrunCount           *uint64           // attribute 0x000C: uint64, ERRCNT, R V, X C
 }
 
 // Patch is a change to the WiFiNetworkDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Bssid                  *[]byte           `matter:"0x0000"` // attribute 0x0000
-	SecurityType           *SecurityTypeEnum `matter:"0x0001"` // attribute 0x0001
-	WiFiVersion            *WiFiVersionEnum  `matter:"0x0002"` // attribute 0x0002
-	ChannelNumber          *uint16           `matter:"0x0003"` // attribute 0x0003
-	Rssi                   *int8             `matter:"0x0004"` // attribute 0x0004
-	BeaconLostCount        *uint32           `matter:"0x0005"` // attribute 0x0005
-	BeaconRxCount          *uint32           `matter:"0x0006"` // attribute 0x0006
-	PacketMulticastRxCount *uint32           `matter:"0x0007"` // attribute 0x0007
-	PacketMulticastTxCount *uint32           `matter:"0x0008"` // attribute 0x0008
-	PacketUnicastRxCount   *uint32           `matter:"0x0009"` // attribute 0x0009
-	PacketUnicastTxCount   *uint32           `matter:"0x000A"` // attribute 0x000A
-	CurrentMaxRate         *uint64           `matter:"0x000B"` // attribute 0x000B
-	OverrunCount           *uint64           `matter:"0x000C"` // attribute 0x000C
+	Bssid                  *[]byte           // attribute 0x0000
+	SecurityType           *SecurityTypeEnum // attribute 0x0001
+	WiFiVersion            *WiFiVersionEnum  // attribute 0x0002
+	ChannelNumber          *uint16           // attribute 0x0003
+	Rssi                   *int8             // attribute 0x0004
+	BeaconLostCount        *uint32           // attribute 0x0005
+	BeaconRxCount          *uint32           // attribute 0x0006
+	PacketMulticastRxCount *uint32           // attribute 0x0007
+	PacketMulticastTxCount *uint32           // attribute 0x0008
+	PacketUnicastRxCount   *uint32           // attribute 0x0009
+	PacketUnicastTxCount   *uint32           // attribute 0x000A
+	CurrentMaxRate         *uint64           // attribute 0x000B
+	OverrunCount           *uint64           // attribute 0x000C
 	Null                   []uint32          // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrBssid); ok {
+		spec.Assign(&st.Bssid, v)
+	}
+	if v, ok := read(AttrSecurityType); ok {
+		spec.Assign(&st.SecurityType, v)
+	}
+	if v, ok := read(AttrWiFiVersion); ok {
+		spec.Assign(&st.WiFiVersion, v)
+	}
+	if v, ok := read(AttrChannelNumber); ok {
+		spec.Assign(&st.ChannelNumber, v)
+	}
+	if v, ok := read(AttrRssi); ok {
+		spec.Assign(&st.Rssi, v)
+	}
+	if v, ok := read(AttrBeaconLostCount); ok {
+		spec.Assign(&st.BeaconLostCount, v)
+	}
+	if v, ok := read(AttrBeaconRxCount); ok {
+		spec.Assign(&st.BeaconRxCount, v)
+	}
+	if v, ok := read(AttrPacketMulticastRxCount); ok {
+		spec.Assign(&st.PacketMulticastRxCount, v)
+	}
+	if v, ok := read(AttrPacketMulticastTxCount); ok {
+		spec.Assign(&st.PacketMulticastTxCount, v)
+	}
+	if v, ok := read(AttrPacketUnicastRxCount); ok {
+		spec.Assign(&st.PacketUnicastRxCount, v)
+	}
+	if v, ok := read(AttrPacketUnicastTxCount); ok {
+		spec.Assign(&st.PacketUnicastTxCount, v)
+	}
+	if v, ok := read(AttrCurrentMaxRate); ok {
+		spec.Assign(&st.CurrentMaxRate, v)
+	}
+	if v, ok := read(AttrOverrunCount); ok {
+		spec.Assign(&st.OverrunCount, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -145,9 +191,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -156,13 +204,15 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleResetCounts registers fn for the ResetCounts command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResetCounts is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResetCounts(fn func(ctx context.Context, req ResetCountsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResetCounts, fn)
 }
@@ -222,7 +272,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

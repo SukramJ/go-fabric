@@ -18,35 +18,75 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MaxNetworks             uint8                           `matter:"0x0000"` // attribute 0x0000: uint8, M, R A, F
-	Networks                []NetworkInfoStruct             `matter:"0x0001"` // attribute 0x0001: list[NetworkInfoStruct], M, R A
-	ScanMaxTimeSeconds      uint8                           `matter:"0x0002"` // attribute 0x0002: uint8, WI | TH, R V, F
-	ConnectMaxTimeSeconds   uint8                           `matter:"0x0003"` // attribute 0x0003: uint8, WI | TH, R V, F
-	InterfaceEnabled        bool                            `matter:"0x0004"` // attribute 0x0004: bool, M, RW VA, N
-	LastNetworkingStatus    *NetworkCommissioningStatusEnum `matter:"0x0005"` // attribute 0x0005: NetworkCommissioningStatusEnum, M, R A, X
-	LastNetworkId           *[]byte                         `matter:"0x0006"` // attribute 0x0006: octstr, M, R A, X
-	LastConnectErrorValue   *int32                          `matter:"0x0007"` // attribute 0x0007: int32, M, R A, X
-	SupportedWiFiBands      []WiFiBandEnum                  `matter:"0x0008"` // attribute 0x0008: list[WiFiBandEnum], WI, R V, F
-	SupportedThreadFeatures ThreadCapabilitiesBitmap        `matter:"0x0009"` // attribute 0x0009: ThreadCapabilitiesBitmap, TH, R V, F
-	ThreadVersion           uint16                          `matter:"0x000A"` // attribute 0x000A: uint16, TH, R V, F
+	MaxNetworks             uint8                           // attribute 0x0000: uint8, M, R A, F
+	Networks                []NetworkInfoStruct             // attribute 0x0001: list[NetworkInfoStruct], M, R A
+	ScanMaxTimeSeconds      uint8                           // attribute 0x0002: uint8, WI | TH, R V, F
+	ConnectMaxTimeSeconds   uint8                           // attribute 0x0003: uint8, WI | TH, R V, F
+	InterfaceEnabled        bool                            // attribute 0x0004: bool, M, RW VA, N
+	LastNetworkingStatus    *NetworkCommissioningStatusEnum // attribute 0x0005: NetworkCommissioningStatusEnum, M, R A, X
+	LastNetworkId           *[]byte                         // attribute 0x0006: octstr, M, R A, X
+	LastConnectErrorValue   *int32                          // attribute 0x0007: int32, M, R A, X
+	SupportedWiFiBands      []WiFiBandEnum                  // attribute 0x0008: list[WiFiBandEnum], WI, R V, F
+	SupportedThreadFeatures ThreadCapabilitiesBitmap        // attribute 0x0009: ThreadCapabilitiesBitmap, TH, R V, F
+	ThreadVersion           uint16                          // attribute 0x000A: uint16, TH, R V, F
 }
 
 // Patch is a change to the NetworkCommissioning state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MaxNetworks             *uint8                          `matter:"0x0000"` // attribute 0x0000
-	Networks                *[]NetworkInfoStruct            `matter:"0x0001"` // attribute 0x0001
-	ScanMaxTimeSeconds      *uint8                          `matter:"0x0002"` // attribute 0x0002
-	ConnectMaxTimeSeconds   *uint8                          `matter:"0x0003"` // attribute 0x0003
-	InterfaceEnabled        *bool                           `matter:"0x0004"` // attribute 0x0004
-	LastNetworkingStatus    *NetworkCommissioningStatusEnum `matter:"0x0005"` // attribute 0x0005
-	LastNetworkId           *[]byte                         `matter:"0x0006"` // attribute 0x0006
-	LastConnectErrorValue   *int32                          `matter:"0x0007"` // attribute 0x0007
-	SupportedWiFiBands      *[]WiFiBandEnum                 `matter:"0x0008"` // attribute 0x0008
-	SupportedThreadFeatures *ThreadCapabilitiesBitmap       `matter:"0x0009"` // attribute 0x0009
-	ThreadVersion           *uint16                         `matter:"0x000A"` // attribute 0x000A
+	MaxNetworks             *uint8                          // attribute 0x0000
+	Networks                *[]NetworkInfoStruct            // attribute 0x0001
+	ScanMaxTimeSeconds      *uint8                          // attribute 0x0002
+	ConnectMaxTimeSeconds   *uint8                          // attribute 0x0003
+	InterfaceEnabled        *bool                           // attribute 0x0004
+	LastNetworkingStatus    *NetworkCommissioningStatusEnum // attribute 0x0005
+	LastNetworkId           *[]byte                         // attribute 0x0006
+	LastConnectErrorValue   *int32                          // attribute 0x0007
+	SupportedWiFiBands      *[]WiFiBandEnum                 // attribute 0x0008
+	SupportedThreadFeatures *ThreadCapabilitiesBitmap       // attribute 0x0009
+	ThreadVersion           *uint16                         // attribute 0x000A
 	Null                    []uint32                        // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMaxNetworks); ok {
+		spec.Assign(&st.MaxNetworks, v)
+	}
+	if v, ok := read(AttrNetworks); ok {
+		spec.Assign(&st.Networks, v)
+	}
+	if v, ok := read(AttrScanMaxTimeSeconds); ok {
+		spec.Assign(&st.ScanMaxTimeSeconds, v)
+	}
+	if v, ok := read(AttrConnectMaxTimeSeconds); ok {
+		spec.Assign(&st.ConnectMaxTimeSeconds, v)
+	}
+	if v, ok := read(AttrInterfaceEnabled); ok {
+		spec.Assign(&st.InterfaceEnabled, v)
+	}
+	if v, ok := read(AttrLastNetworkingStatus); ok {
+		spec.Assign(&st.LastNetworkingStatus, v)
+	}
+	if v, ok := read(AttrLastNetworkId); ok {
+		spec.Assign(&st.LastNetworkId, v)
+	}
+	if v, ok := read(AttrLastConnectErrorValue); ok {
+		spec.Assign(&st.LastConnectErrorValue, v)
+	}
+	if v, ok := read(AttrSupportedWiFiBands); ok {
+		spec.Assign(&st.SupportedWiFiBands, v)
+	}
+	if v, ok := read(AttrSupportedThreadFeatures); ok {
+		spec.Assign(&st.SupportedThreadFeatures, v)
+	}
+	if v, ok := read(AttrThreadVersion); ok {
+		spec.Assign(&st.ThreadVersion, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -135,9 +175,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -146,43 +188,50 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleScanNetworks registers fn for the ScanNetworks command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleScanNetworks is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleScanNetworks(fn func(ctx context.Context, req ScanNetworksRequest) (ScanNetworksResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdScanNetworks, fn)
 }
 
 // HandleAddOrUpdateWiFiNetwork registers fn for the AddOrUpdateWiFiNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateWiFiNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateWiFiNetwork(fn func(ctx context.Context, req AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateWiFiNetwork, fn)
 }
 
 // HandleAddOrUpdateThreadNetwork registers fn for the AddOrUpdateThreadNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateThreadNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateThreadNetwork(fn func(ctx context.Context, req AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateThreadNetwork, fn)
 }
 
 // HandleRemoveNetwork registers fn for the RemoveNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveNetwork(fn func(ctx context.Context, req RemoveNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveNetwork, fn)
 }
 
 // HandleConnectNetwork registers fn for the ConnectNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleConnectNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleConnectNetwork(fn func(ctx context.Context, req ConnectNetworkRequest) (ConnectNetworkResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdConnectNetwork, fn)
 }
 
 // HandleReorderNetwork registers fn for the ReorderNetwork command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleReorderNetwork is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleReorderNetwork(fn func(ctx context.Context, req ReorderNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdReorderNetwork, fn)
 }
@@ -236,7 +285,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

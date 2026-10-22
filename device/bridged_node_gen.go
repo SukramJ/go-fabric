@@ -16,8 +16,8 @@ import (
 
 // BridgedNode device type identity: 0x0013, revision 3.
 const (
-	BridgedNodeID       uint16 = 0x0013
-	BridgedNodeRevision uint16 = 3
+	BridgedNodeID       schema.DeviceTypeID = 0x0013
+	BridgedNodeRevision uint16              = 3
 )
 
 // BridgedNodeType is the BridgedNode device type, matter.js's packages/node/src/endpoints/bridged-node.ts;

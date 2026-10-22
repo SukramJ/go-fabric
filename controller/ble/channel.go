@@ -61,6 +61,8 @@ type Channel struct {
 // handshakeState routes C2 data: to the handshake until the response
 // arrived, to the session afterwards (NobleBleChannel.ts:609-620, :826-836).
 type handshakeState struct {
+	// mu guards session, which Dial sets once the handshake response
+	// arrived.
 	mu       sync.Mutex
 	session  *btp.Session
 	response chan []byte

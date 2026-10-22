@@ -15,8 +15,8 @@ import (
 
 // ExtractorHood device type identity: 0x007A, revision 1.
 const (
-	ExtractorHoodID       uint16 = 0x007A
-	ExtractorHoodRevision uint16 = 1
+	ExtractorHoodID       schema.DeviceTypeID = 0x007A
+	ExtractorHoodRevision uint16              = 1
 )
 
 // ExtractorHoodType is the ExtractorHood device type, matter.js's packages/node/src/devices/extractor-hood.ts;

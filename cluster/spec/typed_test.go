@@ -17,22 +17,61 @@ import (
 )
 
 // hepaState and hepaPatch have the shape script/clustergen generates for
-// a State and a Patch.
+// a State and a Patch, their methods written by hand as the generator
+// writes them (State.FromAttributeValues, Patch.AttributeValues).
 type hepaState struct {
-	Condition              uint8                           `matter:"0x0000"`
-	ChangeIndication       hepa.ChangeIndicationEnum       `matter:"0x0002"`
-	InPlaceIndicator       bool                            `matter:"0x0003"`
-	LastChangedTime        *uint32                         `matter:"0x0004"`
-	ReplacementProductList []hepa.ReplacementProductStruct `matter:"0x0005"`
-	Note                   string                          // untagged: no attribute
+	Condition              uint8
+	ChangeIndication       hepa.ChangeIndicationEnum
+	InPlaceIndicator       bool
+	LastChangedTime        *uint32
+	ReplacementProductList []hepa.ReplacementProductStruct
+	Note                   string // no attribute
+}
+
+func (st *hepaState) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(hepa.AttrCondition); ok {
+		spec.Assign(&st.Condition, v)
+	}
+	if v, ok := read(hepa.AttrChangeIndication); ok {
+		spec.Assign(&st.ChangeIndication, v)
+	}
+	if v, ok := read(hepa.AttrInPlaceIndicator); ok {
+		spec.Assign(&st.InPlaceIndicator, v)
+	}
+	if v, ok := read(hepa.AttrLastChangedTime); ok {
+		spec.Assign(&st.LastChangedTime, v)
+	}
+	if v, ok := read(hepa.AttrReplacementProductList); ok {
+		spec.Assign(&st.ReplacementProductList, v)
+	}
 }
 
 type hepaPatch struct {
-	Condition              *uint8                           `matter:"0x0000"`
-	ChangeIndication       *hepa.ChangeIndicationEnum       `matter:"0x0002"`
-	LastChangedTime        *uint32                          `matter:"0x0004"`
-	ReplacementProductList *[]hepa.ReplacementProductStruct `matter:"0x0005"`
+	Condition              *uint8
+	ChangeIndication       *hepa.ChangeIndicationEnum
+	LastChangedTime        *uint32
+	ReplacementProductList *[]hepa.ReplacementProductStruct
 	Null                   []uint32
+}
+
+func (p hepaPatch) AttributeValues() map[uint32]any {
+	v := map[uint32]any{}
+	if p.Condition != nil {
+		v[hepa.AttrCondition] = *p.Condition
+	}
+	if p.ChangeIndication != nil {
+		v[hepa.AttrChangeIndication] = *p.ChangeIndication
+	}
+	if p.LastChangedTime != nil {
+		v[hepa.AttrLastChangedTime] = *p.LastChangedTime
+	}
+	if p.ReplacementProductList != nil {
+		v[hepa.AttrReplacementProductList] = spec.List[hepa.ReplacementProductStruct](*p.ReplacementProductList)
+	}
+	for _, id := range p.Null {
+		v[id] = nil
+	}
+	return v
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -47,17 +86,17 @@ func TestTypedStateAndPatch(t *testing.T) {
 	}
 
 	p := hepaPatch{Condition: ptr(uint8(50)), LastChangedTime: ptr(uint32(1000))}
-	if got := spec.PatchValues(p); !reflect.DeepEqual(got, map[uint32]any{hepa.AttrCondition: uint8(50), hepa.AttrLastChangedTime: uint32(1000)}) {
+	if got := p.AttributeValues(); !reflect.DeepEqual(got, map[uint32]any{hepa.AttrCondition: uint8(50), hepa.AttrLastChangedTime: uint32(1000)}) {
 		t.Errorf("patch values %#v", got)
 	}
-	if err := srv.SetAttributes(spec.PatchValues(&p)); err != nil {
+	if err := spec.SetPatch(srv, p); err != nil {
 		t.Fatal(err)
 	}
 	st = spec.StateOf[hepaState](srv)
 	if st.Condition != 50 || st.LastChangedTime == nil || *st.LastChangedTime != 1000 {
 		t.Errorf("after the patch: %+v", st)
 	}
-	if err := srv.SetAttributes(spec.PatchValues(hepaPatch{Null: []uint32{hepa.AttrLastChangedTime}})); err != nil {
+	if err := spec.SetPatch(srv, hepaPatch{Null: []uint32{hepa.AttrLastChangedTime}}); err != nil {
 		t.Fatal(err)
 	}
 	if st = spec.StateOf[hepaState](srv); st.LastChangedTime != nil {
@@ -65,17 +104,11 @@ func TestTypedStateAndPatch(t *testing.T) {
 	}
 	// All or nothing: one value outside its constraint stores none.
 	bad := hepaPatch{Condition: ptr(uint8(60)), ChangeIndication: ptr(hepa.ChangeIndicationEnum(9))}
-	if err := srv.SetAttributes(spec.PatchValues(bad)); !errors.Is(err, spec.ErrInvalidValue) {
+	if err := spec.SetPatch(srv, bad); !errors.Is(err, spec.ErrInvalidValue) {
 		t.Errorf("bad patch: %v", err)
 	}
 	if st = spec.StateOf[hepaState](srv); st.Condition != 50 {
 		t.Errorf("a refused patch stored %d", st.Condition)
-	}
-	if got := spec.PatchValues(42); len(got) != 0 {
-		t.Errorf("a non-struct patch: %v", got)
-	}
-	if got := spec.StateOf[int](srv); got != 0 {
-		t.Errorf("a non-struct state: %v", got)
 	}
 }
 
@@ -89,7 +122,7 @@ func TestTypedOnChanged(t *testing.T) {
 		states = append(states, s)
 		ids = append(ids, changed)
 	})
-	if err := srv.SetAttributes(spec.PatchValues(hepaPatch{Condition: ptr(uint8(7)), LastChangedTime: ptr(uint32(3))})); err != nil {
+	if err := spec.SetPatch(srv, hepaPatch{Condition: ptr(uint8(7)), LastChangedTime: ptr(uint32(3))}); err != nil {
 		t.Fatal(err)
 	}
 	if len(states) != 1 || states[0].Condition != 7 || !slices.Equal(ids[0], []uint32{hepa.AttrCondition, hepa.AttrLastChangedTime}) {

@@ -12,8 +12,8 @@ import (
 
 // OtaProvider device type identity: 0x0014, revision 1.
 const (
-	OtaProviderID       uint16 = 0x0014
-	OtaProviderRevision uint16 = 1
+	OtaProviderID       schema.DeviceTypeID = 0x0014
+	OtaProviderRevision uint16              = 1
 )
 
 // OtaProviderType is the OtaProvider device type, matter.js's packages/node/src/endpoints/ota-provider.ts;

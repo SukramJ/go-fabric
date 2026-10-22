@@ -18,77 +18,180 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Status                      PowerSourceStatusEnum    `matter:"0x0000"` // attribute 0x0000: PowerSourceStatusEnum, M, R V
-	Order                       uint8                    `matter:"0x0001"` // attribute 0x0001: uint8, M, R V, N
-	Description                 string                   `matter:"0x0002"` // attribute 0x0002: string, M, R V, F
-	WiredAssessedInputVoltage   *uint32                  `matter:"0x0003"` // attribute 0x0003: uint32, [WIRED], R V, X C
-	WiredAssessedInputFrequency *uint16                  `matter:"0x0004"` // attribute 0x0004: uint16, [WIRED], R V, X C
-	WiredCurrentType            WiredCurrentTypeEnum     `matter:"0x0005"` // attribute 0x0005: WiredCurrentTypeEnum, WIRED, R V, F
-	WiredAssessedCurrent        *uint32                  `matter:"0x0006"` // attribute 0x0006: uint32, [WIRED], R V, X C
-	WiredNominalVoltage         uint32                   `matter:"0x0007"` // attribute 0x0007: uint32, [WIRED], R V, F
-	WiredMaximumCurrent         uint32                   `matter:"0x0008"` // attribute 0x0008: uint32, [WIRED], R V, F
-	WiredPresent                bool                     `matter:"0x0009"` // attribute 0x0009: bool, [WIRED], R V
-	ActiveWiredFaults           []WiredFaultEnum         `matter:"0x000A"` // attribute 0x000A: list[WiredFaultEnum], [WIRED], R V
-	BatVoltage                  *uint32                  `matter:"0x000B"` // attribute 0x000B: uint32, [BAT], R V, X C
-	BatPercentRemaining         *uint8                   `matter:"0x000C"` // attribute 0x000C: uint8, [BAT], R V, X Q
-	BatTimeRemaining            *uint32                  `matter:"0x000D"` // attribute 0x000D: uint32, [BAT], R V, X Q
-	BatChargeLevel              BatChargeLevelEnum       `matter:"0x000E"` // attribute 0x000E: BatChargeLevelEnum, BAT, R V
-	BatReplacementNeeded        bool                     `matter:"0x000F"` // attribute 0x000F: bool, BAT, R V
-	BatReplaceability           BatReplaceabilityEnum    `matter:"0x0010"` // attribute 0x0010: BatReplaceabilityEnum, BAT, R V, F
-	BatPresent                  bool                     `matter:"0x0011"` // attribute 0x0011: bool, [BAT], R V
-	ActiveBatFaults             []BatFaultEnum           `matter:"0x0012"` // attribute 0x0012: list[BatFaultEnum], [BAT], R V
-	BatReplacementDescription   string                   `matter:"0x0013"` // attribute 0x0013: string, REPLC, R V, F
-	BatCommonDesignation        BatCommonDesignationEnum `matter:"0x0014"` // attribute 0x0014: BatCommonDesignationEnum, [REPLC], R V, F
-	BatAnsiDesignation          string                   `matter:"0x0015"` // attribute 0x0015: string, [REPLC], R V, F
-	BatIecDesignation           string                   `matter:"0x0016"` // attribute 0x0016: string, [REPLC], R V, F
-	BatApprovedChemistry        BatApprovedChemistryEnum `matter:"0x0017"` // attribute 0x0017: BatApprovedChemistryEnum, [REPLC], R V, F
-	BatCapacity                 uint32                   `matter:"0x0018"` // attribute 0x0018: uint32, [REPLC | RECHG], R V, F
-	BatQuantity                 uint8                    `matter:"0x0019"` // attribute 0x0019: uint8, REPLC, R V, F
-	BatChargeState              BatChargeStateEnum       `matter:"0x001A"` // attribute 0x001A: BatChargeStateEnum, RECHG, R V
-	BatTimeToFullCharge         *uint32                  `matter:"0x001B"` // attribute 0x001B: uint32, [RECHG], R V, X Q
-	BatFunctionalWhileCharging  bool                     `matter:"0x001C"` // attribute 0x001C: bool, RECHG, R V
-	BatChargingCurrent          *uint32                  `matter:"0x001D"` // attribute 0x001D: uint32, [RECHG], R V, X C
-	ActiveBatChargeFaults       []BatChargeFaultEnum     `matter:"0x001E"` // attribute 0x001E: list[BatChargeFaultEnum], [RECHG], R V
-	EndpointList                []uint16                 `matter:"0x001F"` // attribute 0x001F: list[endpoint-no], M, R V
+	Status                      PowerSourceStatusEnum    // attribute 0x0000: PowerSourceStatusEnum, M, R V
+	Order                       uint8                    // attribute 0x0001: uint8, M, R V, N
+	Description                 string                   // attribute 0x0002: string, M, R V, F
+	WiredAssessedInputVoltage   *uint32                  // attribute 0x0003: uint32, [WIRED], R V, X C
+	WiredAssessedInputFrequency *uint16                  // attribute 0x0004: uint16, [WIRED], R V, X C
+	WiredCurrentType            WiredCurrentTypeEnum     // attribute 0x0005: WiredCurrentTypeEnum, WIRED, R V, F
+	WiredAssessedCurrent        *uint32                  // attribute 0x0006: uint32, [WIRED], R V, X C
+	WiredNominalVoltage         uint32                   // attribute 0x0007: uint32, [WIRED], R V, F
+	WiredMaximumCurrent         uint32                   // attribute 0x0008: uint32, [WIRED], R V, F
+	WiredPresent                bool                     // attribute 0x0009: bool, [WIRED], R V
+	ActiveWiredFaults           []WiredFaultEnum         // attribute 0x000A: list[WiredFaultEnum], [WIRED], R V
+	BatVoltage                  *uint32                  // attribute 0x000B: uint32, [BAT], R V, X C
+	BatPercentRemaining         *uint8                   // attribute 0x000C: uint8, [BAT], R V, X Q
+	BatTimeRemaining            *uint32                  // attribute 0x000D: uint32, [BAT], R V, X Q
+	BatChargeLevel              BatChargeLevelEnum       // attribute 0x000E: BatChargeLevelEnum, BAT, R V
+	BatReplacementNeeded        bool                     // attribute 0x000F: bool, BAT, R V
+	BatReplaceability           BatReplaceabilityEnum    // attribute 0x0010: BatReplaceabilityEnum, BAT, R V, F
+	BatPresent                  bool                     // attribute 0x0011: bool, [BAT], R V
+	ActiveBatFaults             []BatFaultEnum           // attribute 0x0012: list[BatFaultEnum], [BAT], R V
+	BatReplacementDescription   string                   // attribute 0x0013: string, REPLC, R V, F
+	BatCommonDesignation        BatCommonDesignationEnum // attribute 0x0014: BatCommonDesignationEnum, [REPLC], R V, F
+	BatAnsiDesignation          string                   // attribute 0x0015: string, [REPLC], R V, F
+	BatIecDesignation           string                   // attribute 0x0016: string, [REPLC], R V, F
+	BatApprovedChemistry        BatApprovedChemistryEnum // attribute 0x0017: BatApprovedChemistryEnum, [REPLC], R V, F
+	BatCapacity                 uint32                   // attribute 0x0018: uint32, [REPLC | RECHG], R V, F
+	BatQuantity                 uint8                    // attribute 0x0019: uint8, REPLC, R V, F
+	BatChargeState              BatChargeStateEnum       // attribute 0x001A: BatChargeStateEnum, RECHG, R V
+	BatTimeToFullCharge         *uint32                  // attribute 0x001B: uint32, [RECHG], R V, X Q
+	BatFunctionalWhileCharging  bool                     // attribute 0x001C: bool, RECHG, R V
+	BatChargingCurrent          *uint32                  // attribute 0x001D: uint32, [RECHG], R V, X C
+	ActiveBatChargeFaults       []BatChargeFaultEnum     // attribute 0x001E: list[BatChargeFaultEnum], [RECHG], R V
+	EndpointList                []uint16                 // attribute 0x001F: list[endpoint-no], M, R V
 }
 
 // Patch is a change to the PowerSource state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Status                      *PowerSourceStatusEnum    `matter:"0x0000"` // attribute 0x0000
-	Order                       *uint8                    `matter:"0x0001"` // attribute 0x0001
-	Description                 *string                   `matter:"0x0002"` // attribute 0x0002
-	WiredAssessedInputVoltage   *uint32                   `matter:"0x0003"` // attribute 0x0003
-	WiredAssessedInputFrequency *uint16                   `matter:"0x0004"` // attribute 0x0004
-	WiredCurrentType            *WiredCurrentTypeEnum     `matter:"0x0005"` // attribute 0x0005
-	WiredAssessedCurrent        *uint32                   `matter:"0x0006"` // attribute 0x0006
-	WiredNominalVoltage         *uint32                   `matter:"0x0007"` // attribute 0x0007
-	WiredMaximumCurrent         *uint32                   `matter:"0x0008"` // attribute 0x0008
-	WiredPresent                *bool                     `matter:"0x0009"` // attribute 0x0009
-	ActiveWiredFaults           *[]WiredFaultEnum         `matter:"0x000A"` // attribute 0x000A
-	BatVoltage                  *uint32                   `matter:"0x000B"` // attribute 0x000B
-	BatPercentRemaining         *uint8                    `matter:"0x000C"` // attribute 0x000C
-	BatTimeRemaining            *uint32                   `matter:"0x000D"` // attribute 0x000D
-	BatChargeLevel              *BatChargeLevelEnum       `matter:"0x000E"` // attribute 0x000E
-	BatReplacementNeeded        *bool                     `matter:"0x000F"` // attribute 0x000F
-	BatReplaceability           *BatReplaceabilityEnum    `matter:"0x0010"` // attribute 0x0010
-	BatPresent                  *bool                     `matter:"0x0011"` // attribute 0x0011
-	ActiveBatFaults             *[]BatFaultEnum           `matter:"0x0012"` // attribute 0x0012
-	BatReplacementDescription   *string                   `matter:"0x0013"` // attribute 0x0013
-	BatCommonDesignation        *BatCommonDesignationEnum `matter:"0x0014"` // attribute 0x0014
-	BatAnsiDesignation          *string                   `matter:"0x0015"` // attribute 0x0015
-	BatIecDesignation           *string                   `matter:"0x0016"` // attribute 0x0016
-	BatApprovedChemistry        *BatApprovedChemistryEnum `matter:"0x0017"` // attribute 0x0017
-	BatCapacity                 *uint32                   `matter:"0x0018"` // attribute 0x0018
-	BatQuantity                 *uint8                    `matter:"0x0019"` // attribute 0x0019
-	BatChargeState              *BatChargeStateEnum       `matter:"0x001A"` // attribute 0x001A
-	BatTimeToFullCharge         *uint32                   `matter:"0x001B"` // attribute 0x001B
-	BatFunctionalWhileCharging  *bool                     `matter:"0x001C"` // attribute 0x001C
-	BatChargingCurrent          *uint32                   `matter:"0x001D"` // attribute 0x001D
-	ActiveBatChargeFaults       *[]BatChargeFaultEnum     `matter:"0x001E"` // attribute 0x001E
-	EndpointList                *[]uint16                 `matter:"0x001F"` // attribute 0x001F
+	Status                      *PowerSourceStatusEnum    // attribute 0x0000
+	Order                       *uint8                    // attribute 0x0001
+	Description                 *string                   // attribute 0x0002
+	WiredAssessedInputVoltage   *uint32                   // attribute 0x0003
+	WiredAssessedInputFrequency *uint16                   // attribute 0x0004
+	WiredCurrentType            *WiredCurrentTypeEnum     // attribute 0x0005
+	WiredAssessedCurrent        *uint32                   // attribute 0x0006
+	WiredNominalVoltage         *uint32                   // attribute 0x0007
+	WiredMaximumCurrent         *uint32                   // attribute 0x0008
+	WiredPresent                *bool                     // attribute 0x0009
+	ActiveWiredFaults           *[]WiredFaultEnum         // attribute 0x000A
+	BatVoltage                  *uint32                   // attribute 0x000B
+	BatPercentRemaining         *uint8                    // attribute 0x000C
+	BatTimeRemaining            *uint32                   // attribute 0x000D
+	BatChargeLevel              *BatChargeLevelEnum       // attribute 0x000E
+	BatReplacementNeeded        *bool                     // attribute 0x000F
+	BatReplaceability           *BatReplaceabilityEnum    // attribute 0x0010
+	BatPresent                  *bool                     // attribute 0x0011
+	ActiveBatFaults             *[]BatFaultEnum           // attribute 0x0012
+	BatReplacementDescription   *string                   // attribute 0x0013
+	BatCommonDesignation        *BatCommonDesignationEnum // attribute 0x0014
+	BatAnsiDesignation          *string                   // attribute 0x0015
+	BatIecDesignation           *string                   // attribute 0x0016
+	BatApprovedChemistry        *BatApprovedChemistryEnum // attribute 0x0017
+	BatCapacity                 *uint32                   // attribute 0x0018
+	BatQuantity                 *uint8                    // attribute 0x0019
+	BatChargeState              *BatChargeStateEnum       // attribute 0x001A
+	BatTimeToFullCharge         *uint32                   // attribute 0x001B
+	BatFunctionalWhileCharging  *bool                     // attribute 0x001C
+	BatChargingCurrent          *uint32                   // attribute 0x001D
+	ActiveBatChargeFaults       *[]BatChargeFaultEnum     // attribute 0x001E
+	EndpointList                *[]uint16                 // attribute 0x001F
 	Null                        []uint32                  // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrStatus); ok {
+		spec.Assign(&st.Status, v)
+	}
+	if v, ok := read(AttrOrder); ok {
+		spec.Assign(&st.Order, v)
+	}
+	if v, ok := read(AttrDescription); ok {
+		spec.Assign(&st.Description, v)
+	}
+	if v, ok := read(AttrWiredAssessedInputVoltage); ok {
+		spec.Assign(&st.WiredAssessedInputVoltage, v)
+	}
+	if v, ok := read(AttrWiredAssessedInputFrequency); ok {
+		spec.Assign(&st.WiredAssessedInputFrequency, v)
+	}
+	if v, ok := read(AttrWiredCurrentType); ok {
+		spec.Assign(&st.WiredCurrentType, v)
+	}
+	if v, ok := read(AttrWiredAssessedCurrent); ok {
+		spec.Assign(&st.WiredAssessedCurrent, v)
+	}
+	if v, ok := read(AttrWiredNominalVoltage); ok {
+		spec.Assign(&st.WiredNominalVoltage, v)
+	}
+	if v, ok := read(AttrWiredMaximumCurrent); ok {
+		spec.Assign(&st.WiredMaximumCurrent, v)
+	}
+	if v, ok := read(AttrWiredPresent); ok {
+		spec.Assign(&st.WiredPresent, v)
+	}
+	if v, ok := read(AttrActiveWiredFaults); ok {
+		spec.Assign(&st.ActiveWiredFaults, v)
+	}
+	if v, ok := read(AttrBatVoltage); ok {
+		spec.Assign(&st.BatVoltage, v)
+	}
+	if v, ok := read(AttrBatPercentRemaining); ok {
+		spec.Assign(&st.BatPercentRemaining, v)
+	}
+	if v, ok := read(AttrBatTimeRemaining); ok {
+		spec.Assign(&st.BatTimeRemaining, v)
+	}
+	if v, ok := read(AttrBatChargeLevel); ok {
+		spec.Assign(&st.BatChargeLevel, v)
+	}
+	if v, ok := read(AttrBatReplacementNeeded); ok {
+		spec.Assign(&st.BatReplacementNeeded, v)
+	}
+	if v, ok := read(AttrBatReplaceability); ok {
+		spec.Assign(&st.BatReplaceability, v)
+	}
+	if v, ok := read(AttrBatPresent); ok {
+		spec.Assign(&st.BatPresent, v)
+	}
+	if v, ok := read(AttrActiveBatFaults); ok {
+		spec.Assign(&st.ActiveBatFaults, v)
+	}
+	if v, ok := read(AttrBatReplacementDescription); ok {
+		spec.Assign(&st.BatReplacementDescription, v)
+	}
+	if v, ok := read(AttrBatCommonDesignation); ok {
+		spec.Assign(&st.BatCommonDesignation, v)
+	}
+	if v, ok := read(AttrBatAnsiDesignation); ok {
+		spec.Assign(&st.BatAnsiDesignation, v)
+	}
+	if v, ok := read(AttrBatIecDesignation); ok {
+		spec.Assign(&st.BatIecDesignation, v)
+	}
+	if v, ok := read(AttrBatApprovedChemistry); ok {
+		spec.Assign(&st.BatApprovedChemistry, v)
+	}
+	if v, ok := read(AttrBatCapacity); ok {
+		spec.Assign(&st.BatCapacity, v)
+	}
+	if v, ok := read(AttrBatQuantity); ok {
+		spec.Assign(&st.BatQuantity, v)
+	}
+	if v, ok := read(AttrBatChargeState); ok {
+		spec.Assign(&st.BatChargeState, v)
+	}
+	if v, ok := read(AttrBatTimeToFullCharge); ok {
+		spec.Assign(&st.BatTimeToFullCharge, v)
+	}
+	if v, ok := read(AttrBatFunctionalWhileCharging); ok {
+		spec.Assign(&st.BatFunctionalWhileCharging, v)
+	}
+	if v, ok := read(AttrBatChargingCurrent); ok {
+		spec.Assign(&st.BatChargingCurrent, v)
+	}
+	if v, ok := read(AttrActiveBatChargeFaults); ok {
+		spec.Assign(&st.ActiveBatChargeFaults, v)
+	}
+	if v, ok := read(AttrEndpointList); ok {
+		spec.Assign(&st.EndpointList, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -240,9 +343,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -251,7 +356,8 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
@@ -304,7 +410,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

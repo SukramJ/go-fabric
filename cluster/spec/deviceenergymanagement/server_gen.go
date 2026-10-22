@@ -18,29 +18,60 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	EsaType                   ESATypeEnum                  `matter:"0x0000"` // attribute 0x0000: ESATypeEnum, M, R V, F
-	EsaCanGenerate            bool                         `matter:"0x0001"` // attribute 0x0001: bool, M, R V, F
-	EsaState                  ESAStateEnum                 `matter:"0x0002"` // attribute 0x0002: ESAStateEnum, M, R V
-	AbsMinPower               int64                        `matter:"0x0003"` // attribute 0x0003: power-mW, M, R V
-	AbsMaxPower               int64                        `matter:"0x0004"` // attribute 0x0004: power-mW, M, R V
-	PowerAdjustmentCapability *PowerAdjustCapabilityStruct `matter:"0x0005"` // attribute 0x0005: PowerAdjustCapabilityStruct, PA, R V, X Q
-	Forecast                  *ForecastStruct              `matter:"0x0006"` // attribute 0x0006: ForecastStruct, PFR | SFR, R V, X Q
-	OptOutState               OptOutStateEnum              `matter:"0x0007"` // attribute 0x0007: OptOutStateEnum, PA | STA | PAU | FA | CON, R V
+	EsaType                   ESATypeEnum                  // attribute 0x0000: ESATypeEnum, M, R V, F
+	EsaCanGenerate            bool                         // attribute 0x0001: bool, M, R V, F
+	EsaState                  ESAStateEnum                 // attribute 0x0002: ESAStateEnum, M, R V
+	AbsMinPower               int64                        // attribute 0x0003: power-mW, M, R V
+	AbsMaxPower               int64                        // attribute 0x0004: power-mW, M, R V
+	PowerAdjustmentCapability *PowerAdjustCapabilityStruct // attribute 0x0005: PowerAdjustCapabilityStruct, PA, R V, X Q
+	Forecast                  *ForecastStruct              // attribute 0x0006: ForecastStruct, PFR | SFR, R V, X Q
+	OptOutState               OptOutStateEnum              // attribute 0x0007: OptOutStateEnum, PA | STA | PAU | FA | CON, R V
 }
 
 // Patch is a change to the DeviceEnergyManagement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	EsaType                   *ESATypeEnum                 `matter:"0x0000"` // attribute 0x0000
-	EsaCanGenerate            *bool                        `matter:"0x0001"` // attribute 0x0001
-	EsaState                  *ESAStateEnum                `matter:"0x0002"` // attribute 0x0002
-	AbsMinPower               *int64                       `matter:"0x0003"` // attribute 0x0003
-	AbsMaxPower               *int64                       `matter:"0x0004"` // attribute 0x0004
-	PowerAdjustmentCapability *PowerAdjustCapabilityStruct `matter:"0x0005"` // attribute 0x0005
-	Forecast                  *ForecastStruct              `matter:"0x0006"` // attribute 0x0006
-	OptOutState               *OptOutStateEnum             `matter:"0x0007"` // attribute 0x0007
+	EsaType                   *ESATypeEnum                 // attribute 0x0000
+	EsaCanGenerate            *bool                        // attribute 0x0001
+	EsaState                  *ESAStateEnum                // attribute 0x0002
+	AbsMinPower               *int64                       // attribute 0x0003
+	AbsMaxPower               *int64                       // attribute 0x0004
+	PowerAdjustmentCapability *PowerAdjustCapabilityStruct // attribute 0x0005
+	Forecast                  *ForecastStruct              // attribute 0x0006
+	OptOutState               *OptOutStateEnum             // attribute 0x0007
 	Null                      []uint32                     // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrEsaType); ok {
+		spec.Assign(&st.EsaType, v)
+	}
+	if v, ok := read(AttrEsaCanGenerate); ok {
+		spec.Assign(&st.EsaCanGenerate, v)
+	}
+	if v, ok := read(AttrEsaState); ok {
+		spec.Assign(&st.EsaState, v)
+	}
+	if v, ok := read(AttrAbsMinPower); ok {
+		spec.Assign(&st.AbsMinPower, v)
+	}
+	if v, ok := read(AttrAbsMaxPower); ok {
+		spec.Assign(&st.AbsMaxPower, v)
+	}
+	if v, ok := read(AttrPowerAdjustmentCapability); ok {
+		spec.Assign(&st.PowerAdjustmentCapability, v)
+	}
+	if v, ok := read(AttrForecast); ok {
+		spec.Assign(&st.Forecast, v)
+	}
+	if v, ok := read(AttrOptOutState); ok {
+		spec.Assign(&st.OptOutState, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -120,9 +151,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -131,55 +164,64 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandlePowerAdjustRequest registers fn for the PowerAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePowerAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePowerAdjustRequest(fn func(ctx context.Context, req PowerAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPowerAdjustRequest, fn)
 }
 
 // HandleCancelPowerAdjustRequest registers fn for the CancelPowerAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelPowerAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelPowerAdjustRequest(fn func(ctx context.Context, req CancelPowerAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelPowerAdjustRequest, fn)
 }
 
 // HandleStartTimeAdjustRequest registers fn for the StartTimeAdjustRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStartTimeAdjustRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartTimeAdjustRequest(fn func(ctx context.Context, req StartTimeAdjustRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartTimeAdjustRequest, fn)
 }
 
 // HandlePauseRequest registers fn for the PauseRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseRequest(fn func(ctx context.Context, req PauseRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseRequest, fn)
 }
 
 // HandleResumeRequest registers fn for the ResumeRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleResumeRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResumeRequest(fn func(ctx context.Context, req ResumeRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResumeRequest, fn)
 }
 
 // HandleModifyForecastRequest registers fn for the ModifyForecastRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleModifyForecastRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleModifyForecastRequest(fn func(ctx context.Context, req ModifyForecastRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdModifyForecastRequest, fn)
 }
 
 // HandleRequestConstraintBasedForecast registers fn for the RequestConstraintBasedForecast command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRequestConstraintBasedForecast is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRequestConstraintBasedForecast(fn func(ctx context.Context, req RequestConstraintBasedForecastRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRequestConstraintBasedForecast, fn)
 }
 
 // HandleCancelRequest registers fn for the CancelRequest command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelRequest is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelRequest(fn func(ctx context.Context, req CancelRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelRequest, fn)
 }
@@ -286,7 +328,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

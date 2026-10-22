@@ -110,13 +110,11 @@ func TestOnChangedAsyncDrainsAtStop(t *testing.T) {
 	}
 	var mu sync.Mutex
 	var typed, untyped []bool
-	if _, err := light.OnOff().OnChangedAsync(func(s onoffdef.State, _ contract.Change) {
+	light.OnOff().OnChangedAsync(func(s onoffdef.State, _ contract.Change) {
 		mu.Lock()
 		typed = append(typed, s.OnOff)
 		mu.Unlock()
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 	light.OnChangedAsync(onoffdef.ClusterID, func(c contract.Change) {
 		mu.Lock()
 		untyped = append(untyped, c.Origin == contract.OriginHostSet)
@@ -136,8 +134,11 @@ func TestOnChangedAsyncDrainsAtStop(t *testing.T) {
 	if !slices.Equal(typed, []bool{true, false, true}) || !slices.Equal(untyped, []bool{true, true, true}) {
 		t.Errorf("after Stop the queue delivered %v and %v, want every change in order", typed, untyped)
 	}
-	// A server wrapped outside a device has no queue.
-	if _, err := onoffdef.Wrap(light.Server(onoffdef.ClusterID)).OnChangedAsync(func(onoffdef.State, contract.Change) {}); err == nil {
-		t.Error("OnChangedAsync without the device's queue: no error")
+	// A server wrapped outside a device has no queue: it delivers nothing.
+	onoffdef.Wrap(light.Server(onoffdef.ClusterID)).OnChangedAsync(func(onoffdef.State, contract.Change) {
+		t.Error("OnChangedAsync without the device's queue delivered")
+	})
+	if err := light.OnOff().Set(onoffdef.Patch{OnOff: new(true)}); err != nil {
+		t.Fatal(err)
 	}
 }

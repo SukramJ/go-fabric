@@ -497,7 +497,7 @@ func TestContractDeviceTypeNameCoversEverySchemaType(t *testing.T) {
 	}
 	for id, name := range schema.DeviceTypeNames {
 		want := name
-		if o, ok := labelOverrides[id]; ok {
+		if o, ok := labelOverrides[uint32(id)]; ok {
 			want = o
 		}
 		if got := contract.DeviceTypeName(uint16(id)); got != want { //nolint:gosec // generateContractNames refuses an id above uint16

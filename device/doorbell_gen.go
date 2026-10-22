@@ -14,8 +14,8 @@ import (
 
 // Doorbell device type identity: 0x0148, revision 2.
 const (
-	DoorbellID       uint16 = 0x0148
-	DoorbellRevision uint16 = 2
+	DoorbellID       schema.DeviceTypeID = 0x0148
+	DoorbellRevision uint16              = 2
 )
 
 // DoorbellType is the Doorbell device type, matter.js's packages/node/src/devices/doorbell.ts;

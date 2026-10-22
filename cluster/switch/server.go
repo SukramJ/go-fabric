@@ -153,6 +153,10 @@ type Server struct {
 	msm   bool
 	as    bool
 
+	// mu guards the state below it, held through observe: the switch state
+	// lock (held, lockFree, applyPending), the endpoint, the positions and
+	// delays, the timers, the decided results and the outbox. lockFree waits
+	// on it. See Locking above.
 	mu sync.Mutex
 	// held is matter.js's switch state lock taken by another transaction;
 	// lockFree is signalled when it is released.

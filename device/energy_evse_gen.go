@@ -15,8 +15,8 @@ import (
 
 // EnergyEvse device type identity: 0x050C, revision 2.
 const (
-	EnergyEvseID       uint16 = 0x050C
-	EnergyEvseRevision uint16 = 2
+	EnergyEvseID       schema.DeviceTypeID = 0x050C
+	EnergyEvseRevision uint16              = 2
 )
 
 // EnergyEvseType is the EnergyEvse device type, matter.js's packages/node/src/devices/energy-evse.ts;

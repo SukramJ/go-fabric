@@ -271,7 +271,7 @@ func (a *Aggregator) Endpoints() []Endpoint {
 // IncreaseConfigurationVersion raises the ConfigurationVersion of the
 // bridged endpoint with key (and the node's, as the bridge does) and
 // persists both, so the version never decreases across a restart — the
-// daemon's configChange (main.go:299-313).
+// daemon's configChange (main.go:299-313 at b4ea1f96^).
 func (a *Aggregator) IncreaseConfigurationVersion(key device.SourceKey) error {
 	topo := a.n.br.Topology()
 	if topo == nil {
@@ -353,7 +353,7 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 
 // snapshot is the bridge's Snapshotter: the set as one snapshot,
 // model-complete once MarkComplete was called, each endpoint's persisted NodeLabel and ConfigurationVersion
-// restored as the daemon's fleet does (fleet.go:1625-1647). A persisted
+// restored as the daemon's fleet does (fleet.go:1625-1647 at b4ea1f96^). A persisted
 // label replaces the Spec's; the version is the larger of the two.
 func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	a.mu.Lock()

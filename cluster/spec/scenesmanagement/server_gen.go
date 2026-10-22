@@ -22,13 +22,23 @@ import (
 //   - DoNotUse (0x0000): its type is one the generator maps to any.
 //   - FabricSceneInfo (0x0002): fabric-scoped: spec.NewServer refuses to serve it.
 type State struct {
-	SceneTableSize uint16 `matter:"0x0001"` // attribute 0x0001: uint16, M, R V, F
+	SceneTableSize uint16 // attribute 0x0001: uint16, M, R V, F
 }
 
 // Patch is a change to the ScenesManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	SceneTableSize *uint16 `matter:"0x0001"` // attribute 0x0001
+	SceneTableSize *uint16 // attribute 0x0001
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrSceneTableSize); ok {
+		spec.Assign(&st.SceneTableSize, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -84,9 +94,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -95,55 +107,64 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleAddScene registers fn for the AddScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddScene(fn func(ctx context.Context, req AddSceneRequest) (AddSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddScene, fn)
 }
 
 // HandleViewScene registers fn for the ViewScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleViewScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleViewScene(fn func(ctx context.Context, req ViewSceneRequest) (ViewSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdViewScene, fn)
 }
 
 // HandleRemoveScene registers fn for the RemoveScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveScene(fn func(ctx context.Context, req RemoveSceneRequest) (RemoveSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveScene, fn)
 }
 
 // HandleRemoveAllScenes registers fn for the RemoveAllScenes command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAllScenes is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAllScenes(fn func(ctx context.Context, req RemoveAllScenesRequest) (RemoveAllScenesResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveAllScenes, fn)
 }
 
 // HandleStoreScene registers fn for the StoreScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleStoreScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStoreScene(fn func(ctx context.Context, req StoreSceneRequest) (StoreSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStoreScene, fn)
 }
 
 // HandleRecallScene registers fn for the RecallScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRecallScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRecallScene(fn func(ctx context.Context, req RecallSceneRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRecallScene, fn)
 }
 
 // HandleGetSceneMembership registers fn for the GetSceneMembership command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleGetSceneMembership is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetSceneMembership(fn func(ctx context.Context, req GetSceneMembershipRequest) (GetSceneMembershipResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetSceneMembership, fn)
 }
 
 // HandleCopyScene registers fn for the CopyScene command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleCopyScene is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCopyScene(fn func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCopyScene, fn)
 }
@@ -203,7 +224,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -326,7 +326,7 @@ func TestParts(t *testing.T) {
 	}
 
 	s := alarm.Spec()
-	if len(s.Parts) != 1 || s.Parts[0].DeviceType != PowerSourceID || s.Parts[0].Source != ps.Device {
+	if len(s.Parts) != 1 || s.Parts[0].DeviceType != uint16(PowerSourceID) || s.Parts[0].Source != ps.Device {
 		t.Errorf("parts %+v", s.Parts)
 	}
 }
@@ -338,19 +338,25 @@ func TestSpec(t *testing.T) {
 	reach := func() bool { return false }
 	d, err := NewOnOffPlugInUnit(Options{
 		StableKey: endpoint.StringKey("k"), Name: "Plug", Vendor: "ACME", DeviceAddress: "dev-1",
-		ChannelAddress: "dev-1:3", Reachable: reach, Conditions: []string{"Active"}, NodeLabel: "Kitchen",
+		ChannelAddress: "dev-1:3", Reachable: reach, Conditions: []string{"Active"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := d.Spec()
 	if s.StableKey != endpoint.StringKey("k") || s.FriendlyName != "Plug" || s.VendorName != "ACME" ||
-		s.DeviceAddress != "dev-1" || s.ChannelAddress != "dev-1:3" || s.Availability() || s.NodeLabel != "Kitchen" ||
-		!slices.Equal(s.DeviceConditions, []string{"Active"}) || s.DeviceType != OnOffPlugInUnitID {
+		s.DeviceAddress != "dev-1" || s.ChannelAddress != "dev-1:3" || s.Availability() || s.NodeLabel != "" ||
+		!slices.Equal(s.DeviceConditions, []string{"Active"}) || s.DeviceType != uint16(OnOffPlugInUnitID) {
 		t.Errorf("spec %+v", s)
 	}
-	if s.Source != d.Device || d.MatterDeviceType() != OnOffPlugInUnitID {
+	if s.Source != d.Device || d.MatterDeviceType() != uint16(OnOffPlugInUnitID) {
 		t.Error("the device is not the spec's source")
+	}
+	// The NodeLabel is the node's (it persists a Rename and a controller's
+	// write); before the device is added Rename changes the name only.
+	d.Rename(context.Background(), "Kitchen")
+	if s := d.Spec(); s.FriendlyName != "Kitchen" || s.NodeLabel != "" {
+		t.Errorf("after Rename: name %q, label %q", s.FriendlyName, s.NodeLabel)
 	}
 	topo := assemble(t, d.Device)
 	if len(topo.Bridged()) != 1 || len(violationsOf(topo)) != 0 {

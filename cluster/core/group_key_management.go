@@ -742,8 +742,8 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
 	// Mirrors chip src/app/clusters/group-key-mgmt-server/
 	// GroupKeyManagementCluster.cpp: VerifyOrExit(epochKey.size() == 16,
-	// err = CHIP_ERROR_INVALID_ARGUMENT) which the dispatcher maps to
-	// Status::ConstraintError (substring "constraint" triggers that path).
+	// err = CHIP_ERROR_INVALID_ARGUMENT), answered as
+	// Status::ConstraintError: the error below carries that status.
 	const epochKeyLen = 16
 	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
 		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))

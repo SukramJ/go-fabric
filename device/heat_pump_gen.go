@@ -12,8 +12,8 @@ import (
 
 // HeatPump device type identity: 0x0309, revision 1.
 const (
-	HeatPumpID       uint16 = 0x0309
-	HeatPumpRevision uint16 = 1
+	HeatPumpID       schema.DeviceTypeID = 0x0309
+	HeatPumpRevision uint16              = 1
 )
 
 // HeatPumpType is the HeatPump device type, matter.js's packages/node/src/devices/heat-pump.ts;

@@ -18,15 +18,28 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	OutputList    []OutputInfoStruct `matter:"0x0000"` // attribute 0x0000: list[OutputInfoStruct], M, R V
-	CurrentOutput uint8              `matter:"0x0001"` // attribute 0x0001: uint8, M, R V
+	OutputList    []OutputInfoStruct // attribute 0x0000: list[OutputInfoStruct], M, R V
+	CurrentOutput uint8              // attribute 0x0001: uint8, M, R V
 }
 
 // Patch is a change to the AudioOutput state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	OutputList    *[]OutputInfoStruct `matter:"0x0000"` // attribute 0x0000
-	CurrentOutput *uint8              `matter:"0x0001"` // attribute 0x0001
+	OutputList    *[]OutputInfoStruct // attribute 0x0000
+	CurrentOutput *uint8              // attribute 0x0001
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrOutputList); ok {
+		spec.Assign(&st.OutputList, v)
+	}
+	if v, ok := read(AttrCurrentOutput); ok {
+		spec.Assign(&st.CurrentOutput, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -85,9 +98,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -96,19 +111,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSelectOutput registers fn for the SelectOutput command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSelectOutput is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSelectOutput(fn func(ctx context.Context, req SelectOutputRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSelectOutput, fn)
 }
 
 // HandleRenameOutput registers fn for the RenameOutput command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleRenameOutput is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRenameOutput(fn func(ctx context.Context, req RenameOutputRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRenameOutput, fn)
 }
@@ -165,7 +183,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -51,7 +51,7 @@ type trustCert struct {
 // product id (Certificate.ts:345-352, :379-392).
 func parseCert(der []byte, paa bool) (*trustCert, error) {
 	if len(der) > maxDERCertificateSize {
-		return nil, fmt.Errorf("DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
+		return nil, fmt.Errorf("dcl: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
 	}
 	c, err := x509.ParseCertificate(der)
 	if err != nil {

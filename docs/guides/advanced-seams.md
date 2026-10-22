@@ -29,9 +29,11 @@ A host names none of the packages below for these:
 | The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type, name, reachability and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
 | A device's lifecycle | `Device.SetReachable`, `Device.Rename`, `Device.EndpointNumber`; `Aggregator.Add`, `Remove`, `Replace` |
 | Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
-| Field and return types | the aliases `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
 | Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
 | Bindings (seam) | `Node.Bindings()` returns the `*binding.Manager` that resolves the Binding servers' entries into peers; no facade route yet |
+| The controller's stack in a test (seam) | `fabrictest.Controller.Exchanges()` (`*exchange.Manager`), `Names()` (`*discovery.Names`, the DNS-SD cache the site answers), `Peers()` (`*peer.Set`), `Subscriptions()` (`*interaction.Subscriptions`): the `client/…` machinery the site's controller runs on, for a test that drives a layer below `controller/client` |
+| The commissioner's collaborators (seam) | `controller/commissioner.Context` (what a `Commissioner` works with: the exchange manager, the peer set, the attestation trust store, the clock — matter.js ControllerCommissionerContext) and `commissioner.Channel` (the PASE carrier when it is not the UDP socket: a BLE connection's BTP session, `controller/ble.Channel`); a host that commissions through `controller/client` never builds either |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
 An alias is the type of the lower package under a second name, not a new
@@ -65,7 +67,7 @@ semantics, the persistence the facade threads through. A host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
-*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1504-1511` (`AttachACLLister` replaces), `bridge/bridge.go:909`, `:1866`, `:1887`, `:2248`, `bridge/receive.go:566`.*
+*Source: `node/node.go` (`Node.Bridge`), `bridge/bridge.go:1515-1522` (`AttachACLLister` replaces), `bridge/bridge.go:920`, `:1866`, `:1887`, `:2248`, `bridge/receive.go:567`.*
 
 ## `endpoint`
 
@@ -123,7 +125,7 @@ discriminator need), the clock the node hands it and the re-announce loop
 work only if the host's advertiser provides them (`SetClock`,
 `mdns.Reannouncer`). `Node.Stop` closes it either way.
 
-*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go:40-60`, `mdns/zeroconf.go:133-160`.*
+*Source: `node/mdns.go`, `node/node.go` (`New`: `SetClock`), `node/reannounce.go`, `mdns/advertiser.go:40-61`, `mdns/zeroconf.go:137-164`.*
 
 ## `secure/…`
 
@@ -172,7 +174,7 @@ the one manager.
 subscriptions itself ends a controller's view without the controller's
 request.
 
-*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go:533`.*
+*Source: `node/node.go` (`Subscriptions`), `im/subscription/manager.go:534`.*
 
 ## `diagevent`
 

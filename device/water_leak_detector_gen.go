@@ -14,8 +14,8 @@ import (
 
 // WaterLeakDetector device type identity: 0x0043, revision 2.
 const (
-	WaterLeakDetectorID       uint16 = 0x0043
-	WaterLeakDetectorRevision uint16 = 2
+	WaterLeakDetectorID       schema.DeviceTypeID = 0x0043
+	WaterLeakDetectorRevision uint16              = 2
 )
 
 // WaterLeakDetectorType is the WaterLeakDetector device type, matter.js's packages/node/src/devices/water-leak-detector.ts;

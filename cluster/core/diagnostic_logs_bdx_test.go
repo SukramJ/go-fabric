@@ -331,6 +331,11 @@ func TestDiagLogsBDX_Transfer(t *testing.T) {
 	if err := <-c.ended; err != nil {
 		t.Fatalf("EndLogCollection(%v), want nil", err)
 	}
+	// The transfer's goroutine ends the collection before it releases the
+	// transfer slot; MatterQuiesce returns once the slot is free (the
+	// transfer already ended, so its cancel is a no-op). Without the wait a
+	// request between the two is answered Busy and opens no exchange.
+	d.MatterQuiesce()
 	// The next request is no longer Busy.
 	ctx3, after3 := invokeCtx()
 	third := make(chan struct{})

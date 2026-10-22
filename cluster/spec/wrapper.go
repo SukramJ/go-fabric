@@ -26,7 +26,7 @@ type Queue interface {
 }
 
 // NewWrapper returns a wrapper holding srv, without a queue: the
-// asynchronous callbacks of its typed server answer [ErrNoQueue].
+// asynchronous callbacks of its typed server deliver nothing.
 func NewWrapper(srv contract.ClusterServer) Wrapper { return Wrapper{srv: srv} }
 
 // NewWrapperOn returns a wrapper holding srv whose asynchronous callbacks

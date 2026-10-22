@@ -30,6 +30,9 @@ var (
 // from the cluster's global attributes (ClientStructure.ts:754-837). Its
 // methods are safe for concurrent use.
 type Cluster struct {
+	// mu is the owning Node's lock (Node.mu), shared by the structure and
+	// every Endpoint and Cluster of the image; it guards this cluster's
+	// fields.
 	mu    *sync.RWMutex
 	id    uint32
 	name  string

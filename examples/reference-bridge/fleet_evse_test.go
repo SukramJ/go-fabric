@@ -31,7 +31,7 @@ func TestEvseHasItsParts(t *testing.T) {
 		deviceTypeEnergyEvse: "EnergyEvse", deviceTypeDeviceEnergyManagement: "DeviceEnergyManagement",
 		deviceTypeElectricalSensor: "ElectricalSensor", deviceTypePowerSource: "PowerSource",
 	} {
-		if name, _ := schema.DeviceTypeName(uint32(id)); name != want {
+		if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(id)); name != want {
 			t.Errorf("device type 0x%04X is %q in the snapshot, want %q", id, name, want)
 		}
 	}

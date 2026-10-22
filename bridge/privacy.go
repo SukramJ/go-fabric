@@ -152,7 +152,7 @@ func applyOutboundPrivacy(sess *channel.Session, sessionID uint16, datagram []by
 		return nil
 	}
 	if len(datagram) < 4+privacyMICSuffix {
-		return fmt.Errorf("privacy outbound: datagram too short (%d bytes) for MIC tail", len(datagram))
+		return fmt.Errorf("bridge: privacy outbound: datagram too short (%d bytes) for MIC tail", len(datagram))
 	}
 	privacyKey, err := sess.PrivacyKey()
 	if err != nil {

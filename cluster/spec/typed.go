@@ -8,9 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -24,9 +22,10 @@ import (
 // add no semantics: a value still passes the server's own SetAttributes,
 // MatterWrite, MatterInvoke and Emit as it does untyped.
 //
-// A generated State or Patch names the attribute of each field in its
-// `matter` tag (the attribute id, "0x0000"); a Patch states the nullable
-// attributes it sets to null in a []uint32 field named Null.
+// A generated State fills itself from the stored values
+// ([StateReader]) and a generated Patch lists the values it sets
+// ([PatchValuer]), each written per field by the generator: nothing here
+// walks a State or a Patch by reflection.
 
 // The optional interfaces a typed server reaches the server's own methods
 // through. [*Server] implements all four.
@@ -68,38 +67,6 @@ var (
 	ErrNoWriteVeto = errors.New("spec: the server takes no write veto (no SetBeforeWrite)")
 )
 
-// typedField is one attribute field of a generated State or Patch.
-type typedField struct {
-	index int
-	attr  uint32
-}
-
-// typedFields caches the attribute fields of each State and Patch type.
-var typedFields sync.Map // reflect.Type → []typedField
-
-// fieldsOf returns the attribute fields of the struct type t, by its
-// `matter` tags. A malformed tag is a generator defect and panics.
-func fieldsOf(t reflect.Type) []typedField {
-	if v, ok := typedFields.Load(t); ok {
-		fs, _ := v.([]typedField)
-		return fs
-	}
-	var out []typedField
-	for i := range t.NumField() {
-		tag, ok := t.Field(i).Tag.Lookup("matter")
-		if !ok {
-			continue
-		}
-		id, err := strconv.ParseUint(tag, 0, 32)
-		if err != nil {
-			panic(fmt.Sprintf("spec: %s.%s: matter tag %q: %v", t, t.Field(i).Name, tag, err))
-		}
-		out = append(out, typedField{index: i, attr: uint32(id)})
-	}
-	typedFields.Store(t, out)
-	return out
-}
-
 // PatchValuer is a generated Patch: AttributeValues returns the
 // attributes it sets in their stored form, generated per cluster
 // (script/clustergen), so a list of a structure is its [List].
@@ -107,72 +74,74 @@ type PatchValuer interface {
 	AttributeValues() map[uint32]any
 }
 
-// PatchValues returns the attribute values a patch sets, for
-// [Server.SetAttributes]: a generated Patch's own [PatchValuer] form;
-// for another struct (or a pointer to one) with `matter` tags, each
-// non-nil field's value, and nil for every id its Null field lists.
-func PatchValues(patch any) map[uint32]any {
-	if pv, ok := patch.(PatchValuer); ok {
-		return pv.AttributeValues()
-	}
-	rv := reflect.Indirect(reflect.ValueOf(patch))
-	out := map[uint32]any{}
-	if rv.Kind() != reflect.Struct {
-		return out
-	}
-	for _, f := range fieldsOf(rv.Type()) {
-		if fv := rv.Field(f.index); !fv.IsNil() {
-			out[f.attr] = fv.Elem().Interface()
-		}
-	}
-	if null := rv.FieldByName("Null"); null.IsValid() {
-		ids, _ := null.Interface().([]uint32)
-		for _, id := range ids {
-			out[id] = nil
-		}
-	}
-	return out
+// StateReader is a generated State: FromAttributeValues fills each field
+// from the value read answers for its attribute, converted to the field's
+// type ([Assign]), generated per cluster (script/clustergen) as
+// [PatchValuer] is.
+// fabric:reachable:reason="a constraint only: StateOf, OnChangedOf, OnChangedAsyncOf and OnWriteOf take it, and RTA records their instantiations, not the constraint interface"
+type StateReader interface {
+	FromAttributeValues(read func(attrID uint32) (any, bool))
 }
 
-// SetPatch sets the attributes a generated Patch sets ([PatchValues]) on
-// srv, all or nothing as its SetAttributes sets them; [ErrNotSettable] for
-// a server that is no [AttributeSetter].
-func SetPatch(srv contract.ClusterServer, patch any) error {
+// Assign converts the stored value v to T ([Convert]) and stores it in
+// dst; false, with dst untouched, when v does not fit T. A value of type
+// T itself is stored without conversion. A generated
+// State.FromAttributeValues calls it per field.
+// fabric:reachable:reason="generic: every generated server_gen.go calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
+func Assign[T any](dst *T, v any) bool {
+	if t, ok := v.(T); ok {
+		*dst = t
+		return true
+	}
+	c, ok := convert(v, reflect.TypeFor[T]())
+	if !ok {
+		return false
+	}
+	t, ok := c.Interface().(T)
+	if ok {
+		*dst = t
+	}
+	return ok
+}
+
+// SetPatch sets the attributes a generated Patch sets
+// ([PatchValuer.AttributeValues]) on srv, all or nothing as its
+// SetAttributes sets them; [ErrNotSettable] for a server that is no
+// [AttributeSetter].
+func SetPatch(srv contract.ClusterServer, patch PatchValuer) error {
 	setter, ok := srv.(AttributeSetter)
 	if !ok {
 		return fmt.Errorf("%w: %T", ErrNotSettable, srv)
 	}
-	return setter.SetAttributes(PatchValues(patch))
+	return setter.SetAttributes(patch.AttributeValues())
 }
 
 // StateOf returns the generated State S of srv: each field the value srv
-// reads for its attribute (MatterRead), converted to the field's type. An
-// attribute srv does not answer, or answers with a value the field's type
-// cannot hold, leaves the field at its zero value.
+// reads for its attribute (MatterRead), converted to the field's type
+// ([StateReader]). An attribute srv does not answer, or answers with a
+// value the field's type cannot hold, leaves the field at its zero value.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func StateOf[S any](srv contract.ClusterServer) S {
-	return stateOf[S](srv, 0, nil, false)
+func StateOf[S any, P interface {
+	*S
+	StateReader
+}](srv contract.ClusterServer) S {
+	var st S
+	P(&st).FromAttributeValues(srv.MatterRead)
+	return st
 }
 
-// stateOf reads S from srv, with value in place of attrID's when with.
-func stateOf[S any](srv contract.ClusterServer, attrID uint32, value any, with bool) S {
+// stateWith reads S from srv with value in place of attrID's.
+func stateWith[S any, P interface {
+	*S
+	StateReader
+}](srv contract.ClusterServer, attrID uint32, value any) S {
 	var st S
-	rv := reflect.ValueOf(&st).Elem()
-	if rv.Kind() != reflect.Struct {
-		return st
-	}
-	for _, f := range fieldsOf(rv.Type()) {
-		v, ok := value, with && f.attr == attrID
-		if !ok {
-			v, ok = srv.MatterRead(f.attr)
+	P(&st).FromAttributeValues(func(id uint32) (any, bool) {
+		if id == attrID {
+			return value, true
 		}
-		if !ok {
-			continue
-		}
-		if c, ok := convert(v, rv.Field(f.index).Type()); ok {
-			rv.Field(f.index).Set(c)
-		}
-	}
+		return srv.MatterRead(id)
+	})
 	return st
 }
 
@@ -184,11 +153,14 @@ func stateOf[S any](srv contract.ClusterServer, attrID uint32, value any, with b
 // [contract.OriginUnknown] — the switch of device.Device.OnChanged. It returns the unsubscribe function; a server
 // that notifies nothing never calls fn.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func OnChangedOf[S any](srv contract.ClusterServer, fn func(state S, change contract.Change)) (unsubscribe func()) {
+func OnChangedOf[S any, P interface {
+	*S
+	StateReader
+}](srv contract.ClusterServer, fn func(state S, change contract.Change)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}
 	}
-	return ChangesOf(srv, func(c contract.Change) { fn(StateOf[S](srv), c) })
+	return ChangesOf(srv, func(c contract.Change) { fn(StateOf[S, P](srv), c) })
 }
 
 // ChangesOf calls fn with every change srv reports, inline: through its
@@ -209,27 +181,25 @@ func ChangesOf(srv contract.ClusterServer, fn func(contract.Change)) (unsubscrib
 	}
 }
 
-// ErrNoQueue is the refusal of an asynchronous callback on a typed server
-// wrapped without a queue ([NewWrapper]); a device's typed accessors wrap
-// with the device's.
-var ErrNoQueue = errors.New("spec: the typed server has no queue for asynchronous callbacks (wrapped outside a device)")
-
 // OnChangedAsyncOf is [OnChangedOf] with fn queued on w's queue: the state
 // is read and the change taken when the server reports it, and fn runs
-// later, one call after the other, on the queue's goroutine.
-// [ErrNoQueue] for a wrapper without a queue.
+// later, one call after the other, on the queue's goroutine. A wrapper
+// without a queue ([NewWrapper]) delivers nothing — as a device that is
+// not added delivers nothing (by_design
+// BD-Matter-AsyncCallbacks-OnlyWhileAdded). It returns the unsubscribe
+// function.
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func OnChangedAsyncOf[S any](w Wrapper, fn func(state S, change contract.Change)) (unsubscribe func(), err error) {
-	if w.queue == nil {
-		return func() {}, ErrNoQueue
-	}
-	if fn == nil {
-		return func() {}, nil
+func OnChangedAsyncOf[S any, P interface {
+	*S
+	StateReader
+}](w Wrapper, fn func(state S, change contract.Change)) (unsubscribe func()) {
+	if w.queue == nil || fn == nil {
+		return func() {}
 	}
 	q := w.queue
-	return OnChangedOf(w.srv, func(state S, change contract.Change) {
+	return OnChangedOf[S, P](w.srv, func(state S, change contract.Change) {
 		q.Enqueue(func() { fn(state, change) })
-	}), nil
+	})
 }
 
 // OnWriteOf installs a typed write veto on srv ([ServerConfig.BeforeWrite]):
@@ -237,7 +207,10 @@ func OnChangedAsyncOf[S any](w Wrapper, fn func(state S, change contract.Change)
 // attribute's, and the attribute id; nil removes the veto.
 // [ErrNoWriteVeto] for a server that is no [BeforeWriteSetter].
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
-func OnWriteOf[S any](srv contract.ClusterServer, fn func(ctx context.Context, next S, attrID uint32) error) error {
+func OnWriteOf[S any, P interface {
+	*S
+	StateReader
+}](srv contract.ClusterServer, fn func(ctx context.Context, next S, attrID uint32) error) error {
 	setter, ok := srv.(BeforeWriteSetter)
 	if !ok {
 		return fmt.Errorf("%w: %T", ErrNoWriteVeto, srv)
@@ -247,7 +220,7 @@ func OnWriteOf[S any](srv contract.ClusterServer, fn func(ctx context.Context, n
 		return nil
 	}
 	setter.SetBeforeWrite(func(ctx context.Context, attrID uint32, value any) error {
-		return fn(ctx, stateOf[S](srv, attrID, value, true), attrID)
+		return fn(ctx, stateWith[S, P](srv, attrID, value), attrID)
 	})
 	return nil
 }

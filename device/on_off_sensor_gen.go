@@ -13,8 +13,8 @@ import (
 
 // OnOffSensor device type identity: 0x0850, revision 4.
 const (
-	OnOffSensorID       uint16 = 0x0850
-	OnOffSensorRevision uint16 = 4
+	OnOffSensorID       schema.DeviceTypeID = 0x0850
+	OnOffSensorRevision uint16              = 4
 )
 
 // OnOffSensorType is the OnOffSensor device type, matter.js's packages/node/src/devices/on-off-sensor.ts;

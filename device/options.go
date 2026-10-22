@@ -44,9 +44,6 @@ type Options struct {
 	// Conditions are the device-type conditions the host states for the
 	// endpoint ([endpoint.Spec.DeviceConditions]).
 	Conditions []string
-	// NodeLabel is a NodeLabel a controller wrote in an earlier run and
-	// the host persisted ([endpoint.Spec.NodeLabel]).
-	NodeLabel string
 }
 
 // SourceKey is the type of [Options].StableKey ([endpoint.SourceKey]).

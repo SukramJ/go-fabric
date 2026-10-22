@@ -132,7 +132,7 @@ func request[Req any](fields any) (Req, error) {
 			return zero, nil
 		}
 	}
-	return zero, StatusError{Status: im.StatusInvalidCommand, Err: fmt.Errorf("fields %T, want %T", fields, zero)}
+	return zero, StatusError{Status: im.StatusInvalidCommand, Err: fmt.Errorf("media: fields %T, want %T", fields, zero)}
 }
 
 // emptyStruct reports whether t is a struct without fields.
@@ -355,7 +355,12 @@ func (s *stateful[S]) init(srv *spec.Server, st S, values func(S) map[uint32]any
 
 // storeState reads the generated State S from the store ([spec.StateOf]):
 // the read of a server whose state is its cluster's generated State.
-func storeState[S any](srv *spec.Server) S { return spec.StateOf[S](srv) }
+func storeState[S any, P interface {
+	*S
+	spec.StateReader
+}](srv *spec.Server) S {
+	return spec.StateOf[S, P](srv)
+}
 
 // State returns a copy of the committed state.
 func (s *stateful[S]) State() S {

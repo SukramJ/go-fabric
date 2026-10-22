@@ -16,8 +16,8 @@ import (
 
 // DimmableLight device type identity: 0x0101, revision 4.
 const (
-	DimmableLightID       uint16 = 0x0101
-	DimmableLightRevision uint16 = 4
+	DimmableLightID       schema.DeviceTypeID = 0x0101
+	DimmableLightRevision uint16              = 4
 )
 
 // DimmableLightType is the DimmableLight device type, matter.js's packages/node/src/devices/dimmable-light.ts;

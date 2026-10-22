@@ -12,8 +12,8 @@ import (
 
 // ElectricalUtilityMeter device type identity: 0x0511, revision 1.
 const (
-	ElectricalUtilityMeterID       uint16 = 0x0511
-	ElectricalUtilityMeterRevision uint16 = 1
+	ElectricalUtilityMeterID       schema.DeviceTypeID = 0x0511
+	ElectricalUtilityMeterRevision uint16              = 1
 )
 
 // ElectricalUtilityMeterType is the ElectricalUtilityMeter device type, matter.js's packages/node/src/devices/electrical-utility-meter.ts;

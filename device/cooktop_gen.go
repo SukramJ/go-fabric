@@ -13,8 +13,8 @@ import (
 
 // Cooktop device type identity: 0x0078, revision 1.
 const (
-	CooktopID       uint16 = 0x0078
-	CooktopRevision uint16 = 1
+	CooktopID       schema.DeviceTypeID = 0x0078
+	CooktopRevision uint16              = 1
 )
 
 // CooktopType is the Cooktop device type, matter.js's packages/node/src/devices/cooktop.ts;

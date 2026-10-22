@@ -18,31 +18,68 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Mask                              AlarmBitmap `matter:"0x0000"` // attribute 0x0000: AlarmBitmap, M, R V
-	Latch                             AlarmBitmap `matter:"0x0001"` // attribute 0x0001: AlarmBitmap, RESET, R V, F
-	State                             AlarmBitmap `matter:"0x0002"` // attribute 0x0002: AlarmBitmap, M, R V
-	Supported                         AlarmBitmap `matter:"0x0003"` // attribute 0x0003: AlarmBitmap, M, R V, F
-	CriticalOverTemperatureThreshold  int16       `matter:"0x0080"` // attribute 0x0080: temperature, OVER, R V
-	MajorOverTemperatureThreshold     int16       `matter:"0x0081"` // attribute 0x0081: temperature, OVER & MAJOR, R V
-	MinorOverTemperatureThreshold     int16       `matter:"0x0082"` // attribute 0x0082: temperature, OVER & MINOR, R V
-	MinorUnderTemperatureThreshold    int16       `matter:"0x0083"` // attribute 0x0083: temperature, UNDER & MINOR, R V
-	MajorUnderTemperatureThreshold    int16       `matter:"0x0084"` // attribute 0x0084: temperature, UNDER & MAJOR, R V
-	CriticalUnderTemperatureThreshold int16       `matter:"0x0085"` // attribute 0x0085: temperature, UNDER, R V
+	Mask                              AlarmBitmap // attribute 0x0000: AlarmBitmap, M, R V
+	Latch                             AlarmBitmap // attribute 0x0001: AlarmBitmap, RESET, R V, F
+	State                             AlarmBitmap // attribute 0x0002: AlarmBitmap, M, R V
+	Supported                         AlarmBitmap // attribute 0x0003: AlarmBitmap, M, R V, F
+	CriticalOverTemperatureThreshold  int16       // attribute 0x0080: temperature, OVER, R V
+	MajorOverTemperatureThreshold     int16       // attribute 0x0081: temperature, OVER & MAJOR, R V
+	MinorOverTemperatureThreshold     int16       // attribute 0x0082: temperature, OVER & MINOR, R V
+	MinorUnderTemperatureThreshold    int16       // attribute 0x0083: temperature, UNDER & MINOR, R V
+	MajorUnderTemperatureThreshold    int16       // attribute 0x0084: temperature, UNDER & MAJOR, R V
+	CriticalUnderTemperatureThreshold int16       // attribute 0x0085: temperature, UNDER, R V
 }
 
 // Patch is a change to the TemperatureAlarm state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	Mask                              *AlarmBitmap `matter:"0x0000"` // attribute 0x0000
-	Latch                             *AlarmBitmap `matter:"0x0001"` // attribute 0x0001
-	State                             *AlarmBitmap `matter:"0x0002"` // attribute 0x0002
-	Supported                         *AlarmBitmap `matter:"0x0003"` // attribute 0x0003
-	CriticalOverTemperatureThreshold  *int16       `matter:"0x0080"` // attribute 0x0080
-	MajorOverTemperatureThreshold     *int16       `matter:"0x0081"` // attribute 0x0081
-	MinorOverTemperatureThreshold     *int16       `matter:"0x0082"` // attribute 0x0082
-	MinorUnderTemperatureThreshold    *int16       `matter:"0x0083"` // attribute 0x0083
-	MajorUnderTemperatureThreshold    *int16       `matter:"0x0084"` // attribute 0x0084
-	CriticalUnderTemperatureThreshold *int16       `matter:"0x0085"` // attribute 0x0085
+	Mask                              *AlarmBitmap // attribute 0x0000
+	Latch                             *AlarmBitmap // attribute 0x0001
+	State                             *AlarmBitmap // attribute 0x0002
+	Supported                         *AlarmBitmap // attribute 0x0003
+	CriticalOverTemperatureThreshold  *int16       // attribute 0x0080
+	MajorOverTemperatureThreshold     *int16       // attribute 0x0081
+	MinorOverTemperatureThreshold     *int16       // attribute 0x0082
+	MinorUnderTemperatureThreshold    *int16       // attribute 0x0083
+	MajorUnderTemperatureThreshold    *int16       // attribute 0x0084
+	CriticalUnderTemperatureThreshold *int16       // attribute 0x0085
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMask); ok {
+		spec.Assign(&st.Mask, v)
+	}
+	if v, ok := read(AttrLatch); ok {
+		spec.Assign(&st.Latch, v)
+	}
+	if v, ok := read(AttrState); ok {
+		spec.Assign(&st.State, v)
+	}
+	if v, ok := read(AttrSupported); ok {
+		spec.Assign(&st.Supported, v)
+	}
+	if v, ok := read(AttrCriticalOverTemperatureThreshold); ok {
+		spec.Assign(&st.CriticalOverTemperatureThreshold, v)
+	}
+	if v, ok := read(AttrMajorOverTemperatureThreshold); ok {
+		spec.Assign(&st.MajorOverTemperatureThreshold, v)
+	}
+	if v, ok := read(AttrMinorOverTemperatureThreshold); ok {
+		spec.Assign(&st.MinorOverTemperatureThreshold, v)
+	}
+	if v, ok := read(AttrMinorUnderTemperatureThreshold); ok {
+		spec.Assign(&st.MinorUnderTemperatureThreshold, v)
+	}
+	if v, ok := read(AttrMajorUnderTemperatureThreshold); ok {
+		spec.Assign(&st.MajorUnderTemperatureThreshold, v)
+	}
+	if v, ok := read(AttrCriticalUnderTemperatureThreshold); ok {
+		spec.Assign(&st.CriticalUnderTemperatureThreshold, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -125,9 +162,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -136,25 +175,29 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleReset registers fn for the Reset command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleReset is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleReset(fn func(ctx context.Context, req ResetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdReset, fn)
 }
 
 // HandleModifyEnabledAlarms registers fn for the ModifyEnabledAlarms command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleModifyEnabledAlarms is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleModifyEnabledAlarms(fn func(ctx context.Context, req ModifyEnabledAlarmsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdModifyEnabledAlarms, fn)
 }
 
 // HandleSetTemperatureAlarmThresholds registers fn for the SetTemperatureAlarmThresholds command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTemperatureAlarmThresholds is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTemperatureAlarmThresholds(fn func(ctx context.Context, req SetTemperatureAlarmThresholdsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTemperatureAlarmThresholds, fn)
 }
@@ -218,7 +261,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

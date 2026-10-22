@@ -16,8 +16,8 @@ import (
 
 // MountedOnOffControl device type identity: 0x010F, revision 3.
 const (
-	MountedOnOffControlID       uint16 = 0x010F
-	MountedOnOffControlRevision uint16 = 3
+	MountedOnOffControlID       schema.DeviceTypeID = 0x010F
+	MountedOnOffControlRevision uint16              = 3
 )
 
 // MountedOnOffControlType is the MountedOnOffControl device type, matter.js's packages/node/src/devices/mounted-on-off-control.ts;

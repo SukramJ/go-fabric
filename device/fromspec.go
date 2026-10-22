@@ -3,7 +3,11 @@
 
 package device
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/SukramJ/go-fabric/schema"
+)
 
 // Spec is a device as data: its device type by id, its [Options] and its
 // [Declaration]s — what a host whose devices come from a configuration
@@ -14,7 +18,7 @@ import "fmt"
 type Spec struct {
 	// Type is the device type id (DimmableLightID, …): a generated type
 	// ([TypeByID]).
-	Type uint16
+	Type schema.DeviceTypeID
 	// Options are the host's statements about the device.
 	Options Options
 	// Declarations are the device's cluster declarations and the kit's

@@ -64,13 +64,6 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.highlight
   - pymdownx.superfences
-  # The getting-started pages include the quickstart programs from
-  # examples/ by reference (--8<--), so the page shows the code the test
-  # builds. Paths are relative to the repository root; a missing file
-  # fails the build.
-  - pymdownx.snippets:
-      base_path: ["."]
-      check_paths: true
 
 nav:
   - Home: index.md

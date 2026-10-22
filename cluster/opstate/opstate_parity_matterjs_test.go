@@ -228,10 +228,10 @@ func TestParityMatterJS_OperationalStateDeviceTypes(t *testing.T) {
 		{opstate.DeviceTypeRoboticVacuumCleaner, "RoboticVacuumCleaner", opstate.ClusterIDRvcOperationalState},
 	}
 	for _, tc := range cases {
-		if name, _ := schema.DeviceTypeName(uint32(tc.dt)); name != tc.name {
+		if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(tc.dt)); name != tc.name {
 			t.Errorf("device type 0x%04X is %q, want %q", tc.dt, name, tc.name)
 		}
-		if !schema.DeviceTypeRequiresServerCluster(uint32(tc.dt), tc.cluster) {
+		if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(tc.dt), tc.cluster) {
 			t.Errorf("%s does not mandate 0x%04X in the snapshot", tc.name, tc.cluster)
 		}
 		build := opstate.NewServer

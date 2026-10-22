@@ -95,7 +95,7 @@ func TestEnergyMarketWireShapes(t *testing.T) {
 // (notes/briefs/reports/K.md); anything else fails.
 func TestEnergyMarketDevices(t *testing.T) {
 	for id, want := range map[uint16]string{deviceTypeElectricalEnergyTariff: "ElectricalEnergyTariff", deviceTypeElectricalMeter: "ElectricalMeter"} {
-		if name, _ := schema.DeviceTypeName(uint32(id)); name != want {
+		if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(id)); name != want {
 			t.Errorf("device type 0x%04X is %q in the snapshot, want %q", id, name, want)
 		}
 	}

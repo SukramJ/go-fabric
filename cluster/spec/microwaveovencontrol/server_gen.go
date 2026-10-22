@@ -18,29 +18,63 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CookTime          uint32   `matter:"0x0000"` // attribute 0x0000: elapsed-s, M, R V
-	MaxCookTime       uint32   `matter:"0x0001"` // attribute 0x0001: elapsed-s, M, R V, F
-	PowerSetting      uint8    `matter:"0x0002"` // attribute 0x0002: uint8, PWRNUM, R V
-	MinPower          uint8    `matter:"0x0003"` // attribute 0x0003: uint8, PWRLMTS, R V, F
-	MaxPower          uint8    `matter:"0x0004"` // attribute 0x0004: uint8, PWRLMTS, R V, F
-	PowerStep         uint8    `matter:"0x0005"` // attribute 0x0005: uint8, PWRLMTS, R V, F
-	SupportedWatts    []uint16 `matter:"0x0006"` // attribute 0x0006: list[uint16], P, WATTS, R V, F
-	SelectedWattIndex uint8    `matter:"0x0007"` // attribute 0x0007: uint8, P, WATTS, R V
-	WattRating        uint16   `matter:"0x0008"` // attribute 0x0008: uint16, O, R V, F
+	CookTime          uint32   // attribute 0x0000: elapsed-s, M, R V
+	MaxCookTime       uint32   // attribute 0x0001: elapsed-s, M, R V, F
+	PowerSetting      uint8    // attribute 0x0002: uint8, PWRNUM, R V
+	MinPower          uint8    // attribute 0x0003: uint8, PWRLMTS, R V, F
+	MaxPower          uint8    // attribute 0x0004: uint8, PWRLMTS, R V, F
+	PowerStep         uint8    // attribute 0x0005: uint8, PWRLMTS, R V, F
+	SupportedWatts    []uint16 // attribute 0x0006: list[uint16], P, WATTS, R V, F
+	SelectedWattIndex uint8    // attribute 0x0007: uint8, P, WATTS, R V
+	WattRating        uint16   // attribute 0x0008: uint16, O, R V, F
 }
 
 // Patch is a change to the MicrowaveOvenControl state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	CookTime          *uint32   `matter:"0x0000"` // attribute 0x0000
-	MaxCookTime       *uint32   `matter:"0x0001"` // attribute 0x0001
-	PowerSetting      *uint8    `matter:"0x0002"` // attribute 0x0002
-	MinPower          *uint8    `matter:"0x0003"` // attribute 0x0003
-	MaxPower          *uint8    `matter:"0x0004"` // attribute 0x0004
-	PowerStep         *uint8    `matter:"0x0005"` // attribute 0x0005
-	SupportedWatts    *[]uint16 `matter:"0x0006"` // attribute 0x0006
-	SelectedWattIndex *uint8    `matter:"0x0007"` // attribute 0x0007
-	WattRating        *uint16   `matter:"0x0008"` // attribute 0x0008
+	CookTime          *uint32   // attribute 0x0000
+	MaxCookTime       *uint32   // attribute 0x0001
+	PowerSetting      *uint8    // attribute 0x0002
+	MinPower          *uint8    // attribute 0x0003
+	MaxPower          *uint8    // attribute 0x0004
+	PowerStep         *uint8    // attribute 0x0005
+	SupportedWatts    *[]uint16 // attribute 0x0006
+	SelectedWattIndex *uint8    // attribute 0x0007
+	WattRating        *uint16   // attribute 0x0008
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCookTime); ok {
+		spec.Assign(&st.CookTime, v)
+	}
+	if v, ok := read(AttrMaxCookTime); ok {
+		spec.Assign(&st.MaxCookTime, v)
+	}
+	if v, ok := read(AttrPowerSetting); ok {
+		spec.Assign(&st.PowerSetting, v)
+	}
+	if v, ok := read(AttrMinPower); ok {
+		spec.Assign(&st.MinPower, v)
+	}
+	if v, ok := read(AttrMaxPower); ok {
+		spec.Assign(&st.MaxPower, v)
+	}
+	if v, ok := read(AttrPowerStep); ok {
+		spec.Assign(&st.PowerStep, v)
+	}
+	if v, ok := read(AttrSupportedWatts); ok {
+		spec.Assign(&st.SupportedWatts, v)
+	}
+	if v, ok := read(AttrSelectedWattIndex); ok {
+		spec.Assign(&st.SelectedWattIndex, v)
+	}
+	if v, ok := read(AttrWattRating); ok {
+		spec.Assign(&st.WattRating, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -120,9 +154,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -131,19 +167,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 // value in place, attrID the attribute written. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
 // is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none.
+// that takes none. Declare.OnWrite is the veto at construction; this
+// setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
 // HandleSetCookingParameters registers fn for the SetCookingParameters command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleSetCookingParameters is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetCookingParameters(fn func(ctx context.Context, req SetCookingParametersRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetCookingParameters, fn)
 }
 
 // HandleAddMoreTime registers fn for the AddMoreTime command; nil removes the handler;
-// spec.ErrNoHandlers for a server that takes none.
+// spec.ErrNoHandlers for a server that takes none. Declare.HandleAddMoreTime is
+// the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddMoreTime(fn func(ctx context.Context, req AddMoreTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddMoreTime, fn)
 }
@@ -208,7 +247,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

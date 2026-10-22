@@ -352,6 +352,9 @@ type ServerSession struct {
 	init     Init
 	cancel   context.CancelCauseFunc
 
+	// mu guards the transfer's progress and its observers: every field
+	// below it. The observer lists are copied under it and called after it
+	// is released.
 	mu           sync.Mutex
 	transferred  uint64
 	total        *uint64

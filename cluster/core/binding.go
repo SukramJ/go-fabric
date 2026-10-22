@@ -48,6 +48,9 @@ type Binding struct {
 	host   spec.HostHandlers
 	events spec.Events
 	veto   spec.WriteVeto
+	// changes tells the host's listeners (device.Device.OnChanged) and the
+	// bridge's of each change of the list, with its origin.
+	changes cluster.AttributeChanges
 }
 
 // bindingObserver is one [Binding.OnChange] registration; its address
@@ -179,21 +182,32 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 	after := b.bindings
 	b.mu.Unlock()
 	b.writeMu.Unlock()
-	b.notify(before, after)
+	b.notify(contract.OriginHostSet, before, after)
 	return nil
+}
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: fn
+// learns of each committed change of the Binding list — a controller's
+// write from [contract.OriginControllerWrite], the host's SetAttributes
+// and a restore from [contract.OriginHostSet], a removed fabric's entries
+// from [contract.OriginUnknown] — after the [Binding.OnChange] observers,
+// outside the server's locks.
+func (b *Binding) OnAttributeChange(fn func(contract.Change)) (unsubscribe func()) {
+	return b.changes.OnAttributeChange(fn)
 }
 
 // Compile-time assertions: Binding satisfies MatterClusterServer, the
 // attribute-lister and the fabric-scoped-reader capabilities.
 var (
-	_ contract.ClusterServer          = (*Binding)(nil)
-	_ contract.ClusterAttributeLister = (*Binding)(nil)
-	_ contract.FabricScopedReader     = (*Binding)(nil)
-	_ contract.EventReceiver          = (*Binding)(nil)
-	_ spec.AttributeSetter            = (*Binding)(nil)
-	_ spec.CommandRegistrar           = (*Binding)(nil)
-	_ spec.EventEmitting              = (*Binding)(nil)
-	_ spec.BeforeWriteSetter          = (*Binding)(nil)
+	_ contract.ClusterServer           = (*Binding)(nil)
+	_ contract.ClusterAttributeLister  = (*Binding)(nil)
+	_ contract.FabricScopedReader      = (*Binding)(nil)
+	_ contract.EventReceiver           = (*Binding)(nil)
+	_ contract.AttributeChangeNotifier = (*Binding)(nil)
+	_ spec.AttributeSetter             = (*Binding)(nil)
+	_ spec.CommandRegistrar            = (*Binding)(nil)
+	_ spec.EventEmitting               = (*Binding)(nil)
+	_ spec.BeforeWriteSetter           = (*Binding)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -284,7 +298,11 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if err := b.veto.Check(ctx, bindingAttrBinding, slices.Clone(list)); err != nil {
 		return err
 	}
-	return b.replace(func(before []TargetStruct) []TargetStruct {
+	origin := contract.OriginFrom(ctx)
+	if origin == contract.OriginUnknown {
+		origin = contract.OriginControllerWrite // a local writer writes as a controller does
+	}
+	return b.replace(origin, func(before []TargetStruct) []TargetStruct {
 		if !request {
 			return list
 		}
@@ -295,7 +313,7 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 
 // replace commits the list build makes of the current one: saved first,
 // then stored, then told to the [Binding.OnChange] observers.
-func (b *Binding) replace(build func(before []TargetStruct) []TargetStruct) error {
+func (b *Binding) replace(origin contract.Origin, build func(before []TargetStruct) []TargetStruct) error {
 	b.writeMu.Lock()
 	b.mu.RLock()
 	before := b.bindings
@@ -317,7 +335,7 @@ func (b *Binding) replace(build func(before []TargetStruct) []TargetStruct) erro
 	b.bindings = after
 	b.mu.Unlock()
 	b.writeMu.Unlock()
-	b.notify(before, after)
+	b.notify(origin, before, after)
 	return nil
 }
 
@@ -351,7 +369,7 @@ func (b *Binding) SetAttributes(values map[uint32]any) error {
 	if !set {
 		return nil
 	}
-	return b.replace(func([]TargetStruct) []TargetStruct { return list })
+	return b.replace(contract.OriginHostSet, func([]TargetStruct) []TargetStruct { return list })
 }
 
 // Handle implements [spec.CommandRegistrar]. Binding has no command, so
@@ -402,7 +420,7 @@ func (b *Binding) RemoveFabric(fabricIndex uint8) {
 		_ = b.save(slices.Clone(after))
 	}
 	b.writeMu.Unlock()
-	b.notify(before, after)
+	b.notify(contract.OriginUnknown, before, after)
 }
 
 // bindingWriteList converts a written value into the server's entries.
@@ -490,18 +508,20 @@ func (b *Binding) OnChange(fn func(fabricIndex uint8, added, removed []TargetStr
 }
 
 // notify diffs before and after by key per fabric and tells the
-// observers.
-func (b *Binding) notify(before, after []TargetStruct) {
+// observers, then the attribute listeners of a list that changed, from
+// origin.
+func (b *Binding) notify(origin contract.Origin, before, after []TargetStruct) {
 	b.obsMu.Lock()
 	obs := slices.Clone(b.observers)
 	b.obsMu.Unlock()
-	if len(obs) == 0 {
-		return
-	}
-	for _, d := range diffBindings(before, after) {
+	diffs := diffBindings(before, after)
+	for _, d := range diffs {
 		for _, o := range obs {
 			o.fn(d.fabric, d.added, d.removed)
 		}
+	}
+	if len(diffs) > 0 {
+		b.changes.NotifyFrom(origin, bindingAttrBinding)
 	}
 }
 

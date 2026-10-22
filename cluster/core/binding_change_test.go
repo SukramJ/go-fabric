@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -238,4 +239,54 @@ func TestBindingRemoveFabric(t *testing.T) {
 	if got := b.Entries(); len(got) != 1 || got[0].FabricIndex != 2 {
 		t.Fatalf("entries %+v", got)
 	}
+}
+
+// TestBindingOrigins is the origin audit of the Binding server (BY-1 Left
+// out, BY-2 §6): a controller's write of the list reaches the attribute
+// listeners — device.Device.OnChanged and the bridge — from
+// OriginControllerWrite, the host's SetAttributes from OriginHostSet, a
+// removed fabric's entries from OriginUnknown; a write of the same list
+// reports nothing.
+func TestBindingOrigins(t *testing.T) {
+	t.Parallel()
+	b := core.NewBinding()
+	var mu sync.Mutex
+	var got []contract.Change
+	b.OnAttributeChange(func(c contract.Change) {
+		mu.Lock()
+		got = append(got, c)
+		mu.Unlock()
+	})
+	take := func() []contract.Change {
+		mu.Lock()
+		defer mu.Unlock()
+		out := got
+		got = nil
+		return out
+	}
+	e1 := core.TargetStruct{Node: 2, Endpoint: 1, Cluster: 6}
+	ctx := contract.WithOrigin(fabricCtx(1), contract.OriginControllerWrite)
+	if err := b.MatterWrite(ctx, 0, []core.TargetStruct{e1}); err != nil {
+		t.Fatal(err)
+	}
+	want := func(step string, origin contract.Origin) {
+		t.Helper()
+		if c := take(); len(c) != 1 || c[0].Origin != origin || !slices.Equal(c[0].Attributes, []uint32{bindingdef.AttrBinding}) {
+			t.Errorf("%s: changes %+v, want one of Binding from %v", step, c, origin)
+		}
+	}
+	want("controller write", contract.OriginControllerWrite)
+	if err := b.MatterWrite(ctx, 0, []core.TargetStruct{e1}); err != nil {
+		t.Fatal(err)
+	}
+	if c := take(); len(c) != 0 {
+		t.Errorf("the same list again: %+v", c)
+	}
+	e2 := core.TargetStruct{Node: 3, Endpoint: 2, Cluster: 6, FabricIndex: 2}
+	if err := b.SetAttributes(map[uint32]any{bindingdef.AttrBinding: []core.TargetStruct{{Node: 2, Endpoint: 1, Cluster: 6, FabricIndex: 1}, e2}}); err != nil {
+		t.Fatal(err)
+	}
+	want("host set", contract.OriginHostSet)
+	b.RemoveFabric(2)
+	want("fabric removed", contract.OriginUnknown)
 }

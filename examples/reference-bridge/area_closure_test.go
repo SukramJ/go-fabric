@@ -96,7 +96,7 @@ func TestVacuumServesItsAreas(t *testing.T) {
 // ClosureDimension; a SetTarget that unlatches and moves arrives at the
 // target, a tick at a time.
 func TestPanelUnlatchesAndMoves(t *testing.T) {
-	if name, _ := schema.DeviceTypeName(uint32(closure.DeviceTypeClosurePanel)); name != "ClosurePanel" {
+	if name, _ := schema.DeviceTypeName(schema.DeviceTypeID(closure.DeviceTypeClosurePanel)); name != "ClosurePanel" {
 		t.Fatalf("device type 0x0231 is %q", name)
 	}
 	_, br := startFleetBridge(t)

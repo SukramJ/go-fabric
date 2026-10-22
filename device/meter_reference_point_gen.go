@@ -12,8 +12,8 @@ import (
 
 // MeterReferencePoint device type identity: 0x0512, revision 1.
 const (
-	MeterReferencePointID       uint16 = 0x0512
-	MeterReferencePointRevision uint16 = 1
+	MeterReferencePointID       schema.DeviceTypeID = 0x0512
+	MeterReferencePointRevision uint16              = 1
 )
 
 // MeterReferencePointType is the MeterReferencePoint device type, matter.js's packages/node/src/devices/meter-reference-point.ts;

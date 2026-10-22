@@ -75,7 +75,7 @@ func TestParityMatterJS_ServiceAreaSnapshot(t *testing.T) {
 	if c := js.Command(t, "SkipArea"); c.Conformance != "[CurrentArea | Progress]" || c.Response != "SkipAreaResponse" {
 		t.Errorf("SkipArea %+v", c)
 	}
-	if allowed, known := schema.DeviceTypeAllowsServerCluster(uint32(servicearea.DeviceTypeRoboticVacuumCleaner), servicearea.ClusterID); !allowed || !known {
+	if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(servicearea.DeviceTypeRoboticVacuumCleaner), servicearea.ClusterID); !allowed || !known {
 		t.Error("RoboticVacuumCleaner does not offer ServiceArea")
 	}
 }
