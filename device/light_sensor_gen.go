@@ -13,8 +13,8 @@ import (
 
 // LightSensor device type identity: 0x0106, revision 4.
 const (
-	LightSensorID       uint16 = 0x0106
-	LightSensorRevision uint16 = 4
+	LightSensorID       schema.DeviceTypeID = 0x0106
+	LightSensorRevision uint16              = 4
 )
 
 // LightSensorType is the LightSensor device type, matter.js's packages/node/src/devices/light-sensor.ts;

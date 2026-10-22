@@ -97,10 +97,10 @@ func TestParityMatterJS_ApplianceSnapshot(t *testing.T) {
 		{0x0073, appliance.ClusterIDLaundryWasherControls, false}, // LaundryWasher
 		{0x007C, appliance.ClusterIDLaundryDryerControls, false},  // LaundryDryer
 	} {
-		if allowed, known := schema.DeviceTypeAllowsServerCluster(c.dt, c.cluster); !allowed || !known {
+		if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.dt), c.cluster); !allowed || !known {
 			t.Errorf("device type 0x%04X does not offer 0x%04X", c.dt, c.cluster)
 		}
-		if schema.DeviceTypeRequiresServerCluster(c.dt, c.cluster) != c.required {
+		if schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(c.dt), c.cluster) != c.required {
 			t.Errorf("device type 0x%04X requires 0x%04X: want %v", c.dt, c.cluster, c.required)
 		}
 	}

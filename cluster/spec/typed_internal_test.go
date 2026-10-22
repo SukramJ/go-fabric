@@ -98,4 +98,3 @@ func ptrTo[T any](v T) *T { return &v }
 
 // List needs an Encodable entry type.
 func (typedPair) EncodeTLV(*tlv.Encoder, tlv.Tag) {}
-

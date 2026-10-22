@@ -21,7 +21,7 @@ import (
 // not modify it.
 type Type struct {
 	// ID is the device type id (DimmableLight 0x0101).
-	ID uint16
+	ID schema.DeviceTypeID
 	// Name is the device type's name as matter.js states it.
 	Name string
 	// Revision is the device type revision the Descriptor's DeviceTypeList
@@ -144,7 +144,7 @@ func Types() []*Type {
 }
 
 // TypeByID returns the generated device type id, or (nil, false).
-func TypeByID(id uint16) (*Type, bool) {
+func TypeByID(id schema.DeviceTypeID) (*Type, bool) {
 	for _, t := range committedTypes {
 		if t.ID == id {
 			return t, true

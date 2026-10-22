@@ -66,7 +66,7 @@ const (
 // (`.withClientClusters`, `.with`), each once.
 func deviceClients(t *testing.T, dt uint32, with ...uint32) []uint32 {
 	t.Helper()
-	def, ok := schema.DeviceTypeDefinitionOf(dt)
+	def, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(dt))
 	if !ok {
 		t.Fatalf("no device type 0x%04X in the schema", dt)
 	}

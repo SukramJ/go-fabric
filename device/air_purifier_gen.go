@@ -17,8 +17,8 @@ import (
 
 // AirPurifier device type identity: 0x002D, revision 3.
 const (
-	AirPurifierID       uint16 = 0x002D
-	AirPurifierRevision uint16 = 3
+	AirPurifierID       schema.DeviceTypeID = 0x002D
+	AirPurifierRevision uint16              = 3
 )
 
 // AirPurifierType is the AirPurifier device type, matter.js's packages/node/src/devices/air-purifier.ts;

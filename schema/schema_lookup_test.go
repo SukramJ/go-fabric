@@ -88,7 +88,7 @@ func TestDeviceTypeName_KnownDeviceType(t *testing.T) {
 // TestDeviceTypeName_UnknownDeviceType verifies ("", false) for unknown IDs.
 func TestDeviceTypeName_UnknownDeviceType(t *testing.T) {
 	t.Parallel()
-	name, ok := DeviceTypeName(0xFFFF_FFFF)
+	name, ok := DeviceTypeName(0xFFFF)
 	if ok {
 		t.Fatalf("DeviceTypeName(unknown) returned ok=true (name=%q), want false", name)
 	}
@@ -109,7 +109,7 @@ func TestDeviceTypeRevision_KnownDeviceTypes(t *testing.T) {
 	for _, id := range cases {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			rev, ok := DeviceTypeRevision(id)
+			rev, ok := DeviceTypeRevision(DeviceTypeID(id))
 			if !ok {
 				t.Fatalf("DeviceTypeRevision(0x%04X) ok=false", id)
 			}
@@ -123,7 +123,7 @@ func TestDeviceTypeRevision_KnownDeviceTypes(t *testing.T) {
 // TestDeviceTypeRevision_Unknown verifies (0, false) for unknown device type.
 func TestDeviceTypeRevision_Unknown(t *testing.T) {
 	t.Parallel()
-	rev, ok := DeviceTypeRevision(0xFFFF_FFFF)
+	rev, ok := DeviceTypeRevision(0xFFFF)
 	if ok {
 		t.Fatalf("DeviceTypeRevision(unknown) returned ok=true (rev=%d)", rev)
 	}
@@ -158,7 +158,7 @@ func TestDeviceTypeRequiresServerCluster(t *testing.T) {
 		{0xFFFF, 0x0004, false}, // unknown device type
 	}
 	for _, c := range cases {
-		if got := DeviceTypeRequiresServerCluster(c.dt, c.cluster); got != c.want {
+		if got := DeviceTypeRequiresServerCluster(DeviceTypeID(c.dt), c.cluster); got != c.want {
 			t.Errorf("DeviceTypeRequiresServerCluster(0x%04X, 0x%04X) = %v, want %v", c.dt, c.cluster, got, c.want)
 		}
 	}

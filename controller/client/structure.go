@@ -475,11 +475,21 @@ func isApplication(classification string) bool {
 }
 
 // synchronizeDeviceTypes is the DeviceTypeList half of
+// deviceTypeDefinition is the snapshot's definition of a Descriptor
+// entry's 32-bit devtype-id; none for a manufacturer-specific one.
+func deviceTypeDefinition(devtype uint32) (*schema.DeviceTypeDefinition, bool) {
+	id, ok := schema.DeviceTypeIDOf(devtype)
+	if !ok {
+		return nil, false
+	}
+	return schema.DeviceTypeDefinitionOf(id)
+}
+
 // #synchronizeDescriptor (:858-905).
 func (s *structure) synchronizeDeviceTypes(ep *Endpoint, entries []descriptor.DeviceTypeStruct) {
 	s.noteComposition(ep, entries)
 	for _, dt := range entries {
-		def, known := schema.DeviceTypeDefinitionOf(dt.DeviceType)
+		def, known := deviceTypeDefinition(dt.DeviceType)
 		isApp := known && isApplication(def.Classification)
 		// The root of a node whose type is not RootNode takes the revision
 		// only (:876-880).
@@ -512,7 +522,7 @@ func (s *structure) noteComposition(ep *Endpoint, entries []descriptor.DeviceTyp
 	}
 	comp := schema.CompositionTree
 	for _, dt := range entries {
-		if def, ok := schema.DeviceTypeDefinitionOf(dt.DeviceType); ok && def.Composition == schema.CompositionFullFamily {
+		if def, ok := deviceTypeDefinition(dt.DeviceType); ok && def.Composition == schema.CompositionFullFamily {
 			comp = schema.CompositionFullFamily
 		}
 	}

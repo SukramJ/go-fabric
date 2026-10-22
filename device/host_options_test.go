@@ -101,7 +101,7 @@ func TestWithChangeNotifier(t *testing.T) {
 	if fired != 1 {
 		t.Errorf("fired %d times, want 1", fired)
 	}
-	if spec.Source.MatterDeviceType() != OnOffLightID || len(spec.Source.MatterClusterServers()) != 1 {
+	if spec.Source.MatterDeviceType() != uint16(OnOffLightID) || len(spec.Source.MatterClusterServers()) != 1 {
 		t.Errorf("source serves type 0x%04X, %d servers; want the device's", spec.Source.MatterDeviceType(), len(spec.Source.MatterClusterServers()))
 	}
 	if d.Spec().Source != spec.Source {

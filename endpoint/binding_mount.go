@@ -25,7 +25,7 @@ const bindingClusterID uint32 = 0x001E
 // Simple, Dynamic, Client); Base's requirement is evaluated against them,
 // not hand-coded.
 func baseMandatesBinding(deviceType uint16, clients []uint32) bool {
-	dt, ok := schema.DeviceTypeDefinitionOf(uint32(deviceType))
+	dt, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(deviceType))
 	if !ok {
 		return false
 	}

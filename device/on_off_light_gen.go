@@ -16,8 +16,8 @@ import (
 
 // OnOffLight device type identity: 0x0100, revision 4.
 const (
-	OnOffLightID       uint16 = 0x0100
-	OnOffLightRevision uint16 = 4
+	OnOffLightID       schema.DeviceTypeID = 0x0100
+	OnOffLightRevision uint16              = 4
 )
 
 // OnOffLightType is the OnOffLight device type, matter.js's packages/node/src/devices/on-off-light.ts;

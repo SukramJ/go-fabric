@@ -13,8 +13,8 @@ import (
 
 // PressureSensor device type identity: 0x0305, revision 3.
 const (
-	PressureSensorID       uint16 = 0x0305
-	PressureSensorRevision uint16 = 3
+	PressureSensorID       schema.DeviceTypeID = 0x0305
+	PressureSensorRevision uint16              = 3
 )
 
 // PressureSensorType is the PressureSensor device type, matter.js's packages/node/src/devices/pressure-sensor.ts;

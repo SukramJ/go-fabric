@@ -14,8 +14,8 @@ import (
 
 // Closure device type identity: 0x0230, revision 1.
 const (
-	ClosureID       uint16 = 0x0230
-	ClosureRevision uint16 = 1
+	ClosureID       schema.DeviceTypeID = 0x0230
+	ClosureRevision uint16              = 1
 )
 
 // ClosureType is the Closure device type, matter.js's packages/node/src/devices/closure.ts;

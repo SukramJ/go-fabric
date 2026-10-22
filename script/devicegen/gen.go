@@ -402,7 +402,7 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	n := exportName(dt.Name)
 	var w bytes.Buffer
 	fmt.Fprintf(&w, "// %s device type identity: 0x%04X, revision %d.\n", dt.Name, *dt.ID, dt.Revision)
-	fmt.Fprintf(&w, "const (\n\t%sID uint16 = 0x%04X\n\t%sRevision uint16 = %d\n)\n\n", n, *dt.ID, n, dt.Revision)
+	fmt.Fprintf(&w, "const (\n\t%sID schema.DeviceTypeID = 0x%04X\n\t%sRevision uint16 = %d\n)\n\n", n, *dt.ID, n, dt.Revision)
 	fmt.Fprintf(&w, "// %sType is the %s device type, matter.js's %s;\n", n, dt.Name, matterjsPath(dt))
 	fmt.Fprintf(&w, "// its cluster requirements are listed in %s.\n", referenceLink(dt.Name))
 	fmt.Fprintf(&w, "var %sType = %s\n\n", n, typeVar(n))

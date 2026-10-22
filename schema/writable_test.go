@@ -227,7 +227,7 @@ func TestDeviceTypeAllowsServerCluster(t *testing.T) {
 	if allowed, known := DeviceTypeAllowsServerCluster(0x0100, 0x0201); allowed || !known {
 		t.Errorf("OnOffLight / Thermostat: allowed=%v known=%v", allowed, known)
 	}
-	if _, known := DeviceTypeAllowsServerCluster(0xFFFF_FFFF, 0x0006); known {
+	if _, known := DeviceTypeAllowsServerCluster(0xFFFF, 0x0006); known {
 		t.Error("an unknown device type is reported known")
 	}
 }

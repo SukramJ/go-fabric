@@ -14,8 +14,8 @@ import (
 
 // ElectricalSensor device type identity: 0x0510, revision 1.
 const (
-	ElectricalSensorID       uint16 = 0x0510
-	ElectricalSensorRevision uint16 = 1
+	ElectricalSensorID       schema.DeviceTypeID = 0x0510
+	ElectricalSensorRevision uint16              = 1
 )
 
 // ElectricalSensorType is the ElectricalSensor device type, matter.js's packages/node/src/endpoints/electrical-sensor.ts;

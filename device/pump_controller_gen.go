@@ -13,8 +13,8 @@ import (
 
 // PumpController device type identity: 0x0304, revision 5.
 const (
-	PumpControllerID       uint16 = 0x0304
-	PumpControllerRevision uint16 = 5
+	PumpControllerID       schema.DeviceTypeID = 0x0304
+	PumpControllerRevision uint16              = 5
 )
 
 // PumpControllerType is the PumpController device type, matter.js's packages/node/src/devices/pump-controller.ts;

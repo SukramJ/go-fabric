@@ -14,8 +14,8 @@ import (
 
 // WaterValve device type identity: 0x0042, revision 1.
 const (
-	WaterValveID       uint16 = 0x0042
-	WaterValveRevision uint16 = 1
+	WaterValveID       schema.DeviceTypeID = 0x0042
+	WaterValveRevision uint16              = 1
 )
 
 // WaterValveType is the WaterValve device type, matter.js's packages/node/src/devices/water-valve.ts;

@@ -14,8 +14,8 @@ import (
 
 // CookSurface device type identity: 0x0077, revision 2.
 const (
-	CookSurfaceID       uint16 = 0x0077
-	CookSurfaceRevision uint16 = 2
+	CookSurfaceID       schema.DeviceTypeID = 0x0077
+	CookSurfaceRevision uint16              = 2
 )
 
 // CookSurfaceType is the CookSurface device type, matter.js's packages/node/src/devices/cook-surface.ts;

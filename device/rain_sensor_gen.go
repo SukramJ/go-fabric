@@ -14,8 +14,8 @@ import (
 
 // RainSensor device type identity: 0x0044, revision 2.
 const (
-	RainSensorID       uint16 = 0x0044
-	RainSensorRevision uint16 = 2
+	RainSensorID       schema.DeviceTypeID = 0x0044
+	RainSensorRevision uint16              = 2
 )
 
 // RainSensorType is the RainSensor device type, matter.js's packages/node/src/devices/rain-sensor.ts;

@@ -66,7 +66,7 @@ func TestParityMatterJS_DimensionSnapshot(t *testing.T) {
 	if c := cd.Definition.Command(cd.CmdSetTarget, spec.Request).Fields[0].Constraint.Text; c != "max 10000" {
 		t.Errorf("SetTarget Position constraint %q", c)
 	}
-	allowed, known := schema.DeviceTypeAllowsServerCluster(uint32(closure.DeviceTypeClosurePanel), closure.ClusterIDClosureDimension)
+	allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(closure.DeviceTypeClosurePanel), closure.ClusterIDClosureDimension)
 	if !allowed || !known {
 		t.Error("ClosurePanel does not offer ClosureDimension")
 	}

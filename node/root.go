@@ -46,7 +46,7 @@ const (
 // deviceTypeRevision reads a device type's revision from the generated
 // matter.js snapshot (schema.DeviceTypeRevision), so a regeneration
 // propagates without an edit.
-func deviceTypeRevision(id uint32) uint16 {
+func deviceTypeRevision(id schema.DeviceTypeID) uint16 {
 	rev, _ := schema.DeviceTypeRevision(id) // both system types are in every snapshot
 	return rev
 }
@@ -200,7 +200,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() })
 	generalCom.SetOnFailSafeExpired(opCreds.OnFailSafeExpiry)
 
-	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(deviceTypeRootNode)}}
+	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeRootNode))}}
 	if cfg.OTA != nil {
 		r.OTARequestor, r.otaApplier, err = buildOtaRequestor(cfg, d.connector, basicInfo)
 		if err != nil {
@@ -442,7 +442,7 @@ func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixed
 // node's clock.
 func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
-		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(deviceTypeAggregator)}},
+		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeAggregator))}},
 		nil, nil, nil,
 	)
 	if err != nil {

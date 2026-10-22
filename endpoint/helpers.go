@@ -34,7 +34,7 @@ func listedDeviceTypes(ep *Endpoint) []uint16 {
 // effectiveComposition is EndpointComposition.FullFamily).
 func composesFullFamily(ep *Endpoint) bool {
 	for _, id := range listedDeviceTypes(ep) {
-		if dt, ok := schema.DeviceTypeDefinitionOf(uint32(id)); ok && dt.Composition == schema.CompositionFullFamily {
+		if dt, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(id)); ok && dt.Composition == schema.CompositionFullFamily {
 			return true
 		}
 	}
@@ -80,7 +80,7 @@ func deviceTypeRevision(deviceType uint16) uint16 {
 	}
 	// General case: codegen'd from matter.js HEAD schema snapshot.
 	// Mirrors matter.js packages/node/src/devices/<name>.ts revision fields.
-	if rev, ok := schema.DeviceTypeRevision(uint32(deviceType)); ok {
+	if rev, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(deviceType)); ok {
 		return rev
 	}
 	return 1

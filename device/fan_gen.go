@@ -15,8 +15,8 @@ import (
 
 // Fan device type identity: 0x002B, revision 5.
 const (
-	FanID       uint16 = 0x002B
-	FanRevision uint16 = 5
+	FanID       schema.DeviceTypeID = 0x002B
+	FanRevision uint16              = 5
 )
 
 // FanType is the Fan device type, matter.js's packages/node/src/devices/fan.ts;

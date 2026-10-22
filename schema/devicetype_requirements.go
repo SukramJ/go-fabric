@@ -182,7 +182,7 @@ type DeviceTypeDefinition struct {
 //
 // Mirrors matter.js ModelLookups.deviceTypeOf (packages/model/src/logic/
 // device-types/ModelLookups.ts).
-func DeviceTypeDefinitionOf(id uint32) (*DeviceTypeDefinition, bool) {
+func DeviceTypeDefinitionOf(id DeviceTypeID) (*DeviceTypeDefinition, bool) {
 	dt, ok := deviceTypeDefinitions[id]
 	return dt, ok
 }
@@ -199,7 +199,7 @@ func BaseDeviceTypes() []*DeviceTypeDefinition {
 
 // DeviceTypeConditions returns the conditions a device type declares
 // itself, in declaration order, or nil for an unknown device type.
-func DeviceTypeConditions(id uint32) []string {
+func DeviceTypeConditions(id DeviceTypeID) []string {
 	dt, ok := deviceTypeDefinitions[id]
 	if !ok {
 		return nil
@@ -215,7 +215,7 @@ func DeviceTypeConditions(id uint32) []string {
 // Mirrors matter.js RequirementResolver.conditionsOf, without its qualified
 // ("Declarer.Condition") keys (packages/model/src/logic/
 // RequirementResolver.ts).
-func DeviceTypeConditionScope(id uint32) []string {
+func DeviceTypeConditionScope(id DeviceTypeID) []string {
 	dt, ok := deviceTypeDefinitions[id]
 	if !ok {
 		return nil
@@ -283,7 +283,7 @@ func deviceTypeNamed(name string) *DeviceTypeDefinition {
 // clusterID on one side (RequirementServerCluster or
 // RequirementClientCluster), with its nested element requirements, or
 // (zero, false) when the device type states none.
-func DeviceTypeClusterRequirement(deviceType, clusterID uint32, side RequirementElement) (DeviceTypeRequirement, bool) {
+func DeviceTypeClusterRequirement(deviceType DeviceTypeID, clusterID uint32, side RequirementElement) (DeviceTypeRequirement, bool) {
 	dt, ok := deviceTypeDefinitions[deviceType]
 	if !ok {
 		return DeviceTypeRequirement{}, false
@@ -301,7 +301,7 @@ func DeviceTypeClusterRequirement(deviceType, clusterID uint32, side Requirement
 // in declaration order — what an endpoint of the type must (or must not)
 // offer on that cluster beyond the cluster's own conformance. Nil when the
 // device type states none.
-func DeviceTypeElementRequirements(deviceType, clusterID uint32) []DeviceTypeRequirement {
+func DeviceTypeElementRequirements(deviceType DeviceTypeID, clusterID uint32) []DeviceTypeRequirement {
 	r, ok := DeviceTypeClusterRequirement(deviceType, clusterID, RequirementServerCluster)
 	if !ok {
 		return nil

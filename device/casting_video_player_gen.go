@@ -25,8 +25,8 @@ import (
 
 // CastingVideoPlayer device type identity: 0x0023, revision 2.
 const (
-	CastingVideoPlayerID       uint16 = 0x0023
-	CastingVideoPlayerRevision uint16 = 2
+	CastingVideoPlayerID       schema.DeviceTypeID = 0x0023
+	CastingVideoPlayerRevision uint16              = 2
 )
 
 // CastingVideoPlayerType is the CastingVideoPlayer device type, matter.js's packages/node/src/devices/casting-video-player.ts;

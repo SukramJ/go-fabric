@@ -51,7 +51,7 @@ func standardDTModel() *dtModel {
 	}
 	for id := range schema.DeviceTypeRevisions {
 		if dt, ok := schema.DeviceTypeDefinitionOf(id); ok {
-			m.deviceTypes[id] = dt
+			m.deviceTypes[uint32(id)] = dt
 		}
 	}
 	return m

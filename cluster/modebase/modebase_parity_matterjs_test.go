@@ -197,7 +197,7 @@ func TestParityMatterJS_ModeBaseDeviceTypes(t *testing.T) {
 		{dryer, modebase.ClusterIDLaundryWasherMode},
 		{dishwasher, modebase.ClusterIDDishwasherMode},
 	} {
-		if ok, _ := schema.DeviceTypeAllowsServerCluster(c.dt, c.cluster); !ok {
+		if ok, _ := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.dt), c.cluster); !ok {
 			t.Errorf("device type 0x%04X does not allow 0x%04X", c.dt, c.cluster)
 		}
 	}

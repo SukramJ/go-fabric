@@ -104,7 +104,7 @@ func TestParityMatterJS_EnergySnapshot(t *testing.T) {
 		{0x050F, energy.ClusterIDWaterHeaterManagement}, // WaterHeater
 		{0x0301, energy.ClusterIDEnergyPreference},      // Thermostat
 	} {
-		if allowed, known := schema.DeviceTypeAllowsServerCluster(c.deviceType, c.cluster); !allowed || !known {
+		if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.deviceType), c.cluster); !allowed || !known {
 			t.Errorf("device type 0x%04X does not offer 0x%04X", c.deviceType, c.cluster)
 		}
 	}

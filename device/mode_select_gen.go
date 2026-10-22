@@ -12,8 +12,8 @@ import (
 
 // ModeSelect device type identity: 0x0027, revision 1.
 const (
-	ModeSelectID       uint16 = 0x0027
-	ModeSelectRevision uint16 = 1
+	ModeSelectID       schema.DeviceTypeID = 0x0027
+	ModeSelectRevision uint16              = 1
 )
 
 // ModeSelectType is the ModeSelect device type, matter.js's packages/node/src/devices/mode-select.ts;

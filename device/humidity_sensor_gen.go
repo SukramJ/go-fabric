@@ -13,8 +13,8 @@ import (
 
 // HumiditySensor device type identity: 0x0307, revision 3.
 const (
-	HumiditySensorID       uint16 = 0x0307
-	HumiditySensorRevision uint16 = 3
+	HumiditySensorID       schema.DeviceTypeID = 0x0307
+	HumiditySensorRevision uint16              = 3
 )
 
 // HumiditySensorType is the HumiditySensor device type, matter.js's packages/node/src/devices/humidity-sensor.ts;

@@ -14,8 +14,8 @@ import (
 
 // TemperatureSensor device type identity: 0x0302, revision 3.
 const (
-	TemperatureSensorID       uint16 = 0x0302
-	TemperatureSensorRevision uint16 = 3
+	TemperatureSensorID       schema.DeviceTypeID = 0x0302
+	TemperatureSensorRevision uint16              = 3
 )
 
 // TemperatureSensorType is the TemperatureSensor device type, matter.js's packages/node/src/devices/temperature-sensor.ts;

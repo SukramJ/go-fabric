@@ -14,8 +14,8 @@ import (
 
 // OccupancySensor device type identity: 0x0107, revision 4.
 const (
-	OccupancySensorID       uint16 = 0x0107
-	OccupancySensorRevision uint16 = 4
+	OccupancySensorID       schema.DeviceTypeID = 0x0107
+	OccupancySensorRevision uint16              = 4
 )
 
 // OccupancySensorType is the OccupancySensor device type, matter.js's packages/node/src/devices/occupancy-sensor.ts;

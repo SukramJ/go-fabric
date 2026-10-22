@@ -13,8 +13,8 @@ import (
 
 // ClosurePanel device type identity: 0x0231, revision 1.
 const (
-	ClosurePanelID       uint16 = 0x0231
-	ClosurePanelRevision uint16 = 1
+	ClosurePanelID       schema.DeviceTypeID = 0x0231
+	ClosurePanelRevision uint16              = 1
 )
 
 // ClosurePanelType is the ClosurePanel device type, matter.js's packages/node/src/devices/closure-panel.ts;

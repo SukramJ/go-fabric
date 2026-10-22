@@ -13,8 +13,8 @@ import (
 
 // FlowSensor device type identity: 0x0306, revision 3.
 const (
-	FlowSensorID       uint16 = 0x0306
-	FlowSensorRevision uint16 = 3
+	FlowSensorID       schema.DeviceTypeID = 0x0306
+	FlowSensorRevision uint16              = 3
 )
 
 // FlowSensorType is the FlowSensor device type, matter.js's packages/node/src/devices/flow-sensor.ts;

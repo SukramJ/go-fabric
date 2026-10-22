@@ -12,8 +12,8 @@ import (
 
 // VideoRemoteControl device type identity: 0x002A, revision 2.
 const (
-	VideoRemoteControlID       uint16 = 0x002A
-	VideoRemoteControlRevision uint16 = 2
+	VideoRemoteControlID       schema.DeviceTypeID = 0x002A
+	VideoRemoteControlRevision uint16              = 2
 )
 
 // VideoRemoteControlType is the VideoRemoteControl device type, matter.js's packages/node/src/devices/video-remote-control.ts;

@@ -15,8 +15,8 @@ import (
 
 // WaterHeater device type identity: 0x050F, revision 1.
 const (
-	WaterHeaterID       uint16 = 0x050F
-	WaterHeaterRevision uint16 = 1
+	WaterHeaterID       schema.DeviceTypeID = 0x050F
+	WaterHeaterRevision uint16              = 1
 )
 
 // WaterHeaterType is the WaterHeater device type, matter.js's packages/node/src/devices/water-heater.ts;

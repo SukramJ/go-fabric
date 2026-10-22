@@ -73,7 +73,7 @@ func TestGeneratedDeviceTypeDefinitionsMatchSnapshot(t *testing.T) {
 	t.Parallel()
 	dts, bases := loadGolden(t)
 	for _, want := range dts {
-		got, ok := schema.DeviceTypeDefinitionOf(want.ID)
+		got, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(want.ID))
 		if !ok {
 			t.Errorf("%s (0x%04X): no generated definition", want.Name, want.ID)
 			continue
@@ -283,7 +283,7 @@ func TestDeviceTypeElementRequirements(t *testing.T) {
 	}
 	// A command-field requirement is not an element requirement.
 	for id, dt := range map[uint32]string{0x0016: "RootNode"} {
-		for _, r := range schema.DeviceTypeElementRequirements(id, 0x0038) {
+		for _, r := range schema.DeviceTypeElementRequirements(schema.DeviceTypeID(id), 0x0038) {
 			if r.Element == schema.RequirementCommandField {
 				t.Errorf("%s: command field listed", dt)
 			}

@@ -13,8 +13,8 @@ import (
 
 // DeviceEnergyManagement device type identity: 0x050D, revision 3.
 const (
-	DeviceEnergyManagementID       uint16 = 0x050D
-	DeviceEnergyManagementRevision uint16 = 3
+	DeviceEnergyManagementID       schema.DeviceTypeID = 0x050D
+	DeviceEnergyManagementRevision uint16              = 3
 )
 
 // DeviceEnergyManagementType is the DeviceEnergyManagement device type, matter.js's packages/node/src/endpoints/device-energy-management.ts;

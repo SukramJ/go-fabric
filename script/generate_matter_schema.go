@@ -320,11 +320,19 @@ func writeDeviceTypesFile(dts []snapshotDeviceType) error {
 	var buf bytes.Buffer
 	buf.WriteString(fileHeaderTpl)
 
+	// DeviceTypeID
+	buf.WriteString("// DeviceTypeID is a Matter device type id (DimmableLight 0x0101): the\n")
+	buf.WriteString("// key of the device-type tables below and the type of the generated\n")
+	buf.WriteString("// device-type constants (device.DimmableLightID, ...). The\n")
+	buf.WriteString("// Descriptor's DeviceTypeList carries it as a 32-bit devtype-id whose\n")
+	buf.WriteString("// upper half is zero for every standard device type.\n")
+	buf.WriteString("type DeviceTypeID uint16\n\n")
+
 	// DeviceTypeRevisions
 	buf.WriteString("// DeviceTypeRevisions maps every device-type ID present in the matter.js\n")
 	buf.WriteString("// HEAD schema snapshot to its revision number. Generated from\n")
 	buf.WriteString("// parity/schema.json.\n")
-	buf.WriteString("var DeviceTypeRevisions = map[uint32]uint16{\n")
+	buf.WriteString("var DeviceTypeRevisions = map[DeviceTypeID]uint16{\n")
 	for _, dt := range dts {
 		fmt.Fprintf(&buf, "\t0x%04X: %d, // %s\n", dt.ID, dt.Revision, dt.Name)
 	}
@@ -332,7 +340,7 @@ func writeDeviceTypesFile(dts []snapshotDeviceType) error {
 
 	// DeviceTypeNames
 	buf.WriteString("// DeviceTypeNames maps every device-type ID to its canonical matter.js name.\n")
-	buf.WriteString("var DeviceTypeNames = map[uint32]string{\n")
+	buf.WriteString("var DeviceTypeNames = map[DeviceTypeID]string{\n")
 	for _, dt := range dts {
 		fmt.Fprintf(&buf, "\t0x%04X: %q,\n", dt.ID, dt.Name)
 	}
@@ -350,7 +358,7 @@ func writeDeviceTypesFile(dts []snapshotDeviceType) error {
 	buf.WriteString("// from another endpoint, not that it may serve it.\n")
 	buf.WriteString("//\n")
 	buf.WriteString("// Generated from parity/schema.json.\n")
-	buf.WriteString("var DeviceTypeServerClusters = map[uint32][]uint32{\n")
+	buf.WriteString("var DeviceTypeServerClusters = map[DeviceTypeID][]uint32{\n")
 	for _, dt := range dts {
 		ids := serverClusterIDs(dt)
 		if len(ids) == 0 {
@@ -373,7 +381,7 @@ func writeDeviceTypesFile(dts []snapshotDeviceType) error {
 	buf.WriteString("// applies is the projection's decision, not the schema's.\n")
 	buf.WriteString("//\n")
 	buf.WriteString("// Generated from parity/schema.json.\n")
-	buf.WriteString("var DeviceTypeMandatoryServerClusters = map[uint32][]uint32{\n")
+	buf.WriteString("var DeviceTypeMandatoryServerClusters = map[DeviceTypeID][]uint32{\n")
 	for _, dt := range dts {
 		var ids []snapshotRequirement
 		for _, r := range serverClusterIDs(dt) {
@@ -604,7 +612,7 @@ func writeRequirementsFile(snap snapshot) error {
 	buf.WriteString("// declaration order, the conditions it declares, its composition and the\n")
 	buf.WriteString("// device type it derives from. Generated from the device types'\n")
 	buf.WriteString("// \"effective\" layer in parity/schema.json.\n")
-	buf.WriteString("var deviceTypeDefinitions = map[uint32]*DeviceTypeDefinition{\n")
+	buf.WriteString("var deviceTypeDefinitions = map[DeviceTypeID]*DeviceTypeDefinition{\n")
 	for _, dt := range snap.DeviceTypes {
 		if dt.Effective == nil {
 			return fmt.Errorf("device type %s has no effective layer; re-extract the snapshot", dt.Name)

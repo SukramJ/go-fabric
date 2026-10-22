@@ -23,6 +23,17 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
+// Advertiser is the type of [Config].Advertiser: what publishes the node
+// over DNS-SD ([mdns.Advertiser]). An owned name for the seam; the two
+// names are one type, so a value of either is the other.
+type Advertiser = mdns.Advertiser
+
+// Groups is the type of [Config].Groups and of what [Node.Groups]
+// returns: the group state one node shares between its Groups,
+// GroupKeyManagement and Groupcast servers and its group messaging
+// ([groups.Manager]). An owned name for the seam, as [Advertiser] is.
+type Groups = groups.Manager
+
 // Config is the node's configuration, code-first (ADR 0018 decision 5).
 // Its groups are the behaviour ids matter.js's ServerNode.Configuration
 // keys its options by — `network`, `commissioning`, `productDescription`,
@@ -49,7 +60,7 @@ type Config struct {
 	// mdns.Zeroconf with the subtype responder, configured by
 	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
 	// closes it, the host's as the node's.
-	Advertiser mdns.Advertiser
+	Advertiser Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
 	// warn mode.
@@ -92,7 +103,7 @@ type Config struct {
 	// [Node.Groups] returns for a host that binds its assembler after New.
 	// An advanced seam (docs/guides/advanced-seams.md): a host with the
 	// facade's own assembler leaves it nil.
-	Groups *groups.Manager
+	Groups *Groups
 	// Topology, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
 	// own device model, one endpoint.Snapshot per scope, its own label and

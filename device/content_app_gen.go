@@ -19,8 +19,8 @@ import (
 
 // ContentApp device type identity: 0x0024, revision 2.
 const (
-	ContentAppID       uint16 = 0x0024
-	ContentAppRevision uint16 = 2
+	ContentAppID       schema.DeviceTypeID = 0x0024
+	ContentAppRevision uint16              = 2
 )
 
 // ContentAppType is the ContentApp device type, matter.js's packages/node/src/devices/content-app.ts;

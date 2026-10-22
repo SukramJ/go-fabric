@@ -14,8 +14,8 @@ import (
 
 // Aggregator device type identity: 0x000E, revision 2.
 const (
-	AggregatorID       uint16 = 0x000E
-	AggregatorRevision uint16 = 2
+	AggregatorID       schema.DeviceTypeID = 0x000E
+	AggregatorRevision uint16              = 2
 )
 
 // AggregatorType is the Aggregator device type, matter.js's packages/node/src/endpoints/aggregator.ts;

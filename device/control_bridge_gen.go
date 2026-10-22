@@ -13,8 +13,8 @@ import (
 
 // ControlBridge device type identity: 0x0840, revision 4.
 const (
-	ControlBridgeID       uint16 = 0x0840
-	ControlBridgeRevision uint16 = 4
+	ControlBridgeID       schema.DeviceTypeID = 0x0840
+	ControlBridgeRevision uint16              = 4
 )
 
 // ControlBridgeType is the ControlBridge device type, matter.js's packages/node/src/devices/control-bridge.ts;

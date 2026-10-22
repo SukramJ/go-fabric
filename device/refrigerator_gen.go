@@ -15,8 +15,8 @@ import (
 
 // Refrigerator device type identity: 0x0070, revision 3.
 const (
-	RefrigeratorID       uint16 = 0x0070
-	RefrigeratorRevision uint16 = 3
+	RefrigeratorID       schema.DeviceTypeID = 0x0070
+	RefrigeratorRevision uint16              = 3
 )
 
 // RefrigeratorType is the Refrigerator device type, matter.js's packages/node/src/devices/refrigerator.ts;

@@ -14,8 +14,8 @@ import (
 
 // WindowCovering device type identity: 0x0202, revision 7.
 const (
-	WindowCoveringID       uint16 = 0x0202
-	WindowCoveringRevision uint16 = 7
+	WindowCoveringID       schema.DeviceTypeID = 0x0202
+	WindowCoveringRevision uint16              = 7
 )
 
 // WindowCoveringType is the WindowCovering device type, matter.js's packages/node/src/devices/window-covering.ts;

@@ -58,7 +58,7 @@ type Device struct {
 	queue     *queue
 	reachable atomic.Bool
 
-	// mu guards parts, host and opts.Name / opts.NodeLabel (Rename).
+	// mu guards parts, host and opts.Name (Rename).
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
@@ -347,7 +347,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	if factory, held := selfHeldDefaults[r.ID]; held {
 		srv, err := factory(defaultBuild{
-			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: t.ID, key: s.key,
+			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
 		})
 		if err == nil {
@@ -455,7 +455,7 @@ func (d *Device) Server(clusterID uint32) contract.ClusterServer {
 func (d *Device) Servers() []contract.ClusterServer { return slices.Clone(d.servers) }
 
 // MatterDeviceType implements [contract.EndpointSource].
-func (d *Device) MatterDeviceType() uint16 { return d.typ.ID }
+func (d *Device) MatterDeviceType() uint16 { return uint16(d.typ.ID) }
 
 // MatterClusterServers implements [contract.EndpointSource]: the device's
 // servers, without the ones the assembler mounts.
@@ -523,7 +523,7 @@ func composes(owner, part *Type) bool {
 	seen := map[string]bool{}
 	for t := owner; t != nil && !seen[t.Name]; t = typeByName(t.Base) {
 		seen[t.Name] = true
-		dt, ok := schema.DeviceTypeDefinitionOf(uint32(t.ID))
+		dt, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(t.ID))
 		if !ok {
 			continue
 		}
@@ -552,18 +552,17 @@ func (d *Device) Parts() []*Device {
 // [endpoint.Spec.Parts].
 func (d *Device) Spec() endpoint.Spec {
 	d.mu.Lock()
-	name, label := d.opts.Name, d.opts.NodeLabel
+	name := d.opts.Name
 	d.mu.Unlock()
 	s := endpoint.Spec{
 		StableKey:        d.opts.StableKey,
 		DeviceAddress:    d.opts.DeviceAddress,
-		DeviceType:       d.typ.ID,
+		DeviceType:       uint16(d.typ.ID),
 		VendorName:       d.opts.Vendor,
 		FriendlyName:     name,
 		ChannelAddress:   d.opts.ChannelAddress,
 		Availability:     d.available,
 		Source:           d.source,
-		NodeLabel:        label,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),
 		OptIn:            slices.Clone(d.optIn),

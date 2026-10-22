@@ -137,7 +137,6 @@ func (d *Device) available() bool {
 func (d *Device) Rename(ctx context.Context, name string) {
 	d.mu.Lock()
 	d.opts.Name = name
-	d.opts.NodeLabel = ""
 	h := d.host
 	d.mu.Unlock()
 	if h != nil {

@@ -895,7 +895,7 @@ func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 // binds it into its assembler (endpoint.Config.Groups), so the endpoints'
 // Groups servers, the bridge's group-message routing and the root's
 // GroupKeyManagement share one state.
-func (n *Node) Groups() *groups.Manager { return n.groups }
+func (n *Node) Groups() *Groups { return n.groups }
 
 // PairingCodes returns the QR code payload and the manual pairing code of
 // the configured passcode and discriminator — matter.js

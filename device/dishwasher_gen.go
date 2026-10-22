@@ -17,8 +17,8 @@ import (
 
 // Dishwasher device type identity: 0x0075, revision 2.
 const (
-	DishwasherID       uint16 = 0x0075
-	DishwasherRevision uint16 = 2
+	DishwasherID       schema.DeviceTypeID = 0x0075
+	DishwasherRevision uint16              = 2
 )
 
 // DishwasherType is the Dishwasher device type, matter.js's packages/node/src/devices/dishwasher.ts;

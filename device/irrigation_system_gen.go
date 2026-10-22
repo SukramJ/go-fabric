@@ -14,8 +14,8 @@ import (
 
 // IrrigationSystem device type identity: 0x0040, revision 1.
 const (
-	IrrigationSystemID       uint16 = 0x0040
-	IrrigationSystemRevision uint16 = 1
+	IrrigationSystemID       schema.DeviceTypeID = 0x0040
+	IrrigationSystemRevision uint16              = 1
 )
 
 // IrrigationSystemType is the IrrigationSystem device type, matter.js's packages/node/src/devices/irrigation-system.ts;

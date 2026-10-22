@@ -13,8 +13,8 @@ import (
 
 // DoorLock device type identity: 0x000A, revision 4.
 const (
-	DoorLockID       uint16 = 0x000A
-	DoorLockRevision uint16 = 4
+	DoorLockID       schema.DeviceTypeID = 0x000A
+	DoorLockRevision uint16              = 4
 )
 
 // DoorLockType is the DoorLock device type, matter.js's packages/node/src/devices/door-lock.ts;

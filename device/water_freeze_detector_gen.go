@@ -14,8 +14,8 @@ import (
 
 // WaterFreezeDetector device type identity: 0x0041, revision 2.
 const (
-	WaterFreezeDetectorID       uint16 = 0x0041
-	WaterFreezeDetectorRevision uint16 = 2
+	WaterFreezeDetectorID       schema.DeviceTypeID = 0x0041
+	WaterFreezeDetectorRevision uint16              = 2
 )
 
 // WaterFreezeDetectorType is the WaterFreezeDetector device type, matter.js's packages/node/src/devices/water-freeze-detector.ts;

@@ -56,7 +56,7 @@ func TestOptionalGroupsAndScenes(t *testing.T) {
 			topo := assemble(t, d)
 			var ep *endpoint.Endpoint
 			for _, e := range topo.Endpoints {
-				if e.DeviceType == ty.ID && !e.Part {
+				if e.DeviceType == uint16(ty.ID) && !e.Part {
 					ep = e
 				}
 			}

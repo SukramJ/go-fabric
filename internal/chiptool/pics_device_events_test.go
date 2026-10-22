@@ -28,7 +28,7 @@ import (
 func deviceTypeEvents() map[string]map[string][]uint32 {
 	out := map[string]map[string][]uint32{}
 	for id := range uint32(0x10000) {
-		dt, ok := schema.DeviceTypeDefinitionOf(id)
+		dt, ok := schema.DeviceTypeDefinitionOf(schema.DeviceTypeID(id))
 		if !ok {
 			continue
 		}

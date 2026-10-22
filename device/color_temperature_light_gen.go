@@ -17,8 +17,8 @@ import (
 
 // ColorTemperatureLight device type identity: 0x010C, revision 5.
 const (
-	ColorTemperatureLightID       uint16 = 0x010C
-	ColorTemperatureLightRevision uint16 = 5
+	ColorTemperatureLightID       schema.DeviceTypeID = 0x010C
+	ColorTemperatureLightRevision uint16              = 5
 )
 
 // ColorTemperatureLightType is the ColorTemperatureLight device type, matter.js's packages/node/src/devices/color-temperature-light.ts;

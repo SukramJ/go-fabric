@@ -134,7 +134,7 @@ func TestParityMatterJS_ModeBaseTrancheDeviceTypes(t *testing.T) {
 		{evse, modebase.ClusterIDEnergyEvseMode},
 		{waterHeater, modebase.ClusterIDWaterHeaterMode},
 	} {
-		if !schema.DeviceTypeRequiresServerCluster(c.dt, c.cluster) {
+		if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(c.dt), c.cluster) {
 			t.Errorf("device type 0x%04X does not mandate 0x%04X", c.dt, c.cluster)
 		}
 	}
@@ -144,7 +144,7 @@ func TestParityMatterJS_ModeBaseTrancheDeviceTypes(t *testing.T) {
 		{cabinet, modebase.ClusterIDOvenMode},
 		{dem, modebase.ClusterIDDeviceEnergyManagementMode},
 	} {
-		if ok, _ := schema.DeviceTypeAllowsServerCluster(c.dt, c.cluster); !ok {
+		if ok, _ := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.dt), c.cluster); !ok {
 			t.Errorf("device type 0x%04X does not allow 0x%04X", c.dt, c.cluster)
 		}
 	}

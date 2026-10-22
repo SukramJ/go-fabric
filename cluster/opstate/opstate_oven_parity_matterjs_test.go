@@ -73,10 +73,10 @@ func TestParityMatterJS_OvenCavitySnapshot(t *testing.T) {
 			}
 		}
 	}
-	if allowed, known := schema.DeviceTypeAllowsServerCluster(uint32(opstate.DeviceTypeTemperatureControlledCabinet), opstate.ClusterIDOvenCavityOperationalState); !allowed || !known {
+	if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(opstate.DeviceTypeTemperatureControlledCabinet), opstate.ClusterIDOvenCavityOperationalState); !allowed || !known {
 		t.Error("TemperatureControlledCabinet does not offer OvenCavityOperationalState")
 	}
-	if !schema.DeviceTypeRequiresServerCluster(uint32(opstate.DeviceTypeMicrowaveOven), opstate.ClusterIDOperationalState) {
+	if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(opstate.DeviceTypeMicrowaveOven), opstate.ClusterIDOperationalState) {
 		t.Error("MicrowaveOven does not mandate OperationalState")
 	}
 	srv, err := opstate.NewServer(opstate.Config{States: washerStates, DeviceType: opstate.DeviceTypeMicrowaveOven})

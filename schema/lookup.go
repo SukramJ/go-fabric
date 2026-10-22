@@ -32,14 +32,25 @@ func ClusterName(id uint32) (string, bool) {
 // automatically on the next `go generate ./schema/...` run.
 //
 // Mirrors matter.js packages/node/src/devices/<name>.ts revision fields.
-func DeviceTypeRevision(id uint32) (uint16, bool) {
+func DeviceTypeRevision(id DeviceTypeID) (uint16, bool) {
 	rev, ok := DeviceTypeRevisions[id]
 	return rev, ok
 }
 
+// DeviceTypeIDOf returns the device type id a Descriptor's 32-bit
+// devtype-id carries: the id and true for one whose upper half is zero (a
+// standard device type), false for a manufacturer-specific id, which no
+// table here holds.
+func DeviceTypeIDOf(devtype uint32) (DeviceTypeID, bool) {
+	if devtype > 0xFFFF {
+		return 0, false
+	}
+	return DeviceTypeID(devtype), true
+}
+
 // DeviceTypeName returns the canonical matter.js device-type name for the
 // given id, or ("", false) if the device type is not present in the snapshot.
-func DeviceTypeName(id uint32) (string, bool) {
+func DeviceTypeName(id DeviceTypeID) (string, bool) {
 	name, ok := DeviceTypeNames[id]
 	return name, ok
 }
@@ -58,7 +69,7 @@ func DeviceTypeName(id uint32) (string, bool) {
 // Callers must distinguish the two return values: an unknown device type
 // (known=false) means the snapshot cannot answer the question, which is not
 // the same as a definite "no".
-func DeviceTypeAllowsServerCluster(deviceType, clusterID uint32) (allowed, known bool) {
+func DeviceTypeAllowsServerCluster(deviceType DeviceTypeID, clusterID uint32) (allowed, known bool) {
 	ids, ok := DeviceTypeServerClusters[deviceType]
 	if !ok {
 		return false, false
@@ -75,6 +86,6 @@ func DeviceTypeAllowsServerCluster(deviceType, clusterID uint32) (allowed, known
 // endpoint of that type by default (packages/node/src/devices/<name>.ts,
 // `requirements.server.mandatory`). An unknown device type requires
 // nothing.
-func DeviceTypeRequiresServerCluster(deviceType, clusterID uint32) bool {
+func DeviceTypeRequiresServerCluster(deviceType DeviceTypeID, clusterID uint32) bool {
 	return slices.Contains(DeviceTypeMandatoryServerClusters[deviceType], clusterID)
 }

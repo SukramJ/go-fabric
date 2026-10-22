@@ -7,10 +7,17 @@
 
 package schema
 
+// DeviceTypeID is a Matter device type id (DimmableLight 0x0101): the
+// key of the device-type tables below and the type of the generated
+// device-type constants (device.DimmableLightID, ...). The
+// Descriptor's DeviceTypeList carries it as a 32-bit devtype-id whose
+// upper half is zero for every standard device type.
+type DeviceTypeID uint16
+
 // DeviceTypeRevisions maps every device-type ID present in the matter.js
 // HEAD schema snapshot to its revision number. Generated from
 // parity/schema.json.
-var DeviceTypeRevisions = map[uint32]uint16{
+var DeviceTypeRevisions = map[DeviceTypeID]uint16{
 	0x000A: 4, // DoorLock
 	0x000B: 4, // DoorLockController
 	0x000E: 2, // Aggregator
@@ -105,7 +112,7 @@ var DeviceTypeRevisions = map[uint32]uint16{
 }
 
 // DeviceTypeNames maps every device-type ID to its canonical matter.js name.
-var DeviceTypeNames = map[uint32]string{
+var DeviceTypeNames = map[DeviceTypeID]string{
 	0x000A: "DoorLock",
 	0x000B: "DoorLockController",
 	0x000E: "Aggregator",
@@ -210,7 +217,7 @@ var DeviceTypeNames = map[uint32]string{
 // from another endpoint, not that it may serve it.
 //
 // Generated from parity/schema.json.
-var DeviceTypeServerClusters = map[uint32][]uint32{
+var DeviceTypeServerClusters = map[DeviceTypeID][]uint32{
 	0x000A: { // DoorLock
 		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
@@ -831,7 +838,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 // applies is the projection's decision, not the schema's.
 //
 // Generated from parity/schema.json.
-var DeviceTypeMandatoryServerClusters = map[uint32][]uint32{
+var DeviceTypeMandatoryServerClusters = map[DeviceTypeID][]uint32{
 	0x000A: { // DoorLock
 		0x0003, // Identify
 		0x0101, // DoorLock

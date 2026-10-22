@@ -16,8 +16,8 @@ import (
 
 // RoboticVacuumCleaner device type identity: 0x0074, revision 4.
 const (
-	RoboticVacuumCleanerID       uint16 = 0x0074
-	RoboticVacuumCleanerRevision uint16 = 4
+	RoboticVacuumCleanerID       schema.DeviceTypeID = 0x0074
+	RoboticVacuumCleanerRevision uint16              = 4
 )
 
 // RoboticVacuumCleanerType is the RoboticVacuumCleaner device type, matter.js's packages/node/src/devices/robotic-vacuum-cleaner.ts;

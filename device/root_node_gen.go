@@ -27,8 +27,8 @@ import (
 
 // RootNode device type identity: 0x0016, revision 5.
 const (
-	RootNodeID       uint16 = 0x0016
-	RootNodeRevision uint16 = 5
+	RootNodeID       schema.DeviceTypeID = 0x0016
+	RootNodeRevision uint16              = 5
 )
 
 // RootNodeType is the RootNode device type, matter.js's packages/node/src/endpoints/root.ts;

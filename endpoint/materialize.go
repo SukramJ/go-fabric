@@ -320,7 +320,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 // PowerSourceServer and its Descriptor only).
 func partClusterServers(ep *Endpoint, inner []contract.ClusterServer) []contract.ClusterServer {
 	out := make([]contract.ClusterServer, 0, len(inner)+2)
-	if schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), identifyClusterID) {
+	if schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(ep.DeviceType), identifyClusterID) {
 		out = append(out, ep.identifyServer())
 	}
 	out = append(out, inner...)
@@ -470,7 +470,7 @@ func mountGroups(ep *Endpoint, identify *mattercore.Identify, inner []contract.C
 // ScenesManagementServer where the endpoint type is extended with it
 // (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112).
 func stackClusterWanted(ep *Endpoint, id uint32) bool {
-	dt := uint32(ep.DeviceType)
+	dt := schema.DeviceTypeID(ep.DeviceType)
 	if schema.DeviceTypeRequiresServerCluster(dt, id) {
 		return true
 	}

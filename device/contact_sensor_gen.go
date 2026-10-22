@@ -14,8 +14,8 @@ import (
 
 // ContactSensor device type identity: 0x0015, revision 2.
 const (
-	ContactSensorID       uint16 = 0x0015
-	ContactSensorRevision uint16 = 2
+	ContactSensorID       schema.DeviceTypeID = 0x0015
+	ContactSensorRevision uint16              = 2
 )
 
 // ContactSensorType is the ContactSensor device type, matter.js's packages/node/src/devices/contact-sensor.ts;

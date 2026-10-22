@@ -182,10 +182,10 @@ func TestParityMatterJS_FanControlDeviceTypes(t *testing.T) {
 	for id, name := range map[uint16]string{
 		fan.DeviceTypeFan: "Fan", fan.DeviceTypeAirPurifier: "AirPurifier", fan.DeviceTypeExtractorHood: "ExtractorHood",
 	} {
-		if got, _ := schema.DeviceTypeName(uint32(id)); got != name {
+		if got, _ := schema.DeviceTypeName(schema.DeviceTypeID(id)); got != name {
 			t.Errorf("device type 0x%04X is %q, want %q", id, got, name)
 		}
-		if !schema.DeviceTypeRequiresServerCluster(uint32(id), fan.ClusterID) {
+		if !schema.DeviceTypeRequiresServerCluster(schema.DeviceTypeID(id), fan.ClusterID) {
 			t.Errorf("%s does not mandate FanControl in the snapshot", name)
 		}
 	}

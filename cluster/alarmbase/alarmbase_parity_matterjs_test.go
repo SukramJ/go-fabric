@@ -125,7 +125,7 @@ func TestParityMatterJS_AlarmBaseSnapshot(t *testing.T) {
 		{0x0070, alarmbase.ClusterIDRefrigeratorAlarm}, // Refrigerator
 		{0x0071, alarmbase.ClusterIDTemperatureAlarm},  // TemperatureControlledCabinet
 	} {
-		if allowed, known := schema.DeviceTypeAllowsServerCluster(c.dt, c.cluster); !allowed || !known {
+		if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(c.dt), c.cluster); !allowed || !known {
 			t.Errorf("device type 0x%04X does not offer 0x%04X", c.dt, c.cluster)
 		}
 	}

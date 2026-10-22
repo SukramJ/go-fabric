@@ -64,7 +64,7 @@ func TestParityMatterJS_FilterSnapshot(t *testing.T) {
 			t.Errorf("LastChangedTime %+v", a)
 		}
 		for _, dt := range []uint32{0x002D, 0x007A} { // AirPurifier, ExtractorHood
-			if allowed, known := schema.DeviceTypeAllowsServerCluster(dt, id); !allowed || !known {
+			if allowed, known := schema.DeviceTypeAllowsServerCluster(schema.DeviceTypeID(dt), id); !allowed || !known {
 				t.Errorf("device type 0x%04X does not offer 0x%04X", dt, id)
 			}
 		}

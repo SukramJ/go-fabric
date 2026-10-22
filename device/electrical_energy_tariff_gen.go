@@ -15,8 +15,8 @@ import (
 
 // ElectricalEnergyTariff device type identity: 0x0513, revision 1.
 const (
-	ElectricalEnergyTariffID       uint16 = 0x0513
-	ElectricalEnergyTariffRevision uint16 = 1
+	ElectricalEnergyTariffID       schema.DeviceTypeID = 0x0513
+	ElectricalEnergyTariffRevision uint16              = 1
 )
 
 // ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, matter.js's packages/node/src/devices/electrical-energy-tariff.ts;
