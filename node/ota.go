@@ -52,8 +52,9 @@ type otaApplier struct {
 	// life bounds the in-place restart (restartedWhenIdle); stop cancels
 	// it. mu guards stopped; work is the restart's goroutine, added under
 	// mu while not stopped and waited for by [otaApplier.close].
-	life    context.Context //nolint:containedctx // the applier's lifetime, cancelled by close
-	stop    context.CancelFunc
+	life context.Context //nolint:containedctx // the applier's lifetime, cancelled by close
+	stop context.CancelFunc
+	// mu guards life, stopped and work.
 	mu      sync.Mutex
 	stopped bool
 	work    sync.WaitGroup

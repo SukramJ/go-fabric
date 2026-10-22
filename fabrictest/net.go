@@ -62,6 +62,7 @@ const queueDepth = 1024
 type Network struct {
 	clk clock.Clock
 
+	// mu guards filter, opts, rnd and sockets.
 	mu      sync.Mutex
 	opts    NetOptions
 	rnd     *rand.Rand

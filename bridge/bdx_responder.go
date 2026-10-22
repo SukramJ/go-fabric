@@ -179,6 +179,7 @@ const responderTurnBound = 2 * time.Second
 // waits, bounded, until the responder has taken it and is waiting for the
 // next one or has finished.
 type responderTurn struct {
+	// mu guards changed, delivered, idleAt and taken.
 	mu        sync.Mutex
 	delivered int64
 	taken     int64

@@ -97,6 +97,7 @@ type Site struct {
 	// and are no work of the site.
 	inSyscall uint64
 
+	// mu guards closers and nextIndex.
 	mu          sync.Mutex
 	nextIndex   int
 	devices     []*Device
