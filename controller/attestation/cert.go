@@ -76,7 +76,7 @@ func checkRequiredExtensions(c *x509.Certificate, authorityKeyID bool) error {
 // :22-32) do not parse here.
 func parseAttCert(der []byte, authorityKeyID bool) (*attCert, error) {
 	if len(der) > maxDERCertificateSize {
-		return nil, fmt.Errorf("DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
+		return nil, fmt.Errorf("attestation: DER certificate of %d bytes exceeds the %d byte limit", len(der), maxDERCertificateSize)
 	}
 	c, err := x509.ParseCertificate(der)
 	if err != nil {
@@ -166,7 +166,7 @@ func fallbackID(cn, prefix string) (*uint16, error) {
 		return &id, nil
 	}
 	if strings.Contains(cn, prefix) {
-		return nil, fmt.Errorf("commonName contains %s not followed by 4 uppercase hex digits", prefix)
+		return nil, fmt.Errorf("attestation: commonName contains %s not followed by 4 uppercase hex digits", prefix)
 	}
 	return nil, nil
 }
@@ -186,7 +186,7 @@ func P256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
 // ecdsa-with-SHA256 signature over its TBS DER verifies with key.
 func VerifySignedBy(c *x509.Certificate, key *ecdsa.PublicKey) error {
 	if c.SignatureAlgorithm != x509.ECDSAWithSHA256 {
-		return fmt.Errorf("signature algorithm %v is not ecdsa-with-SHA256", c.SignatureAlgorithm)
+		return fmt.Errorf("attestation: signature algorithm %v is not ecdsa-with-SHA256", c.SignatureAlgorithm)
 	}
 	digest := sha256.Sum256(c.RawTBSCertificate)
 	if !ecdsa.VerifyASN1(key, digest[:], c.Signature) {

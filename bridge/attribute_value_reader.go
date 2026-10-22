@@ -111,7 +111,7 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 // already consumed it via dec.Next() in [im.readAttributeData].
 func decodeACLList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
 	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("AccessControl.ACL: value is not array (type=0x%02X)", el.Type)
+		return im.AttributeValue{}, fmt.Errorf("bridge: AccessControl.ACL: value is not array (type=0x%02X)", el.Type)
 	}
 	var out []mattercore.AccessControlEntryStruct
 	for {
@@ -173,7 +173,7 @@ func decodeACLEntry(dec *tlv.Decoder) (mattercore.AccessControlEntryStruct, erro
 				continue
 			}
 			if !el.IsContainer || el.Type != tlv.TypeArray {
-				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("ACL entry: subjects not array (type=0x%02X)", el.Type)
+				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("bridge: ACL entry: subjects not array (type=0x%02X)", el.Type)
 			}
 			subs, err := decodeACLSubjects(dec)
 			if err != nil {
@@ -186,7 +186,7 @@ func decodeACLEntry(dec *tlv.Decoder) (mattercore.AccessControlEntryStruct, erro
 				continue
 			}
 			if !el.IsContainer || el.Type != tlv.TypeArray {
-				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("ACL entry: targets not array (type=0x%02X)", el.Type)
+				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("bridge: ACL entry: targets not array (type=0x%02X)", el.Type)
 			}
 			tgts, err := decodeACLTargets(dec)
 			if err != nil {
@@ -295,7 +295,7 @@ func decodeACLTarget(dec *tlv.Decoder) (mattercore.ACLTargetStruct, error) {
 // established.
 func decodeGroupKeyMapList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
 	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("GroupKeyManagement.GroupKeyMap: value is not array (type=0x%02X)", el.Type)
+		return im.AttributeValue{}, fmt.Errorf("bridge: GroupKeyManagement.GroupKeyMap: value is not array (type=0x%02X)", el.Type)
 	}
 	var out []mattercore.GroupKeyMapStruct
 	for {
@@ -369,7 +369,7 @@ func decodeGroupKeyMapEntry(dec *tlv.Decoder) (mattercore.GroupKeyMapStruct, err
 // primitive fall-through) made every Extension write answer FAILURE.
 func decodeExtensionList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
 	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("AccessControl.Extension: value is not array (type=0x%02X)", el.Type)
+		return im.AttributeValue{}, fmt.Errorf("bridge: AccessControl.Extension: value is not array (type=0x%02X)", el.Type)
 	}
 	var out []mattercore.AccessControlExtensionEntry
 	for {

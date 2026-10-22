@@ -12,6 +12,7 @@ linters:
     - errcheck
     - errorlint
     - exhaustive
+    - forbidigo
     - funlen
     - gocognit
     - gocritic
@@ -40,6 +41,13 @@ linters:
       check-type-assertions: true
     exhaustive:
       default-signifies-exhaustive: true
+    forbidigo:
+      forbid:
+        # ADR 0026 P9: a component logs through its logger() accessor or its
+        # config. slog.Default() as the accessor's fallback or as a config
+        # default has no selector after the call and is not matched.
+        - pattern: ^slog\.Default\(\)\.\w+
+          msg: take the logger from the component's logger() accessor or its config, not slog.Default().<method> inline (ADR 0026 P9)
     funlen:
       lines: 100
       statements: 60

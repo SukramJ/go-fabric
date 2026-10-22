@@ -107,7 +107,7 @@ type SemanticTag = descdef.Semtag
 
 // ErrTagListNotEnabled is [Descriptor.AddTags] on a Descriptor without the
 // TagList feature. Mirrors matter.js DescriptorServer.ts:124-126.
-var ErrTagListNotEnabled = errors.New(`matter: you must enable the descriptor "TagList" feature to set tags`)
+var ErrTagListNotEnabled = errors.New(`core: you must enable the descriptor "TagList" feature to set tags`)
 
 // errDescriptorReadOnly is returned for any write attempt — the
 // Descriptor cluster has no writable attributes.

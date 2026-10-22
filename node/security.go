@@ -491,7 +491,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*bridge.CaseInitiation, error) {
 		fabric, ok := ids.forFabric(fabricIndex)
 		if !ok {
-			return nil, fmt.Errorf("no CASE identity loaded for fabric %d", fabricIndex)
+			return nil, fmt.Errorf("node: no CASE identity loaded for fabric %d", fabricIndex)
 		}
 		sessionID, err := sessions.AllocateID()
 		if err != nil {
@@ -556,7 +556,7 @@ type paseParams struct {
 // OperationalCredentials.
 func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseParams, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	if !setup.IsValidSetupPIN(p.passcode) {
-		return nil, fmt.Errorf("passcode %d is invalid or trivially guessable", p.passcode)
+		return nil, fmt.Errorf("node: passcode %d is invalid or trivially guessable", p.passcode)
 	}
 	vc, err := spake2.NewVerifierContext(p.passcode, p.salt, p.iterations)
 	if err != nil {

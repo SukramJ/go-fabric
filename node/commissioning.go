@@ -306,7 +306,7 @@ func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st *stor
 func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, salt []byte) (func(), error) {
 	const want = spake2.VerifierW0Size + spake2.VerifierLSize // 97 bytes, Matter §3.10.5
 	if len(verifier) != want {
-		return nil, fmt.Errorf("PAKE passcode verifier is %d bytes, want %d", len(verifier), want)
+		return nil, fmt.Errorf("node: PAKE passcode verifier is %d bytes, want %d", len(verifier), want)
 	}
 	vc, err := spake2.NewVerifierFromValue(verifier[:spake2.VerifierW0Size], verifier[spake2.VerifierW0Size:])
 	if err != nil {
@@ -413,7 +413,7 @@ func (c *WindowCredentials) validate() error {
 	}
 	errs = append(errs, checkPBKDF(int64(c.Iterations), len(c.Salt))...)
 	if c.Timeout < 0 {
-		errs = append(errs, fmt.Errorf("timeout %s is negative", c.Timeout))
+		errs = append(errs, fmt.Errorf("node: timeout %s is negative", c.Timeout))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)

@@ -305,7 +305,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 	}
 	bodyOffset := protocolHeaderSize(proto)
 	if bodyOffset > len(msg.Payload) {
-		return fmt.Errorf("group message: protocol header consumed %d > %d bytes", bodyOffset, len(msg.Payload))
+		return fmt.Errorf("bridge: group message: protocol header consumed %d > %d bytes", bodyOffset, len(msg.Payload))
 	}
 	if (proto.HasVendorID && proto.VendorID != 0) || proto.ProtocolID != im.InteractionModelProtocolID || !proto.Initiator {
 		b.logger.Debug("matter.rx.group.not_interaction",

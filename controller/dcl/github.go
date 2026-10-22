@@ -116,7 +116,7 @@ func (d *githubDir) cd(ctx context.Context, name string) (*githubDir, error) {
 			return nil, err
 		}
 		if e.Type != "tree" {
-			return nil, fmt.Errorf("path %q not a directory", p)
+			return nil, fmt.Errorf("dcl: path %q not a directory", p)
 		}
 		result = &githubDir{g: d.g, url: e.URL}
 	}
@@ -129,7 +129,7 @@ func (d *githubDir) getBinary(ctx context.Context, name string) ([]byte, error) 
 		return nil, err
 	}
 	if e.Type != "blob" {
-		return nil, fmt.Errorf("path %q not a regular file", name)
+		return nil, fmt.Errorf("dcl: path %q not a regular file", name)
 	}
 	return d.fetch(ctx, e.URL)
 }
@@ -171,7 +171,7 @@ func (d *githubDir) find(ctx context.Context, name string) (githubEntry, error) 
 	defer d.mu.Unlock()
 	e, ok := d.contents[name]
 	if !ok {
-		return githubEntry{}, fmt.Errorf("path %q not found", name)
+		return githubEntry{}, fmt.Errorf("dcl: path %q not found", name)
 	}
 	return e, nil
 }

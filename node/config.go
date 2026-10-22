@@ -429,14 +429,14 @@ func validSetupPIN(pin uint32) bool { return pin <= setupPasscodeMax && setup.Is
 
 // errSetupPIN is the failure every passcode check reports.
 func errSetupPIN(pin uint32) error {
-	return fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", pin)
+	return fmt.Errorf("node: passcode %d is invalid or on the trivially-guessable list", pin)
 }
 
 // The checks [Config.Validate] and [Node.OpenBasicWindow] share, against
 // the bounds above.
 func checkDiscriminator(d uint16) error {
 	if d > MaxDiscriminator {
-		return fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
+		return fmt.Errorf("node: discriminator %d exceeds the 12-bit maximum %d", d, MaxDiscriminator)
 	}
 	return nil
 }
@@ -444,10 +444,10 @@ func checkDiscriminator(d uint16) error {
 func checkPBKDF(iterations int64, saltLen int) []error {
 	var errs []error
 	if iterations < PBKDFIterationsMin || iterations > PBKDFIterationsMax {
-		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
+		errs = append(errs, fmt.Errorf("node: PBKDF iterations %d not in [%d, %d]", iterations, PBKDFIterationsMin, PBKDFIterationsMax))
 	}
 	if saltLen < PBKDFSaltMin || saltLen > PBKDFSaltMax {
-		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
+		errs = append(errs, fmt.Errorf("node: PBKDF salt is %d bytes, want %d to %d", saltLen, PBKDFSaltMin, PBKDFSaltMax))
 	}
 	return errs
 }
@@ -484,13 +484,13 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
 	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
-		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
+		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
 	}
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
-		errs = append(errs, fmt.Errorf("BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
+		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
-		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
@@ -498,10 +498,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("node: Attestation.BlockCommissioningOnError needs Files"))
 	}
 	if c.Health.Interval < 0 {
-		errs = append(errs, fmt.Errorf("Health.Interval %v is negative", c.Health.Interval))
+		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
 	if c.Network.ReannounceInterval < 0 {
-		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
+		errs = append(errs, fmt.Errorf("node: Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))

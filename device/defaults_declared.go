@@ -142,7 +142,7 @@ func newValveServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("valve: %w", errNoPort))
 	}
 	if b.opts.Features != 0 {
-		return nil, notServed(errors.New("valve: the server serves no feature"))
+		return nil, notServed(errors.New("device: valve: the server serves no feature"))
 	}
 	hostState(b.initial)
 	return valve.NewServer(valve.Config{Source: d.StateSource, Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion}), nil
@@ -251,7 +251,7 @@ func newMicrowaveControlServer(b defaultBuild) (contract.ClusterServer, error) {
 func newMicrowaveModeServer(b defaultBuild) (contract.ClusterServer, error) {
 	v, ok := b.initial[modeAttrSupportedModes]
 	if !ok {
-		return nil, notServed(errors.New("microwaveovenmode: the declaration's Initial carries no SupportedModes"))
+		return nil, notServed(errors.New("device: microwaveovenmode: the declaration's Initial carries no SupportedModes"))
 	}
 	delete(b.initial, modeAttrSupportedModes)
 	cfg := modebase.Config{SupportedModes: modeOptionsOf(v), Features: modebase.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
@@ -295,7 +295,7 @@ func newDeviceEnergyManagementServer(b defaultBuild) (contract.ClusterServer, er
 // server.
 func newDryerControlsServer(b defaultBuild) (contract.ClusterServer, error) {
 	if _, ok := b.initial[ldcdef.AttrSupportedDrynessLevels]; !ok {
-		return nil, notServed(errors.New("laundrydryercontrols: the declaration's Initial carries no SupportedDrynessLevels"))
+		return nil, notServed(errors.New("device: laundrydryercontrols: the declaration's Initial carries no SupportedDrynessLevels"))
 	}
 	cfg := appliance.DryerConfig{DataVersion: b.cfg.DataVersion}
 	configFrom(&cfg, b.def, b.initial)

@@ -419,7 +419,7 @@ func verifyCRLSignature(signer *x509.Certificate, tbs, algorithm, value []byte) 
 	}
 	var oid asn1.ObjectIdentifier
 	if _, err := asn1.Unmarshal(derEncode(alg.elements[0]), &oid); err != nil || !oid.Equal(oidECDSAWithSHA256) {
-		return fmt.Errorf("signature algorithm %s is neither ecdsa-with-SHA256 nor ML-DSA", strings.ToLower(hexUpper(alg.elements[0].bytes)))
+		return fmt.Errorf("dcl: signature algorithm %s is neither ecdsa-with-SHA256 nor ML-DSA", strings.ToLower(hexUpper(alg.elements[0].bytes)))
 	}
 	key, err := attestation.P256Key(signer)
 	if err != nil {

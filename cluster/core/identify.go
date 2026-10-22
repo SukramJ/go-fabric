@@ -331,5 +331,5 @@ func coerceUint16(v any) (uint16, error) {
 	case nil:
 		return 0, nil
 	}
-	return 0, fmt.Errorf("unsupported IdentifyTime type %T", v)
+	return 0, fmt.Errorf("core: unsupported IdentifyTime type %T", v)
 }

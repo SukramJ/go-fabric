@@ -277,7 +277,7 @@ func loadOperationalTime(ctx context.Context, st *store.Store) (time.Duration, e
 	if ok {
 		ms, err := strconv.ParseUint(raw, 10, 63)
 		if err != nil || ms > uint64(math.MaxInt64/int64(time.Millisecond)) {
-			return 0, fmt.Errorf("%s %q: not a millisecond count", operationalTimeSetting, raw)
+			return 0, fmt.Errorf("node: %s %q: not a millisecond count", operationalTimeSetting, raw)
 		}
 		return time.Duration(ms) * time.Millisecond, nil //nolint:gosec // bounded above
 	}
