@@ -154,8 +154,9 @@ func (d *device) state() (level uint8, on bool) {
 	return d.level, d.on
 }
 
-// reports collects what a server reports, with the value read at report
-// time, as a subscription's report would carry it.
+// reports collects what a server reports on the wire
+// (contract.AttributeReportNotifier), with the value read at report time,
+// as a subscription's report would carry it.
 type reports struct {
 	mu     sync.Mutex
 	levels []uint8
@@ -164,8 +165,19 @@ type reports struct {
 
 func listen(t *testing.T, srv *levelcontrol.Server) *reports {
 	t.Helper()
+	return collect(srv, srv.OnAttributeReport)
+}
+
+// observe collects what a server tells its change listeners
+// (contract.AttributeChangeNotifier, the host's OnChanged).
+func observe(t *testing.T, srv *levelcontrol.Server) *reports {
+	t.Helper()
+	return collect(srv, srv.OnAttributeChange)
+}
+
+func collect(srv *levelcontrol.Server, subscribe func(func(contract.Change)) func()) *reports {
 	r := &reports{}
-	srv.OnAttributeChange(func(change contract.Change) {
+	subscribe(func(change contract.Change) {
 		ids := change.Attributes
 		for _, id := range ids {
 			v, _ := srv.MatterRead(id)

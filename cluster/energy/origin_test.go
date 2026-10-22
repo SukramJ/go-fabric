@@ -148,11 +148,6 @@ func TestEnergyPreferenceOrigins(t *testing.T) {
 				tb.Fatal(err)
 			}
 		}},
-		spectest.OriginCase{Name: "controller write", Want: contract.OriginControllerWrite, Act: func(tb testing.TB, srv contract.ClusterServer) {
-			tb.Helper()
-			if err := srv.MatterWrite(context.Background(), ep.AttrCurrentEnergyBalance, uint8(2)); err != nil {
-				tb.Fatal(err)
-			}
-		}},
+		spectest.Write(ep.AttrCurrentEnergyBalance, uint8(2)),
 	)
 }

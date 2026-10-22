@@ -61,7 +61,7 @@ type report struct {
 
 func watch(srv *light.ColorControlServer, attrs ...uint32) *reportLog {
 	r := &reportLog{start: time.Now()}
-	srv.OnAttributeChange(func(change contract.Change) {
+	srv.OnAttributeReport(func(change contract.Change) { // the wire's view
 		ids := change.Attributes
 		for _, id := range ids {
 			if !slices.Contains(attrs, id) {

@@ -3821,21 +3821,6 @@ Reasoning: a queue without an owner that stops it is a goroutine leak; a
 change before the device is part of a node has no controller and no
 report, and the inline `OnChanged` still sees it (phase 20c, brief BU-a).
 
-### BD-Matter-Quieter-OneOriginPerReport — a quieter attribute's deferred change reaches the host once, with the origin of the last change
-
-matter.js notifies its `$Changed` observers once per change, each with the
-session that made it (`Datasource.ts:1473-1476` at `862ad75f`: `params:
-[newval, oldval, this.#session]`), and throttles only the subscription
-report of a quiet-reporting attribute. The module's servers report a
-quiet-reporting attribute (LevelControl CurrentLevel, ColorControl's colour
-attributes, the transitions' outputs) through `cluster.Quieter`, which
-defers the change itself, so the host's `OnChanged` sees one
-`contract.Change` per report window and its `Origin` is the last change's
-(`cluster/attribute_changes.go` `NotifyFrom`). Reasoning: one path from a
-server to the host and to the wire (ADR 0025 principle 2); a transition's
-intermediate steps are the one case where the origins could differ, and
-there every step is the command's own (phase 20c, brief BU-a).
-
 ### BD-Matter-CommandOrigin-PerServerFlag — a change made while a server runs a command is reported as the command's, a concurrent host `Set` included
 
 matter.js knows a change's origin from the transaction that commits it:

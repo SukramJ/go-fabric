@@ -1332,7 +1332,13 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 // requestor's UpdateState is plain behavior state
 // (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
 // server that is also a [contract.ChangeNotifier] is wired by
-// wireRootNotifiersLocked already and is skipped here. Caller holds b.mu.
+// wireRootNotifiersLocked already and is skipped here. A server that is a
+// [contract.AttributeReportNotifier] is subscribed through its report view
+// — a quieter attribute by its throttle, as matter.js's
+// ServerBehaviorBacking subscribes a QuietEvent's `online` observable
+// (ServerBehaviorBacking.ts:265-273) — and through OnAttributeChange,
+// which tells the host of every change at once, otherwise. Caller holds
+// b.mu.
 func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 	for _, ep := range b.topology.Endpoints {
 		if ep == nil {
@@ -1348,7 +1354,11 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				continue
 			}
 			clusterID := srv.MatterClusterID()
-			unsub := notifier.OnAttributeChange(func(change contract.Change) {
+			subscribe := notifier.OnAttributeChange
+			if r, reports := srv.(contract.AttributeReportNotifier); reports {
+				subscribe = r.OnAttributeReport
+			}
+			unsub := subscribe(func(change contract.Change) {
 				attrIDs := change.Attributes
 				if len(attrIDs) == 0 {
 					return

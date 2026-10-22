@@ -91,7 +91,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 	s.onOff, s.ct = cfg.OnOff, cfg.ColorTemperature
 	s.quiet = &cluster.Quieter{Report: func() {
 		if !s.quiescing.Load() {
-			s.changes.NotifyFrom(contract.Origin(s.levelOrigin.Load()), AttrCurrentLevel) //nolint:gosec // only an Origin is stored
+			s.changes.ReportFrom(contract.Origin(s.levelOrigin.Load()), AttrCurrentLevel) //nolint:gosec // only an Origin is stored
 		}
 	}, Clock: cfg.Clock}
 	s.engine = transition.New(transition.Config{
@@ -137,15 +137,20 @@ func (s *Server) readLevel(string) (float64, bool) {
 // the command already — then reports the change and couples.
 func (s *Server) applyLevel(changes []transition.Change) error {
 	ctx := context.Background()
+	// A change the host's notifier reports while the level is handed over
+	// is the command's.
+	s.forwarding.Add(1)
 	for _, c := range changes {
 		zero := uint16(0)
 		if err := s.src.MoveToLevel(ctx, wire.MoveToLevelRequest{
 			Level: uint8(c.Value), TransitionTime: &zero, //nolint:gosec // the engine keeps the value between MinLevel and MaxLevel
 			OptionsMask: OptionExecuteIfOff, OptionsOverride: OptionExecuteIfOff,
 		}); err != nil {
+			s.forwarding.Add(-1)
 			return fmt.Errorf("levelcontrol: apply level %v: %w", c.Value, err)
 		}
 	}
+	s.forwarding.Add(-1)
 	s.observeLevel(contract.OriginCommand)
 	s.mu.Lock()
 	c := s.coupling
@@ -153,36 +158,72 @@ func (s *Server) applyLevel(changes []transition.Change) error {
 	return s.commit(ctx, c)
 }
 
-// observeLevel reports CurrentLevel when it changed: by the quieter rules
-// of its "Q" quality (matter.js QuietEvent), at once from or to null and
-// otherwise at most once a second, the end of a transition flushing the
-// last value. It runs after every level the engine applied and on every
-// change notification of the host, so a level the device moved by itself
-// is reported the same way, from origin — a report the quieter defers
-// carries the origin of the last change before it.
+// observeLevel is the one place a change of CurrentLevel is reported,
+// whoever made it: a command — at once or a transition's step —, the
+// host's Set, the OnOff coupling, the device's own change through the
+// host's notifier, and on the hand-off path what the host's port moved.
+// The change listeners see it at once, from origin, as every observer of
+// matter.js's currentLevel$Changed does (Datasource.ts:1473-1476 emits it
+// on the commit of each state write; Events.ts:267-297 QuietEvent is an
+// OnlineEvent whose own observers are not throttled). Under the engine
+// the wire report follows the quieter rules of the "Q" quality (matter.js
+// QuietEvent's QuietObservable, ServerBehaviorBacking.ts:265-273): at
+// once from or to null and otherwise at most once a second, the end of a
+// transition flushing the last value — a report the quieter defers
+// carries the origin of the last change before it. On the hand-off path
+// the host's own notifier is the wire's ([Server.OnMatterValueChanged]),
+// so the listeners alone are told.
 func (s *Server) observeLevel(origin contract.Origin) {
-	s.levelOrigin.Store(uint32(origin))
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
 	wasNull := !s.levelKnown
 	changed := known != s.levelKnown || (known && level != s.level)
 	s.level, s.levelKnown = level, known
 	s.mu.Unlock()
-	if changed {
+	if !changed {
+		return
+	}
+	s.changes.ChangedFrom(origin, AttrCurrentLevel)
+	if s.quiet != nil {
+		s.levelOrigin.Store(uint32(origin))
 		s.quiet.Changed(wasNull, !known)
 	}
 }
 
-// OnAttributeChange implements [contract.AttributeChangeNotifier].
-// Under the engine it reports CurrentLevel by its quieter rules and
-// RemainingTime when matter.js's #updateRemainingTime would; while a
-// listener is registered the server follows the host's own change
+// sourceOrigin is the origin of a change the host's notifier reports: a
+// command's while one is handed to the port — forwarded on the hand-off
+// path, or a level the engine applies —, the host's own otherwise: the
+// device moved.
+func (s *Server) sourceOrigin() contract.Origin {
+	if s.forwarding.Load() > 0 {
+		return contract.OriginCommand
+	}
+	return contract.OriginHostSet
+}
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: every
+// change at once — CurrentLevel whoever moved it ([Server.observeLevel]),
+// Options, OnLevel and StartUpCurrentLevel, and under the engine
+// RemainingTime when matter.js's #updateRemainingTime would report it.
+// While a listener is registered the server follows the host's own change
 // notification, so a level the device changed by itself is reported too.
-// On the hand-off path nothing is reported here: the host's notifier
-// reports CurrentLevel ([Server.OnMatterValueChanged]).
 func (s *Server) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
-	unsub := s.changes.OnAttributeChange(cb)
-	if s.engine == nil {
+	return s.listen(s.changes.OnAttributeChange(cb))
+}
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: what
+// goes on the wire — CurrentLevel under the engine by the quieter rules of
+// its "Q" quality, every other change at once. On the hand-off path
+// CurrentLevel is not reported here: the host's notifier reports it
+// ([Server.OnMatterValueChanged]).
+func (s *Server) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.listen(s.changes.OnAttributeReport(cb))
+}
+
+// listen counts a listener whose unsubscribe is unsub: while there is one,
+// the server follows the host's notifier ([Server.observeLevel]).
+func (s *Server) listen(unsub func()) (unsubscribe func()) {
+	if s.src == nil {
 		return unsub
 	}
 	s.mu.Lock()
@@ -191,7 +232,7 @@ func (s *Server) OnAttributeChange(cb func(change contract.Change)) (unsubscribe
 	s.mu.Unlock()
 	if subscribe {
 		if n, ok := s.src.(contract.ChangeNotifier); ok && n != nil {
-			stop := n.OnMatterValueChanged(func() { s.observeLevel(contract.OriginHostSet) }) // the device moved: the host's own change
+			stop := n.OnMatterValueChanged(func() { s.observeLevel(s.sourceOrigin()) })
 			s.mu.Lock()
 			s.unsubSrc = stop
 			s.mu.Unlock()

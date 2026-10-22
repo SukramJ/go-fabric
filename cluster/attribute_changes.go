@@ -13,32 +13,61 @@ import (
 )
 
 // AttributeChanges is the listener set behind
-// [contract.AttributeChangeNotifier] for a cluster server that keeps its
-// own attribute state. Embed it (by value, never copied after first use)
-// and call [AttributeChanges.Notify] with the attributes that moved; the
-// zero value is ready to use.
+// [contract.AttributeChangeNotifier] and [contract.AttributeReportNotifier]
+// for a cluster server that keeps its own attribute state. Embed it (by
+// value, never copied after first use) and call [AttributeChanges.Notify]
+// with the attributes that moved; the zero value is ready to use.
+//
+// A change goes to two listener sets: the change listeners
+// (OnAttributeChange, the host's view — matter.js's `$Changed` observers)
+// and the report listeners (OnAttributeReport, the wire's — matter.js's
+// OnlineEvent.online). [AttributeChanges.NotifyFrom] tells both; a server
+// with a quieter ("Q") attribute tells the change listeners of its every
+// change with [AttributeChanges.ChangedFrom] and the report listeners
+// when its [Quieter] emits, with [AttributeChanges.ReportFrom].
 type AttributeChanges struct {
-	// mu guards listeners and next.
+	// mu guards next, listeners and reporters.
 	mu        sync.Mutex
 	next      int
 	listeners map[int]func(contract.Change)
+	reporters map[int]func(contract.Change)
 }
 
-// OnAttributeChange implements [contract.AttributeChangeNotifier].
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: cb
+// sees every change at once.
 func (c *AttributeChanges) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return c.add(false, cb)
+}
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: cb
+// sees the changes that go on the wire — a quieter attribute's by its
+// throttle.
+func (c *AttributeChanges) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return c.add(true, cb)
+}
+
+// add registers cb as a report listener when report, as a change
+// listener otherwise, and returns its idempotent unsubscribe.
+func (c *AttributeChanges) add(report bool, cb func(contract.Change)) (unsubscribe func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.listeners == nil {
 		c.listeners = map[int]func(contract.Change){}
+		c.reporters = map[int]func(contract.Change){}
 	}
 	id := c.next
 	c.next++
-	c.listeners[id] = cb
+	if report {
+		c.reporters[id] = cb
+	} else {
+		c.listeners[id] = cb
+	}
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			c.mu.Lock()
 			delete(c.listeners, id)
+			delete(c.reporters, id)
 			c.mu.Unlock()
 		})
 	}
@@ -51,23 +80,55 @@ func (c *AttributeChanges) Notify(attrIDs ...uint32) {
 	c.NotifyFrom(contract.OriginUnknown, attrIDs...)
 }
 
-// NotifyFrom tells every listener that attrIDs changed and where the
-// change came from ([contract.Change]); each listener gets its own copy of
-// the ids. It calls them outside its lock, in registration order; an empty
-// list notifies nobody.
+// NotifyFrom tells every listener — change and report listeners alike —
+// that attrIDs changed and where the change came from
+// ([contract.Change]); each listener gets its own copy of the ids. It
+// calls them outside its lock, in registration order; an empty list
+// notifies nobody.
 func (c *AttributeChanges) NotifyFrom(origin contract.Origin, attrIDs ...uint32) {
+	c.notify(origin, attrIDs, true, true)
+}
+
+// ChangedFrom tells the change listeners alone that attrIDs changed: a
+// quieter attribute's change, which the host sees at once while its
+// report waits for the throttle ([AttributeChanges.ReportFrom]).
+func (c *AttributeChanges) ChangedFrom(origin contract.Origin, attrIDs ...uint32) {
+	c.notify(origin, attrIDs, true, false)
+}
+
+// ReportFrom tells the report listeners alone that attrIDs changed: the
+// emit of a quieter attribute's throttle, whose changes the change
+// listeners saw already ([AttributeChanges.ChangedFrom]).
+func (c *AttributeChanges) ReportFrom(origin contract.Origin, attrIDs ...uint32) {
+	c.notify(origin, attrIDs, false, true)
+}
+
+// notify calls the change listeners when changes and the report listeners
+// when reports, outside the lock, in registration order.
+func (c *AttributeChanges) notify(origin contract.Origin, attrIDs []uint32, changes, reports bool) {
 	if len(attrIDs) == 0 {
 		return
 	}
 	c.mu.Lock()
-	ids := make([]int, 0, len(c.listeners))
-	for id := range c.listeners {
-		ids = append(ids, id)
+	ids := make([]int, 0, len(c.listeners)+len(c.reporters))
+	if changes {
+		for id := range c.listeners {
+			ids = append(ids, id)
+		}
+	}
+	if reports {
+		for id := range c.reporters {
+			ids = append(ids, id)
+		}
 	}
 	slices.Sort(ids)
 	cbs := make([]func(contract.Change), 0, len(ids))
 	for _, id := range ids {
-		cbs = append(cbs, c.listeners[id])
+		if cb, ok := c.listeners[id]; ok && changes {
+			cbs = append(cbs, cb)
+		} else if cb, ok := c.reporters[id]; ok && reports {
+			cbs = append(cbs, cb)
+		}
 	}
 	c.mu.Unlock()
 	for _, cb := range cbs {
@@ -96,7 +157,17 @@ const QuietMinimumInterval = time.Second
 // read sees it — but neither advances the DataVersion nor marks the
 // attribute dirty until the deferred report goes out
 // (ServerBehaviorBacking reports a quieter property only on its quiet
-// emit).
+// emit). The throttle stands in front of the wire only: the host's
+// listeners see every change at once ([AttributeChanges.ChangedFrom]), as
+// every observer of a QuietEvent itself does (Events.ts:267-297, the
+// QuietObservable is only its `online` view); Report is the wire's
+// ([AttributeChanges.ReportFrom]).
+//
+// A last report later than the clock's now — the clock changed beneath
+// the throttle, as a device's does when it is added to a node and its
+// servers move from the system clock to the node's — counts as long past:
+// the change is reported at once rather than after the distance between
+// the two clocks.
 type Quieter struct {
 	// Report is called, outside the throttle's lock, when a report goes
 	// out.
@@ -119,7 +190,7 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	q.mu.Lock()
 	now := q.now()
 	immediate := wasNull || isNull
-	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(QuietMinimumInterval).Before(now) {
+	if immediate || q.lastEmit.IsZero() || q.lastEmit.Add(QuietMinimumInterval).Before(now) || now.Before(q.lastEmit) {
 		q.emitLocked(now)
 		q.mu.Unlock()
 		q.Report()
