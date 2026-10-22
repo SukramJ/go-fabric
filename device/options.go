@@ -115,6 +115,8 @@ type settings struct {
 	// clients are the client clusters [WithClientClusters] declared, in
 	// call order.
 	clients []uint32
+	// measurements are the [Measurement] sources, in call order.
+	measurements []contract.MeasurementSource
 	// clock is the device's clock, for the servers the device builds.
 	clock clock.Clock
 	// typed are the clusters a generated Declare declared; attach their

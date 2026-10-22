@@ -81,6 +81,8 @@ the existing layer stays for it beside the device kit
 ([ADR 0018](../adr/0018-device-layer-and-node-facade.md)). It hands the
 facade's group state (`Node.Groups`) and endpoint persistence
 (`Node.Persistence`, or `node.NewEndpointPersistence`) to that assembler.
+A sensor built from a classified measurement source does not need the
+seam: `device.Measurement(src)` mounts it on a device of the kit.
 
 **Costs.** With `Config.Topology` the node builds no assembler and no
 `Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, the

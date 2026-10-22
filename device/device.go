@@ -51,6 +51,9 @@ type Device struct {
 	// clients are the client clusters the host declared beyond the type's
 	// mandatory ones ([WithClientClusters]).
 	clients []uint32
+	// measured is what the [Measurement] declarations resolved to: the
+	// sources Spec hands the assembler and the clusters they serve.
+	measured measured
 	// clock is the time source of the servers the device built; queue
 	// runs the device's asynchronous callbacks; reachable is what
 	// [Device.SetReachable] set.
@@ -122,8 +125,12 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err := checkOptedClusters(t, s); err != nil {
 		return nil, err
 	}
+	m, err := resolveMeasurements(t, s)
+	if err != nil {
+		return nil, err
+	}
 	d := &Device{
-		typ: t, opts: opts, clients: slices.Clone(s.clients),
+		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
 		clock: clk, queue: newQueue(),
 	}
 	d.reachable.Store(true)
@@ -144,7 +151,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	sibling := func(id uint32) contract.ClusterServer { return built[id] }
 	for _, i := range buildOrder(t.Servers) {
 		r := &t.Servers[i]
-		if _, ok := assemblerMounted[r.ID]; ok {
+		if _, ok := assemblerMounted[r.ID]; ok || m.ids[r.ID] {
 			continue
 		}
 		srv, ok := s.servers[r.ID]
@@ -440,7 +447,8 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 func (d *Device) Type() *Type { return d.typ }
 
 // Server returns the device's server for clusterID, or nil when it mounts
-// none.
+// none — a cluster served from a [Measurement] source included, whose
+// servers the assembler builds.
 func (d *Device) Server(clusterID uint32) contract.ClusterServer {
 	for _, srv := range d.servers {
 		if srv.MatterClusterID() == clusterID {
@@ -566,6 +574,8 @@ func (d *Device) Spec() endpoint.Spec {
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),
 		OptIn:            slices.Clone(d.optIn),
+		Measurement:      d.measured.source,
+		PowerSource:      d.measured.battery,
 	}
 	for _, p := range d.Parts() {
 		s.Parts = append(s.Parts, p.Spec())

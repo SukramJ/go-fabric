@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - `device.HostServer(srv)`: the one declaration of a host's own server for a host whose servers are a list (#220). It resolves `srv.MatterClusterID()` to the generated `<cluster>def.Declare{HostServer: srv}` through a table `script/devicegen` writes (`device/hostserver_gen.go`, one line per generated cluster package) and mounts a cluster without a package — a manufacturer-specific one — as `WithServer` does. A host stating a port, an `Initial` patch or a feature selection keeps the typed `Declare`.
+- `device.Measurement(src)`: the device kit's form for a classified measurement source (`contract.MeasurementSource`), for a host whose sensors are data (#221). The kit hands the source to the endpoint assembler, which runs `cluster/measurement`'s materialiser once the device is added and its endpoint number is known — the momentary switch and the battery (`contract.MeasurementBattery`, the device's PowerSource) included — and the device keeps the kit's construction-time checks, the type's mandatory client clusters and its lifecycle. `endpoint.Spec.Measurement` stays as the seam.
 
 ### Changed
 
