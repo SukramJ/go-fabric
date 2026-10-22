@@ -78,6 +78,7 @@ type PatchValuer interface {
 // from the value read answers for its attribute, converted to the field's
 // type ([Assign]), generated per cluster (script/clustergen) as
 // [PatchValuer] is.
+// fabric:reachable:reason="a constraint only: StateOf, OnChangedOf, OnChangedAsyncOf and OnWriteOf take it, and RTA records their instantiations, not the constraint interface"
 type StateReader interface {
 	FromAttributeValues(read func(attrID uint32) (any, bool))
 }
