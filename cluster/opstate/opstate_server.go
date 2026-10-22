@@ -531,7 +531,7 @@ func newServer(v variant, cfg Config) (*Server, error) {
 		states: slices.Clone(cfg.States), countOn: cfg.CountdownTime,
 		state: cfg.State, phases: slices.Clone(cfg.Phases), currentPhase: syncedPhase(cfg.Phases, cfg.CurrentPhase),
 	}
-	s.quiet = &cluster.Quieter{Report: func() { s.changed(AttrCountdownTime) }, Clock: cfg.Clock}
+	s.quiet = &cluster.Quieter{Report: func() { s.reported(AttrCountdownTime) }, Clock: cfg.Clock}
 	return s, nil
 }
 
@@ -659,12 +659,26 @@ func (s *Server) changed(attrs ...uint32) {
 	if len(attrs) == 0 {
 		return
 	}
-	origin := contract.OriginHostSet
-	if c := s.cause.Load(); c != 0 {
-		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
-	}
 	s.tracker().Bump()
-	s.NotifyFrom(origin, attrs...)
+	s.NotifyFrom(s.origin(), attrs...)
+}
+
+// reported is the wire report of a quieter attribute when its throttle
+// emits: the DataVersion advances and the report listeners are told; the
+// change listeners saw the change when it happened
+// ([Server.SetCountdownTime]).
+func (s *Server) reported(attrs ...uint32) {
+	s.tracker().Bump()
+	s.ReportFrom(s.origin(), attrs...)
+}
+
+// origin is where the change being reported comes from: a command's
+// while its handler runs, the host's otherwise.
+func (s *Server) origin() contract.Origin {
+	if c := s.cause.Load(); c != 0 {
+		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	}
+	return contract.OriginHostSet
 }
 
 // MatterClusterID returns 0x0060, 0x0061 or 0x0048.
@@ -933,9 +947,11 @@ func equalPhase(a, b *uint8) bool {
 }
 
 // SetCountdownTime sets CountdownTime (nil is null). The value is read
-// back at once, but a change is reported as matter.js reports its "Q"
+// back at once and the change listeners (the host's OnChanged) see it at
+// once, but on the wire a change is reported as matter.js reports its "Q"
 // quality: at once from or to null, otherwise at most once a second, with
-// the latest value (see [cluster.Quieter]). The server applies matter.js's
+// the latest value (see [cluster.Quieter]; the throttle is the
+// QuietEvent's `online` view only, Events.ts:267-297). The server applies matter.js's
 // throttle, not the specification's fuller list of when a countdown change
 // is reportable — matter.js's RvcOperationalStateServer notes the same
 // gap.
@@ -956,6 +972,7 @@ func (s *Server) SetCountdownTime(seconds *uint32) error {
 		s.countdown = &v
 	}
 	s.mu.Unlock()
+	s.ChangedFrom(s.origin(), AttrCountdownTime)
 	s.quiet.Changed(old == nil, seconds == nil)
 	return nil
 }

@@ -657,19 +657,23 @@ type ChangeNotifier interface {
 
 // AttributeChangeNotifier is the optional capability of a [ClusterServer]
 // that holds its attribute state itself, as a matter.js behavior does,
-// and therefore knows exactly which of its attributes moved. The bridge
-// subscribes to it at reassembly for every bridged endpoint: on a fire it
-// advances the endpoint-hosted DataVersion of the server's cluster and
-// marks the named attributes — and only those — dirty for every
-// subscription that covers them.
+// and therefore knows exactly which of its attributes moved. It reports
+// every change at once, whoever made it — matter.js's `$Changed` event,
+// whose observers see each committed change
+// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476):
+// the host's OnChanged is subscribed here. The bridge subscribes to it at
+// reassembly for every bridged endpoint — to [AttributeReportNotifier]
+// instead when the server implements that — and on a fire it advances
+// the endpoint-hosted DataVersion of the server's cluster and marks the
+// named attributes — and only those — dirty for every subscription that
+// covers them. A controller's write is reported by the write path as
+// well; the two mark the same attribute, and a subscription reports it
+// once.
 //
 // Unlike [ChangeNotifier], which a host's source fires and which marks
-// every reportable attribute of its cluster dirty, this one lets a server
-// keep an attribute out of change reporting until its own rule says it
-// changed — a "Q" (quieter) attribute such as OperationalState
-// CountdownTime. Mirrors matter.js Datasource onChange, which reports
-// the properties that changed, and ServerBehaviorBacking, which reports a
-// quieter property only when its QuietEvent emits.
+// every reportable attribute of its cluster dirty, this one names the
+// attributes that moved. Mirrors matter.js Datasource onChange, which
+// reports the properties that changed.
 //
 // Each change carries the attributes that moved and where the change came
 // from ([Change], [Origin]) — the session matter.js hands every change
@@ -683,6 +687,34 @@ type AttributeChangeNotifier interface {
 	OnAttributeChange(cb func(change Change)) (unsubscribe func())
 }
 
+// AttributeReportNotifier is the optional capability of an
+// [AttributeChangeNotifier] whose changes do not all go on the wire as
+// they happen: a server with a quieter ("Q") attribute — LevelControl
+// CurrentLevel, ColorControl's current colour, OperationalState
+// CountdownTime — reports such an attribute to subscribers by its
+// throttle, at most once a second, while [AttributeChangeNotifier] tells
+// the host of every change at once. OnAttributeReport delivers the
+// changes that go on the wire: every change of the server's other
+// attributes as it happens, a quieter attribute's when its throttle
+// emits. The bridge subscribes here in place of
+// [AttributeChangeNotifier.OnAttributeChange] when a server implements
+// it. Mirrors matter.js's OnlineEvent.online — the observable "that emits
+// only those events conveyed between nodes", the event itself normally
+// and its QuietObservable for a server-side quieter element
+// (packages/node/src/behavior/Events.ts:228-236, :267-297;
+// cluster/ClusterBehaviorType.ts:343-344) — to which
+// ServerBehaviorBacking subscribes the report of a quieter property
+// (internal/ServerBehaviorBacking.ts:231-276).
+//
+// A type that forwards OnAttributeChange to a server implementing this
+// forwards OnAttributeReport too, or the bridge reports every change of
+// a quieter attribute at once.
+//
+// Returns an unsubscribe closure; calling it more than once is a no-op.
+type AttributeReportNotifier interface {
+	OnAttributeReport(cb func(change Change)) (unsubscribe func())
+}
+
 // SelfReportedAttributeLister is the optional capability of an
 // [AttributeChangeNotifier] that decides by itself when some of its
 // attributes are reported: a quieter ("Q") attribute that changes while a
@@ -691,8 +723,9 @@ type AttributeChangeNotifier interface {
 // effect on a cluster by comparing the cluster's attributes before and
 // after the command; it leaves the listed attributes out of that
 // comparison, so their changes reach subscribers only through the
-// server's own notification — matter.js ServerBehaviorBacking reports a
-// quieter property only when its QuietEvent emits.
+// server's own report ([AttributeReportNotifier]) — matter.js
+// ServerBehaviorBacking reports a quieter property only when its
+// QuietEvent emits.
 //
 // MatterSelfReportedAttributes may answer differently over a server's
 // lifetime only where its configuration says so; the bridge asks per

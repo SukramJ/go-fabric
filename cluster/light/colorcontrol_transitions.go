@@ -203,48 +203,67 @@ func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWrite
 	return nil
 }
 
-// report reports the attributes that differ between prev and next, from
-// origin — a quieter report it defers carries the origin of the last
-// change before it.
+// report is the one place a change of the colour state is reported: the
+// attributes that differ between prev and next, from origin. The change
+// listeners see all of them at once, as every observer of matter.js's
+// `$Changed` events does (Datasource.ts:1473-1476; Events.ts:267-297 a
+// QuietEvent's own observers are not throttled); on the wire the "Q"
+// attributes follow their quieter rules (ServerBehaviorBacking.ts:265-273)
+// — a quieter report it defers carries the origin of the last change
+// before it — and the rest go at once.
 func (s *ColorControlServer) report(origin contract.Origin, prev, next colorState) {
 	s.cause.Store(uint32(origin))
-	quiet := func(id uint32, changed bool) {
-		if changed && s.inst.Serves(id) {
-			s.quiet[id].Changed(false, false)
+	var all, quiet, plain []uint32
+	add := func(id uint32, changed, isQuiet bool) {
+		if !changed || !s.inst.Serves(id) {
+			return
+		}
+		all = append(all, id)
+		if isQuiet {
+			quiet = append(quiet, id)
+		} else {
+			plain = append(plain, id)
 		}
 	}
-	quiet(ccdef.AttrCurrentHue, prev.hue != next.hue)
-	quiet(ccdef.AttrCurrentSaturation, prev.saturation != next.saturation)
-	quiet(ccdef.AttrCurrentX, prev.x != next.x)
-	quiet(ccdef.AttrCurrentY, prev.y != next.y)
-	quiet(ccdef.AttrColorTemperatureMireds, prev.mireds != next.mireds)
-	quiet(ccdef.AttrEnhancedCurrentHue, prev.enhancedHue != next.enhancedHue)
-
-	var ids []uint32
-	add := func(id uint32, changed bool) {
-		if changed && s.inst.Serves(id) {
-			ids = append(ids, id)
-		}
+	add(ccdef.AttrCurrentHue, prev.hue != next.hue, true)
+	add(ccdef.AttrCurrentSaturation, prev.saturation != next.saturation, true)
+	add(ccdef.AttrCurrentX, prev.x != next.x, true)
+	add(ccdef.AttrCurrentY, prev.y != next.y, true)
+	add(ccdef.AttrColorTemperatureMireds, prev.mireds != next.mireds, true)
+	add(ccdef.AttrEnhancedCurrentHue, prev.enhancedHue != next.enhancedHue, true)
+	add(ccdef.AttrColorMode, prev.mode != next.mode, false)
+	add(ccdef.AttrEnhancedColorMode, prev.enhancedMode != next.enhancedMode, false)
+	add(ccdef.AttrColorLoopActive, prev.loopActive != next.loopActive, false)
+	add(ccdef.AttrColorLoopDirection, prev.loopDirection != next.loopDirection, false)
+	add(ccdef.AttrColorLoopTime, prev.loopTime != next.loopTime, false)
+	add(ccdef.AttrColorLoopStartEnhancedHue, prev.loopStart != next.loopStart, false)
+	add(ccdef.AttrColorLoopStoredEnhancedHue, prev.loopStored != next.loopStored, false)
+	if len(all) == 0 {
+		return
 	}
-	add(ccdef.AttrColorMode, prev.mode != next.mode)
-	add(ccdef.AttrEnhancedColorMode, prev.enhancedMode != next.enhancedMode)
-	add(ccdef.AttrColorLoopActive, prev.loopActive != next.loopActive)
-	add(ccdef.AttrColorLoopDirection, prev.loopDirection != next.loopDirection)
-	add(ccdef.AttrColorLoopTime, prev.loopTime != next.loopTime)
-	add(ccdef.AttrColorLoopStartEnhancedHue, prev.loopStart != next.loopStart)
-	add(ccdef.AttrColorLoopStoredEnhancedHue, prev.loopStored != next.loopStored)
-	if len(ids) > 0 {
-		s.changes.NotifyFrom(origin, ids...)
+	slices.Sort(all)
+	s.changes.ChangedFrom(origin, all...)
+	for _, id := range quiet {
+		s.quiet[id].Changed(false, false)
 	}
+	s.changes.ReportFrom(origin, plain...)
 }
 
-// OnAttributeChange implements [contract.AttributeChangeNotifier]:
-// the "Q" attributes by their quieter rules — at most once a second while
-// a transition runs, the end flushing the last value — RemainingTime when
-// matter.js's #updateRemainingTime would report it, and the colour mode
-// and colour loop attributes when they change.
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: every
+// change at once — the colour, its modes and its loop whoever changed
+// them ([ColorControlServer.report]), Options and
+// StartUpColorTemperatureMireds, and RemainingTime when matter.js's
+// #updateRemainingTime would report it.
 func (s *ColorControlServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	return s.changes.OnAttributeChange(cb)
+}
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: what
+// goes on the wire — the "Q" attributes by their quieter rules, at most
+// once a second while a transition runs and the end flushing the last
+// value, every other change at once.
+func (s *ColorControlServer) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.changes.OnAttributeReport(cb)
 }
 
 // MatterSelfReportedAttributes implements

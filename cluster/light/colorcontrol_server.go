@@ -293,6 +293,7 @@ var (
 	_ contract.ClusterAttributeWritePrivilege = (*ColorControlServer)(nil)
 	_ contract.AttributeChangeNotifier        = (*ColorControlServer)(nil)
 	_ contract.SelfReportedAttributeLister    = (*ColorControlServer)(nil)
+	_ contract.AttributeReportNotifier        = (*ColorControlServer)(nil)
 	_ contract.ClusterQuiescer                = (*ColorControlServer)(nil)
 )
 
@@ -369,7 +370,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
-		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.NotifyFrom(contract.Origin(s.cause.Load()), id) }, Clock: cfg.Clock} //nolint:gosec // only an Origin is stored
+		s.quiet[id] = &cluster.Quieter{Report: func() { s.changes.ReportFrom(contract.Origin(s.cause.Load()), id) }, Clock: cfg.Clock} //nolint:gosec // only an Origin is stored
 	}
 	s.engine = transition.New(transition.Config{
 		Manage:       cfg.ManageTransitions,
@@ -576,18 +577,28 @@ func (s *ColorControlServer) MatterWrite(ctx context.Context, attrID uint32, val
 	if err := s.veto.Check(ctx, attrID, vetoed); err != nil {
 		return err
 	}
+	changed := false
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	switch attrID {
 	case ccdef.AttrOptions:
 		n, _ := v.(uint64)
-		s.options = uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
+		options := uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
+		changed = options != s.options
+		s.options = options
 	case ccdef.AttrStartUpColorTemperatureMireds:
-		s.startUpMireds = nil
+		var next *uint16
 		if n, ok := v.(uint64); ok {
 			m := uint16(n) //nolint:gosec // within "1 to 65279" per ValidateWrite
-			s.startUpMireds = &m
+			next = &m
 		}
+		changed = !equalMireds(s.startUpMireds, next)
+		s.startUpMireds = next
+	}
+	s.mu.Unlock()
+	// A change is reported to the server's listeners, as matter.js emits
+	// <attribute>$Changed when the write commits (Datasource.ts:1473-1476).
+	if changed {
+		s.changes.NotifyFrom(contract.OriginFrom(ctx), attrID)
 	}
 	return nil
 }

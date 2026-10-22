@@ -154,8 +154,12 @@ func (d *Device) Rename(ctx context.Context, name string) {
 // inline, on the goroutine that made the change and before the write,
 // command or Set that made it returns; [Device.OnChangedAsync] queues it.
 // It is the untyped form of the typed accessor's OnChanged — one hook, two
-// signatures. It returns the unsubscribe function; a cluster the device
-// does not mount, or whose server notifies nothing, never calls fn.
+// signatures. It returns the unsubscribe function. A cluster the device
+// does not mount never calls fn, nor does Binding, whose server reports
+// its changes through core.Binding.OnChange instead; a server that reads
+// its state from a host port ([contract.ChangeNotifier] only — valve,
+// fan, pump, SmokeCoAlarm, ModeSelect) calls fn when that port notifies,
+// with [contract.OriginUnknown].
 func (d *Device) OnChanged(clusterID uint32, fn func(change contract.Change)) (unsubscribe func()) {
 	srv := d.Server(clusterID)
 	if srv == nil || fn == nil {

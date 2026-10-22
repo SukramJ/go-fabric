@@ -24,6 +24,7 @@ import (
 type typedOnOff struct {
 	mu      sync.Mutex
 	on      bool
+	origin  contract.Origin // of the changes it reports; zero is OriginUnknown
 	changes cluster.AttributeChanges
 }
 
@@ -39,7 +40,7 @@ func (o *typedOnOff) SetOnOff(_ context.Context, on bool) error {
 	o.on = on
 	o.mu.Unlock()
 	if changed {
-		o.changes.Notify(0x0000)
+		o.changes.NotifyFrom(o.origin, 0x0000)
 	}
 	return nil
 }

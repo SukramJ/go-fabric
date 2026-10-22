@@ -728,13 +728,18 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 		thermoAttrMinHeatSetpointLimit, thermoAttrMaxHeatSetpointLimit,
 		thermoAttrMinCoolSetpointLimit, thermoAttrMaxCoolSetpointLimit:
 		n, _ := v.(int64) // an int16 per ValidateWrite
-		coupled, err := s.writeSetpoint(ctx, attrID, int(n))
+		changed, err := s.writeSetpoint(ctx, attrID, int(n))
 		if err != nil {
 			return err
 		}
-		// The written attribute is reported by the write path; what the
-		// reconcile moved besides it is reported here.
-		s.changes.NotifyFrom(contract.OriginControllerWrite, coupled...)
+		// The written attribute and what the reconcile moved besides it
+		// reach the listeners from the write, as matter.js emits each
+		// <setpoint>$Changed on the commit of the write's transaction
+		// (Datasource.ts:1473-1476). The subscriber's report of the
+		// written attribute is the write path's as well; a subscription
+		// reports it once.
+		slices.Sort(changed)
+		s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
 		return nil
 	case thermoAttrControlSequenceOfOperation:
 		// "For backwards compatibility, this attribute is optionally
@@ -752,9 +757,14 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	case thermoAttrLocalTemperatureCalibration:
 		// "RW VM", plain state in matter.js.
 		n, _ := v.(int64) // an int8 per ValidateWrite
+		calib := int16(n) //nolint:gosec // an int8 per ValidateWrite
 		s.mu.Lock()
-		s.localTempCalib = int16(n) //nolint:gosec // an int8 per ValidateWrite
+		changed := s.localTempCalib != calib
+		s.localTempCalib = calib
 		s.mu.Unlock()
+		if changed {
+			s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrLocalTemperatureCalibration)
+		}
 		return nil
 	default: // thermoAttrSystemMode, the last writable attribute
 		n, _ := v.(uint64)                      // an enum8 per ValidateWrite, its conformance checked
@@ -820,6 +830,7 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 	s.mu.Lock()
 	s.systemMode = v
 	s.mu.Unlock()
+	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
 	return nil
 }
 
@@ -828,7 +839,8 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 // occupied*Setpoint$Changing (#assertSetpointWithinLimits, then
 // #reconcileSetpoints) and on the limits' $Changing
 // (#assertLimitWithinAbs, then #reconcileSetpoints). It returns the
-// attributes the reconcile moved besides the written one.
+// attributes the write changed: the written one and what the reconcile
+// moved besides it.
 //
 // An occupied setpoint goes to the [Sink] after the assert and the
 // reconcile, with what the reconcile would move, and before anything is
@@ -882,12 +894,12 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	if t.limit || s.sink == nil {
 		// No port call: computed and stored under one hold of s.mu, so an
 		// inbound setter cannot land in between.
-		coupled := withoutAttr(s.commitSetpoints(st), attrID)
+		changed := s.commitSetpoints(st)
 		s.mu.Unlock()
 		if !t.limit {
 			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
 		}
-		return coupled, nil
+		return changed, nil
 	}
 	// The Sink hears the value the server will store: the written
 	// setpoint after the reconcile, not the value the controller wrote.
@@ -930,21 +942,10 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		}
 		s.logger().Warn("matter.thermostat.sink_companions_moved", attrs...)
 	}
-	coupled := withoutAttr(s.commitSetpoints(next), attrID)
+	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
 	s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
-	return coupled, nil
-}
-
-// withoutAttr drops attrID from ids.
-func withoutAttr(ids []uint32, attrID uint32) []uint32 {
-	var out []uint32
-	for _, id := range ids {
-		if id != attrID {
-			out = append(out, id)
-		}
-	}
-	return out
+	return changed, nil
 }
 
 // withoutChange drops attrID's entry from changes.
@@ -1190,6 +1191,7 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool,
 		}
 	}
 	s.mu.Lock()
+	changed := make([]uint32, 0, len(moves))
 	for _, m := range moves {
 		switch m.AttrID {
 		case thermoAttrOccupiedCoolingSetpoint:
@@ -1201,8 +1203,13 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool,
 		default:
 			s.unoccHeat = m.Value
 		}
+		changed = append(changed, m.AttrID)
 	}
 	s.mu.Unlock()
+	// What the command moved reaches the listeners from the command, as
+	// applyCommandSetpoints reports it (Datasource.ts:1473-1476).
+	slices.Sort(changed)
+	s.changes.NotifyFrom(contract.OriginCommand, changed...)
 	return nil
 }
 
