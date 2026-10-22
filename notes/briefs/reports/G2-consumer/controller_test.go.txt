@@ -1,0 +1,128 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package main
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/SukramJ/go-fabric/client/interaction"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
+)
+
+// TestControllerView is the controller program over controller/client: it
+// commissions the bridge, subscribes to the light's OnOff and CurrentLevel
+// and reads the thermostat's setpoint through the node's image.
+func TestControllerView(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	b, err := newBridge()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev := site.AddDevice(fabrictest.Topology{Bridged: b.endpoints()})
+	ctl := site.AddController(fabrictest.ControllerOptions{})
+	cn, err := ctl.CommissionNode(ctx, dev, client.CommissionOptions{AutoSubscribe: new(false)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("commissioned")
+	lightEP := endpointOf(t, b.light, "light")
+	thermoEP := endpointOf(t, b.thermo, "thermostat")
+
+	var mu sync.Mutex
+	reports := 0
+	sub, err := cn.Subscribe(ctx, interaction.SubscribeRequest{
+		Attributes: []im.ConcreteAttributePath{
+			attr(lightEP, onoffdef.ClusterID, onoffdef.AttrOnOff),
+			attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel),
+		},
+		Updated: func(*interaction.Report) {
+			mu.Lock()
+			reports++
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = sub
+	t.Log("subscribed")
+
+	light := cn.Endpoint(lightEP)
+	if light == nil {
+		t.Fatal("the image has no light endpoint")
+	}
+	level := func() any {
+		v, _ := light.Cluster(levelcontroldef.ClusterID).Decoded(levelcontroldef.AttrCurrentLevel)
+		return v
+	}
+	t.Logf("CurrentLevel in the image: %T %v", level(), level())
+
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return reports
+	}
+	primed := count()
+
+	// The host switches the light off: the report reaches the image.
+	if err := dev.Act(func(*node.Node) error { return b.light.OnOff().Set(onoffdef.Patch{OnOff: new(false)}) }); err != nil {
+		t.Fatal(err)
+	}
+	onOff := func() any {
+		v, _ := light.Cluster(onoffdef.ClusterID).Decoded(onoffdef.AttrOnOff)
+		return v
+	}
+	if err := site.Eventually(ctx, "the OnOff report", func() bool { return onOff() == false }); err != nil {
+		t.Fatalf("%v: OnOff %T %v", err, onOff(), onOff())
+	}
+	t.Logf("reports: %d primed, %d after OnOff", primed, count())
+
+	// The bridge dims: the report reaches the image.
+	if err := dev.Act(func(*node.Node) error { return b.stepLevel() }); err != nil {
+		t.Fatal(err)
+	}
+	// The host's Set of CurrentLevel is never reported to the
+	// subscription (NOTES 2), not even past the 1 s quieter-reporting
+	// window; a read brings the image up to date.
+	site.Fake().Advance(2 * time.Second)
+	short, cancelShort := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelShort()
+	if err := site.Eventually(short, "the level report", func() bool { return level() == uint64(20) }); err != nil {
+		t.Logf("%v: CurrentLevel %T %v, reports %d", err, level(), level(), count())
+		if _, err := cn.Read(ctx, client.ReadRequest{ReadRequest: interaction.ReadRequest{
+			Attributes: []im.ConcreteAttributePath{attr(lightEP, levelcontroldef.ClusterID, levelcontroldef.AttrCurrentLevel)},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if level() != uint64(20) {
+		t.Errorf("CurrentLevel in the image %T %v, want 20", level(), level())
+	}
+
+	// Read the thermostat's setpoint and take it from the image.
+	if _, err := cn.Read(ctx, client.ReadRequest{ReadRequest: interaction.ReadRequest{
+		Attributes: []im.ConcreteAttributePath{attr(thermoEP, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := cn.Endpoint(thermoEP).Cluster(thermostatdef.ClusterID).Decoded(thermostatdef.AttrOccupiedHeatingSetpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != int64(2000) { // Decoded hands an int16 attribute back as int64 (NOTES 11)
+		t.Errorf("OccupiedHeatingSetpoint %T %v, want 2000", v, v)
+	}
+}

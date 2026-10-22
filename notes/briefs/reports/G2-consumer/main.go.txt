@@ -1,0 +1,312 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+// Command g2consumer is the gate-2 consumer's bridge: four devices on the
+// declaration — a dimmable light the program dims every second, a contact
+// sensor, a thermostat whose setpoint the host owns, and a door lock with
+// a host actuator.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
+	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
+	"github.com/SukramJ/go-fabric/node"
+)
+
+// key is the host's stable key of a device.
+type key string
+
+func (k key) String() string { return string(k) }
+
+// levelSeen is one change of the light's level as the host saw it.
+type levelSeen struct {
+	Level  uint8
+	Origin contract.Origin
+}
+
+// setpointSeen is one setpoint change that reached the host's heating.
+type setpointSeen struct {
+	AttrID uint32
+	Value  int16
+}
+
+// heating is the host's heating controller: the source of the occupied
+// heating setpoint and the sink of the setpoint a controller asks for.
+type heating struct {
+	mu       sync.Mutex
+	setpoint int16 // 0.01 °C
+	seen     []setpointSeen
+}
+
+func (h *heating) Setpoint() int16 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.setpoint
+}
+
+// SetSystemMode implements thermostatdef.Sink.
+func (h *heating) SetSystemMode(context.Context, uint8) error { return nil }
+
+// SetSetpoint implements thermostatdef.Sink: the controller's setpoint
+// reaches the host's heating.
+func (h *heating) SetSetpoint(_ context.Context, attrID uint32, value int16, _ []thermostatdef.SetpointChange) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.seen = append(h.seen, setpointSeen{AttrID: attrID, Value: value})
+	if attrID == thermostatdef.AttrOccupiedHeatingSetpoint {
+		h.setpoint = value
+	}
+	return nil
+}
+
+func (h *heating) Seen() []setpointSeen {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]setpointSeen(nil), h.seen...)
+}
+
+// bolt is the host's lock actuator.
+type bolt struct {
+	mu      sync.Mutex
+	locked  bool
+	invoked []uint32
+}
+
+// IsJammed implements doorlockdef.StateSource.
+func (b *bolt) IsJammed() bool { return false }
+
+// IsLocked implements doorlockdef.StateSource.
+func (b *bolt) IsLocked() (locked, observed bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.locked, true
+}
+
+// LockInvoke implements doorlockdef.StateSource: the motor runs.
+func (b *bolt) LockInvoke(_ context.Context, cmdID uint32) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.invoked = append(b.invoked, cmdID)
+	switch cmdID {
+	case doorlockdef.CmdLockDoor:
+		b.locked = true
+	case doorlockdef.CmdUnlockDoor:
+		b.locked = false
+	}
+	return nil
+}
+
+func (b *bolt) Invoked() []uint32 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]uint32(nil), b.invoked...)
+}
+
+// bridge is the host's four devices and the host-side state behind them.
+type bridge struct {
+	light  *device.DimmableLight
+	door   *device.ContactSensor
+	thermo *device.Thermostat
+	lock   *device.DoorLock
+
+	heat *heating
+	bolt *bolt
+
+	mu        sync.Mutex
+	levels    []levelSeen // every change OnChanged reported
+	commanded []levelSeen // every MoveToLevel the host handled
+	changes   []changeSeen
+}
+
+func newBridge() (*bridge, error) {
+	b := &bridge{heat: &heating{setpoint: 2000}, bolt: &bolt{}}
+	var err error
+	b.light, err = device.NewDimmableLight(device.Options{StableKey: key("light"), Name: "Hall light"},
+		onoffdef.Declare{Initial: onoffdef.Patch{OnOff: new(true)}},
+		levelcontroldef.Declare{
+			Initial: levelcontroldef.Patch{CurrentLevel: new(uint8(10))},
+			// The kit's LevelControl server never calls OnChanged (NOTES 1),
+			// so the host takes MoveToLevel itself to see it.
+			HandleMoveToLevel: func(ctx context.Context, req levelcontroldef.MoveToLevelRequest) (struct{}, error) {
+				b.mu.Lock()
+				b.commanded = append(b.commanded, levelSeen{Level: req.Level, Origin: contract.OriginFrom(ctx)})
+				b.mu.Unlock()
+				return struct{}{}, b.light.LevelControl().Set(levelcontroldef.Patch{CurrentLevel: &req.Level})
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("light: %w", err)
+	}
+	b.door, err = device.NewContactSensor(device.Options{StableKey: key("door"), Name: "Front door"},
+		booleanstatedef.Declare{Initial: booleanstatedef.Patch{StateValue: new(true)}})
+	if err != nil {
+		return nil, fmt.Errorf("door: %w", err)
+	}
+	b.thermo, err = device.NewThermostat(device.Options{StableKey: key("thermo"), Name: "Living room"},
+		thermostatdef.Declare{
+			Features: thermostatdef.FeatureHeating,
+			Initial: thermostatdef.Patch{
+				LocalTemperature:        new(int16(1950)),
+				OccupiedHeatingSetpoint: new(b.heat.Setpoint()),
+			},
+			Sink: b.heat,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("thermostat: %w", err)
+	}
+	b.lock, err = device.NewDoorLock(device.Options{StableKey: key("lock"), Name: "Front lock"},
+		doorlockdef.Declare{StateSource: b.bolt})
+	if err != nil {
+		return nil, fmt.Errorf("lock: %w", err)
+	}
+	b.light.LevelControl().OnChanged(func(s levelcontroldef.State, c contract.Change) {
+		if s.CurrentLevel == nil {
+			return
+		}
+		b.mu.Lock()
+		b.levels = append(b.levels, levelSeen{Level: *s.CurrentLevel, Origin: c.Origin})
+		b.mu.Unlock()
+	})
+	b.thermo.Thermostat().OnChanged(func(_ thermostatdef.State, c contract.Change) {
+		b.mu.Lock()
+		b.changes = append(b.changes, changeSeen{Cluster: thermostatdef.ClusterID, Origin: c.Origin})
+		b.mu.Unlock()
+	})
+	b.lock.DoorLock().OnChanged(func(_ doorlockdef.State, c contract.Change) {
+		b.mu.Lock()
+		b.changes = append(b.changes, changeSeen{Cluster: doorlockdef.ClusterID, Origin: c.Origin})
+		b.mu.Unlock()
+	})
+	return b, nil
+}
+
+// changeSeen is one change of a cluster the host observes, with its origin.
+type changeSeen struct {
+	Cluster uint32
+	Origin  contract.Origin
+}
+
+func (b *bridge) Changes() []changeSeen {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]changeSeen(nil), b.changes...)
+}
+
+func (b *bridge) endpoints() []node.Endpoint {
+	return []node.Endpoint{b.light, b.door, b.thermo, b.lock}
+}
+
+func (b *bridge) Levels() []levelSeen {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]levelSeen(nil), b.levels...)
+}
+
+func (b *bridge) Commanded() []levelSeen {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]levelSeen(nil), b.commanded...)
+}
+
+// stepLevel is the program's own dimming: one step up, wrapping at 254.
+func (b *bridge) stepLevel() error {
+	cur := uint8(0)
+	if l := b.light.LevelControl().Get().CurrentLevel; l != nil {
+		cur = *l
+	}
+	next := cur + 10
+	if next > 254 || next < cur {
+		next = 1
+	}
+	return b.light.LevelControl().Set(levelcontroldef.Patch{CurrentLevel: &next})
+}
+
+// heatingChanged is the host-side source moving the setpoint (a wall dial).
+func (b *bridge) heatingChanged(setpoint int16) error {
+	b.heat.mu.Lock()
+	b.heat.setpoint = setpoint
+	b.heat.mu.Unlock()
+	return b.thermo.Thermostat().Set(thermostatdef.Patch{OccupiedHeatingSetpoint: &setpoint})
+}
+
+// dim changes the level every tick until ctx ends.
+func (b *bridge) dim(ctx context.Context, tick <-chan time.Time) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick:
+			if err := b.stepLevel(); err != nil {
+				slog.Warn("dim", slog.String("err", err.Error()))
+			}
+		}
+	}
+}
+
+func config(path string) node.Config {
+	return node.Config{
+		Commissioning: node.Commissioning{
+			Passcode: 20202021, Discriminator: 3840,
+			PBKDFIterations: 1000, Salt: []byte("go-fabric-g2-consumer"),
+		},
+		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8003},
+		BasicInformation: node.BasicInformation{
+			VendorName: "g2", ProductName: "g2 bridge",
+			NodeLabel: "G2 bridge", SerialNumber: "G2-0001",
+		},
+		Store: node.Store{Path: path},
+	}
+}
+
+func run(ctx context.Context) error {
+	b, err := newBridge()
+	if err != nil {
+		return err
+	}
+	n, err := node.New(config("g2consumer.db")) //nolint:contextcheck // the constructor takes no context
+	if err != nil {
+		return err
+	}
+	for _, ep := range b.endpoints() {
+		if err := n.Aggregator().Add(ctx, ep); err != nil {
+			_ = n.Stop(context.WithoutCancel(ctx))
+			return err
+		}
+	}
+	n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own
+	if err := n.Start(ctx); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
+		return err
+	}
+	if qr, manual, err := n.PairingCodes(); err == nil {
+		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)
+	}
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	b.dim(ctx, t.C)
+	return n.Stop(context.WithoutCancel(ctx))
+}
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx)
+	stop()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

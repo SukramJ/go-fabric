@@ -108,14 +108,19 @@ hold gets the guard (principle 11).
    (`controller/dcl/store.go`), the controller's CA key file
    (`controller/ca/keyfile`) and the attestation chain files
    (`secure/attestation/files.go`). No package opens a file or keeps
-   state across a restart by any other path.
+   state across a restart by any other path — two residues named at
+   gate 2 (2026-10-22) until phase 21 moves them behind a seam: the OTA
+   requestor's downloaded image (`cluster/core/ota_requestor_query.go`)
+   and the DCL snapshot fetch (`controller/dcl/snapshot/fetch.go`).
 8. **Errors are values with one style.** A sentinel or typed error per
    condition, its message prefixed with the package name, wrapped with
    `%w` on the way up; a wire status (an Interaction Model status code) is
    carried by one typed error and mapped to the wire in one place (the
    dispatcher), so a server names the condition and never formats the
-   status itself. Where a layer imports `im` only to spell a status, the
-   first audit decides whether the status type moves below the servers.
+   status itself. A server spells its status through `im` (`spec.Errorf`,
+   `im.UnsupportedCommandf`): `im` is the model-and-protocol layer below
+   the servers, the edge is downward, and no second status type is
+   introduced (decided at gate 2, 2026-10-22).
 9. **Observability is `slog` with injected loggers.** Every component
    takes a `*slog.Logger` (nil = `slog.Default()`), events are named
    `area.event` in dotted lower case (`ota.provider.apply_version_adjusted`),
@@ -144,6 +149,12 @@ hold gets the guard (principle 11).
     outside `controller/` changes for the controller role until a stage
     lands — stays; this principle is about where shared code lives, not
     about scope.
+    The controller's reading of a peer's device types and composition
+    (`controller/client/endpoint.go`, `conformance.go`) uses `device.Type`
+    and `endpoint.DeviceTypeTree`: role-neutral by content, in `endpoint`
+    by history, a downward edge in the layer order; milestone 5 moves the
+    validator to a role-neutral package when it touches that reading
+    (gate 2, 2026-10-22).
 
 **Gates.** The architecture review at each gate of phase 20 (ADR 0025)
 audits the whole tree against these twelve principles, one section per
