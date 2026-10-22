@@ -128,6 +128,8 @@ func (b *Bridge) ReestablishFormerSubscriptions(ctx context.Context) Reestablish
 	}
 
 	var (
+		// mu guards done, which the per-peer goroutines append their
+		// re-established ids to.
 		mu   sync.Mutex
 		done []uint32
 		wg   sync.WaitGroup

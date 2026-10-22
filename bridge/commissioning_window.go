@@ -106,6 +106,9 @@ type CommissioningWindow struct {
 	// clock times the window (see [CommissioningWindow.SetClock]).
 	clock clockvar.Var
 
+	// mu guards the window's state: every field below it. The transition
+	// hooks and the restore closure are read under it and run after it is
+	// released.
 	mu sync.RWMutex
 	// blocked, while non-nil, refuses every window ([SetBlocked]).
 	blocked        error

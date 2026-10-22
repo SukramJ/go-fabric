@@ -71,6 +71,8 @@ func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) 
 	if req.Sustain {
 		callerRefresh = req.RefreshRequest
 	}
+	// sentMu guards sent, the scope the next report is applied by, which a
+	// re-subscription's RefreshRequest replaces.
 	var sentMu sync.Mutex
 	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req

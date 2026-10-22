@@ -220,6 +220,12 @@ type Groupcast struct {
 	// and then changes several sources, as one matter.js transaction does.
 	cmdMu sync.Mutex
 
+	// mu guards the fields below it except dataVersion: the endpoint, the
+	// emitter, the GroupcastTesting period (fabricUnderTest, testingGen,
+	// stopTesting, unlisten) and the change notifiers. It is taken inside
+	// cmdMu, and held across the timer and the stopTesting call of
+	// GroupcastTesting; the notifiers, the emitter and unlisten run after
+	// it is released.
 	mu              sync.RWMutex
 	endpoint        uint16
 	emitter         contract.EventEmitter

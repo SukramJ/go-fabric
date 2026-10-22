@@ -116,6 +116,8 @@ type connection struct {
 	workers     sync.WaitGroup
 	wake        chan struct{}
 
+	// mu guards the connection's state: every field below it, session
+	// through kickHandlers.
 	mu             sync.Mutex
 	session        *exchange.Session
 	fatal          error

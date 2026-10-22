@@ -372,6 +372,7 @@ type MeasurementKind struct {
 // because registration may happen from several host init functions
 // whose order nobody controls.
 var (
+	// measurementKindsMu guards measurementKinds and nextMeasurementClass.
 	measurementKindsMu   sync.RWMutex
 	measurementKinds     = builtinMeasurementKinds()
 	nextMeasurementClass = measurementClassBuiltinEnd

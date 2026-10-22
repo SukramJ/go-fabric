@@ -85,6 +85,9 @@ type Session struct {
 	fragmentSize int
 	windowSize   int
 
+	// mu guards the session's state below it: the receive and send state,
+	// the queue, pendingFirstAck, onStall and the sessionTimers' state. It is
+	// released around the Message, Write and Disconnect callbacks.
 	mu sync.Mutex
 	// Receive side (:32-35): the message being reassembled, the last
 	// sequence number received, the last acknowledgement received.

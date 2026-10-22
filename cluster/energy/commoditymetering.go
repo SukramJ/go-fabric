@@ -62,6 +62,9 @@ type CommodityMeteringConfig struct {
 type CommodityMeteringServer struct {
 	*spec.Server
 
+	// mu serialises the setters that read an attribute before they write
+	// (SetMaximumMeteredQuantities, SetMeteredQuantity), held across the
+	// embedded Server's Set. The server has no field of its own to guard.
 	mu sync.Mutex
 }
 

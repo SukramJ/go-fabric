@@ -277,7 +277,10 @@ type ThermostatServer struct {
 	// queue, held across the Sink, never taken by the inbound setters. mu
 	// guards the values; the setters take only mu, and it is not held
 	// while the Sink runs (issue #63).
-	op       sync.Mutex
+	op sync.Mutex
+	// mu guards the values that change after construction: localTemp
+	// through systemMode. It is taken inside op and not held while the Sink
+	// runs.
 	mu       sync.RWMutex
 	features uint32
 	inst     *spec.Instance

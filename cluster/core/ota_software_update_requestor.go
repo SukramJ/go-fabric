@@ -63,6 +63,9 @@ type OTASoftwareUpdateRequestor struct {
 	logger *slog.Logger
 	dv     cluster.DataVersionTracker
 
+	// mu guards the emitter, the endpoint, the attribute state, the
+	// persisted state and the query state: every field below it up to
+	// stopped, wg aside (a WaitGroup).
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16

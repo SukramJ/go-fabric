@@ -51,6 +51,8 @@ type pendingChange struct{ erase, install, rebuild bool }
 // at 0ceb202d): the endpoints and clusters the peer's reports describe. Its
 // state is guarded by the node's lock; every method expects it held.
 type structure struct {
+	// mu is the owning Node's lock (Node.mu); it guards every field of the
+	// structure, and every method expects it held.
 	mu  *sync.RWMutex
 	log *slog.Logger
 	p   *persister
