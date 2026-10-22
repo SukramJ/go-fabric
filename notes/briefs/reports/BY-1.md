@@ -126,7 +126,25 @@ filter, onoff, EVSE, GridConditions, washer, dryer, DoorLock, ThermostatUI.
 
 ## Guards
 
-GUARDS
+At `59681890` (the code and snapshots; `0202963a` changes only a test's
+counters, race and chip-tool ran there):
+
+| Guard | HEAD | Exit |
+| --- | --- | --- |
+| `make ci` | `59681890` | 0 |
+| `make reachability-check` (unreached 5, on its ratchet) | `59681890` | 0 |
+| `make cite-check` (hard 0, drift 263, on its ratchet) | `59681890` | 0 |
+| `make testparity-check` | `59681890` | 0 |
+| `make race` ×2 | `0202963a` | 0, 0 |
+| `make chiptool-test` | `0202963a` | 0 (TestMatterJSController skipped by its own condition) |
+| `GOFABRIC_CHIP_FAMILIES=LVL,OO,CC,TSTAT make chiptool-families` | `0202963a` | 0 (36 cases pass, 19 skip, none fail) |
+
+The first `make race` found a race in a new test (a counter the
+quieter's timer goroutine wrote, read after `synctest.Wait`); the counter
+is atomic now (`0202963a`). Five new citations of `Datasource.ts:1473-1476`
+read as drift (the sentence named `$Changed`, which those lines do not
+contain); reworded to what the lines do. No FeatureMap or composition
+moved: no `needs-chiptool` label.
 
 ## Differences
 
