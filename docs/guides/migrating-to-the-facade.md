@@ -1,9 +1,11 @@
 # Migrating to the facade
 
 For a host that imports packages below `node/` today. The worked example is
-[OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) at its go-fabric
-`v0.6.0` pin (`go.mod:36`); its locations are given as `file:line` in that
-repository. Each row names the facade route, or the section of
+[OpenCCU-Loom](https://github.com/SukramJ/openccu-loom); its locations are
+given as `file:line` in that repository, taken when loom pinned go-fabric
+`v0.6.0` (`go.mod:36`), and the table was checked against that pin. Loom
+migrated from `v0.7.3` (SukramJ/openccu-loom#998), and the cited lines
+still held there. Each row names the facade route, or the section of
 [Advanced seams](advanced-seams.md) when the symbol stays below the facade.
 
 ## Symbol → route
@@ -83,6 +85,7 @@ without a type; each has one form now.
 | `schema.DeviceTypeRevision`, `DeviceTypeName`, `DeviceTypeAllowsServerCluster`, `DeviceTypeRequiresServerCluster`, `DeviceTypeDefinitionOf`, `DeviceTypeConditions`, `DeviceTypeConditionScope`, `DeviceTypeClusterRequirement`, `DeviceTypeElementRequirements` and the `DeviceType*` tables over `uint32` | the same over `schema.DeviceTypeID`; a Descriptor's 32-bit devtype-id converts with `schema.DeviceTypeIDOf(id)` (false for a manufacturer-specific one) |
 | `spec.PatchValues(patch any)` | `Patch.AttributeValues()` (the generated `spec.PatchValuer`); `spec.SetPatch` takes a `spec.PatchValuer` |
 | `spec.StateOf[S]`, `OnChangedOf`, `OnChangedAsyncOf`, `OnWriteOf` over any struct with `matter` tags | the same over a generated `State` (its `FromAttributeValues`, the `spec.StateReader` the generator writes per field); a call with a generated type compiles unchanged, a hand-written struct writes its own `FromAttributeValues`. The generated `State` and `Patch` carry no `matter` struct tags any more |
+| `lock.New` and `device.NewDoorLock` with an empty feature selection, which served Unbolting | an empty selection is none, matter.js's DoorLockServer without features; a lock that relied on Unbolting states it: `lock.DoorLockConfig{Features: lock.FeatureUBOLT}`, on the device kit `doorlockdef.Declare{Features: lock.FeatureUBOLT}` (`lock.Feature` is `doorlockdef.Feature`, the bit `doorlockdef.FeatureUnbolting`); without it UnboltDoor is refused and FeatureMap lacks the bit |
 
 Not a break: `node.Config.Groups` is `*node.Groups` and
 `node.Config.Advertiser` is `node.Advertiser` — owned aliases of
@@ -159,6 +162,16 @@ groups follow the deprecation table the README carried until `v0.9.x`.
    `Network.MDNS.Disabled`.
 3. **Accessor return types** of the typed cluster layer change, landing in
    `v0.10.0`.
+4. **A DoorLock without a feature selection has none** ([Changed](#changed-in-v0100-one-shape-gate-2)):
+   up to `v0.9.x` an empty selection served Unbolting. A lock that
+   relied on it declares `Features: lock.FeatureUBOLT`; without it the
+   lock loses UnboltDoor and the FeatureMap bit.
+5. **A store on the host's own handle** ([`store`](advanced-seams.md#store)):
+   a host that carries the schema in its own migrations adds the tables
+   the schema gained since `v0.6.0` — `matter_thermostat_presets`
+   (schema version 5, `v0.8.3`) and `matter_doorlock_users`,
+   `matter_doorlock_credentials`, `matter_doorlock_schedules` (version 6,
+   `v0.8.4`).
 
 ## Verify
 

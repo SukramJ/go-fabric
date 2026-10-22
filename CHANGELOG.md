@@ -18,6 +18,7 @@ pseudo-version of `main`.
 ### Changed
 
 - `levelcontrol.NativeMover.MoveLevel` takes the generated `levelcontroldef.MoveRequest` (was `cluster/wire`'s `MoveRequest`), the request a `LevelSource`'s `Move` takes, so a host implementing it no longer imports `cluster/wire` (#222). It was the last exported port of a cluster server over a `cluster/wire` request; the `wire` level and fan-step requests stay as the engines' internal form.
+- `docs/guides/migrating-to-the-facade.md` and `advanced-seams.md`: a validator that runs without a node imports `secure/setup` and `secure/spake2` rather than `node` (#223); the DoorLock's empty feature selection, the store tables a host carrying the schema in its own migrations adds since `v0.6.0`, and the pin the worked example was checked against (#224).
 
 ### Fixed
 

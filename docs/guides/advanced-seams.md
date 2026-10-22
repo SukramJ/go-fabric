@@ -104,13 +104,20 @@ node a store it built on a shared handle (`Config.Store.Credentials`), or
 a host whose migration tool applies the schema itself (`store.Schema`).
 A store of the host's own design behind a port is milestone 4, phase 21.
 
+A host that carries the schema in its own migrations follows the
+store's: since `v0.6.0` it gained `matter_thermostat_presets` (schema
+version 5, `v0.8.3`, the Thermostat presets) and `matter_doorlock_users`,
+`matter_doorlock_credentials` and `matter_doorlock_schedules` (version 6,
+`v0.8.4`, the DoorLock server's users, credentials and schedules);
+`store/migrations/v5.up.sql` and `v6.up.sql` hold the statements.
+
 **Costs.** The node writes the same tables. A host that writes a fabric,
 an ACL row or a group key directly bypasses the fan-out the node runs for
 the command that writes it (the CASE identity, the operational record,
 the sessions and subscriptions, the group routing). Read; write only
 settings of the host's own.
 
-*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `examples/reference-bridge/persist.go`.*
+*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql`, `v6.up.sql`), `examples/reference-bridge/persist.go`.*
 
 ## `mdns`
 
