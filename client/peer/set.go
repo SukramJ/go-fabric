@@ -194,6 +194,16 @@ func (s *Set) Size() int {
 // session parameters only when the peer has none. Mirrors matter.js
 // PeerSet.addKnownPeer (PeerSet.ts:306-338).
 func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
+	if p := s.Get(d.Address); p != nil {
+		p.mergeKnown(d)
+		return p, nil
+	}
+	// The host's fabric lookup runs without s.mu (ADR 0026 P6); a peer
+	// another call added meanwhile is the one kept.
+	fabric, ok := s.ctx.Fabrics(d.Address)
+	if !ok || fabric.Identity == nil {
+		return nil, fmt.Errorf("peer: no fabric with index %d", d.Address.FabricIndex)
+	}
 	s.mu.Lock()
 	for _, p := range s.peers {
 		if p.address == d.Address {
@@ -201,11 +211,6 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 			p.mergeKnown(d)
 			return p, nil
 		}
-	}
-	fabric, ok := s.ctx.Fabrics(d.Address)
-	if !ok || fabric.Identity == nil {
-		s.mu.Unlock()
-		return nil, fmt.Errorf("peer: no fabric with index %d", d.Address.FabricIndex)
 	}
 	p := newPeer(s, d, fabric)
 	s.peers = append(s.peers, p)

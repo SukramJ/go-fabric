@@ -109,7 +109,9 @@ type Config struct {
 	Read func(name string) (value float64, ok bool)
 	// Apply writes the values of one step, or of an immediate transition.
 	// An error ends every transition of the engine without a report, as
-	// matter.js aborts on an unhandled error during a step.
+	// matter.js aborts on an unhandled error during a step. It runs with
+	// the engine's step lock held (one step at a time): it must not start
+	// or stop a transition of the same engine.
 	Apply func(changes []Change) error
 	// RemainingTimeChanged reports that RemainingTime is to be reported
 	// (matter.js remainingTimeEvent). Nil disables RemainingTime

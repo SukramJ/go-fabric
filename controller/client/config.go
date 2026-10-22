@@ -122,7 +122,11 @@ type Hooks struct {
 	// peer left it — matter.js lifecycle.decommissioned
 	// (node/NodeLifecycle.ts:105-110), emitted when the peer address is
 	// cleared (CommissioningClient.ts:637-646) and on a leave event
-	// (node/client/Peers.ts:827).
+	// (node/client/Peers.ts:827). On a leave it runs inside the
+	// [Registry]'s fabric operation, before the node's sessions go and it
+	// is deleted (Peers.ts:826-833): it must not start a fabric operation
+	// of the same registry (decommission, a fabric change), which waits for
+	// that one to end.
 	Decommissioned func()
 	// Commissioned: the registry commissioned the node — matter.js
 	// lifecycle.commissioned (CommissioningClient.ts:325 at 0ceb202d),

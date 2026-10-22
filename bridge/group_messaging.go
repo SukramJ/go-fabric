@@ -224,24 +224,28 @@ func (b *Bridge) startGroupNetworking(member multicastMember) {
 
 // stopGroupNetworking leaves every joined address and detaches the
 // socket. Mirrors ServerGroupNetworking.close: a socket left with active
-// memberships can hang on close.
+// memberships can hang on close. The socket is detached and the joined
+// set taken under groupNetMu; the leaves — calls on the network — run
+// after it is released (ADR 0026 P6: snapshot, release, call).
 func (b *Bridge) stopGroupNetworking() {
 	b.groupNetMu.Lock()
-	defer b.groupNetMu.Unlock()
 	if b.groupJoinRetry != nil {
 		b.groupJoinRetry.Stop()
 		b.groupJoinRetry = nil
 	}
-	if b.groupMember != nil {
-		for key, addr := range b.groupJoined {
-			if err := b.groupMember.LeaveGroup(addr); err != nil {
-				b.logger.Debug("matter.groups.leave_on_stop", slog.String("address", key), slog.String("err", err.Error()))
-			}
-		}
-	}
+	member, joined := b.groupMember, b.groupJoined
 	b.groupJoined = nil
 	b.groupJoinFailed = nil
 	b.groupMember = nil
+	b.groupNetMu.Unlock()
+	if member == nil {
+		return
+	}
+	for key, addr := range joined {
+		if err := member.LeaveGroup(addr); err != nil {
+			b.logger.Debug("matter.groups.leave_on_stop", slog.String("address", key), slog.String("err", err.Error()))
+		}
+	}
 }
 
 // joinedGroupAddresses returns the addresses currently joined (tests).
