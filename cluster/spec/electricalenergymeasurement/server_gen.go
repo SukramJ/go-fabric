@@ -18,25 +18,50 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Accuracy                 MeasurementAccuracyStruct    `matter:"0x0000"` // attribute 0x0000: MeasurementAccuracyStruct, M, R V, F
-	CumulativeEnergyImported *EnergyMeasurementStruct     `matter:"0x0001"` // attribute 0x0001: EnergyMeasurementStruct, IMPE & CUME, R V, X Q
-	CumulativeEnergyExported *EnergyMeasurementStruct     `matter:"0x0002"` // attribute 0x0002: EnergyMeasurementStruct, EXPE & CUME, R V, X Q
-	PeriodicEnergyImported   *EnergyMeasurementStruct     `matter:"0x0003"` // attribute 0x0003: EnergyMeasurementStruct, IMPE & PERE, R V, X Q
-	PeriodicEnergyExported   *EnergyMeasurementStruct     `matter:"0x0004"` // attribute 0x0004: EnergyMeasurementStruct, EXPE & PERE, R V, X Q
-	CumulativeEnergyReset    *CumulativeEnergyResetStruct `matter:"0x0005"` // attribute 0x0005: CumulativeEnergyResetStruct, [CUME], R V, X
+	Accuracy                 MeasurementAccuracyStruct    // attribute 0x0000: MeasurementAccuracyStruct, M, R V, F
+	CumulativeEnergyImported *EnergyMeasurementStruct     // attribute 0x0001: EnergyMeasurementStruct, IMPE & CUME, R V, X Q
+	CumulativeEnergyExported *EnergyMeasurementStruct     // attribute 0x0002: EnergyMeasurementStruct, EXPE & CUME, R V, X Q
+	PeriodicEnergyImported   *EnergyMeasurementStruct     // attribute 0x0003: EnergyMeasurementStruct, IMPE & PERE, R V, X Q
+	PeriodicEnergyExported   *EnergyMeasurementStruct     // attribute 0x0004: EnergyMeasurementStruct, EXPE & PERE, R V, X Q
+	CumulativeEnergyReset    *CumulativeEnergyResetStruct // attribute 0x0005: CumulativeEnergyResetStruct, [CUME], R V, X
 }
 
 // Patch is a change to the ElectricalEnergyMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Accuracy                 *MeasurementAccuracyStruct   `matter:"0x0000"` // attribute 0x0000
-	CumulativeEnergyImported *EnergyMeasurementStruct     `matter:"0x0001"` // attribute 0x0001
-	CumulativeEnergyExported *EnergyMeasurementStruct     `matter:"0x0002"` // attribute 0x0002
-	PeriodicEnergyImported   *EnergyMeasurementStruct     `matter:"0x0003"` // attribute 0x0003
-	PeriodicEnergyExported   *EnergyMeasurementStruct     `matter:"0x0004"` // attribute 0x0004
-	CumulativeEnergyReset    *CumulativeEnergyResetStruct `matter:"0x0005"` // attribute 0x0005
+	Accuracy                 *MeasurementAccuracyStruct   // attribute 0x0000
+	CumulativeEnergyImported *EnergyMeasurementStruct     // attribute 0x0001
+	CumulativeEnergyExported *EnergyMeasurementStruct     // attribute 0x0002
+	PeriodicEnergyImported   *EnergyMeasurementStruct     // attribute 0x0003
+	PeriodicEnergyExported   *EnergyMeasurementStruct     // attribute 0x0004
+	CumulativeEnergyReset    *CumulativeEnergyResetStruct // attribute 0x0005
 	Null                     []uint32                     // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrAccuracy); ok {
+		spec.Assign(&st.Accuracy, v)
+	}
+	if v, ok := read(AttrCumulativeEnergyImported); ok {
+		spec.Assign(&st.CumulativeEnergyImported, v)
+	}
+	if v, ok := read(AttrCumulativeEnergyExported); ok {
+		spec.Assign(&st.CumulativeEnergyExported, v)
+	}
+	if v, ok := read(AttrPeriodicEnergyImported); ok {
+		spec.Assign(&st.PeriodicEnergyImported, v)
+	}
+	if v, ok := read(AttrPeriodicEnergyExported); ok {
+		spec.Assign(&st.PeriodicEnergyExported, v)
+	}
+	if v, ok := read(AttrCumulativeEnergyReset); ok {
+		spec.Assign(&st.CumulativeEnergyReset, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -110,9 +135,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -168,7 +195,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

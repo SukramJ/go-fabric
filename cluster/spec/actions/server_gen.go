@@ -18,17 +18,33 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	ActionList    []ActionStruct       `matter:"0x0000"` // attribute 0x0000: list[ActionStruct], M, R V
-	EndpointLists []EndpointListStruct `matter:"0x0001"` // attribute 0x0001: list[EndpointListStruct], M, R V
-	SetupUrl      string               `matter:"0x0002"` // attribute 0x0002: string, O, R V
+	ActionList    []ActionStruct       // attribute 0x0000: list[ActionStruct], M, R V
+	EndpointLists []EndpointListStruct // attribute 0x0001: list[EndpointListStruct], M, R V
+	SetupUrl      string               // attribute 0x0002: string, O, R V
 }
 
 // Patch is a change to the Actions state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	ActionList    *[]ActionStruct       `matter:"0x0000"` // attribute 0x0000
-	EndpointLists *[]EndpointListStruct `matter:"0x0001"` // attribute 0x0001
-	SetupUrl      *string               `matter:"0x0002"` // attribute 0x0002
+	ActionList    *[]ActionStruct       // attribute 0x0000
+	EndpointLists *[]EndpointListStruct // attribute 0x0001
+	SetupUrl      *string               // attribute 0x0002
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrActionList); ok {
+		spec.Assign(&st.ActionList, v)
+	}
+	if v, ok := read(AttrEndpointLists); ok {
+		spec.Assign(&st.EndpointLists, v)
+	}
+	if v, ok := read(AttrSetupUrl); ok {
+		spec.Assign(&st.SetupUrl, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -90,9 +106,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -258,7 +276,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

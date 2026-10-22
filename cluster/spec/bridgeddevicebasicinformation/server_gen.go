@@ -18,59 +18,138 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	DataModelRevision     uint16                  `matter:"0x0000"` // attribute 0x0000: uint16, X, R V, F
-	VendorName            string                  `matter:"0x0001"` // attribute 0x0001: string, desc, R V, F
-	VendorId              uint16                  `matter:"0x0002"` // attribute 0x0002: vendor-id, desc, R V, F
-	ProductName           string                  `matter:"0x0003"` // attribute 0x0003: string, O, R V, F
-	ProductId             uint16                  `matter:"0x0004"` // attribute 0x0004: uint16, desc, R V, F
-	NodeLabel             string                  `matter:"0x0005"` // attribute 0x0005: string, O, RW VM, N
-	Location              string                  `matter:"0x0006"` // attribute 0x0006: string, X, RW VA, N
-	HardwareVersion       uint16                  `matter:"0x0007"` // attribute 0x0007: uint16, O, R V, F
-	HardwareVersionString string                  `matter:"0x0008"` // attribute 0x0008: string, O, R V, F
-	SoftwareVersion       uint32                  `matter:"0x0009"` // attribute 0x0009: uint32, O, R V, F
-	SoftwareVersionString string                  `matter:"0x000A"` // attribute 0x000A: string, O, R V, F
-	ManufacturingDate     string                  `matter:"0x000B"` // attribute 0x000B: string, O, R V, F
-	PartNumber            string                  `matter:"0x000C"` // attribute 0x000C: string, O, R V, F
-	ProductUrl            string                  `matter:"0x000D"` // attribute 0x000D: string, O, R V, F
-	ProductLabel          string                  `matter:"0x000E"` // attribute 0x000E: string, O, R V, F
-	SerialNumber          string                  `matter:"0x000F"` // attribute 0x000F: string, O, R V, F
-	LocalConfigDisabled   bool                    `matter:"0x0010"` // attribute 0x0010: bool, X, RW VM, N
-	Reachable             bool                    `matter:"0x0011"` // attribute 0x0011: bool, M, R V
-	UniqueId              string                  `matter:"0x0012"` // attribute 0x0012: string, Rev >= v4, O, R V, F
-	CapabilityMinima      CapabilityMinimaStruct  `matter:"0x0013"` // attribute 0x0013: CapabilityMinimaStruct, X, R V, F
-	ProductAppearance     ProductAppearanceStruct `matter:"0x0014"` // attribute 0x0014: ProductAppearanceStruct, [Rev >= v2], R V, F
-	SpecificationVersion  uint32                  `matter:"0x0015"` // attribute 0x0015: uint32, X, R V, F
-	MaxPathsPerInvoke     uint16                  `matter:"0x0016"` // attribute 0x0016: uint16, X, R V, F
-	ConfigurationVersion  uint32                  `matter:"0x0018"` // attribute 0x0018: uint32, [Rev >= v6], R V, N
+	DataModelRevision     uint16                  // attribute 0x0000: uint16, X, R V, F
+	VendorName            string                  // attribute 0x0001: string, desc, R V, F
+	VendorId              uint16                  // attribute 0x0002: vendor-id, desc, R V, F
+	ProductName           string                  // attribute 0x0003: string, O, R V, F
+	ProductId             uint16                  // attribute 0x0004: uint16, desc, R V, F
+	NodeLabel             string                  // attribute 0x0005: string, O, RW VM, N
+	Location              string                  // attribute 0x0006: string, X, RW VA, N
+	HardwareVersion       uint16                  // attribute 0x0007: uint16, O, R V, F
+	HardwareVersionString string                  // attribute 0x0008: string, O, R V, F
+	SoftwareVersion       uint32                  // attribute 0x0009: uint32, O, R V, F
+	SoftwareVersionString string                  // attribute 0x000A: string, O, R V, F
+	ManufacturingDate     string                  // attribute 0x000B: string, O, R V, F
+	PartNumber            string                  // attribute 0x000C: string, O, R V, F
+	ProductUrl            string                  // attribute 0x000D: string, O, R V, F
+	ProductLabel          string                  // attribute 0x000E: string, O, R V, F
+	SerialNumber          string                  // attribute 0x000F: string, O, R V, F
+	LocalConfigDisabled   bool                    // attribute 0x0010: bool, X, RW VM, N
+	Reachable             bool                    // attribute 0x0011: bool, M, R V
+	UniqueId              string                  // attribute 0x0012: string, Rev >= v4, O, R V, F
+	CapabilityMinima      CapabilityMinimaStruct  // attribute 0x0013: CapabilityMinimaStruct, X, R V, F
+	ProductAppearance     ProductAppearanceStruct // attribute 0x0014: ProductAppearanceStruct, [Rev >= v2], R V, F
+	SpecificationVersion  uint32                  // attribute 0x0015: uint32, X, R V, F
+	MaxPathsPerInvoke     uint16                  // attribute 0x0016: uint16, X, R V, F
+	ConfigurationVersion  uint32                  // attribute 0x0018: uint32, [Rev >= v6], R V, N
 }
 
 // Patch is a change to the BridgedDeviceBasicInformation state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	DataModelRevision     *uint16                  `matter:"0x0000"` // attribute 0x0000
-	VendorName            *string                  `matter:"0x0001"` // attribute 0x0001
-	VendorId              *uint16                  `matter:"0x0002"` // attribute 0x0002
-	ProductName           *string                  `matter:"0x0003"` // attribute 0x0003
-	ProductId             *uint16                  `matter:"0x0004"` // attribute 0x0004
-	NodeLabel             *string                  `matter:"0x0005"` // attribute 0x0005
-	Location              *string                  `matter:"0x0006"` // attribute 0x0006
-	HardwareVersion       *uint16                  `matter:"0x0007"` // attribute 0x0007
-	HardwareVersionString *string                  `matter:"0x0008"` // attribute 0x0008
-	SoftwareVersion       *uint32                  `matter:"0x0009"` // attribute 0x0009
-	SoftwareVersionString *string                  `matter:"0x000A"` // attribute 0x000A
-	ManufacturingDate     *string                  `matter:"0x000B"` // attribute 0x000B
-	PartNumber            *string                  `matter:"0x000C"` // attribute 0x000C
-	ProductUrl            *string                  `matter:"0x000D"` // attribute 0x000D
-	ProductLabel          *string                  `matter:"0x000E"` // attribute 0x000E
-	SerialNumber          *string                  `matter:"0x000F"` // attribute 0x000F
-	LocalConfigDisabled   *bool                    `matter:"0x0010"` // attribute 0x0010
-	Reachable             *bool                    `matter:"0x0011"` // attribute 0x0011
-	UniqueId              *string                  `matter:"0x0012"` // attribute 0x0012
-	CapabilityMinima      *CapabilityMinimaStruct  `matter:"0x0013"` // attribute 0x0013
-	ProductAppearance     *ProductAppearanceStruct `matter:"0x0014"` // attribute 0x0014
-	SpecificationVersion  *uint32                  `matter:"0x0015"` // attribute 0x0015
-	MaxPathsPerInvoke     *uint16                  `matter:"0x0016"` // attribute 0x0016
-	ConfigurationVersion  *uint32                  `matter:"0x0018"` // attribute 0x0018
+	DataModelRevision     *uint16                  // attribute 0x0000
+	VendorName            *string                  // attribute 0x0001
+	VendorId              *uint16                  // attribute 0x0002
+	ProductName           *string                  // attribute 0x0003
+	ProductId             *uint16                  // attribute 0x0004
+	NodeLabel             *string                  // attribute 0x0005
+	Location              *string                  // attribute 0x0006
+	HardwareVersion       *uint16                  // attribute 0x0007
+	HardwareVersionString *string                  // attribute 0x0008
+	SoftwareVersion       *uint32                  // attribute 0x0009
+	SoftwareVersionString *string                  // attribute 0x000A
+	ManufacturingDate     *string                  // attribute 0x000B
+	PartNumber            *string                  // attribute 0x000C
+	ProductUrl            *string                  // attribute 0x000D
+	ProductLabel          *string                  // attribute 0x000E
+	SerialNumber          *string                  // attribute 0x000F
+	LocalConfigDisabled   *bool                    // attribute 0x0010
+	Reachable             *bool                    // attribute 0x0011
+	UniqueId              *string                  // attribute 0x0012
+	CapabilityMinima      *CapabilityMinimaStruct  // attribute 0x0013
+	ProductAppearance     *ProductAppearanceStruct // attribute 0x0014
+	SpecificationVersion  *uint32                  // attribute 0x0015
+	MaxPathsPerInvoke     *uint16                  // attribute 0x0016
+	ConfigurationVersion  *uint32                  // attribute 0x0018
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrDataModelRevision); ok {
+		spec.Assign(&st.DataModelRevision, v)
+	}
+	if v, ok := read(AttrVendorName); ok {
+		spec.Assign(&st.VendorName, v)
+	}
+	if v, ok := read(AttrVendorId); ok {
+		spec.Assign(&st.VendorId, v)
+	}
+	if v, ok := read(AttrProductName); ok {
+		spec.Assign(&st.ProductName, v)
+	}
+	if v, ok := read(AttrProductId); ok {
+		spec.Assign(&st.ProductId, v)
+	}
+	if v, ok := read(AttrNodeLabel); ok {
+		spec.Assign(&st.NodeLabel, v)
+	}
+	if v, ok := read(AttrLocation); ok {
+		spec.Assign(&st.Location, v)
+	}
+	if v, ok := read(AttrHardwareVersion); ok {
+		spec.Assign(&st.HardwareVersion, v)
+	}
+	if v, ok := read(AttrHardwareVersionString); ok {
+		spec.Assign(&st.HardwareVersionString, v)
+	}
+	if v, ok := read(AttrSoftwareVersion); ok {
+		spec.Assign(&st.SoftwareVersion, v)
+	}
+	if v, ok := read(AttrSoftwareVersionString); ok {
+		spec.Assign(&st.SoftwareVersionString, v)
+	}
+	if v, ok := read(AttrManufacturingDate); ok {
+		spec.Assign(&st.ManufacturingDate, v)
+	}
+	if v, ok := read(AttrPartNumber); ok {
+		spec.Assign(&st.PartNumber, v)
+	}
+	if v, ok := read(AttrProductUrl); ok {
+		spec.Assign(&st.ProductUrl, v)
+	}
+	if v, ok := read(AttrProductLabel); ok {
+		spec.Assign(&st.ProductLabel, v)
+	}
+	if v, ok := read(AttrSerialNumber); ok {
+		spec.Assign(&st.SerialNumber, v)
+	}
+	if v, ok := read(AttrLocalConfigDisabled); ok {
+		spec.Assign(&st.LocalConfigDisabled, v)
+	}
+	if v, ok := read(AttrReachable); ok {
+		spec.Assign(&st.Reachable, v)
+	}
+	if v, ok := read(AttrUniqueId); ok {
+		spec.Assign(&st.UniqueId, v)
+	}
+	if v, ok := read(AttrCapabilityMinima); ok {
+		spec.Assign(&st.CapabilityMinima, v)
+	}
+	if v, ok := read(AttrProductAppearance); ok {
+		spec.Assign(&st.ProductAppearance, v)
+	}
+	if v, ok := read(AttrSpecificationVersion); ok {
+		spec.Assign(&st.SpecificationVersion, v)
+	}
+	if v, ok := read(AttrMaxPathsPerInvoke); ok {
+		spec.Assign(&st.MaxPathsPerInvoke, v)
+	}
+	if v, ok := read(AttrConfigurationVersion); ok {
+		spec.Assign(&st.ConfigurationVersion, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -195,9 +274,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -284,7 +365,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

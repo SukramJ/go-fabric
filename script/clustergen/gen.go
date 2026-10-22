@@ -554,6 +554,11 @@ func (g *generator) source() ([]byte, error) {
 			if e.Response != "" {
 				note += " → " + e.Response
 			}
+			if e.Access != nil && e.Access.Timed {
+				// A timed command: the invoke must be timed (InvokeTimed),
+				// schema.IsTimedInvoke says the same.
+				note += ", timed"
+			}
 			w.p("\t%s uint32 = 0x%02X // %s, %s", id, cmd.ID, note, confText(e.Conformance))
 		}
 		w.p(")")
@@ -1588,7 +1593,6 @@ func (g *generator) test() ([]byte, error) {
 	w.p("")
 	w.p("import (")
 	w.p("\t\"context\"")
-	w.p("\t\"errors\"")
 	w.p("\t\"testing\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")

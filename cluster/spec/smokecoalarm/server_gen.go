@@ -18,39 +18,88 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	ExpressedState         ExpressedStateEnum     `matter:"0x0000"` // attribute 0x0000: ExpressedStateEnum, M, R V, N
-	SmokeState             AlarmStateEnum         `matter:"0x0001"` // attribute 0x0001: AlarmStateEnum, SMOKE, R V, N
-	CoState                AlarmStateEnum         `matter:"0x0002"` // attribute 0x0002: AlarmStateEnum, CO, R V, N
-	BatteryAlert           AlarmStateEnum         `matter:"0x0003"` // attribute 0x0003: AlarmStateEnum, M, R V, N
-	DeviceMuted            MuteStateEnum          `matter:"0x0004"` // attribute 0x0004: MuteStateEnum, O, R V, N
-	TestInProgress         bool                   `matter:"0x0005"` // attribute 0x0005: bool, M, R V
-	HardwareFaultAlert     bool                   `matter:"0x0006"` // attribute 0x0006: bool, M, R V, N
-	EndOfServiceAlert      EndOfServiceEnum       `matter:"0x0007"` // attribute 0x0007: EndOfServiceEnum, M, R V, N
-	InterconnectSmokeAlarm AlarmStateEnum         `matter:"0x0008"` // attribute 0x0008: AlarmStateEnum, O, R V
-	InterconnectCoAlarm    AlarmStateEnum         `matter:"0x0009"` // attribute 0x0009: AlarmStateEnum, O, R V
-	ContaminationState     ContaminationStateEnum `matter:"0x000A"` // attribute 0x000A: ContaminationStateEnum, [SMOKE], R V
-	SmokeSensitivityLevel  SensitivityEnum        `matter:"0x000B"` // attribute 0x000B: SensitivityEnum, [SMOKE], RW VM
-	ExpiryDate             uint32                 `matter:"0x000C"` // attribute 0x000C: epoch-s, O, R V, F
-	Unmounted              bool                   `matter:"0x000D"` // attribute 0x000D: bool, [Rev >= v2], R V
+	ExpressedState         ExpressedStateEnum     // attribute 0x0000: ExpressedStateEnum, M, R V, N
+	SmokeState             AlarmStateEnum         // attribute 0x0001: AlarmStateEnum, SMOKE, R V, N
+	CoState                AlarmStateEnum         // attribute 0x0002: AlarmStateEnum, CO, R V, N
+	BatteryAlert           AlarmStateEnum         // attribute 0x0003: AlarmStateEnum, M, R V, N
+	DeviceMuted            MuteStateEnum          // attribute 0x0004: MuteStateEnum, O, R V, N
+	TestInProgress         bool                   // attribute 0x0005: bool, M, R V
+	HardwareFaultAlert     bool                   // attribute 0x0006: bool, M, R V, N
+	EndOfServiceAlert      EndOfServiceEnum       // attribute 0x0007: EndOfServiceEnum, M, R V, N
+	InterconnectSmokeAlarm AlarmStateEnum         // attribute 0x0008: AlarmStateEnum, O, R V
+	InterconnectCoAlarm    AlarmStateEnum         // attribute 0x0009: AlarmStateEnum, O, R V
+	ContaminationState     ContaminationStateEnum // attribute 0x000A: ContaminationStateEnum, [SMOKE], R V
+	SmokeSensitivityLevel  SensitivityEnum        // attribute 0x000B: SensitivityEnum, [SMOKE], RW VM
+	ExpiryDate             uint32                 // attribute 0x000C: epoch-s, O, R V, F
+	Unmounted              bool                   // attribute 0x000D: bool, [Rev >= v2], R V
 }
 
 // Patch is a change to the SmokeCoAlarm state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	ExpressedState         *ExpressedStateEnum     `matter:"0x0000"` // attribute 0x0000
-	SmokeState             *AlarmStateEnum         `matter:"0x0001"` // attribute 0x0001
-	CoState                *AlarmStateEnum         `matter:"0x0002"` // attribute 0x0002
-	BatteryAlert           *AlarmStateEnum         `matter:"0x0003"` // attribute 0x0003
-	DeviceMuted            *MuteStateEnum          `matter:"0x0004"` // attribute 0x0004
-	TestInProgress         *bool                   `matter:"0x0005"` // attribute 0x0005
-	HardwareFaultAlert     *bool                   `matter:"0x0006"` // attribute 0x0006
-	EndOfServiceAlert      *EndOfServiceEnum       `matter:"0x0007"` // attribute 0x0007
-	InterconnectSmokeAlarm *AlarmStateEnum         `matter:"0x0008"` // attribute 0x0008
-	InterconnectCoAlarm    *AlarmStateEnum         `matter:"0x0009"` // attribute 0x0009
-	ContaminationState     *ContaminationStateEnum `matter:"0x000A"` // attribute 0x000A
-	SmokeSensitivityLevel  *SensitivityEnum        `matter:"0x000B"` // attribute 0x000B
-	ExpiryDate             *uint32                 `matter:"0x000C"` // attribute 0x000C
-	Unmounted              *bool                   `matter:"0x000D"` // attribute 0x000D
+	ExpressedState         *ExpressedStateEnum     // attribute 0x0000
+	SmokeState             *AlarmStateEnum         // attribute 0x0001
+	CoState                *AlarmStateEnum         // attribute 0x0002
+	BatteryAlert           *AlarmStateEnum         // attribute 0x0003
+	DeviceMuted            *MuteStateEnum          // attribute 0x0004
+	TestInProgress         *bool                   // attribute 0x0005
+	HardwareFaultAlert     *bool                   // attribute 0x0006
+	EndOfServiceAlert      *EndOfServiceEnum       // attribute 0x0007
+	InterconnectSmokeAlarm *AlarmStateEnum         // attribute 0x0008
+	InterconnectCoAlarm    *AlarmStateEnum         // attribute 0x0009
+	ContaminationState     *ContaminationStateEnum // attribute 0x000A
+	SmokeSensitivityLevel  *SensitivityEnum        // attribute 0x000B
+	ExpiryDate             *uint32                 // attribute 0x000C
+	Unmounted              *bool                   // attribute 0x000D
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrExpressedState); ok {
+		spec.Assign(&st.ExpressedState, v)
+	}
+	if v, ok := read(AttrSmokeState); ok {
+		spec.Assign(&st.SmokeState, v)
+	}
+	if v, ok := read(AttrCoState); ok {
+		spec.Assign(&st.CoState, v)
+	}
+	if v, ok := read(AttrBatteryAlert); ok {
+		spec.Assign(&st.BatteryAlert, v)
+	}
+	if v, ok := read(AttrDeviceMuted); ok {
+		spec.Assign(&st.DeviceMuted, v)
+	}
+	if v, ok := read(AttrTestInProgress); ok {
+		spec.Assign(&st.TestInProgress, v)
+	}
+	if v, ok := read(AttrHardwareFaultAlert); ok {
+		spec.Assign(&st.HardwareFaultAlert, v)
+	}
+	if v, ok := read(AttrEndOfServiceAlert); ok {
+		spec.Assign(&st.EndOfServiceAlert, v)
+	}
+	if v, ok := read(AttrInterconnectSmokeAlarm); ok {
+		spec.Assign(&st.InterconnectSmokeAlarm, v)
+	}
+	if v, ok := read(AttrInterconnectCoAlarm); ok {
+		spec.Assign(&st.InterconnectCoAlarm, v)
+	}
+	if v, ok := read(AttrContaminationState); ok {
+		spec.Assign(&st.ContaminationState, v)
+	}
+	if v, ok := read(AttrSmokeSensitivityLevel); ok {
+		spec.Assign(&st.SmokeSensitivityLevel, v)
+	}
+	if v, ok := read(AttrExpiryDate); ok {
+		spec.Assign(&st.ExpiryDate, v)
+	}
+	if v, ok := read(AttrUnmounted); ok {
+		spec.Assign(&st.Unmounted, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -145,9 +194,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -296,7 +347,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

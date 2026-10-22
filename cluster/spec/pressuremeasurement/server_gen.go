@@ -18,31 +18,65 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MeasuredValue    *int16 `matter:"0x0000"` // attribute 0x0000: int16, M, R V, X
-	MinMeasuredValue *int16 `matter:"0x0001"` // attribute 0x0001: int16, M, R V, X F
-	MaxMeasuredValue *int16 `matter:"0x0002"` // attribute 0x0002: int16, M, R V, X F
-	Tolerance        uint16 `matter:"0x0003"` // attribute 0x0003: uint16, O, R V, F
-	ScaledValue      *int16 `matter:"0x0010"` // attribute 0x0010: int16, EXT, R V, X
-	MinScaledValue   *int16 `matter:"0x0011"` // attribute 0x0011: int16, EXT, R V, X F
-	MaxScaledValue   *int16 `matter:"0x0012"` // attribute 0x0012: int16, EXT, R V, X F
-	ScaledTolerance  uint16 `matter:"0x0013"` // attribute 0x0013: uint16, [EXT], R V, F
-	Scale            int8   `matter:"0x0014"` // attribute 0x0014: int8, EXT, R V, F
+	MeasuredValue    *int16 // attribute 0x0000: int16, M, R V, X
+	MinMeasuredValue *int16 // attribute 0x0001: int16, M, R V, X F
+	MaxMeasuredValue *int16 // attribute 0x0002: int16, M, R V, X F
+	Tolerance        uint16 // attribute 0x0003: uint16, O, R V, F
+	ScaledValue      *int16 // attribute 0x0010: int16, EXT, R V, X
+	MinScaledValue   *int16 // attribute 0x0011: int16, EXT, R V, X F
+	MaxScaledValue   *int16 // attribute 0x0012: int16, EXT, R V, X F
+	ScaledTolerance  uint16 // attribute 0x0013: uint16, [EXT], R V, F
+	Scale            int8   // attribute 0x0014: int8, EXT, R V, F
 }
 
 // Patch is a change to the PressureMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MeasuredValue    *int16   `matter:"0x0000"` // attribute 0x0000
-	MinMeasuredValue *int16   `matter:"0x0001"` // attribute 0x0001
-	MaxMeasuredValue *int16   `matter:"0x0002"` // attribute 0x0002
-	Tolerance        *uint16  `matter:"0x0003"` // attribute 0x0003
-	ScaledValue      *int16   `matter:"0x0010"` // attribute 0x0010
-	MinScaledValue   *int16   `matter:"0x0011"` // attribute 0x0011
-	MaxScaledValue   *int16   `matter:"0x0012"` // attribute 0x0012
-	ScaledTolerance  *uint16  `matter:"0x0013"` // attribute 0x0013
-	Scale            *int8    `matter:"0x0014"` // attribute 0x0014
+	MeasuredValue    *int16   // attribute 0x0000
+	MinMeasuredValue *int16   // attribute 0x0001
+	MaxMeasuredValue *int16   // attribute 0x0002
+	Tolerance        *uint16  // attribute 0x0003
+	ScaledValue      *int16   // attribute 0x0010
+	MinScaledValue   *int16   // attribute 0x0011
+	MaxScaledValue   *int16   // attribute 0x0012
+	ScaledTolerance  *uint16  // attribute 0x0013
+	Scale            *int8    // attribute 0x0014
 	Null             []uint32 // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMeasuredValue); ok {
+		spec.Assign(&st.MeasuredValue, v)
+	}
+	if v, ok := read(AttrMinMeasuredValue); ok {
+		spec.Assign(&st.MinMeasuredValue, v)
+	}
+	if v, ok := read(AttrMaxMeasuredValue); ok {
+		spec.Assign(&st.MaxMeasuredValue, v)
+	}
+	if v, ok := read(AttrTolerance); ok {
+		spec.Assign(&st.Tolerance, v)
+	}
+	if v, ok := read(AttrScaledValue); ok {
+		spec.Assign(&st.ScaledValue, v)
+	}
+	if v, ok := read(AttrMinScaledValue); ok {
+		spec.Assign(&st.MinScaledValue, v)
+	}
+	if v, ok := read(AttrMaxScaledValue); ok {
+		spec.Assign(&st.MaxScaledValue, v)
+	}
+	if v, ok := read(AttrScaledTolerance); ok {
+		spec.Assign(&st.ScaledTolerance, v)
+	}
+	if v, ok := read(AttrScale); ok {
+		spec.Assign(&st.Scale, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -125,9 +159,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -168,7 +204,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

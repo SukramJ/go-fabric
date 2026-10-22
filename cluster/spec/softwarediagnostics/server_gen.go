@@ -18,19 +18,38 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	ThreadMetrics            []ThreadMetricsStruct `matter:"0x0000"` // attribute 0x0000: list[ThreadMetricsStruct], O, R V, C
-	CurrentHeapFree          uint64                `matter:"0x0001"` // attribute 0x0001: uint64, O, R V, C
-	CurrentHeapUsed          uint64                `matter:"0x0002"` // attribute 0x0002: uint64, O, R V, C
-	CurrentHeapHighWatermark uint64                `matter:"0x0003"` // attribute 0x0003: uint64, WTRMRK, R V, C
+	ThreadMetrics            []ThreadMetricsStruct // attribute 0x0000: list[ThreadMetricsStruct], O, R V, C
+	CurrentHeapFree          uint64                // attribute 0x0001: uint64, O, R V, C
+	CurrentHeapUsed          uint64                // attribute 0x0002: uint64, O, R V, C
+	CurrentHeapHighWatermark uint64                // attribute 0x0003: uint64, WTRMRK, R V, C
 }
 
 // Patch is a change to the SoftwareDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	ThreadMetrics            *[]ThreadMetricsStruct `matter:"0x0000"` // attribute 0x0000
-	CurrentHeapFree          *uint64                `matter:"0x0001"` // attribute 0x0001
-	CurrentHeapUsed          *uint64                `matter:"0x0002"` // attribute 0x0002
-	CurrentHeapHighWatermark *uint64                `matter:"0x0003"` // attribute 0x0003
+	ThreadMetrics            *[]ThreadMetricsStruct // attribute 0x0000
+	CurrentHeapFree          *uint64                // attribute 0x0001
+	CurrentHeapUsed          *uint64                // attribute 0x0002
+	CurrentHeapHighWatermark *uint64                // attribute 0x0003
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrThreadMetrics); ok {
+		spec.Assign(&st.ThreadMetrics, v)
+	}
+	if v, ok := read(AttrCurrentHeapFree); ok {
+		spec.Assign(&st.CurrentHeapFree, v)
+	}
+	if v, ok := read(AttrCurrentHeapUsed); ok {
+		spec.Assign(&st.CurrentHeapUsed, v)
+	}
+	if v, ok := read(AttrCurrentHeapHighWatermark); ok {
+		spec.Assign(&st.CurrentHeapHighWatermark, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -95,9 +114,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -160,7 +181,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

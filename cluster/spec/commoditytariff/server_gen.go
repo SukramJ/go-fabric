@@ -19,51 +19,115 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	TariffInfo                 *TariffInformationStruct       `matter:"0x0000"` // attribute 0x0000: TariffInformationStruct, M, R V, X
-	TariffUnit                 *TariffUnitEnum                `matter:"0x0001"` // attribute 0x0001: TariffUnitEnum, M, R V, X
-	StartDate                  *uint32                        `matter:"0x0002"` // attribute 0x0002: epoch-s, M, R V, X
-	DayEntries                 *[]DayEntryStruct              `matter:"0x0003"` // attribute 0x0003: list[DayEntryStruct], M, R V, X
-	DayPatterns                *[]DayPatternStruct            `matter:"0x0004"` // attribute 0x0004: list[DayPatternStruct], M, R V, X
-	CalendarPeriods            *[]CalendarPeriodStruct        `matter:"0x0005"` // attribute 0x0005: list[CalendarPeriodStruct], M, R V, X
-	IndividualDays             *[]DayStruct                   `matter:"0x0006"` // attribute 0x0006: list[DayStruct], M, R V, X
-	CurrentDay                 *DayStruct                     `matter:"0x0007"` // attribute 0x0007: DayStruct, M, R V, X
-	NextDay                    *DayStruct                     `matter:"0x0008"` // attribute 0x0008: DayStruct, M, R V, X
-	CurrentDayEntry            *DayEntryStruct                `matter:"0x0009"` // attribute 0x0009: DayEntryStruct, M, R V, X
-	CurrentDayEntryDate        *uint32                        `matter:"0x000A"` // attribute 0x000A: epoch-s, M, R V, X
-	NextDayEntry               *DayEntryStruct                `matter:"0x000B"` // attribute 0x000B: DayEntryStruct, M, R V, X
-	NextDayEntryDate           *uint32                        `matter:"0x000C"` // attribute 0x000C: epoch-s, M, R V, X
-	TariffComponents           *[]TariffComponentStruct       `matter:"0x000D"` // attribute 0x000D: list[TariffComponentStruct], M, R V, X
-	TariffPeriods              *[]TariffPeriodStruct          `matter:"0x000E"` // attribute 0x000E: list[TariffPeriodStruct], M, R V, X
-	CurrentTariffComponents    *[]TariffComponentStruct       `matter:"0x000F"` // attribute 0x000F: list[TariffComponentStruct], M, R V, X
-	NextTariffComponents       *[]TariffComponentStruct       `matter:"0x0010"` // attribute 0x0010: list[TariffComponentStruct], M, R V, X
-	DefaultRandomizationOffset *int16                         `matter:"0x0011"` // attribute 0x0011: int16, RNDM, R V, X
-	DefaultRandomizationType   *DayEntryRandomizationTypeEnum `matter:"0x0012"` // attribute 0x0012: DayEntryRandomizationTypeEnum, RNDM, R V, X
+	TariffInfo                 *TariffInformationStruct       // attribute 0x0000: TariffInformationStruct, M, R V, X
+	TariffUnit                 *TariffUnitEnum                // attribute 0x0001: TariffUnitEnum, M, R V, X
+	StartDate                  *uint32                        // attribute 0x0002: epoch-s, M, R V, X
+	DayEntries                 *[]DayEntryStruct              // attribute 0x0003: list[DayEntryStruct], M, R V, X
+	DayPatterns                *[]DayPatternStruct            // attribute 0x0004: list[DayPatternStruct], M, R V, X
+	CalendarPeriods            *[]CalendarPeriodStruct        // attribute 0x0005: list[CalendarPeriodStruct], M, R V, X
+	IndividualDays             *[]DayStruct                   // attribute 0x0006: list[DayStruct], M, R V, X
+	CurrentDay                 *DayStruct                     // attribute 0x0007: DayStruct, M, R V, X
+	NextDay                    *DayStruct                     // attribute 0x0008: DayStruct, M, R V, X
+	CurrentDayEntry            *DayEntryStruct                // attribute 0x0009: DayEntryStruct, M, R V, X
+	CurrentDayEntryDate        *uint32                        // attribute 0x000A: epoch-s, M, R V, X
+	NextDayEntry               *DayEntryStruct                // attribute 0x000B: DayEntryStruct, M, R V, X
+	NextDayEntryDate           *uint32                        // attribute 0x000C: epoch-s, M, R V, X
+	TariffComponents           *[]TariffComponentStruct       // attribute 0x000D: list[TariffComponentStruct], M, R V, X
+	TariffPeriods              *[]TariffPeriodStruct          // attribute 0x000E: list[TariffPeriodStruct], M, R V, X
+	CurrentTariffComponents    *[]TariffComponentStruct       // attribute 0x000F: list[TariffComponentStruct], M, R V, X
+	NextTariffComponents       *[]TariffComponentStruct       // attribute 0x0010: list[TariffComponentStruct], M, R V, X
+	DefaultRandomizationOffset *int16                         // attribute 0x0011: int16, RNDM, R V, X
+	DefaultRandomizationType   *DayEntryRandomizationTypeEnum // attribute 0x0012: DayEntryRandomizationTypeEnum, RNDM, R V, X
 }
 
 // Patch is a change to the CommodityTariff state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	TariffInfo                 *TariffInformationStruct       `matter:"0x0000"` // attribute 0x0000
-	TariffUnit                 *TariffUnitEnum                `matter:"0x0001"` // attribute 0x0001
-	StartDate                  *uint32                        `matter:"0x0002"` // attribute 0x0002
-	DayEntries                 *[]DayEntryStruct              `matter:"0x0003"` // attribute 0x0003
-	DayPatterns                *[]DayPatternStruct            `matter:"0x0004"` // attribute 0x0004
-	CalendarPeriods            *[]CalendarPeriodStruct        `matter:"0x0005"` // attribute 0x0005
-	IndividualDays             *[]DayStruct                   `matter:"0x0006"` // attribute 0x0006
-	CurrentDay                 *DayStruct                     `matter:"0x0007"` // attribute 0x0007
-	NextDay                    *DayStruct                     `matter:"0x0008"` // attribute 0x0008
-	CurrentDayEntry            *DayEntryStruct                `matter:"0x0009"` // attribute 0x0009
-	CurrentDayEntryDate        *uint32                        `matter:"0x000A"` // attribute 0x000A
-	NextDayEntry               *DayEntryStruct                `matter:"0x000B"` // attribute 0x000B
-	NextDayEntryDate           *uint32                        `matter:"0x000C"` // attribute 0x000C
-	TariffComponents           *[]TariffComponentStruct       `matter:"0x000D"` // attribute 0x000D
-	TariffPeriods              *[]TariffPeriodStruct          `matter:"0x000E"` // attribute 0x000E
-	CurrentTariffComponents    *[]TariffComponentStruct       `matter:"0x000F"` // attribute 0x000F
-	NextTariffComponents       *[]TariffComponentStruct       `matter:"0x0010"` // attribute 0x0010
-	DefaultRandomizationOffset *int16                         `matter:"0x0011"` // attribute 0x0011
-	DefaultRandomizationType   *DayEntryRandomizationTypeEnum `matter:"0x0012"` // attribute 0x0012
+	TariffInfo                 *TariffInformationStruct       // attribute 0x0000
+	TariffUnit                 *TariffUnitEnum                // attribute 0x0001
+	StartDate                  *uint32                        // attribute 0x0002
+	DayEntries                 *[]DayEntryStruct              // attribute 0x0003
+	DayPatterns                *[]DayPatternStruct            // attribute 0x0004
+	CalendarPeriods            *[]CalendarPeriodStruct        // attribute 0x0005
+	IndividualDays             *[]DayStruct                   // attribute 0x0006
+	CurrentDay                 *DayStruct                     // attribute 0x0007
+	NextDay                    *DayStruct                     // attribute 0x0008
+	CurrentDayEntry            *DayEntryStruct                // attribute 0x0009
+	CurrentDayEntryDate        *uint32                        // attribute 0x000A
+	NextDayEntry               *DayEntryStruct                // attribute 0x000B
+	NextDayEntryDate           *uint32                        // attribute 0x000C
+	TariffComponents           *[]TariffComponentStruct       // attribute 0x000D
+	TariffPeriods              *[]TariffPeriodStruct          // attribute 0x000E
+	CurrentTariffComponents    *[]TariffComponentStruct       // attribute 0x000F
+	NextTariffComponents       *[]TariffComponentStruct       // attribute 0x0010
+	DefaultRandomizationOffset *int16                         // attribute 0x0011
+	DefaultRandomizationType   *DayEntryRandomizationTypeEnum // attribute 0x0012
 	Null                       []uint32                       // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrTariffInfo); ok {
+		spec.Assign(&st.TariffInfo, v)
+	}
+	if v, ok := read(AttrTariffUnit); ok {
+		spec.Assign(&st.TariffUnit, v)
+	}
+	if v, ok := read(AttrStartDate); ok {
+		spec.Assign(&st.StartDate, v)
+	}
+	if v, ok := read(AttrDayEntries); ok {
+		spec.Assign(&st.DayEntries, v)
+	}
+	if v, ok := read(AttrDayPatterns); ok {
+		spec.Assign(&st.DayPatterns, v)
+	}
+	if v, ok := read(AttrCalendarPeriods); ok {
+		spec.Assign(&st.CalendarPeriods, v)
+	}
+	if v, ok := read(AttrIndividualDays); ok {
+		spec.Assign(&st.IndividualDays, v)
+	}
+	if v, ok := read(AttrCurrentDay); ok {
+		spec.Assign(&st.CurrentDay, v)
+	}
+	if v, ok := read(AttrNextDay); ok {
+		spec.Assign(&st.NextDay, v)
+	}
+	if v, ok := read(AttrCurrentDayEntry); ok {
+		spec.Assign(&st.CurrentDayEntry, v)
+	}
+	if v, ok := read(AttrCurrentDayEntryDate); ok {
+		spec.Assign(&st.CurrentDayEntryDate, v)
+	}
+	if v, ok := read(AttrNextDayEntry); ok {
+		spec.Assign(&st.NextDayEntry, v)
+	}
+	if v, ok := read(AttrNextDayEntryDate); ok {
+		spec.Assign(&st.NextDayEntryDate, v)
+	}
+	if v, ok := read(AttrTariffComponents); ok {
+		spec.Assign(&st.TariffComponents, v)
+	}
+	if v, ok := read(AttrTariffPeriods); ok {
+		spec.Assign(&st.TariffPeriods, v)
+	}
+	if v, ok := read(AttrCurrentTariffComponents); ok {
+		spec.Assign(&st.CurrentTariffComponents, v)
+	}
+	if v, ok := read(AttrNextTariffComponents); ok {
+		spec.Assign(&st.NextTariffComponents, v)
+	}
+	if v, ok := read(AttrDefaultRandomizationOffset); ok {
+		spec.Assign(&st.DefaultRandomizationOffset, v)
+	}
+	if v, ok := read(AttrDefaultRandomizationType); ok {
+		spec.Assign(&st.DefaultRandomizationType, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -176,9 +240,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -254,7 +320,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

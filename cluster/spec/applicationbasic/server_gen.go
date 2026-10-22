@@ -18,27 +18,58 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	VendorName         string                `matter:"0x0000"` // attribute 0x0000: string, O, R V, F
-	VendorId           uint16                `matter:"0x0001"` // attribute 0x0001: vendor-id, O, R V, F
-	ApplicationName    string                `matter:"0x0002"` // attribute 0x0002: string, M, R V, F
-	ProductId          uint16                `matter:"0x0003"` // attribute 0x0003: uint16, O, R V, F
-	Application        ApplicationStruct     `matter:"0x0004"` // attribute 0x0004: ApplicationStruct, M, R V, F
-	Status             ApplicationStatusEnum `matter:"0x0005"` // attribute 0x0005: ApplicationStatusEnum, M, R V
-	ApplicationVersion string                `matter:"0x0006"` // attribute 0x0006: string, M, R V, F
-	AllowedVendorList  []uint16              `matter:"0x0007"` // attribute 0x0007: list[vendor-id], M, R A, F
+	VendorName         string                // attribute 0x0000: string, O, R V, F
+	VendorId           uint16                // attribute 0x0001: vendor-id, O, R V, F
+	ApplicationName    string                // attribute 0x0002: string, M, R V, F
+	ProductId          uint16                // attribute 0x0003: uint16, O, R V, F
+	Application        ApplicationStruct     // attribute 0x0004: ApplicationStruct, M, R V, F
+	Status             ApplicationStatusEnum // attribute 0x0005: ApplicationStatusEnum, M, R V
+	ApplicationVersion string                // attribute 0x0006: string, M, R V, F
+	AllowedVendorList  []uint16              // attribute 0x0007: list[vendor-id], M, R A, F
 }
 
 // Patch is a change to the ApplicationBasic state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	VendorName         *string                `matter:"0x0000"` // attribute 0x0000
-	VendorId           *uint16                `matter:"0x0001"` // attribute 0x0001
-	ApplicationName    *string                `matter:"0x0002"` // attribute 0x0002
-	ProductId          *uint16                `matter:"0x0003"` // attribute 0x0003
-	Application        *ApplicationStruct     `matter:"0x0004"` // attribute 0x0004
-	Status             *ApplicationStatusEnum `matter:"0x0005"` // attribute 0x0005
-	ApplicationVersion *string                `matter:"0x0006"` // attribute 0x0006
-	AllowedVendorList  *[]uint16              `matter:"0x0007"` // attribute 0x0007
+	VendorName         *string                // attribute 0x0000
+	VendorId           *uint16                // attribute 0x0001
+	ApplicationName    *string                // attribute 0x0002
+	ProductId          *uint16                // attribute 0x0003
+	Application        *ApplicationStruct     // attribute 0x0004
+	Status             *ApplicationStatusEnum // attribute 0x0005
+	ApplicationVersion *string                // attribute 0x0006
+	AllowedVendorList  *[]uint16              // attribute 0x0007
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrVendorName); ok {
+		spec.Assign(&st.VendorName, v)
+	}
+	if v, ok := read(AttrVendorId); ok {
+		spec.Assign(&st.VendorId, v)
+	}
+	if v, ok := read(AttrApplicationName); ok {
+		spec.Assign(&st.ApplicationName, v)
+	}
+	if v, ok := read(AttrProductId); ok {
+		spec.Assign(&st.ProductId, v)
+	}
+	if v, ok := read(AttrApplication); ok {
+		spec.Assign(&st.Application, v)
+	}
+	if v, ok := read(AttrStatus); ok {
+		spec.Assign(&st.Status, v)
+	}
+	if v, ok := read(AttrApplicationVersion); ok {
+		spec.Assign(&st.ApplicationVersion, v)
+	}
+	if v, ok := read(AttrAllowedVendorList); ok {
+		spec.Assign(&st.AllowedVendorList, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -115,9 +146,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -156,7 +189,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

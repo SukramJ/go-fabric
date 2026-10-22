@@ -22,103 +22,245 @@ import (
 // Not in State, and set only untyped (spec.Server.Set):
 //   - SecurityLevel (0x0034): its type is one the generator maps to any.
 type State struct {
-	LockState                                          *LockStateEnum                 `matter:"0x0000"` // attribute 0x0000: LockStateEnum, M, R V, X
-	LockType                                           LockTypeEnum                   `matter:"0x0001"` // attribute 0x0001: LockTypeEnum, M, R V
-	ActuatorEnabled                                    bool                           `matter:"0x0002"` // attribute 0x0002: bool, M, R V
-	DoorState                                          *DoorStateEnum                 `matter:"0x0003"` // attribute 0x0003: DoorStateEnum, DPS, R V, X
-	DoorOpenEvents                                     uint32                         `matter:"0x0004"` // attribute 0x0004: uint32, [DPS], RW VM
-	DoorClosedEvents                                   uint32                         `matter:"0x0005"` // attribute 0x0005: uint32, [DPS], RW VM
-	OpenPeriod                                         uint16                         `matter:"0x0006"` // attribute 0x0006: uint16, [DPS], RW VM
-	NumberOfTotalUsersSupported                        uint16                         `matter:"0x0011"` // attribute 0x0011: uint16, USR, R V, F
-	NumberOfPinUsersSupported                          uint16                         `matter:"0x0012"` // attribute 0x0012: uint16, PIN, R V, F
-	NumberOfRfidUsersSupported                         uint16                         `matter:"0x0013"` // attribute 0x0013: uint16, RID, R V, F
-	NumberOfWeekDaySchedulesSupportedPerUser           uint8                          `matter:"0x0014"` // attribute 0x0014: uint8, WDSCH, R V, F
-	NumberOfYearDaySchedulesSupportedPerUser           uint8                          `matter:"0x0015"` // attribute 0x0015: uint8, YDSCH, R V, F
-	NumberOfHolidaySchedulesSupported                  uint8                          `matter:"0x0016"` // attribute 0x0016: uint8, HDSCH, R V, F
-	MaxPinCodeLength                                   uint8                          `matter:"0x0017"` // attribute 0x0017: uint8, PIN, R V, F
-	MinPinCodeLength                                   uint8                          `matter:"0x0018"` // attribute 0x0018: uint8, PIN, R V, F
-	MaxRfidCodeLength                                  uint8                          `matter:"0x0019"` // attribute 0x0019: uint8, RID, R V, F
-	MinRfidCodeLength                                  uint8                          `matter:"0x001A"` // attribute 0x001A: uint8, RID, R V, F
-	CredentialRulesSupport                             CredentialRulesBitmap          `matter:"0x001B"` // attribute 0x001B: CredentialRulesBitmap, USR, R V, F
-	NumberOfCredentialsSupportedPerUser                uint8                          `matter:"0x001C"` // attribute 0x001C: uint8, USR, R V, F
-	Language                                           string                         `matter:"0x0021"` // attribute 0x0021: string, O, R[W] VM
-	LedSettings                                        LEDSettingEnum                 `matter:"0x0022"` // attribute 0x0022: LEDSettingEnum, O, R[W] VM
-	AutoRelockTime                                     uint32                         `matter:"0x0023"` // attribute 0x0023: uint32, O, R[W] VM
-	SoundVolume                                        SoundVolumeEnum                `matter:"0x0024"` // attribute 0x0024: SoundVolumeEnum, O, R[W] VM
-	OperatingMode                                      OperatingModeEnum              `matter:"0x0025"` // attribute 0x0025: OperatingModeEnum, M, R[W] VM
-	SupportedOperatingModes                            OperatingModesBitmap           `matter:"0x0026"` // attribute 0x0026: OperatingModesBitmap, M, R V, F
-	DefaultConfigurationRegister                       ConfigurationRegisterBitmap    `matter:"0x0027"` // attribute 0x0027: ConfigurationRegisterBitmap, O, R V
-	EnableLocalProgramming                             bool                           `matter:"0x0028"` // attribute 0x0028: bool, O, R[W] VA
-	EnableOneTouchLocking                              bool                           `matter:"0x0029"` // attribute 0x0029: bool, O, RW VM
-	EnableInsideStatusLed                              bool                           `matter:"0x002A"` // attribute 0x002A: bool, O, RW VM
-	EnablePrivacyModeButton                            bool                           `matter:"0x002B"` // attribute 0x002B: bool, O, RW VM
-	LocalProgrammingFeatures                           LocalProgrammingFeaturesBitmap `matter:"0x002C"` // attribute 0x002C: LocalProgrammingFeaturesBitmap, O, R[W] VA
-	WrongCodeEntryLimit                                uint8                          `matter:"0x0030"` // attribute 0x0030: uint8, PIN | RID, R[W] VA
-	UserCodeTemporaryDisableTime                       uint8                          `matter:"0x0031"` // attribute 0x0031: uint8, PIN | RID, R[W] VA
-	SendPinOverTheAir                                  bool                           `matter:"0x0032"` // attribute 0x0032: bool, [!USR & PIN], R[W] VA
-	RequirePinForRemoteOperation                       bool                           `matter:"0x0033"` // attribute 0x0033: bool, COTA & PIN, R[W] VA
-	ExpiringUserTimeout                                uint16                         `matter:"0x0035"` // attribute 0x0035: uint16, [USR], R[W] VA
-	AliroReaderVerificationKey                         *[]byte                        `matter:"0x0080"` // attribute 0x0080: octstr, ALIRO, R A, X
-	AliroReaderGroupIdentifier                         *[]byte                        `matter:"0x0081"` // attribute 0x0081: octstr, ALIRO, R A, X
-	AliroReaderGroupSubIdentifier                      []byte                         `matter:"0x0082"` // attribute 0x0082: octstr, ALIRO, R A, F
-	AliroExpeditedTransactionSupportedProtocolVersions [][]byte                       `matter:"0x0083"` // attribute 0x0083: list[octstr], ALIRO, R A, F
-	AliroGroupResolvingKey                             *[]byte                        `matter:"0x0084"` // attribute 0x0084: octstr, ALBU, R A, X
-	AliroSupportedBleuwbProtocolVersions               [][]byte                       `matter:"0x0085"` // attribute 0x0085: list[octstr], ALBU, R A, F
-	AliroBleAdvertisingVersion                         uint8                          `matter:"0x0086"` // attribute 0x0086: uint8, ALBU, R A, F
-	NumberOfAliroCredentialIssuerKeysSupported         uint16                         `matter:"0x0087"` // attribute 0x0087: uint16, ALIRO, R V, F
-	NumberOfAliroEndpointKeysSupported                 uint16                         `matter:"0x0088"` // attribute 0x0088: uint16, ALIRO, R V, F
+	LockState                                          *LockStateEnum                 // attribute 0x0000: LockStateEnum, M, R V, X
+	LockType                                           LockTypeEnum                   // attribute 0x0001: LockTypeEnum, M, R V
+	ActuatorEnabled                                    bool                           // attribute 0x0002: bool, M, R V
+	DoorState                                          *DoorStateEnum                 // attribute 0x0003: DoorStateEnum, DPS, R V, X
+	DoorOpenEvents                                     uint32                         // attribute 0x0004: uint32, [DPS], RW VM
+	DoorClosedEvents                                   uint32                         // attribute 0x0005: uint32, [DPS], RW VM
+	OpenPeriod                                         uint16                         // attribute 0x0006: uint16, [DPS], RW VM
+	NumberOfTotalUsersSupported                        uint16                         // attribute 0x0011: uint16, USR, R V, F
+	NumberOfPinUsersSupported                          uint16                         // attribute 0x0012: uint16, PIN, R V, F
+	NumberOfRfidUsersSupported                         uint16                         // attribute 0x0013: uint16, RID, R V, F
+	NumberOfWeekDaySchedulesSupportedPerUser           uint8                          // attribute 0x0014: uint8, WDSCH, R V, F
+	NumberOfYearDaySchedulesSupportedPerUser           uint8                          // attribute 0x0015: uint8, YDSCH, R V, F
+	NumberOfHolidaySchedulesSupported                  uint8                          // attribute 0x0016: uint8, HDSCH, R V, F
+	MaxPinCodeLength                                   uint8                          // attribute 0x0017: uint8, PIN, R V, F
+	MinPinCodeLength                                   uint8                          // attribute 0x0018: uint8, PIN, R V, F
+	MaxRfidCodeLength                                  uint8                          // attribute 0x0019: uint8, RID, R V, F
+	MinRfidCodeLength                                  uint8                          // attribute 0x001A: uint8, RID, R V, F
+	CredentialRulesSupport                             CredentialRulesBitmap          // attribute 0x001B: CredentialRulesBitmap, USR, R V, F
+	NumberOfCredentialsSupportedPerUser                uint8                          // attribute 0x001C: uint8, USR, R V, F
+	Language                                           string                         // attribute 0x0021: string, O, R[W] VM
+	LedSettings                                        LEDSettingEnum                 // attribute 0x0022: LEDSettingEnum, O, R[W] VM
+	AutoRelockTime                                     uint32                         // attribute 0x0023: uint32, O, R[W] VM
+	SoundVolume                                        SoundVolumeEnum                // attribute 0x0024: SoundVolumeEnum, O, R[W] VM
+	OperatingMode                                      OperatingModeEnum              // attribute 0x0025: OperatingModeEnum, M, R[W] VM
+	SupportedOperatingModes                            OperatingModesBitmap           // attribute 0x0026: OperatingModesBitmap, M, R V, F
+	DefaultConfigurationRegister                       ConfigurationRegisterBitmap    // attribute 0x0027: ConfigurationRegisterBitmap, O, R V
+	EnableLocalProgramming                             bool                           // attribute 0x0028: bool, O, R[W] VA
+	EnableOneTouchLocking                              bool                           // attribute 0x0029: bool, O, RW VM
+	EnableInsideStatusLed                              bool                           // attribute 0x002A: bool, O, RW VM
+	EnablePrivacyModeButton                            bool                           // attribute 0x002B: bool, O, RW VM
+	LocalProgrammingFeatures                           LocalProgrammingFeaturesBitmap // attribute 0x002C: LocalProgrammingFeaturesBitmap, O, R[W] VA
+	WrongCodeEntryLimit                                uint8                          // attribute 0x0030: uint8, PIN | RID, R[W] VA
+	UserCodeTemporaryDisableTime                       uint8                          // attribute 0x0031: uint8, PIN | RID, R[W] VA
+	SendPinOverTheAir                                  bool                           // attribute 0x0032: bool, [!USR & PIN], R[W] VA
+	RequirePinForRemoteOperation                       bool                           // attribute 0x0033: bool, COTA & PIN, R[W] VA
+	ExpiringUserTimeout                                uint16                         // attribute 0x0035: uint16, [USR], R[W] VA
+	AliroReaderVerificationKey                         *[]byte                        // attribute 0x0080: octstr, ALIRO, R A, X
+	AliroReaderGroupIdentifier                         *[]byte                        // attribute 0x0081: octstr, ALIRO, R A, X
+	AliroReaderGroupSubIdentifier                      []byte                         // attribute 0x0082: octstr, ALIRO, R A, F
+	AliroExpeditedTransactionSupportedProtocolVersions [][]byte                       // attribute 0x0083: list[octstr], ALIRO, R A, F
+	AliroGroupResolvingKey                             *[]byte                        // attribute 0x0084: octstr, ALBU, R A, X
+	AliroSupportedBleuwbProtocolVersions               [][]byte                       // attribute 0x0085: list[octstr], ALBU, R A, F
+	AliroBleAdvertisingVersion                         uint8                          // attribute 0x0086: uint8, ALBU, R A, F
+	NumberOfAliroCredentialIssuerKeysSupported         uint16                         // attribute 0x0087: uint16, ALIRO, R V, F
+	NumberOfAliroEndpointKeysSupported                 uint16                         // attribute 0x0088: uint16, ALIRO, R V, F
 }
 
 // Patch is a change to the DoorLock state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	LockState                                          *LockStateEnum                  `matter:"0x0000"` // attribute 0x0000
-	LockType                                           *LockTypeEnum                   `matter:"0x0001"` // attribute 0x0001
-	ActuatorEnabled                                    *bool                           `matter:"0x0002"` // attribute 0x0002
-	DoorState                                          *DoorStateEnum                  `matter:"0x0003"` // attribute 0x0003
-	DoorOpenEvents                                     *uint32                         `matter:"0x0004"` // attribute 0x0004
-	DoorClosedEvents                                   *uint32                         `matter:"0x0005"` // attribute 0x0005
-	OpenPeriod                                         *uint16                         `matter:"0x0006"` // attribute 0x0006
-	NumberOfTotalUsersSupported                        *uint16                         `matter:"0x0011"` // attribute 0x0011
-	NumberOfPinUsersSupported                          *uint16                         `matter:"0x0012"` // attribute 0x0012
-	NumberOfRfidUsersSupported                         *uint16                         `matter:"0x0013"` // attribute 0x0013
-	NumberOfWeekDaySchedulesSupportedPerUser           *uint8                          `matter:"0x0014"` // attribute 0x0014
-	NumberOfYearDaySchedulesSupportedPerUser           *uint8                          `matter:"0x0015"` // attribute 0x0015
-	NumberOfHolidaySchedulesSupported                  *uint8                          `matter:"0x0016"` // attribute 0x0016
-	MaxPinCodeLength                                   *uint8                          `matter:"0x0017"` // attribute 0x0017
-	MinPinCodeLength                                   *uint8                          `matter:"0x0018"` // attribute 0x0018
-	MaxRfidCodeLength                                  *uint8                          `matter:"0x0019"` // attribute 0x0019
-	MinRfidCodeLength                                  *uint8                          `matter:"0x001A"` // attribute 0x001A
-	CredentialRulesSupport                             *CredentialRulesBitmap          `matter:"0x001B"` // attribute 0x001B
-	NumberOfCredentialsSupportedPerUser                *uint8                          `matter:"0x001C"` // attribute 0x001C
-	Language                                           *string                         `matter:"0x0021"` // attribute 0x0021
-	LedSettings                                        *LEDSettingEnum                 `matter:"0x0022"` // attribute 0x0022
-	AutoRelockTime                                     *uint32                         `matter:"0x0023"` // attribute 0x0023
-	SoundVolume                                        *SoundVolumeEnum                `matter:"0x0024"` // attribute 0x0024
-	OperatingMode                                      *OperatingModeEnum              `matter:"0x0025"` // attribute 0x0025
-	SupportedOperatingModes                            *OperatingModesBitmap           `matter:"0x0026"` // attribute 0x0026
-	DefaultConfigurationRegister                       *ConfigurationRegisterBitmap    `matter:"0x0027"` // attribute 0x0027
-	EnableLocalProgramming                             *bool                           `matter:"0x0028"` // attribute 0x0028
-	EnableOneTouchLocking                              *bool                           `matter:"0x0029"` // attribute 0x0029
-	EnableInsideStatusLed                              *bool                           `matter:"0x002A"` // attribute 0x002A
-	EnablePrivacyModeButton                            *bool                           `matter:"0x002B"` // attribute 0x002B
-	LocalProgrammingFeatures                           *LocalProgrammingFeaturesBitmap `matter:"0x002C"` // attribute 0x002C
-	WrongCodeEntryLimit                                *uint8                          `matter:"0x0030"` // attribute 0x0030
-	UserCodeTemporaryDisableTime                       *uint8                          `matter:"0x0031"` // attribute 0x0031
-	SendPinOverTheAir                                  *bool                           `matter:"0x0032"` // attribute 0x0032
-	RequirePinForRemoteOperation                       *bool                           `matter:"0x0033"` // attribute 0x0033
-	ExpiringUserTimeout                                *uint16                         `matter:"0x0035"` // attribute 0x0035
-	AliroReaderVerificationKey                         *[]byte                         `matter:"0x0080"` // attribute 0x0080
-	AliroReaderGroupIdentifier                         *[]byte                         `matter:"0x0081"` // attribute 0x0081
-	AliroReaderGroupSubIdentifier                      *[]byte                         `matter:"0x0082"` // attribute 0x0082
-	AliroExpeditedTransactionSupportedProtocolVersions *[][]byte                       `matter:"0x0083"` // attribute 0x0083
-	AliroGroupResolvingKey                             *[]byte                         `matter:"0x0084"` // attribute 0x0084
-	AliroSupportedBleuwbProtocolVersions               *[][]byte                       `matter:"0x0085"` // attribute 0x0085
-	AliroBleAdvertisingVersion                         *uint8                          `matter:"0x0086"` // attribute 0x0086
-	NumberOfAliroCredentialIssuerKeysSupported         *uint16                         `matter:"0x0087"` // attribute 0x0087
-	NumberOfAliroEndpointKeysSupported                 *uint16                         `matter:"0x0088"` // attribute 0x0088
+	LockState                                          *LockStateEnum                  // attribute 0x0000
+	LockType                                           *LockTypeEnum                   // attribute 0x0001
+	ActuatorEnabled                                    *bool                           // attribute 0x0002
+	DoorState                                          *DoorStateEnum                  // attribute 0x0003
+	DoorOpenEvents                                     *uint32                         // attribute 0x0004
+	DoorClosedEvents                                   *uint32                         // attribute 0x0005
+	OpenPeriod                                         *uint16                         // attribute 0x0006
+	NumberOfTotalUsersSupported                        *uint16                         // attribute 0x0011
+	NumberOfPinUsersSupported                          *uint16                         // attribute 0x0012
+	NumberOfRfidUsersSupported                         *uint16                         // attribute 0x0013
+	NumberOfWeekDaySchedulesSupportedPerUser           *uint8                          // attribute 0x0014
+	NumberOfYearDaySchedulesSupportedPerUser           *uint8                          // attribute 0x0015
+	NumberOfHolidaySchedulesSupported                  *uint8                          // attribute 0x0016
+	MaxPinCodeLength                                   *uint8                          // attribute 0x0017
+	MinPinCodeLength                                   *uint8                          // attribute 0x0018
+	MaxRfidCodeLength                                  *uint8                          // attribute 0x0019
+	MinRfidCodeLength                                  *uint8                          // attribute 0x001A
+	CredentialRulesSupport                             *CredentialRulesBitmap          // attribute 0x001B
+	NumberOfCredentialsSupportedPerUser                *uint8                          // attribute 0x001C
+	Language                                           *string                         // attribute 0x0021
+	LedSettings                                        *LEDSettingEnum                 // attribute 0x0022
+	AutoRelockTime                                     *uint32                         // attribute 0x0023
+	SoundVolume                                        *SoundVolumeEnum                // attribute 0x0024
+	OperatingMode                                      *OperatingModeEnum              // attribute 0x0025
+	SupportedOperatingModes                            *OperatingModesBitmap           // attribute 0x0026
+	DefaultConfigurationRegister                       *ConfigurationRegisterBitmap    // attribute 0x0027
+	EnableLocalProgramming                             *bool                           // attribute 0x0028
+	EnableOneTouchLocking                              *bool                           // attribute 0x0029
+	EnableInsideStatusLed                              *bool                           // attribute 0x002A
+	EnablePrivacyModeButton                            *bool                           // attribute 0x002B
+	LocalProgrammingFeatures                           *LocalProgrammingFeaturesBitmap // attribute 0x002C
+	WrongCodeEntryLimit                                *uint8                          // attribute 0x0030
+	UserCodeTemporaryDisableTime                       *uint8                          // attribute 0x0031
+	SendPinOverTheAir                                  *bool                           // attribute 0x0032
+	RequirePinForRemoteOperation                       *bool                           // attribute 0x0033
+	ExpiringUserTimeout                                *uint16                         // attribute 0x0035
+	AliroReaderVerificationKey                         *[]byte                         // attribute 0x0080
+	AliroReaderGroupIdentifier                         *[]byte                         // attribute 0x0081
+	AliroReaderGroupSubIdentifier                      *[]byte                         // attribute 0x0082
+	AliroExpeditedTransactionSupportedProtocolVersions *[][]byte                       // attribute 0x0083
+	AliroGroupResolvingKey                             *[]byte                         // attribute 0x0084
+	AliroSupportedBleuwbProtocolVersions               *[][]byte                       // attribute 0x0085
+	AliroBleAdvertisingVersion                         *uint8                          // attribute 0x0086
+	NumberOfAliroCredentialIssuerKeysSupported         *uint16                         // attribute 0x0087
+	NumberOfAliroEndpointKeysSupported                 *uint16                         // attribute 0x0088
 	Null                                               []uint32                        // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrLockState); ok {
+		spec.Assign(&st.LockState, v)
+	}
+	if v, ok := read(AttrLockType); ok {
+		spec.Assign(&st.LockType, v)
+	}
+	if v, ok := read(AttrActuatorEnabled); ok {
+		spec.Assign(&st.ActuatorEnabled, v)
+	}
+	if v, ok := read(AttrDoorState); ok {
+		spec.Assign(&st.DoorState, v)
+	}
+	if v, ok := read(AttrDoorOpenEvents); ok {
+		spec.Assign(&st.DoorOpenEvents, v)
+	}
+	if v, ok := read(AttrDoorClosedEvents); ok {
+		spec.Assign(&st.DoorClosedEvents, v)
+	}
+	if v, ok := read(AttrOpenPeriod); ok {
+		spec.Assign(&st.OpenPeriod, v)
+	}
+	if v, ok := read(AttrNumberOfTotalUsersSupported); ok {
+		spec.Assign(&st.NumberOfTotalUsersSupported, v)
+	}
+	if v, ok := read(AttrNumberOfPinUsersSupported); ok {
+		spec.Assign(&st.NumberOfPinUsersSupported, v)
+	}
+	if v, ok := read(AttrNumberOfRfidUsersSupported); ok {
+		spec.Assign(&st.NumberOfRfidUsersSupported, v)
+	}
+	if v, ok := read(AttrNumberOfWeekDaySchedulesSupportedPerUser); ok {
+		spec.Assign(&st.NumberOfWeekDaySchedulesSupportedPerUser, v)
+	}
+	if v, ok := read(AttrNumberOfYearDaySchedulesSupportedPerUser); ok {
+		spec.Assign(&st.NumberOfYearDaySchedulesSupportedPerUser, v)
+	}
+	if v, ok := read(AttrNumberOfHolidaySchedulesSupported); ok {
+		spec.Assign(&st.NumberOfHolidaySchedulesSupported, v)
+	}
+	if v, ok := read(AttrMaxPinCodeLength); ok {
+		spec.Assign(&st.MaxPinCodeLength, v)
+	}
+	if v, ok := read(AttrMinPinCodeLength); ok {
+		spec.Assign(&st.MinPinCodeLength, v)
+	}
+	if v, ok := read(AttrMaxRfidCodeLength); ok {
+		spec.Assign(&st.MaxRfidCodeLength, v)
+	}
+	if v, ok := read(AttrMinRfidCodeLength); ok {
+		spec.Assign(&st.MinRfidCodeLength, v)
+	}
+	if v, ok := read(AttrCredentialRulesSupport); ok {
+		spec.Assign(&st.CredentialRulesSupport, v)
+	}
+	if v, ok := read(AttrNumberOfCredentialsSupportedPerUser); ok {
+		spec.Assign(&st.NumberOfCredentialsSupportedPerUser, v)
+	}
+	if v, ok := read(AttrLanguage); ok {
+		spec.Assign(&st.Language, v)
+	}
+	if v, ok := read(AttrLedSettings); ok {
+		spec.Assign(&st.LedSettings, v)
+	}
+	if v, ok := read(AttrAutoRelockTime); ok {
+		spec.Assign(&st.AutoRelockTime, v)
+	}
+	if v, ok := read(AttrSoundVolume); ok {
+		spec.Assign(&st.SoundVolume, v)
+	}
+	if v, ok := read(AttrOperatingMode); ok {
+		spec.Assign(&st.OperatingMode, v)
+	}
+	if v, ok := read(AttrSupportedOperatingModes); ok {
+		spec.Assign(&st.SupportedOperatingModes, v)
+	}
+	if v, ok := read(AttrDefaultConfigurationRegister); ok {
+		spec.Assign(&st.DefaultConfigurationRegister, v)
+	}
+	if v, ok := read(AttrEnableLocalProgramming); ok {
+		spec.Assign(&st.EnableLocalProgramming, v)
+	}
+	if v, ok := read(AttrEnableOneTouchLocking); ok {
+		spec.Assign(&st.EnableOneTouchLocking, v)
+	}
+	if v, ok := read(AttrEnableInsideStatusLed); ok {
+		spec.Assign(&st.EnableInsideStatusLed, v)
+	}
+	if v, ok := read(AttrEnablePrivacyModeButton); ok {
+		spec.Assign(&st.EnablePrivacyModeButton, v)
+	}
+	if v, ok := read(AttrLocalProgrammingFeatures); ok {
+		spec.Assign(&st.LocalProgrammingFeatures, v)
+	}
+	if v, ok := read(AttrWrongCodeEntryLimit); ok {
+		spec.Assign(&st.WrongCodeEntryLimit, v)
+	}
+	if v, ok := read(AttrUserCodeTemporaryDisableTime); ok {
+		spec.Assign(&st.UserCodeTemporaryDisableTime, v)
+	}
+	if v, ok := read(AttrSendPinOverTheAir); ok {
+		spec.Assign(&st.SendPinOverTheAir, v)
+	}
+	if v, ok := read(AttrRequirePinForRemoteOperation); ok {
+		spec.Assign(&st.RequirePinForRemoteOperation, v)
+	}
+	if v, ok := read(AttrExpiringUserTimeout); ok {
+		spec.Assign(&st.ExpiringUserTimeout, v)
+	}
+	if v, ok := read(AttrAliroReaderVerificationKey); ok {
+		spec.Assign(&st.AliroReaderVerificationKey, v)
+	}
+	if v, ok := read(AttrAliroReaderGroupIdentifier); ok {
+		spec.Assign(&st.AliroReaderGroupIdentifier, v)
+	}
+	if v, ok := read(AttrAliroReaderGroupSubIdentifier); ok {
+		spec.Assign(&st.AliroReaderGroupSubIdentifier, v)
+	}
+	if v, ok := read(AttrAliroExpeditedTransactionSupportedProtocolVersions); ok {
+		spec.Assign(&st.AliroExpeditedTransactionSupportedProtocolVersions, v)
+	}
+	if v, ok := read(AttrAliroGroupResolvingKey); ok {
+		spec.Assign(&st.AliroGroupResolvingKey, v)
+	}
+	if v, ok := read(AttrAliroSupportedBleuwbProtocolVersions); ok {
+		spec.Assign(&st.AliroSupportedBleuwbProtocolVersions, v)
+	}
+	if v, ok := read(AttrAliroBleAdvertisingVersion); ok {
+		spec.Assign(&st.AliroBleAdvertisingVersion, v)
+	}
+	if v, ok := read(AttrNumberOfAliroCredentialIssuerKeysSupported); ok {
+		spec.Assign(&st.NumberOfAliroCredentialIssuerKeysSupported, v)
+	}
+	if v, ok := read(AttrNumberOfAliroEndpointKeysSupported); ok {
+		spec.Assign(&st.NumberOfAliroEndpointKeysSupported, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -309,9 +451,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -612,7 +756,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

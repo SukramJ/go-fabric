@@ -18,41 +18,90 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentLevel        *uint8        `matter:"0x0000"` // attribute 0x0000: uint8, M, R V, X N S Q
-	RemainingTime       uint16        `matter:"0x0001"` // attribute 0x0001: uint16, LT, R V, Q
-	MinLevel            uint8         `matter:"0x0002"` // attribute 0x0002: uint8, Rev >= v7, O, R V, F
-	MaxLevel            uint8         `matter:"0x0003"` // attribute 0x0003: uint8, Rev >= v7, O, R V, F
-	CurrentFrequency    uint16        `matter:"0x0004"` // attribute 0x0004: uint16, FQ, R V, S Q
-	MinFrequency        uint16        `matter:"0x0005"` // attribute 0x0005: uint16, FQ, R V
-	MaxFrequency        uint16        `matter:"0x0006"` // attribute 0x0006: uint16, FQ, R V
-	Options             OptionsBitmap `matter:"0x000F"` // attribute 0x000F: OptionsBitmap, M, RW VO
-	OnOffTransitionTime uint16        `matter:"0x0010"` // attribute 0x0010: uint16, O, RW VO
-	OnLevel             *uint8        `matter:"0x0011"` // attribute 0x0011: uint8, M, RW VO, X
-	OnTransitionTime    *uint16       `matter:"0x0012"` // attribute 0x0012: uint16, O, RW VO, X
-	OffTransitionTime   *uint16       `matter:"0x0013"` // attribute 0x0013: uint16, O, RW VO, X
-	DefaultMoveRate     *uint8        `matter:"0x0014"` // attribute 0x0014: uint8, O, RW VO, X
-	StartUpCurrentLevel *uint8        `matter:"0x4000"` // attribute 0x4000: uint8, LT, RW VM, X N
+	CurrentLevel        *uint8        // attribute 0x0000: uint8, M, R V, X N S Q
+	RemainingTime       uint16        // attribute 0x0001: uint16, LT, R V, Q
+	MinLevel            uint8         // attribute 0x0002: uint8, Rev >= v7, O, R V, F
+	MaxLevel            uint8         // attribute 0x0003: uint8, Rev >= v7, O, R V, F
+	CurrentFrequency    uint16        // attribute 0x0004: uint16, FQ, R V, S Q
+	MinFrequency        uint16        // attribute 0x0005: uint16, FQ, R V
+	MaxFrequency        uint16        // attribute 0x0006: uint16, FQ, R V
+	Options             OptionsBitmap // attribute 0x000F: OptionsBitmap, M, RW VO
+	OnOffTransitionTime uint16        // attribute 0x0010: uint16, O, RW VO
+	OnLevel             *uint8        // attribute 0x0011: uint8, M, RW VO, X
+	OnTransitionTime    *uint16       // attribute 0x0012: uint16, O, RW VO, X
+	OffTransitionTime   *uint16       // attribute 0x0013: uint16, O, RW VO, X
+	DefaultMoveRate     *uint8        // attribute 0x0014: uint8, O, RW VO, X
+	StartUpCurrentLevel *uint8        // attribute 0x4000: uint8, LT, RW VM, X N
 }
 
 // Patch is a change to the LevelControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	CurrentLevel        *uint8         `matter:"0x0000"` // attribute 0x0000
-	RemainingTime       *uint16        `matter:"0x0001"` // attribute 0x0001
-	MinLevel            *uint8         `matter:"0x0002"` // attribute 0x0002
-	MaxLevel            *uint8         `matter:"0x0003"` // attribute 0x0003
-	CurrentFrequency    *uint16        `matter:"0x0004"` // attribute 0x0004
-	MinFrequency        *uint16        `matter:"0x0005"` // attribute 0x0005
-	MaxFrequency        *uint16        `matter:"0x0006"` // attribute 0x0006
-	Options             *OptionsBitmap `matter:"0x000F"` // attribute 0x000F
-	OnOffTransitionTime *uint16        `matter:"0x0010"` // attribute 0x0010
-	OnLevel             *uint8         `matter:"0x0011"` // attribute 0x0011
-	OnTransitionTime    *uint16        `matter:"0x0012"` // attribute 0x0012
-	OffTransitionTime   *uint16        `matter:"0x0013"` // attribute 0x0013
-	DefaultMoveRate     *uint8         `matter:"0x0014"` // attribute 0x0014
-	StartUpCurrentLevel *uint8         `matter:"0x4000"` // attribute 0x4000
+	CurrentLevel        *uint8         // attribute 0x0000
+	RemainingTime       *uint16        // attribute 0x0001
+	MinLevel            *uint8         // attribute 0x0002
+	MaxLevel            *uint8         // attribute 0x0003
+	CurrentFrequency    *uint16        // attribute 0x0004
+	MinFrequency        *uint16        // attribute 0x0005
+	MaxFrequency        *uint16        // attribute 0x0006
+	Options             *OptionsBitmap // attribute 0x000F
+	OnOffTransitionTime *uint16        // attribute 0x0010
+	OnLevel             *uint8         // attribute 0x0011
+	OnTransitionTime    *uint16        // attribute 0x0012
+	OffTransitionTime   *uint16        // attribute 0x0013
+	DefaultMoveRate     *uint8         // attribute 0x0014
+	StartUpCurrentLevel *uint8         // attribute 0x4000
 	Null                []uint32       // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentLevel); ok {
+		spec.Assign(&st.CurrentLevel, v)
+	}
+	if v, ok := read(AttrRemainingTime); ok {
+		spec.Assign(&st.RemainingTime, v)
+	}
+	if v, ok := read(AttrMinLevel); ok {
+		spec.Assign(&st.MinLevel, v)
+	}
+	if v, ok := read(AttrMaxLevel); ok {
+		spec.Assign(&st.MaxLevel, v)
+	}
+	if v, ok := read(AttrCurrentFrequency); ok {
+		spec.Assign(&st.CurrentFrequency, v)
+	}
+	if v, ok := read(AttrMinFrequency); ok {
+		spec.Assign(&st.MinFrequency, v)
+	}
+	if v, ok := read(AttrMaxFrequency); ok {
+		spec.Assign(&st.MaxFrequency, v)
+	}
+	if v, ok := read(AttrOptions); ok {
+		spec.Assign(&st.Options, v)
+	}
+	if v, ok := read(AttrOnOffTransitionTime); ok {
+		spec.Assign(&st.OnOffTransitionTime, v)
+	}
+	if v, ok := read(AttrOnLevel); ok {
+		spec.Assign(&st.OnLevel, v)
+	}
+	if v, ok := read(AttrOnTransitionTime); ok {
+		spec.Assign(&st.OnTransitionTime, v)
+	}
+	if v, ok := read(AttrOffTransitionTime); ok {
+		spec.Assign(&st.OffTransitionTime, v)
+	}
+	if v, ok := read(AttrDefaultMoveRate); ok {
+		spec.Assign(&st.DefaultMoveRate, v)
+	}
+	if v, ok := read(AttrStartUpCurrentLevel); ok {
+		spec.Assign(&st.StartUpCurrentLevel, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -150,9 +199,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -303,7 +354,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

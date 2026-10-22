@@ -21,29 +21,63 @@ import (
 // Not in State, and set only untyped (spec.Server.Set):
 //   - RegisteredClients (0x0003): fabric-scoped: spec.NewServer refuses to serve it.
 type State struct {
-	IdleModeDuration                 uint32                      `matter:"0x0000"` // attribute 0x0000: uint32, M, R V, F
-	ActiveModeDuration               uint32                      `matter:"0x0001"` // attribute 0x0001: uint32, M, R V, F
-	ActiveModeThreshold              uint16                      `matter:"0x0002"` // attribute 0x0002: uint16, M, R V, F
-	IcdCounter                       uint32                      `matter:"0x0004"` // attribute 0x0004: uint32, CIP, R A, N C
-	ClientsSupportedPerFabric        uint16                      `matter:"0x0005"` // attribute 0x0005: uint16, CIP, R V, F
-	UserActiveModeTriggerHint        UserActiveModeTriggerBitmap `matter:"0x0006"` // attribute 0x0006: UserActiveModeTriggerBitmap, UAT, R V, F
-	UserActiveModeTriggerInstruction string                      `matter:"0x0007"` // attribute 0x0007: string, desc, R V, F
-	OperatingMode                    OperatingModeEnum           `matter:"0x0008"` // attribute 0x0008: OperatingModeEnum, LITS, R V
-	MaximumCheckInBackoff            uint32                      `matter:"0x0009"` // attribute 0x0009: uint32, CIP, R V, F
+	IdleModeDuration                 uint32                      // attribute 0x0000: uint32, M, R V, F
+	ActiveModeDuration               uint32                      // attribute 0x0001: uint32, M, R V, F
+	ActiveModeThreshold              uint16                      // attribute 0x0002: uint16, M, R V, F
+	IcdCounter                       uint32                      // attribute 0x0004: uint32, CIP, R A, N C
+	ClientsSupportedPerFabric        uint16                      // attribute 0x0005: uint16, CIP, R V, F
+	UserActiveModeTriggerHint        UserActiveModeTriggerBitmap // attribute 0x0006: UserActiveModeTriggerBitmap, UAT, R V, F
+	UserActiveModeTriggerInstruction string                      // attribute 0x0007: string, desc, R V, F
+	OperatingMode                    OperatingModeEnum           // attribute 0x0008: OperatingModeEnum, LITS, R V
+	MaximumCheckInBackoff            uint32                      // attribute 0x0009: uint32, CIP, R V, F
 }
 
 // Patch is a change to the IcdManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	IdleModeDuration                 *uint32                      `matter:"0x0000"` // attribute 0x0000
-	ActiveModeDuration               *uint32                      `matter:"0x0001"` // attribute 0x0001
-	ActiveModeThreshold              *uint16                      `matter:"0x0002"` // attribute 0x0002
-	IcdCounter                       *uint32                      `matter:"0x0004"` // attribute 0x0004
-	ClientsSupportedPerFabric        *uint16                      `matter:"0x0005"` // attribute 0x0005
-	UserActiveModeTriggerHint        *UserActiveModeTriggerBitmap `matter:"0x0006"` // attribute 0x0006
-	UserActiveModeTriggerInstruction *string                      `matter:"0x0007"` // attribute 0x0007
-	OperatingMode                    *OperatingModeEnum           `matter:"0x0008"` // attribute 0x0008
-	MaximumCheckInBackoff            *uint32                      `matter:"0x0009"` // attribute 0x0009
+	IdleModeDuration                 *uint32                      // attribute 0x0000
+	ActiveModeDuration               *uint32                      // attribute 0x0001
+	ActiveModeThreshold              *uint16                      // attribute 0x0002
+	IcdCounter                       *uint32                      // attribute 0x0004
+	ClientsSupportedPerFabric        *uint16                      // attribute 0x0005
+	UserActiveModeTriggerHint        *UserActiveModeTriggerBitmap // attribute 0x0006
+	UserActiveModeTriggerInstruction *string                      // attribute 0x0007
+	OperatingMode                    *OperatingModeEnum           // attribute 0x0008
+	MaximumCheckInBackoff            *uint32                      // attribute 0x0009
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrIdleModeDuration); ok {
+		spec.Assign(&st.IdleModeDuration, v)
+	}
+	if v, ok := read(AttrActiveModeDuration); ok {
+		spec.Assign(&st.ActiveModeDuration, v)
+	}
+	if v, ok := read(AttrActiveModeThreshold); ok {
+		spec.Assign(&st.ActiveModeThreshold, v)
+	}
+	if v, ok := read(AttrIcdCounter); ok {
+		spec.Assign(&st.IcdCounter, v)
+	}
+	if v, ok := read(AttrClientsSupportedPerFabric); ok {
+		spec.Assign(&st.ClientsSupportedPerFabric, v)
+	}
+	if v, ok := read(AttrUserActiveModeTriggerHint); ok {
+		spec.Assign(&st.UserActiveModeTriggerHint, v)
+	}
+	if v, ok := read(AttrUserActiveModeTriggerInstruction); ok {
+		spec.Assign(&st.UserActiveModeTriggerInstruction, v)
+	}
+	if v, ok := read(AttrOperatingMode); ok {
+		spec.Assign(&st.OperatingMode, v)
+	}
+	if v, ok := read(AttrMaximumCheckInBackoff); ok {
+		spec.Assign(&st.MaximumCheckInBackoff, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -123,9 +157,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -197,7 +233,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

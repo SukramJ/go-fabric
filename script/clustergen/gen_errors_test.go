@@ -128,8 +128,8 @@ func TestGenerateShapes(t *testing.T) {
 	// response and one answered by status, an event.
 	hull := strings.Join(strings.Fields(string(o.Server)), " ") // gofmt's column alignment aside
 	for _, want := range []string{
-		"Level *uint8 `matter:\"0x0005\"`", "Anon []AnonEntry `matter:\"0x0000\"`", "Rec Pair `matter:\"0x0002\"`",
-		"Anon *[]AnonEntry `matter:\"0x0000\"`", "Null []uint32",
+		"Level *uint8 // attribute 0x0005", "Anon []AnonEntry // attribute 0x0000", "Rec Pair // attribute 0x0002",
+		"Anon *[]AnonEntry // attribute 0x0000", "Null []uint32", "spec.Assign(&st.Level, v)",
 		"// - Untyped (0x0003): its type is one the generator maps to any.",
 		"// - Scoped (0x0006): fabric-scoped: spec.NewServer refuses to serve it.",
 		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error)) error",

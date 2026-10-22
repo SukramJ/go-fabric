@@ -301,7 +301,7 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	w.p("// ClusterDeclaration implements device.Declaration: the declaration in")
 	w.p("// the form the device kit applies it.")
 	w.p("func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {")
-	w.p("\tdecl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}")
+	w.p("\tdecl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}")
 	w.p("\tif d.OnWrite != nil {")
 	w.p("\t\tdecl.Attach = d.attach")
 	w.p("\t}")

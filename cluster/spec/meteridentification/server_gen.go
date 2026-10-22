@@ -18,23 +18,45 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MeterType         *MeterTypeEnum        `matter:"0x0000"` // attribute 0x0000: MeterTypeEnum, M, R V, X
-	PointOfDelivery   *string               `matter:"0x0001"` // attribute 0x0001: string, M, R V, X
-	MeterSerialNumber *string               `matter:"0x0002"` // attribute 0x0002: string, M, R V, X
-	ProtocolVersion   *string               `matter:"0x0003"` // attribute 0x0003: string, O, R V, X
-	PowerThreshold    *PowerThresholdStruct `matter:"0x0004"` // attribute 0x0004: PowerThresholdStruct, PWRTHLD, R V, X
+	MeterType         *MeterTypeEnum        // attribute 0x0000: MeterTypeEnum, M, R V, X
+	PointOfDelivery   *string               // attribute 0x0001: string, M, R V, X
+	MeterSerialNumber *string               // attribute 0x0002: string, M, R V, X
+	ProtocolVersion   *string               // attribute 0x0003: string, O, R V, X
+	PowerThreshold    *PowerThresholdStruct // attribute 0x0004: PowerThresholdStruct, PWRTHLD, R V, X
 }
 
 // Patch is a change to the MeterIdentification state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MeterType         *MeterTypeEnum        `matter:"0x0000"` // attribute 0x0000
-	PointOfDelivery   *string               `matter:"0x0001"` // attribute 0x0001
-	MeterSerialNumber *string               `matter:"0x0002"` // attribute 0x0002
-	ProtocolVersion   *string               `matter:"0x0003"` // attribute 0x0003
-	PowerThreshold    *PowerThresholdStruct `matter:"0x0004"` // attribute 0x0004
+	MeterType         *MeterTypeEnum        // attribute 0x0000
+	PointOfDelivery   *string               // attribute 0x0001
+	MeterSerialNumber *string               // attribute 0x0002
+	ProtocolVersion   *string               // attribute 0x0003
+	PowerThreshold    *PowerThresholdStruct // attribute 0x0004
 	Null              []uint32              // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMeterType); ok {
+		spec.Assign(&st.MeterType, v)
+	}
+	if v, ok := read(AttrPointOfDelivery); ok {
+		spec.Assign(&st.PointOfDelivery, v)
+	}
+	if v, ok := read(AttrMeterSerialNumber); ok {
+		spec.Assign(&st.MeterSerialNumber, v)
+	}
+	if v, ok := read(AttrProtocolVersion); ok {
+		spec.Assign(&st.ProtocolVersion, v)
+	}
+	if v, ok := read(AttrPowerThreshold); ok {
+		spec.Assign(&st.PowerThreshold, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -105,9 +127,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -148,7 +172,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

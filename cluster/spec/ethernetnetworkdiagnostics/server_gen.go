@@ -18,31 +18,65 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	PhyRate        *PHYRateEnum `matter:"0x0000"` // attribute 0x0000: PHYRateEnum, O, R V, X
-	FullDuplex     *bool        `matter:"0x0001"` // attribute 0x0001: bool, O, R V, X
-	PacketRxCount  uint64       `matter:"0x0002"` // attribute 0x0002: uint64, PKTCNT, R V, C
-	PacketTxCount  uint64       `matter:"0x0003"` // attribute 0x0003: uint64, PKTCNT, R V, C
-	TxErrCount     uint64       `matter:"0x0004"` // attribute 0x0004: uint64, ERRCNT, R V, C
-	CollisionCount uint64       `matter:"0x0005"` // attribute 0x0005: uint64, ERRCNT, R V, C
-	OverrunCount   uint64       `matter:"0x0006"` // attribute 0x0006: uint64, ERRCNT, R V, C
-	CarrierDetect  *bool        `matter:"0x0007"` // attribute 0x0007: bool, O, R V, X C
-	TimeSinceReset uint64       `matter:"0x0008"` // attribute 0x0008: uint64, O, R V, C
+	PhyRate        *PHYRateEnum // attribute 0x0000: PHYRateEnum, O, R V, X
+	FullDuplex     *bool        // attribute 0x0001: bool, O, R V, X
+	PacketRxCount  uint64       // attribute 0x0002: uint64, PKTCNT, R V, C
+	PacketTxCount  uint64       // attribute 0x0003: uint64, PKTCNT, R V, C
+	TxErrCount     uint64       // attribute 0x0004: uint64, ERRCNT, R V, C
+	CollisionCount uint64       // attribute 0x0005: uint64, ERRCNT, R V, C
+	OverrunCount   uint64       // attribute 0x0006: uint64, ERRCNT, R V, C
+	CarrierDetect  *bool        // attribute 0x0007: bool, O, R V, X C
+	TimeSinceReset uint64       // attribute 0x0008: uint64, O, R V, C
 }
 
 // Patch is a change to the EthernetNetworkDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	PhyRate        *PHYRateEnum `matter:"0x0000"` // attribute 0x0000
-	FullDuplex     *bool        `matter:"0x0001"` // attribute 0x0001
-	PacketRxCount  *uint64      `matter:"0x0002"` // attribute 0x0002
-	PacketTxCount  *uint64      `matter:"0x0003"` // attribute 0x0003
-	TxErrCount     *uint64      `matter:"0x0004"` // attribute 0x0004
-	CollisionCount *uint64      `matter:"0x0005"` // attribute 0x0005
-	OverrunCount   *uint64      `matter:"0x0006"` // attribute 0x0006
-	CarrierDetect  *bool        `matter:"0x0007"` // attribute 0x0007
-	TimeSinceReset *uint64      `matter:"0x0008"` // attribute 0x0008
+	PhyRate        *PHYRateEnum // attribute 0x0000
+	FullDuplex     *bool        // attribute 0x0001
+	PacketRxCount  *uint64      // attribute 0x0002
+	PacketTxCount  *uint64      // attribute 0x0003
+	TxErrCount     *uint64      // attribute 0x0004
+	CollisionCount *uint64      // attribute 0x0005
+	OverrunCount   *uint64      // attribute 0x0006
+	CarrierDetect  *bool        // attribute 0x0007
+	TimeSinceReset *uint64      // attribute 0x0008
 	Null           []uint32     // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrPhyRate); ok {
+		spec.Assign(&st.PhyRate, v)
+	}
+	if v, ok := read(AttrFullDuplex); ok {
+		spec.Assign(&st.FullDuplex, v)
+	}
+	if v, ok := read(AttrPacketRxCount); ok {
+		spec.Assign(&st.PacketRxCount, v)
+	}
+	if v, ok := read(AttrPacketTxCount); ok {
+		spec.Assign(&st.PacketTxCount, v)
+	}
+	if v, ok := read(AttrTxErrCount); ok {
+		spec.Assign(&st.TxErrCount, v)
+	}
+	if v, ok := read(AttrCollisionCount); ok {
+		spec.Assign(&st.CollisionCount, v)
+	}
+	if v, ok := read(AttrOverrunCount); ok {
+		spec.Assign(&st.OverrunCount, v)
+	}
+	if v, ok := read(AttrCarrierDetect); ok {
+		spec.Assign(&st.CarrierDetect, v)
+	}
+	if v, ok := read(AttrTimeSinceReset); ok {
+		spec.Assign(&st.TimeSinceReset, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -125,9 +159,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -181,7 +217,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -18,61 +18,140 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MaxPressure            *int16            `matter:"0x0000"` // attribute 0x0000: int16, M, R V, X F
-	MaxSpeed               *uint16           `matter:"0x0001"` // attribute 0x0001: uint16, M, R V, X F
-	MaxFlow                *uint16           `matter:"0x0002"` // attribute 0x0002: uint16, M, R V, X F
-	MinConstPressure       *int16            `matter:"0x0003"` // attribute 0x0003: int16, PRSCONST, [AUTO], R V, X F
-	MaxConstPressure       *int16            `matter:"0x0004"` // attribute 0x0004: int16, PRSCONST, [AUTO], R V, X F
-	MinCompPressure        *int16            `matter:"0x0005"` // attribute 0x0005: int16, PRSCOMP, [AUTO], R V, X F
-	MaxCompPressure        *int16            `matter:"0x0006"` // attribute 0x0006: int16, PRSCOMP, [AUTO], R V, X F
-	MinConstSpeed          *uint16           `matter:"0x0007"` // attribute 0x0007: uint16, SPD, [AUTO], R V, X F
-	MaxConstSpeed          *uint16           `matter:"0x0008"` // attribute 0x0008: uint16, SPD, [AUTO], R V, X F
-	MinConstFlow           *uint16           `matter:"0x0009"` // attribute 0x0009: uint16, FLW, [AUTO], R V, X F
-	MaxConstFlow           *uint16           `matter:"0x000A"` // attribute 0x000A: uint16, FLW, [AUTO], R V, X F
-	MinConstTemp           *int16            `matter:"0x000B"` // attribute 0x000B: int16, TEMP, [AUTO], R V, X F
-	MaxConstTemp           *int16            `matter:"0x000C"` // attribute 0x000C: int16, TEMP, [AUTO], R V, X F
-	PumpStatus             PumpStatusBitmap  `matter:"0x0010"` // attribute 0x0010: PumpStatusBitmap, O, R V
-	EffectiveOperationMode OperationModeEnum `matter:"0x0011"` // attribute 0x0011: OperationModeEnum, M, R V, N
-	EffectiveControlMode   ControlModeEnum   `matter:"0x0012"` // attribute 0x0012: ControlModeEnum, M, R V, N
-	Capacity               *int16            `matter:"0x0013"` // attribute 0x0013: int16, M, R V, X
-	Speed                  *uint16           `matter:"0x0014"` // attribute 0x0014: uint16, O, R V, X
-	LifetimeRunningHours   *uint32           `matter:"0x0015"` // attribute 0x0015: uint24, O, RW VM, X N
-	Power                  *uint32           `matter:"0x0016"` // attribute 0x0016: uint24, O, R V, X
-	LifetimeEnergyConsumed *uint32           `matter:"0x0017"` // attribute 0x0017: uint32, O, RW VM, X N
-	OperationMode          OperationModeEnum `matter:"0x0020"` // attribute 0x0020: OperationModeEnum, M, RW VM, N
-	ControlMode            ControlModeEnum   `matter:"0x0021"` // attribute 0x0021: ControlModeEnum, O, RW VM, N
-	AlarmMask              uint16            `matter:"0x0022"` // attribute 0x0022: uint16, D, RW VO
+	MaxPressure            *int16            // attribute 0x0000: int16, M, R V, X F
+	MaxSpeed               *uint16           // attribute 0x0001: uint16, M, R V, X F
+	MaxFlow                *uint16           // attribute 0x0002: uint16, M, R V, X F
+	MinConstPressure       *int16            // attribute 0x0003: int16, PRSCONST, [AUTO], R V, X F
+	MaxConstPressure       *int16            // attribute 0x0004: int16, PRSCONST, [AUTO], R V, X F
+	MinCompPressure        *int16            // attribute 0x0005: int16, PRSCOMP, [AUTO], R V, X F
+	MaxCompPressure        *int16            // attribute 0x0006: int16, PRSCOMP, [AUTO], R V, X F
+	MinConstSpeed          *uint16           // attribute 0x0007: uint16, SPD, [AUTO], R V, X F
+	MaxConstSpeed          *uint16           // attribute 0x0008: uint16, SPD, [AUTO], R V, X F
+	MinConstFlow           *uint16           // attribute 0x0009: uint16, FLW, [AUTO], R V, X F
+	MaxConstFlow           *uint16           // attribute 0x000A: uint16, FLW, [AUTO], R V, X F
+	MinConstTemp           *int16            // attribute 0x000B: int16, TEMP, [AUTO], R V, X F
+	MaxConstTemp           *int16            // attribute 0x000C: int16, TEMP, [AUTO], R V, X F
+	PumpStatus             PumpStatusBitmap  // attribute 0x0010: PumpStatusBitmap, O, R V
+	EffectiveOperationMode OperationModeEnum // attribute 0x0011: OperationModeEnum, M, R V, N
+	EffectiveControlMode   ControlModeEnum   // attribute 0x0012: ControlModeEnum, M, R V, N
+	Capacity               *int16            // attribute 0x0013: int16, M, R V, X
+	Speed                  *uint16           // attribute 0x0014: uint16, O, R V, X
+	LifetimeRunningHours   *uint32           // attribute 0x0015: uint24, O, RW VM, X N
+	Power                  *uint32           // attribute 0x0016: uint24, O, R V, X
+	LifetimeEnergyConsumed *uint32           // attribute 0x0017: uint32, O, RW VM, X N
+	OperationMode          OperationModeEnum // attribute 0x0020: OperationModeEnum, M, RW VM, N
+	ControlMode            ControlModeEnum   // attribute 0x0021: ControlModeEnum, O, RW VM, N
+	AlarmMask              uint16            // attribute 0x0022: uint16, D, RW VO
 }
 
 // Patch is a change to the PumpConfigurationAndControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MaxPressure            *int16             `matter:"0x0000"` // attribute 0x0000
-	MaxSpeed               *uint16            `matter:"0x0001"` // attribute 0x0001
-	MaxFlow                *uint16            `matter:"0x0002"` // attribute 0x0002
-	MinConstPressure       *int16             `matter:"0x0003"` // attribute 0x0003
-	MaxConstPressure       *int16             `matter:"0x0004"` // attribute 0x0004
-	MinCompPressure        *int16             `matter:"0x0005"` // attribute 0x0005
-	MaxCompPressure        *int16             `matter:"0x0006"` // attribute 0x0006
-	MinConstSpeed          *uint16            `matter:"0x0007"` // attribute 0x0007
-	MaxConstSpeed          *uint16            `matter:"0x0008"` // attribute 0x0008
-	MinConstFlow           *uint16            `matter:"0x0009"` // attribute 0x0009
-	MaxConstFlow           *uint16            `matter:"0x000A"` // attribute 0x000A
-	MinConstTemp           *int16             `matter:"0x000B"` // attribute 0x000B
-	MaxConstTemp           *int16             `matter:"0x000C"` // attribute 0x000C
-	PumpStatus             *PumpStatusBitmap  `matter:"0x0010"` // attribute 0x0010
-	EffectiveOperationMode *OperationModeEnum `matter:"0x0011"` // attribute 0x0011
-	EffectiveControlMode   *ControlModeEnum   `matter:"0x0012"` // attribute 0x0012
-	Capacity               *int16             `matter:"0x0013"` // attribute 0x0013
-	Speed                  *uint16            `matter:"0x0014"` // attribute 0x0014
-	LifetimeRunningHours   *uint32            `matter:"0x0015"` // attribute 0x0015
-	Power                  *uint32            `matter:"0x0016"` // attribute 0x0016
-	LifetimeEnergyConsumed *uint32            `matter:"0x0017"` // attribute 0x0017
-	OperationMode          *OperationModeEnum `matter:"0x0020"` // attribute 0x0020
-	ControlMode            *ControlModeEnum   `matter:"0x0021"` // attribute 0x0021
-	AlarmMask              *uint16            `matter:"0x0022"` // attribute 0x0022
+	MaxPressure            *int16             // attribute 0x0000
+	MaxSpeed               *uint16            // attribute 0x0001
+	MaxFlow                *uint16            // attribute 0x0002
+	MinConstPressure       *int16             // attribute 0x0003
+	MaxConstPressure       *int16             // attribute 0x0004
+	MinCompPressure        *int16             // attribute 0x0005
+	MaxCompPressure        *int16             // attribute 0x0006
+	MinConstSpeed          *uint16            // attribute 0x0007
+	MaxConstSpeed          *uint16            // attribute 0x0008
+	MinConstFlow           *uint16            // attribute 0x0009
+	MaxConstFlow           *uint16            // attribute 0x000A
+	MinConstTemp           *int16             // attribute 0x000B
+	MaxConstTemp           *int16             // attribute 0x000C
+	PumpStatus             *PumpStatusBitmap  // attribute 0x0010
+	EffectiveOperationMode *OperationModeEnum // attribute 0x0011
+	EffectiveControlMode   *ControlModeEnum   // attribute 0x0012
+	Capacity               *int16             // attribute 0x0013
+	Speed                  *uint16            // attribute 0x0014
+	LifetimeRunningHours   *uint32            // attribute 0x0015
+	Power                  *uint32            // attribute 0x0016
+	LifetimeEnergyConsumed *uint32            // attribute 0x0017
+	OperationMode          *OperationModeEnum // attribute 0x0020
+	ControlMode            *ControlModeEnum   // attribute 0x0021
+	AlarmMask              *uint16            // attribute 0x0022
 	Null                   []uint32           // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMaxPressure); ok {
+		spec.Assign(&st.MaxPressure, v)
+	}
+	if v, ok := read(AttrMaxSpeed); ok {
+		spec.Assign(&st.MaxSpeed, v)
+	}
+	if v, ok := read(AttrMaxFlow); ok {
+		spec.Assign(&st.MaxFlow, v)
+	}
+	if v, ok := read(AttrMinConstPressure); ok {
+		spec.Assign(&st.MinConstPressure, v)
+	}
+	if v, ok := read(AttrMaxConstPressure); ok {
+		spec.Assign(&st.MaxConstPressure, v)
+	}
+	if v, ok := read(AttrMinCompPressure); ok {
+		spec.Assign(&st.MinCompPressure, v)
+	}
+	if v, ok := read(AttrMaxCompPressure); ok {
+		spec.Assign(&st.MaxCompPressure, v)
+	}
+	if v, ok := read(AttrMinConstSpeed); ok {
+		spec.Assign(&st.MinConstSpeed, v)
+	}
+	if v, ok := read(AttrMaxConstSpeed); ok {
+		spec.Assign(&st.MaxConstSpeed, v)
+	}
+	if v, ok := read(AttrMinConstFlow); ok {
+		spec.Assign(&st.MinConstFlow, v)
+	}
+	if v, ok := read(AttrMaxConstFlow); ok {
+		spec.Assign(&st.MaxConstFlow, v)
+	}
+	if v, ok := read(AttrMinConstTemp); ok {
+		spec.Assign(&st.MinConstTemp, v)
+	}
+	if v, ok := read(AttrMaxConstTemp); ok {
+		spec.Assign(&st.MaxConstTemp, v)
+	}
+	if v, ok := read(AttrPumpStatus); ok {
+		spec.Assign(&st.PumpStatus, v)
+	}
+	if v, ok := read(AttrEffectiveOperationMode); ok {
+		spec.Assign(&st.EffectiveOperationMode, v)
+	}
+	if v, ok := read(AttrEffectiveControlMode); ok {
+		spec.Assign(&st.EffectiveControlMode, v)
+	}
+	if v, ok := read(AttrCapacity); ok {
+		spec.Assign(&st.Capacity, v)
+	}
+	if v, ok := read(AttrSpeed); ok {
+		spec.Assign(&st.Speed, v)
+	}
+	if v, ok := read(AttrLifetimeRunningHours); ok {
+		spec.Assign(&st.LifetimeRunningHours, v)
+	}
+	if v, ok := read(AttrPower); ok {
+		spec.Assign(&st.Power, v)
+	}
+	if v, ok := read(AttrLifetimeEnergyConsumed); ok {
+		spec.Assign(&st.LifetimeEnergyConsumed, v)
+	}
+	if v, ok := read(AttrOperationMode); ok {
+		spec.Assign(&st.OperationMode, v)
+	}
+	if v, ok := read(AttrControlMode); ok {
+		spec.Assign(&st.ControlMode, v)
+	}
+	if v, ok := read(AttrAlarmMask); ok {
+		spec.Assign(&st.AlarmMask, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -200,9 +279,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -379,7 +460,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

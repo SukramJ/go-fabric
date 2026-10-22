@@ -18,135 +18,325 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	LocalTemperature                       *int16                                        `matter:"0x0000"` // attribute 0x0000: temperature, M, R V, X
-	OutdoorTemperature                     *int16                                        `matter:"0x0001"` // attribute 0x0001: temperature, O, R V, X
-	Occupancy                              OccupancyBitmap                               `matter:"0x0002"` // attribute 0x0002: OccupancyBitmap, OCC, R V
-	AbsMinHeatSetpointLimit                int16                                         `matter:"0x0003"` // attribute 0x0003: temperature, [HEAT], R V, F
-	AbsMaxHeatSetpointLimit                int16                                         `matter:"0x0004"` // attribute 0x0004: temperature, [HEAT], R V, F
-	AbsMinCoolSetpointLimit                int16                                         `matter:"0x0005"` // attribute 0x0005: temperature, [COOL], R V, F
-	AbsMaxCoolSetpointLimit                int16                                         `matter:"0x0006"` // attribute 0x0006: temperature, [COOL], R V, F
-	PiCoolingDemand                        uint8                                         `matter:"0x0007"` // attribute 0x0007: uint8, D, R V
-	PiHeatingDemand                        uint8                                         `matter:"0x0008"` // attribute 0x0008: uint8, D, R V
-	HvacSystemTypeConfiguration            HVACSystemTypeBitmap                          `matter:"0x0009"` // attribute 0x0009: HVACSystemTypeBitmap, D, R[W] VM
-	LocalTemperatureCalibration            int8                                          `matter:"0x0010"` // attribute 0x0010: SignedTemperature, [!LTNE], RW VM, N
-	OccupiedCoolingSetpoint                int16                                         `matter:"0x0011"` // attribute 0x0011: temperature, COOL, RW VO, N
-	OccupiedHeatingSetpoint                int16                                         `matter:"0x0012"` // attribute 0x0012: temperature, HEAT, RW VO, N
-	UnoccupiedCoolingSetpoint              int16                                         `matter:"0x0013"` // attribute 0x0013: temperature, COOL & OCC, RW VO, N
-	UnoccupiedHeatingSetpoint              int16                                         `matter:"0x0014"` // attribute 0x0014: temperature, HEAT & OCC, RW VO, N
-	MinHeatSetpointLimit                   int16                                         `matter:"0x0015"` // attribute 0x0015: temperature, [HEAT], RW VM, N
-	MaxHeatSetpointLimit                   int16                                         `matter:"0x0016"` // attribute 0x0016: temperature, [HEAT], RW VM, N
-	MinCoolSetpointLimit                   int16                                         `matter:"0x0017"` // attribute 0x0017: temperature, [COOL], RW VM, N
-	MaxCoolSetpointLimit                   int16                                         `matter:"0x0018"` // attribute 0x0018: temperature, [COOL], RW VM, N
-	MinSetpointDeadBand                    int8                                          `matter:"0x0019"` // attribute 0x0019: SignedTemperature, AUTO, R[W] VM, N
-	RemoteSensing                          RemoteSensingBitmap                           `matter:"0x001A"` // attribute 0x001A: RemoteSensingBitmap, O, RW VM, N
-	ControlSequenceOfOperation             ControlSequenceOfOperationEnum                `matter:"0x001B"` // attribute 0x001B: ControlSequenceOfOperationEnum, M, RW VM, N
-	SystemMode                             SystemModeEnum                                `matter:"0x001C"` // attribute 0x001C: SystemModeEnum, M, RW VM, N
-	ThermostatRunningMode                  ThermostatRunningModeEnum                     `matter:"0x001E"` // attribute 0x001E: ThermostatRunningModeEnum, TEVT & AUTO, [AUTO], R V
-	TemperatureSetpointHold                TemperatureSetpointHoldEnum                   `matter:"0x0023"` // attribute 0x0023: TemperatureSetpointHoldEnum, O, RW VM, N
-	TemperatureSetpointHoldDuration        *uint16                                       `matter:"0x0024"` // attribute 0x0024: uint16, O, RW VM, X N
-	ThermostatProgrammingOperationMode     ProgrammingOperationModeBitmap                `matter:"0x0025"` // attribute 0x0025: ProgrammingOperationModeBitmap, D, RW VM
-	ThermostatRunningState                 RelayStateBitmap                              `matter:"0x0029"` // attribute 0x0029: RelayStateBitmap, O, R V
-	SetpointChangeSource                   SetpointChangeSourceEnum                      `matter:"0x0030"` // attribute 0x0030: SetpointChangeSourceEnum, O, R V
-	SetpointChangeAmount                   *int16                                        `matter:"0x0031"` // attribute 0x0031: TemperatureDifference, O, R V, X
-	SetpointChangeSourceTimestamp          uint32                                        `matter:"0x0032"` // attribute 0x0032: epoch-s, O, R V
-	OccupiedSetback                        *uint8                                        `matter:"0x0034"` // attribute 0x0034: UnsignedTemperature, D, RW VM, X N
-	OccupiedSetbackMin                     *uint8                                        `matter:"0x0035"` // attribute 0x0035: UnsignedTemperature, D, R V, X F
-	OccupiedSetbackMax                     *uint8                                        `matter:"0x0036"` // attribute 0x0036: UnsignedTemperature, D, R V, X F
-	UnoccupiedSetback                      *uint8                                        `matter:"0x0037"` // attribute 0x0037: UnsignedTemperature, D, RW VM, X N
-	UnoccupiedSetbackMin                   *uint8                                        `matter:"0x0038"` // attribute 0x0038: UnsignedTemperature, D, R V, X F
-	UnoccupiedSetbackMax                   *uint8                                        `matter:"0x0039"` // attribute 0x0039: UnsignedTemperature, D, R V, X F
-	EmergencyHeatDelta                     uint8                                         `matter:"0x003A"` // attribute 0x003A: UnsignedTemperature, O, RW VM, N
-	AcType                                 ACTypeEnum                                    `matter:"0x0040"` // attribute 0x0040: ACTypeEnum, O, RW VM, N
-	AcCapacity                             uint16                                        `matter:"0x0041"` // attribute 0x0041: uint16, O, RW VM, N
-	AcRefrigerantType                      ACRefrigerantTypeEnum                         `matter:"0x0042"` // attribute 0x0042: ACRefrigerantTypeEnum, O, RW VM, N
-	AcCompressorType                       ACCompressorTypeEnum                          `matter:"0x0043"` // attribute 0x0043: ACCompressorTypeEnum, O, RW VM, N
-	AcErrorCode                            ACErrorCodeBitmap                             `matter:"0x0044"` // attribute 0x0044: ACErrorCodeBitmap, O, RW VM
-	AcLouverPosition                       ACLouverPositionEnum                          `matter:"0x0045"` // attribute 0x0045: ACLouverPositionEnum, O, RW VM, N
-	AcCoilTemperature                      *int16                                        `matter:"0x0046"` // attribute 0x0046: temperature, O, R V, X
-	AcCapacityFormat                       ACCapacityFormatEnum                          `matter:"0x0047"` // attribute 0x0047: ACCapacityFormatEnum, O, RW VM, N
-	PresetTypes                            []PresetTypeStruct                            `matter:"0x0048"` // attribute 0x0048: list[PresetTypeStruct], PRES, R V, F
-	ScheduleTypes                          []ScheduleTypeStruct                          `matter:"0x0049"` // attribute 0x0049: list[ScheduleTypeStruct], MSCH, R V, F
-	NumberOfPresets                        uint8                                         `matter:"0x004A"` // attribute 0x004A: uint8, PRES, R V, F
-	NumberOfSchedules                      uint8                                         `matter:"0x004B"` // attribute 0x004B: uint8, MSCH, R V, F
-	NumberOfScheduleTransitions            uint8                                         `matter:"0x004C"` // attribute 0x004C: uint8, MSCH, R V, F
-	NumberOfScheduleTransitionPerDay       *uint8                                        `matter:"0x004D"` // attribute 0x004D: uint8, MSCH, R V, X F
-	ActivePresetHandle                     *[]byte                                       `matter:"0x004E"` // attribute 0x004E: octstr, PRES, R V, X N
-	ActiveScheduleHandle                   *[]byte                                       `matter:"0x004F"` // attribute 0x004F: octstr, MSCH, R V, X N
-	Presets                                []PresetStruct                                `matter:"0x0050"` // attribute 0x0050: list[PresetStruct], PRES, RW VM, N T
-	Schedules                              []ScheduleStruct                              `matter:"0x0051"` // attribute 0x0051: list[ScheduleStruct], MSCH, RW VM, N T
-	SetpointHoldExpiryTimestamp            *uint32                                       `matter:"0x0052"` // attribute 0x0052: epoch-s, O, R V, X N
-	MaxThermostatSuggestions               uint8                                         `matter:"0x0053"` // attribute 0x0053: uint8, TSUGGEST, R V, F
-	ThermostatSuggestions                  []ThermostatSuggestionStruct                  `matter:"0x0054"` // attribute 0x0054: list[ThermostatSuggestionStruct], TSUGGEST, R V, N
-	CurrentThermostatSuggestion            *ThermostatSuggestionStruct                   `matter:"0x0055"` // attribute 0x0055: ThermostatSuggestionStruct, TSUGGEST, R V, X
-	ThermostatSuggestionNotFollowingReason *ThermostatSuggestionNotFollowingReasonBitmap `matter:"0x0056"` // attribute 0x0056: ThermostatSuggestionNotFollowingReasonBitmap, TSUGGEST, R V, X
+	LocalTemperature                       *int16                                        // attribute 0x0000: temperature, M, R V, X
+	OutdoorTemperature                     *int16                                        // attribute 0x0001: temperature, O, R V, X
+	Occupancy                              OccupancyBitmap                               // attribute 0x0002: OccupancyBitmap, OCC, R V
+	AbsMinHeatSetpointLimit                int16                                         // attribute 0x0003: temperature, [HEAT], R V, F
+	AbsMaxHeatSetpointLimit                int16                                         // attribute 0x0004: temperature, [HEAT], R V, F
+	AbsMinCoolSetpointLimit                int16                                         // attribute 0x0005: temperature, [COOL], R V, F
+	AbsMaxCoolSetpointLimit                int16                                         // attribute 0x0006: temperature, [COOL], R V, F
+	PiCoolingDemand                        uint8                                         // attribute 0x0007: uint8, D, R V
+	PiHeatingDemand                        uint8                                         // attribute 0x0008: uint8, D, R V
+	HvacSystemTypeConfiguration            HVACSystemTypeBitmap                          // attribute 0x0009: HVACSystemTypeBitmap, D, R[W] VM
+	LocalTemperatureCalibration            int8                                          // attribute 0x0010: SignedTemperature, [!LTNE], RW VM, N
+	OccupiedCoolingSetpoint                int16                                         // attribute 0x0011: temperature, COOL, RW VO, N
+	OccupiedHeatingSetpoint                int16                                         // attribute 0x0012: temperature, HEAT, RW VO, N
+	UnoccupiedCoolingSetpoint              int16                                         // attribute 0x0013: temperature, COOL & OCC, RW VO, N
+	UnoccupiedHeatingSetpoint              int16                                         // attribute 0x0014: temperature, HEAT & OCC, RW VO, N
+	MinHeatSetpointLimit                   int16                                         // attribute 0x0015: temperature, [HEAT], RW VM, N
+	MaxHeatSetpointLimit                   int16                                         // attribute 0x0016: temperature, [HEAT], RW VM, N
+	MinCoolSetpointLimit                   int16                                         // attribute 0x0017: temperature, [COOL], RW VM, N
+	MaxCoolSetpointLimit                   int16                                         // attribute 0x0018: temperature, [COOL], RW VM, N
+	MinSetpointDeadBand                    int8                                          // attribute 0x0019: SignedTemperature, AUTO, R[W] VM, N
+	RemoteSensing                          RemoteSensingBitmap                           // attribute 0x001A: RemoteSensingBitmap, O, RW VM, N
+	ControlSequenceOfOperation             ControlSequenceOfOperationEnum                // attribute 0x001B: ControlSequenceOfOperationEnum, M, RW VM, N
+	SystemMode                             SystemModeEnum                                // attribute 0x001C: SystemModeEnum, M, RW VM, N
+	ThermostatRunningMode                  ThermostatRunningModeEnum                     // attribute 0x001E: ThermostatRunningModeEnum, TEVT & AUTO, [AUTO], R V
+	TemperatureSetpointHold                TemperatureSetpointHoldEnum                   // attribute 0x0023: TemperatureSetpointHoldEnum, O, RW VM, N
+	TemperatureSetpointHoldDuration        *uint16                                       // attribute 0x0024: uint16, O, RW VM, X N
+	ThermostatProgrammingOperationMode     ProgrammingOperationModeBitmap                // attribute 0x0025: ProgrammingOperationModeBitmap, D, RW VM
+	ThermostatRunningState                 RelayStateBitmap                              // attribute 0x0029: RelayStateBitmap, O, R V
+	SetpointChangeSource                   SetpointChangeSourceEnum                      // attribute 0x0030: SetpointChangeSourceEnum, O, R V
+	SetpointChangeAmount                   *int16                                        // attribute 0x0031: TemperatureDifference, O, R V, X
+	SetpointChangeSourceTimestamp          uint32                                        // attribute 0x0032: epoch-s, O, R V
+	OccupiedSetback                        *uint8                                        // attribute 0x0034: UnsignedTemperature, D, RW VM, X N
+	OccupiedSetbackMin                     *uint8                                        // attribute 0x0035: UnsignedTemperature, D, R V, X F
+	OccupiedSetbackMax                     *uint8                                        // attribute 0x0036: UnsignedTemperature, D, R V, X F
+	UnoccupiedSetback                      *uint8                                        // attribute 0x0037: UnsignedTemperature, D, RW VM, X N
+	UnoccupiedSetbackMin                   *uint8                                        // attribute 0x0038: UnsignedTemperature, D, R V, X F
+	UnoccupiedSetbackMax                   *uint8                                        // attribute 0x0039: UnsignedTemperature, D, R V, X F
+	EmergencyHeatDelta                     uint8                                         // attribute 0x003A: UnsignedTemperature, O, RW VM, N
+	AcType                                 ACTypeEnum                                    // attribute 0x0040: ACTypeEnum, O, RW VM, N
+	AcCapacity                             uint16                                        // attribute 0x0041: uint16, O, RW VM, N
+	AcRefrigerantType                      ACRefrigerantTypeEnum                         // attribute 0x0042: ACRefrigerantTypeEnum, O, RW VM, N
+	AcCompressorType                       ACCompressorTypeEnum                          // attribute 0x0043: ACCompressorTypeEnum, O, RW VM, N
+	AcErrorCode                            ACErrorCodeBitmap                             // attribute 0x0044: ACErrorCodeBitmap, O, RW VM
+	AcLouverPosition                       ACLouverPositionEnum                          // attribute 0x0045: ACLouverPositionEnum, O, RW VM, N
+	AcCoilTemperature                      *int16                                        // attribute 0x0046: temperature, O, R V, X
+	AcCapacityFormat                       ACCapacityFormatEnum                          // attribute 0x0047: ACCapacityFormatEnum, O, RW VM, N
+	PresetTypes                            []PresetTypeStruct                            // attribute 0x0048: list[PresetTypeStruct], PRES, R V, F
+	ScheduleTypes                          []ScheduleTypeStruct                          // attribute 0x0049: list[ScheduleTypeStruct], MSCH, R V, F
+	NumberOfPresets                        uint8                                         // attribute 0x004A: uint8, PRES, R V, F
+	NumberOfSchedules                      uint8                                         // attribute 0x004B: uint8, MSCH, R V, F
+	NumberOfScheduleTransitions            uint8                                         // attribute 0x004C: uint8, MSCH, R V, F
+	NumberOfScheduleTransitionPerDay       *uint8                                        // attribute 0x004D: uint8, MSCH, R V, X F
+	ActivePresetHandle                     *[]byte                                       // attribute 0x004E: octstr, PRES, R V, X N
+	ActiveScheduleHandle                   *[]byte                                       // attribute 0x004F: octstr, MSCH, R V, X N
+	Presets                                []PresetStruct                                // attribute 0x0050: list[PresetStruct], PRES, RW VM, N T
+	Schedules                              []ScheduleStruct                              // attribute 0x0051: list[ScheduleStruct], MSCH, RW VM, N T
+	SetpointHoldExpiryTimestamp            *uint32                                       // attribute 0x0052: epoch-s, O, R V, X N
+	MaxThermostatSuggestions               uint8                                         // attribute 0x0053: uint8, TSUGGEST, R V, F
+	ThermostatSuggestions                  []ThermostatSuggestionStruct                  // attribute 0x0054: list[ThermostatSuggestionStruct], TSUGGEST, R V, N
+	CurrentThermostatSuggestion            *ThermostatSuggestionStruct                   // attribute 0x0055: ThermostatSuggestionStruct, TSUGGEST, R V, X
+	ThermostatSuggestionNotFollowingReason *ThermostatSuggestionNotFollowingReasonBitmap // attribute 0x0056: ThermostatSuggestionNotFollowingReasonBitmap, TSUGGEST, R V, X
 }
 
 // Patch is a change to the Thermostat state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	LocalTemperature                       *int16                                        `matter:"0x0000"` // attribute 0x0000
-	OutdoorTemperature                     *int16                                        `matter:"0x0001"` // attribute 0x0001
-	Occupancy                              *OccupancyBitmap                              `matter:"0x0002"` // attribute 0x0002
-	AbsMinHeatSetpointLimit                *int16                                        `matter:"0x0003"` // attribute 0x0003
-	AbsMaxHeatSetpointLimit                *int16                                        `matter:"0x0004"` // attribute 0x0004
-	AbsMinCoolSetpointLimit                *int16                                        `matter:"0x0005"` // attribute 0x0005
-	AbsMaxCoolSetpointLimit                *int16                                        `matter:"0x0006"` // attribute 0x0006
-	PiCoolingDemand                        *uint8                                        `matter:"0x0007"` // attribute 0x0007
-	PiHeatingDemand                        *uint8                                        `matter:"0x0008"` // attribute 0x0008
-	HvacSystemTypeConfiguration            *HVACSystemTypeBitmap                         `matter:"0x0009"` // attribute 0x0009
-	LocalTemperatureCalibration            *int8                                         `matter:"0x0010"` // attribute 0x0010
-	OccupiedCoolingSetpoint                *int16                                        `matter:"0x0011"` // attribute 0x0011
-	OccupiedHeatingSetpoint                *int16                                        `matter:"0x0012"` // attribute 0x0012
-	UnoccupiedCoolingSetpoint              *int16                                        `matter:"0x0013"` // attribute 0x0013
-	UnoccupiedHeatingSetpoint              *int16                                        `matter:"0x0014"` // attribute 0x0014
-	MinHeatSetpointLimit                   *int16                                        `matter:"0x0015"` // attribute 0x0015
-	MaxHeatSetpointLimit                   *int16                                        `matter:"0x0016"` // attribute 0x0016
-	MinCoolSetpointLimit                   *int16                                        `matter:"0x0017"` // attribute 0x0017
-	MaxCoolSetpointLimit                   *int16                                        `matter:"0x0018"` // attribute 0x0018
-	MinSetpointDeadBand                    *int8                                         `matter:"0x0019"` // attribute 0x0019
-	RemoteSensing                          *RemoteSensingBitmap                          `matter:"0x001A"` // attribute 0x001A
-	ControlSequenceOfOperation             *ControlSequenceOfOperationEnum               `matter:"0x001B"` // attribute 0x001B
-	SystemMode                             *SystemModeEnum                               `matter:"0x001C"` // attribute 0x001C
-	ThermostatRunningMode                  *ThermostatRunningModeEnum                    `matter:"0x001E"` // attribute 0x001E
-	TemperatureSetpointHold                *TemperatureSetpointHoldEnum                  `matter:"0x0023"` // attribute 0x0023
-	TemperatureSetpointHoldDuration        *uint16                                       `matter:"0x0024"` // attribute 0x0024
-	ThermostatProgrammingOperationMode     *ProgrammingOperationModeBitmap               `matter:"0x0025"` // attribute 0x0025
-	ThermostatRunningState                 *RelayStateBitmap                             `matter:"0x0029"` // attribute 0x0029
-	SetpointChangeSource                   *SetpointChangeSourceEnum                     `matter:"0x0030"` // attribute 0x0030
-	SetpointChangeAmount                   *int16                                        `matter:"0x0031"` // attribute 0x0031
-	SetpointChangeSourceTimestamp          *uint32                                       `matter:"0x0032"` // attribute 0x0032
-	OccupiedSetback                        *uint8                                        `matter:"0x0034"` // attribute 0x0034
-	OccupiedSetbackMin                     *uint8                                        `matter:"0x0035"` // attribute 0x0035
-	OccupiedSetbackMax                     *uint8                                        `matter:"0x0036"` // attribute 0x0036
-	UnoccupiedSetback                      *uint8                                        `matter:"0x0037"` // attribute 0x0037
-	UnoccupiedSetbackMin                   *uint8                                        `matter:"0x0038"` // attribute 0x0038
-	UnoccupiedSetbackMax                   *uint8                                        `matter:"0x0039"` // attribute 0x0039
-	EmergencyHeatDelta                     *uint8                                        `matter:"0x003A"` // attribute 0x003A
-	AcType                                 *ACTypeEnum                                   `matter:"0x0040"` // attribute 0x0040
-	AcCapacity                             *uint16                                       `matter:"0x0041"` // attribute 0x0041
-	AcRefrigerantType                      *ACRefrigerantTypeEnum                        `matter:"0x0042"` // attribute 0x0042
-	AcCompressorType                       *ACCompressorTypeEnum                         `matter:"0x0043"` // attribute 0x0043
-	AcErrorCode                            *ACErrorCodeBitmap                            `matter:"0x0044"` // attribute 0x0044
-	AcLouverPosition                       *ACLouverPositionEnum                         `matter:"0x0045"` // attribute 0x0045
-	AcCoilTemperature                      *int16                                        `matter:"0x0046"` // attribute 0x0046
-	AcCapacityFormat                       *ACCapacityFormatEnum                         `matter:"0x0047"` // attribute 0x0047
-	PresetTypes                            *[]PresetTypeStruct                           `matter:"0x0048"` // attribute 0x0048
-	ScheduleTypes                          *[]ScheduleTypeStruct                         `matter:"0x0049"` // attribute 0x0049
-	NumberOfPresets                        *uint8                                        `matter:"0x004A"` // attribute 0x004A
-	NumberOfSchedules                      *uint8                                        `matter:"0x004B"` // attribute 0x004B
-	NumberOfScheduleTransitions            *uint8                                        `matter:"0x004C"` // attribute 0x004C
-	NumberOfScheduleTransitionPerDay       *uint8                                        `matter:"0x004D"` // attribute 0x004D
-	ActivePresetHandle                     *[]byte                                       `matter:"0x004E"` // attribute 0x004E
-	ActiveScheduleHandle                   *[]byte                                       `matter:"0x004F"` // attribute 0x004F
-	Presets                                *[]PresetStruct                               `matter:"0x0050"` // attribute 0x0050
-	Schedules                              *[]ScheduleStruct                             `matter:"0x0051"` // attribute 0x0051
-	SetpointHoldExpiryTimestamp            *uint32                                       `matter:"0x0052"` // attribute 0x0052
-	MaxThermostatSuggestions               *uint8                                        `matter:"0x0053"` // attribute 0x0053
-	ThermostatSuggestions                  *[]ThermostatSuggestionStruct                 `matter:"0x0054"` // attribute 0x0054
-	CurrentThermostatSuggestion            *ThermostatSuggestionStruct                   `matter:"0x0055"` // attribute 0x0055
-	ThermostatSuggestionNotFollowingReason *ThermostatSuggestionNotFollowingReasonBitmap `matter:"0x0056"` // attribute 0x0056
+	LocalTemperature                       *int16                                        // attribute 0x0000
+	OutdoorTemperature                     *int16                                        // attribute 0x0001
+	Occupancy                              *OccupancyBitmap                              // attribute 0x0002
+	AbsMinHeatSetpointLimit                *int16                                        // attribute 0x0003
+	AbsMaxHeatSetpointLimit                *int16                                        // attribute 0x0004
+	AbsMinCoolSetpointLimit                *int16                                        // attribute 0x0005
+	AbsMaxCoolSetpointLimit                *int16                                        // attribute 0x0006
+	PiCoolingDemand                        *uint8                                        // attribute 0x0007
+	PiHeatingDemand                        *uint8                                        // attribute 0x0008
+	HvacSystemTypeConfiguration            *HVACSystemTypeBitmap                         // attribute 0x0009
+	LocalTemperatureCalibration            *int8                                         // attribute 0x0010
+	OccupiedCoolingSetpoint                *int16                                        // attribute 0x0011
+	OccupiedHeatingSetpoint                *int16                                        // attribute 0x0012
+	UnoccupiedCoolingSetpoint              *int16                                        // attribute 0x0013
+	UnoccupiedHeatingSetpoint              *int16                                        // attribute 0x0014
+	MinHeatSetpointLimit                   *int16                                        // attribute 0x0015
+	MaxHeatSetpointLimit                   *int16                                        // attribute 0x0016
+	MinCoolSetpointLimit                   *int16                                        // attribute 0x0017
+	MaxCoolSetpointLimit                   *int16                                        // attribute 0x0018
+	MinSetpointDeadBand                    *int8                                         // attribute 0x0019
+	RemoteSensing                          *RemoteSensingBitmap                          // attribute 0x001A
+	ControlSequenceOfOperation             *ControlSequenceOfOperationEnum               // attribute 0x001B
+	SystemMode                             *SystemModeEnum                               // attribute 0x001C
+	ThermostatRunningMode                  *ThermostatRunningModeEnum                    // attribute 0x001E
+	TemperatureSetpointHold                *TemperatureSetpointHoldEnum                  // attribute 0x0023
+	TemperatureSetpointHoldDuration        *uint16                                       // attribute 0x0024
+	ThermostatProgrammingOperationMode     *ProgrammingOperationModeBitmap               // attribute 0x0025
+	ThermostatRunningState                 *RelayStateBitmap                             // attribute 0x0029
+	SetpointChangeSource                   *SetpointChangeSourceEnum                     // attribute 0x0030
+	SetpointChangeAmount                   *int16                                        // attribute 0x0031
+	SetpointChangeSourceTimestamp          *uint32                                       // attribute 0x0032
+	OccupiedSetback                        *uint8                                        // attribute 0x0034
+	OccupiedSetbackMin                     *uint8                                        // attribute 0x0035
+	OccupiedSetbackMax                     *uint8                                        // attribute 0x0036
+	UnoccupiedSetback                      *uint8                                        // attribute 0x0037
+	UnoccupiedSetbackMin                   *uint8                                        // attribute 0x0038
+	UnoccupiedSetbackMax                   *uint8                                        // attribute 0x0039
+	EmergencyHeatDelta                     *uint8                                        // attribute 0x003A
+	AcType                                 *ACTypeEnum                                   // attribute 0x0040
+	AcCapacity                             *uint16                                       // attribute 0x0041
+	AcRefrigerantType                      *ACRefrigerantTypeEnum                        // attribute 0x0042
+	AcCompressorType                       *ACCompressorTypeEnum                         // attribute 0x0043
+	AcErrorCode                            *ACErrorCodeBitmap                            // attribute 0x0044
+	AcLouverPosition                       *ACLouverPositionEnum                         // attribute 0x0045
+	AcCoilTemperature                      *int16                                        // attribute 0x0046
+	AcCapacityFormat                       *ACCapacityFormatEnum                         // attribute 0x0047
+	PresetTypes                            *[]PresetTypeStruct                           // attribute 0x0048
+	ScheduleTypes                          *[]ScheduleTypeStruct                         // attribute 0x0049
+	NumberOfPresets                        *uint8                                        // attribute 0x004A
+	NumberOfSchedules                      *uint8                                        // attribute 0x004B
+	NumberOfScheduleTransitions            *uint8                                        // attribute 0x004C
+	NumberOfScheduleTransitionPerDay       *uint8                                        // attribute 0x004D
+	ActivePresetHandle                     *[]byte                                       // attribute 0x004E
+	ActiveScheduleHandle                   *[]byte                                       // attribute 0x004F
+	Presets                                *[]PresetStruct                               // attribute 0x0050
+	Schedules                              *[]ScheduleStruct                             // attribute 0x0051
+	SetpointHoldExpiryTimestamp            *uint32                                       // attribute 0x0052
+	MaxThermostatSuggestions               *uint8                                        // attribute 0x0053
+	ThermostatSuggestions                  *[]ThermostatSuggestionStruct                 // attribute 0x0054
+	CurrentThermostatSuggestion            *ThermostatSuggestionStruct                   // attribute 0x0055
+	ThermostatSuggestionNotFollowingReason *ThermostatSuggestionNotFollowingReasonBitmap // attribute 0x0056
 	Null                                   []uint32                                      // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrLocalTemperature); ok {
+		spec.Assign(&st.LocalTemperature, v)
+	}
+	if v, ok := read(AttrOutdoorTemperature); ok {
+		spec.Assign(&st.OutdoorTemperature, v)
+	}
+	if v, ok := read(AttrOccupancy); ok {
+		spec.Assign(&st.Occupancy, v)
+	}
+	if v, ok := read(AttrAbsMinHeatSetpointLimit); ok {
+		spec.Assign(&st.AbsMinHeatSetpointLimit, v)
+	}
+	if v, ok := read(AttrAbsMaxHeatSetpointLimit); ok {
+		spec.Assign(&st.AbsMaxHeatSetpointLimit, v)
+	}
+	if v, ok := read(AttrAbsMinCoolSetpointLimit); ok {
+		spec.Assign(&st.AbsMinCoolSetpointLimit, v)
+	}
+	if v, ok := read(AttrAbsMaxCoolSetpointLimit); ok {
+		spec.Assign(&st.AbsMaxCoolSetpointLimit, v)
+	}
+	if v, ok := read(AttrPiCoolingDemand); ok {
+		spec.Assign(&st.PiCoolingDemand, v)
+	}
+	if v, ok := read(AttrPiHeatingDemand); ok {
+		spec.Assign(&st.PiHeatingDemand, v)
+	}
+	if v, ok := read(AttrHvacSystemTypeConfiguration); ok {
+		spec.Assign(&st.HvacSystemTypeConfiguration, v)
+	}
+	if v, ok := read(AttrLocalTemperatureCalibration); ok {
+		spec.Assign(&st.LocalTemperatureCalibration, v)
+	}
+	if v, ok := read(AttrOccupiedCoolingSetpoint); ok {
+		spec.Assign(&st.OccupiedCoolingSetpoint, v)
+	}
+	if v, ok := read(AttrOccupiedHeatingSetpoint); ok {
+		spec.Assign(&st.OccupiedHeatingSetpoint, v)
+	}
+	if v, ok := read(AttrUnoccupiedCoolingSetpoint); ok {
+		spec.Assign(&st.UnoccupiedCoolingSetpoint, v)
+	}
+	if v, ok := read(AttrUnoccupiedHeatingSetpoint); ok {
+		spec.Assign(&st.UnoccupiedHeatingSetpoint, v)
+	}
+	if v, ok := read(AttrMinHeatSetpointLimit); ok {
+		spec.Assign(&st.MinHeatSetpointLimit, v)
+	}
+	if v, ok := read(AttrMaxHeatSetpointLimit); ok {
+		spec.Assign(&st.MaxHeatSetpointLimit, v)
+	}
+	if v, ok := read(AttrMinCoolSetpointLimit); ok {
+		spec.Assign(&st.MinCoolSetpointLimit, v)
+	}
+	if v, ok := read(AttrMaxCoolSetpointLimit); ok {
+		spec.Assign(&st.MaxCoolSetpointLimit, v)
+	}
+	if v, ok := read(AttrMinSetpointDeadBand); ok {
+		spec.Assign(&st.MinSetpointDeadBand, v)
+	}
+	if v, ok := read(AttrRemoteSensing); ok {
+		spec.Assign(&st.RemoteSensing, v)
+	}
+	if v, ok := read(AttrControlSequenceOfOperation); ok {
+		spec.Assign(&st.ControlSequenceOfOperation, v)
+	}
+	if v, ok := read(AttrSystemMode); ok {
+		spec.Assign(&st.SystemMode, v)
+	}
+	if v, ok := read(AttrThermostatRunningMode); ok {
+		spec.Assign(&st.ThermostatRunningMode, v)
+	}
+	if v, ok := read(AttrTemperatureSetpointHold); ok {
+		spec.Assign(&st.TemperatureSetpointHold, v)
+	}
+	if v, ok := read(AttrTemperatureSetpointHoldDuration); ok {
+		spec.Assign(&st.TemperatureSetpointHoldDuration, v)
+	}
+	if v, ok := read(AttrThermostatProgrammingOperationMode); ok {
+		spec.Assign(&st.ThermostatProgrammingOperationMode, v)
+	}
+	if v, ok := read(AttrThermostatRunningState); ok {
+		spec.Assign(&st.ThermostatRunningState, v)
+	}
+	if v, ok := read(AttrSetpointChangeSource); ok {
+		spec.Assign(&st.SetpointChangeSource, v)
+	}
+	if v, ok := read(AttrSetpointChangeAmount); ok {
+		spec.Assign(&st.SetpointChangeAmount, v)
+	}
+	if v, ok := read(AttrSetpointChangeSourceTimestamp); ok {
+		spec.Assign(&st.SetpointChangeSourceTimestamp, v)
+	}
+	if v, ok := read(AttrOccupiedSetback); ok {
+		spec.Assign(&st.OccupiedSetback, v)
+	}
+	if v, ok := read(AttrOccupiedSetbackMin); ok {
+		spec.Assign(&st.OccupiedSetbackMin, v)
+	}
+	if v, ok := read(AttrOccupiedSetbackMax); ok {
+		spec.Assign(&st.OccupiedSetbackMax, v)
+	}
+	if v, ok := read(AttrUnoccupiedSetback); ok {
+		spec.Assign(&st.UnoccupiedSetback, v)
+	}
+	if v, ok := read(AttrUnoccupiedSetbackMin); ok {
+		spec.Assign(&st.UnoccupiedSetbackMin, v)
+	}
+	if v, ok := read(AttrUnoccupiedSetbackMax); ok {
+		spec.Assign(&st.UnoccupiedSetbackMax, v)
+	}
+	if v, ok := read(AttrEmergencyHeatDelta); ok {
+		spec.Assign(&st.EmergencyHeatDelta, v)
+	}
+	if v, ok := read(AttrAcType); ok {
+		spec.Assign(&st.AcType, v)
+	}
+	if v, ok := read(AttrAcCapacity); ok {
+		spec.Assign(&st.AcCapacity, v)
+	}
+	if v, ok := read(AttrAcRefrigerantType); ok {
+		spec.Assign(&st.AcRefrigerantType, v)
+	}
+	if v, ok := read(AttrAcCompressorType); ok {
+		spec.Assign(&st.AcCompressorType, v)
+	}
+	if v, ok := read(AttrAcErrorCode); ok {
+		spec.Assign(&st.AcErrorCode, v)
+	}
+	if v, ok := read(AttrAcLouverPosition); ok {
+		spec.Assign(&st.AcLouverPosition, v)
+	}
+	if v, ok := read(AttrAcCoilTemperature); ok {
+		spec.Assign(&st.AcCoilTemperature, v)
+	}
+	if v, ok := read(AttrAcCapacityFormat); ok {
+		spec.Assign(&st.AcCapacityFormat, v)
+	}
+	if v, ok := read(AttrPresetTypes); ok {
+		spec.Assign(&st.PresetTypes, v)
+	}
+	if v, ok := read(AttrScheduleTypes); ok {
+		spec.Assign(&st.ScheduleTypes, v)
+	}
+	if v, ok := read(AttrNumberOfPresets); ok {
+		spec.Assign(&st.NumberOfPresets, v)
+	}
+	if v, ok := read(AttrNumberOfSchedules); ok {
+		spec.Assign(&st.NumberOfSchedules, v)
+	}
+	if v, ok := read(AttrNumberOfScheduleTransitions); ok {
+		spec.Assign(&st.NumberOfScheduleTransitions, v)
+	}
+	if v, ok := read(AttrNumberOfScheduleTransitionPerDay); ok {
+		spec.Assign(&st.NumberOfScheduleTransitionPerDay, v)
+	}
+	if v, ok := read(AttrActivePresetHandle); ok {
+		spec.Assign(&st.ActivePresetHandle, v)
+	}
+	if v, ok := read(AttrActiveScheduleHandle); ok {
+		spec.Assign(&st.ActiveScheduleHandle, v)
+	}
+	if v, ok := read(AttrPresets); ok {
+		spec.Assign(&st.Presets, v)
+	}
+	if v, ok := read(AttrSchedules); ok {
+		spec.Assign(&st.Schedules, v)
+	}
+	if v, ok := read(AttrSetpointHoldExpiryTimestamp); ok {
+		spec.Assign(&st.SetpointHoldExpiryTimestamp, v)
+	}
+	if v, ok := read(AttrMaxThermostatSuggestions); ok {
+		spec.Assign(&st.MaxThermostatSuggestions, v)
+	}
+	if v, ok := read(AttrThermostatSuggestions); ok {
+		spec.Assign(&st.ThermostatSuggestions, v)
+	}
+	if v, ok := read(AttrCurrentThermostatSuggestion); ok {
+		spec.Assign(&st.CurrentThermostatSuggestion, v)
+	}
+	if v, ok := read(AttrThermostatSuggestionNotFollowingReason); ok {
+		spec.Assign(&st.ThermostatSuggestionNotFollowingReason, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -385,9 +575,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -566,7 +758,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

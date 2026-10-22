@@ -18,37 +18,80 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	FanMode          FanModeEnum          `matter:"0x0000"` // attribute 0x0000: FanModeEnum, M, RW VO, N
-	FanModeSequence  FanModeSequenceEnum  `matter:"0x0001"` // attribute 0x0001: FanModeSequenceEnum, M, R V, F
-	PercentSetting   *uint8               `matter:"0x0002"` // attribute 0x0002: percent, M, RW VO, X
-	PercentCurrent   uint8                `matter:"0x0003"` // attribute 0x0003: percent, M, R V
-	SpeedMax         uint8                `matter:"0x0004"` // attribute 0x0004: uint8, SPD, R V, F
-	SpeedSetting     *uint8               `matter:"0x0005"` // attribute 0x0005: uint8, SPD, RW VO, X
-	SpeedCurrent     uint8                `matter:"0x0006"` // attribute 0x0006: uint8, SPD, R V
-	RockSupport      RockBitmap           `matter:"0x0007"` // attribute 0x0007: RockBitmap, RCK, R V, F
-	RockSetting      RockBitmap           `matter:"0x0008"` // attribute 0x0008: RockBitmap, RCK, RW VO
-	WindSupport      WindBitmap           `matter:"0x0009"` // attribute 0x0009: WindBitmap, WND, R V, F
-	WindSetting      WindBitmap           `matter:"0x000A"` // attribute 0x000A: WindBitmap, WND, RW VO
-	AirflowDirection AirflowDirectionEnum `matter:"0x000B"` // attribute 0x000B: AirflowDirectionEnum, DIR, RW VO
+	FanMode          FanModeEnum          // attribute 0x0000: FanModeEnum, M, RW VO, N
+	FanModeSequence  FanModeSequenceEnum  // attribute 0x0001: FanModeSequenceEnum, M, R V, F
+	PercentSetting   *uint8               // attribute 0x0002: percent, M, RW VO, X
+	PercentCurrent   uint8                // attribute 0x0003: percent, M, R V
+	SpeedMax         uint8                // attribute 0x0004: uint8, SPD, R V, F
+	SpeedSetting     *uint8               // attribute 0x0005: uint8, SPD, RW VO, X
+	SpeedCurrent     uint8                // attribute 0x0006: uint8, SPD, R V
+	RockSupport      RockBitmap           // attribute 0x0007: RockBitmap, RCK, R V, F
+	RockSetting      RockBitmap           // attribute 0x0008: RockBitmap, RCK, RW VO
+	WindSupport      WindBitmap           // attribute 0x0009: WindBitmap, WND, R V, F
+	WindSetting      WindBitmap           // attribute 0x000A: WindBitmap, WND, RW VO
+	AirflowDirection AirflowDirectionEnum // attribute 0x000B: AirflowDirectionEnum, DIR, RW VO
 }
 
 // Patch is a change to the FanControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	FanMode          *FanModeEnum          `matter:"0x0000"` // attribute 0x0000
-	FanModeSequence  *FanModeSequenceEnum  `matter:"0x0001"` // attribute 0x0001
-	PercentSetting   *uint8                `matter:"0x0002"` // attribute 0x0002
-	PercentCurrent   *uint8                `matter:"0x0003"` // attribute 0x0003
-	SpeedMax         *uint8                `matter:"0x0004"` // attribute 0x0004
-	SpeedSetting     *uint8                `matter:"0x0005"` // attribute 0x0005
-	SpeedCurrent     *uint8                `matter:"0x0006"` // attribute 0x0006
-	RockSupport      *RockBitmap           `matter:"0x0007"` // attribute 0x0007
-	RockSetting      *RockBitmap           `matter:"0x0008"` // attribute 0x0008
-	WindSupport      *WindBitmap           `matter:"0x0009"` // attribute 0x0009
-	WindSetting      *WindBitmap           `matter:"0x000A"` // attribute 0x000A
-	AirflowDirection *AirflowDirectionEnum `matter:"0x000B"` // attribute 0x000B
+	FanMode          *FanModeEnum          // attribute 0x0000
+	FanModeSequence  *FanModeSequenceEnum  // attribute 0x0001
+	PercentSetting   *uint8                // attribute 0x0002
+	PercentCurrent   *uint8                // attribute 0x0003
+	SpeedMax         *uint8                // attribute 0x0004
+	SpeedSetting     *uint8                // attribute 0x0005
+	SpeedCurrent     *uint8                // attribute 0x0006
+	RockSupport      *RockBitmap           // attribute 0x0007
+	RockSetting      *RockBitmap           // attribute 0x0008
+	WindSupport      *WindBitmap           // attribute 0x0009
+	WindSetting      *WindBitmap           // attribute 0x000A
+	AirflowDirection *AirflowDirectionEnum // attribute 0x000B
 	Null             []uint32              // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrFanMode); ok {
+		spec.Assign(&st.FanMode, v)
+	}
+	if v, ok := read(AttrFanModeSequence); ok {
+		spec.Assign(&st.FanModeSequence, v)
+	}
+	if v, ok := read(AttrPercentSetting); ok {
+		spec.Assign(&st.PercentSetting, v)
+	}
+	if v, ok := read(AttrPercentCurrent); ok {
+		spec.Assign(&st.PercentCurrent, v)
+	}
+	if v, ok := read(AttrSpeedMax); ok {
+		spec.Assign(&st.SpeedMax, v)
+	}
+	if v, ok := read(AttrSpeedSetting); ok {
+		spec.Assign(&st.SpeedSetting, v)
+	}
+	if v, ok := read(AttrSpeedCurrent); ok {
+		spec.Assign(&st.SpeedCurrent, v)
+	}
+	if v, ok := read(AttrRockSupport); ok {
+		spec.Assign(&st.RockSupport, v)
+	}
+	if v, ok := read(AttrRockSetting); ok {
+		spec.Assign(&st.RockSetting, v)
+	}
+	if v, ok := read(AttrWindSupport); ok {
+		spec.Assign(&st.WindSupport, v)
+	}
+	if v, ok := read(AttrWindSetting); ok {
+		spec.Assign(&st.WindSetting, v)
+	}
+	if v, ok := read(AttrAirflowDirection); ok {
+		spec.Assign(&st.AirflowDirection, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -140,9 +183,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -217,7 +262,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

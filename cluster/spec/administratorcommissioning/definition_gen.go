@@ -34,9 +34,9 @@ const (
 
 // Command ids.
 const (
-	CmdOpenCommissioningWindow      uint32 = 0x00 // request → status, M
-	CmdOpenBasicCommissioningWindow uint32 = 0x01 // request → status, BC
-	CmdRevokeCommissioning          uint32 = 0x02 // request → status, M
+	CmdOpenCommissioningWindow      uint32 = 0x00 // request → status, timed, M
+	CmdOpenBasicCommissioningWindow uint32 = 0x01 // request → status, timed, BC
+	CmdRevokeCommissioning          uint32 = 0x02 // request → status, timed, M
 )
 
 // Feature is a AdministratorCommissioning FeatureMap bit.

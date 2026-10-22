@@ -18,21 +18,40 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	MeasuredValue    *uint16 `matter:"0x0000"` // attribute 0x0000: uint16, M, R V, X
-	MinMeasuredValue *uint16 `matter:"0x0001"` // attribute 0x0001: uint16, M, R V, X F
-	MaxMeasuredValue *uint16 `matter:"0x0002"` // attribute 0x0002: uint16, M, R V, X F
-	Tolerance        uint16  `matter:"0x0003"` // attribute 0x0003: uint16, O, R V, F
+	MeasuredValue    *uint16 // attribute 0x0000: uint16, M, R V, X
+	MinMeasuredValue *uint16 // attribute 0x0001: uint16, M, R V, X F
+	MaxMeasuredValue *uint16 // attribute 0x0002: uint16, M, R V, X F
+	Tolerance        uint16  // attribute 0x0003: uint16, O, R V, F
 }
 
 // Patch is a change to the RelativeHumidityMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	MeasuredValue    *uint16  `matter:"0x0000"` // attribute 0x0000
-	MinMeasuredValue *uint16  `matter:"0x0001"` // attribute 0x0001
-	MaxMeasuredValue *uint16  `matter:"0x0002"` // attribute 0x0002
-	Tolerance        *uint16  `matter:"0x0003"` // attribute 0x0003
+	MeasuredValue    *uint16  // attribute 0x0000
+	MinMeasuredValue *uint16  // attribute 0x0001
+	MaxMeasuredValue *uint16  // attribute 0x0002
+	Tolerance        *uint16  // attribute 0x0003
 	Null             []uint32 // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrMeasuredValue); ok {
+		spec.Assign(&st.MeasuredValue, v)
+	}
+	if v, ok := read(AttrMinMeasuredValue); ok {
+		spec.Assign(&st.MinMeasuredValue, v)
+	}
+	if v, ok := read(AttrMaxMeasuredValue); ok {
+		spec.Assign(&st.MaxMeasuredValue, v)
+	}
+	if v, ok := read(AttrTolerance); ok {
+		spec.Assign(&st.Tolerance, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -100,9 +119,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -141,7 +162,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

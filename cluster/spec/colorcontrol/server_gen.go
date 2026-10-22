@@ -18,117 +18,280 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentHue                      uint8                   `matter:"0x0000"` // attribute 0x0000: uint8, HS, R V, N Q
-	CurrentSaturation               uint8                   `matter:"0x0001"` // attribute 0x0001: uint8, HS, R V, N S Q
-	RemainingTime                   uint16                  `matter:"0x0002"` // attribute 0x0002: uint16, O, R V, Q
-	CurrentX                        uint16                  `matter:"0x0003"` // attribute 0x0003: uint16, XY, R V, N S Q
-	CurrentY                        uint16                  `matter:"0x0004"` // attribute 0x0004: uint16, XY, R V, N S Q
-	DriftCompensation               DriftCompensationEnum   `matter:"0x0005"` // attribute 0x0005: DriftCompensationEnum, O, R V
-	CompensationText                string                  `matter:"0x0006"` // attribute 0x0006: string, O, R V
-	ColorTemperatureMireds          uint16                  `matter:"0x0007"` // attribute 0x0007: uint16, CT, R V, N S Q
-	ColorMode                       ColorModeEnum           `matter:"0x0008"` // attribute 0x0008: ColorModeEnum, M, R V, N
-	Options                         OptionsBitmap           `matter:"0x000F"` // attribute 0x000F: OptionsBitmap, M, RW VO
-	NumberOfPrimaries               *uint8                  `matter:"0x0010"` // attribute 0x0010: uint8, M, R V, X F
-	Primary1X                       uint16                  `matter:"0x0011"` // attribute 0x0011: uint16, NumberOfPrimaries > 0, O, R V, F
-	Primary1Y                       uint16                  `matter:"0x0012"` // attribute 0x0012: uint16, NumberOfPrimaries > 0, O, R V, F
-	Primary1Intensity               *uint8                  `matter:"0x0013"` // attribute 0x0013: uint8, NumberOfPrimaries > 0, O, R V, X F
-	Primary2X                       uint16                  `matter:"0x0015"` // attribute 0x0015: uint16, NumberOfPrimaries > 1, O, R V, F
-	Primary2Y                       uint16                  `matter:"0x0016"` // attribute 0x0016: uint16, NumberOfPrimaries > 1, O, R V, F
-	Primary2Intensity               *uint8                  `matter:"0x0017"` // attribute 0x0017: uint8, NumberOfPrimaries > 1, O, R V, X F
-	Primary3X                       uint16                  `matter:"0x0019"` // attribute 0x0019: uint16, NumberOfPrimaries > 2, O, R V, F
-	Primary3Y                       uint16                  `matter:"0x001A"` // attribute 0x001A: uint16, NumberOfPrimaries > 2, O, R V, F
-	Primary3Intensity               *uint8                  `matter:"0x001B"` // attribute 0x001B: uint8, NumberOfPrimaries > 2, O, R V, X F
-	Primary4X                       uint16                  `matter:"0x0020"` // attribute 0x0020: uint16, NumberOfPrimaries > 3, O, R V, F
-	Primary4Y                       uint16                  `matter:"0x0021"` // attribute 0x0021: uint16, NumberOfPrimaries > 3, O, R V, F
-	Primary4Intensity               *uint8                  `matter:"0x0022"` // attribute 0x0022: uint8, NumberOfPrimaries > 3, O, R V, X F
-	Primary5X                       uint16                  `matter:"0x0024"` // attribute 0x0024: uint16, NumberOfPrimaries > 4, O, R V, F
-	Primary5Y                       uint16                  `matter:"0x0025"` // attribute 0x0025: uint16, NumberOfPrimaries > 4, O, R V, F
-	Primary5Intensity               *uint8                  `matter:"0x0026"` // attribute 0x0026: uint8, NumberOfPrimaries > 4, O, R V, X F
-	Primary6X                       uint16                  `matter:"0x0028"` // attribute 0x0028: uint16, NumberOfPrimaries > 5, O, R V, F
-	Primary6Y                       uint16                  `matter:"0x0029"` // attribute 0x0029: uint16, NumberOfPrimaries > 5, O, R V, F
-	Primary6Intensity               *uint8                  `matter:"0x002A"` // attribute 0x002A: uint8, NumberOfPrimaries > 5, O, R V, X F
-	WhitePointX                     uint16                  `matter:"0x0030"` // attribute 0x0030: uint16, O, R V
-	WhitePointY                     uint16                  `matter:"0x0031"` // attribute 0x0031: uint16, O, R V
-	ColorPointRx                    uint16                  `matter:"0x0032"` // attribute 0x0032: uint16, O, R V
-	ColorPointRy                    uint16                  `matter:"0x0033"` // attribute 0x0033: uint16, O, R V
-	ColorPointRIntensity            *uint8                  `matter:"0x0034"` // attribute 0x0034: uint8, O, R V, X
-	ColorPointGx                    uint16                  `matter:"0x0036"` // attribute 0x0036: uint16, O, R V
-	ColorPointGy                    uint16                  `matter:"0x0037"` // attribute 0x0037: uint16, O, R V
-	ColorPointGIntensity            *uint8                  `matter:"0x0038"` // attribute 0x0038: uint8, O, R V, X
-	ColorPointBx                    uint16                  `matter:"0x003A"` // attribute 0x003A: uint16, O, R V
-	ColorPointBy                    uint16                  `matter:"0x003B"` // attribute 0x003B: uint16, O, R V
-	ColorPointBIntensity            *uint8                  `matter:"0x003C"` // attribute 0x003C: uint8, O, R V, X
-	EnhancedCurrentHue              uint16                  `matter:"0x4000"` // attribute 0x4000: uint16, EHUE, R V, N S Q
-	EnhancedColorMode               EnhancedColorModeEnum   `matter:"0x4001"` // attribute 0x4001: EnhancedColorModeEnum, M, R V, N S
-	ColorLoopActive                 uint8                   `matter:"0x4002"` // attribute 0x4002: enum8, CL, R V, N S
-	ColorLoopDirection              ColorLoopDirectionEnum  `matter:"0x4003"` // attribute 0x4003: ColorLoopDirectionEnum, CL, R V, N S
-	ColorLoopTime                   uint16                  `matter:"0x4004"` // attribute 0x4004: uint16, CL, R V, N S
-	ColorLoopStartEnhancedHue       uint16                  `matter:"0x4005"` // attribute 0x4005: uint16, CL, R V
-	ColorLoopStoredEnhancedHue      uint16                  `matter:"0x4006"` // attribute 0x4006: uint16, CL, R V
-	ColorCapabilities               ColorCapabilitiesBitmap `matter:"0x400A"` // attribute 0x400A: ColorCapabilitiesBitmap, M, R V
-	ColorTempPhysicalMinMireds      uint16                  `matter:"0x400B"` // attribute 0x400B: uint16, CT, R V
-	ColorTempPhysicalMaxMireds      uint16                  `matter:"0x400C"` // attribute 0x400C: uint16, CT, R V
-	CoupleColorTempToLevelMinMireds uint16                  `matter:"0x400D"` // attribute 0x400D: uint16, CT, R V
-	StartUpColorTemperatureMireds   *uint16                 `matter:"0x4010"` // attribute 0x4010: uint16, CT, RW VM, X N
+	CurrentHue                      uint8                   // attribute 0x0000: uint8, HS, R V, N Q
+	CurrentSaturation               uint8                   // attribute 0x0001: uint8, HS, R V, N S Q
+	RemainingTime                   uint16                  // attribute 0x0002: uint16, O, R V, Q
+	CurrentX                        uint16                  // attribute 0x0003: uint16, XY, R V, N S Q
+	CurrentY                        uint16                  // attribute 0x0004: uint16, XY, R V, N S Q
+	DriftCompensation               DriftCompensationEnum   // attribute 0x0005: DriftCompensationEnum, O, R V
+	CompensationText                string                  // attribute 0x0006: string, O, R V
+	ColorTemperatureMireds          uint16                  // attribute 0x0007: uint16, CT, R V, N S Q
+	ColorMode                       ColorModeEnum           // attribute 0x0008: ColorModeEnum, M, R V, N
+	Options                         OptionsBitmap           // attribute 0x000F: OptionsBitmap, M, RW VO
+	NumberOfPrimaries               *uint8                  // attribute 0x0010: uint8, M, R V, X F
+	Primary1X                       uint16                  // attribute 0x0011: uint16, NumberOfPrimaries > 0, O, R V, F
+	Primary1Y                       uint16                  // attribute 0x0012: uint16, NumberOfPrimaries > 0, O, R V, F
+	Primary1Intensity               *uint8                  // attribute 0x0013: uint8, NumberOfPrimaries > 0, O, R V, X F
+	Primary2X                       uint16                  // attribute 0x0015: uint16, NumberOfPrimaries > 1, O, R V, F
+	Primary2Y                       uint16                  // attribute 0x0016: uint16, NumberOfPrimaries > 1, O, R V, F
+	Primary2Intensity               *uint8                  // attribute 0x0017: uint8, NumberOfPrimaries > 1, O, R V, X F
+	Primary3X                       uint16                  // attribute 0x0019: uint16, NumberOfPrimaries > 2, O, R V, F
+	Primary3Y                       uint16                  // attribute 0x001A: uint16, NumberOfPrimaries > 2, O, R V, F
+	Primary3Intensity               *uint8                  // attribute 0x001B: uint8, NumberOfPrimaries > 2, O, R V, X F
+	Primary4X                       uint16                  // attribute 0x0020: uint16, NumberOfPrimaries > 3, O, R V, F
+	Primary4Y                       uint16                  // attribute 0x0021: uint16, NumberOfPrimaries > 3, O, R V, F
+	Primary4Intensity               *uint8                  // attribute 0x0022: uint8, NumberOfPrimaries > 3, O, R V, X F
+	Primary5X                       uint16                  // attribute 0x0024: uint16, NumberOfPrimaries > 4, O, R V, F
+	Primary5Y                       uint16                  // attribute 0x0025: uint16, NumberOfPrimaries > 4, O, R V, F
+	Primary5Intensity               *uint8                  // attribute 0x0026: uint8, NumberOfPrimaries > 4, O, R V, X F
+	Primary6X                       uint16                  // attribute 0x0028: uint16, NumberOfPrimaries > 5, O, R V, F
+	Primary6Y                       uint16                  // attribute 0x0029: uint16, NumberOfPrimaries > 5, O, R V, F
+	Primary6Intensity               *uint8                  // attribute 0x002A: uint8, NumberOfPrimaries > 5, O, R V, X F
+	WhitePointX                     uint16                  // attribute 0x0030: uint16, O, R V
+	WhitePointY                     uint16                  // attribute 0x0031: uint16, O, R V
+	ColorPointRx                    uint16                  // attribute 0x0032: uint16, O, R V
+	ColorPointRy                    uint16                  // attribute 0x0033: uint16, O, R V
+	ColorPointRIntensity            *uint8                  // attribute 0x0034: uint8, O, R V, X
+	ColorPointGx                    uint16                  // attribute 0x0036: uint16, O, R V
+	ColorPointGy                    uint16                  // attribute 0x0037: uint16, O, R V
+	ColorPointGIntensity            *uint8                  // attribute 0x0038: uint8, O, R V, X
+	ColorPointBx                    uint16                  // attribute 0x003A: uint16, O, R V
+	ColorPointBy                    uint16                  // attribute 0x003B: uint16, O, R V
+	ColorPointBIntensity            *uint8                  // attribute 0x003C: uint8, O, R V, X
+	EnhancedCurrentHue              uint16                  // attribute 0x4000: uint16, EHUE, R V, N S Q
+	EnhancedColorMode               EnhancedColorModeEnum   // attribute 0x4001: EnhancedColorModeEnum, M, R V, N S
+	ColorLoopActive                 uint8                   // attribute 0x4002: enum8, CL, R V, N S
+	ColorLoopDirection              ColorLoopDirectionEnum  // attribute 0x4003: ColorLoopDirectionEnum, CL, R V, N S
+	ColorLoopTime                   uint16                  // attribute 0x4004: uint16, CL, R V, N S
+	ColorLoopStartEnhancedHue       uint16                  // attribute 0x4005: uint16, CL, R V
+	ColorLoopStoredEnhancedHue      uint16                  // attribute 0x4006: uint16, CL, R V
+	ColorCapabilities               ColorCapabilitiesBitmap // attribute 0x400A: ColorCapabilitiesBitmap, M, R V
+	ColorTempPhysicalMinMireds      uint16                  // attribute 0x400B: uint16, CT, R V
+	ColorTempPhysicalMaxMireds      uint16                  // attribute 0x400C: uint16, CT, R V
+	CoupleColorTempToLevelMinMireds uint16                  // attribute 0x400D: uint16, CT, R V
+	StartUpColorTemperatureMireds   *uint16                 // attribute 0x4010: uint16, CT, RW VM, X N
 }
 
 // Patch is a change to the ColorControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	CurrentHue                      *uint8                   `matter:"0x0000"` // attribute 0x0000
-	CurrentSaturation               *uint8                   `matter:"0x0001"` // attribute 0x0001
-	RemainingTime                   *uint16                  `matter:"0x0002"` // attribute 0x0002
-	CurrentX                        *uint16                  `matter:"0x0003"` // attribute 0x0003
-	CurrentY                        *uint16                  `matter:"0x0004"` // attribute 0x0004
-	DriftCompensation               *DriftCompensationEnum   `matter:"0x0005"` // attribute 0x0005
-	CompensationText                *string                  `matter:"0x0006"` // attribute 0x0006
-	ColorTemperatureMireds          *uint16                  `matter:"0x0007"` // attribute 0x0007
-	ColorMode                       *ColorModeEnum           `matter:"0x0008"` // attribute 0x0008
-	Options                         *OptionsBitmap           `matter:"0x000F"` // attribute 0x000F
-	NumberOfPrimaries               *uint8                   `matter:"0x0010"` // attribute 0x0010
-	Primary1X                       *uint16                  `matter:"0x0011"` // attribute 0x0011
-	Primary1Y                       *uint16                  `matter:"0x0012"` // attribute 0x0012
-	Primary1Intensity               *uint8                   `matter:"0x0013"` // attribute 0x0013
-	Primary2X                       *uint16                  `matter:"0x0015"` // attribute 0x0015
-	Primary2Y                       *uint16                  `matter:"0x0016"` // attribute 0x0016
-	Primary2Intensity               *uint8                   `matter:"0x0017"` // attribute 0x0017
-	Primary3X                       *uint16                  `matter:"0x0019"` // attribute 0x0019
-	Primary3Y                       *uint16                  `matter:"0x001A"` // attribute 0x001A
-	Primary3Intensity               *uint8                   `matter:"0x001B"` // attribute 0x001B
-	Primary4X                       *uint16                  `matter:"0x0020"` // attribute 0x0020
-	Primary4Y                       *uint16                  `matter:"0x0021"` // attribute 0x0021
-	Primary4Intensity               *uint8                   `matter:"0x0022"` // attribute 0x0022
-	Primary5X                       *uint16                  `matter:"0x0024"` // attribute 0x0024
-	Primary5Y                       *uint16                  `matter:"0x0025"` // attribute 0x0025
-	Primary5Intensity               *uint8                   `matter:"0x0026"` // attribute 0x0026
-	Primary6X                       *uint16                  `matter:"0x0028"` // attribute 0x0028
-	Primary6Y                       *uint16                  `matter:"0x0029"` // attribute 0x0029
-	Primary6Intensity               *uint8                   `matter:"0x002A"` // attribute 0x002A
-	WhitePointX                     *uint16                  `matter:"0x0030"` // attribute 0x0030
-	WhitePointY                     *uint16                  `matter:"0x0031"` // attribute 0x0031
-	ColorPointRx                    *uint16                  `matter:"0x0032"` // attribute 0x0032
-	ColorPointRy                    *uint16                  `matter:"0x0033"` // attribute 0x0033
-	ColorPointRIntensity            *uint8                   `matter:"0x0034"` // attribute 0x0034
-	ColorPointGx                    *uint16                  `matter:"0x0036"` // attribute 0x0036
-	ColorPointGy                    *uint16                  `matter:"0x0037"` // attribute 0x0037
-	ColorPointGIntensity            *uint8                   `matter:"0x0038"` // attribute 0x0038
-	ColorPointBx                    *uint16                  `matter:"0x003A"` // attribute 0x003A
-	ColorPointBy                    *uint16                  `matter:"0x003B"` // attribute 0x003B
-	ColorPointBIntensity            *uint8                   `matter:"0x003C"` // attribute 0x003C
-	EnhancedCurrentHue              *uint16                  `matter:"0x4000"` // attribute 0x4000
-	EnhancedColorMode               *EnhancedColorModeEnum   `matter:"0x4001"` // attribute 0x4001
-	ColorLoopActive                 *uint8                   `matter:"0x4002"` // attribute 0x4002
-	ColorLoopDirection              *ColorLoopDirectionEnum  `matter:"0x4003"` // attribute 0x4003
-	ColorLoopTime                   *uint16                  `matter:"0x4004"` // attribute 0x4004
-	ColorLoopStartEnhancedHue       *uint16                  `matter:"0x4005"` // attribute 0x4005
-	ColorLoopStoredEnhancedHue      *uint16                  `matter:"0x4006"` // attribute 0x4006
-	ColorCapabilities               *ColorCapabilitiesBitmap `matter:"0x400A"` // attribute 0x400A
-	ColorTempPhysicalMinMireds      *uint16                  `matter:"0x400B"` // attribute 0x400B
-	ColorTempPhysicalMaxMireds      *uint16                  `matter:"0x400C"` // attribute 0x400C
-	CoupleColorTempToLevelMinMireds *uint16                  `matter:"0x400D"` // attribute 0x400D
-	StartUpColorTemperatureMireds   *uint16                  `matter:"0x4010"` // attribute 0x4010
+	CurrentHue                      *uint8                   // attribute 0x0000
+	CurrentSaturation               *uint8                   // attribute 0x0001
+	RemainingTime                   *uint16                  // attribute 0x0002
+	CurrentX                        *uint16                  // attribute 0x0003
+	CurrentY                        *uint16                  // attribute 0x0004
+	DriftCompensation               *DriftCompensationEnum   // attribute 0x0005
+	CompensationText                *string                  // attribute 0x0006
+	ColorTemperatureMireds          *uint16                  // attribute 0x0007
+	ColorMode                       *ColorModeEnum           // attribute 0x0008
+	Options                         *OptionsBitmap           // attribute 0x000F
+	NumberOfPrimaries               *uint8                   // attribute 0x0010
+	Primary1X                       *uint16                  // attribute 0x0011
+	Primary1Y                       *uint16                  // attribute 0x0012
+	Primary1Intensity               *uint8                   // attribute 0x0013
+	Primary2X                       *uint16                  // attribute 0x0015
+	Primary2Y                       *uint16                  // attribute 0x0016
+	Primary2Intensity               *uint8                   // attribute 0x0017
+	Primary3X                       *uint16                  // attribute 0x0019
+	Primary3Y                       *uint16                  // attribute 0x001A
+	Primary3Intensity               *uint8                   // attribute 0x001B
+	Primary4X                       *uint16                  // attribute 0x0020
+	Primary4Y                       *uint16                  // attribute 0x0021
+	Primary4Intensity               *uint8                   // attribute 0x0022
+	Primary5X                       *uint16                  // attribute 0x0024
+	Primary5Y                       *uint16                  // attribute 0x0025
+	Primary5Intensity               *uint8                   // attribute 0x0026
+	Primary6X                       *uint16                  // attribute 0x0028
+	Primary6Y                       *uint16                  // attribute 0x0029
+	Primary6Intensity               *uint8                   // attribute 0x002A
+	WhitePointX                     *uint16                  // attribute 0x0030
+	WhitePointY                     *uint16                  // attribute 0x0031
+	ColorPointRx                    *uint16                  // attribute 0x0032
+	ColorPointRy                    *uint16                  // attribute 0x0033
+	ColorPointRIntensity            *uint8                   // attribute 0x0034
+	ColorPointGx                    *uint16                  // attribute 0x0036
+	ColorPointGy                    *uint16                  // attribute 0x0037
+	ColorPointGIntensity            *uint8                   // attribute 0x0038
+	ColorPointBx                    *uint16                  // attribute 0x003A
+	ColorPointBy                    *uint16                  // attribute 0x003B
+	ColorPointBIntensity            *uint8                   // attribute 0x003C
+	EnhancedCurrentHue              *uint16                  // attribute 0x4000
+	EnhancedColorMode               *EnhancedColorModeEnum   // attribute 0x4001
+	ColorLoopActive                 *uint8                   // attribute 0x4002
+	ColorLoopDirection              *ColorLoopDirectionEnum  // attribute 0x4003
+	ColorLoopTime                   *uint16                  // attribute 0x4004
+	ColorLoopStartEnhancedHue       *uint16                  // attribute 0x4005
+	ColorLoopStoredEnhancedHue      *uint16                  // attribute 0x4006
+	ColorCapabilities               *ColorCapabilitiesBitmap // attribute 0x400A
+	ColorTempPhysicalMinMireds      *uint16                  // attribute 0x400B
+	ColorTempPhysicalMaxMireds      *uint16                  // attribute 0x400C
+	CoupleColorTempToLevelMinMireds *uint16                  // attribute 0x400D
+	StartUpColorTemperatureMireds   *uint16                  // attribute 0x4010
 	Null                            []uint32                 // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentHue); ok {
+		spec.Assign(&st.CurrentHue, v)
+	}
+	if v, ok := read(AttrCurrentSaturation); ok {
+		spec.Assign(&st.CurrentSaturation, v)
+	}
+	if v, ok := read(AttrRemainingTime); ok {
+		spec.Assign(&st.RemainingTime, v)
+	}
+	if v, ok := read(AttrCurrentX); ok {
+		spec.Assign(&st.CurrentX, v)
+	}
+	if v, ok := read(AttrCurrentY); ok {
+		spec.Assign(&st.CurrentY, v)
+	}
+	if v, ok := read(AttrDriftCompensation); ok {
+		spec.Assign(&st.DriftCompensation, v)
+	}
+	if v, ok := read(AttrCompensationText); ok {
+		spec.Assign(&st.CompensationText, v)
+	}
+	if v, ok := read(AttrColorTemperatureMireds); ok {
+		spec.Assign(&st.ColorTemperatureMireds, v)
+	}
+	if v, ok := read(AttrColorMode); ok {
+		spec.Assign(&st.ColorMode, v)
+	}
+	if v, ok := read(AttrOptions); ok {
+		spec.Assign(&st.Options, v)
+	}
+	if v, ok := read(AttrNumberOfPrimaries); ok {
+		spec.Assign(&st.NumberOfPrimaries, v)
+	}
+	if v, ok := read(AttrPrimary1X); ok {
+		spec.Assign(&st.Primary1X, v)
+	}
+	if v, ok := read(AttrPrimary1Y); ok {
+		spec.Assign(&st.Primary1Y, v)
+	}
+	if v, ok := read(AttrPrimary1Intensity); ok {
+		spec.Assign(&st.Primary1Intensity, v)
+	}
+	if v, ok := read(AttrPrimary2X); ok {
+		spec.Assign(&st.Primary2X, v)
+	}
+	if v, ok := read(AttrPrimary2Y); ok {
+		spec.Assign(&st.Primary2Y, v)
+	}
+	if v, ok := read(AttrPrimary2Intensity); ok {
+		spec.Assign(&st.Primary2Intensity, v)
+	}
+	if v, ok := read(AttrPrimary3X); ok {
+		spec.Assign(&st.Primary3X, v)
+	}
+	if v, ok := read(AttrPrimary3Y); ok {
+		spec.Assign(&st.Primary3Y, v)
+	}
+	if v, ok := read(AttrPrimary3Intensity); ok {
+		spec.Assign(&st.Primary3Intensity, v)
+	}
+	if v, ok := read(AttrPrimary4X); ok {
+		spec.Assign(&st.Primary4X, v)
+	}
+	if v, ok := read(AttrPrimary4Y); ok {
+		spec.Assign(&st.Primary4Y, v)
+	}
+	if v, ok := read(AttrPrimary4Intensity); ok {
+		spec.Assign(&st.Primary4Intensity, v)
+	}
+	if v, ok := read(AttrPrimary5X); ok {
+		spec.Assign(&st.Primary5X, v)
+	}
+	if v, ok := read(AttrPrimary5Y); ok {
+		spec.Assign(&st.Primary5Y, v)
+	}
+	if v, ok := read(AttrPrimary5Intensity); ok {
+		spec.Assign(&st.Primary5Intensity, v)
+	}
+	if v, ok := read(AttrPrimary6X); ok {
+		spec.Assign(&st.Primary6X, v)
+	}
+	if v, ok := read(AttrPrimary6Y); ok {
+		spec.Assign(&st.Primary6Y, v)
+	}
+	if v, ok := read(AttrPrimary6Intensity); ok {
+		spec.Assign(&st.Primary6Intensity, v)
+	}
+	if v, ok := read(AttrWhitePointX); ok {
+		spec.Assign(&st.WhitePointX, v)
+	}
+	if v, ok := read(AttrWhitePointY); ok {
+		spec.Assign(&st.WhitePointY, v)
+	}
+	if v, ok := read(AttrColorPointRx); ok {
+		spec.Assign(&st.ColorPointRx, v)
+	}
+	if v, ok := read(AttrColorPointRy); ok {
+		spec.Assign(&st.ColorPointRy, v)
+	}
+	if v, ok := read(AttrColorPointRIntensity); ok {
+		spec.Assign(&st.ColorPointRIntensity, v)
+	}
+	if v, ok := read(AttrColorPointGx); ok {
+		spec.Assign(&st.ColorPointGx, v)
+	}
+	if v, ok := read(AttrColorPointGy); ok {
+		spec.Assign(&st.ColorPointGy, v)
+	}
+	if v, ok := read(AttrColorPointGIntensity); ok {
+		spec.Assign(&st.ColorPointGIntensity, v)
+	}
+	if v, ok := read(AttrColorPointBx); ok {
+		spec.Assign(&st.ColorPointBx, v)
+	}
+	if v, ok := read(AttrColorPointBy); ok {
+		spec.Assign(&st.ColorPointBy, v)
+	}
+	if v, ok := read(AttrColorPointBIntensity); ok {
+		spec.Assign(&st.ColorPointBIntensity, v)
+	}
+	if v, ok := read(AttrEnhancedCurrentHue); ok {
+		spec.Assign(&st.EnhancedCurrentHue, v)
+	}
+	if v, ok := read(AttrEnhancedColorMode); ok {
+		spec.Assign(&st.EnhancedColorMode, v)
+	}
+	if v, ok := read(AttrColorLoopActive); ok {
+		spec.Assign(&st.ColorLoopActive, v)
+	}
+	if v, ok := read(AttrColorLoopDirection); ok {
+		spec.Assign(&st.ColorLoopDirection, v)
+	}
+	if v, ok := read(AttrColorLoopTime); ok {
+		spec.Assign(&st.ColorLoopTime, v)
+	}
+	if v, ok := read(AttrColorLoopStartEnhancedHue); ok {
+		spec.Assign(&st.ColorLoopStartEnhancedHue, v)
+	}
+	if v, ok := read(AttrColorLoopStoredEnhancedHue); ok {
+		spec.Assign(&st.ColorLoopStoredEnhancedHue, v)
+	}
+	if v, ok := read(AttrColorCapabilities); ok {
+		spec.Assign(&st.ColorCapabilities, v)
+	}
+	if v, ok := read(AttrColorTempPhysicalMinMireds); ok {
+		spec.Assign(&st.ColorTempPhysicalMinMireds, v)
+	}
+	if v, ok := read(AttrColorTempPhysicalMaxMireds); ok {
+		spec.Assign(&st.ColorTempPhysicalMaxMireds, v)
+	}
+	if v, ok := read(AttrCoupleColorTempToLevelMinMireds); ok {
+		spec.Assign(&st.CoupleColorTempToLevelMinMireds, v)
+	}
+	if v, ok := read(AttrStartUpColorTemperatureMireds); ok {
+		spec.Assign(&st.StartUpColorTemperatureMireds, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -340,9 +503,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -592,7 +757,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

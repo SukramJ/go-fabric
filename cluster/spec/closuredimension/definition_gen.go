@@ -43,8 +43,8 @@ const (
 
 // Command ids.
 const (
-	CmdSetTarget uint32 = 0x00 // request → status, M
-	CmdStep      uint32 = 0x01 // request → status, PS
+	CmdSetTarget uint32 = 0x00 // request → status, timed, M
+	CmdStep      uint32 = 0x01 // request → status, timed, PS
 )
 
 // Feature is a ClosureDimension FeatureMap bit.

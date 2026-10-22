@@ -18,23 +18,48 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	HeaterTypes           WaterHeaterHeatSourceBitmap `matter:"0x0000"` // attribute 0x0000: WaterHeaterHeatSourceBitmap, M, R V, F
-	HeatDemand            WaterHeaterHeatSourceBitmap `matter:"0x0001"` // attribute 0x0001: WaterHeaterHeatSourceBitmap, M, R V
-	TankVolume            uint16                      `matter:"0x0002"` // attribute 0x0002: uint16, EM, R V
-	EstimatedHeatRequired int64                       `matter:"0x0003"` // attribute 0x0003: energy-mWh, EM, R V
-	TankPercentage        uint8                       `matter:"0x0004"` // attribute 0x0004: percent, TP, R V
-	BoostState            BoostStateEnum              `matter:"0x0005"` // attribute 0x0005: BoostStateEnum, M, R V
+	HeaterTypes           WaterHeaterHeatSourceBitmap // attribute 0x0000: WaterHeaterHeatSourceBitmap, M, R V, F
+	HeatDemand            WaterHeaterHeatSourceBitmap // attribute 0x0001: WaterHeaterHeatSourceBitmap, M, R V
+	TankVolume            uint16                      // attribute 0x0002: uint16, EM, R V
+	EstimatedHeatRequired int64                       // attribute 0x0003: energy-mWh, EM, R V
+	TankPercentage        uint8                       // attribute 0x0004: percent, TP, R V
+	BoostState            BoostStateEnum              // attribute 0x0005: BoostStateEnum, M, R V
 }
 
 // Patch is a change to the WaterHeaterManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	HeaterTypes           *WaterHeaterHeatSourceBitmap `matter:"0x0000"` // attribute 0x0000
-	HeatDemand            *WaterHeaterHeatSourceBitmap `matter:"0x0001"` // attribute 0x0001
-	TankVolume            *uint16                      `matter:"0x0002"` // attribute 0x0002
-	EstimatedHeatRequired *int64                       `matter:"0x0003"` // attribute 0x0003
-	TankPercentage        *uint8                       `matter:"0x0004"` // attribute 0x0004
-	BoostState            *BoostStateEnum              `matter:"0x0005"` // attribute 0x0005
+	HeaterTypes           *WaterHeaterHeatSourceBitmap // attribute 0x0000
+	HeatDemand            *WaterHeaterHeatSourceBitmap // attribute 0x0001
+	TankVolume            *uint16                      // attribute 0x0002
+	EstimatedHeatRequired *int64                       // attribute 0x0003
+	TankPercentage        *uint8                       // attribute 0x0004
+	BoostState            *BoostStateEnum              // attribute 0x0005
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrHeaterTypes); ok {
+		spec.Assign(&st.HeaterTypes, v)
+	}
+	if v, ok := read(AttrHeatDemand); ok {
+		spec.Assign(&st.HeatDemand, v)
+	}
+	if v, ok := read(AttrTankVolume); ok {
+		spec.Assign(&st.TankVolume, v)
+	}
+	if v, ok := read(AttrEstimatedHeatRequired); ok {
+		spec.Assign(&st.EstimatedHeatRequired, v)
+	}
+	if v, ok := read(AttrTankPercentage); ok {
+		spec.Assign(&st.TankPercentage, v)
+	}
+	if v, ok := read(AttrBoostState); ok {
+		spec.Assign(&st.BoostState, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -105,9 +130,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -194,7 +221,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

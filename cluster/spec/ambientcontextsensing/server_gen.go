@@ -18,35 +18,78 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	HumanActivityDetected       bool                       `matter:"0x0000"` // attribute 0x0000: bool, P, HA, R V
-	ObjectIdentified            bool                       `matter:"0x0001"` // attribute 0x0001: bool, P, OI, R V
-	AudioContextDetected        bool                       `matter:"0x0002"` // attribute 0x0002: bool, P, AUD, R V
-	AmbientContextType          []AmbientContextTypeStruct `matter:"0x0003"` // attribute 0x0003: list[AmbientContextTypeStruct], P, HA | OI | AUD, R V
-	AmbientContextTypeSupported []Semtag                   `matter:"0x0004"` // attribute 0x0004: list[semtag], P, HA | OI | AUD, R V
-	ObjectCountThresholdReached bool                       `matter:"0x0005"` // attribute 0x0005: bool, P, OC & OI, R V
-	ObjectCountConfig           ObjectCountConfigStruct    `matter:"0x0006"` // attribute 0x0006: ObjectCountConfigStruct, P, OC & OI, RW VM, N
-	ObjectCount                 uint16                     `matter:"0x0007"` // attribute 0x0007: uint16, P, [OC & OI], R V
-	SimultaneousDetectionLimit  uint8                      `matter:"0x0008"` // attribute 0x0008: uint8, P, M, R V, F
-	HoldTime                    uint16                     `matter:"0x0009"` // attribute 0x0009: uint16, P, M, RW VM, N
-	HoldTimeLimits              HoldTimeLimitsStruct       `matter:"0x000A"` // attribute 0x000A: HoldTimeLimitsStruct, P, M, R V, F
-	PredictedActivity           []PredictedActivityStruct  `matter:"0x000B"` // attribute 0x000B: list[PredictedActivityStruct], P, PRED, R V
+	HumanActivityDetected       bool                       // attribute 0x0000: bool, P, HA, R V
+	ObjectIdentified            bool                       // attribute 0x0001: bool, P, OI, R V
+	AudioContextDetected        bool                       // attribute 0x0002: bool, P, AUD, R V
+	AmbientContextType          []AmbientContextTypeStruct // attribute 0x0003: list[AmbientContextTypeStruct], P, HA | OI | AUD, R V
+	AmbientContextTypeSupported []Semtag                   // attribute 0x0004: list[semtag], P, HA | OI | AUD, R V
+	ObjectCountThresholdReached bool                       // attribute 0x0005: bool, P, OC & OI, R V
+	ObjectCountConfig           ObjectCountConfigStruct    // attribute 0x0006: ObjectCountConfigStruct, P, OC & OI, RW VM, N
+	ObjectCount                 uint16                     // attribute 0x0007: uint16, P, [OC & OI], R V
+	SimultaneousDetectionLimit  uint8                      // attribute 0x0008: uint8, P, M, R V, F
+	HoldTime                    uint16                     // attribute 0x0009: uint16, P, M, RW VM, N
+	HoldTimeLimits              HoldTimeLimitsStruct       // attribute 0x000A: HoldTimeLimitsStruct, P, M, R V, F
+	PredictedActivity           []PredictedActivityStruct  // attribute 0x000B: list[PredictedActivityStruct], P, PRED, R V
 }
 
 // Patch is a change to the AmbientContextSensing state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	HumanActivityDetected       *bool                       `matter:"0x0000"` // attribute 0x0000
-	ObjectIdentified            *bool                       `matter:"0x0001"` // attribute 0x0001
-	AudioContextDetected        *bool                       `matter:"0x0002"` // attribute 0x0002
-	AmbientContextType          *[]AmbientContextTypeStruct `matter:"0x0003"` // attribute 0x0003
-	AmbientContextTypeSupported *[]Semtag                   `matter:"0x0004"` // attribute 0x0004
-	ObjectCountThresholdReached *bool                       `matter:"0x0005"` // attribute 0x0005
-	ObjectCountConfig           *ObjectCountConfigStruct    `matter:"0x0006"` // attribute 0x0006
-	ObjectCount                 *uint16                     `matter:"0x0007"` // attribute 0x0007
-	SimultaneousDetectionLimit  *uint8                      `matter:"0x0008"` // attribute 0x0008
-	HoldTime                    *uint16                     `matter:"0x0009"` // attribute 0x0009
-	HoldTimeLimits              *HoldTimeLimitsStruct       `matter:"0x000A"` // attribute 0x000A
-	PredictedActivity           *[]PredictedActivityStruct  `matter:"0x000B"` // attribute 0x000B
+	HumanActivityDetected       *bool                       // attribute 0x0000
+	ObjectIdentified            *bool                       // attribute 0x0001
+	AudioContextDetected        *bool                       // attribute 0x0002
+	AmbientContextType          *[]AmbientContextTypeStruct // attribute 0x0003
+	AmbientContextTypeSupported *[]Semtag                   // attribute 0x0004
+	ObjectCountThresholdReached *bool                       // attribute 0x0005
+	ObjectCountConfig           *ObjectCountConfigStruct    // attribute 0x0006
+	ObjectCount                 *uint16                     // attribute 0x0007
+	SimultaneousDetectionLimit  *uint8                      // attribute 0x0008
+	HoldTime                    *uint16                     // attribute 0x0009
+	HoldTimeLimits              *HoldTimeLimitsStruct       // attribute 0x000A
+	PredictedActivity           *[]PredictedActivityStruct  // attribute 0x000B
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrHumanActivityDetected); ok {
+		spec.Assign(&st.HumanActivityDetected, v)
+	}
+	if v, ok := read(AttrObjectIdentified); ok {
+		spec.Assign(&st.ObjectIdentified, v)
+	}
+	if v, ok := read(AttrAudioContextDetected); ok {
+		spec.Assign(&st.AudioContextDetected, v)
+	}
+	if v, ok := read(AttrAmbientContextType); ok {
+		spec.Assign(&st.AmbientContextType, v)
+	}
+	if v, ok := read(AttrAmbientContextTypeSupported); ok {
+		spec.Assign(&st.AmbientContextTypeSupported, v)
+	}
+	if v, ok := read(AttrObjectCountThresholdReached); ok {
+		spec.Assign(&st.ObjectCountThresholdReached, v)
+	}
+	if v, ok := read(AttrObjectCountConfig); ok {
+		spec.Assign(&st.ObjectCountConfig, v)
+	}
+	if v, ok := read(AttrObjectCount); ok {
+		spec.Assign(&st.ObjectCount, v)
+	}
+	if v, ok := read(AttrSimultaneousDetectionLimit); ok {
+		spec.Assign(&st.SimultaneousDetectionLimit, v)
+	}
+	if v, ok := read(AttrHoldTime); ok {
+		spec.Assign(&st.HoldTime, v)
+	}
+	if v, ok := read(AttrHoldTimeLimits); ok {
+		spec.Assign(&st.HoldTimeLimits, v)
+	}
+	if v, ok := read(AttrPredictedActivity); ok {
+		spec.Assign(&st.PredictedActivity, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -135,9 +178,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -193,7 +238,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

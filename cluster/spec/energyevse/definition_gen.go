@@ -55,13 +55,13 @@ const (
 // Command ids.
 const (
 	CmdGetTargetsResponse uint32 = 0x00 // response, PREF
-	CmdDisable            uint32 = 0x01 // request → status, M
-	CmdEnableCharging     uint32 = 0x02 // request → status, M
-	CmdEnableDischarging  uint32 = 0x03 // request → status, V2X
-	CmdStartDiagnostics   uint32 = 0x04 // request → status, O
-	CmdSetTargets         uint32 = 0x05 // request → status, PREF
-	CmdGetTargets         uint32 = 0x06 // request → GetTargetsResponse, PREF
-	CmdClearTargets       uint32 = 0x07 // request → status, PREF
+	CmdDisable            uint32 = 0x01 // request → status, timed, M
+	CmdEnableCharging     uint32 = 0x02 // request → status, timed, M
+	CmdEnableDischarging  uint32 = 0x03 // request → status, timed, V2X
+	CmdStartDiagnostics   uint32 = 0x04 // request → status, timed, O
+	CmdSetTargets         uint32 = 0x05 // request → status, timed, PREF
+	CmdGetTargets         uint32 = 0x06 // request → GetTargetsResponse, timed, PREF
+	CmdClearTargets       uint32 = 0x07 // request → status, timed, PREF
 )
 
 // Event ids.

@@ -18,23 +18,45 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	OnOff              bool              `matter:"0x0000"` // attribute 0x0000: bool, M, R V, N S
-	GlobalSceneControl bool              `matter:"0x4000"` // attribute 0x4000: bool, LT, R V
-	OnTime             uint16            `matter:"0x4001"` // attribute 0x4001: uint16, LT, RW VO
-	OffWaitTime        uint16            `matter:"0x4002"` // attribute 0x4002: uint16, LT, RW VO
-	StartUpOnOff       *StartUpOnOffEnum `matter:"0x4003"` // attribute 0x4003: StartUpOnOffEnum, LT, RW VM, X N
+	OnOff              bool              // attribute 0x0000: bool, M, R V, N S
+	GlobalSceneControl bool              // attribute 0x4000: bool, LT, R V
+	OnTime             uint16            // attribute 0x4001: uint16, LT, RW VO
+	OffWaitTime        uint16            // attribute 0x4002: uint16, LT, RW VO
+	StartUpOnOff       *StartUpOnOffEnum // attribute 0x4003: StartUpOnOffEnum, LT, RW VM, X N
 }
 
 // Patch is a change to the OnOff state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	OnOff              *bool             `matter:"0x0000"` // attribute 0x0000
-	GlobalSceneControl *bool             `matter:"0x4000"` // attribute 0x4000
-	OnTime             *uint16           `matter:"0x4001"` // attribute 0x4001
-	OffWaitTime        *uint16           `matter:"0x4002"` // attribute 0x4002
-	StartUpOnOff       *StartUpOnOffEnum `matter:"0x4003"` // attribute 0x4003
+	OnOff              *bool             // attribute 0x0000
+	GlobalSceneControl *bool             // attribute 0x4000
+	OnTime             *uint16           // attribute 0x4001
+	OffWaitTime        *uint16           // attribute 0x4002
+	StartUpOnOff       *StartUpOnOffEnum // attribute 0x4003
 	Null               []uint32          // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrOnOff); ok {
+		spec.Assign(&st.OnOff, v)
+	}
+	if v, ok := read(AttrGlobalSceneControl); ok {
+		spec.Assign(&st.GlobalSceneControl, v)
+	}
+	if v, ok := read(AttrOnTime); ok {
+		spec.Assign(&st.OnTime, v)
+	}
+	if v, ok := read(AttrOffWaitTime); ok {
+		spec.Assign(&st.OffWaitTime, v)
+	}
+	if v, ok := read(AttrStartUpOnOff); ok {
+		spec.Assign(&st.StartUpOnOff, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -105,9 +127,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -215,7 +239,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

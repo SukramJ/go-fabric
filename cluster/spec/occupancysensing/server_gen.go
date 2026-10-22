@@ -18,39 +18,88 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Occupancy                                    OccupancyBitmap           `matter:"0x0000"` // attribute 0x0000: OccupancyBitmap, M, R V
-	OccupancySensorType                          OccupancySensorTypeEnum   `matter:"0x0001"` // attribute 0x0001: OccupancySensorTypeEnum, M, D, R V, F
-	OccupancySensorTypeBitmap                    OccupancySensorTypeBitmap `matter:"0x0002"` // attribute 0x0002: OccupancySensorTypeBitmap, M, D, R V, F
-	HoldTime                                     uint16                    `matter:"0x0003"` // attribute 0x0003: uint16, O, RW VM, N
-	HoldTimeLimits                               HoldTimeLimitsStruct      `matter:"0x0004"` // attribute 0x0004: HoldTimeLimitsStruct, HoldTime, R V, F
-	PirOccupiedToUnoccupiedDelay                 uint16                    `matter:"0x0010"` // attribute 0x0010: uint16, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
-	PirUnoccupiedToOccupiedDelay                 uint16                    `matter:"0x0011"` // attribute 0x0011: uint16, HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
-	PirUnoccupiedToOccupiedThreshold             uint8                     `matter:"0x0012"` // attribute 0x0012: uint8, HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedDelay, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
-	UltrasonicOccupiedToUnoccupiedDelay          uint16                    `matter:"0x0020"` // attribute 0x0020: uint16, [HoldTime & US], D, RW VM, N
-	UltrasonicUnoccupiedToOccupiedDelay          uint16                    `matter:"0x0021"` // attribute 0x0021: uint16, HoldTime & US & UltrasonicUnoccupiedToOccupiedThreshold, [HoldTime & US], D, RW VM, N
-	UltrasonicUnoccupiedToOccupiedThreshold      uint8                     `matter:"0x0022"` // attribute 0x0022: uint8, HoldTime & US & UltrasonicUnoccupiedToOccupiedDelay, [HoldTime & US], D, RW VM, N
-	PhysicalContactOccupiedToUnoccupiedDelay     uint16                    `matter:"0x0030"` // attribute 0x0030: uint16, [HoldTime & PHY], D, RW VM, N
-	PhysicalContactUnoccupiedToOccupiedDelay     uint16                    `matter:"0x0031"` // attribute 0x0031: uint16, HoldTime & PHY & PhysicalContactUnoccupiedToOccupiedThreshold, [HoldTime & PHY], D, RW VM, N
-	PhysicalContactUnoccupiedToOccupiedThreshold uint8                     `matter:"0x0032"` // attribute 0x0032: uint8, HoldTime & PHY & PhysicalContactUnoccupiedToOccupiedDelay, [HoldTime & PHY], D, RW VM, N
+	Occupancy                                    OccupancyBitmap           // attribute 0x0000: OccupancyBitmap, M, R V
+	OccupancySensorType                          OccupancySensorTypeEnum   // attribute 0x0001: OccupancySensorTypeEnum, M, D, R V, F
+	OccupancySensorTypeBitmap                    OccupancySensorTypeBitmap // attribute 0x0002: OccupancySensorTypeBitmap, M, D, R V, F
+	HoldTime                                     uint16                    // attribute 0x0003: uint16, O, RW VM, N
+	HoldTimeLimits                               HoldTimeLimitsStruct      // attribute 0x0004: HoldTimeLimitsStruct, HoldTime, R V, F
+	PirOccupiedToUnoccupiedDelay                 uint16                    // attribute 0x0010: uint16, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
+	PirUnoccupiedToOccupiedDelay                 uint16                    // attribute 0x0011: uint16, HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
+	PirUnoccupiedToOccupiedThreshold             uint8                     // attribute 0x0012: uint8, HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedDelay, [HoldTime & (PIR | !PIR & !US & !PHY)], D, RW VM, N
+	UltrasonicOccupiedToUnoccupiedDelay          uint16                    // attribute 0x0020: uint16, [HoldTime & US], D, RW VM, N
+	UltrasonicUnoccupiedToOccupiedDelay          uint16                    // attribute 0x0021: uint16, HoldTime & US & UltrasonicUnoccupiedToOccupiedThreshold, [HoldTime & US], D, RW VM, N
+	UltrasonicUnoccupiedToOccupiedThreshold      uint8                     // attribute 0x0022: uint8, HoldTime & US & UltrasonicUnoccupiedToOccupiedDelay, [HoldTime & US], D, RW VM, N
+	PhysicalContactOccupiedToUnoccupiedDelay     uint16                    // attribute 0x0030: uint16, [HoldTime & PHY], D, RW VM, N
+	PhysicalContactUnoccupiedToOccupiedDelay     uint16                    // attribute 0x0031: uint16, HoldTime & PHY & PhysicalContactUnoccupiedToOccupiedThreshold, [HoldTime & PHY], D, RW VM, N
+	PhysicalContactUnoccupiedToOccupiedThreshold uint8                     // attribute 0x0032: uint8, HoldTime & PHY & PhysicalContactUnoccupiedToOccupiedDelay, [HoldTime & PHY], D, RW VM, N
 }
 
 // Patch is a change to the OccupancySensing state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	Occupancy                                    *OccupancyBitmap           `matter:"0x0000"` // attribute 0x0000
-	OccupancySensorType                          *OccupancySensorTypeEnum   `matter:"0x0001"` // attribute 0x0001
-	OccupancySensorTypeBitmap                    *OccupancySensorTypeBitmap `matter:"0x0002"` // attribute 0x0002
-	HoldTime                                     *uint16                    `matter:"0x0003"` // attribute 0x0003
-	HoldTimeLimits                               *HoldTimeLimitsStruct      `matter:"0x0004"` // attribute 0x0004
-	PirOccupiedToUnoccupiedDelay                 *uint16                    `matter:"0x0010"` // attribute 0x0010
-	PirUnoccupiedToOccupiedDelay                 *uint16                    `matter:"0x0011"` // attribute 0x0011
-	PirUnoccupiedToOccupiedThreshold             *uint8                     `matter:"0x0012"` // attribute 0x0012
-	UltrasonicOccupiedToUnoccupiedDelay          *uint16                    `matter:"0x0020"` // attribute 0x0020
-	UltrasonicUnoccupiedToOccupiedDelay          *uint16                    `matter:"0x0021"` // attribute 0x0021
-	UltrasonicUnoccupiedToOccupiedThreshold      *uint8                     `matter:"0x0022"` // attribute 0x0022
-	PhysicalContactOccupiedToUnoccupiedDelay     *uint16                    `matter:"0x0030"` // attribute 0x0030
-	PhysicalContactUnoccupiedToOccupiedDelay     *uint16                    `matter:"0x0031"` // attribute 0x0031
-	PhysicalContactUnoccupiedToOccupiedThreshold *uint8                     `matter:"0x0032"` // attribute 0x0032
+	Occupancy                                    *OccupancyBitmap           // attribute 0x0000
+	OccupancySensorType                          *OccupancySensorTypeEnum   // attribute 0x0001
+	OccupancySensorTypeBitmap                    *OccupancySensorTypeBitmap // attribute 0x0002
+	HoldTime                                     *uint16                    // attribute 0x0003
+	HoldTimeLimits                               *HoldTimeLimitsStruct      // attribute 0x0004
+	PirOccupiedToUnoccupiedDelay                 *uint16                    // attribute 0x0010
+	PirUnoccupiedToOccupiedDelay                 *uint16                    // attribute 0x0011
+	PirUnoccupiedToOccupiedThreshold             *uint8                     // attribute 0x0012
+	UltrasonicOccupiedToUnoccupiedDelay          *uint16                    // attribute 0x0020
+	UltrasonicUnoccupiedToOccupiedDelay          *uint16                    // attribute 0x0021
+	UltrasonicUnoccupiedToOccupiedThreshold      *uint8                     // attribute 0x0022
+	PhysicalContactOccupiedToUnoccupiedDelay     *uint16                    // attribute 0x0030
+	PhysicalContactUnoccupiedToOccupiedDelay     *uint16                    // attribute 0x0031
+	PhysicalContactUnoccupiedToOccupiedThreshold *uint8                     // attribute 0x0032
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrOccupancy); ok {
+		spec.Assign(&st.Occupancy, v)
+	}
+	if v, ok := read(AttrOccupancySensorType); ok {
+		spec.Assign(&st.OccupancySensorType, v)
+	}
+	if v, ok := read(AttrOccupancySensorTypeBitmap); ok {
+		spec.Assign(&st.OccupancySensorTypeBitmap, v)
+	}
+	if v, ok := read(AttrHoldTime); ok {
+		spec.Assign(&st.HoldTime, v)
+	}
+	if v, ok := read(AttrHoldTimeLimits); ok {
+		spec.Assign(&st.HoldTimeLimits, v)
+	}
+	if v, ok := read(AttrPirOccupiedToUnoccupiedDelay); ok {
+		spec.Assign(&st.PirOccupiedToUnoccupiedDelay, v)
+	}
+	if v, ok := read(AttrPirUnoccupiedToOccupiedDelay); ok {
+		spec.Assign(&st.PirUnoccupiedToOccupiedDelay, v)
+	}
+	if v, ok := read(AttrPirUnoccupiedToOccupiedThreshold); ok {
+		spec.Assign(&st.PirUnoccupiedToOccupiedThreshold, v)
+	}
+	if v, ok := read(AttrUltrasonicOccupiedToUnoccupiedDelay); ok {
+		spec.Assign(&st.UltrasonicOccupiedToUnoccupiedDelay, v)
+	}
+	if v, ok := read(AttrUltrasonicUnoccupiedToOccupiedDelay); ok {
+		spec.Assign(&st.UltrasonicUnoccupiedToOccupiedDelay, v)
+	}
+	if v, ok := read(AttrUltrasonicUnoccupiedToOccupiedThreshold); ok {
+		spec.Assign(&st.UltrasonicUnoccupiedToOccupiedThreshold, v)
+	}
+	if v, ok := read(AttrPhysicalContactOccupiedToUnoccupiedDelay); ok {
+		spec.Assign(&st.PhysicalContactOccupiedToUnoccupiedDelay, v)
+	}
+	if v, ok := read(AttrPhysicalContactUnoccupiedToOccupiedDelay); ok {
+		spec.Assign(&st.PhysicalContactUnoccupiedToOccupiedDelay, v)
+	}
+	if v, ok := read(AttrPhysicalContactUnoccupiedToOccupiedThreshold); ok {
+		spec.Assign(&st.PhysicalContactUnoccupiedToOccupiedThreshold, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -145,9 +194,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -197,7 +248,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

@@ -18,25 +18,50 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	Condition              uint8                      `matter:"0x0000"` // attribute 0x0000: percent, CON, R V
-	DegradationDirection   DegradationDirectionEnum   `matter:"0x0001"` // attribute 0x0001: DegradationDirectionEnum, CON, R V, F
-	ChangeIndication       ChangeIndicationEnum       `matter:"0x0002"` // attribute 0x0002: ChangeIndicationEnum, M, R V
-	InPlaceIndicator       bool                       `matter:"0x0003"` // attribute 0x0003: bool, O, R V
-	LastChangedTime        *uint32                    `matter:"0x0004"` // attribute 0x0004: epoch-s, O, RW VO, X N
-	ReplacementProductList []ReplacementProductStruct `matter:"0x0005"` // attribute 0x0005: list[ReplacementProductStruct], REP, R V, F
+	Condition              uint8                      // attribute 0x0000: percent, CON, R V
+	DegradationDirection   DegradationDirectionEnum   // attribute 0x0001: DegradationDirectionEnum, CON, R V, F
+	ChangeIndication       ChangeIndicationEnum       // attribute 0x0002: ChangeIndicationEnum, M, R V
+	InPlaceIndicator       bool                       // attribute 0x0003: bool, O, R V
+	LastChangedTime        *uint32                    // attribute 0x0004: epoch-s, O, RW VO, X N
+	ReplacementProductList []ReplacementProductStruct // attribute 0x0005: list[ReplacementProductStruct], REP, R V, F
 }
 
 // Patch is a change to the ActivatedCarbonFilterMonitoring state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
 type Patch struct {
-	Condition              *uint8                      `matter:"0x0000"` // attribute 0x0000
-	DegradationDirection   *DegradationDirectionEnum   `matter:"0x0001"` // attribute 0x0001
-	ChangeIndication       *ChangeIndicationEnum       `matter:"0x0002"` // attribute 0x0002
-	InPlaceIndicator       *bool                       `matter:"0x0003"` // attribute 0x0003
-	LastChangedTime        *uint32                     `matter:"0x0004"` // attribute 0x0004
-	ReplacementProductList *[]ReplacementProductStruct `matter:"0x0005"` // attribute 0x0005
+	Condition              *uint8                      // attribute 0x0000
+	DegradationDirection   *DegradationDirectionEnum   // attribute 0x0001
+	ChangeIndication       *ChangeIndicationEnum       // attribute 0x0002
+	InPlaceIndicator       *bool                       // attribute 0x0003
+	LastChangedTime        *uint32                     // attribute 0x0004
+	ReplacementProductList *[]ReplacementProductStruct // attribute 0x0005
 	Null                   []uint32                    // attribute ids set to null
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCondition); ok {
+		spec.Assign(&st.Condition, v)
+	}
+	if v, ok := read(AttrDegradationDirection); ok {
+		spec.Assign(&st.DegradationDirection, v)
+	}
+	if v, ok := read(AttrChangeIndication); ok {
+		spec.Assign(&st.ChangeIndication, v)
+	}
+	if v, ok := read(AttrInPlaceIndicator); ok {
+		spec.Assign(&st.InPlaceIndicator, v)
+	}
+	if v, ok := read(AttrLastChangedTime); ok {
+		spec.Assign(&st.LastChangedTime, v)
+	}
+	if v, ok := read(AttrReplacementProductList); ok {
+		spec.Assign(&st.ReplacementProductList, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -110,9 +135,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -184,7 +211,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

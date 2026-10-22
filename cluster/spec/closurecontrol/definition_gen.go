@@ -38,8 +38,8 @@ const (
 // Command ids.
 const (
 	CmdStop      uint32 = 0x00 // request → status, !IS
-	CmdMoveTo    uint32 = 0x01 // request → status, M
-	CmdCalibrate uint32 = 0x02 // request → status, CL
+	CmdMoveTo    uint32 = 0x01 // request → status, timed, M
+	CmdCalibrate uint32 = 0x02 // request → status, timed, CL
 )
 
 // Event ids.

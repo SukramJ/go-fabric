@@ -18,27 +18,58 @@ import (
 // slice. [Server.Get] fills it from the stored values; an attribute the
 // server does not serve stays at its zero value.
 type State struct {
-	CurrentSensitivityLevel    uint8             `matter:"0x0000"` // attribute 0x0000: uint8, SENSLVL, RW VO, N
-	SupportedSensitivityLevels uint8             `matter:"0x0001"` // attribute 0x0001: uint8, SENSLVL, R V, F
-	DefaultSensitivityLevel    uint8             `matter:"0x0002"` // attribute 0x0002: uint8, [SENSLVL], R V, F
-	AlarmsActive               AlarmModeBitmap   `matter:"0x0003"` // attribute 0x0003: AlarmModeBitmap, VIS | AUD, R V
-	AlarmsSuppressed           AlarmModeBitmap   `matter:"0x0004"` // attribute 0x0004: AlarmModeBitmap, SPRS, R V
-	AlarmsEnabled              AlarmModeBitmap   `matter:"0x0005"` // attribute 0x0005: AlarmModeBitmap, [VIS | AUD], R V, N
-	AlarmsSupported            AlarmModeBitmap   `matter:"0x0006"` // attribute 0x0006: AlarmModeBitmap, VIS | AUD, R V, F
-	SensorFault                SensorFaultBitmap `matter:"0x0007"` // attribute 0x0007: SensorFaultBitmap, O, R V
+	CurrentSensitivityLevel    uint8             // attribute 0x0000: uint8, SENSLVL, RW VO, N
+	SupportedSensitivityLevels uint8             // attribute 0x0001: uint8, SENSLVL, R V, F
+	DefaultSensitivityLevel    uint8             // attribute 0x0002: uint8, [SENSLVL], R V, F
+	AlarmsActive               AlarmModeBitmap   // attribute 0x0003: AlarmModeBitmap, VIS | AUD, R V
+	AlarmsSuppressed           AlarmModeBitmap   // attribute 0x0004: AlarmModeBitmap, SPRS, R V
+	AlarmsEnabled              AlarmModeBitmap   // attribute 0x0005: AlarmModeBitmap, [VIS | AUD], R V, N
+	AlarmsSupported            AlarmModeBitmap   // attribute 0x0006: AlarmModeBitmap, VIS | AUD, R V, F
+	SensorFault                SensorFaultBitmap // attribute 0x0007: SensorFaultBitmap, O, R V
 }
 
 // Patch is a change to the BooleanStateConfiguration state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
-	CurrentSensitivityLevel    *uint8             `matter:"0x0000"` // attribute 0x0000
-	SupportedSensitivityLevels *uint8             `matter:"0x0001"` // attribute 0x0001
-	DefaultSensitivityLevel    *uint8             `matter:"0x0002"` // attribute 0x0002
-	AlarmsActive               *AlarmModeBitmap   `matter:"0x0003"` // attribute 0x0003
-	AlarmsSuppressed           *AlarmModeBitmap   `matter:"0x0004"` // attribute 0x0004
-	AlarmsEnabled              *AlarmModeBitmap   `matter:"0x0005"` // attribute 0x0005
-	AlarmsSupported            *AlarmModeBitmap   `matter:"0x0006"` // attribute 0x0006
-	SensorFault                *SensorFaultBitmap `matter:"0x0007"` // attribute 0x0007
+	CurrentSensitivityLevel    *uint8             // attribute 0x0000
+	SupportedSensitivityLevels *uint8             // attribute 0x0001
+	DefaultSensitivityLevel    *uint8             // attribute 0x0002
+	AlarmsActive               *AlarmModeBitmap   // attribute 0x0003
+	AlarmsSuppressed           *AlarmModeBitmap   // attribute 0x0004
+	AlarmsEnabled              *AlarmModeBitmap   // attribute 0x0005
+	AlarmsSupported            *AlarmModeBitmap   // attribute 0x0006
+	SensorFault                *SensorFaultBitmap // attribute 0x0007
+}
+
+// FromAttributeValues implements spec.StateReader: each field the value
+// read answers for its attribute, converted to the field's type; an
+// attribute read does not answer, or answers with a value the field
+// cannot hold, leaves the field as it is.
+func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
+	if v, ok := read(AttrCurrentSensitivityLevel); ok {
+		spec.Assign(&st.CurrentSensitivityLevel, v)
+	}
+	if v, ok := read(AttrSupportedSensitivityLevels); ok {
+		spec.Assign(&st.SupportedSensitivityLevels, v)
+	}
+	if v, ok := read(AttrDefaultSensitivityLevel); ok {
+		spec.Assign(&st.DefaultSensitivityLevel, v)
+	}
+	if v, ok := read(AttrAlarmsActive); ok {
+		spec.Assign(&st.AlarmsActive, v)
+	}
+	if v, ok := read(AttrAlarmsSuppressed); ok {
+		spec.Assign(&st.AlarmsSuppressed, v)
+	}
+	if v, ok := read(AttrAlarmsEnabled); ok {
+		spec.Assign(&st.AlarmsEnabled, v)
+	}
+	if v, ok := read(AttrAlarmsSupported); ok {
+		spec.Assign(&st.AlarmsSupported, v)
+	}
+	if v, ok := read(AttrSensorFault); ok {
+		spec.Assign(&st.SensorFault, v)
+	}
 }
 
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
@@ -115,9 +146,11 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
-// device's goroutine, one call after the other. spec.ErrNoQueue for a
-// server wrapped outside a device (Wrap).
-func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func(), err error) {
+// device's goroutine, one call after the other. A server wrapped
+// outside a device (Wrap) has no queue and delivers nothing, as a
+// device not added delivers nothing. It returns the unsubscribe
+// function.
+func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (unsubscribe func()) {
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
@@ -208,7 +241,7 @@ func (Declare) ClusterID() uint32 { return ClusterID }
 // ClusterDeclaration implements device.Declaration: the declaration in
 // the form the device kit applies it.
 func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
-	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: spec.PatchValues(d.Initial), Server: d.HostServer, Ports: d}
+	decl := spec.ClusterDeclaration{Cluster: ClusterID, Initial: d.Initial.AttributeValues(), Server: d.HostServer, Ports: d}
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}

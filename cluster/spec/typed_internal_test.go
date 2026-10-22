@@ -99,27 +99,3 @@ func ptrTo[T any](v T) *T { return &v }
 // List needs an Encodable entry type.
 func (typedPair) EncodeTLV(*tlv.Encoder, tlv.Tag) {}
 
-func TestTypedFieldsOf(t *testing.T) {
-	t.Parallel()
-	type state struct {
-		A uint8 `matter:"0x0001"`
-		B uint8
-		C uint8 `matter:"12"`
-	}
-	typ := reflect.TypeFor[state]()
-	want := []typedField{{index: 0, attr: 1}, {index: 2, attr: 12}}
-	if got := fieldsOf(typ); !reflect.DeepEqual(got, want) {
-		t.Errorf("fields %v", got)
-	}
-	if got := fieldsOf(typ); !reflect.DeepEqual(got, want) {
-		t.Errorf("cached fields %v", got)
-	}
-	defer func() {
-		if recover() == nil {
-			t.Error("a malformed tag did not panic")
-		}
-	}()
-	fieldsOf(reflect.TypeFor[struct {
-		A uint8 `matter:"one"`
-	}]())
-}
