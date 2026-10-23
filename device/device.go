@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
@@ -141,6 +142,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	}
 	slices.Sort(d.optIn)
 	d.source = d
+	s.self = d.EndpointNumber
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
 	}
@@ -384,7 +386,16 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
 	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
-	srv, err := spec.NewServer(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
+	if r.ID == powersourcedef.ClusterID {
+		powerSourceDefaults(features, initial)
+	}
+	cfg := spec.ServerConfig{Initial: initial, Unimplemented: true}
+	if r.ID == powersourcedef.ClusterID && s.self != nil {
+		if _, declared := initial[powersourcedef.AttrEndpointList]; !declared {
+			cfg.Source = ownEndpointList{s.self}
+		}
+	}
+	srv, err := spec.NewServer(def, opts, cfg)
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
 		return nil, fmt.Errorf("%w: %s %s: %w: supply its server as the declaration's HostServer", ErrNoDefaultServer, t.Name, r.Name, err)
@@ -392,6 +403,57 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	return srv, nil
+}
+
+// powerSourceDefaults fills what matter.js's PowerSourceServer.initialize
+// sets when the state leaves it unset (packages/node/src/behaviors/power-source/PowerSourceServer.ts:37-62
+// at 862ad75f): Status Unspecified; Description "Mains power" with WIRED,
+// else "Battery power" with BAT; with BAT, BatChargeLevel Ok and
+// BatReplaceability Unspecified; with WIRED, WiredCurrentType AC.
+func powerSourceDefaults(features uint32, initial map[uint32]any) {
+	set := func(id uint32, v any) {
+		if _, ok := initial[id]; !ok {
+			initial[id] = v
+		}
+	}
+	wired := features&uint32(powersourcedef.FeatureWired) != 0
+	battery := features&uint32(powersourcedef.FeatureBattery) != 0
+	set(powersourcedef.AttrStatus, powersourcedef.PowerSourceStatusUnspecified)
+	switch {
+	case wired:
+		set(powersourcedef.AttrDescription, "Mains power")
+	case battery:
+		set(powersourcedef.AttrDescription, "Battery power")
+	}
+	if battery {
+		set(powersourcedef.AttrBatChargeLevel, powersourcedef.BatChargeLevelOk)
+		set(powersourcedef.AttrBatReplaceability, powersourcedef.BatReplaceabilityUnspecified)
+	}
+	if wired {
+		set(powersourcedef.AttrWiredCurrentType, powersourcedef.WiredCurrentTypeAc)
+	}
+}
+
+// ownEndpointList answers a default PowerSource's EndpointList with the
+// device's own endpoint once the node assembled it, empty before: the
+// endpoints a bridged device's power source feeds are its own, unless the
+// declaration's Initial names them. matter.js's PowerSourceServer sets no
+// EndpointList (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63
+// at 862ad75f) and the attribute is mandatory
+// (power-source-cluster.element.ts:130), so the application fills it; the
+// kit fills it as the measurement-projected PowerSource does
+// (cluster/measurement PowerSourceServer.SetEndpoint).
+type ownEndpointList struct{ self func() (uint16, bool) }
+
+// MatterAttribute implements [spec.Source].
+func (o ownEndpointList) MatterAttribute(attrID uint32) (any, bool) {
+	if attrID != powersourcedef.AttrEndpointList {
+		return nil, false
+	}
+	if n, ok := o.self(); ok {
+		return []uint16{n}, true
+	}
+	return []uint16{}, true
 }
 
 // clusterMandatedFeatures is the FeatureMap of the features whose own
