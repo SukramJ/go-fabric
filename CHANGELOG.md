@@ -15,6 +15,15 @@ API already used, or a new symbol. One value changed, under Changed.
 
 ### Added
 
+- The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
+  - OTA: `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob`, the consent states `node.OTAConsentGranted`, `OTAConsentDenied`, `OTAConsentObtaining` and `OTAConsentUnknown`, and the image file format `node.CreateOTAImage`, `node.OTAImageOptions`, `node.ReadOTAImage` and `node.OTAImageHeader`.
+  - The ledger's software versions: `node.NewDCLClient`, `node.DCLProductionURL`, `node.DCLTestNetURL`, `node.DCLOTAVersions`, `node.DCLSoftwareVersion` and `node.VerifyOTAImage`.
+  - Aggregator Actions: `node.NewActions`, `node.Actions`, `node.ActionsConfig`, `node.ActionsHost` and `node.ActionRequest`.
+  - EcosystemInformation: `node.NewEcosystemInformation`, `node.EcosystemInformation` and `node.EcosystemDirectory`.
+  - The root servers a host drives after Start: `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer` and `node.PowerSourceConfigurationServer`.
+  - Each is an alias of the lower package's type, or a one-line function over it.
+- `device.FixedLabel(labels...)`: the FixedLabel cluster, which the Base device type allows on every endpoint, declared with its labels.
+- `contentcontroldef.Declare{ContentControl: port}` (BU-b Left out): ContentControl by declaration, on the generated port `contentcontroldef.ContentControl` and its feature interfaces, run by the kit's `cluster/media` server.
 - `spec.Value[T]`, a scalar a controller writes, as a `spec.Encodable`: `spec.Uint`, `spec.Int` (they keep a generated enum or bitmap type), `spec.Uint8` … `spec.Int64`, `spec.Bool`, `spec.Float32`, `spec.Float64`, `spec.String`, `spec.Bytes`, and `spec.Null[T]()` for a nullable attribute's null. `fabrictest.Write` and `client.Node.Write` need no `tlv` (gate 2, G2-8).
 - The controller's typed reads: `<cluster>def.StateFrom(values)` in every generated package fills the cluster's `State` from a peer's values and lists the attributes absent. It is the same generated path the device's typed server reads through (`spec.StateFrom` over `State.FromAttributeValues`). `spec.Values`, `spec.AttributeValues`, `spec.DecodeAttribute` (the decode `client.Cluster.Decoded` used, moved), `spec.ErrUntyped`; `client.Report.Values(endpoint, cluster)`; `fabrictest.ReadCluster`. A nil `*client.Cluster` is empty values.
 - `controller/client` owns the role's vocabulary as aliases: `AttributePath`, `CommandPath`, `EventPath`, `DataVersionFilter`, `EventMinimumNumber`, `ReadPaths`, `SubscribeRequest`, `Subscription`, `Report`, `AttributeData`, `AttributeStatus`, `EventData`, `EventStatus`, `WriteRequest`, `WriteOptions`, `WriteStatus`, `WriteStatuses`, `InvokeOptions`, `Result`, `StatusError`, `PeerAddress`, `Device`, `SupportedTransports`, `Timing`, `SessionParameters`, `DeviceTypeViolation`; `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`, `Interval`. `fabrictest` the same for its helpers (`ReadRequest` is `client.ReadPaths`), plus `Interaction`, `Peer`, `Session`, `Message` and `Privilege` with `PrivilegeView` … `PrivilegeAdminister` (gate 2, G2-8).
@@ -23,6 +32,9 @@ API already used, or a new symbol. One value changed, under Changed.
 
 ### Changed
 
+- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
+- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
+- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
 - `client.Cluster.Decoded` of a nullable struct attribute returns the generated struct, as for a non-nullable one; it returned a `map[uint32]any` by field id. The generated `Attribute.Decode` now covers nullable struct and struct-list attributes, with TLV null as nil.
 
 ### Fixed

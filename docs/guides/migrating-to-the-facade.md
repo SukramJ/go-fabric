@@ -40,7 +40,7 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## The node features in BV-b
+## The node features in v0.10.4
 
 Nothing was removed; each route is an alias of the type it replaces or a
 one-line function over it.

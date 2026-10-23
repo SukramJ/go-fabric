@@ -6,6 +6,7 @@ package main
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // change is one incompatible change apidiff reports.
@@ -35,7 +36,7 @@ func parse(out string) []change {
 		subject, _, _ := strings.Cut(line, ": ")
 		c := split(subject)
 		c.Line = line
-		if isExcluded(c.Package) {
+		if isExcluded(c.Package) || (c.Symbol != c.Package && unexported(c.Symbol)) {
 			continue
 		}
 		changes = append(changes, c)
@@ -65,6 +66,14 @@ func split(subject string) change {
 // tidy writes a method as Type.Method.
 func tidy(symbol string) string {
 	return strings.NewReplacer("(*", "", "(", "", ")", "").Replace(symbol)
+}
+
+// unexported reports whether the symbol's first name is unexported: a
+// method of an unexported type, reached only as a promoted method of an
+// exported one, whose own change apidiff reports.
+func unexported(symbol string) bool {
+	r := []rune(symbol)
+	return len(r) > 0 && unicode.IsLower(r[0])
 }
 
 func isExcluded(pkg string) bool {
