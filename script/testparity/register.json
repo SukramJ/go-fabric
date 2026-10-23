@@ -731,9 +731,9 @@
       "path": "packages/node/test/behaviors/color-control/ColorConversionUtilsTest.ts",
       "status": "ported",
       "go": [
-        "cluster/light:TestColorConversionHSVToRGBAndBack",
-        "cluster/light:TestColorConversionXYToRGBAndBack",
-        "cluster/light:TestColorConversionMiredsToXYAndBack"
+        "cluster/spec/colorcontrol:TestColorConversionHSVToRGBAndBack",
+        "cluster/spec/colorcontrol:TestColorConversionXYToRGBAndBack",
+        "cluster/spec/colorcontrol:TestColorConversionMiredsToXYAndBack"
       ],
       "reason": "The three colour-space round trips are ported one to one.",
       "snapshotSha": "fe8933a091de7a4439fd230448fd7b07f711eba1"

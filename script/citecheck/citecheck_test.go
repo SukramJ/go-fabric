@@ -42,7 +42,11 @@ import (
 //
 // 265 after brief BH-1: the report assembler's InteractionMessenger.ts
 // citation moved to the lines that name what it mirrors.
-const citecheckDriftRatchet = 263
+//
+// 262 after brief BV-1: the NativeSwitcher doc moved into the generator
+// (levelcontroldef) and its LevelControlServer.ts:529-550 citation now names
+// transition there and #turnOnForLevel at :597.
+const citecheckDriftRatchet = 262
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

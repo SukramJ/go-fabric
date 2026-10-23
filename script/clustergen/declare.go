@@ -199,9 +199,10 @@ var ports = map[string]portSet{
 			"The source then sets nothing on the OnOff attribute itself: the host's",
 			"OnOff reflects what the device did. matter.js has no counterpart — it",
 			"couples On/Off and the transition in one transaction against local",
-			"state (LevelControlServer.ts:529-550, #turnOnForLevel) — so the",
-			"interface is a bridged host's affordance; a device without it keeps",
-			"matter.js's order. A [NativeMover] still takes Move and MoveWithOnOff.",
+			"state (LevelControlServer.ts:529-550 transition, :597 #turnOnForLevel) —",
+			"so the interface is a bridged host's affordance; a device without it",
+			"keeps matter.js's order. A [NativeMover] still takes Move and",
+			"MoveWithOnOff.",
 		},
 		methods: []string{
 			"SwitchOn(ctx context.Context, level uint8, d time.Duration) error",

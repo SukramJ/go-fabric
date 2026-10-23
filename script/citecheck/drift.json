@@ -1208,16 +1208,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 69,
-    "citation": "LevelControlServer.ts:529-550",
-    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
-    "identifier": "#turnOnForLevel",
-    "nearest": 590,
-    "occurrences": 2
-  },
-  {
-    "file": "cluster/levelcontrol/native.go",
-    "line": 282,
+    "line": 228,
     "citation": "LevelControlServer.ts:186-195",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "MoveMode",
@@ -1226,7 +1217,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 482,
+    "line": 428,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "targetValue",
