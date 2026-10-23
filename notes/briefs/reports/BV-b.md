@@ -60,7 +60,17 @@ The decision for each name:
 
 ## Guards
 
-GUARDS_TABLE
+| Guard | HEAD | Exit |
+| --- | --- | --- |
+| `make ci` (including `apidiff-check`: the 14 ContentControl alias changes, named under Changed) | 19dfdb9f | 0. Earlier runs failed on: an import cycle (`controller/dcl`'s commission test imported `node`, which now imports `controller/dcl`; the node now comes from an external test file), lint, and gofumpt |
+| `make race` ×2 | 7746af61 | 0, 0. Two earlier runs each timed out once in a `node` gate-2 subscription test under the whole-module load: `TestThermostatControllerWriteReachesOnChanged` (BV-1 saw the same) and `TestLevelControlTransitionReachesHostAndSubscriber`. Both pass 15× in isolation under `-race`, and `go test -race ./node/` is green |
+| `make reachability` then `reachability-check` | 19dfdb9f | 0 (unreached 4, unchanged; `node.NewActions` reached by `node/routes_test.go`) |
+| `make cite-report` then `cite-check` | 19dfdb9f | 0 (drift 262, unchanged) |
+| `make testparity` then `testparity-check` | 19dfdb9f | 0 (planned 35) |
+| `go test ./script/...` | 19dfdb9f | 0 |
+| `mkdocs build --strict` | 19dfdb9f | 0 |
+| `make chiptool-test` | 19dfdb9f | 0 |
+| `make chiptool-families` (`GOFABRIC_CHIP_FAMILIES=PS,FLABEL`) | 19dfdb9f | 0 (PS 3.1, FLABEL 2.1) |
 
 ## Differences from the brief
 
@@ -80,7 +90,6 @@ GUARDS_TABLE
 
 - The EVSE declaration (M5).
 - The eight M5 ports whose subject exists in part.
-- The chip-tool run: see Guards.
 
 ## Questions
 
