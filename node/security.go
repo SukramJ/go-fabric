@@ -247,10 +247,16 @@ func (c *caseIdentities) forFabric(fabricIndex uint8) (*caseFabric, bool) {
 	return entry, ok && entry.identity != nil
 }
 
+// fabricIdentities is what loading a fabric's CASE identity reads.
+type fabricIdentities interface {
+	GetFabric(ctx context.Context, fabricIndex uint8) (store.FabricRecord, error)
+	GetIdentity(ctx context.Context, fabricIndex uint8) (store.IdentityRecord, error)
+}
+
 // load rebuilds the identity for one fabric from its persisted rows. Called
 // at boot for every already-installed fabric and again from
 // OperationalCredentials' OnFabricInstalled hook after each AddNOC.
-func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex uint8) error {
+func (c *caseIdentities) load(ctx context.Context, st fabricIdentities, fabricIndex uint8) error {
 	fabric, err := st.GetFabric(ctx, fabricIndex)
 	if err != nil {
 		return fmt.Errorf("get fabric %d: %w", fabricIndex, err)
@@ -356,7 +362,7 @@ func responderSessionParams(tcp bridge.TCPConfig, maxPathsPerInvoke uint16) *ses
 func wireSecurity(
 	ctx context.Context,
 	br *bridge.Bridge,
-	st *store.Store,
+	st store.Port,
 	root *RootClusters,
 	ids *caseIdentities,
 	pase paseParams,
@@ -487,7 +493,7 @@ func wireSecurity(
 // resumption record, which matter.js CaseClient offers whenever it holds
 // one. A completed handshake registers the session and stores the new
 // resumption record, as matter.js does after every pair.
-func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) bridge.CaseInitiatorProvider {
+func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) bridge.CaseInitiatorProvider {
 	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*bridge.CaseInitiation, error) {
 		fabric, ok := ids.forFabric(fabricIndex)
 		if !ok {

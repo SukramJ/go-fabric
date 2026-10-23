@@ -83,7 +83,7 @@ func (r FabricRecord) clone() FabricRecord {
 	return r
 }
 
-// Settings is a string key-value store — *store.Store's GetSetting and
+// Settings is a string key-value store — store.Settings' GetSetting and
 // SetSetting, the table the node keeps its own settings in.
 type Settings interface {
 	GetSetting(ctx context.Context, key string) (string, bool, error)

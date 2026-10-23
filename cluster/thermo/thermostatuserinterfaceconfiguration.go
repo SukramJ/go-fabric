@@ -79,7 +79,7 @@ type ThermostatUIConfig struct {
 	// Settings, optional, persists KeypadLockout: a value stored there
 	// replaces KeypadLockout at construction, and every change — a
 	// controller's write or the device's own ([ThermostatUIServer.Set]) —
-	// is saved; nil keeps it in memory. *store.Store is one.
+	// is saved; nil keeps it in memory. Every store.Port is one.
 	Settings SettingStore
 	// SettingKey is the key KeypadLockout persists under in Settings;
 	// empty is [DefaultKeypadLockoutSetting]. An endpoint of its own needs

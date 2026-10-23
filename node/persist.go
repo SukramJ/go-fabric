@@ -47,7 +47,7 @@ const (
 // an [endpoint.StringKey] under the string itself, so a database the
 // daemon wrote reads back; a host's own key type under what it prints.
 type persisted struct {
-	st     *store.Store
+	st     store.Settings
 	logger *slog.Logger
 	// salt is the UniqueID rotation salt uniqueID consults; nil is
 	// bootid.Salt (a test pins its own).
@@ -79,7 +79,7 @@ type EndpointPersistence interface {
 // may build it before [New] (for the assembler its Topology runs) over a
 // store the node later opens. st must hold the store schema
 // (store.Apply); a nil logger is slog.Default().
-func NewEndpointPersistence(st *store.Store, logger *slog.Logger) EndpointPersistence {
+func NewEndpointPersistence(st store.Settings, logger *slog.Logger) EndpointPersistence {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -247,7 +247,7 @@ func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, 
 // first boot of a database, one more on every boot after — matter.js
 // GeneralDiagnosticsServer.ts initialize(), as the daemon's countBoot
 // (wiring.go:951-971 at b4ea1f96^).
-func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
+func countBoot(ctx context.Context, st store.Settings) (uint16, error) {
 	raw, ok, err := st.GetSetting(ctx, rebootCountSetting)
 	if err != nil {
 		return 0, err
@@ -269,7 +269,7 @@ func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
 // loadOperationalTime is the operational time earlier boots accumulated,
 // in milliseconds, or in whole hours under the legacy key
 // (wiring.go:984-1010 at b4ea1f96^).
-func loadOperationalTime(ctx context.Context, st *store.Store) (time.Duration, error) {
+func loadOperationalTime(ctx context.Context, st store.Settings) (time.Duration, error) {
 	raw, ok, err := st.GetSetting(ctx, operationalTimeSetting)
 	if err != nil {
 		return 0, err
@@ -293,14 +293,14 @@ func loadOperationalTime(ctx context.Context, st *store.Store) (time.Duration, e
 }
 
 // storeOperationalTime persists the operational time in milliseconds.
-func storeOperationalTime(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics) error {
+func storeOperationalTime(ctx context.Context, st store.Settings, g *mattercore.GeneralDiagnostics) error {
 	ms := g.TotalOperationalTime().Milliseconds()
 	return st.SetSetting(ctx, operationalTimeSetting, strconv.FormatInt(ms, 10))
 }
 
 // keepOperationalTime persists the operational time every interval until
 // ctx ends (wiring.go:1019-1036 at b4ea1f96^); Stop stores it once more.
-func keepOperationalTime(ctx context.Context, clk clock.Clock, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
+func keepOperationalTime(ctx context.Context, clk clock.Clock, st store.Settings, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
 	tick := clock.Or(clk).NewTicker(interval)
 	defer tick.Stop()
 	for {

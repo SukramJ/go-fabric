@@ -21,7 +21,8 @@ import (
 //
 // The payload is the bridge's encoding of one subscription
 // ([subscription.MarshalPeerSubscription]) and is opaque to the store; the
-// key columns are there for deletion. *store.Store implements it.
+// key columns are there for deletion. It is store.ServerSubscriptions;
+// every store.Port implements it.
 // Implementations must be safe for concurrent use.
 type SubscriptionStore interface {
 	// SaveServerSubscription inserts or replaces the row of subscriptionID.
@@ -88,7 +89,7 @@ func (r *resumptionState) storeLocked() SubscriptionStore {
 }
 
 // AttachSubscriptionStore wires where the subscriptions of CASE sessions
-// are persisted. *store.Store satisfies [SubscriptionStore]. Attach before
+// are persisted. Every store.Port satisfies [SubscriptionStore]. Attach before
 // [Bridge.Start]: Start loads the previous run's subscriptions from it.
 // Pass nil to revert to the noop store, which persists nothing — silently:
 // a restart then drops every subscription and each controller waits out

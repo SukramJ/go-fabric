@@ -50,7 +50,7 @@ in-memory network, and moves the clock only while no datagram is in flight
 and no goroutine of the process is working — the
 [Testing in process](testing-in-process.md) guide.
 
-*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:415-462`, `node/node.go:37-39`, `node/node.go:567-575`, `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go:111-125`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
+*Source: `transport/udp/listener.go:158-229`, `bridge/bridge.go:808-864`, `bridge/ackpump.go:18-24`, `bridge/ackpump.go:291-314`, `im/subscription/manager.go:185-186`, `im/subscription/manager.go:230-236`, `im/subscription/engine.go:74-95`, `secure/operational/manager.go:231-235`, `secure/operational/manager.go:1157-1172`, `node/security.go:421-468`, `node/node.go:37-39`, `node/node.go:567-575`, `node/reannounce.go:15-31`, `node/config.go:231-235`, `bridge/securechannel.go:1265-1299`, `bridge/bdx_responder.go:141-158`, `binding/manager.go:255-261`, `node/client.go:115-125`, `node/node.go:111-125`, `clock/clock.go`, `node/config.go` (`Config.Clock`), `endpoint/assembler.go` (`Config.Clock`), `node/root.go` (`buildAggregatorClusters`), `device/options.go` (`Options.Clock`), `fabrictest/site.go` (`Run`).*
 
 ## Dispatch and ordering
 
@@ -130,7 +130,7 @@ report to a channel.
 **`client/discovery`** runs one goroutine per `Names` that holds all
 cache, service and scanner state. User callbacks never run on that loop.
 
-*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:308`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
+*Source: `endpoint/dispatcher.go:364-389`, `bridge/session_order.go:55-69`, `bridge/receive.go:185`, `bridge/ackpump.go:95-105`, `bridge/ackpump.go:291-295`, `transport/mrp/ack.go:50-55`, `node/security.go:314`, `im/subscription/engine.go:74-95`, `cluster/onoff/server.go:54-72`, `cluster/onoff/server.go:734-753`, `node/observers.go:4-21`, `device/lifecycle.go` (`OnChanged`, `OnChangedAsync`), `device/queue.go`, `client/interaction/handler.go:126-138`, `client/interaction/subscribe.go:180-200`, `examples/reference-controller/cli/interact.go:289-330`, `client/discovery/doc.go:21-30`.*
 
 ## Changing the topology
 
