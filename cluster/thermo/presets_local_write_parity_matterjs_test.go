@@ -42,6 +42,7 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // localThermostat is PresetsLocalWriteTest.ts:22-26: the presets
@@ -148,7 +149,7 @@ func TestParityMatterJS_PresetsLocalWriteTest(t *testing.T) {
 			if err := dev.Act(func(n *node.Node) error {
 				cfg := thermostatConfig(5, []thermo.Preset{})
 				cfg.Clock = site.Clock()
-				cfg.PresetStore = n.Store().ThermostatPresets("thermostat")
+				cfg.PresetStore = store.NewThermostatPresetStore(n.Store(), "thermostat")
 				var err error
 				if srv, err = thermo.New(cfg); err != nil {
 					return err

@@ -20,7 +20,7 @@ func TestThermostatPresetsRoundTrip(t *testing.T) {
 	if _, _, ok, err := s.LoadThermostatPresets(ctx, "thermostat"); err != nil || ok {
 		t.Fatalf("empty store: ok %v, err %v", ok, err)
 	}
-	p := s.ThermostatPresets("thermostat")
+	p := store.NewThermostatPresetStore(s, "thermostat")
 	if err := p.SavePresets(ctx, []byte{0x16, 0x18}, []byte{1, 2}); err != nil {
 		t.Fatal(err)
 	}
