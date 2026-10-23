@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
 )
 
@@ -126,15 +127,21 @@ func (d *Device) available() bool {
 	if !d.reachable.Load() {
 		return false
 	}
-	return d.opts.Reachable == nil || d.opts.Reachable()
+	d.mu.Lock()
+	probe := d.opts.Reachable
+	d.mu.Unlock()
+	return probe == nil || probe()
 }
 
 // Rename names the device name: its BridgedDeviceBasicInformation
 // NodeLabel, reported to a subscribed controller and persisted by the node
-// as a controller's write of it is, so it survives a restart. The Name of
-// the device's [Options] becomes name. Before the device is added only
+// as a controller's write of it is, so it survives a restart — a written
+// label, which a later [Device.Update] of the host's name does not
+// replace. The Name of the device's [Options] becomes name, capped at the
+// NodeLabel maximum ([ComposeNodeLabel]). Before the device is added only
 // the name changes.
 func (d *Device) Rename(ctx context.Context, name string) {
+	name = ComposeNodeLabel(name, "")
 	d.mu.Lock()
 	d.opts.Name = name
 	h := d.host
@@ -143,6 +150,70 @@ func (d *Device) Rename(ctx context.Context, name string) {
 		h.Rename(ctx, d.opts.StableKey, name)
 	}
 }
+
+// HostStatement are the facts of a device's [Options] the host states and
+// may change while the device is bound — what the host's own model says
+// about the device, as against what a controller writes to it:
+//
+//   - Name: the name the device's NodeLabel serves as long as no label is
+//     written. A controller's write of NodeLabel, and [Device.Rename],
+//     persist a label that wins over it, across restarts.
+//   - DeviceAddress, ChannelAddress: the host's addresses of the physical
+//     device and of this function of it.
+//   - Reachable: the availability probe.
+//
+// StableKey, Vendor and Conditions are the device's identity and type and
+// do not change while it is bound; a host that changes them replaces the
+// device (node.Aggregator.Replace).
+type HostStatement struct {
+	Name                          string
+	DeviceAddress, ChannelAddress string
+	Reachable                     AvailabilityProbe
+}
+
+// Update applies a change of the host's statements: fn gets the current
+// ones and changes what changed. The new Name (capped at the NodeLabel
+// maximum, [ComposeNodeLabel]) is served at once to a subscribed
+// controller unless a written label wins, and persisted nowhere, so the
+// next restart starts from the host's statement again. The addresses
+// reach the endpoint at the node's next reassembly, the probe at its next
+// read. The device stays bound: [Device.EndpointNumber] and
+// [Device.SetReachable] keep working. Before the device is added only the
+// statements change.
+//
+// matter.js has no such split: every change of a persistent attribute is
+// stored, whoever made it (packages/node/src/behavior/state/managed/Datasource.ts:1427-1438
+// at 862ad75f; NodeLabel is nonvolatile, basic-information.element.ts:36-37),
+// and the stored value replaces the endpoint's configured state when the
+// node restarts (Datasource.ts:85-97). The host's statement is the
+// configured state here — changed without becoming the stored one.
+func (d *Device) Update(ctx context.Context, fn func(*HostStatement)) {
+	if fn == nil {
+		return
+	}
+	d.mu.Lock()
+	st := HostStatement{
+		Name: d.opts.Name, DeviceAddress: d.opts.DeviceAddress,
+		ChannelAddress: d.opts.ChannelAddress, Reachable: d.opts.Reachable,
+	}
+	fn(&st)
+	st.Name = ComposeNodeLabel(st.Name, "")
+	renamed := st.Name != d.opts.Name
+	d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress, d.opts.Reachable = st.Name, st.DeviceAddress, st.ChannelAddress, st.Reachable
+	h := d.host
+	d.mu.Unlock()
+	if h != nil && renamed {
+		h.HostName(ctx, d.opts.StableKey, st.Name)
+	}
+}
+
+// ComposeNodeLabel is the NodeLabel of a bridged endpoint named base with
+// the parameter suffix — "base (suffix)", or base alone for an empty
+// suffix — capped at the NodeLabel maximum: 32 UTF-8 bytes, the generated
+// definition's constraint, cut at a rune boundary, the suffix dropped
+// first. [New], [Device.Rename] and [Device.Update] cap a name with it,
+// so a host composes a label with it and never re-derives the cap.
+func ComposeNodeLabel(base, suffix string) string { return endpoint.ComposeNodeLabel(base, suffix) }
 
 // OnChanged calls fn with every change of the device's clusterID server —
 // matter.js's `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:456)

@@ -6,6 +6,8 @@ package endpoint
 import (
 	"strings"
 
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -139,8 +141,11 @@ func ComposeNodeLabel(base, suffix string) string {
 // labelMaxBytes is the Matter maximum length of the
 // BridgedDeviceBasicInformation strings the assembly fills — NodeLabel and
 // VendorName, both "max 32" — 32 utf-8 BYTES, not 32 codepoints (Matter
-// Core §9.13.6.5).
-const labelMaxBytes = 32
+// Core §9.13.6.5). It is the generated definition's NodeLabel constraint
+// (matter.js packages/model/src/standard/elements/basic-information.element.ts:36,
+// constraint "max 32", which BridgedDeviceBasicInformation's NodeLabel
+// inherits), not a literal of this package.
+var labelMaxBytes = int(bdbidef.Definition.Attribute(bdbidef.AttrNodeLabel).Constraint.Max.Int)
 
 // truncateLabel caps s at [labelMaxBytes], snapping back to a rune
 // boundary so a multi-byte codepoint is never cut in half.

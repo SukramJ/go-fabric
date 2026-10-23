@@ -615,32 +615,64 @@ func (b *Bridge) NotifyEndpointReachable(endpointID uint16, reachable bool) bool
 // marks the attribute dirty, so a subscribed controller reads the new
 // name. It reports false when no bridged endpoint has the id.
 func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) bool {
-	if b == nil {
+	ep := b.bridgedEndpoint(endpointID)
+	if ep == nil {
 		return false
+	}
+	ep.SetNodeLabel(label)
+	b.nodeLabelChanged(ep)
+	return true
+}
+
+// NotifyEndpointHostName gives the bridged endpoint with id endpointID the
+// host's current name (endpoint.Endpoint.SetHostName): a host statement,
+// persisted nowhere, served as the NodeLabel while no label is written.
+// When it is served, the cluster's DataVersion is bumped and the attribute
+// marked dirty, as for a rename; a written label keeps winning and nothing
+// is reported. It reports false when no bridged endpoint has the id.
+func (b *Bridge) NotifyEndpointHostName(endpointID uint16, name string) bool {
+	ep := b.bridgedEndpoint(endpointID)
+	if ep == nil {
+		return false
+	}
+	if ep.SetHostName(name) {
+		b.nodeLabelChanged(ep)
+	}
+	return true
+}
+
+// bridgedEndpoint is the bridged endpoint with id endpointID of the
+// running topology, nil when there is none.
+func (b *Bridge) bridgedEndpoint(endpointID uint16) *endpoint.Endpoint {
+	if b == nil {
+		return nil
 	}
 	topo := b.Topology()
 	if topo == nil {
-		return false
+		return nil
 	}
 	for _, ep := range topo.Bridged() {
-		if ep == nil || ep.ID != endpointID {
-			continue
+		if ep != nil && ep.ID == endpointID {
+			return ep
 		}
-		ep.SetNodeLabel(label)
-		ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
-		if mgr := b.subscriptionManagerLocked(); mgr != nil {
-			mgr.OnAttributeChanged(im.ConcreteAttributePath{
-				Endpoint:     ep.ID,
-				Cluster:      core.BridgedDeviceBasicInformationClusterID,
-				Attribute:    bdbidef.AttrNodeLabel,
-				HasEndpoint:  true,
-				HasCluster:   true,
-				HasAttribute: true,
-			})
-		}
-		return true
 	}
-	return false
+	return nil
+}
+
+// nodeLabelChanged bumps ep's BridgedDeviceBasicInformation DataVersion
+// and marks its NodeLabel dirty for the subscriptions.
+func (b *Bridge) nodeLabelChanged(ep *endpoint.Endpoint) {
+	ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
+	if mgr := b.subscriptionManagerLocked(); mgr != nil {
+		mgr.OnAttributeChanged(im.ConcreteAttributePath{
+			Endpoint:     ep.ID,
+			Cluster:      core.BridgedDeviceBasicInformationClusterID,
+			Attribute:    bdbidef.AttrNodeLabel,
+			HasEndpoint:  true,
+			HasCluster:   true,
+			HasAttribute: true,
+		})
+	}
 }
 
 // notifyReachable is the reachability flip of one bridged endpoint.

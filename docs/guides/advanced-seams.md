@@ -27,7 +27,8 @@ A host names none of the packages below for these:
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers` |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
 | The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type, name, reachability and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
-| A device's lifecycle | `Device.SetReachable`, `Device.Rename`, `Device.EndpointNumber`; `Aggregator.Add`, `Remove`, `Replace` |
+| A device's lifecycle | `Device.SetReachable`, `Device.Rename` (a persisted label, as a controller writes it), `Device.Update` (the host's statements: name, addresses, availability probe — persisted nowhere, a written label wins), `Device.EndpointNumber`; `Aggregator.Add`, `Remove`, `Replace` |
+| A bridged NodeLabel | `device.ComposeNodeLabel(base, suffix)`: the parameter suffix and the 32-byte cap of the generated definition; `device.New`, `Rename` and `Update` cap a name with it |
 | Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
 | Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
 | Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
@@ -77,7 +78,7 @@ semantics, the persistence the facade threads through. A host that drives
 
 **Gives.** The Matter-near level: `endpoint.Assembler`, `endpoint.Spec`,
 `endpoint.Topology`, the endpoint-number store (`endpoint.Store`,
-`endpoint/sqlitestore`), `ComposeNodeLabel`.
+`endpoint/sqlitestore`). `ComposeNodeLabel` has the facade route `device.ComposeNodeLabel`.
 
 **When.** A host that assembles its own topology from its own device model
 — its own assembler behind `Config.Topology` (a `node.Snapshotter`) — as

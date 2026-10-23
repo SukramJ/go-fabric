@@ -11,10 +11,12 @@ pseudo-version of `main`.
 ## [Unreleased]
 
 No source change is required: every new name is an alias of a type the
-API already used, or a new symbol. One value changed, under Changed.
+API already used, or a new symbol. Two behaviours changed, under Changed.
 
 ### Added
 
+- `Device.Update(ctx, func(*device.HostStatement))` and `device.HostStatement` (#238). They change the facts the host states about a bound device: its name, its addresses and its availability probe. The new name reaches a subscribed controller at once, as the NodeLabel the device serves while no label is written. It is persisted nowhere, so a controller-written label, or `Device.Rename`'s, wins across restarts. The device stays bound: `EndpointNumber` and `SetReachable` keep working. `endpoint.Endpoint.SetHostName` and `bridge.Bridge.NotifyEndpointHostName` carry it.
+- `device.ComposeNodeLabel(base, suffix)` (#239): the facade route for the bridged NodeLabel composition, with the parameter suffix and the 32-byte cap.
 - `spec.Value[T]`, a scalar a controller writes, as a `spec.Encodable`: `spec.Uint`, `spec.Int` (they keep a generated enum or bitmap type), `spec.Uint8` … `spec.Int64`, `spec.Bool`, `spec.Float32`, `spec.Float64`, `spec.String`, `spec.Bytes`, and `spec.Null[T]()` for a nullable attribute's null. `fabrictest.Write` and `client.Node.Write` need no `tlv` (gate 2, G2-8).
 - The controller's typed reads: `<cluster>def.StateFrom(values)` in every generated package fills the cluster's `State` from a peer's values and lists the attributes absent. It is the same generated path the device's typed server reads through (`spec.StateFrom` over `State.FromAttributeValues`). `spec.Values`, `spec.AttributeValues`, `spec.DecodeAttribute` (the decode `client.Cluster.Decoded` used, moved), `spec.ErrUntyped`; `client.Report.Values(endpoint, cluster)`; `fabrictest.ReadCluster`. A nil `*client.Cluster` is empty values.
 - `controller/client` owns the role's vocabulary as aliases: `AttributePath`, `CommandPath`, `EventPath`, `DataVersionFilter`, `EventMinimumNumber`, `ReadPaths`, `SubscribeRequest`, `Subscription`, `Report`, `AttributeData`, `AttributeStatus`, `EventData`, `EventStatus`, `WriteRequest`, `WriteOptions`, `WriteStatus`, `WriteStatuses`, `InvokeOptions`, `Result`, `StatusError`, `PeerAddress`, `Device`, `SupportedTransports`, `Timing`, `SessionParameters`, `DeviceTypeViolation`; `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`, `Interval`. `fabrictest` the same for its helpers (`ReadRequest` is `client.ReadPaths`), plus `Interaction`, `Peer`, `Session`, `Message` and `Privilege` with `PrivilegeView` … `PrivilegeAdminister` (gate 2, G2-8).
@@ -23,6 +25,7 @@ API already used, or a new symbol. One value changed, under Changed.
 
 ### Changed
 
+- `device.New`, `Device.Rename` and `Device.Update` cap a name at the NodeLabel maximum (#239), so `Options.Name` and `Spec().FriendlyName` hold what the endpoint serves. The cap is now read from the generated BridgedDeviceBasicInformation definition's constraint, not from a literal; it is still 32 bytes, cut at a rune boundary.
 - `client.Cluster.Decoded` of a nullable struct attribute returns the generated struct, as for a non-nullable one; it returned a `map[uint32]any` by field id. The generated `Attribute.Decode` now covers nullable struct and struct-list attributes, with TLV null as nil.
 
 ### Fixed
