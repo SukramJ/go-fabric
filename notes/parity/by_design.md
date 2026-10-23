@@ -3927,3 +3927,34 @@ explicit width is what the generated request types already do for
 commands; a controller-side model lookup per write is BV-b's typed write
 if a consumer asks for it (brief BV-a).
 
+### BD-Matter-HostStatement-NotPersisted — a host's statements about its device (name, addresses, probe) are configured state, not stored state
+
+matter.js persists every change of a non-volatile attribute whoever made
+it: the datasource's commit stores the `storeFields` of the changed
+values (`packages/node/src/behavior/state/managed/Datasource.ts:1427-1438`
+at `862ad75f`) and the next start layers the stored values over the
+defaults (`:580-583`), so a bridge that sets its own `nodeLabel` has it
+written to storage like a controller's write. The module separates the
+two: `Device.Update(ctx, func(*HostStatement))` (`device/lifecycle.go`)
+changes the host's name, addresses and availability probe, serves the
+new name at once unless a controller-written label is persisted, and
+persists nothing; `Device.Rename` remains the controller-equivalent write
+that persists. Reasoning: the host's model is the source of its own
+facts (a CCU's device name changes on the CCU and is re-read on every
+walk), and persisting them would make a host rename and a controller
+write fight over one slot (reference consumer, issue 238; brief BV-b1).
+
+### BD-Matter-NodeLabel-Truncated — an over-long bridged name is truncated to the NodeLabel bound, where matter.js's validator rejects it
+
+`NodeLabel` is `string`, `constraint: "max 32"`
+(`packages/model/src/standard/elements/basic-information.element.ts:36`
+at `862ad75f`); matter.js validates a value against the model and
+rejects an over-long one. The module's endpoint assembler truncates a
+composed label at the bound (`endpoint.ComposeNodeLabel`, now also the
+device kit's `device.ComposeNodeLabel`, applied to `Options.Name`,
+`Device.Rename` and `HostStatement.Name`). Reasoning: the name is the
+host's statement, not a controller's write — a controller's write is
+still refused with CONSTRAINT_ERROR by the definition — and a bridge
+with a long device name must not fail to assemble over its label (an
+older rule, made uniform by brief BV-b1; issue 239).
+
