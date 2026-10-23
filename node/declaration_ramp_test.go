@@ -211,6 +211,8 @@ func TestDeclaredRampPersister(t *testing.T) {
 	ctx := parityCtx(t)
 	site := quietSite(t)
 	ramp := persistRamp{fakeRamp: &fakeRamp{level: 10}, options: make(chan levelcontroldef.OptionsBitmap, 4)}
+	var persister levelcontroldef.NativePersister = ramp // the optional interface the kit finds
+	_ = persister
 	light, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("ramp-persist"), Name: "Desk dimmer"},
 		levelcontroldef.Declare{Ramp: ramp})
 	if err != nil {

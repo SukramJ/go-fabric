@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6260,
+  "entry_points": 6281,
   "entry_packages": [
     ".",
     "bdx",
@@ -230,18 +230,12 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14304,
-    "reachable": 9952,
-    "whitelisted": 4347,
-    "unreachable": 5
+    "total_exported": 14311,
+    "reachable": 9959,
+    "whitelisted": 4348,
+    "unreachable": 4
   },
   "by_package": [
-    {
-      "package": "cluster/measurement",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
     {
       "package": "endpoint",
       "unreachable_funcs": 1,
@@ -268,13 +262,6 @@
     }
   ],
   "unreachable": [
-    {
-      "package": "cluster/measurement",
-      "identifier": "CelsiusToInt16",
-      "file": "cluster/measurement/measurement.go",
-      "line": 1662,
-      "kind": "func"
-    },
     {
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
@@ -2249,21 +2236,21 @@
       "identifier": "TestDefaultAttrWriter_ModeSelectEmptyList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 253
+      "line": 255
     },
     {
       "package": "bridge",
       "identifier": "TestDefaultAttrWriter_ModeSelectListAsGiven",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 231
+      "line": 233
     },
     {
       "package": "bridge",
       "identifier": "TestDefaultAttrWriter_ModeSelectSupportedModes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 181
+      "line": 183
     },
     {
       "package": "bridge",
@@ -8423,7 +8410,7 @@
       "identifier": "LevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 243
+      "line": 227
     },
     {
       "package": "cluster/levelcontrol",
@@ -8493,7 +8480,7 @@
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 890
+      "line": 870
     },
     {
       "package": "cluster/measurement",
@@ -8507,14 +8494,14 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 882
+      "line": 862
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1597
+      "line": 1577
     },
     {
       "package": "cluster/measurement",
@@ -8864,28 +8851,28 @@
       "identifier": "ChangeToModeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 126
+      "line": 103
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeOptionStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 122
+      "line": 99
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 145
+      "line": 122
     },
     {
       "package": "cluster/modeselect",
       "identifier": "SemanticTagStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 114
+      "line": 91
     },
     {
       "package": "cluster/onoff",
@@ -22717,7 +22704,7 @@
       "identifier": "TestNativeDimmerTakesTheHandOffPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_lighting_test.go",
-      "line": 23
+      "line": 25
     },
     {
       "package": "examples/reference-bridge",
@@ -26183,6 +26170,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
       "line": 144
+    },
+    {
+      "package": "node",
+      "identifier": "Reassemblies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 11
     },
     {
       "package": "node",
