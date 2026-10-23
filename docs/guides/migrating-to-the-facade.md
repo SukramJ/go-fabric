@@ -59,6 +59,20 @@ one-line function over it.
 | `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
 | a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
 
+## The persistence port in v0.10.4
+
+The node takes a port instead of SQLite's type (`docs/guides/persistence.md`,
+the persistence port). A host that sets `Store.Path` or `Store.DB` changes
+nothing.
+
+| Before | Now |
+| --- | --- |
+| `node.Config.Store.Credentials` of type `*store.Store` | `store.Port`; `store.New(db)` still is one, `memstore.New()` (`store/memstore`) another |
+| `Node.Store()` returning `*store.Store` | `store.Port`: the same methods, no `*sql.DB` behind it guaranteed |
+| `fabrictest.Device.Store()` returning `*store.Store` | `store.Port` |
+| `(*store.Store).ThermostatPresets(key)` | `store.NewThermostatPresetStore(st, key)` over any `store.ThermostatPresets` (removed) |
+| a fabrictest device on a SQLite file | in memory by default; `fabrictest.Options{StoreOnDisk: true}` keeps the file |
+
 ## The controller side in v0.10.3
 
 Nothing was removed: the old spellings compile, since the new names are

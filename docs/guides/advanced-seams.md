@@ -110,15 +110,18 @@ persistence are the host assembler's to get right.
 
 ## `store`
 
-**Gives.** `*store.Store` (`Node.Store`): fabrics, credentials, ACL,
-groups, subscriptions, settings and the operational counters, over the
-schema `store.Apply` writes.
+**Gives.** The persistence port `store.Port` (`Node.Store`): fabrics,
+credentials, ACL, groups, subscriptions, settings and the operational
+counters, one interface per area. `*store.Store` implements it over the
+schema `store.Apply` writes, `store/memstore` in memory.
 
 **When.** A host that keeps its own values in the settings table (the
 reference daemon keeps a blind's position there), a host that hands the
-node a store it built on a shared handle (`Config.Store.Credentials`), or
-a host whose migration tool applies the schema itself (`store.Schema`).
-A store of the host's own design behind a port is milestone 4, phase 21.
+node a store it built on a shared handle or a backend of its own design
+(`Config.Store.Credentials`, any `store.Port`, proved by
+`store/storetest`), or a host whose migration tool applies the schema
+itself (`store.Schema`). The port and its contract are in
+[Persistence](persistence.md#the-persistence-port).
 
 A host that carries the schema in its own migrations follows the
 store's: since `v0.6.0` it gained `matter_thermostat_presets` (schema
