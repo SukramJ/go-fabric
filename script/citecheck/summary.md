@@ -5,7 +5,7 @@ Pin: `862ad75f4d3c7ab528b8a3954168146082cad8a6` (parity/schema.json matter.sourc
 | Metric | Count |
 |---|---|
 | Citations | 4859 |
-| Go files citing | 886 |
+| Go files citing | 888 |
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 976 |
 | Resolved: unique suffix | 144 |
 | Resolved: unique basename | 3739 |

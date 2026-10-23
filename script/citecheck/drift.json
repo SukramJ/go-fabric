@@ -1226,7 +1226,7 @@
   },
   {
     "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
-    "line": 767,
+    "line": 741,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "preCommit",
