@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/node"
+
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
 
@@ -58,7 +57,7 @@ func newTestImages() (*testImages, error) {
 	for i := range payload {
 		payload[i] = byte(i * 7)
 	}
-	image, err := otaimage.Create(otaimage.CreateOptions{
+	image, err := node.CreateOTAImage(node.OTAImageOptions{
 		VendorID: testVendorID, ProductID: testProductID,
 		SoftwareVersion: testProviderImageVersion, SoftwareVersionString: strconv.Itoa(testProviderImageVersion),
 		Payload: payload,
@@ -70,43 +69,43 @@ func newTestImages() (*testImages, error) {
 }
 
 var (
-	_ mattercore.OTAImageSource = (*testImages)(nil)
-	_ mattercore.OTAConsent     = (*testImages)(nil)
+	_ node.OTAImageSource = (*testImages)(nil)
+	_ node.OTAConsent     = (*testImages)(nil)
 )
 
-// QueryImage implements mattercore.OTAImageSource: the image for the CSA
+// QueryImage implements node.OTAImageSource: the image for the CSA
 // test vendor/product below its version, nothing for anything else.
-func (s *testImages) QueryImage(_ context.Context, _ mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
+func (s *testImages) QueryImage(_ context.Context, _ node.OTAPeer, req provdef.QueryImageRequest) (img node.OTAImage, ok bool, err error) {
 	if req.VendorId != testVendorID || req.ProductId != testProductID || req.SoftwareVersion >= testProviderImageVersion {
-		return mattercore.OTAImage{}, false, nil
+		return node.OTAImage{}, false, nil
 	}
 	s.mu.Lock()
 	withhold := s.withhold
 	s.mu.Unlock()
-	return mattercore.OTAImage{
-		FileDesignator:        bdx.FileDesignator(testProviderImageName),
+	return node.OTAImage{
+		FileDesignator:        node.OTAFileDesignator(testProviderImageName),
 		SoftwareVersion:       testProviderImageVersion,
 		SoftwareVersionString: strconv.Itoa(testProviderImageVersion),
 		ConsentRequired:       withhold,
 	}, true, nil
 }
 
-// Open implements mattercore.OTAImageSource.
-func (s *testImages) Open(_ context.Context, file string) (bdx.Blob, error) {
+// Open implements node.OTAImageSource.
+func (s *testImages) Open(_ context.Context, file string) (node.OTABlob, error) {
 	if file != testProviderImageName {
 		return nil, fs.ErrNotExist
 	}
 	return bytes.NewReader(s.image), nil
 }
 
-// RequestConsent implements mattercore.OTAConsent: denied while withheld.
-func (s *testImages) RequestConsent(context.Context, mattercore.OTAPeer, provdef.QueryImageRequest, mattercore.OTAImage) (mattercore.OTAConsentState, time.Duration, error) {
+// RequestConsent implements node.OTAConsent: denied while withheld.
+func (s *testImages) RequestConsent(context.Context, node.OTAPeer, provdef.QueryImageRequest, node.OTAImage) (node.OTAConsentState, time.Duration, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.withhold {
-		return mattercore.OTAConsentDenied, 0, nil
+		return node.OTAConsentDenied, 0, nil
 	}
-	return mattercore.OTAConsentGranted, 0, nil
+	return node.OTAConsentGranted, 0, nil
 }
 
 // pipeCommand applies OtaProviderConsent.

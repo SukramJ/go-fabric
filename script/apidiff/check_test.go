@@ -16,6 +16,7 @@ Incompatible changes:
 - ./examples/quickstart-controller.Thing: removed
 - ./script/apidiff.change: removed
 - ./node/old: removed
+- ./cluster/media.(*stateful[State]).State: changed from func() A to func() B
 `
 
 func TestParse(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/contentcontrol"
 	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
 	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
@@ -50,6 +51,7 @@ func init() {
 		logindef.ClusterID:    newAccountLoginServer,
 		woldef.ClusterID:      newWakeOnLanServer,
 		basicdef.ClusterID:    newApplicationBasicServer,
+		ccdef.ClusterID:       newContentControlServer,
 	} {
 		selfHeldDefaults[id] = f
 	}
@@ -201,4 +203,17 @@ func newApplicationBasicServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(err)
 	}
 	return srv, err
+}
+
+// newContentControlServer is the module's ContentControl server
+// ([media.NewContentControl]) on the declared ContentControl, its state
+// from the declaration's Initial.
+func newContentControlServer(b defaultBuild) (contract.ClusterServer, error) {
+	d, _ := b.ports.(ccdef.Declare)
+	if d.ContentControl == nil {
+		return nil, notServed(fmt.Errorf("contentcontrol: %w", errNoPort))
+	}
+	cfg := media.ContentControlConfig{Port: d.ContentControl, Features: ccdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	configFrom(&cfg.Initial, b.def, b.initial)
+	return media.NewContentControl(cfg)
 }

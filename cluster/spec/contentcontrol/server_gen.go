@@ -323,6 +323,76 @@ func (s *Server) EmitEnteringBlockContentTimeWindow(endpoint uint16, data Enteri
 	return spec.EmitOn(s.Underlying(), endpoint, EventEnteringBlockContentTimeWindow, data)
 }
 
+// ContentControlPIN is a ContentControl that takes UpdatePin and
+// ResetPin; PinManagement (PM) requires it.
+type ContentControlPIN interface {
+	UpdatePin(ctx context.Context, st *State, req UpdatePinRequest) error
+	ResetPin(ctx context.Context, st *State) (ResetPinResponse, error)
+}
+
+// ContentControlScreenTime is a ContentControl that takes AddBonusTime
+// and SetScreenDailyTime; ScreenTime (ST) requires it.
+type ContentControlScreenTime interface {
+	AddBonusTime(ctx context.Context, st *State, req AddBonusTimeRequest) error
+	SetScreenDailyTime(ctx context.Context, st *State, req SetScreenDailyTimeRequest) error
+}
+
+// ContentControlUnrated is a ContentControl that takes
+// BlockUnratedContent and UnblockUnratedContent; BlockUnrated (BU)
+// requires it.
+type ContentControlUnrated interface {
+	BlockUnratedContent(ctx context.Context, st *State) error
+	UnblockUnratedContent(ctx context.Context, st *State) error
+}
+
+// ContentControlOnDemandRating is a ContentControl that takes
+// SetOnDemandRatingThreshold; OnDemandContentRating (OCR) requires it.
+type ContentControlOnDemandRating interface {
+	SetOnDemandRatingThreshold(ctx context.Context, st *State, req SetOnDemandRatingThresholdRequest) error
+}
+
+// ContentControlScheduledRating is a ContentControl that takes
+// SetScheduledContentRatingThreshold; ScheduledContentRating (SCR)
+// requires it.
+type ContentControlScheduledRating interface {
+	SetScheduledContentRatingThreshold(ctx context.Context, st *State, req SetScheduledContentRatingThresholdRequest) error
+}
+
+// ContentControlChannels is a ContentControl that takes AddBlockChannels
+// and RemoveBlockChannels; BlockChannels (BC) requires it.
+type ContentControlChannels interface {
+	AddBlockChannels(ctx context.Context, st *State, req AddBlockChannelsRequest) error
+	RemoveBlockChannels(ctx context.Context, st *State, req RemoveBlockChannelsRequest) error
+}
+
+// ContentControlApps is a ContentControl that takes AddBlockApplications
+// and RemoveBlockApplications; BlockApplications (BA) requires it.
+type ContentControlApps interface {
+	AddBlockApplications(ctx context.Context, st *State, req AddBlockApplicationsRequest) error
+	RemoveBlockApplications(ctx context.Context, st *State, req RemoveBlockApplicationsRequest) error
+}
+
+// ContentControlTimeWindows is a ContentControl that takes
+// SetBlockContentTimeWindow and RemoveBlockContentTimeWindow;
+// BlockContentTimeWindow (BTW) requires it.
+type ContentControlTimeWindows interface {
+	SetBlockContentTimeWindow(ctx context.Context, st *State, req SetBlockContentTimeWindowRequest) error
+	RemoveBlockContentTimeWindow(ctx context.Context, st *State, req RemoveBlockContentTimeWindowRequest) error
+}
+
+// ContentControl carries out Enable and Disable, status only, on st,
+// the state the attributes report. Each feature's commands are a
+// further interface the port implements with the feature:
+// ContentControlPIN (PM), ContentControlScreenTime (ST),
+// ContentControlUnrated (BU), ContentControlOnDemandRating (OCR),
+// ContentControlScheduledRating (SCR), ContentControlChannels (BC),
+// ContentControlApps (BA), ContentControlTimeWindows (BTW)
+// (cluster/media).
+type ContentControl interface {
+	Enable(ctx context.Context, st *State) error
+	Disable(ctx context.Context, st *State) error
+}
+
 // Declare is the declaration of the ContentControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -392,6 +462,8 @@ type Declare struct {
 	// HandleRemoveBlockContentTimeWindow handles the RemoveBlockContentTimeWindow command in place of the server
 	// (Server.HandleRemoveBlockContentTimeWindow), inline; an optional command it handles is accepted.
 	HandleRemoveBlockContentTimeWindow func(ctx context.Context, req RemoveBlockContentTimeWindowRequest) (struct{}, error)
+	// ContentControl is the host port the kit's server runs on ([ContentControl]).
+	ContentControl ContentControl
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

@@ -13,34 +13,13 @@ import (
 )
 
 // ContentControlState is the ContentControl attribute state
-// (content-control.element.ts:35-74); each attribute is served with the
-// feature its conformance names. The lists of a selected feature have no
-// default: nil refuses construction ([ErrMissingState]).
-type ContentControlState struct {
-	// Enabled (M).
-	Enabled bool
-	// OnDemandRatings and OnDemandRatingThreshold: OnDemandContentRating
-	// (OCR).
-	OnDemandRatings         []ccdef.RatingNameStruct
-	OnDemandRatingThreshold string
-	// ScheduledContentRatings and ScheduledContentRatingThreshold:
-	// ScheduledContentRating (SCR).
-	ScheduledContentRatings         []ccdef.RatingNameStruct
-	ScheduledContentRatingThreshold string
-	// ScreenDailyTime and RemainingScreenTime: ScreenTime (ST).
-	ScreenDailyTime     uint32
-	RemainingScreenTime uint32
-	// BlockUnrated: BlockUnrated (BU).
-	BlockUnrated bool
-	// BlockChannelList: BlockChannels (BC).
-	BlockChannelList []ccdef.BlockChannelStruct
-	// BlockApplicationList: BlockApplications (BA).
-	BlockApplicationList []ccdef.AppInfoStruct
-	// BlockContentTimeWindow: BlockContentTimeWindow (BTW).
-	BlockContentTimeWindow []ccdef.TimeWindowStruct
-}
+// (content-control.element.ts:35-74), the generated State; each attribute
+// is served with the feature its conformance names. The lists of a
+// selected feature have no default: nil refuses construction
+// ([ErrMissingState]).
+type ContentControlState = ccdef.State
 
-func (st ContentControlState) values() map[uint32]any {
+func contentControlValues(st ContentControlState) map[uint32]any {
 	return map[uint32]any{
 		ccdef.AttrEnabled:                         st.Enabled,
 		ccdef.AttrOnDemandRatings:                 listOr(st.OnDemandRatings),
@@ -56,7 +35,7 @@ func (st ContentControlState) values() map[uint32]any {
 	}
 }
 
-func (st ContentControlState) clone() ContentControlState {
+func cloneContentControl(st ContentControlState) ContentControlState {
 	st.OnDemandRatings = slices.Clone(st.OnDemandRatings)
 	st.ScheduledContentRatings = slices.Clone(st.ScheduledContentRatings)
 	st.BlockChannelList = slices.Clone(st.BlockChannelList)
@@ -65,66 +44,35 @@ func (st ContentControlState) clone() ContentControlState {
 	return st
 }
 
-// ContentControl is the ContentControl host port: Enable and Disable
-// (:87-88), status only. Each feature's commands are a further interface,
-// required with the feature.
-type ContentControl interface {
-	Enable(ctx context.Context, st *ContentControlState) error
-	Disable(ctx context.Context, st *ContentControlState) error
-}
-
-// ContentControlPIN is UpdatePin and ResetPin (PinManagement, PM, :77-86).
-type ContentControlPIN interface {
-	UpdatePin(ctx context.Context, st *ContentControlState, req ccdef.UpdatePinRequest) error
-	ResetPin(ctx context.Context, st *ContentControlState) (ccdef.ResetPinResponse, error)
-}
-
-// ContentControlScreenTime is AddBonusTime and SetScreenDailyTime
-// (ScreenTime, ST, :89-101).
-type ContentControlScreenTime interface {
-	AddBonusTime(ctx context.Context, st *ContentControlState, req ccdef.AddBonusTimeRequest) error
-	SetScreenDailyTime(ctx context.Context, st *ContentControlState, req ccdef.SetScreenDailyTimeRequest) error
-}
-
-// ContentControlUnrated is BlockUnratedContent and UnblockUnratedContent
-// (BlockUnrated, BU, :103-107).
-type ContentControlUnrated interface {
-	BlockUnratedContent(ctx context.Context, st *ContentControlState) error
-	UnblockUnratedContent(ctx context.Context, st *ContentControlState) error
-}
-
-// ContentControlOnDemandRating is SetOnDemandRatingThreshold
-// (OnDemandContentRating, OCR, :109-115).
-type ContentControlOnDemandRating interface {
-	SetOnDemandRatingThreshold(ctx context.Context, st *ContentControlState, req ccdef.SetOnDemandRatingThresholdRequest) error
-}
-
-// ContentControlScheduledRating is SetScheduledContentRatingThreshold
-// (ScheduledContentRating, SCR, :117-123).
-type ContentControlScheduledRating interface {
-	SetScheduledContentRatingThreshold(ctx context.Context, st *ContentControlState, req ccdef.SetScheduledContentRatingThresholdRequest) error
-}
-
-// ContentControlChannels is AddBlockChannels and RemoveBlockChannels
-// (BlockChannels, BC, :125-142).
-type ContentControlChannels interface {
-	AddBlockChannels(ctx context.Context, st *ContentControlState, req ccdef.AddBlockChannelsRequest) error
-	RemoveBlockChannels(ctx context.Context, st *ContentControlState, req ccdef.RemoveBlockChannelsRequest) error
-}
-
-// ContentControlApps is AddBlockApplications and RemoveBlockApplications
-// (BlockApplications, BA, :144-164).
-type ContentControlApps interface {
-	AddBlockApplications(ctx context.Context, st *ContentControlState, req ccdef.AddBlockApplicationsRequest) error
-	RemoveBlockApplications(ctx context.Context, st *ContentControlState, req ccdef.RemoveBlockApplicationsRequest) error
-}
-
-// ContentControlTimeWindows is SetBlockContentTimeWindow and
-// RemoveBlockContentTimeWindow (BlockContentTimeWindow, BTW, :166-184).
-type ContentControlTimeWindows interface {
-	SetBlockContentTimeWindow(ctx context.Context, st *ContentControlState, req ccdef.SetBlockContentTimeWindowRequest) error
-	RemoveBlockContentTimeWindow(ctx context.Context, st *ContentControlState, req ccdef.RemoveBlockContentTimeWindowRequest) error
-}
+// The ContentControl host ports are the generated ones (contentcontroldef):
+// ContentControl carries out Enable and Disable (:87-88), status only, and
+// each feature's commands are a further interface, required with the
+// feature — PinManagement (PM, :77-86), ScreenTime (ST, :89-101),
+// BlockUnrated (BU, :103-107), OnDemandContentRating (OCR, :109-115),
+// ScheduledContentRating (SCR, :117-123), BlockChannels (BC, :125-142),
+// BlockApplications (BA, :144-164), BlockContentTimeWindow (BTW,
+// :166-184).
+type (
+	// ContentControl is Enable and Disable.
+	ContentControl = ccdef.ContentControl
+	// ContentControlPIN is UpdatePin and ResetPin (PM).
+	ContentControlPIN = ccdef.ContentControlPIN
+	// ContentControlScreenTime is AddBonusTime and SetScreenDailyTime (ST).
+	ContentControlScreenTime = ccdef.ContentControlScreenTime
+	// ContentControlUnrated is BlockUnratedContent and UnblockUnratedContent (BU).
+	ContentControlUnrated = ccdef.ContentControlUnrated
+	// ContentControlOnDemandRating is SetOnDemandRatingThreshold (OCR).
+	ContentControlOnDemandRating = ccdef.ContentControlOnDemandRating
+	// ContentControlScheduledRating is SetScheduledContentRatingThreshold (SCR).
+	ContentControlScheduledRating = ccdef.ContentControlScheduledRating
+	// ContentControlChannels is AddBlockChannels and RemoveBlockChannels (BC).
+	ContentControlChannels = ccdef.ContentControlChannels
+	// ContentControlApps is AddBlockApplications and RemoveBlockApplications (BA).
+	ContentControlApps = ccdef.ContentControlApps
+	// ContentControlTimeWindows is SetBlockContentTimeWindow and
+	// RemoveBlockContentTimeWindow (BTW).
+	ContentControlTimeWindows = ccdef.ContentControlTimeWindows
+)
 
 // ContentControlConfig carries the construction parameters of a
 // ContentControl server.
@@ -231,19 +179,13 @@ func NewContentControl(cfg ContentControlConfig) (*ContentControlServer, error) 
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, ContentControlState.values, ContentControlState.clone, readContentControl); err != nil {
+	if err := s.init(srv, cfg.Initial, contentControlValues, cloneContentControl, storeState[ContentControlState]); err != nil {
 		return nil, fmt.Errorf("media: ContentControl: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
 	}
 	return s, nil
-}
-
-// readContentControl is the ContentControlState the store holds: the
-// generated State, whose fields it has.
-func readContentControl(srv *spec.Server) ContentControlState {
-	return ContentControlState(spec.StateOf[ccdef.State](srv))
 }
 
 // SetAttributes implements [spec.AttributeSetter] ([stateful.setAttributes]).

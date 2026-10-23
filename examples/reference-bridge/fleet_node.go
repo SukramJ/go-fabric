@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"sync"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
@@ -56,7 +55,7 @@ func findByKey(devices []node.BridgedDevice, key device.StringKey) (uint16, bool
 // charger's PowerSource endpoint, the demo actions at the desk lamp's and
 // the fleet's endpoint lookup at the live topology. Attached after Start,
 // as the PartsList providers are.
-func attachNodeProviders(topology func() node.BridgeTopology, pscfg *mattercore.PowerSourceConfiguration, f *fleet) {
+func attachNodeProviders(topology func() node.BridgeTopology, pscfg *node.PowerSourceConfigurationServer, f *fleet) {
 	resolve := func(key device.StringKey) (uint16, bool) { return endpointByKey(topology(), key) }
 	f.endpointOf = resolve
 	actions := f.actions
@@ -86,7 +85,7 @@ const (
 	demoLightsOff      uint16 = 0x1002
 )
 
-// demoActions is the Aggregator's [mattercore.ActionsHost]: two scenes
+// demoActions is the Aggregator's [node.ActionsHost]: two scenes
 // over the living room, which holds the desk lamp. An instant action
 // leaves its action Inactive, so it raises no StateChanged.
 type demoActions struct {
@@ -96,7 +95,7 @@ type demoActions struct {
 	lamp func() (uint16, bool)
 }
 
-var _ mattercore.ActionsHost = (*demoActions)(nil)
+var _ node.ActionsHost = (*demoActions)(nil)
 
 func newDemoActions(light *demoLight) *demoActions { return &demoActions{light: light} }
 
@@ -106,7 +105,7 @@ func (a *demoActions) setLampEndpoint(fn func() (uint16, bool)) {
 	a.mu.Unlock()
 }
 
-// ActionList implements [mattercore.ActionsHost].
+// ActionList implements [node.ActionsHost].
 func (*demoActions) ActionList() []actionsdef.ActionStruct {
 	return []actionsdef.ActionStruct{
 		{
@@ -122,7 +121,7 @@ func (*demoActions) ActionList() []actionsdef.ActionStruct {
 	}
 }
 
-// EndpointLists implements [mattercore.ActionsHost]: the living room, with
+// EndpointLists implements [node.ActionsHost]: the living room, with
 // the desk lamp once the topology numbers it.
 func (a *demoActions) EndpointLists() []actionsdef.EndpointListStruct {
 	endpoints := []uint16{}
@@ -139,10 +138,10 @@ func (a *demoActions) EndpointLists() []actionsdef.EndpointListStruct {
 	}}
 }
 
-// HandleAction implements [mattercore.ActionsHost]. The server has
+// HandleAction implements [node.ActionsHost]. The server has
 // already refused an unknown action and a command the action does not
 // support, so only InstantAction on one of the two reaches here.
-func (a *demoActions) HandleAction(_ context.Context, req mattercore.ActionRequest) error {
+func (a *demoActions) HandleAction(_ context.Context, req node.ActionRequest) error {
 	on := req.ActionID == demoLightsOn
 	if a.light != nil {
 		a.light.setOn(on)
@@ -158,13 +157,13 @@ func (a *demoActions) HandleAction(_ context.Context, req mattercore.ActionReque
 // fabric reads the directory empty (filtered) or redacted (unfiltered).
 const demoEcosystemFabric uint8 = 1
 
-// demoEcosystem is a static [mattercore.EcosystemDirectory]: the air
+// demoEcosystem is a static [node.EcosystemDirectory]: the air
 // quality sensor as the ecosystem behind the bridge knows it, in one room.
 type demoEcosystem struct{ name string }
 
-var _ mattercore.EcosystemDirectory = demoEcosystem{}
+var _ node.EcosystemDirectory = demoEcosystem{}
 
-// EcosystemDevices implements [mattercore.EcosystemDirectory].
+// EcosystemDevices implements [node.EcosystemDirectory].
 func (e demoEcosystem) EcosystemDevices(context.Context) []ecodef.EcosystemDeviceStruct {
 	name := e.name
 	original := uint16(1)
@@ -181,7 +180,7 @@ func (e demoEcosystem) EcosystemDevices(context.Context) []ecodef.EcosystemDevic
 	}}
 }
 
-// EcosystemLocations implements [mattercore.EcosystemDirectory].
+// EcosystemLocations implements [node.EcosystemDirectory].
 func (demoEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLocationStruct {
 	return []ecodef.EcosystemLocationStruct{{
 		UniqueLocationId: "living-room",

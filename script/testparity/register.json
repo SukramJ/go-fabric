@@ -51,9 +51,24 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts",
-      "status": "planned",
-      "until": "M4",
-      "reason": "Feature selection of behaviors; its published-behaviors cases fix which features a matter.js server enables by default and that a selection violating FeatureMap conformance is refused on an endpoint, which the Go servers and device types must match. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "status": "partial",
+      "go": [
+        "device:TestClusterBehaviorFeaturesParityMatterJS"
+      ],
+      "missing": [
+        "selects exactly the named features",
+        "drops all features when invoked with no features",
+        "drops elements gated by a dropped feature",
+        "rejects a feature the cluster does not define",
+        "leaves feature selection alone for a namespace that designates no features",
+        "adopts the feature selection a namespace designates",
+        "caches per designated feature selection",
+        "alter retains feature selection",
+        "enable retains feature selection",
+        "retain features enabled as a matter.js implementation decision",
+        "enable only features matter.js implements unconditionally"
+      ],
+      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes.",
       "snapshotSha": "223fcd05a368c9a8fb7ebe3079ffa671276528da"
     },
     {
@@ -153,8 +168,8 @@
     {
       "path": "packages/node/test/behavior/internal/MarkChangedTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "markChanged reports a computed attribute and advances its data version; the Go servers' change notification must show the same reporting and data-version rules. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "markChanged of a computed attribute: the Go servers report a change through contract.ChangeNotifier and advance the DataVersion per write (BY-2), but a computed attribute with markChanged has no counterpart in the typed hull yet. Milestone 5 (gate 3, the hull's reporting rules).",
       "snapshotSha": "1fb1c1b8e88dee014ba4d22ce015172f6b81706e"
     },
     {
@@ -226,8 +241,8 @@
     {
       "path": "packages/node/test/behavior/state/managed/values/ValuePatcherTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Feature-dependent default fallbacks (omitted where a feature disallows a field, applied where it makes it mandatory, per feature set), which decide the defaults a Go server starts with. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Feature-dependent default fallbacks per feature set: the kit applies the device type's defaults and the declaration's Initial, not matter.js's ValuePatcher fallbacks per feature; a port needs the patcher's rules first. Milestone 5.",
       "snapshotSha": "8d16b9842415d25a12a7a5dbb46d7ab8b3db411b"
     },
     {
@@ -285,8 +300,8 @@
     {
       "path": "packages/node/test/behavior/state/validation/conformanceTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Field conformance of struct and command fields (outer resolution, element references, operational extension, revision conditions), checked through matter.js's validation table helpers. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Field conformance of struct and command fields through matter.js's validation tables: spec checks field conformance per field, but the tables' element-reference and revision cases need the validator's table form. Milestone 5 (the validator, P12's move of gate 2).",
       "snapshotSha": "6d5d6808f5881ec2dc21fc9ce2a86a816027c9d9"
     },
     {
@@ -604,8 +619,8 @@
     {
       "path": "packages/node/test/behaviors/access-control/AccessControlCustomExtensionTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "A manufacturer extension of AccessControl (a custom attribute and command) served, advertised and reached from a controller.",
+      "until": "M5",
+      "reason": "A manufacturer extension of AccessControl (a custom attribute and command): the root AccessControl server takes no extension elements; the subject is missing. Milestone 5.",
       "snapshotSha": "4ee3a54035ed20ee81b0e0687711943b476254c5"
     },
     {
@@ -1367,8 +1382,8 @@
     {
       "path": "packages/node/test/endpoint/EndpointNumberConflictTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Refusal of an endpoint that claims a live endpoint's number, endpoint 0 or a sibling's id, and the retry after a failed add, as the node's PartsList shows it. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "An endpoint claiming a live, root or sibling number: the assembler numbers endpoints itself and a host cannot claim one, so the refusals have no direct subject; the retry after a failed add is the Aggregator's, to port with the endpoint model. Milestone 5.",
       "snapshotSha": "cdf30f5cc5585c8ac49ee6a4f72e1fd52ba4bd61"
     },
     {
@@ -1492,8 +1507,8 @@
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "The node's protocol service: fabric-filtered reads and writes, subscribe/notify, implemented-command and feature-map publication, deprecated globals and command-field validation. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "The node's protocol service as one unit (fabric-filtered reads and writes, subscribe/notify, feature-map publication, deprecated globals, command-field validation): covered piecemeal by the bridge and im ports; the unit port waits for the protocol service's own seam. Milestone 5.",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
@@ -1564,15 +1579,15 @@
     {
       "path": "packages/node/test/endpoint/type/SemanticNamespaceTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "The semantic tag namespaces: standard tags, custom namespaces and their use on an endpoint. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Semantic tag namespaces as values (standard tags, custom namespaces): schema and device carry no namespace table and the device kit no TagList declaration; the subject is missing. Milestone 5.",
       "snapshotSha": "bf9c7994abef9eb3e7b6cd8775458ff982bdd910"
     },
     {
       "path": "packages/node/test/endpoint/validation/ConstructionValidationTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Device-type validation of a tree at construction: one pass per tree, strict refusal, singleton placement and crashed endpoints. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Device-type validation at construction (one pass per tree, strict refusal, singleton placement, crashed endpoints): endpoint.DeviceTypeValidation judges an assembled tree, the per-tree pass and the crash semantics need the validator's construction hook. Milestone 5 (P12's validator move).",
       "snapshotSha": "945b895c82bab2343b9c27d8ea03b9f8bc2b1b59"
     },
     {
@@ -1713,8 +1728,8 @@
     {
       "path": "packages/node/test/endpoint/validation/RuntimeValidationTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Device-type validation after construction: destroyed children, changed device-type lists, added parts, factory reset. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Device-type validation after construction (destroyed children, changed device-type lists, added parts, factory reset): the validator runs at assembly; its runtime triggers are milestone 5's (P12's validator move).",
       "snapshotSha": "7dceb4c71f56ffe843b5c70f4448f6c89ce701e8"
     },
     {
@@ -1741,8 +1756,8 @@
     {
       "path": "packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts",
       "status": "planned",
-      "until": "M4",
-      "reason": "Every standard device type judged as built, and the Closure TagList requirement. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "until": "M5",
+      "reason": "Every standard device type judged as built, with per-type state: the devicegen test builds every committed type, but judging each with matter.js's per-type state (door lock, fan, operational state, RVC modes) and the Closure TagList refusal needs the validator's corpus form. Milestone 5.",
       "snapshotSha": "bdfc8d3f028840052f223b3e3b1fb0f15f088d93"
     },
     {
@@ -1788,9 +1803,11 @@
     },
     {
       "path": "packages/node/test/endpoints/LargeBridgeTest.ts",
-      "status": "planned",
-      "until": "M4",
-      "reason": "Instantiating, reading and destroying a bridge with many bridged devices in bounded time. Validation, state and endpoint model: milestone 4 (concept v5 F.0 19.3).",
+      "status": "ported",
+      "go": [
+        "node:TestLargeBridgeParityMatterJS"
+      ],
+      "reason": "NODE_COUNT device-kit on/off lights under the node's Aggregator on a fabrictest site: the node starts and stops, and a commissioned controller reads every attribute of every endpoint in one wildcard read within the test's deadline (node/large_bridge_parity_matterjs_test.go).",
       "snapshotSha": "7ef34cc123970d48c24eeb14568a339bec5c977f"
     },
     {

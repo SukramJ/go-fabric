@@ -102,7 +102,11 @@ func (deviceOption) ClusterDeclaration() spec.ClusterDeclaration { return spec.C
 // settings is what the declarations of one New call collected.
 type settings struct {
 	// key is the device's StableKey ([defaultBuild] key).
-	key      string
+	key string
+	// self is the device's endpoint number once assembled
+	// ([Device.EndpointNumber]): a default PowerSource names it in its
+	// EndpointList.
+	self     func() (uint16, bool)
 	features map[uint32]uint32
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer

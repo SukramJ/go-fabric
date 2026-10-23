@@ -10,6 +10,24 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
+  - OTA: `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob`, the consent states `node.OTAConsentGranted`, `OTAConsentDenied`, `OTAConsentObtaining` and `OTAConsentUnknown`, and the image file format `node.CreateOTAImage`, `node.OTAImageOptions`, `node.ReadOTAImage` and `node.OTAImageHeader`.
+  - The ledger's software versions: `node.NewDCLClient`, `node.DCLProductionURL`, `node.DCLTestNetURL`, `node.DCLOTAVersions`, `node.DCLSoftwareVersion` and `node.VerifyOTAImage`.
+  - Aggregator Actions: `node.NewActions`, `node.Actions`, `node.ActionsConfig`, `node.ActionsHost` and `node.ActionRequest`.
+  - EcosystemInformation: `node.NewEcosystemInformation`, `node.EcosystemInformation` and `node.EcosystemDirectory`.
+  - The root servers a host drives after Start: `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer` and `node.PowerSourceConfigurationServer`.
+  - Each is an alias of the lower package's type, or a one-line function over it.
+- `device.FixedLabel(labels...)`: the FixedLabel cluster, which the Base device type allows on every endpoint, declared with its labels.
+- `contentcontroldef.Declare{ContentControl: port}` (BU-b Left out): ContentControl by declaration, on the generated port `contentcontroldef.ContentControl` and its feature interfaces, run by the kit's `cluster/media` server.
+
+### Changed
+
+- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
+- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
+- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
+
 ## [0.10.3] — 2026-10-23
 
 ### Added

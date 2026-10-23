@@ -47,10 +47,8 @@ import (
 	"strings"
 	"syscall"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -186,7 +184,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	}
 	// Actions on the Aggregator (Aggregator: optional), over the demo
 	// scenes (fleet_node.go).
-	actions, err := mattercore.NewActions(mattercore.ActionsConfig{Host: devices.actions})
+	actions, err := node.NewActions(node.ActionsConfig{Host: devices.actions})
 	if err != nil {
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
@@ -213,7 +211,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 			return err
 		} else if ledger != nil {
 			cfg.OTAProvider.ImageSource = &ledgerCheckedImages{
-				OTAImageSource: images, versions: &dcl.OTAVersions{Client: ledger, Logger: logger},
+				OTAImageSource: images, versions: &node.DCLOTAVersions{Client: ledger, Logger: logger},
 				image: func(string) []byte { return images.image }, logger: logger,
 			}
 		}
@@ -296,7 +294,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	devices.wifi.attach(n.Root().WiFiNetworkDiagnostics)
 	if applier != nil {
 		applier.basicInfo = n.Root().BasicInformation
-		applier.requestor = func() *mattercore.OTASoftwareUpdateRequestor { return n.Root().OTARequestor }
+		applier.requestor = func() *node.OTARequestorServer { return n.Root().OTARequestor }
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
 	devices.lock.auth = n.Store()
