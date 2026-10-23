@@ -3896,3 +3896,34 @@ that is running is the best evidence of the cause the port has; a host
 that moves the level on its own during a command is the same race
 BD-Matter-CommandOrigin-PerServerFlag names (brief BY-1).
 
+### BD-Matter-Controller-PairRejectsFailedAttestation — `controller.Pair` rejects a node whose attestation fails unless the host decides otherwise
+
+matter.js's commissioning flow takes an `onAttestationFailure` policy:
+`true` proceeds, `false` rejects, a function decides per finding, and
+**`undefined` — the default — is "backward-compatible accept with
+logging"** (`packages/protocol/src/certificate/DeviceAttestationValidator.ts:146`
+at `862ad75f`; wired through `ControllerCommissioner.ts:64`, `:668` and
+`CommissioningClient.ts:293`). The module's composition root
+`controller.New` makes `Config.Attestation` required and
+`controller.Pair`'s zero `OnAttestationFailure` rejects (`controller/controller.go:287`):
+a host that wants matter.js's lenient default sets the policy to proceed.
+Reasoning: a Go daemon has no interactive operator at pairing time who
+reads the warning; failing closed is the safer default for a product,
+and the host's one line restores matter.js's behaviour (phase 20d, brief
+BV-a).
+
+### BD-Matter-ScalarWrite-ExplicitWidth — a scalar written from the controller names its wire width
+
+matter.js encodes a written value by the attribute's model: `Write.ts:149-185`
+at `862ad75f` resolves `TlvOfModel(attribute)` and calls
+`encodeTlv(value, { forWriteInteraction: true })`, so the caller passes
+a JavaScript number and the schema picks the TLV width. The module's
+`spec.Value[T]` (`cluster/spec/value.go`) is an `Encodable` whose Go type
+names the width (`spec.Uint8(20)`, `spec.Int16(2250)`, `spec.Null[uint16]()`),
+because `fabrictest.Write` and `client.Node.Write` take an `Encodable`,
+not a model lookup, and Go has no untyped number at run time. The typed
+read side (`<cluster>def.StateFrom`) carries the model. Reasoning: an
+explicit width is what the generated request types already do for
+commands; a controller-side model lookup per write is BV-b's typed write
+if a consumer asks for it (brief BV-a).
+

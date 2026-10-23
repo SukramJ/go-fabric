@@ -387,9 +387,11 @@ same pull request.
   ```
 - **No cgo.** The module builds with `CGO_ENABLED=0`; only the race-enabled
   test run turns it on.
-- Five direct dependencies. A sixth is a decision, not a convenience: MIT /
-  Apache-2.0 / BSD only, and it updates `THIRD-PARTY-NOTICES.md` (plus
-  `licenses/` when the licence text must travel).
+- Six direct dependencies and one tool (`golang.org/x/exp/cmd/apidiff`,
+  the API-break guard, concept v6 decision 0.2). Every further dependency
+  is a decision, not a convenience: MIT / Apache-2.0 / BSD only, and it
+  updates `THIRD-PARTY-NOTICES.md` (plus `licenses/` when the licence text
+  must travel); `go mod tidy -diff` in `make lint` keeps the list honest.
 - User-visible changes get a `CHANGELOG.md` entry under `[Unreleased]`. A
   break that appears only in a commit message has not been announced — see
   `README.md` §"How a consumer learns about a break".
