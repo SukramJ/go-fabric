@@ -13,12 +13,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/node"
+
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
-// otaApplier is the daemon's [mattercore.OtaApplier].
+// otaApplier is the daemon's [node.OTAApplier].
 //
 // A product applies an image by installing it and restarting into it; the
 // requestor then reports the update at the next start (matter.js
@@ -39,16 +39,16 @@ import (
 // SoftwareVersion alone.
 type otaApplier struct {
 	vendorID, productID uint16
-	basicInfo           *mattercore.BasicInformation
+	basicInfo           *node.BasicInformationServer
 	dir                 string
 	harness             bool
-	requestor           func() *mattercore.OTASoftwareUpdateRequestor
+	requestor           func() *node.OTARequestorServer
 	logger              *slog.Logger
 }
 
-var _ mattercore.OtaApplier = (*otaApplier)(nil)
+var _ node.OTAApplier = (*otaApplier)(nil)
 
-// RequestUserConsent implements [mattercore.OtaApplier]. The daemon has no
+// RequestUserConsent implements [node.OTAApplier]. The daemon has no
 // user to ask; it declares CanConsent only in harness mode, where it
 // consents as the matter.js cert requestor does
 // (OtaRequestorTestInstance.ts:166-168).
@@ -56,7 +56,7 @@ func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, 
 	return a.harness, nil
 }
 
-// ApplyUpdate implements [mattercore.OtaApplier]: the image's payload digest
+// ApplyUpdate implements [node.OTAApplier]: the image's payload digest
 // and total size hold, its version is the one the provider offered, it
 // carries a payload, and its vendor and product are this node's (a zero
 // field applies to every vendor or product, OtaImageHeader.ts:26-41) —
@@ -120,20 +120,20 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 	}
 }
 
-func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error) {
+func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, error) {
 	f, err := os.Open(filepath.Clean(file)) //nolint:gosec // the requestor names its own download location
 	if err != nil {
-		return otaimage.Header{}, err
+		return node.OTAImageHeader{}, err
 	}
 	defer func() { _ = f.Close() }()
 	fi, err := f.Stat()
 	if err != nil {
-		return otaimage.Header{}, err
+		return node.OTAImageHeader{}, err
 	}
 	size := uint64(fi.Size()) //nolint:gosec // a file size is not negative
-	h, err := otaimage.ExtractPayload(f, io.Discard, &size)
+	h, err := node.ReadOTAImage(f, io.Discard, &size)
 	if err != nil {
-		return otaimage.Header{}, err
+		return node.OTAImageHeader{}, err
 	}
 	switch {
 	case h.SoftwareVersion != version:

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
@@ -105,13 +104,13 @@ func newDemoLight(name string) *demoLight { return &demoLight{name: name} }
 // and that app serves FixedLabel there. Base allows the cluster on any
 // endpoint.
 func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
-	fixedLabel, err := mattercore.NewFixedLabel([]fixedlabeldef.LabelStruct{{Label: "room", Value: "demo"}})
+	fixedLabel, err := device.FixedLabel(fixedlabeldef.LabelStruct{Label: "room", Value: "demo"})
 	if err != nil {
 		return nil, fmt.Errorf("light FixedLabel: %w", err)
 	}
 	dev, err := device.NewOnOffLight(opts,
 		onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}},
-		fixedlabeldef.Declare{HostServer: fixedLabel})
+		fixedLabel)
 	if err != nil {
 		return nil, err
 	}

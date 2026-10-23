@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/node"
+
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/controller/dcl"
 )
 
 // --dcl prod|testnet|off (default off) lets the daemon ask the CSA
@@ -34,14 +34,14 @@ import (
 // names the daemon shows are embedded (eligibility/vendor_name.go).
 
 // dclClient is the ledger --dcl names, nil for off.
-func dclClient(mode string) (*dcl.Client, error) {
+func dclClient(mode string) (*node.DCLClient, error) {
 	switch mode {
 	case "", "off":
 		return nil, nil
 	case "prod":
-		return dcl.NewClient(dcl.ProductionURL), nil
+		return node.NewDCLClient(node.DCLProductionURL), nil
 	case "testnet":
-		return dcl.NewClient(dcl.TestNetURL), nil
+		return node.NewDCLClient(node.DCLTestNetURL), nil
 	}
 	return nil, fmt.Errorf("--dcl %q, want prod, testnet or off", mode)
 }
@@ -49,17 +49,17 @@ func dclClient(mode string) (*dcl.Client, error) {
 // ledgerCheckedImages is an OTA image source whose offers are looked up in
 // the ledger and logged.
 type ledgerCheckedImages struct {
-	mattercore.OTAImageSource
-	versions *dcl.OTAVersions
+	node.OTAImageSource
+	versions *node.DCLOTAVersions
 	// image is the bytes of the offered image, checked against the
 	// ledger's checksum.
 	image  func(file string) []byte
 	logger *slog.Logger
 }
 
-// QueryImage implements mattercore.OTAImageSource: the inner source's
+// QueryImage implements node.OTAImageSource: the inner source's
 // answer, its version looked up in the ledger.
-func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
+func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer node.OTAPeer, req provdef.QueryImageRequest) (node.OTAImage, bool, error) {
 	img, ok, err := s.OTAImageSource.QueryImage(ctx, peer, req)
 	if err != nil || !ok {
 		return img, ok, err
@@ -74,7 +74,7 @@ func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer mattercore.OT
 	case v.OTAChecksum == "":
 		s.logger.Info("dcl.ota.in_ledger", append(attrs, slog.Bool("checksum", false))...)
 	default:
-		if _, verr := dcl.VerifyImage(bytes.NewReader(s.image(string(img.FileDesignator))), v, s.logger); verr != nil {
+		if _, verr := node.VerifyOTAImage(bytes.NewReader(s.image(string(img.FileDesignator))), v, s.logger); verr != nil {
 			s.logger.Warn("dcl.ota.ledger_mismatch", append(attrs, slog.String("err", verr.Error()))...)
 		} else {
 			s.logger.Info("dcl.ota.in_ledger", append(attrs, slog.Bool("checksum", true))...)

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/node"
 )
@@ -28,7 +27,7 @@ import (
 //
 // A real Wi-Fi host reads the values from the kernel instead — nl80211, or
 // `iw dev <if> link` and `iw dev <if> station dump` — behind its own
-// mattercore.WiFiReporter; NetworkCommissioning stays Ethernet-only either
+// node.WiFiReporter; NetworkCommissioning stays Ethernet-only either
 // way (concept v2 §B.4).
 
 // CHIP's Wi-Fi diagnostics test event triggers
@@ -54,7 +53,7 @@ const (
 // first octet set), so it names no real access point.
 var demoWiFiBSSID = []byte{0x02, 0x00, 0x5E, 0x10, 0x20, 0x01}
 
-// demoWiFi is the simulated link: a mattercore.WiFiReporter with fixed
+// demoWiFi is the simulated link: a node.WiFiReporter with fixed
 // association values and counters, and the server it feeds once mounted.
 type demoWiFi struct {
 	mu                       sync.Mutex
@@ -63,10 +62,10 @@ type demoWiFi struct {
 	unicastRx, unicastTx     uint32
 	overrun                  uint64
 	resets                   int
-	srv                      *mattercore.WiFiNetworkDiagnostics
+	srv                      *node.WiFiNetworkDiagnosticsServer
 }
 
-var _ mattercore.WiFiReporter = (*demoWiFi)(nil)
+var _ node.WiFiReporter = (*demoWiFi)(nil)
 
 func newDemoWiFi() *demoWiFi {
 	w := &demoWiFi{}
@@ -93,7 +92,7 @@ func (w *demoWiFi) nodeConfig() node.WiFi {
 }
 
 // attach hands the link the server the node mounted (nil without --wifi).
-func (w *demoWiFi) attach(srv *mattercore.WiFiNetworkDiagnostics) {
+func (w *demoWiFi) attach(srv *node.WiFiNetworkDiagnosticsServer) {
 	w.mu.Lock()
 	w.srv = srv
 	w.mu.Unlock()
@@ -105,54 +104,54 @@ func (w *demoWiFi) count32(p *uint32) (uint32, bool) {
 	return *p, true
 }
 
-// BSSID implements mattercore.WiFiReporter.
+// BSSID implements node.WiFiReporter.
 func (*demoWiFi) BSSID() ([]byte, bool) { return demoWiFiBSSID, true }
 
-// SecurityType implements mattercore.WiFiReporter: WPA2.
+// SecurityType implements node.WiFiReporter: WPA2.
 func (*demoWiFi) SecurityType() (wifidiagdef.SecurityTypeEnum, bool) {
 	return wifidiagdef.SecurityTypeWpa2, true
 }
 
-// WiFiVersion implements mattercore.WiFiReporter: 802.11ax.
+// WiFiVersion implements node.WiFiReporter: 802.11ax.
 func (*demoWiFi) WiFiVersion() (wifidiagdef.WiFiVersionEnum, bool) {
 	return wifidiagdef.WiFiVersionAx, true
 }
 
-// ChannelNumber implements mattercore.WiFiReporter: channel 36 (5 GHz).
+// ChannelNumber implements node.WiFiReporter: channel 36 (5 GHz).
 func (*demoWiFi) ChannelNumber() (uint16, bool) { return 36, true }
 
-// RSSI implements mattercore.WiFiReporter.
+// RSSI implements node.WiFiReporter.
 func (*demoWiFi) RSSI() (int8, bool) { return -52, true }
 
-// CurrentMaxRate implements mattercore.WiFiReporter: 2x2 HE80, in bit/s.
+// CurrentMaxRate implements node.WiFiReporter: 2x2 HE80, in bit/s.
 func (*demoWiFi) CurrentMaxRate() (uint64, bool) { return 1_201_000_000, true }
 
-// BeaconLostCount implements mattercore.WiFiReporter.
+// BeaconLostCount implements node.WiFiReporter.
 func (w *demoWiFi) BeaconLostCount() (uint32, bool) { return w.count32(&w.beaconLost) }
 
-// BeaconRxCount implements mattercore.WiFiReporter.
+// BeaconRxCount implements node.WiFiReporter.
 func (w *demoWiFi) BeaconRxCount() (uint32, bool) { return w.count32(&w.beaconRx) }
 
-// PacketMulticastRxCount implements mattercore.WiFiReporter.
+// PacketMulticastRxCount implements node.WiFiReporter.
 func (w *demoWiFi) PacketMulticastRxCount() (uint32, bool) { return w.count32(&w.multicastRx) }
 
-// PacketMulticastTxCount implements mattercore.WiFiReporter.
+// PacketMulticastTxCount implements node.WiFiReporter.
 func (w *demoWiFi) PacketMulticastTxCount() (uint32, bool) { return w.count32(&w.multicastTx) }
 
-// PacketUnicastRxCount implements mattercore.WiFiReporter.
+// PacketUnicastRxCount implements node.WiFiReporter.
 func (w *demoWiFi) PacketUnicastRxCount() (uint32, bool) { return w.count32(&w.unicastRx) }
 
-// PacketUnicastTxCount implements mattercore.WiFiReporter.
+// PacketUnicastTxCount implements node.WiFiReporter.
 func (w *demoWiFi) PacketUnicastTxCount() (uint32, bool) { return w.count32(&w.unicastTx) }
 
-// OverrunCount implements mattercore.WiFiReporter.
+// OverrunCount implements node.WiFiReporter.
 func (w *demoWiFi) OverrunCount() (uint64, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.overrun, true
 }
 
-// ResetCounts implements mattercore.WiFiReporter: every counter to zero.
+// ResetCounts implements node.WiFiReporter: every counter to zero.
 func (w *demoWiFi) ResetCounts() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -179,7 +178,7 @@ func (w *demoWiFi) step() {
 // errNoWiFi: a Wi-Fi command for a daemon started without --wifi.
 var errNoWiFi = errors.New("WiFiNetworkDiagnostics is not mounted (start the daemon with --wifi)")
 
-func (w *demoWiFi) server() (*mattercore.WiFiNetworkDiagnostics, error) {
+func (w *demoWiFi) server() (*node.WiFiNetworkDiagnosticsServer, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.srv == nil {

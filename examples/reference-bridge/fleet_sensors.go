@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/node"
+
 	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
 	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
@@ -461,7 +462,7 @@ func (a *demoAirQualitySensor) declarations() []device.Option {
 			MeasuredValue: v(radonBQM3), MinMeasuredValue: lo, MaxMeasuredValue: hi,
 			MeasurementUnit: new(radondef.MeasurementUnitBqm3), MeasurementMedium: new(radondef.MeasurementMediumAir),
 		}},
-		ecodef.Declare{HostServer: mattercore.NewEcosystemInformation(demoEcosystem{name: a.name})},
+		ecodef.Declare{HostServer: node.NewEcosystemInformation(demoEcosystem{name: a.name})},
 	}
 }
 
