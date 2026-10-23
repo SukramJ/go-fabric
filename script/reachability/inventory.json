@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6303,
+  "entry_points": 6304,
   "entry_packages": [
     ".",
     "bdx",
@@ -233,19 +233,13 @@
   ],
   "summary": {
     "total_exported": 14558,
-    "reachable": 10127,
+    "reachable": 10128,
     "whitelisted": 4426,
-    "unreachable": 5
+    "unreachable": 4
   },
   "by_package": [
     {
       "package": "endpoint",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "node",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 0
@@ -275,13 +269,6 @@
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
       "line": 132,
-      "kind": "func"
-    },
-    {
-      "package": "node",
-      "identifier": "NewActions",
-      "file": "node/routes.go",
-      "line": 111,
       "kind": "func"
     },
     {
