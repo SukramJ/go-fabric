@@ -768,7 +768,7 @@ func (s *Store) SaveDoorLockAuth(_ context.Context, endpointKey string, auth sto
 		return cmp.Compare(x.HolidayIndex, y.HolidayIndex)
 	})
 	if err := lockDuplicates(a); err != nil {
-		return fmt.Errorf("memstore: save door lock: %w", err)
+		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -782,29 +782,29 @@ func (s *Store) SaveDoorLockAuth(_ context.Context, endpointKey string, auth sto
 func lockDuplicates(a store.DoorLockAuth) error {
 	for i := 1; i < len(a.Users); i++ {
 		if a.Users[i].UserIndex == a.Users[i-1].UserIndex {
-			return fmt.Errorf("user %d twice", a.Users[i].UserIndex)
+			return fmt.Errorf("memstore: save door lock: user %d twice", a.Users[i].UserIndex)
 		}
 	}
 	for i := 1; i < len(a.Credentials); i++ {
 		if a.Credentials[i].Type == a.Credentials[i-1].Type && a.Credentials[i].Index == a.Credentials[i-1].Index {
-			return fmt.Errorf("credential %d/%d twice", a.Credentials[i].Type, a.Credentials[i].Index)
+			return fmt.Errorf("memstore: save door lock: credential %d/%d twice", a.Credentials[i].Type, a.Credentials[i].Index)
 		}
 	}
 	for i := 1; i < len(a.WeekDaySchedules); i++ {
 		x, y := a.WeekDaySchedules[i], a.WeekDaySchedules[i-1]
 		if x.UserIndex == y.UserIndex && x.WeekDayIndex == y.WeekDayIndex {
-			return fmt.Errorf("week day schedule %d of user %d twice", x.WeekDayIndex, x.UserIndex)
+			return fmt.Errorf("memstore: save door lock: week day schedule %d of user %d twice", x.WeekDayIndex, x.UserIndex)
 		}
 	}
 	for i := 1; i < len(a.YearDaySchedules); i++ {
 		x, y := a.YearDaySchedules[i], a.YearDaySchedules[i-1]
 		if x.UserIndex == y.UserIndex && x.YearDayIndex == y.YearDayIndex {
-			return fmt.Errorf("year day schedule %d of user %d twice", x.YearDayIndex, x.UserIndex)
+			return fmt.Errorf("memstore: save door lock: year day schedule %d of user %d twice", x.YearDayIndex, x.UserIndex)
 		}
 	}
 	for i := 1; i < len(a.HolidaySchedules); i++ {
 		if a.HolidaySchedules[i].HolidayIndex == a.HolidaySchedules[i-1].HolidayIndex {
-			return fmt.Errorf("holiday schedule %d twice", a.HolidaySchedules[i].HolidayIndex)
+			return fmt.Errorf("memstore: save door lock: holiday schedule %d twice", a.HolidaySchedules[i].HolidayIndex)
 		}
 	}
 	return nil
