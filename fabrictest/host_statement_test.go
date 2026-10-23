@@ -99,7 +99,7 @@ func TestHostStatementName(t *testing.T) {
 // is the facade's composition.
 func TestNodeLabelCap(t *testing.T) {
 	t.Parallel()
-	max := int(bridgedinfodef.Definition.Attribute(bridgedinfodef.AttrNodeLabel).Constraint.Max.Int)
+	limit := int(bridgedinfodef.Definition.Attribute(bridgedinfodef.AttrNodeLabel).Constraint.Max.Int)
 	long := strings.Repeat("ä", 20) // 40 bytes
 	plug, err := device.NewOnOffPlugInUnit(device.Options{StableKey: device.StringKey("plug"), Name: long})
 	if err != nil {
@@ -107,8 +107,8 @@ func TestNodeLabelCap(t *testing.T) {
 	}
 	check := func(what, got string) {
 		t.Helper()
-		if len(got) > max || !utf8.ValidString(got) || !strings.HasPrefix(long, got) {
-			t.Errorf("%s: %q (%d bytes), want a valid prefix of at most %d bytes", what, got, len(got), max)
+		if len(got) > limit || !utf8.ValidString(got) || !strings.HasPrefix(long, got) {
+			t.Errorf("%s: %q (%d bytes), want a valid prefix of at most %d bytes", what, got, len(got), limit)
 		}
 	}
 	check("New", plug.Spec().FriendlyName)
@@ -119,7 +119,7 @@ func TestNodeLabelCap(t *testing.T) {
 	if got := device.ComposeNodeLabel("Lamp", "ch 2"); got != "Lamp (ch 2)" {
 		t.Errorf("ComposeNodeLabel %q", got)
 	}
-	if got := device.ComposeNodeLabel(strings.Repeat("a", 30), "suffix"); len(got) != max {
+	if got := device.ComposeNodeLabel(strings.Repeat("a", 30), "suffix"); len(got) != limit {
 		t.Errorf("ComposeNodeLabel over the cap: %q", got)
 	}
 }
