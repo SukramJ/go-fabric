@@ -106,7 +106,7 @@ type settings struct {
 	// self is the device's endpoint number once assembled
 	// ([Device.EndpointNumber]): a default PowerSource names it in its
 	// EndpointList.
-	self func() (uint16, bool)
+	self     func() (uint16, bool)
 	features map[uint32]uint32
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer
