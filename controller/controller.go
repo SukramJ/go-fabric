@@ -169,19 +169,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
 		return nil, err
 	}
-	l, err := udp.New(udp.Config{LocalAddr: listen})
-	if err != nil {
-		return nil, err
-	}
-	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log}); err != nil {
-		_ = l.Close()
-		return nil, err
-	}
-	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	served := make(chan struct{})
-	go func() { defer close(served); _ = l.Serve(serveCtx, c.mgr.HandleDatagram) }()
-	c.stop = func() { cancel(); <-served }
-	if c.names, err = openNames(log); err != nil {
+	if err := c.openNetwork(ctx, listen, openNames); err != nil {
 		return nil, err
 	}
 	resumption := &peer.MemoryResumptionStore{}
@@ -214,6 +202,28 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		}
 	}
 	return c, nil
+}
+
+// openNetwork opens the socket, the exchanges over it and DNS-SD: the
+// steps of [New] between the fabric and the peers.
+func (c *Controller) openNetwork(ctx context.Context, listen string, openNames func(*slog.Logger) (*discovery.Names, error)) error {
+	log := c.log
+	l, err := udp.New(udp.Config{LocalAddr: listen})
+	if err != nil {
+		return err
+	}
+	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log}); err != nil {
+		_ = l.Close()
+		return err
+	}
+	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	served := make(chan struct{})
+	go func() { defer close(served); _ = l.Serve(serveCtx, c.mgr.HandleDatagram) }()
+	c.stop = func() { cancel(); <-served }
+	if c.names, err = openNames(log); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Close tears the stack down in the reverse order of [New]: the

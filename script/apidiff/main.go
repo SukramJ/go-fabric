@@ -22,6 +22,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -117,11 +118,11 @@ func run(check bool, base string) error {
 
 // extract writes the tree of rev into dir: git archive, unpacked by tar.
 func extract(rev, dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
-	archive := exec.Command("git", "archive", "--format=tar", rev)
-	untar := exec.Command("tar", "-x", "-C", dir)
+	archive := exec.CommandContext(context.Background(), "git", "archive", "--format=tar", rev) //nolint:gosec // rev is the tag the guard resolved itself
+	untar := exec.CommandContext(context.Background(), "tar", "-x", "-C", dir)                  //nolint:gosec // dir is the guard's own temporary directory
 	pipe, err := archive.StdoutPipe()
 	if err != nil {
 		return err
@@ -142,7 +143,7 @@ func extract(rev, dir string) error {
 }
 
 func output(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // the guard runs git, go and the apidiff it built, with arguments it builds
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -153,7 +154,7 @@ func output(name string, args ...string) (string, error) {
 }
 
 func runIn(dir, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // as output
 	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

@@ -126,24 +126,24 @@ type (
 )
 
 // AttributeAt is the path of one attribute of a cluster of an endpoint.
-func AttributeAt(endpoint uint16, cluster, attribute uint32) AttributePath {
-	return AttributePath{Endpoint: endpoint, Cluster: cluster, Attribute: attribute, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+func AttributeAt(ep uint16, cluster, attribute uint32) AttributePath {
+	return AttributePath{Endpoint: ep, Cluster: cluster, Attribute: attribute, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 }
 
 // ClusterAt is the path of every attribute of a cluster of an endpoint —
 // the read a generated <cluster>def.StateFrom takes.
-func ClusterAt(endpoint uint16, cluster uint32) AttributePath {
-	return AttributePath{Endpoint: endpoint, Cluster: cluster, HasEndpoint: true, HasCluster: true}
+func ClusterAt(ep uint16, cluster uint32) AttributePath {
+	return AttributePath{Endpoint: ep, Cluster: cluster, HasEndpoint: true, HasCluster: true}
 }
 
 // CommandAt is the path of a command of a cluster of an endpoint.
-func CommandAt(endpoint uint16, cluster, command uint32) CommandPath {
-	return CommandPath{Endpoint: endpoint, Cluster: cluster, Command: command, HasEndpoint: true, HasCluster: true, HasCommand: true}
+func CommandAt(ep uint16, cluster, command uint32) CommandPath {
+	return CommandPath{Endpoint: ep, Cluster: cluster, Command: command, HasEndpoint: true, HasCluster: true, HasCommand: true}
 }
 
 // EventAt is the path of an event of a cluster of an endpoint.
-func EventAt(endpoint uint16, cluster, event uint32) EventPath {
-	return EventPath{Endpoint: endpoint, Cluster: cluster, Event: event, HasEndpoint: true, HasCluster: true, HasEvent: true}
+func EventAt(ep uint16, cluster, event uint32) EventPath {
+	return EventPath{Endpoint: ep, Cluster: cluster, Event: event, HasEndpoint: true, HasCluster: true, HasEvent: true}
 }
 
 // Interval is d as the pointer a [SubscribeRequest]'s interval bounds take.
