@@ -56,7 +56,7 @@ import; a host that uses none of them changes nothing.
 | `light.SaturationPercentToAttr`, `AttrToSaturationPercent`, `CropMireds` | the same names in `colorcontroldef`; `light.HueDegreesToAttr` and `AttrToHueDegrees` stay |
 | `modeselect.LabelMaxBytes`, `SemanticTagsMaxEntries`, `SupportedModesMaxEntries` | the same names in `modeselectdef` (`cluster/spec/modeselect`); `modeselect.DescriptionMaxBytes` stays |
 | `levelcontrol.NativeRamp`, `NativeMover`, `NativeSwitcher` | `levelcontroldef.NativeRamp`, `NativeMover`, `NativeSwitcher`; `levelcontrol.NewNativeSource` stays for the seam route and takes a `levelcontroldef.NativeRamp` |
-| `levelcontrol.NewNativeSource(ramp, onOff, NativeConfig{…})` on a device the kit builds | `levelcontroldef.Declare{Ramp: ramp}`: the kit builds the source, couples it to the device's OnOff server (no `levelcontrol.OnOff` to implement), takes Options and OnLevel from `Initial`, MinLevel from the Lighting feature, and `NativeConfig.Persist` from the ramp's optional `levelcontroldef.NativePersister` (`PersistLevel(ctx, options, onLevel)`). `Ramp` beside `LevelSource` is `device.ErrConfiguration` |
+| `levelcontrol.NewNativeSource(ramp, onOff, NativeConfig{…})` on a device the kit builds | `levelcontroldef.Declare{Ramp: ramp}`: the kit builds the source, couples it under the OO feature to the device's OnOff server (no `levelcontrol.OnOff` to implement), takes Options and OnLevel from `Initial`, MinLevel from the Lighting feature, and `NativeConfig.Persist` from the ramp's optional `levelcontroldef.NativePersister` (`PersistLevel(ctx, options, onLevel)`). `Ramp` beside `LevelSource` or `Transitions` is `device.ErrConfiguration` |
 
 ### A fleet from several sources
 

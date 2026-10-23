@@ -89,6 +89,7 @@ with Adds (race).
 | `make testparity-check` | `820963b7` | green; three register paths moved to `cluster/spec/colorcontrol` |
 | `go test ./script/...` | `820963b7` | green |
 | `mkdocs build --strict` | `820963b7` | green |
+| review fixes: `make ci`, `go test -race ./device/... ./node/... ./cluster/levelcontrol/...`, `make cite-check` | `31f713b9` / `f44d691c` (the commit amended with the regenerated citation report only) | green |
 
 ## Differences from the brief
 
@@ -125,13 +126,19 @@ with Adds (race).
 
 ## Decisions
 
-- The sibling OnOff couples to the native source whenever the device has
-  an OnOff server (not only under OO): the revised brief's "no sibling →
-  nil", and the ExecuteIfOff gate reads `agent.has(OnOffServer)`
-  (`LevelControlServer.ts:733`).
-- A `Ramp` with `Transitions` is not refused; it takes the existing
-  `LevelSource` path (the engine then forwards each step as an immediate
-  ramp, as `NewNativeSource` documents).
+- Review fix: the native source couples to the sibling OnOff only under
+  the OO feature, nil otherwise, as the Transitions path does. matter.js
+  gates both the coupling and the ExecuteIfOff gate on
+  `this.features.onOff && this.agent.has(OnOffServer)`
+  (`LevelControlServer.ts:558`, `:728-736`). The first version coupled
+  whenever an OnOff server existed and cited :733 for it; corrected, with
+  `TestDeclaredRampWithoutOnOffFeature` (a Speaker without OO: MoveToLevel
+  passes with OnOff off, MoveToLevelWithOnOff leaves OnOff off).
+  `TestDeclaredRampVolume` selects OO explicitly now.
+- Owner decision: `Ramp` beside `Transitions: true` is refused
+  (`"%w: levelcontrol: Ramp and Transitions are exclusive"`,
+  `ErrConfiguration`; `TestDeclaredRampBesideTransitions`; the generated
+  field doc says so).
 - `Batch` returns a single error unwrapped (not `errors.Join` of one), so
   `Add`'s error stays the value it was.
 
@@ -141,7 +148,8 @@ Nothing of the brief.
 
 ## Questions
 
-- `Ramp` beside `Transitions: true` — refuse it as well?
+None open. Both earlier questions are decided: Ramp + Transitions is
+refused (owner), and the coupling follows OO (review fix above).
 
 ## `by_design` candidates
 

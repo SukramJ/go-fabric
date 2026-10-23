@@ -242,6 +242,9 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.Ramp != nil && d.LevelSource != nil {
 		return nil, fmt.Errorf("%w: levelcontrol: Ramp and LevelSource are exclusive", ErrConfiguration)
 	}
+	if d.Ramp != nil && d.Transitions {
+		return nil, fmt.Errorf("%w: levelcontrol: Ramp and Transitions are exclusive", ErrConfiguration)
+	}
 	if d.Ramp != nil {
 		d.LevelSource = nativeSource(b, d.Ramp)
 	}

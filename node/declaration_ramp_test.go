@@ -162,7 +162,7 @@ func TestDeclaredRampVolume(t *testing.T) {
 	ramp := &moverSwitcher{base}
 	speaker, err := device.NewSpeaker(device.Options{StableKey: endpoint.StringKey("ramp-speaker"), Name: "Kitchen speaker"},
 		onoffdef.Declare{Initial: onoffdef.Patch{OnOff: new(false)}},
-		levelcontroldef.Declare{Ramp: ramp})
+		levelcontroldef.Declare{Ramp: ramp, Features: levelcontroldef.FeatureOnOff})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,5 +244,55 @@ func TestDeclaredRampBesideLevelSource(t *testing.T) {
 		levelcontroldef.Declare{Ramp: &fakeRamp{}, LevelSource: &heldLevelSource{}})
 	if !errors.Is(err, device.ErrConfiguration) {
 		t.Fatalf("Ramp beside LevelSource: %v, want ErrConfiguration", err)
+	}
+}
+
+// TestDeclaredRampBesideTransitions: the owner's rule — a device that ramps
+// by itself takes no managed transitions.
+func TestDeclaredRampBesideTransitions(t *testing.T) {
+	t.Parallel()
+	_, err := device.NewDimmableLight(device.Options{StableKey: endpoint.StringKey("ramp-transitions"), Name: "Both"},
+		levelcontroldef.Declare{Ramp: &fakeRamp{}, Transitions: true})
+	if !errors.Is(err, device.ErrConfiguration) {
+		t.Fatalf("Ramp beside Transitions: %v, want ErrConfiguration", err)
+	}
+}
+
+// TestDeclaredRampWithoutOnOffFeature: a Ramp without the OO feature beside
+// an OnOff cluster neither couples nor gates — matter.js gates both on
+// `this.features.onOff && this.agent.has(OnOffServer)`
+// (LevelControlServer.ts:558, :728-736). With OnOff off, MoveToLevel
+// ramps, and MoveToLevelWithOnOff leaves OnOff off.
+func TestDeclaredRampWithoutOnOffFeature(t *testing.T) {
+	t.Parallel()
+	ctx := parityCtx(t)
+	site := quietSite(t)
+	ramp := &fakeRamp{level: 0}
+	speaker, err := device.NewSpeaker(device.Options{StableKey: endpoint.StringKey("ramp-no-oo"), Name: "Hall speaker"},
+		onoffdef.Declare{Initial: onoffdef.Patch{OnOff: new(false)}},
+		levelcontroldef.Declare{Ramp: ramp})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{speaker}}})
+	ep, _ := speaker.EndpointNumber()
+	const attrFeatureMap = 0xFFFC
+	if v, _ := speaker.Server(levelcontroldef.ClusterID).MatterRead(attrFeatureMap); v.(uint32)&uint32(levelcontroldef.FeatureOnOff) != 0 {
+		f := v
+		t.Fatalf("FeatureMap %#x selects OO; the test needs a selection without it", f)
+	}
+	if _, err := fabrictest.Invoke(ctx, pair, levelCmd(ep, levelcontroldef.CmdMoveToLevel),
+		levelcontroldef.MoveToLevelRequest{Level: 80}); err != nil {
+		t.Fatal(err)
+	}
+	if got := ramp.seen(); len(got) != 1 || got[0].method != "Ramp" || got[0].level != 80 {
+		t.Errorf("MoveToLevel with OnOff off: the ramp saw %+v, want a Ramp to 80 (no gate without OO)", got)
+	}
+	if _, err := fabrictest.Invoke(ctx, pair, levelCmd(ep, levelcontroldef.CmdMoveToLevelWithOnOff),
+		levelcontroldef.MoveToLevelWithOnOffRequest{Level: 120}); err != nil {
+		t.Fatal(err)
+	}
+	if speaker.OnOff().Get().OnOff {
+		t.Error("MoveToLevelWithOnOff switched OnOff on without the OO feature")
 	}
 }

@@ -311,10 +311,11 @@ type LevelSource interface {
 // couples the endpoint's On/Off state for the "with On/Off" commands,
 // as matter.js LevelControlServer does on its own transitions. The
 // optional interfaces [NativeMover], [NativeSwitcher] and
-// [NativePersister] are found on it by type assertion. The kit couples
-// to the endpoint's OnOff server itself, so the host implements no
-// On/Off port for it. A device declares a NativeRamp or a
-// [LevelSource], not both.
+// [NativePersister] are found on it by type assertion. Under the OO
+// feature the kit couples to the endpoint's OnOff server itself, so
+// the host implements no On/Off port for it. A device declares a
+// NativeRamp or a [LevelSource], not both, and a NativeRamp without
+// Transitions.
 type NativeRamp interface {
 	// Level reports the device's current level; known=false is a level
 	// the device has not reported, which reads as null. A level below the
@@ -428,9 +429,10 @@ type Declare struct {
 	LevelSource LevelSource
 	// Ramp is a device that ramps its level by itself ([NativeRamp]):
 	// the kit's server runs on cluster/levelcontrol's NativeSource over
-	// it, coupled to the endpoint's OnOff server, so the host implements
-	// no On/Off port; Options and OnLevel start from Initial. Refused
-	// beside LevelSource.
+	// it, coupled under the OO feature to the endpoint's OnOff server, so
+	// the host implements no On/Off port; Options and OnLevel start from
+	// Initial. The device ramps by itself, so Ramp is refused beside
+	// LevelSource and beside Transitions.
 	Ramp NativeRamp
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
