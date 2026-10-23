@@ -58,7 +58,7 @@ import (
 // Lowered 5 -> 4 when CelsiusToInt16 moved to cluster/spec/thermostat
 // (brief BV-1): the TemperatureMeasurement server calls it there, so the
 // tests that read a temperature reach it.
-const reachabilityUnreachedRatchet = 4
+const reachabilityUnreachedRatchet = 3
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {
