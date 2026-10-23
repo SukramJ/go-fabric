@@ -175,6 +175,11 @@ func TestTypedReadsConsumer(t *testing.T) {
 	}
 	heat.mu.Unlock()
 
+	// An event path is the role's own type too.
+	if ev := client.EventAt(lightEP, onoffdef.ClusterID, 0); !ev.HasEndpoint || !ev.HasCluster || !ev.HasEvent || ev.Endpoint != lightEP {
+		t.Errorf("EventAt %+v", ev)
+	}
+
 	// A cluster the endpoint does not have: every attribute absent.
 	if _, absent := onoffdef.StateFrom(cn.Endpoint(thermoEP).Cluster(onoffdef.ClusterID)); len(absent) == 0 {
 		t.Error("OnOff on the thermostat: nothing absent")

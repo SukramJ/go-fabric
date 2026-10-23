@@ -30,6 +30,7 @@ import "github.com/SukramJ/go-fabric/tlv"
 //
 // The zero Value encodes TLV null, as [Null] does. [Value.Get] returns the
 // value and whether it is one.
+// fabric:reachable:reason="generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration"
 type Value[T any] struct {
 	v   T
 	put Put[T]
