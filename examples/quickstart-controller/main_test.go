@@ -73,9 +73,21 @@ func TestQuickstartControllerPairErrors(t *testing.T) {
 	if err := run(ctx, filepath.Join(t.TempDir(), "controller.db"), "not a code"); err == nil {
 		t.Error("run accepted a malformed code")
 	}
+	// The stack opens on a context of its own; only the pairing is bounded
+	// short, so a slow schema apply (the race detector) does not end it.
+	db, err := openDB(filepath.Join(t.TempDir(), "controller2.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	c, err := open(ctx, db, "127.0.0.1:0", slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close(ctx) }()
 	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
-	if err := run(short, filepath.Join(t.TempDir(), "controller2.db"), "34970112332"); !errors.Is(err, controller.ErrNoDevice) {
+	if _, err := c.Pair(short, "34970112332", controller.PairOptions{}); !errors.Is(err, controller.ErrNoDevice) {
 		t.Errorf("pair on a silent network = %v, want ErrNoDevice", err)
 	}
 }
