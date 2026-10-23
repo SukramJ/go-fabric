@@ -386,16 +386,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
 	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
-	if r.ID == powersourcedef.ClusterID {
-		powerSourceDefaults(features, initial)
-	}
-	cfg := spec.ServerConfig{Initial: initial, Unimplemented: true}
-	if r.ID == powersourcedef.ClusterID && s.self != nil {
-		if _, declared := initial[powersourcedef.AttrEndpointList]; !declared {
-			cfg.Source = ownEndpointList{s.self}
-		}
-	}
-	srv, err := spec.NewServer(def, opts, cfg)
+	srv, err := spec.NewServer(def, opts, generatedConfig(r.ID, features, initial, s.self))
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
 		return nil, fmt.Errorf("%w: %s %s: %w: supply its server as the declaration's HostServer", ErrNoDefaultServer, t.Name, r.Name, err)
@@ -403,6 +394,28 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	return srv, nil
+}
+
+// generatedConfig is the configuration of the generated server of cluster
+// id: its Initial, unimplemented commands until the host handles them,
+// and a PowerSource's own additions ([powerSource]).
+func generatedConfig(id, features uint32, initial map[uint32]any, self func() (uint16, bool)) spec.ServerConfig {
+	cfg := spec.ServerConfig{Initial: initial, Unimplemented: true}
+	if id == powersourcedef.ClusterID {
+		powerSource(&cfg, features, self)
+	}
+	return cfg
+}
+
+// powerSource is the generated PowerSource's configuration beyond its
+// definition: matter.js's initialize defaults ([powerSourceDefaults]) and,
+// unless the declaration names its endpoints, the device's own endpoint as
+// EndpointList ([ownEndpointList]).
+func powerSource(cfg *spec.ServerConfig, features uint32, self func() (uint16, bool)) {
+	powerSourceDefaults(features, cfg.Initial)
+	if _, declared := cfg.Initial[powersourcedef.AttrEndpointList]; !declared && self != nil {
+		cfg.Source = ownEndpointList{self}
+	}
 }
 
 // powerSourceDefaults fills what matter.js's PowerSourceServer.initialize

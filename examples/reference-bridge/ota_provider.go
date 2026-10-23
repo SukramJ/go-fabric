@@ -75,7 +75,7 @@ var (
 
 // QueryImage implements node.OTAImageSource: the image for the CSA
 // test vendor/product below its version, nothing for anything else.
-func (s *testImages) QueryImage(_ context.Context, _ node.OTAPeer, req provdef.QueryImageRequest) (node.OTAImage, bool, error) {
+func (s *testImages) QueryImage(_ context.Context, _ node.OTAPeer, req provdef.QueryImageRequest) (img node.OTAImage, ok bool, err error) {
 	if req.VendorId != testVendorID || req.ProductId != testProductID || req.SoftwareVersion >= testProviderImageVersion {
 		return node.OTAImage{}, false, nil
 	}

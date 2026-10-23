@@ -59,8 +59,8 @@ type ledgerCheckedImages struct {
 
 // QueryImage implements node.OTAImageSource: the inner source's
 // answer, its version looked up in the ledger.
-func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer node.OTAPeer, req provdef.QueryImageRequest) (node.OTAImage, bool, error) {
-	img, ok, err := s.OTAImageSource.QueryImage(ctx, peer, req)
+func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer node.OTAPeer, req provdef.QueryImageRequest) (img node.OTAImage, ok bool, err error) {
+	img, ok, err = s.OTAImageSource.QueryImage(ctx, peer, req)
 	if err != nil || !ok {
 		return img, ok, err
 	}

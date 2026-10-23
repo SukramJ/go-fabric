@@ -53,15 +53,25 @@ func cloneContentControl(st ContentControlState) ContentControlState {
 // BlockApplications (BA, :144-164), BlockContentTimeWindow (BTW,
 // :166-184).
 type (
-	ContentControl                = ccdef.ContentControl
-	ContentControlPIN             = ccdef.ContentControlPIN
-	ContentControlScreenTime      = ccdef.ContentControlScreenTime
-	ContentControlUnrated         = ccdef.ContentControlUnrated
-	ContentControlOnDemandRating  = ccdef.ContentControlOnDemandRating
+	// ContentControl is Enable and Disable.
+	ContentControl = ccdef.ContentControl
+	// ContentControlPIN is UpdatePin and ResetPin (PM).
+	ContentControlPIN = ccdef.ContentControlPIN
+	// ContentControlScreenTime is AddBonusTime and SetScreenDailyTime (ST).
+	ContentControlScreenTime = ccdef.ContentControlScreenTime
+	// ContentControlUnrated is BlockUnratedContent and UnblockUnratedContent (BU).
+	ContentControlUnrated = ccdef.ContentControlUnrated
+	// ContentControlOnDemandRating is SetOnDemandRatingThreshold (OCR).
+	ContentControlOnDemandRating = ccdef.ContentControlOnDemandRating
+	// ContentControlScheduledRating is SetScheduledContentRatingThreshold (SCR).
 	ContentControlScheduledRating = ccdef.ContentControlScheduledRating
-	ContentControlChannels        = ccdef.ContentControlChannels
-	ContentControlApps            = ccdef.ContentControlApps
-	ContentControlTimeWindows     = ccdef.ContentControlTimeWindows
+	// ContentControlChannels is AddBlockChannels and RemoveBlockChannels (BC).
+	ContentControlChannels = ccdef.ContentControlChannels
+	// ContentControlApps is AddBlockApplications and RemoveBlockApplications (BA).
+	ContentControlApps = ccdef.ContentControlApps
+	// ContentControlTimeWindows is SetBlockContentTimeWindow and
+	// RemoveBlockContentTimeWindow (BTW).
+	ContentControlTimeWindows = ccdef.ContentControlTimeWindows
 )
 
 // ContentControlConfig carries the construction parameters of a
