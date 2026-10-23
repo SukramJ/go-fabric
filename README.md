@@ -48,6 +48,23 @@ logos. See [`licenses/NOTICE-matter.js.txt`](./licenses/NOTICE-matter.js.txt),
 reproduced from matter.js, which states the same terms for the project this
 one is ported from.
 
+### Why "Matter" is not in the name
+
+"Matter" and the Matter logo are trademarks of the Connectivity Standards
+Alliance. Their use — in a product, project or repository name as much as
+on a device — is reserved to Alliance members and certified products under
+the *Connectivity Standards Alliance Trademark and Logo Usage Guidelines
+and Terms* (<https://csa-iot.org/resources/governing-documents/>; the
+terms are restated in [`licenses/NOTICE-matter.js.txt`](./licenses/NOTICE-matter.js.txt):
+"Only the Alliance and its members may use Alliance trademarks and logos,
+including, without limitation, the Matter trademarks and logos"). This
+project is neither, so the mark is not part of its name or of the names of
+the repositories built on it (`go-habridge`, `go-hafabric`); the word
+appears only descriptively — a library that implements the Matter
+specification, a bridge for Matter controllers — and never to suggest
+certification or endorsement. The name `go-fabric` is the specification's
+own term for a commissioned network of nodes.
+
 Certification is not pursued by this project. Certifiability is a goal: the
 module is meant to let a product built on it pass certification, and the CSA
 certification test families run against the reference daemon to hold it
