@@ -29,6 +29,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTrip(t, ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)}, spec.DecodeStruct[ElectricalGridConditionsStruct])
 	spectest.RoundTripEvent(t, Definition, EventCurrentConditionsChanged, CurrentConditionsChangedEvent{CurrentConditions: spec.ValueOf(ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)})})
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentConditions, ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)})
 	spectest.RoundTripAttribute(t, Definition, AttrForecastConditions, spec.List[ElectricalGridConditionsStruct]([]ElectricalGridConditionsStruct{ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)}}))
 }
 
@@ -60,6 +61,25 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		LocalGenerationAvailable: spectest.Ptr(true),
+		CurrentConditions:        spectest.Ptr(ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)}),
+		ForecastConditions:       spectest.Ptr([]ElectricalGridConditionsStruct{ElectricalGridConditionsStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), GridCarbonIntensity: int16(1), GridCarbonLevel: ThreeLevelEnum(0), LocalCarbonIntensity: int16(1), LocalCarbonLevel: ThreeLevelEnum(0)}}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 3 {
+		t.Errorf("StateFrom(nil): %v absent, want all 3", absent)
+	}
 	if len(values) != 4 {
 		t.Errorf("a patch of every field sets %d values, want 4", len(values))
 	}

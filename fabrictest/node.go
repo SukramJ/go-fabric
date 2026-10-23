@@ -19,16 +19,16 @@ import (
 // (node/client/Peers.ts:204-206, a ContinuousDiscovery) as far as one
 // result goes. With a fake site clock it runs under [Site.Run]; a search
 // that finds nothing returns an empty slice.
-func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, timeout time.Duration) ([]discovery.Device, error) {
+func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, timeout time.Duration) ([]client.Device, error) {
 	s := discovery.NewScanner(c.Names())
 	defer s.Close()
-	var found []discovery.Device
+	var found []client.Device
 	err := c.site.Run(ctx, func(ctx context.Context) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		t := c.site.clk.AfterFunc(timeout, cancel)
 		defer t.Stop()
-		_, err := s.FindCommissionable(ctx, id, func(d discovery.Device) {
+		_, err := s.FindCommissionable(ctx, id, func(d client.Device) {
 			found = append(found, d)
 			cancel()
 		})

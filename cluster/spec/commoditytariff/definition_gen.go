@@ -840,6 +840,105 @@ func decodeGetDayEntryResponse(n spec.Node) (any, error) {
 	return spec.DecodeStruct[GetDayEntryResponse](n)
 }
 
+func decodeAttrTariffInfo(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[TariffInformationStruct](n)
+}
+
+func decodeAttrDayEntries(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[DayEntryStruct], 0, 672)(n)
+	return spec.List[DayEntryStruct](v), err
+}
+
+func decodeAttrDayPatterns(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[DayPatternStruct], 0, 28)(n)
+	return spec.List[DayPatternStruct](v), err
+}
+
+func decodeAttrCalendarPeriods(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[CalendarPeriodStruct], 1, 4)(n)
+	return spec.List[CalendarPeriodStruct](v), err
+}
+
+func decodeAttrIndividualDays(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[DayStruct], 0, 50)(n)
+	return spec.List[DayStruct](v), err
+}
+
+func decodeAttrCurrentDay(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DayStruct](n)
+}
+
+func decodeAttrNextDay(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DayStruct](n)
+}
+
+func decodeAttrCurrentDayEntry(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DayEntryStruct](n)
+}
+
+func decodeAttrNextDayEntry(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DayEntryStruct](n)
+}
+
+func decodeAttrTariffComponents(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[TariffComponentStruct], 1, 672)(n)
+	return spec.List[TariffComponentStruct](v), err
+}
+
+func decodeAttrTariffPeriods(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[TariffPeriodStruct], 1, 672)(n)
+	return spec.List[TariffPeriodStruct](v), err
+}
+
+func decodeAttrCurrentTariffComponents(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[TariffComponentStruct], 0, 20)(n)
+	return spec.List[TariffComponentStruct](v), err
+}
+
+func decodeAttrNextTariffComponents(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[TariffComponentStruct], 0, 20)(n)
+	return spec.List[TariffComponentStruct](v), err
+}
+
 // Definition is the CommodityTariff cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -858,6 +957,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrTariffInfo,
 		},
 		{
 			ID: AttrTariffUnit, Name: "TariffUnit",
@@ -881,6 +981,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max 672", Max: &spec.Bound{Int: 672}},
+			Decode:      decodeAttrDayEntries,
 		},
 		{
 			ID: AttrDayPatterns, Name: "DayPatterns",
@@ -889,6 +990,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max 28", Max: &spec.Bound{Int: 28}},
+			Decode:      decodeAttrDayPatterns,
 		},
 		{
 			ID: AttrCalendarPeriods, Name: "CalendarPeriods",
@@ -897,6 +999,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "1 to 4", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 4}},
+			Decode:      decodeAttrCalendarPeriods,
 		},
 		{
 			ID: AttrIndividualDays, Name: "IndividualDays",
@@ -905,6 +1008,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max 50", Max: &spec.Bound{Int: 50}},
+			Decode:      decodeAttrIndividualDays,
 		},
 		{
 			ID: AttrCurrentDay, Name: "CurrentDay",
@@ -912,6 +1016,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrentDay,
 		},
 		{
 			ID: AttrNextDay, Name: "NextDay",
@@ -919,6 +1024,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrNextDay,
 		},
 		{
 			ID: AttrCurrentDayEntry, Name: "CurrentDayEntry",
@@ -926,6 +1032,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrentDayEntry,
 		},
 		{
 			ID: AttrCurrentDayEntryDate, Name: "CurrentDayEntryDate",
@@ -940,6 +1047,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrNextDayEntry,
 		},
 		{
 			ID: AttrNextDayEntryDate, Name: "NextDayEntryDate",
@@ -955,6 +1063,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "1 to 672", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 672}},
+			Decode:      decodeAttrTariffComponents,
 		},
 		{
 			ID: AttrTariffPeriods, Name: "TariffPeriods",
@@ -963,6 +1072,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "1 to 672", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 672}},
+			Decode:      decodeAttrTariffPeriods,
 		},
 		{
 			ID: AttrCurrentTariffComponents, Name: "CurrentTariffComponents",
@@ -971,6 +1081,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max 20", Max: &spec.Bound{Int: 20}},
+			Decode:      decodeAttrCurrentTariffComponents,
 		},
 		{
 			ID: AttrNextTariffComponents, Name: "NextTariffComponents",
@@ -979,6 +1090,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max 20", Max: &spec.Bound{Int: 20}},
+			Decode:      decodeAttrNextTariffComponents,
 		},
 		{
 			ID: AttrDefaultRandomizationOffset, Name: "DefaultRandomizationOffset",

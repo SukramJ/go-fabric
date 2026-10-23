@@ -345,6 +345,41 @@ func decodeAttrAccuracy(n spec.Node) (any, error) {
 	return spec.DecodeStruct[MeasurementAccuracyStruct](n)
 }
 
+func decodeAttrCumulativeEnergyImported(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[EnergyMeasurementStruct](n)
+}
+
+func decodeAttrCumulativeEnergyExported(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[EnergyMeasurementStruct](n)
+}
+
+func decodeAttrPeriodicEnergyImported(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[EnergyMeasurementStruct](n)
+}
+
+func decodeAttrPeriodicEnergyExported(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[EnergyMeasurementStruct](n)
+}
+
+func decodeAttrCumulativeEnergyReset(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[CumulativeEnergyResetStruct](n)
+}
+
 // Definition is the ElectricalEnergyMeasurement cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -371,6 +406,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "IMPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "CUME"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrCumulativeEnergyImported,
 		},
 		{
 			ID: AttrCumulativeEnergyExported, Name: "CumulativeEnergyExported",
@@ -378,6 +414,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "EXPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "CUME"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrCumulativeEnergyExported,
 		},
 		{
 			ID: AttrPeriodicEnergyImported, Name: "PeriodicEnergyImported",
@@ -385,6 +422,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "IMPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "PERE"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrPeriodicEnergyImported,
 		},
 		{
 			ID: AttrPeriodicEnergyExported, Name: "PeriodicEnergyExported",
@@ -392,6 +430,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "EXPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "PERE"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrPeriodicEnergyExported,
 		},
 		{
 			ID: AttrCumulativeEnergyReset, Name: "CumulativeEnergyReset",
@@ -400,6 +439,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrCumulativeEnergyReset,
 		},
 	},
 	Events: []spec.Event{

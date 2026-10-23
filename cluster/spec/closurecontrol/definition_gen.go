@@ -434,6 +434,20 @@ func decodeSecureStateChangedEvent(n spec.Node) (any, error) {
 	return spec.DecodeStruct[SecureStateChangedEvent](n)
 }
 
+func decodeAttrOverallCurrentState(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[OverallCurrentStateStruct](n)
+}
+
+func decodeAttrOverallTargetState(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[OverallTargetStateStruct](n)
+}
+
 // Definition is the ClosureControl cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -478,6 +492,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrOverallCurrentState,
 		},
 		{
 			ID: AttrOverallTargetState, Name: "OverallTargetState",
@@ -486,6 +501,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrOverallTargetState,
 		},
 		{
 			ID: AttrLatchControlModes, Name: "LatchControlModes",

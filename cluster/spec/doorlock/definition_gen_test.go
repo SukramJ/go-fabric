@@ -133,6 +133,67 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		LockState:                                spectest.Ptr(LockStateEnum(0)),
+		LockType:                                 spectest.Ptr(LockTypeEnum(0)),
+		ActuatorEnabled:                          spectest.Ptr(true),
+		DoorState:                                spectest.Ptr(DoorStateEnum(0)),
+		DoorOpenEvents:                           spectest.Ptr(uint32(1)),
+		DoorClosedEvents:                         spectest.Ptr(uint32(1)),
+		OpenPeriod:                               spectest.Ptr(uint16(1)),
+		NumberOfTotalUsersSupported:              spectest.Ptr(uint16(1)),
+		NumberOfPinUsersSupported:                spectest.Ptr(uint16(1)),
+		NumberOfRfidUsersSupported:               spectest.Ptr(uint16(1)),
+		NumberOfWeekDaySchedulesSupportedPerUser: spectest.Ptr(uint8(1)),
+		NumberOfYearDaySchedulesSupportedPerUser: spectest.Ptr(uint8(1)),
+		NumberOfHolidaySchedulesSupported:        spectest.Ptr(uint8(1)),
+		MaxPinCodeLength:                         spectest.Ptr(uint8(1)),
+		MinPinCodeLength:                         spectest.Ptr(uint8(1)),
+		MaxRfidCodeLength:                        spectest.Ptr(uint8(1)),
+		MinRfidCodeLength:                        spectest.Ptr(uint8(1)),
+		CredentialRulesSupport:                   spectest.Ptr(CredentialRulesBitmap(1 << 0)),
+		NumberOfCredentialsSupportedPerUser:      spectest.Ptr(uint8(1)),
+		Language:                                 spectest.Ptr("x"),
+		LedSettings:                              spectest.Ptr(LEDSettingEnum(0)),
+		AutoRelockTime:                           spectest.Ptr(uint32(1)),
+		SoundVolume:                              spectest.Ptr(SoundVolumeEnum(0)),
+		OperatingMode:                            spectest.Ptr(OperatingModeEnum(0)),
+		SupportedOperatingModes:                  spectest.Ptr(OperatingModesBitmap(1 << 0)),
+		DefaultConfigurationRegister:             spectest.Ptr(ConfigurationRegisterBitmap(1 << 0)),
+		EnableLocalProgramming:                   spectest.Ptr(true),
+		EnableOneTouchLocking:                    spectest.Ptr(true),
+		EnableInsideStatusLed:                    spectest.Ptr(true),
+		EnablePrivacyModeButton:                  spectest.Ptr(true),
+		LocalProgrammingFeatures:                 spectest.Ptr(LocalProgrammingFeaturesBitmap(1 << 0)),
+		WrongCodeEntryLimit:                      spectest.Ptr(uint8(1)),
+		UserCodeTemporaryDisableTime:             spectest.Ptr(uint8(1)),
+		SendPinOverTheAir:                        spectest.Ptr(true),
+		RequirePinForRemoteOperation:             spectest.Ptr(true),
+		ExpiringUserTimeout:                      spectest.Ptr(uint16(1)),
+		AliroReaderVerificationKey:               spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}),
+		AliroReaderGroupIdentifier:               spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}),
+		AliroReaderGroupSubIdentifier:            spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}),
+		AliroExpeditedTransactionSupportedProtocolVersions: spectest.Ptr([][]byte{[]byte{1}}),
+		AliroGroupResolvingKey:                             spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}),
+		AliroSupportedBleuwbProtocolVersions:               spectest.Ptr([][]byte{[]byte{1}}),
+		AliroBleAdvertisingVersion:                         spectest.Ptr(uint8(1)),
+		NumberOfAliroCredentialIssuerKeysSupported:         spectest.Ptr(uint16(1)),
+		NumberOfAliroEndpointKeysSupported:                 spectest.Ptr(uint16(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 45 {
+		t.Errorf("StateFrom(nil): %v absent, want all 45", absent)
+	}
 	if len(values) != 46 {
 		t.Errorf("a patch of every field sets %d values, want 46", len(values))
 	}

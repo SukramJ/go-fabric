@@ -120,6 +120,13 @@ var PowerThresholdSourceEnumDef = &spec.Enum{Name: "PowerThresholdSourceEnum", B
 	{Value: 2, Name: "Equipment", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
+func decodeAttrPowerThreshold(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[PowerThresholdStruct](n)
+}
+
 // Definition is the MeterIdentification cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -164,6 +171,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PWRTHLD", Op: spec.ConfName, Name: "PWRTHLD"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrPowerThreshold,
 		},
 	},
 }

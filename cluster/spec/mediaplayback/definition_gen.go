@@ -611,6 +611,43 @@ func decodeStateChangedEvent(n spec.Node) (any, error) {
 	return spec.DecodeStruct[StateChangedEvent](n)
 }
 
+func decodeAttrSampledPosition(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[PlaybackPositionStruct](n)
+}
+
+func decodeAttrActiveAudioTrack(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[TrackStruct](n)
+}
+
+func decodeAttrAvailableAudioTracks(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeList(spec.DecodeStruct[TrackStruct])(n)
+	return spec.List[TrackStruct](v), err
+}
+
+func decodeAttrActiveTextTrack(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[TrackStruct](n)
+}
+
+func decodeAttrAvailableTextTracks(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeList(spec.DecodeStruct[TrackStruct])(n)
+	return spec.List[TrackStruct](v), err
+}
+
 // Definition is the MediaPlayback cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -655,6 +692,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrSampledPosition,
 		},
 		{
 			ID: AttrPlaybackSpeed, Name: "PlaybackSpeed",
@@ -690,6 +728,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrActiveAudioTrack,
 		},
 		{
 			ID: AttrAvailableAudioTracks, Name: "AvailableAudioTracks",
@@ -699,6 +738,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrAvailableAudioTracks,
 		},
 		{
 			ID: AttrActiveTextTrack, Name: "ActiveTextTrack",
@@ -708,6 +748,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrActiveTextTrack,
 		},
 		{
 			ID: AttrAvailableTextTracks, Name: "AvailableTextTracks",
@@ -717,6 +758,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrAvailableTextTracks,
 		},
 	},
 	Commands: []spec.Command{

@@ -20,7 +20,7 @@ default clock is a `clocktest.Fake`, matter.js's `MockTime`.
 func TestPlugToggles(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	plug, err := device.NewOnOffPlugInUnit(device.Options{
-		StableKey: endpoint.StringKey("plug:1"), Name: "plug",
+		StableKey: device.StringKey("plug:1"), Name: "plug",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -34,15 +34,16 @@ func TestPlugToggles(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	toggle := im.ConcreteCommandPath{Endpoint: ep, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle}
+	toggle := client.CommandAt(ep, onoffdef.ClusterID, onoffdef.CmdToggle)
 	if _, err := fabrictest.Invoke(ctx, pair, toggle, nil); err != nil {
 		t.Fatal(err)
 	}
-	onOff := im.ConcreteAttributePath{Endpoint: ep, Cluster: onoffdef.ClusterID, Attribute: onoffdef.AttrOnOff,
-		HasEndpoint: true, HasCluster: true, HasAttribute: true}
-	got, err := fabrictest.Read(ctx, pair, onOff)
-	if err != nil || !got.Value.El.Bool {
-		t.Fatalf("OnOff %+v, %v", got, err)
+	values, err := fabrictest.ReadCluster(ctx, pair, ep, onoffdef.ClusterID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state, _ := onoffdef.StateFrom(values); !state.OnOff {
+		t.Fatalf("OnOff %+v", state)
 	}
 }
 ```
@@ -94,11 +95,12 @@ subscribed.
 | --- | --- | --- |
 | `Connect` | a CASE session when the peer holds none | the pair's interaction |
 | `Read` | one attribute, fabric-filtered | its `AttributeData` |
-| `ReadWith` | any `interaction.ReadRequest` (wildcards, events, filters) | the whole report |
+| `ReadCluster` | every attribute of one cluster of an endpoint | its values, for the generated `<cluster>def.StateFrom` |
+| `ReadWith` | any `ReadRequest` (wildcards, events, filters) | the whole `Report` |
 | `Events` | event paths | the events in report order |
 | `Write`, `WriteTimed` | one attribute; timed sends a TimedRequest first | nil |
-| `Invoke`, `InvokeTimed` | one command | the `interaction.Result` |
-| `Subscribe` | an `interaction.SubscribeRequest` | the subscription, once the device answered |
+| `Invoke`, `InvokeTimed` | one command | the `Result` |
+| `Subscribe` | a `SubscribeRequest` | the `Subscription`, once the device answered |
 | `Exchange` | one IM message as it stands (opcode, TLV payload) — a request the controller refuses to formulate | the device's first answer |
 | `Send` | the same | nothing; for a request the device answers with nothing |
 
@@ -113,7 +115,16 @@ AddNOC; the wire helpers accept it. `Device.OpenWindow(ctx, timeout)` opens
 a basic commissioning window with the device's own passcode, so a second
 controller commissions it onto another fabric.
 
-A status other than Success is an `*interaction.StatusError`: the IM status,
+The helpers' types are `fabrictest`'s own aliases of the controller
+role's (`AttributePath`, `ReadRequest`, `SubscribeRequest`, `Report`,
+`Result`, `StatusError`, …), so a test names no package below the facade;
+paths are built with `client.AttributeAt`, `client.ClusterAt` and
+`client.CommandAt`, a scalar to write with `spec.Uint8(20)`,
+`spec.Int16(2250)` or `spec.Null[uint16]()`. The typed read of a cluster
+is `ReadCluster` with the generated `StateFrom`, which fills the same
+`State` the device's typed server reads.
+
+A status other than Success is an `*StatusError`: the IM status,
 the cluster status when the device sent one, and the attribute path for an
 attribute. An uncommissioned pair returns `fabrictest.ErrNotCommissioned`.
 

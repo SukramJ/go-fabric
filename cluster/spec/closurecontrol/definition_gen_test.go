@@ -36,6 +36,8 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventMovementCompleted, MovementCompletedEvent{})
 	spectest.RoundTripEvent(t, Definition, EventEngageStateChanged, EngageStateChangedEvent{EngageValue: true})
 	spectest.RoundTripEvent(t, Definition, EventSecureStateChanged, SecureStateChangedEvent{SecureValue: true})
+	spectest.RoundTripAttribute(t, Definition, AttrOverallCurrentState, OverallCurrentStateStruct{Position: spectest.Ptr(spec.ValueOf(CurrentPositionEnum(0))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0)), SecureState: spec.ValueOf(true)})
+	spectest.RoundTripAttribute(t, Definition, AttrOverallTargetState, OverallTargetStateStruct{Position: spectest.Ptr(spec.ValueOf(TargetPositionEnum(0))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))})
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -69,6 +71,28 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		CountdownTime:       spectest.Ptr(uint32(1)),
+		MainState:           spectest.Ptr(MainStateEnum(0)),
+		CurrentErrorList:    spectest.Ptr([]ClosureErrorEnum{ClosureErrorEnum(0)}),
+		OverallCurrentState: spectest.Ptr(OverallCurrentStateStruct{Position: spectest.Ptr(spec.ValueOf(CurrentPositionEnum(0))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0)), SecureState: spec.ValueOf(true)}),
+		OverallTargetState:  spectest.Ptr(OverallTargetStateStruct{Position: spectest.Ptr(spec.ValueOf(TargetPositionEnum(0))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))}),
+		LatchControlModes:   spectest.Ptr(LatchControlModesBitmap(1 << 0)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 6 {
+		t.Errorf("StateFrom(nil): %v absent, want all 6", absent)
+	}
 	if len(values) != 7 {
 		t.Errorf("a patch of every field sets %d values, want 7", len(values))
 	}

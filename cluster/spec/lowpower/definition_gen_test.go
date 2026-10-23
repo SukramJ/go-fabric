@@ -51,6 +51,9 @@ func TestTypedServer(t *testing.T) {
 	if got := (Patch{}).AttributeValues(); len(got) != 0 {
 		t.Errorf("an empty patch sets %v", got)
 	}
+	if _, absent := StateFrom(nil); len(absent) != 0 {
+		t.Errorf("StateFrom(nil): %v absent, want none", absent)
+	}
 	s.OnChanged(func(State, contract.Change) {})()
 	s.OnChangedAsync(func(State, contract.Change) { t.Error("OnChangedAsync without a queue delivered") })()
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {

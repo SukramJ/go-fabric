@@ -89,6 +89,54 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		Status:                      spectest.Ptr(PowerSourceStatusEnum(0)),
+		Order:                       spectest.Ptr(uint8(1)),
+		Description:                 spectest.Ptr("x"),
+		WiredAssessedInputVoltage:   spectest.Ptr(uint32(1)),
+		WiredAssessedInputFrequency: spectest.Ptr(uint16(1)),
+		WiredCurrentType:            spectest.Ptr(WiredCurrentTypeEnum(0)),
+		WiredAssessedCurrent:        spectest.Ptr(uint32(1)),
+		WiredNominalVoltage:         spectest.Ptr(uint32(1)),
+		WiredMaximumCurrent:         spectest.Ptr(uint32(1)),
+		WiredPresent:                spectest.Ptr(true),
+		ActiveWiredFaults:           spectest.Ptr([]WiredFaultEnum{WiredFaultEnum(0)}),
+		BatVoltage:                  spectest.Ptr(uint32(1)),
+		BatPercentRemaining:         spectest.Ptr(uint8(1)),
+		BatTimeRemaining:            spectest.Ptr(uint32(1)),
+		BatChargeLevel:              spectest.Ptr(BatChargeLevelEnum(0)),
+		BatReplacementNeeded:        spectest.Ptr(true),
+		BatReplaceability:           spectest.Ptr(BatReplaceabilityEnum(0)),
+		BatPresent:                  spectest.Ptr(true),
+		ActiveBatFaults:             spectest.Ptr([]BatFaultEnum{BatFaultEnum(0)}),
+		BatReplacementDescription:   spectest.Ptr("x"),
+		BatCommonDesignation:        spectest.Ptr(BatCommonDesignationEnum(0)),
+		BatAnsiDesignation:          spectest.Ptr("x"),
+		BatIecDesignation:           spectest.Ptr("x"),
+		BatApprovedChemistry:        spectest.Ptr(BatApprovedChemistryEnum(0)),
+		BatCapacity:                 spectest.Ptr(uint32(1)),
+		BatQuantity:                 spectest.Ptr(uint8(1)),
+		BatChargeState:              spectest.Ptr(BatChargeStateEnum(0)),
+		BatTimeToFullCharge:         spectest.Ptr(uint32(1)),
+		BatFunctionalWhileCharging:  spectest.Ptr(true),
+		BatChargingCurrent:          spectest.Ptr(uint32(1)),
+		ActiveBatChargeFaults:       spectest.Ptr([]BatChargeFaultEnum{BatChargeFaultEnum(0)}),
+		EndpointList:                spectest.Ptr([]uint16{uint16(1)}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 32 {
+		t.Errorf("StateFrom(nil): %v absent, want all 32", absent)
+	}
 	if len(values) != 33 {
 		t.Errorf("a patch of every field sets %d values, want 33", len(values))
 	}

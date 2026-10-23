@@ -298,7 +298,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 253,
+    "line": 267,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:679",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "suppressResponse",
@@ -307,7 +307,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 301,
+    "line": 315,
     "citation": "InteractionMessenger.ts:719-721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReportMessage",
@@ -316,7 +316,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 412,
+    "line": 426,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -325,7 +325,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 454,
+    "line": 468,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "identifier": "InvokeResponse",
@@ -334,7 +334,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 531,
+    "line": 545,
     "citation": "packages/node/src/node/server/InteractionServer.ts:1043-1074",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "identifier": "suppressedBuffer",
@@ -1490,7 +1490,7 @@
   },
   {
     "file": "controller/client/addresses.go",
-    "line": 24,
+    "line": 22,
     "citation": "Peers.ts:959-966",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "identifier": "expirationOf",
@@ -1544,7 +1544,7 @@
   },
   {
     "file": "controller/client/config.go",
-    "line": 36,
+    "line": 35,
     "citation": "NetworkClient.ts:432-439",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "AutoSubscribe",
@@ -1553,7 +1553,7 @@
   },
   {
     "file": "controller/client/config.go",
-    "line": 41,
+    "line": 40,
     "citation": "NetworkClient.ts:412-421",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "DefaultSubscription",
@@ -1589,7 +1589,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 124,
+    "line": 121,
     "citation": "CommissioningClient.ts:775-779",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "DiscoveryData",
@@ -1598,7 +1598,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 183,
+    "line": 180,
     "citation": "CommissioningClient.ts:883-895",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "NetworkAddress",
@@ -1607,7 +1607,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 203,
+    "line": 200,
     "citation": "CommissioningClient.ts:664-680",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#catsChanged",
@@ -1616,7 +1616,7 @@
   },
   {
     "file": "controller/client/fabricops.go",
-    "line": 373,
+    "line": 370,
     "citation": "CommissioningClient.ts:406-408",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "PeerInitiatedCloseError",
@@ -1625,7 +1625,7 @@
   },
   {
     "file": "controller/client/label.go",
-    "line": 27,
+    "line": 25,
     "citation": "NetworkClient.ts:259-307",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#reconcileFabricLabel",
@@ -1634,7 +1634,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 187,
+    "line": 186,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1697,7 +1697,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 130,
+    "line": 129,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -1706,7 +1706,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 462,
+    "line": 461,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -1715,7 +1715,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 486,
+    "line": 485,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -1724,7 +1724,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 691,
+    "line": 690,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",
@@ -1742,7 +1742,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 211,
+    "line": 209,
     "citation": "ClientStructure.ts:1674-1692",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeList",
@@ -1751,7 +1751,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 225,
+    "line": 223,
     "citation": "ClientStructure.ts:1601-1605",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeUpdates",

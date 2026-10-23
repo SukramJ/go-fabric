@@ -87,6 +87,14 @@ var TariffUnitEnumDef = &spec.Enum{Name: "TariffUnitEnum", Bits: 8, Values: []sp
 	{Value: 1, Name: "KVAh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
+func decodeAttrMeteredQuantity(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeList(spec.DecodeStruct[MeteredQuantityStruct])(n)
+	return spec.List[MeteredQuantityStruct](v), err
+}
+
 // Definition is the CommodityMetering cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -98,6 +106,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "max maximumMeteredQuantities", Max: &spec.Bound{Ref: "maximumMeteredQuantities"}},
+			Decode:      decodeAttrMeteredQuantity,
 		},
 		{
 			ID: AttrMeteredQuantityTimestamp, Name: "MeteredQuantityTimestamp",

@@ -87,6 +87,46 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		DataModelRevision:     spectest.Ptr(uint16(1)),
+		VendorName:            spectest.Ptr("x"),
+		VendorId:              spectest.Ptr(uint16(1)),
+		ProductName:           spectest.Ptr("x"),
+		ProductId:             spectest.Ptr(uint16(1)),
+		NodeLabel:             spectest.Ptr("x"),
+		Location:              spectest.Ptr("xx"),
+		HardwareVersion:       spectest.Ptr(uint16(1)),
+		HardwareVersionString: spectest.Ptr("x"),
+		SoftwareVersion:       spectest.Ptr(uint32(1)),
+		SoftwareVersionString: spectest.Ptr("x"),
+		ManufacturingDate:     spectest.Ptr("xxxxxxxx"),
+		PartNumber:            spectest.Ptr("x"),
+		ProductUrl:            spectest.Ptr("x"),
+		ProductLabel:          spectest.Ptr("x"),
+		SerialNumber:          spectest.Ptr("x"),
+		LocalConfigDisabled:   spectest.Ptr(true),
+		Reachable:             spectest.Ptr(true),
+		UniqueId:              spectest.Ptr("x"),
+		CapabilityMinima:      spectest.Ptr(CapabilityMinimaStruct{CaseSessionsPerFabric: uint16(3), SubscriptionsPerFabric: uint16(3), SimultaneousInvocationsSupported: spectest.Ptr(uint16(1)), SimultaneousWritesSupported: spectest.Ptr(uint16(1)), ReadPathsSupported: spectest.Ptr(uint16(9)), SubscribePathsSupported: spectest.Ptr(uint16(3))}),
+		ProductAppearance:     spectest.Ptr(ProductAppearanceStruct{Finish: ProductFinishEnum(0), PrimaryColor: spec.ValueOf(ColorEnum(0))}),
+		SpecificationVersion:  spectest.Ptr(uint32(1)),
+		MaxPathsPerInvoke:     spectest.Ptr(uint16(1)),
+		ConfigurationVersion:  spectest.Ptr(uint32(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 24 {
+		t.Errorf("StateFrom(nil): %v absent, want all 24", absent)
+	}
 	if len(values) != 24 {
 		t.Errorf("a patch of every field sets %d values, want 24", len(values))
 	}

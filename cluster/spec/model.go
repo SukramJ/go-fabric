@@ -247,7 +247,8 @@ type Attribute struct {
 	Default     any
 	// Decode decodes a value of the attribute into the generated type —
 	// for an attribute whose value is a struct (the struct) or a list of
-	// structs (a [List]); nil for any other.
+	// structs (a [List]), TLV null nil for a nullable one; nil for any
+	// other.
 	Decode func(Node) (any, error)
 }
 

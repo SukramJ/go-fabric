@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6285,
+  "entry_points": 6299,
   "entry_packages": [
     ".",
     "bdx",
@@ -167,6 +167,7 @@
     "commissioning",
     "conformance",
     "contract",
+    "controller",
     "controller/attestation",
     "controller/ble",
     "controller/ble/bletest",
@@ -201,6 +202,7 @@
     "node",
     "parity",
     "schema",
+    "script/apidiff",
     "script/archcheck",
     "script/citecheck",
     "script/clustergen",
@@ -230,9 +232,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14311,
-    "reachable": 9959,
-    "whitelisted": 4348,
+    "total_exported": 14517,
+    "reachable": 10116,
+    "whitelisted": 4397,
     "unreachable": 4
   },
   "by_package": [
@@ -4547,6 +4549,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
       "line": 263
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportStatusResponseAckedAtOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/report_final_ack_test.go",
+      "line": 28
     },
     {
       "package": "bridge",
@@ -9226,10 +9235,24 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "Int",
+      "reason": "generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/value.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "List",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
       "line": 399
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Null",
+      "reason": "generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/value.go",
+      "line": 105
     },
     {
       "package": "cluster/spec",
@@ -9338,6 +9361,13 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "StateFrom",
+      "reason": "generic: every generated server_gen.go calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/peer_state.go",
+      "line": 101
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "StateOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
@@ -9429,10 +9459,24 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "Uint",
+      "reason": "generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/value.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "Unsigned",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
       "line": 111
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Value",
+      "reason": "generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/value.go",
+      "line": 34
     },
     {
       "package": "cluster/spec",
@@ -9936,7 +9980,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/applicationlauncher/definition_gen_test.go",
-      "line": 39
+      "line": 40
     },
     {
       "package": "cluster/spec/audiooutput",
@@ -10545,7 +10589,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/channel/definition_gen_test.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/spec/chime",
@@ -10692,7 +10736,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closurecontrol/definition_gen_test.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -10832,7 +10876,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/closuredimension/definition_gen_test.go",
-      "line": 39
+      "line": 42
     },
     {
       "package": "cluster/spec/closuredimension",
@@ -11154,7 +11198,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditymetering/definition_gen_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "cluster/spec/commodityprice",
@@ -11245,7 +11289,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commodityprice/definition_gen_test.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/spec/commoditytariff",
@@ -11490,7 +11534,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/commoditytariff/definition_gen_test.go",
-      "line": 50
+      "line": 63
     },
     {
       "package": "cluster/spec/contentappobserver",
@@ -12008,7 +12052,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/deviceenergymanagement/definition_gen_test.go",
-      "line": 52
+      "line": 54
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
@@ -12771,7 +12815,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
-      "line": 40
+      "line": 45
     },
     {
       "package": "cluster/spec/electricalgridconditions",
@@ -12806,7 +12850,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "cluster/spec/electricalgridconditions",
@@ -12904,7 +12948,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen_test.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/spec/energyevse",
@@ -14472,7 +14516,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/mediaplayback/definition_gen_test.go",
-      "line": 52
+      "line": 57
     },
     {
       "package": "cluster/spec/mediaplayback",
@@ -14633,7 +14677,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/meteridentification/definition_gen_test.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "cluster/spec/microwaveovencontrol",
@@ -17489,7 +17533,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/thermostat/definition_gen_test.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "cluster/spec/thermostat",
@@ -17727,7 +17771,7 @@
       "identifier": "TestTypedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/timesynchronization/definition_gen_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "cluster/spec/timesynchronization",
@@ -19145,10 +19189,38 @@
     },
     {
       "package": "controller/client",
+      "identifier": "AttributeData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 73
+    },
+    {
+      "package": "controller/client",
+      "identifier": "AttributePath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 29
+    },
+    {
+      "package": "controller/client",
+      "identifier": "AttributeStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 75
+    },
+    {
+      "package": "controller/client",
       "identifier": "CacheFabricFiltered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 70
+    },
+    {
+      "package": "controller/client",
+      "identifier": "CommandPath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 31
     },
     {
       "package": "controller/client",
@@ -19159,6 +19231,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "DataVersionFilter",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 36
+    },
+    {
+      "package": "controller/client",
       "identifier": "DeliverEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
@@ -19166,10 +19245,59 @@
     },
     {
       "package": "controller/client",
+      "identifier": "Device",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 115
+    },
+    {
+      "package": "controller/client",
+      "identifier": "DeviceTypeViolation",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 125
+    },
+    {
+      "package": "controller/client",
+      "identifier": "EventData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 79
+    },
+    {
+      "package": "controller/client",
+      "identifier": "EventMinimumNumber",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 38
+    },
+    {
+      "package": "controller/client",
+      "identifier": "EventPath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 33
+    },
+    {
+      "package": "controller/client",
+      "identifier": "EventStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 81
+    },
+    {
+      "package": "controller/client",
       "identifier": "HoldOperation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 37
+    },
+    {
+      "package": "controller/client",
+      "identifier": "InvokeOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 100
     },
     {
       "package": "controller/client",
@@ -19194,6 +19322,34 @@
     },
     {
       "package": "controller/client",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 112
+    },
+    {
+      "package": "controller/client",
+      "identifier": "ReadPaths",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 48
+    },
+    {
+      "package": "controller/client",
+      "identifier": "Report",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 68
+    },
+    {
+      "package": "controller/client",
+      "identifier": "Result",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 104
+    },
+    {
+      "package": "controller/client",
       "identifier": "SaveRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
@@ -19205,6 +19361,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 51
+    },
+    {
+      "package": "controller/client",
+      "identifier": "SessionParameters",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 123
+    },
+    {
+      "package": "controller/client",
+      "identifier": "StatusError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 108
+    },
+    {
+      "package": "controller/client",
+      "identifier": "SubscribeRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 59
+    },
+    {
+      "package": "controller/client",
+      "identifier": "Subscription",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 63
+    },
+    {
+      "package": "controller/client",
+      "identifier": "SupportedTransports",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 118
     },
     {
       "package": "controller/client",
@@ -19358,7 +19549,7 @@
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 153
+      "line": 150
     },
     {
       "package": "controller/client",
@@ -19677,6 +19868,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "Timing",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 121
+    },
+    {
+      "package": "controller/client",
       "identifier": "UpdateRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
@@ -19688,6 +19886,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 33
+    },
+    {
+      "package": "controller/client",
+      "identifier": "WriteOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 91
+    },
+    {
+      "package": "controller/client",
+      "identifier": "WriteRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 87
+    },
+    {
+      "package": "controller/client",
+      "identifier": "WriteStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 93
+    },
+    {
+      "package": "controller/client",
+      "identifier": "WriteStatuses",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 96
     },
     {
       "package": "controller/commissioner",
@@ -22424,21 +22650,21 @@
       "identifier": "TestMain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-controller/main_test.go",
-      "line": 26
+      "line": 28
     },
     {
       "package": "examples/quickstart-controller",
       "identifier": "TestQuickstartControllerPairErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-controller/main_test.go",
-      "line": 62
+      "line": 71
     },
     {
       "package": "examples/quickstart-controller",
       "identifier": "TestQuickstartControllerStack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/quickstart-controller/main_test.go",
-      "line": 36
+      "line": 39
     },
     {
       "package": "examples/quickstart-device",
@@ -23020,6 +23246,125 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/window_test.go",
       "line": 142
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "AttributeData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 43
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "AttributePath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 22
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "CommandPath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 24
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "EventData",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 45
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "EventPath",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 26
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Interaction",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 56
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Message",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 63
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Peer",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 59
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 51
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Privilege",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 66
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "ReadRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 30
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Report",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 41
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Result",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 47
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Session",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 61
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "StatusError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 49
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "SubscribeRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 34
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "Subscription",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "fabrictest/surface.go",
+      "line": 37
     },
     {
       "package": "fabrictest",

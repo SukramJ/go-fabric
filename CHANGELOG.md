@@ -10,6 +10,25 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+No source change is required: every new name is an alias of a type the
+API already used, or a new symbol. One value changed, under Changed.
+
+### Added
+
+- `spec.Value[T]`, a scalar a controller writes, as a `spec.Encodable`: `spec.Uint`, `spec.Int` (they keep a generated enum or bitmap type), `spec.Uint8` … `spec.Int64`, `spec.Bool`, `spec.Float32`, `spec.Float64`, `spec.String`, `spec.Bytes`, and `spec.Null[T]()` for a nullable attribute's null. `fabrictest.Write` and `client.Node.Write` need no `tlv` (gate 2, G2-8).
+- The controller's typed reads: `<cluster>def.StateFrom(values)` in every generated package fills the cluster's `State` from a peer's values and lists the attributes absent. It is the same generated path the device's typed server reads through (`spec.StateFrom` over `State.FromAttributeValues`). `spec.Values`, `spec.AttributeValues`, `spec.DecodeAttribute` (the decode `client.Cluster.Decoded` used, moved), `spec.ErrUntyped`; `client.Report.Values(endpoint, cluster)`; `fabrictest.ReadCluster`. A nil `*client.Cluster` is empty values.
+- `controller/client` owns the role's vocabulary as aliases: `AttributePath`, `CommandPath`, `EventPath`, `DataVersionFilter`, `EventMinimumNumber`, `ReadPaths`, `SubscribeRequest`, `Subscription`, `Report`, `AttributeData`, `AttributeStatus`, `EventData`, `EventStatus`, `WriteRequest`, `WriteOptions`, `WriteStatus`, `WriteStatuses`, `InvokeOptions`, `Result`, `StatusError`, `PeerAddress`, `Device`, `SupportedTransports`, `Timing`, `SessionParameters`, `DeviceTypeViolation`; `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`, `Interval`. `fabrictest` the same for its helpers (`ReadRequest` is `client.ReadPaths`), plus `Interaction`, `Peer`, `Session`, `Message` and `Privilege` with `PrivilegeView` … `PrivilegeAdminister` (gate 2, G2-8).
+- `controller.New(ctx, controller.Config)`, the controller role's composition root: the database schemas, CA, fabric, socket, DNS-SD, peers, subscriptions, commissioner and registry in one call. `Config.Attestation` is required (`controller.ErrConfiguration`), so the test PAAs are never trusted by default. `Controller.Pair(ctx, code, PairOptions)` commissions by QR or manual code (`controller.ErrNoDevice`, `DefaultPairTimeout`). `Controller.Nodes`, `Close`, and the seams `Registry`, `Commissioner` and `Fabric`. The quickstart controller and `docs/getting-started/controller.md` use it (gate 2, consumer note 21).
+- `make apidiff` and `make apidiff-check` (a CI job): the incompatible API changes against the last tag, and a failure for each that `[Unreleased]` does not name. `golang.org/x/exp/cmd/apidiff` is a tool dependency of the module.
+
+### Changed
+
+- `client.Cluster.Decoded` of a nullable struct attribute returns the generated struct, as for a non-nullable one; it returned a `map[uint32]any` by field id. The generated `Attribute.Decode` now covers nullable struct and struct-list attributes, with TLV null as nil.
+
+### Fixed
+
+- The device acknowledges a controller's StatusResponse that ends one of its report exchanges at once, with a standalone ack, as matter.js's MessageExchange.close does (`MessageExchange.ts:1117-1124`). The ack used to wait for the ack pump's grace window, so a controller's StatusResponse kept retransmitting and its exchange stayed open past it. On a fake clock the controller's teardown then ran into its 10 s bound.
+
 ## [0.10.2] — 2026-10-23
 
 Upgrading **requires a source change** for a host that imports one of the

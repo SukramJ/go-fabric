@@ -10,11 +10,12 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // ReadRequest is a read through the node — matter.js ClientRead
-// (packages/protocol/src/action/client/ClientRead.ts:12 at 0ceb202d).
+// (packages/protocol/src/action/client/ClientRead.ts:12 at 0ceb202d): the
+// paths and filters it sends ([ReadPaths], embedded as ReadRequest, its
+// fields promoted) and IncludeKnownVersions.
 type ReadRequest struct {
 	interaction.ReadRequest
 	// IncludeKnownVersions skips the version filters, so the peer sends
@@ -29,7 +30,7 @@ type ReadRequest struct {
 // for a cluster with a changes-omitted attribute (:107) and none for a
 // cluster the caller filters ([structure.withKnownVersions]). The caller
 // gets the report as the peer sent it, its chunks merged.
-func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, error) {
+func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 	r := req.ReadRequest
 	sc := newScope(r.Attributes, r.NoFabricFilter)
 	n.mu.RLock()
@@ -65,9 +66,9 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, 
 // produced them. Mirrors matter.js
 // packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
 // 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
-func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) (*interaction.Subscription, error) {
+func (n *Node) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
 	callerFilters := slices.Clone(req.DataVersionFilters)
-	var callerRefresh func(interaction.SubscribeRequest) interaction.SubscribeRequest
+	var callerRefresh func(SubscribeRequest) SubscribeRequest
 	if req.Sustain {
 		callerRefresh = req.RefreshRequest
 	}
@@ -81,7 +82,7 @@ func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) 
 	n.mu.RUnlock()
 	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
 	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
-	r.Updated = func(rep *interaction.Report) {
+	r.Updated = func(rep *Report) {
 		sentMu.Lock()
 		sc := sent
 		sentMu.Unlock()
@@ -90,14 +91,14 @@ func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) 
 			req.Updated(rep)
 		}
 	}
-	r.RefreshRequest = func(x interaction.SubscribeRequest) interaction.SubscribeRequest {
+	r.RefreshRequest = func(x SubscribeRequest) SubscribeRequest {
 		x.DataVersionFilters = slices.Clone(callerFilters)
 		if callerRefresh != nil {
 			x = callerRefresh(x)
 		}
 		sc := newScope(x.Attributes, x.NoFabricFilter)
 		n.mu.RLock()
-		x.EventFilters = []im.EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
+		x.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
 		x.DataVersionFilters = n.s.withKnownVersions(sc, x.DataVersionFilters, false)
 		n.mu.RUnlock()
 		sentMu.Lock()
@@ -115,7 +116,7 @@ func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) 
 }
 
 // observeRequest hands a subscription request to the test seam.
-func (n *Node) observeRequest(r interaction.SubscribeRequest) {
+func (n *Node) observeRequest(r SubscribeRequest) {
 	n.mu.RLock()
 	f := n.requestObserver
 	n.mu.RUnlock()
@@ -131,7 +132,7 @@ func (n *Node) observeRequest(r interaction.SubscribeRequest) {
 // (ClientNodeInteraction.ts:175-186). The image changes when the peer
 // reports the new value, not through the write (matter.js's RemoteWriter
 // sets the cache and compensates a refusal).
-func (n *Node) Write(ctx context.Context, writes []interaction.WriteRequest, opts interaction.WriteOptions) (interaction.WriteStatuses, error) {
+func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptions) (WriteStatuses, error) {
 	ia, err := n.interaction()
 	if err != nil {
 		return nil, err
@@ -141,10 +142,10 @@ func (n *Node) Write(ctx context.Context, writes []interaction.WriteRequest, opt
 
 // Invoke invokes a command on the peer — ClientNodeInteraction.invoke
 // (ClientNodeInteraction.ts:197-210).
-func (n *Node) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error) {
+func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
 	ia, err := n.interaction()
 	if err != nil {
-		return interaction.Result{}, err
+		return Result{}, err
 	}
 	return ia.Invoke(ctx, path, fields, opts)
 }

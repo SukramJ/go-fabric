@@ -40,6 +40,27 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## The controller side in v0.10.3
+
+Nothing was removed: the old spellings compile, since the new names are
+aliases of the same types. A controller program or a `fabrictest` test
+stops importing `client/interaction`, `im` and `tlv` this way:
+
+| Before | Route |
+| --- | --- |
+| `interaction.ReadRequest`, `SubscribeRequest`, `WriteRequest`, `WriteOptions`, `InvokeOptions`, `Report`, `AttributeData`, `EventData`, `Subscription`, `Result`, `StatusError` | `client.ReadPaths` (the embedded part of `client.ReadRequest`; set its promoted fields, `req.Attributes = …`), `client.SubscribeRequest`, … — the same names in `controller/client`; in a test the same names in `fabrictest` (`fabrictest.ReadRequest` is `client.ReadPaths`) |
+| `im.ConcreteAttributePath{…, HasEndpoint: true, HasCluster: true, HasAttribute: true}`, `im.ConcreteCommandPath`, `im.ConcreteEventPath` | `client.AttributeAt(ep, cluster, attr)`, `client.ClusterAt(ep, cluster)`, `client.CommandAt`, `client.EventAt`; the types are `client.AttributePath`, `CommandPath`, `EventPath` |
+| `handshake.PeerAddress`, `discovery.Device`, `discovery.SupportedTransports`, `peer.Timing`, `sessionparams.Parameters` | `client.PeerAddress`, `client.Device`, `client.SupportedTransports`, `client.Timing`, `client.SessionParameters` |
+| a hand-written `spec.Encodable` over `tlv.Encoder` for a scalar write | `spec.Uint8(20)`, `spec.Int16(2250)`, `spec.Uint(onoffdef.StartUpOnOffToggle)`, `spec.String("x")`, `spec.Null[uint16]()` |
+| `Cluster.Decoded(attr)` compared with a widened integer (`== uint64(20)`) | `<cluster>def.StateFrom(ep.Cluster(<cluster>def.ClusterID))`: the generated `State`, every field in its own type, and the attributes the image lacks; `StateFrom(report.Values(ep, cluster))` for one report |
+| `got.Value.El.Bool` on `fabrictest.Read` | `fabrictest.ReadCluster(ctx, pair, ep, cluster)` and the generated `StateFrom` |
+| the nine-package controller stack (`store`, `ca`, `commissioner`, `transport/udp`, `client/exchange`, `client/discovery`, `client/peer`, `client/interaction`, `controller/client`) | `controller.New(ctx, controller.Config{DB, Attestation, …})`, `Controller.Pair(ctx, code, …)`, `Controller.Nodes`, `Controller.Close` |
+| `store.Privilege` for `Pair.Grant` | `fabrictest.Privilege` and `fabrictest.PrivilegeView` … `PrivilegeAdminister` |
+
+One value changed: `Cluster.Decoded` of a nullable struct attribute
+returns the generated struct now, as it does for a non-nullable one,
+where it returned a `map[uint32]any` by field id.
+
 ## Moved in v0.10.2: value helpers and the native-ramp ports
 
 A host that declares its devices (`<cluster>def.Declare`) reaches these

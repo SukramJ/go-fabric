@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/mdns"
 )
 
@@ -31,28 +33,35 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestQuickstartControllerStack opens the stack twice on one database: the
-// second run is the same fabric, and with no node paired run says so.
+// TestQuickstartControllerStack opens the controller twice on one
+// database: the second run is the same fabric, and with no node paired run
+// says so.
 func TestQuickstartControllerStack(t *testing.T) {
 	ctx := context.Background()
-	db := filepath.Join(t.TempDir(), "controller.db")
+	path := filepath.Join(t.TempDir(), "controller.db")
+	db, err := openDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
 	var fabricID, nodeID uint64
 	for run := range 2 {
-		s, err := open(ctx, db, "127.0.0.1:0", slog.Default())
+		c, err := open(ctx, db, "127.0.0.1:0", slog.Default())
 		if err != nil {
 			t.Fatalf("run %d: open: %v", run, err)
 		}
+		f := c.Fabric()
 		if run == 0 {
-			fabricID, nodeID = s.fabric.FabricID, s.fabric.RootNodeID
-		} else if s.fabric.FabricID != fabricID || s.fabric.RootNodeID != nodeID {
-			t.Errorf("run %d: fabric %x node %x, want the first run's %x / %x", run, s.fabric.FabricID, s.fabric.RootNodeID, fabricID, nodeID)
+			fabricID, nodeID = f.FabricID, f.RootNodeID
+		} else if f.FabricID != fabricID || f.RootNodeID != nodeID {
+			t.Errorf("run %d: fabric %x node %x, want the first run's %x / %x", run, f.FabricID, f.RootNodeID, fabricID, nodeID)
 		}
-		if got := len(s.reg.Commissioned()); got != 0 {
+		if got := len(c.Nodes()); got != 0 {
 			t.Errorf("run %d: %d commissioned nodes, want none", run, got)
 		}
-		s.close(ctx)
+		_ = c.Close(ctx)
 	}
-	if err := run(ctx, db, ""); err == nil || !strings.Contains(err.Error(), "no paired node") {
+	if err := run(ctx, filepath.Join(t.TempDir(), "empty.db"), ""); err == nil || !strings.Contains(err.Error(), "no paired node") {
 		t.Errorf("run without a node = %v, want the no-paired-node error", err)
 	}
 }
@@ -60,17 +69,25 @@ func TestQuickstartControllerStack(t *testing.T) {
 // TestQuickstartControllerPairErrors: a malformed code is refused, a valid
 // one that no device answers ends at the deadline.
 func TestQuickstartControllerPairErrors(t *testing.T) {
-	s, err := open(context.Background(), filepath.Join(t.TempDir(), "controller.db"), "127.0.0.1:0", slog.Default())
+	ctx := context.Background()
+	if err := run(ctx, filepath.Join(t.TempDir(), "controller.db"), "not a code"); err == nil {
+		t.Error("run accepted a malformed code")
+	}
+	// The stack opens on a context of its own; only the pairing is bounded
+	// short, so a slow schema apply (the race detector) does not end it.
+	db, err := openDB(filepath.Join(t.TempDir(), "controller2.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.close(context.Background())
-	if err := s.pair(context.Background(), "not a code"); err == nil {
-		t.Error("pair accepted a malformed code")
+	defer func() { _ = db.Close() }()
+	c, err := open(ctx, db, "127.0.0.1:0", slog.Default())
+	if err != nil {
+		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer func() { _ = c.Close(ctx) }()
+	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
-	if err := s.pair(ctx, "34970112332"); err == nil || !strings.Contains(err.Error(), "no commissionable device") {
-		t.Errorf("pair on a silent network = %v, want the no-device error", err)
+	if _, err := c.Pair(short, "34970112332", controller.PairOptions{}); !errors.Is(err, controller.ErrNoDevice) {
+		t.Errorf("pair on a silent network = %v, want ErrNoDevice", err)
 	}
 }

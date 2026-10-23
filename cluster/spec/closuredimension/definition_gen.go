@@ -430,6 +430,27 @@ func decodeSetTargetRequest(n spec.Node) (any, error) { return spec.DecodeStruct
 
 func decodeStepRequest(n spec.Node) (any, error) { return spec.DecodeStruct[StepRequest](n) }
 
+func decodeAttrCurrentState(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DimensionStateStruct](n)
+}
+
+func decodeAttrTargetState(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[DimensionStateStruct](n)
+}
+
+func decodeAttrUnitRange(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[UnitRangeStruct](n)
+}
+
 func decodeAttrLimitRange(n spec.Node) (any, error) {
 	return spec.DecodeStruct[RangePercent100thsStruct](n)
 }
@@ -456,6 +477,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrCurrentState,
 		},
 		{
 			ID: AttrTargetState, Name: "TargetState",
@@ -465,6 +487,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrTargetState,
 		},
 		{
 			ID: AttrResolution, Name: "Resolution",
@@ -497,6 +520,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrUnitRange,
 		},
 		{
 			ID: AttrLimitRange, Name: "LimitRange",

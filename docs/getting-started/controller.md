@@ -9,8 +9,10 @@ complete tool, with every command, is `examples/reference-controller`.
 
 ## The stack
 
-A controller is assembled from the packages under `controller/`. The
-reference controller's `openStack` builds them in this order:
+`controller.New(ctx, controller.Config{…})` builds the controller in one
+call. It is the role's composition root (ADR 0026 principle 2): it
+applies the database schemas and assembles the nine parts in the order
+the reference controller's `openStack` builds them:
 
 | Step | Package | What it is |
 | --- | --- | --- |
@@ -24,10 +26,27 @@ reference controller's `openStack` builds them in this order:
 | Commissioner | `controller/commissioner` (`New`) | PASE, attestation, CSR, NOC, CommissioningComplete |
 | Registry | `controller/client` | one image per remote node, persisted |
 
-The quickstart's `open` follows the same order, and its `close` tears the
-stack down in reverse.
+`Controller.Close` tears the stack down in reverse; the database stays
+the host's. `Config` takes:
 
-*Source: `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
+- `DB` (required): the host opens it with the SQLite driver of its choice.
+- `Attestation` (required): the PAA trust store. There is no default, so
+  a controller never trusts the test PAAs by accident.
+  `attestation.TestStore()` is for development devices; a production
+  controller passes a DCL-backed store.
+- `Listen`, `VendorID` (0 is the test vendor 0xFFF1), `Label`, `Logger`,
+  `Node` (every client node's `client.Config`).
+- `ManualStart`: false starts the commissioned nodes, as matter.js's
+  controller connects them on start. A program that only pairs or reads
+  once sets it.
+
+`Controller.Registry`, `Controller.Commissioner` and `Controller.Fabric`
+are the role's seams ([advanced seams](../guides/advanced-seams.md)). A
+host with a different composition, such as its own trust policy per
+finding or a BLE channel, builds the parts itself, as the reference
+controller does.
+
+*Source: `controller/controller.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -46,9 +65,7 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -61,38 +78,15 @@ import (
 	_ "modernc.org/sqlite" // the host picks the SQLite driver
 
 	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // openNames opens the DNS-SD cache; a test replaces it.
 var openNames = discovery.Open
-
-// stack is the controller, in the order the reference controller's
-// openStack builds it.
-type stack struct {
-	db     *sql.DB
-	fabric *commissioner.Fabric
-	mgr    *exchange.Manager
-	names  *discovery.Names
-	peers  *peer.Set
-	subs   *interaction.Subscriptions
-	com    *commissioner.Commissioner
-	reg    *client.Registry
-	stop   func()
-}
 
 func main() {
 	dbPath := flag.String("db", "quickstart-controller.db", "the SQLite file holding the fabric and the paired nodes")
@@ -108,174 +102,73 @@ func main() {
 }
 
 func run(ctx context.Context, dbPath, code string) error {
-	s, err := open(ctx, dbPath, "[::]:0", slog.Default())
+	db, err := openDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer s.close(context.WithoutCancel(ctx))
+	defer func() { _ = db.Close() }()
+	c, err := open(ctx, db, "[::]:0", slog.Default())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
 	if code != "" {
-		if err := s.pair(ctx, code); err != nil {
+		noSubscribe := false // this program exits; a resident host keeps the default subscription
+		if _, err := c.Pair(ctx, code, controller.PairOptions{AutoSubscribe: &noSubscribe}); err != nil {
 			return err
 		}
 	}
-	nodes := s.reg.Commissioned()
+	nodes := c.Nodes()
 	if len(nodes) == 0 {
 		return errors.New("no paired node: pass -code")
 	}
 	return use(ctx, nodes[0])
 }
 
-// open builds the stack over the database: the fabric (created on the first
-// run, loaded afterwards), the socket, DNS-SD, peers, commissioner, registry.
-func open(ctx context.Context, dbPath, listen string, log *slog.Logger) (_ *stack, err error) {
-	s := &stack{stop: func() {}}
-	defer func() {
-		if err != nil {
-			s.close(context.WithoutCancel(ctx))
-		}
-	}()
-	if s.db, err = sql.Open("sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"); err != nil {
-		return nil, err
-	}
-	if err := errors.Join(store.Apply(ctx, s.db), sqlstore.Apply(ctx, s.db)); err != nil {
-		return nil, err
-	}
-	keep := ca.SettingStore{Settings: store.New(s.db)} // "controller.ca" and "controller.ca.fabric"
-	authority, err := ca.New(ca.Config{Store: keep})
-	if err != nil {
-		return nil, err
-	}
-	// A first run draws the fabric id and our node id; NewFabric saves them.
-	fcfg := commissioner.FabricConfig{VendorID: 0xFFF1, Label: "quickstart", Store: keep, FabricID: max(random(), 1), RootNodeID: random()%0xFFFF_FFEF_FFFF_FFFF + 1}
-	if _, found, err := keep.LoadFabric(); err != nil { //nolint:contextcheck // the settings store's Load takes no context
-		return nil, err
-	} else if found {
-		fcfg.FabricID, fcfg.RootNodeID = 0, 0 // the stored record decides
-	}
-	if s.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
-		return nil, err
-	}
-	l, err := udp.New(udp.Config{LocalAddr: listen})
-	if err != nil {
-		return nil, err
-	}
-	if s.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log}); err != nil {
-		_ = l.Close()
-		return nil, err
-	}
-	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	served := make(chan struct{})
-	go func() { defer close(served); _ = l.Serve(serveCtx, s.mgr.HandleDatagram) }()
-	s.stop = func() { cancel(); <-served }
-	if s.names, err = openNames(log); err != nil {
-		return nil, err
-	}
-	resumption := &peer.MemoryResumptionStore{}
-	fabrics := []*commissioner.Fabric{s.fabric}
-	if s.peers, err = peer.NewSet(peer.Context{Exchanges: s.mgr, Names: s.names, Fabrics: s.fabric.Lookup, Resumption: resumption, Logger: log}); err != nil {
-		return nil, err
-	}
-	s.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log})
-	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
-	if s.com, err = commissioner.New(commissioner.Context{
-		Exchanges: s.mgr, Peers: s.peers, Attestation: attestation.TestStore(), Logger: log,
-		Subscriptions: s.subs, Fabrics: fabrics, Resumption: resumption,
-	}); err != nil {
-		return nil, err
-	}
-	s.reg, err = client.NewRegistry(client.RegistryConfig{ //nolint:contextcheck // as commissioner.New
-		Store: sqlstore.New(s.db), Commissioner: s.com, Peers: s.peers, Exchanges: s.mgr,
-		Fabrics: fabrics, Subscriptions: s.subs, Logger: log, Node: client.Config{Logger: log},
-	})
-	return s, err
+// openDB opens the SQLite file the controller keeps its fabric in.
+func openDB(path string) (*sql.DB, error) {
+	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 }
 
-// close tears the stack down in reverse order.
-func (s *stack) close(ctx context.Context) {
-	if s.reg != nil {
-		_ = s.reg.Close(ctx)
-	}
-	if s.subs != nil {
-		_ = s.subs.Close(ctx)
-	}
-	if s.com != nil {
-		s.com.Close()
-	}
-	if s.peers != nil {
-		s.peers.Close(ctx)
-	}
-	if s.mgr != nil {
-		s.mgr.Close()
-	}
-	s.stop()
-	if s.names != nil {
-		_ = s.names.Close()
-	}
-	if s.db != nil {
-		_ = s.db.Close()
-	}
-}
-
-// pair finds the device by the code's discriminator over DNS-SD and
-// commissions it: PASE, attestation against the CSA test PAAs, the NOC.
-func (s *stack) pair(ctx context.Context, code string) error {
-	var passcode uint32
-	var id discovery.Identifier
-	if qr, err := setup.DecodeQRCode(code); err == nil {
-		passcode, id = qr.Passcode, discovery.ByLongDiscriminator(qr.Discriminator)
-	} else if m, err := setup.DecodeManualCode(code); err == nil {
-		passcode, id = m.Passcode, discovery.ByShortDiscriminator(m.ShortDiscriminator)
-	} else {
-		return fmt.Errorf("-code: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	sc := discovery.NewScanner(s.names)
-	defer sc.Close()
-	fctx, found := context.WithCancel(ctx)
-	var dev *discovery.Device
-	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
-		if dev == nil && len(d.Addresses) > 0 {
-			dev = &d
-			found()
-		}
-	})
-	found()
-	if dev == nil {
-		return errors.New("no commissionable device answered")
-	}
-	n, err := s.reg.ForDevice(ctx, *dev)
-	if err != nil {
-		return err
-	}
-	noSubscribe := false // this program exits; a resident host keeps the default subscription
-	return s.reg.Commission(ctx, n, client.CommissionOptions{
-		Options:       commissioner.Options{Passcode: passcode, OnAttestationFailure: attestation.Reject()},
-		AutoSubscribe: &noSubscribe,
+// open builds the controller over the database: the fabric (created on the
+// first run, loaded afterwards), the socket, DNS-SD, peers, commissioner,
+// registry — one call. The trust store is the CSA's test PAAs, for
+// development devices; a production controller passes a DCL-backed one.
+func open(ctx context.Context, db *sql.DB, listen string, log *slog.Logger) (*controller.Controller, error) {
+	return controller.New(ctx, controller.Config{
+		DB:          db,
+		Attestation: attestation.TestStore(),
+		Listen:      listen,
+		Label:       "quickstart",
+		Logger:      log,
+		Names:       openNames,
+		ManualStart: true, // the program reads and subscribes itself
 	})
 }
 
 // use reads, invokes and subscribes through the node's client image.
 func use(ctx context.Context, n *client.Node) error {
-	label := im.ConcreteAttributePath{Endpoint: 0, Cluster: basicinfo.ClusterID, Attribute: basicinfo.AttrNodeLabel, HasEndpoint: true, HasCluster: true, HasAttribute: true}
-	if _, err := n.Read(ctx, client.ReadRequest{ReadRequest: interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{label}}}); err != nil {
+	var read client.ReadRequest
+	read.Attributes = []client.AttributePath{client.ClusterAt(0, basicinfo.ClusterID)}
+	if _, err := n.Read(ctx, read); err != nil {
 		return err
 	}
-	if ep := n.Endpoint(0); ep != nil && ep.Cluster(basicinfo.ClusterID) != nil {
-		if v, err := ep.Cluster(basicinfo.ClusterID).Decoded(basicinfo.AttrNodeLabel); err == nil {
-			fmt.Printf("NodeLabel: %v\n", v)
-		}
+	// The typed read: the image's values as the generated State.
+	if info, _ := basicinfo.StateFrom(n.Endpoint(0).Cluster(basicinfo.ClusterID)); info.NodeLabel != "" {
+		fmt.Printf("NodeLabel: %s\n", info.NodeLabel)
 	}
-	toggle := im.ConcreteCommandPath{Endpoint: 1, Cluster: onoffdef.ClusterID, Command: onoffdef.CmdToggle, HasEndpoint: true, HasCluster: true, HasCommand: true}
-	if _, err := n.Invoke(ctx, toggle, onoffdef.ToggleRequest{}, interaction.InvokeOptions{}); err != nil {
+	toggle := client.CommandAt(1, onoffdef.ClusterID, onoffdef.CmdToggle)
+	if _, err := n.Invoke(ctx, toggle, onoffdef.ToggleRequest{}, client.InvokeOptions{}); err != nil {
 		return err
 	}
-	onOff := im.ConcreteAttributePath{Endpoint: 1, Cluster: onoffdef.ClusterID, Attribute: onoffdef.AttrOnOff, HasEndpoint: true, HasCluster: true, HasAttribute: true}
-	sub, err := n.Subscribe(ctx, interaction.SubscribeRequest{
-		Attributes:         []im.ConcreteAttributePath{onOff},
-		MaxIntervalCeiling: interaction.Interval(time.Minute),
-		Updated: func(r *interaction.Report) { // keep it short: it runs on the report's exchange
-			fmt.Printf("report: %d attribute(s)\n", len(r.Attributes))
+	sub, err := n.Subscribe(ctx, client.SubscribeRequest{
+		Attributes:         []client.AttributePath{client.AttributeAt(1, onoffdef.ClusterID, onoffdef.AttrOnOff)},
+		MaxIntervalCeiling: client.Interval(time.Minute),
+		Updated: func(r *client.Report) { // keep it short: it runs on the report's exchange
+			if _, ok := r.Value(1, onoffdef.ClusterID, onoffdef.AttrOnOff); ok {
+				st, _ := onoffdef.StateFrom(r.Values(1, onoffdef.ClusterID))
+				fmt.Printf("OnOff: %v\n", st.OnOff)
+			}
 		},
 	})
 	if err != nil {
@@ -288,12 +181,6 @@ func use(ctx context.Context, n *client.Node) error {
 	}
 	return nil
 }
-
-func random() uint64 {
-	var b [8]byte
-	_, _ = rand.Read(b[:])
-	return binary.BigEndian.Uint64(b[:])
-}
 ```
 
 ```sh
@@ -301,9 +188,10 @@ go run ./examples/quickstart-controller -code MT:-24J0AFN00KA0648G00
 go run ./examples/quickstart-controller          # the same node, next run
 ```
 
-The test opens the stack twice on one database and checks that the second
-run is the same fabric. It also checks that a malformed code is refused and
-that a valid code that no device answers ends at the deadline.
+The test opens the controller twice on one database and checks that the
+second run is the same fabric. It also checks that a malformed code is
+refused and that a valid code that no device answers ends at the deadline
+with `controller.ErrNoDevice`.
 
 *Source: `examples/quickstart-controller/main_test.go`.*
 
@@ -317,7 +205,7 @@ mints and saves a new record only when the store has none.
 
 A stored record wins over the configuration. A non-zero `FabricID` or
 `RootNodeID` that differs from the stored record is `ErrFabricMismatch`.
-That is why the quickstart sets both fields to zero once a record exists.
+That is why `controller.New` sets both fields to zero once a record exists.
 `ca.SettingStore` keeps the CA under the settings key `controller.ca` and
 the fabric under `controller.ca.fabric`.
 
@@ -327,6 +215,12 @@ file controls every node paired to it.
 *Source: `controller/ca/doc.go:4-17`, `controller/commissioner/fabric.go:23-69`, `controller/ca/persist.go:94-115`, `examples/reference-controller/README.md` (The database).*
 
 ## Pairing
+
+`Controller.Pair(ctx, code, controller.PairOptions{})` runs the four steps
+below. Its `OnAttestationFailure` defaults to `attestation.Reject()`, and
+`AutoSubscribe` overrides the registry's default subscription. A context
+without a deadline is bounded by `controller.DefaultPairTimeout` (one
+minute).
 
 1. **Decode the code.** `setup.DecodeQRCode` reads an `MT:` payload and
    gives the long discriminator. `setup.DecodeManualCode` reads 11 or 21
@@ -429,8 +323,15 @@ cluster's shape.
 | `Endpoints()`, `Endpoint(n)` | the image's endpoints |
 | `Endpoint.DeviceType()`, `Endpoint.Device()` | the device type id, and its definition when known |
 | `Endpoint.Clusters()`, `Endpoint.Cluster(id)` | the clusters |
-| `Cluster.Decoded(attr)` | an attribute value, decoded through the definition |
+| `<cluster>def.StateFrom(Endpoint.Cluster(id))` | the cluster's typed `State`, and the attributes the image lacks |
+| `Cluster.Decoded(attr)` | one attribute value, untyped: a struct as its generated type, any other value at its widest Go type (a uint8 as `uint64`) |
 | `Cluster.Value(attr)` | the raw TLV tree |
+
+The typed read is the generated `StateFrom` of each `<cluster>def`
+package. It fills the same `State` the device side's typed server reads,
+through the same generated code, so a value has its attribute's own type.
+It takes any `spec.Values`: a cluster of the image, or one cluster of a
+report (`Report.Values(endpoint, cluster)`).
 
 The image is persisted with `controller/client/sqlstore`, so a later run
 starts from what the last one saw.
@@ -440,16 +341,23 @@ starts from what the last one saw.
 ## Read, write, invoke, subscribe
 
 All four go through the node and its CASE session. The peer set
-establishes CASE when no session is live.
+establishes CASE when no session is live. Their types are
+`controller/client`'s own: `AttributePath`, `CommandPath`, `EventPath`
+(built with `client.AttributeAt`, `client.ClusterAt`, `client.CommandAt`,
+`client.EventAt`), `ReadRequest`, `SubscribeRequest`, `Report`,
+`WriteRequest`, `InvokeOptions`, `Result` and `StatusError`. Each type's
+doc comment names the fields a host sets.
 
 - **Read.** `Node.Read` applies the report to the image and returns it.
-  Unless `IncludeKnownVersions` is set, the cached data versions go along
+  Its paths are promoted fields (`req.Attributes = …`). Unless
+  `IncludeKnownVersions` is set, the cached data versions go along
   as filters, so the peer sends only clusters that changed.
-- **Write.** `Node.Write` takes `interaction.WriteRequest`s, each a path
-  and a value. The value is a generated type, or a TLV tree through
-  `interaction.Raw`. `DataVersion` makes a write conditional. The write
-  goes to the peer only, and the image follows when the peer reports the
-  new value.
+- **Write.** `Node.Write` takes `client.WriteRequest`s, each a path and a
+  value. The value is a generated struct or request, a `spec.List`, or a
+  scalar `spec.Value`: `spec.Int16(2250)`, `spec.Uint8(20)`,
+  `spec.Uint(onoffdef.StartUpOnOffToggle)`, `spec.Null[uint16]()`.
+  `DataVersion` makes a write conditional. The write goes to the peer
+  only, and the image follows when the peer reports the new value.
 - **Invoke.** `Node.Invoke` takes the command path and the generated
   request type (`onoffdef.ToggleRequest{}`).
   `InvokeOptions{Timed: true}` sends a TimedRequest first.
@@ -457,9 +365,10 @@ establishes CASE when no session is live.
   `Updated` sees it. `Updated` runs on the goroutine that reads the report,
   inside the report's exchange, so keep it short. The reference controller
   hands each report to a channel. `Sustain` re-establishes a subscription
-  that was lost.
+  that was lost. `Subscription.Close` ends it, and so does the node's
+  `Close`; `Done` is closed then.
 
-*Source: `controller/client/interact.go:15-122`, `client/interaction/write.go:39-52`, `client/interaction/invoke.go:19-31`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
+*Source: `controller/client/surface.go`, `controller/client/interact.go:15-122`, `cluster/spec/value.go`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
 
 ## What is not here yet
 

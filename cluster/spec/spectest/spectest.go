@@ -281,7 +281,8 @@ func RoundTripEvent(tb testing.TB, def *spec.Cluster, eventID uint32, v spec.Enc
 }
 
 // RoundTripAttribute round-trips an attribute value through the
-// definition's decoder for the attribute.
+// definition's decoder for the attribute, and for a nullable attribute
+// decodes its TLV null to nil.
 func RoundTripAttribute(tb testing.TB, def *spec.Cluster, attrID uint32, v spec.Encodable) {
 	tb.Helper()
 	a := def.Attribute(attrID)
@@ -289,6 +290,13 @@ func RoundTripAttribute(tb testing.TB, def *spec.Cluster, attrID uint32, v spec.
 		tb.Fatalf("%s: no attribute 0x%04X", def.Name, attrID)
 	}
 	roundTripVia(tb, def.Name+"."+a.Name, a.Decode, v)
+	if a.Quality.Nullable && a.Decode != nil {
+		// The null of a nullable attribute decodes to nil, not to a
+		// half-filled generated value.
+		if got, err := a.Decode(Decode(tb, Encode(tb, spec.Null[bool]()))); got != nil || err != nil {
+			tb.Errorf("%s: null decodes to %v, %v; want nil", def.Name+"."+a.Name, got, err)
+		}
+	}
 }
 
 // CheckServer holds a server built on def with the given FeatureMap against

@@ -42,6 +42,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventTimeZoneStatus, TimeZoneStatusEvent{Offset: int32(1), Name: spectest.Ptr("x")})
 	spectest.RoundTripEvent(t, Definition, EventTimeFailure, TimeFailureEvent{})
 	spectest.RoundTripEvent(t, Definition, EventMissingTrustedTimeSource, MissingTrustedTimeSourceEvent{})
+	spectest.RoundTripAttribute(t, Definition, AttrTrustedTimeSource, TrustedTimeSourceStruct{FabricIndex: uint8(1), NodeId: uint64(1), Endpoint: uint16(1)})
 	spectest.RoundTripAttribute(t, Definition, AttrTimeZone, spec.List[TimeZoneStruct]([]TimeZoneStruct{TimeZoneStruct{Offset: int32(1), ValidAt: uint64(1), Name: spectest.Ptr("x")}}))
 	spectest.RoundTripAttribute(t, Definition, AttrDstOffset, spec.List[DSTOffsetStruct]([]DSTOffsetStruct{DSTOffsetStruct{Offset: int32(1), ValidStarting: uint64(1), ValidUntil: spec.ValueOf(uint64(1))}}))
 }
@@ -84,6 +85,35 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		UtcTime:              spectest.Ptr(uint64(1)),
+		Granularity:          spectest.Ptr(GranularityEnum(0)),
+		TimeSource:           spectest.Ptr(TimeSourceEnum(0)),
+		TrustedTimeSource:    spectest.Ptr(TrustedTimeSourceStruct{FabricIndex: uint8(1), NodeId: uint64(1), Endpoint: uint16(1)}),
+		DefaultNtp:           spectest.Ptr("x"),
+		TimeZone:             spectest.Ptr([]TimeZoneStruct{TimeZoneStruct{Offset: int32(1), ValidAt: uint64(1), Name: spectest.Ptr("x")}}),
+		DstOffset:            spectest.Ptr([]DSTOffsetStruct{DSTOffsetStruct{Offset: int32(1), ValidStarting: uint64(1), ValidUntil: spec.ValueOf(uint64(1))}}),
+		LocalTime:            spectest.Ptr(uint64(1)),
+		TimeZoneDatabase:     spectest.Ptr(TimeZoneDatabaseEnum(0)),
+		NtpServerAvailable:   spectest.Ptr(true),
+		TimeZoneListMaxSize:  spectest.Ptr(uint8(1)),
+		DstOffsetListMaxSize: spectest.Ptr(uint8(1)),
+		SupportsDnsResolve:   spectest.Ptr(true),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 13 {
+		t.Errorf("StateFrom(nil): %v absent, want all 13", absent)
+	}
 	if len(values) != 14 {
 		t.Errorf("a patch of every field sets %d values, want 14", len(values))
 	}

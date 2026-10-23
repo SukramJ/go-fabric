@@ -1147,17 +1147,22 @@ func lengthBounds(c *constraint) (lo, hi int, ok bool) {
 // generated types encode; empty for any other.
 func (g *generator) attrDecoder(a *element) string {
 	t := g.attrType[a.ID]
-	if a.Effective.Quality["nullable"] {
-		return ""
-	}
 	f := &fieldInfo{t: t, v: &a.Effective.value}
+	var body string
 	switch {
 	case t.kind == kindStruct:
-		return "return " + decExpr(f) + "(n)"
+		body = "return " + decExpr(f) + "(n)"
 	case t.kind == kindList && t.elem.t.kind == kindStruct && !t.elem.nullable:
-		return fmt.Sprintf("v, err := %s(n)\n\treturn spec.List[%s](v), err", decExpr(f), t.elem.t.goType)
+		body = fmt.Sprintf("v, err := %s(n)\n\treturn spec.List[%s](v), err", decExpr(f), t.elem.t.goType)
+	default:
+		return ""
 	}
-	return ""
+	if a.Effective.Quality["nullable"] {
+		// A nullable attribute's null is nil, as spec.DecodeValue answers
+		// it, so the generated type is never a half-decoded null.
+		body = "if n.El.Type == tlv.TypeNull {\n\t\treturn nil, nil\n\t}\n\t" + body
+	}
+	return body
 }
 
 //nolint:funlen // a template: the definition literal, section by section

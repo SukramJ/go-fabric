@@ -59,6 +59,16 @@ func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {
 	}
 }
 
+// StateFrom is the State of a peer's values of the IlluminanceMeasurement cluster —
+// a controller's client image of it (client.Cluster), one cluster of a
+// report (client.Report.Values) — each attribute decoded by
+// [Definition] and converted to its field's type as [Server.Get]
+// converts a stored one (spec.StateFrom). absent lists the attributes
+// of State the values do not hold; their fields stay at the zero value.
+func StateFrom(values spec.Values) (state State, absent []uint32) {
+	return spec.StateFrom[State](Definition, values)
+}
+
 // AttributeValues implements spec.PatchValuer: the attributes p sets,
 // by id, in their stored form — a list of a structure as its
 // spec.List — and nil for each id in Null.

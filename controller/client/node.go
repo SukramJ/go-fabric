@@ -47,7 +47,7 @@ type Node struct {
 	// newlyCommissioned is Internal.isNewlyCommissioned (NetworkClient.ts:385-391).
 	newlyCommissioned bool
 	// sub is the default subscription, activeSubscription (:380-382).
-	sub *interaction.Subscription
+	sub *Subscription
 	// likelyOffline is the latch of :393-398.
 	likelyOffline bool
 	seeded        bool
@@ -59,7 +59,7 @@ type Node struct {
 	warned          map[[2]uint64]bool
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
-	requestObserver func(interaction.SubscribeRequest)
+	requestObserver func(SubscribeRequest)
 }
 
 // New builds the node cfg describes and loads its image from the store.
@@ -135,7 +135,7 @@ func newNode(cfg Config) (*Node, error) {
 // apply applies a report to the image under the lock and delivers what it
 // produced after — ClientStructure.mutate (D8 of the brief: no job queue,
 // the callbacks after the lock).
-func (n *Node) apply(sc scope, r *interaction.Report) {
+func (n *Node) apply(sc scope, r *Report) {
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
 	n.s.mutate(sc, r)

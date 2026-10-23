@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 )
@@ -25,7 +24,7 @@ import (
 // [Pair.Commissioned] is false. With a fake site clock it runs under
 // [Site.Run].
 func (c *Controller) PASE(ctx context.Context, d *Device) (*Pair, error) {
-	var s *exchange.Session
+	var s *Session
 	err := c.site.Run(ctx, func(ctx context.Context) error {
 		var err error
 		s, _, err = c.com.EstablishPASE(ctx, commissioner.PASEOptions{Passcode: d.Passcode(), Addresses: []*net.UDPAddr{d.Addr()}})

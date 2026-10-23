@@ -34,6 +34,8 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventMeasurementPeriodRanges, MeasurementPeriodRangesEvent{Ranges: []MeasurementRangeStruct{MeasurementRangeStruct{MeasurementType: MeasurementTypeEnum(0), Min: int64(1), Max: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), MinTimestamp: spectest.Ptr(uint32(1)), MaxTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), MinSystime: spectest.Ptr(uint64(1)), MaxSystime: spectest.Ptr(uint64(1))}}})
 	spectest.RoundTripAttribute(t, Definition, AttrAccuracy, spec.List[MeasurementAccuracyStruct]([]MeasurementAccuracyStruct{MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}}}))
 	spectest.RoundTripAttribute(t, Definition, AttrRanges, spec.List[MeasurementRangeStruct]([]MeasurementRangeStruct{MeasurementRangeStruct{MeasurementType: MeasurementTypeEnum(0), Min: int64(1), Max: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), MinTimestamp: spectest.Ptr(uint32(1)), MaxTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), MinSystime: spectest.Ptr(uint64(1)), MaxSystime: spectest.Ptr(uint64(1))}}))
+	spectest.RoundTripAttribute(t, Definition, AttrHarmonicCurrents, spec.List[HarmonicMeasurementStruct]([]HarmonicMeasurementStruct{HarmonicMeasurementStruct{Order: uint8(1), Measurement: spec.ValueOf(int64(1))}}))
+	spectest.RoundTripAttribute(t, Definition, AttrHarmonicPhases, spec.List[HarmonicMeasurementStruct]([]HarmonicMeasurementStruct{HarmonicMeasurementStruct{Order: uint8(1), Measurement: spec.ValueOf(int64(1))}}))
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -80,6 +82,41 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		PowerMode:                spectest.Ptr(PowerModeEnum(0)),
+		NumberOfMeasurementTypes: spectest.Ptr(uint8(1)),
+		Accuracy:                 spectest.Ptr([]MeasurementAccuracyStruct{MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}}}),
+		Ranges:                   spectest.Ptr([]MeasurementRangeStruct{MeasurementRangeStruct{MeasurementType: MeasurementTypeEnum(0), Min: int64(1), Max: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), MinTimestamp: spectest.Ptr(uint32(1)), MaxTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), MinSystime: spectest.Ptr(uint64(1)), MaxSystime: spectest.Ptr(uint64(1))}}),
+		Voltage:                  spectest.Ptr(int64(1)),
+		ActiveCurrent:            spectest.Ptr(int64(1)),
+		ReactiveCurrent:          spectest.Ptr(int64(1)),
+		ApparentCurrent:          spectest.Ptr(int64(1)),
+		ActivePower:              spectest.Ptr(int64(1)),
+		ReactivePower:            spectest.Ptr(int64(1)),
+		ApparentPower:            spectest.Ptr(int64(1)),
+		RmsVoltage:               spectest.Ptr(int64(1)),
+		RmsCurrent:               spectest.Ptr(int64(1)),
+		RmsPower:                 spectest.Ptr(int64(1)),
+		Frequency:                spectest.Ptr(int64(1)),
+		HarmonicCurrents:         spectest.Ptr([]HarmonicMeasurementStruct{HarmonicMeasurementStruct{Order: uint8(1), Measurement: spec.ValueOf(int64(1))}}),
+		HarmonicPhases:           spectest.Ptr([]HarmonicMeasurementStruct{HarmonicMeasurementStruct{Order: uint8(1), Measurement: spec.ValueOf(int64(1))}}),
+		PowerFactor:              spectest.Ptr(int64(1)),
+		NeutralCurrent:           spectest.Ptr(int64(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 19 {
+		t.Errorf("StateFrom(nil): %v absent, want all 19", absent)
+	}
 	if len(values) != 20 {
 		t.Errorf("a patch of every field sets %d values, want 20", len(values))
 	}

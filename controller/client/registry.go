@@ -14,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
@@ -317,7 +316,7 @@ func (r *Registry) remove(n *Node) {
 // it is closed and forgotten, its store erased, and the protocol peer of
 // addr (the node's peer address when nil) deleted even when the teardown
 // failed. A node whose teardown failed stays in the registry.
-func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *handshake.PeerAddress) error {
+func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *PeerAddress) error {
 	if addr == nil {
 		if a, ok := n.PeerAddress(); ok {
 			addr = &a
@@ -472,7 +471,7 @@ func (r *Registry) Get(id string) *Node {
 
 // GetByAddress is the commissioned node with peer address addr, nil when
 // there is none (Peers.ts:412-427).
-func (r *Registry) GetByAddress(addr handshake.PeerAddress) *Node {
+func (r *Registry) GetByAddress(addr PeerAddress) *Node {
 	for _, n := range r.Nodes() {
 		if a, ok := n.PeerAddress(); ok && a == addr {
 			return n
@@ -505,7 +504,7 @@ func (r *Registry) fabricByIndex(index uint8) *commissioner.Fabric {
 // node takes id when given (:464-470) and an allocated one otherwise,
 // joins the registry and takes the address, bound to its peer but neither
 // started nor auto-subscribed (:472-484).
-func (r *Registry) ForAddress(addr handshake.PeerAddress, id string) (*Node, error) {
+func (r *Registry) ForAddress(addr PeerAddress, id string) (*Node, error) {
 	if r.fabricByIndex(addr.FabricIndex) == nil {
 		return nil, ErrForeignFabric
 	}
@@ -555,7 +554,7 @@ func (r *Registry) hooksFor(id string, holder *nodeHolder) Hooks {
 		h = r.cfg.HooksFor(id)
 	}
 	host := h.Event
-	h.Event = func(endpoint uint16, cluster, event uint32, e interaction.EventData, value any) {
+	h.Event = func(endpoint uint16, cluster, event uint32, e EventData, value any) {
 		if n := holder.get(); n != nil {
 			r.onEvent(n, endpoint, cluster, event, value)
 		}
