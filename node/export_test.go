@@ -6,3 +6,6 @@ package node
 // RemoveFabricBindings is the node's removal of a fabric's Binding entries,
 // what OperationalCredentials' RemoveFabric runs (fabricRemoved).
 func RemoveFabricBindings(n *Node, fabricIndex uint8) { n.removeFabricBindings(fabricIndex) }
+
+// Reassemblies is the number of reassemblies the Aggregator completed.
+func Reassemblies(a *Aggregator) int64 { return a.reassemblies.Load() }
