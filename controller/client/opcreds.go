@@ -20,9 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -142,7 +140,7 @@ type nocResponse struct {
 // errNoNOCResponse: the command was answered without a NocResponse.
 var errNoNOCResponse = errors.New("client: no NocResponse")
 
-func nocResponseOf(res interaction.Result) (nocResponse, error) {
+func nocResponseOf(res Result) (nocResponse, error) {
 	var r nocResponse
 	if !res.HasFields || res.Command != opCredsCmdNOCResponse {
 		return r, errNoNOCResponse
@@ -157,6 +155,6 @@ func nocResponseOf(res interaction.Result) (nocResponse, error) {
 	return r, nil
 }
 
-func opCredsCommand(cmd uint32) im.ConcreteCommandPath {
-	return im.ConcreteCommandPath{Endpoint: 0, Cluster: opCredsCluster, Command: cmd}
+func opCredsCommand(cmd uint32) CommandPath {
+	return CommandPath{Endpoint: 0, Cluster: opCredsCluster, Command: cmd}
 }

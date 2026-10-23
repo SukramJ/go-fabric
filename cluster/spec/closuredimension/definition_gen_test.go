@@ -32,6 +32,9 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTrip(t, UnitRangeStruct{Min: int16(1), Max: int16(1)}, spec.DecodeStruct[UnitRangeStruct])
 	spectest.RoundTripCommand(t, Definition, CmdSetTarget, spec.Request, SetTargetRequest{Position: spectest.Ptr(uint16(1)), Latch: spectest.Ptr(true), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))})
 	spectest.RoundTripCommand(t, Definition, CmdStep, spec.Request, StepRequest{Direction: StepDirectionEnum(0), NumberOfSteps: uint16(1), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))})
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentState, DimensionStateStruct{Position: spectest.Ptr(spec.ValueOf(uint16(1))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))})
+	spectest.RoundTripAttribute(t, Definition, AttrTargetState, DimensionStateStruct{Position: spectest.Ptr(spec.ValueOf(uint16(1))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))})
+	spectest.RoundTripAttribute(t, Definition, AttrUnitRange, UnitRangeStruct{Min: int16(1), Max: int16(1)})
 	spectest.RoundTripAttribute(t, Definition, AttrLimitRange, RangePercent100thsStruct{Min: uint16(1), Max: uint16(1)})
 }
 
@@ -72,6 +75,34 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		CurrentState:         spectest.Ptr(DimensionStateStruct{Position: spectest.Ptr(spec.ValueOf(uint16(1))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))}),
+		TargetState:          spectest.Ptr(DimensionStateStruct{Position: spectest.Ptr(spec.ValueOf(uint16(1))), Latch: spectest.Ptr(spec.ValueOf(true)), Speed: spectest.Ptr(ThreeLevelAutoEnum(0))}),
+		Resolution:           spectest.Ptr(uint16(1)),
+		StepValue:            spectest.Ptr(uint16(1)),
+		Unit:                 spectest.Ptr(ClosureUnitEnum(0)),
+		UnitRange:            spectest.Ptr(UnitRangeStruct{Min: int16(1), Max: int16(1)}),
+		LimitRange:           spectest.Ptr(RangePercent100thsStruct{Min: uint16(1), Max: uint16(1)}),
+		TranslationDirection: spectest.Ptr(TranslationDirectionEnum(0)),
+		RotationAxis:         spectest.Ptr(RotationAxisEnum(0)),
+		Overflow:             spectest.Ptr(OverflowEnum(0)),
+		ModulationType:       spectest.Ptr(ModulationTypeEnum(0)),
+		LatchControlModes:    spectest.Ptr(LatchControlModesBitmap(1 << 0)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 12 {
+		t.Errorf("StateFrom(nil): %v absent, want all 12", absent)
+	}
 	if len(values) != 13 {
 		t.Errorf("a patch of every field sets %d values, want 13", len(values))
 	}

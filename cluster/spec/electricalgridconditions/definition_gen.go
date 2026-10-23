@@ -137,6 +137,13 @@ func decodeCurrentConditionsChangedEvent(n spec.Node) (any, error) {
 	return spec.DecodeStruct[CurrentConditionsChangedEvent](n)
 }
 
+func decodeAttrCurrentConditions(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[ElectricalGridConditionsStruct](n)
+}
+
 func decodeAttrForecastConditions(n spec.Node) (any, error) {
 	v, err := spec.DecodeListIn(spec.DecodeStruct[ElectricalGridConditionsStruct], 0, 56)(n)
 	return spec.List[ElectricalGridConditionsStruct](v), err
@@ -162,6 +169,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrentConditions,
 		},
 		{
 			ID: AttrForecastConditions, Name: "ForecastConditions",

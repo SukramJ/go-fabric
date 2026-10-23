@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -182,9 +181,9 @@ func decodePathIDs(n spec.Node) (pathIDs, error) {
 	return p, err
 }
 
-func decodeAttributePath(n spec.Node) (im.ConcreteAttributePath, error) {
+func decodeAttributePath(n spec.Node) (AttributePath, error) {
 	ids, err := decodePathIDs(n)
-	var p im.ConcreteAttributePath
+	var p AttributePath
 	if ids.node != nil {
 		p.Node, p.HasNode = *ids.node, true
 	}
@@ -200,9 +199,9 @@ func decodeAttributePath(n spec.Node) (im.ConcreteAttributePath, error) {
 	return p, err
 }
 
-func decodeEventPath(n spec.Node) (im.ConcreteEventPath, error) {
+func decodeEventPath(n spec.Node) (EventPath, error) {
 	ids, err := decodePathIDs(n)
-	p := im.ConcreteEventPath{IsUrgent: ids.urgent}
+	p := EventPath{IsUrgent: ids.urgent}
 	if ids.node != nil {
 		p.Node, p.HasNode = *ids.node, true
 	}

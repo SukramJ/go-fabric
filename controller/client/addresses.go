@@ -7,8 +7,6 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/SukramJ/go-fabric/client/discovery"
 )
 
 // The address book's lifespans — node/client/Peers.ts:73-74 at 0ceb202d.
@@ -150,7 +148,7 @@ func (r *Registry) cull(ctx context.Context) error {
 // (:369-375, the record's applyDevice); otherwise a new node is created
 // with an allocated id (:376). The host runs discovery.Scanner and hands
 // the device over; Commission commissions the node.
-func (r *Registry) ForDevice(ctx context.Context, d discovery.Device) (*Node, error) {
+func (r *Registry) ForDevice(ctx context.Context, d Device) (*Node, error) {
 	for {
 		n, op, err := r.findOrCreate(d)
 		if op == nil {
@@ -170,7 +168,7 @@ func (r *Registry) ForDevice(ctx context.Context, d discovery.Device) (*Node, er
 // (Peers.ts:371-389 at 862ad75f), a second forDescriptor finding the node
 // the first created. A match under decommission is returned as the
 // operation to wait for.
-func (r *Registry) findOrCreate(d discovery.Device) (*Node, *fabricOp, error) {
+func (r *Registry) findOrCreate(d Device) (*Node, *fabricOp, error) {
 	r.op.Lock()
 	defer r.op.Unlock()
 	if n := r.find(d.InstanceID); n != nil {
@@ -201,7 +199,7 @@ func (r *Registry) findOrCreate(d discovery.Device) (*Node, *fabricOp, error) {
 // find is Factory.find with RemoteDescriptor.is: the first node (not
 // closing) whose record has the non-empty device identifier. The
 // peer-address branch of RemoteDescriptor.is (:38-40) needs both sides to
-// have one, and a discovery.Device has none, so it never applies here.
+// have one, and a Device has none, so it never applies here.
 func (r *Registry) find(deviceIdentifier string) *Node {
 	if deviceIdentifier == "" {
 		return nil

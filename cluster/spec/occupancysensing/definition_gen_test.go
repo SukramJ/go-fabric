@@ -70,6 +70,36 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		Occupancy:                                    spectest.Ptr(OccupancyBitmap(1 << 0)),
+		OccupancySensorType:                          spectest.Ptr(OccupancySensorTypeEnum(0)),
+		OccupancySensorTypeBitmap:                    spectest.Ptr(OccupancySensorTypeBitmap(1 << 0)),
+		HoldTime:                                     spectest.Ptr(uint16(1)),
+		HoldTimeLimits:                               spectest.Ptr(HoldTimeLimitsStruct{HoldTimeMin: uint16(1), HoldTimeMax: uint16(1), HoldTimeDefault: uint16(1)}),
+		PirOccupiedToUnoccupiedDelay:                 spectest.Ptr(uint16(1)),
+		PirUnoccupiedToOccupiedDelay:                 spectest.Ptr(uint16(1)),
+		PirUnoccupiedToOccupiedThreshold:             spectest.Ptr(uint8(1)),
+		UltrasonicOccupiedToUnoccupiedDelay:          spectest.Ptr(uint16(1)),
+		UltrasonicUnoccupiedToOccupiedDelay:          spectest.Ptr(uint16(1)),
+		UltrasonicUnoccupiedToOccupiedThreshold:      spectest.Ptr(uint8(1)),
+		PhysicalContactOccupiedToUnoccupiedDelay:     spectest.Ptr(uint16(1)),
+		PhysicalContactUnoccupiedToOccupiedDelay:     spectest.Ptr(uint16(1)),
+		PhysicalContactUnoccupiedToOccupiedThreshold: spectest.Ptr(uint8(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 14 {
+		t.Errorf("StateFrom(nil): %v absent, want all 14", absent)
+	}
 	if len(values) != 14 {
 		t.Errorf("a patch of every field sets %d values, want 14", len(values))
 	}

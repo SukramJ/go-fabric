@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -22,10 +21,10 @@ import (
 // event urgent, fabric-filtered, replacing our other subscriptions —
 // narrowed by the stored options (NetworkClient.ts:121-128 at 0ceb202d).
 // The caller holds the lock.
-func (n *Node) defaultRequest() interaction.SubscribeRequest {
-	r := interaction.SubscribeRequest{
-		Attributes:           []im.ConcreteAttributePath{{}},
-		Events:               []im.ConcreteEventPath{{IsUrgent: true}},
+func (n *Node) defaultRequest() SubscribeRequest {
+	r := SubscribeRequest{
+		Attributes:           []AttributePath{{}},
+		Events:               []EventPath{{IsUrgent: true}},
 		ReplaceSubscriptions: true,
 	}
 	if o := n.settings.defaultSubscription; o != nil {
@@ -58,7 +57,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.mu.Unlock()
 	didRead := false
 	if newly && !n.cfg.NoInitialRead {
-		if _, err := n.Read(ctx, ReadRequest{ReadRequest: interaction.ReadRequest{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}); err != nil {
+		if _, err := n.Read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}); err != nil {
 			return err
 		}
 		didRead = true
@@ -77,12 +76,12 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	sreq := req
 	sreq.Sustain = true
 	n.mu.RLock()
-	sreq.EventFilters = []im.EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
+	sreq.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
 	n.mu.RUnlock()
 	if !didRead {
 		sreq.BootstrapRead = func(ctx context.Context) error { return n.bootstrapRead(ctx, req) }
 	}
-	var sub *interaction.Subscription
+	var sub *Subscription
 	alive := func() {
 		n.mu.RLock()
 		s := n.sub
@@ -91,7 +90,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 			n.cfg.Hooks.SubscriptionAlive()
 		}
 	}
-	sreq.Updated = func(*interaction.Report) { alive() }
+	sreq.Updated = func(*Report) { alive() }
 	sreq.KeepaliveReceived = alive
 	sreq.Closed = func() {
 		n.mu.Lock()
@@ -128,12 +127,12 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 // before its first attempt — SustainedSubscription.ts:187-204 reading the
 // subscription's request, its version filters and event minimum, and
 // handing the result to the request's updated (here: the image).
-func (n *Node) bootstrapRead(ctx context.Context, req interaction.SubscribeRequest) error {
+func (n *Node) bootstrapRead(ctx context.Context, req SubscribeRequest) error {
 	sc := newScope(req.Attributes, req.NoFabricFilter)
 	n.mu.RLock()
-	r := interaction.ReadRequest{
+	r := ReadPaths{
 		Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter,
-		EventFilters:       []im.EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}},
+		EventFilters:       []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}},
 		DataVersionFilters: n.s.injectVersionFilters(sc, false),
 	}
 	n.mu.RUnlock()
@@ -223,7 +222,7 @@ func connectionStateFor(active, hasSession, offline, likelyOffline bool) Connect
 // (:47-53); decoded through the event's definition; an unknown cluster or
 // event noted once (:156-175) and delivered raw; the event cursor raised
 // and persisted (:70-76).
-func (n *Node) deliverEvent(e *interaction.EventData) {
+func (n *Node) deliverEvent(e *EventData) {
 	n.mu.RLock()
 	closing := n.closing
 	n.mu.RUnlock()

@@ -12,7 +12,6 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // Config configures a [Node].
@@ -65,8 +64,8 @@ type Config struct {
 // attribute, every event urgent); a non-nil one, empty included, replaces
 // it.
 type SubscribeOptions struct {
-	Attributes []im.ConcreteAttributePath
-	Events     []im.ConcreteEventPath
+	Attributes []AttributePath
+	Events     []EventPath
 	// NoFabricFilter subscribes unfiltered (fabricFilter false). The cache
 	// keeps the values of one fabric view: those of interactions with the
 	// default subscription's filter (ClientStructure.ts:468-471).
@@ -112,7 +111,7 @@ type Hooks struct {
 	// Event: an event the peer reported, for every cluster. value is the
 	// payload decoded through the event's definition, the raw [spec.Node]
 	// when there is none, nil without a payload.
-	Event func(endpoint uint16, cluster, event uint32, e interaction.EventData, value any)
+	Event func(endpoint uint16, cluster, event uint32, e EventData, value any)
 	// Seeded: the structure is known, once — BasicInformation is present
 	// and every endpoint the root's PartsList names is installed, more than
 	// the root when no PartsList was reported (Peers.ts:760-797,

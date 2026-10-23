@@ -753,6 +753,20 @@ func decodeAttrChannelList(n spec.Node) (any, error) {
 	return spec.List[ChannelInfoStruct](v), err
 }
 
+func decodeAttrLineup(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[LineupInfoStruct](n)
+}
+
+func decodeAttrCurrentChannel(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[ChannelInfoStruct](n)
+}
+
 // Definition is the Channel cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -778,6 +792,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrLineup,
 		},
 		{
 			ID: AttrCurrentChannel, Name: "CurrentChannel",
@@ -787,6 +802,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrCurrentChannel,
 		},
 	},
 	Commands: []spec.Command{

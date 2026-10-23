@@ -231,6 +231,13 @@ func decodeHideAppRequest(n spec.Node) (any, error) { return spec.DecodeStruct[H
 
 func decodeLauncherResponse(n spec.Node) (any, error) { return spec.DecodeStruct[LauncherResponse](n) }
 
+func decodeAttrCurrentApp(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[ApplicationEPStruct](n)
+}
+
 // Definition is the ApplicationLauncher cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -253,6 +260,7 @@ var Definition = &spec.Cluster{
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrCurrentApp,
 		},
 	},
 	Commands: []spec.Command{

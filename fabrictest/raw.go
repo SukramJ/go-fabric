@@ -21,8 +21,8 @@ import (
 // readAttrRaw in read-helpers.ts). The exchange is closed when the answer
 // has arrived; an answer that is itself a request for more (a chunked
 // report) is the caller's to read no further.
-func Exchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*exchange.Message, error) {
-	var msg *exchange.Message
+func Exchange(ctx context.Context, p *Pair, opcode uint8, payload []byte) (*Message, error) {
+	var msg *Message
 	err := run(ctx, p, func(ctx context.Context) error {
 		x, err := p.Interaction.Provider().InitiateExchange(ctx, interaction.ExchangeOptions{})
 		if err != nil {

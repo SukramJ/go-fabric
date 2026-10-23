@@ -362,6 +362,22 @@ func decodeAttrRanges(n spec.Node) (any, error) {
 	return spec.List[MeasurementRangeStruct](v), err
 }
 
+func decodeAttrHarmonicCurrents(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[HarmonicMeasurementStruct], 0, 25)(n)
+	return spec.List[HarmonicMeasurementStruct](v), err
+}
+
+func decodeAttrHarmonicPhases(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	v, err := spec.DecodeListIn(spec.DecodeStruct[HarmonicMeasurementStruct], 0, 25)(n)
+	return spec.List[HarmonicMeasurementStruct](v), err
+}
+
 // Definition is the ElectricalPowerMeasurement cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -510,6 +526,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
 			Constraint:  spec.Constraint{Text: "max 25", Max: &spec.Bound{Int: 25}},
+			Decode:      decodeAttrHarmonicCurrents,
 		},
 		{
 			ID: AttrHarmonicPhases, Name: "HarmonicPhases",
@@ -518,6 +535,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
 			Constraint:  spec.Constraint{Text: "max 25", Max: &spec.Bound{Int: 25}},
+			Decode:      decodeAttrHarmonicPhases,
 		},
 		{
 			ID: AttrPowerFactor, Name: "PowerFactor",

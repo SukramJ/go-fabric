@@ -61,6 +61,26 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		ThreadMetrics:            spectest.Ptr([]ThreadMetricsStruct{ThreadMetricsStruct{Id: uint64(1), Name: spectest.Ptr("x"), StackFreeCurrent: spectest.Ptr(uint32(1)), StackFreeMinimum: spectest.Ptr(uint32(1)), StackSize: spectest.Ptr(uint32(1))}}),
+		CurrentHeapFree:          spectest.Ptr(uint64(1)),
+		CurrentHeapUsed:          spectest.Ptr(uint64(1)),
+		CurrentHeapHighWatermark: spectest.Ptr(uint64(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 4 {
+		t.Errorf("StateFrom(nil): %v absent, want all 4", absent)
+	}
 	if len(values) != 4 {
 		t.Errorf("a patch of every field sets %d values, want 4", len(values))
 	}

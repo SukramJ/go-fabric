@@ -356,6 +356,20 @@ func decodeGetDetailedForecastResponse(n spec.Node) (any, error) {
 
 func decodePriceChangeEvent(n spec.Node) (any, error) { return spec.DecodeStruct[PriceChangeEvent](n) }
 
+func decodeAttrCurrency(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[Currency](n)
+}
+
+func decodeAttrCurrentPrice(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[CommodityPriceStruct](n)
+}
+
 func decodeAttrPriceForecast(n spec.Node) (any, error) {
 	v, err := spec.DecodeListIn(spec.DecodeStruct[CommodityPriceStruct], 0, 56)(n)
 	return spec.List[CommodityPriceStruct](v), err
@@ -380,6 +394,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrency,
 		},
 		{
 			ID: AttrCurrentPrice, Name: "CurrentPrice",
@@ -387,6 +402,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrentPrice,
 		},
 		{
 			ID: AttrPriceForecast, Name: "PriceForecast",

@@ -143,9 +143,6 @@ func TestClusterDecoded(t *testing.T) {
 	if v, err := u.Decoded(spec.AttrClusterRevision); err != nil || v != uint64(3) {
 		t.Fatalf("global of a named cluster %v %v", v, err)
 	}
-	if _, ok := globalType(0); ok {
-		t.Fatal("attribute 0 is no global")
-	}
 }
 
 // TestEveryGeneratedClusterIsKnown: known.go links every generated

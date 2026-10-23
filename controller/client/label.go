@@ -5,8 +5,6 @@ package client
 
 import (
 	"log/slog"
-
-	"github.com/SukramJ/go-fabric/client/interaction"
 )
 
 // latchLabel sets the node's once-per-start latch of the fabric-label
@@ -53,7 +51,7 @@ func (r *Registry) reconcileLabel(n *Node) {
 	if own == nil || own.Label == label {
 		return
 	}
-	res, err := n.Invoke(r.ctx, opCredsCommand(opCredsCmdUpdateFabricLabel), updateFabricLabelRequest(label), interaction.InvokeOptions{})
+	res, err := n.Invoke(r.ctx, opCredsCommand(opCredsCmdUpdateFabricLabel), updateFabricLabelRequest(label), InvokeOptions{})
 	if err != nil {
 		r.log.Info("matter.controller.client.registry.label_reconcile_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
 		return

@@ -72,6 +72,28 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		PhaseList:            spectest.Ptr([]string{"x"}),
+		CurrentPhase:         spectest.Ptr(uint8(1)),
+		CountdownTime:        spectest.Ptr(uint32(1)),
+		OperationalStateList: spectest.Ptr([]OperationalStateStruct{OperationalStateStruct{OperationalStateId: OperationalStateEnum(0), OperationalStateLabel: spectest.Ptr("x")}}),
+		OperationalState:     spectest.Ptr(OperationalStateEnum(0)),
+		OperationalError:     spectest.Ptr(ErrorStateStruct{ErrorStateId: ErrorStateEnum(0), ErrorStateLabel: spectest.Ptr("x"), ErrorStateDetails: spectest.Ptr("x")}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 6 {
+		t.Errorf("StateFrom(nil): %v absent, want all 6", absent)
+	}
 	if len(values) != 7 {
 		t.Errorf("a patch of every field sets %d values, want 7", len(values))
 	}

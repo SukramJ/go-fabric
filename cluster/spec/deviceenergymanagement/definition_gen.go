@@ -881,6 +881,20 @@ func decodePausedEvent(n spec.Node) (any, error) { return spec.DecodeStruct[Paus
 
 func decodeResumedEvent(n spec.Node) (any, error) { return spec.DecodeStruct[ResumedEvent](n) }
 
+func decodeAttrPowerAdjustmentCapability(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[PowerAdjustCapabilityStruct](n)
+}
+
+func decodeAttrForecast(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[ForecastStruct](n)
+}
+
 // Definition is the DeviceEnergyManagement cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -934,6 +948,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PA", Op: spec.ConfName, Name: "PA"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrPowerAdjustmentCapability,
 		},
 		{
 			ID: AttrForecast, Name: "Forecast",
@@ -941,6 +956,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PFR | SFR", Op: spec.ConfOr, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PFR"}, {Op: spec.ConfName, Name: "SFR"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Decode:      decodeAttrForecast,
 		},
 		{
 			ID: AttrOptOutState, Name: "OptOutState",
