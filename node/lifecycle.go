@@ -53,6 +53,16 @@ func (h nodeHost) Rename(_ context.Context, key endpoint.SourceKey, name string)
 	h.n.endpoints.OnNodeLabelWritten(key, name)
 }
 
+// HostName implements [deviceseam.Host]: the host's current name of the
+// assembled endpoint (bridge.Bridge.NotifyEndpointHostName), persisted
+// nowhere; before the node assembled it the assembly reads the name from
+// the device's Spec.
+func (h nodeHost) HostName(_ context.Context, key endpoint.SourceKey, name string) {
+	if ep := h.n.assembled(key); ep != nil {
+		h.n.br.NotifyEndpointHostName(ep.ID, name)
+	}
+}
+
 // assembled returns the endpoint of the running topology with key — a
 // bridged endpoint or a part — or nil.
 func (n *Node) assembled(key endpoint.SourceKey) *endpoint.Endpoint {
