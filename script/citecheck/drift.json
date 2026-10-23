@@ -1787,16 +1787,6 @@
   },
   {
     "file": "device/device.go",
-    "line": 456,
-    "citation": "power-source-cluster.element.ts:130",
-    "resolved": "packages/model/src/standard/elements/power-source-cluster.element.ts",
-    "at": "862ad75f",
-    "identifier": "PowerSource",
-    "nearest": 19,
-    "occurrences": 3
-  },
-  {
-    "file": "device/device.go",
     "line": 556,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
