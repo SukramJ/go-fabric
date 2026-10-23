@@ -56,6 +56,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrPresets, spec.List[PresetStruct]([]PresetStruct{PresetStruct{PresetHandle: spec.ValueOf([]byte{1}), PresetScenario: PresetScenarioEnum(1), Name: spectest.Ptr(spec.ValueOf("x")), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1)), BuiltIn: spec.ValueOf(true)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrSchedules, spec.List[ScheduleStruct]([]ScheduleStruct{ScheduleStruct{ScheduleHandle: spec.ValueOf([]byte{1}), SystemMode: SystemModeEnum(0), Name: spectest.Ptr("x"), PresetHandle: spectest.Ptr([]byte{1}), Transitions: []ScheduleTransitionStruct{ScheduleTransitionStruct{DayOfWeek: ScheduleDayOfWeekBitmap(1 << 0), TransitionTime: uint16(1), PresetHandle: spectest.Ptr([]byte{1}), SystemMode: spectest.Ptr(SystemModeEnum(0)), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1))}}, BuiltIn: spec.ValueOf(true)}}))
 	spectest.RoundTripAttribute(t, Definition, AttrThermostatSuggestions, spec.List[ThermostatSuggestionStruct]([]ThermostatSuggestionStruct{ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)}}))
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentThermostatSuggestion, ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)})
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -144,6 +145,83 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		LocalTemperature:                       spectest.Ptr(int16(1)),
+		OutdoorTemperature:                     spectest.Ptr(int16(1)),
+		Occupancy:                              spectest.Ptr(OccupancyBitmap(1 << 0)),
+		AbsMinHeatSetpointLimit:                spectest.Ptr(int16(1)),
+		AbsMaxHeatSetpointLimit:                spectest.Ptr(int16(1)),
+		AbsMinCoolSetpointLimit:                spectest.Ptr(int16(1)),
+		AbsMaxCoolSetpointLimit:                spectest.Ptr(int16(1)),
+		PiCoolingDemand:                        spectest.Ptr(uint8(1)),
+		PiHeatingDemand:                        spectest.Ptr(uint8(1)),
+		HvacSystemTypeConfiguration:            spectest.Ptr(HVACSystemTypeBitmap(1 << 0)),
+		LocalTemperatureCalibration:            spectest.Ptr(int8(1)),
+		OccupiedCoolingSetpoint:                spectest.Ptr(int16(1)),
+		OccupiedHeatingSetpoint:                spectest.Ptr(int16(1)),
+		UnoccupiedCoolingSetpoint:              spectest.Ptr(int16(1)),
+		UnoccupiedHeatingSetpoint:              spectest.Ptr(int16(1)),
+		MinHeatSetpointLimit:                   spectest.Ptr(int16(1)),
+		MaxHeatSetpointLimit:                   spectest.Ptr(int16(1)),
+		MinCoolSetpointLimit:                   spectest.Ptr(int16(1)),
+		MaxCoolSetpointLimit:                   spectest.Ptr(int16(1)),
+		MinSetpointDeadBand:                    spectest.Ptr(int8(1)),
+		RemoteSensing:                          spectest.Ptr(RemoteSensingBitmap(1 << 0)),
+		ControlSequenceOfOperation:             spectest.Ptr(ControlSequenceOfOperationEnum(0)),
+		SystemMode:                             spectest.Ptr(SystemModeEnum(0)),
+		ThermostatRunningMode:                  spectest.Ptr(ThermostatRunningModeEnum(0)),
+		TemperatureSetpointHold:                spectest.Ptr(TemperatureSetpointHoldEnum(0)),
+		TemperatureSetpointHoldDuration:        spectest.Ptr(uint16(1)),
+		ThermostatProgrammingOperationMode:     spectest.Ptr(ProgrammingOperationModeBitmap(1 << 0)),
+		ThermostatRunningState:                 spectest.Ptr(RelayStateBitmap(1 << 0)),
+		SetpointChangeSource:                   spectest.Ptr(SetpointChangeSourceEnum(0)),
+		SetpointChangeAmount:                   spectest.Ptr(int16(1)),
+		SetpointChangeSourceTimestamp:          spectest.Ptr(uint32(1)),
+		OccupiedSetback:                        spectest.Ptr(uint8(1)),
+		OccupiedSetbackMin:                     spectest.Ptr(uint8(1)),
+		OccupiedSetbackMax:                     spectest.Ptr(uint8(1)),
+		UnoccupiedSetback:                      spectest.Ptr(uint8(1)),
+		UnoccupiedSetbackMin:                   spectest.Ptr(uint8(1)),
+		UnoccupiedSetbackMax:                   spectest.Ptr(uint8(1)),
+		EmergencyHeatDelta:                     spectest.Ptr(uint8(1)),
+		AcType:                                 spectest.Ptr(ACTypeEnum(0)),
+		AcCapacity:                             spectest.Ptr(uint16(1)),
+		AcRefrigerantType:                      spectest.Ptr(ACRefrigerantTypeEnum(0)),
+		AcCompressorType:                       spectest.Ptr(ACCompressorTypeEnum(0)),
+		AcErrorCode:                            spectest.Ptr(ACErrorCodeBitmap(1 << 0)),
+		AcLouverPosition:                       spectest.Ptr(ACLouverPositionEnum(1)),
+		AcCoilTemperature:                      spectest.Ptr(int16(1)),
+		AcCapacityFormat:                       spectest.Ptr(ACCapacityFormatEnum(0)),
+		PresetTypes:                            spectest.Ptr([]PresetTypeStruct{PresetTypeStruct{PresetScenario: PresetScenarioEnum(1), NumberOfPresets: uint8(1), PresetTypeFeatures: PresetTypeFeaturesBitmap(1 << 0)}}),
+		ScheduleTypes:                          spectest.Ptr([]ScheduleTypeStruct{ScheduleTypeStruct{SystemMode: SystemModeEnum(0), NumberOfSchedules: uint8(1), ScheduleTypeFeatures: ScheduleTypeFeaturesBitmap(1 << 0)}}),
+		NumberOfPresets:                        spectest.Ptr(uint8(1)),
+		NumberOfSchedules:                      spectest.Ptr(uint8(1)),
+		NumberOfScheduleTransitions:            spectest.Ptr(uint8(1)),
+		NumberOfScheduleTransitionPerDay:       spectest.Ptr(uint8(1)),
+		ActivePresetHandle:                     spectest.Ptr([]byte{1}),
+		ActiveScheduleHandle:                   spectest.Ptr([]byte{1}),
+		Presets:                                spectest.Ptr([]PresetStruct{PresetStruct{PresetHandle: spec.ValueOf([]byte{1}), PresetScenario: PresetScenarioEnum(1), Name: spectest.Ptr(spec.ValueOf("x")), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1)), BuiltIn: spec.ValueOf(true)}}),
+		Schedules:                              spectest.Ptr([]ScheduleStruct{ScheduleStruct{ScheduleHandle: spec.ValueOf([]byte{1}), SystemMode: SystemModeEnum(0), Name: spectest.Ptr("x"), PresetHandle: spectest.Ptr([]byte{1}), Transitions: []ScheduleTransitionStruct{ScheduleTransitionStruct{DayOfWeek: ScheduleDayOfWeekBitmap(1 << 0), TransitionTime: uint16(1), PresetHandle: spectest.Ptr([]byte{1}), SystemMode: spectest.Ptr(SystemModeEnum(0)), CoolingSetpoint: spectest.Ptr(int16(1)), HeatingSetpoint: spectest.Ptr(int16(1))}}, BuiltIn: spec.ValueOf(true)}}),
+		SetpointHoldExpiryTimestamp:            spectest.Ptr(uint32(1)),
+		MaxThermostatSuggestions:               spectest.Ptr(uint8(5)),
+		ThermostatSuggestions:                  spectest.Ptr([]ThermostatSuggestionStruct{ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)}}),
+		CurrentThermostatSuggestion:            spectest.Ptr(ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)}),
+		ThermostatSuggestionNotFollowingReason: spectest.Ptr(ThermostatSuggestionNotFollowingReasonBitmap(1 << 0)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 61 {
+		t.Errorf("StateFrom(nil): %v absent, want all 61", absent)
+	}
 	if len(values) != 62 {
 		t.Errorf("a patch of every field sets %d values, want 62", len(values))
 	}

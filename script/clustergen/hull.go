@@ -396,6 +396,7 @@ func (g *generator) stateValues(w *writer, fields []hullField) {
 	if len(fields) == 0 {
 		w.p("func (st *State) FromAttributeValues(func(attrID uint32) (any, bool)) {}")
 		w.p("")
+		g.stateFrom(w)
 		return
 	}
 	w.p("func (st *State) FromAttributeValues(read func(attrID uint32) (any, bool)) {")
@@ -404,6 +405,23 @@ func (g *generator) stateValues(w *writer, fields []hullField) {
 		w.p("		spec.Assign(&st.%s, v)", f.goName)
 		w.p("	}")
 	}
+	w.p("}")
+	w.p("")
+	g.stateFrom(w)
+}
+
+// stateFrom renders StateFrom, the controller's typed read: a peer's
+// values of the cluster decoded by Definition into State through the
+// FromAttributeValues above (spec.StateFrom).
+func (g *generator) stateFrom(w *writer) {
+	w.p("// StateFrom is the State of a peer's values of the %s cluster —", g.c.Name)
+	w.p("// a controller's client image of it (client.Cluster), one cluster of a")
+	w.p("// report (client.Report.Values) — each attribute decoded by")
+	w.p("// [Definition] and converted to its field's type as [Server.Get]")
+	w.p("// converts a stored one (spec.StateFrom). absent lists the attributes")
+	w.p("// of State the values do not hold; their fields stay at the zero value.")
+	w.p("func StateFrom(values spec.Values) (state State, absent []uint32) {")
+	w.p("	return spec.StateFrom[State](Definition, values)")
 	w.p("}")
 	w.p("")
 }
@@ -450,6 +468,9 @@ func (g *generator) patchValuesTest(w *writer) {
 		w.p("\tif got := (Patch{}).AttributeValues(); len(got) != 0 {")
 		w.p("\t\tt.Errorf(\"an empty patch sets %%v\", got)")
 		w.p("\t}")
+		w.p("\tif _, absent := StateFrom(nil); len(absent) != 0 {")
+		w.p("\t\tt.Errorf(\"StateFrom(nil): %%v absent, want none\", absent)")
+		w.p("\t}")
 		return
 	}
 	w.p("\tfull := Patch{")
@@ -466,6 +487,25 @@ func (g *generator) patchValuesTest(w *writer) {
 	w.p("\t// The stored values read back into a State, field by field.")
 	w.p("\tvar back State")
 	w.p("\tback.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })")
+	w.p("\t// A populated value of every attribute over the wire, decoded by the")
+	w.p("\t// definition: the controller's typed read equals the State the")
+	w.p("\t// device reads from the same stored values.")
+	w.p("\tsample := Patch{")
+	for _, f := range fields {
+		w.p("\t\t%s: spectest.Ptr(%s),", f.goName, g.sampleType(g.attrType[f.a.ID], &f.a.Effective.value, 0))
+	}
+	w.p("\t}")
+	w.p("\tstored := sample.AttributeValues()")
+	w.p("\tvar device State")
+	w.p("\tdevice.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })")
+	w.p("\tpeer, absent := StateFrom(spectest.WireValues(t, stored))")
+	w.p("\tspectest.EqualState(t, peer, device)")
+	w.p("\tif len(absent) != 0 {")
+	w.p("\t\tt.Errorf(\"StateFrom: %%v absent, want none\", absent)")
+	w.p("\t}")
+	w.p("\tif _, absent := StateFrom(nil); len(absent) != %d {", len(fields))
+	w.p("\t\tt.Errorf(\"StateFrom(nil): %%v absent, want all %d\", absent)", len(fields))
+	w.p("\t}")
 	w.p("\tif len(values) != %d {", want)
 	w.p("\t\tt.Errorf(\"a patch of every field sets %%d values, want %d\", len(values))", want)
 	w.p("\t}")

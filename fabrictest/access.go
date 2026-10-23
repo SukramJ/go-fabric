@@ -22,7 +22,7 @@ import (
 // change, so a Grant below Administer is not undone over the wire; a test
 // that needs the administrator back calls Grant with
 // store.PrivilegeAdminister.
-func (p *Pair) Grant(ctx context.Context, privilege store.Privilege) error {
+func (p *Pair) Grant(ctx context.Context, privilege Privilege) error {
 	if !p.Commissioned() {
 		return ErrNotCommissioned
 	}

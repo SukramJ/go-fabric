@@ -11,10 +11,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -40,7 +38,7 @@ type emission struct {
 	kind  emissionKind
 	ep    *Endpoint
 	c     *Cluster
-	event interaction.EventData
+	event EventData
 }
 
 // pendingChange is a structural change queued until a report is applied
@@ -76,7 +74,7 @@ type structure struct {
 	subscribedFabricFiltered bool
 
 	events  []emission
-	delayed []interaction.EventData
+	delayed []EventData
 }
 
 // newStructure is a structure with its root endpoint (ClientStructure.ts:155-164):
@@ -156,8 +154,8 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 // read covers (isRelevant) whose version is known, none with
 // refreshChangesOmitted for a cluster in which the peer has a
 // changes-omitted attribute (:269-271, :1674-1692).
-func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) []im.DataVersionFilter {
-	var out []im.DataVersionFilter
+func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) []DataVersionFilter {
+	var out []DataVersionFilter
 	for _, epNo := range slices.Sorted(maps.Keys(s.endpoints)) {
 		ep := s.endpoints[epNo]
 		for _, id := range slices.Sorted(maps.Keys(ep.clusters)) {
@@ -171,7 +169,7 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 			if !c.cache.hasVersion {
 				continue
 			}
-			out = append(out, im.DataVersionFilter{Endpoint: epNo, Cluster: id, DataVersion: c.cache.version})
+			out = append(out, DataVersionFilter{Endpoint: epNo, Cluster: id, DataVersion: c.cache.version})
 		}
 	}
 	return out
@@ -184,7 +182,7 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 // filter than the cache's gets none injected (:288), and a cluster the
 // caller filters gets no injected filter (:293-295, :312), so the peer
 // sees exactly the caller's filter for it. caller is not modified.
-func (s *structure) withKnownVersions(sc scope, caller []im.DataVersionFilter, refreshChangesOmitted bool) []im.DataVersionFilter {
+func (s *structure) withKnownVersions(sc scope, caller []DataVersionFilter, refreshChangesOmitted bool) []DataVersionFilter {
 	out := slices.Clone(caller)
 	if sc.fabricFiltered != s.subscribedFabricFiltered {
 		return out
@@ -242,7 +240,7 @@ type mutateContext struct {
 // and cluster (:462-504), the events (:506-528), the statuses logged
 // (:338-346), the last batch (:357-361), the structural changes (:375),
 // the structure events (:378) and the delayed events (:379).
-func (s *structure) mutate(sc scope, r *interaction.Report) {
+func (s *structure) mutate(sc scope, r *Report) {
 	q := &mutateContext{endpointsWithData: map[uint16]bool{}, clustersWithData: map[*Cluster]bool{}}
 	var cur *batch
 	for i := range r.Attributes {
@@ -272,7 +270,7 @@ func (s *structure) mutate(sc scope, r *interaction.Report) {
 // (:468-471); the endpoint is recorded (:477); a change of endpoint or
 // cluster flushes the batch (:479-484); a new batch carries the report's
 // version only when the read covered the whole cluster (:494-497).
-func (s *structure) mutateAttribute(a *interaction.AttributeData, sc scope, cur *batch, q *mutateContext) *batch {
+func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *mutateContext) *batch {
 	if s.subscribedFabricFiltered != sc.fabricFiltered {
 		return cur
 	}
@@ -298,7 +296,7 @@ func (s *structure) mutateAttribute(a *interaction.AttributeData, sc scope, cur 
 // emitEvent is #emitEvent (:506-528): delayed to the end of the report when
 // the endpoint is unknown or not installed, received data in this report or
 // has a structural change pending (:518-524), else delivered now (:526).
-func (s *structure) emitEvent(e *interaction.EventData, q *mutateContext) {
+func (s *structure) emitEvent(e *EventData, q *mutateContext) {
 	ep := s.endpoints[e.Path.Endpoint]
 	if ep == nil || !ep.installed || q.endpointsWithData[e.Path.Endpoint] || s.pending[ep] != nil {
 		s.delayed = append(s.delayed, *e)

@@ -564,6 +564,13 @@ func decodeMissingTrustedTimeSourceEvent(n spec.Node) (any, error) {
 	return spec.DecodeStruct[MissingTrustedTimeSourceEvent](n)
 }
 
+func decodeAttrTrustedTimeSource(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[TrustedTimeSourceStruct](n)
+}
+
 func decodeAttrTimeZone(n spec.Node) (any, error) {
 	v, err := spec.DecodeListIn(spec.DecodeStruct[TimeZoneStruct], 1, 2)(n)
 	return spec.List[TimeZoneStruct](v), err
@@ -615,6 +622,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true, NonVolatile: true},
 			Default:     spec.NullDefault{},
+			Decode:      decodeAttrTrustedTimeSource,
 		},
 		{
 			ID: AttrDefaultNtp, Name: "DefaultNtp",

@@ -76,6 +76,32 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		NetworkInterfaces:        spectest.Ptr([]NetworkInterface{NetworkInterface{Name: "x", IsOperational: true, OffPremiseServicesReachableIPv4: spec.ValueOf(true), OffPremiseServicesReachableIPv6: spec.ValueOf(true), HardwareAddress: []byte{1}, IPv4Addresses: [][]byte{[]byte{1, 1, 1, 1}}, IPv6Addresses: [][]byte{[]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}, Type: InterfaceTypeEnum(0)}}),
+		RebootCount:              spectest.Ptr(uint16(1)),
+		UpTime:                   spectest.Ptr(uint64(1)),
+		TotalOperationalHours:    spectest.Ptr(uint32(1)),
+		BootReason:               spectest.Ptr(BootReasonEnum(0)),
+		ActiveHardwareFaults:     spectest.Ptr([]HardwareFaultEnum{HardwareFaultEnum(0)}),
+		ActiveRadioFaults:        spectest.Ptr([]RadioFaultEnum{RadioFaultEnum(0)}),
+		ActiveNetworkFaults:      spectest.Ptr([]NetworkFaultEnum{NetworkFaultEnum(0)}),
+		TestEventTriggersEnabled: spectest.Ptr(true),
+		DeviceLoadStatus:         spectest.Ptr(DeviceLoadStruct{CurrentSubscriptions: uint16(1), CurrentSubscriptionsForFabric: uint16(1), TotalSubscriptionsEstablished: uint32(1), TotalInteractionModelMessagesSent: uint32(1), TotalInteractionModelMessagesReceived: uint32(1)}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 10 {
+		t.Errorf("StateFrom(nil): %v absent, want all 10", absent)
+	}
 	if len(values) != 10 {
 		t.Errorf("a patch of every field sets %d values, want 10", len(values))
 	}

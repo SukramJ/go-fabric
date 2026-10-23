@@ -28,6 +28,7 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 func TestCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
 	spectest.RoundTrip(t, PowerThresholdStruct{PowerThreshold: spectest.Ptr(int64(1)), ApparentPowerThreshold: spectest.Ptr(int64(1)), PowerThresholdSource: spec.ValueOf(PowerThresholdSourceEnum(0))}, spec.DecodeStruct[PowerThresholdStruct])
+	spectest.RoundTripAttribute(t, Definition, AttrPowerThreshold, PowerThresholdStruct{PowerThreshold: spectest.Ptr(int64(1)), ApparentPowerThreshold: spectest.Ptr(int64(1)), PowerThresholdSource: spec.ValueOf(PowerThresholdSourceEnum(0))})
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -60,6 +61,27 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		MeterType:         spectest.Ptr(MeterTypeEnum(0)),
+		PointOfDelivery:   spectest.Ptr("x"),
+		MeterSerialNumber: spectest.Ptr("x"),
+		ProtocolVersion:   spectest.Ptr("x"),
+		PowerThreshold:    spectest.Ptr(PowerThresholdStruct{PowerThreshold: spectest.Ptr(int64(1)), ApparentPowerThreshold: spectest.Ptr(int64(1)), PowerThresholdSource: spec.ValueOf(PowerThresholdSourceEnum(0))}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 5 {
+		t.Errorf("StateFrom(nil): %v absent, want all 5", absent)
+	}
 	if len(values) != 6 {
 		t.Errorf("a patch of every field sets %d values, want 6", len(values))
 	}

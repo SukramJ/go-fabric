@@ -73,6 +73,14 @@ build-32bit: ## compile for linux/armv7 and vet for linux/386 — an int is 32 b
 archcheck: ## layers and dependency direction (ADR 0026)
 	$(GO) test -count=1 ./script/archcheck/...
 
+.PHONY: apidiff
+apidiff: ## the incompatible API changes of the public packages against the last tag
+	$(GO) run ./script/apidiff
+
+.PHONY: apidiff-check
+apidiff-check: ## fail when an incompatible API change has no CHANGELOG line under [Unreleased]
+	$(GO) run ./script/apidiff -check
+
 .PHONY: test
 test: ## run the test suite
 	$(GO) test -count=1 ./...
@@ -370,4 +378,4 @@ bluez-check: ## the ble/bluez sub-module: build (Linux and the stub), vet, test,
 	cd $(BLUEZ_DIR) && $(GO) mod verify
 
 .PHONY: ci
-ci: build build-32bit vet archcheck test lint cover-check bluez-check ## everything the pipeline runs
+ci: build build-32bit vet archcheck apidiff-check test lint cover-check bluez-check ## everything the pipeline runs

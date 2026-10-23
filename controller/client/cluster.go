@@ -19,7 +19,7 @@ var (
 	// ErrUntyped: the value has no type to decode it by — an attribute of a
 	// named or unknown cluster, or one the definition does not know. The
 	// node comes with it.
-	ErrUntyped = errors.New("client: attribute has no type")
+	ErrUntyped = spec.ErrUntyped
 	// ErrNoValue: the image holds no value of the attribute.
 	ErrNoValue = errors.New("client: no value")
 )
@@ -326,56 +326,38 @@ func (c *Cluster) Version() (version uint32, ok bool) {
 	return c.cache.version, c.cache.hasVersion
 }
 
-// Value returns the attribute's value as the peer reported it.
+// Value returns the attribute's value as the peer reported it; false for
+// a nil Cluster — an [Endpoint.Cluster] the image does not hold — so a
+// generated <cluster>def.StateFrom over it reports every attribute absent.
+// It implements [spec.Values].
 func (c *Cluster) Value(attr uint32) (spec.Node, bool) {
+	if c == nil {
+		return spec.Node{}, false
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	v, ok := c.cache.values[attr]
 	return v, ok
 }
 
-// Decoded returns the attribute's value decoded by its type: a global
-// attribute by its own type, whatever the cluster (InputChunk.ts:105-110);
-// otherwise through the definition's Attribute.Decode when it has one,
-// else [spec.DecodeValue]. A value without a type — of a named or unknown
-// cluster, or an attribute the definition does not know — is the node with
-// [ErrUntyped]; TLV null is nil.
+// Decoded returns the attribute's value decoded by its type
+// ([spec.DecodeAttribute]): a global attribute by its own type, whatever
+// the cluster (InputChunk.ts:105-110); a struct, or a list of structs,
+// through the definition as the generated type; every other value at its
+// widest Go type — an unsigned integer, enum or bitmap as uint64, a
+// signed integer as int64, a list as []any, whatever the attribute's
+// width (a uint8 attribute of 20 is uint64(20)). A value without a type —
+// of a named or unknown cluster, or an attribute the definition does not
+// know — is the node with [ErrUntyped]; TLV null is nil.
+//
+// It is the untyped form, for a cluster without a definition and for one
+// attribute at a time. The typed form is the generated package's
+// StateFrom over the cluster (onoffdef.StateFrom(ep.Cluster(onoffdef.ClusterID))):
+// every attribute in its field's type, and the ones the image lacks.
 func (c *Cluster) Decoded(attr uint32) (any, error) {
 	n, ok := c.Value(attr)
 	if !ok {
 		return nil, ErrNoValue
 	}
-	if t, ok := globalType(attr); ok {
-		return spec.DecodeValue(t, n)
-	}
-	var a *spec.Attribute
-	if c.def != nil {
-		a = c.def.Attribute(attr)
-	}
-	if a == nil {
-		return n, ErrUntyped
-	}
-	if n.El.Type == tlv.TypeNull {
-		return nil, nil
-	}
-	if a.Decode != nil {
-		return a.Decode(n)
-	}
-	return spec.DecodeValue(a.Type, n)
-}
-
-// globalType is a global attribute's type (Matter Core §7.13).
-func globalType(attr uint32) (spec.Type, bool) {
-	idList := func(bits int) spec.Type {
-		return spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Type: spec.Type{Kind: spec.KindUint, Bits: bits}}}
-	}
-	switch attr {
-	case spec.AttrClusterRevision:
-		return spec.Type{Name: "ClusterRevision", Kind: spec.KindUint, Bits: 16}, true
-	case spec.AttrFeatureMap:
-		return spec.Type{Name: "FeatureMap", Kind: spec.KindBitmap, Bits: 32}, true
-	case spec.AttrAttributeList, spec.AttrAcceptedCommandList, spec.AttrGeneratedCommandList, spec.AttrEventList:
-		return idList(32), true
-	}
-	return spec.Type{}, false
+	return spec.DecodeAttribute(c.def, attr, n)
 }

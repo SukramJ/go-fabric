@@ -74,9 +74,10 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// retransmits it 4 times before giving up (symptom:
 	// `Dropping message without piggyback ack when we are waiting
 	// for an ack`, then `CHIP Error 0x32 Timeout`). Let the ack pump
-	// fire the synthesised StandaloneAck per its normal cadence so
-	// the peer's MRP layer can advance to receive subsequent
-	// retransmits / new exchanges.
+	// fire the synthesised StandaloneAck so the peer's MRP layer can
+	// advance to receive subsequent retransmits / new exchanges — at
+	// once when the StatusResponse ends our exchange (below), else at
+	// its normal cadence.
 	//
 	// Subscribe-Initial chunk-streaming loop in subscribe.go blocks
 	// on this signal between chunks to mirror matter.js's
@@ -86,7 +87,20 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// fires past Apple's state-machine and
 	// `ProcessSubscribeResponse` never triggers (Run 19 of the
 	// Apple-pair-diagnose cycle).
-	b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	waited := b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	// A StatusResponse no chunk loop waits for, on an exchange we
+	// initiated (the peer speaks as the responder), is the last message of
+	// a report exchange: nothing of ours follows to piggyback its ack on,
+	// so the exchange closes and the ack goes out now. Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:1117-1124 at
+	// 862ad75f (close sends the standalone ack of the last received
+	// message at once, not after STANDALONE_ACK_TIMEOUT). Left to the ack
+	// pump's cadence, the peer's MRP layer holds the exchange open for the
+	// grace window and retransmits past it.
+	if !waited && !proto.Initiator {
+		b.expediteDuplicateAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		b.RunAckPumpOnce(b.clk().Now())
+	}
 	// An error status answering an ongoing subscription report — a
 	// bridge-initiated exchange, so the peer speaks as the responder —
 	// means the peer no longer honours the subscription

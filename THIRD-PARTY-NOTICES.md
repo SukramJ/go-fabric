@@ -109,6 +109,19 @@ build links it.
 | `github.com/ncruces/go-strftime` | MIT |
 | `github.com/remyoudompheng/bigfft` | BSD-3-Clause |
 
+### Developer tools (the guards under `script/`, never in a consumer's build)
+
+`golang.org/x/tools` is the reachability guard's analysis library;
+`golang.org/x/exp` provides `cmd/apidiff`, the API-break guard's
+comparison (`make apidiff`), declared as a tool dependency in `go.mod`.
+Neither is imported by a package outside `script/`.
+
+| Module | License |
+| --- | --- |
+| `golang.org/x/tools` | BSD-3-Clause ("Copyright 2009 The Go Authors.") |
+| `golang.org/x/exp` | BSD-3-Clause ("Copyright 2009 The Go Authors.") |
+| `golang.org/x/mod`, `golang.org/x/sync` | BSD-3-Clause (their dependencies) |
+
 To regenerate an exhaustive, machine-verified list, run a tool such as
 `go-licenses report ./...` against the module graph.
 

@@ -59,6 +59,27 @@ jobs:
       # type-checks the test files too.
       - name: go build (linux/armv7), go vet (linux/386)
         run: make build-32bit
+  apidiff:
+    name: apidiff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The guard compares with the last tag: the full history and the
+          # tags, not the shallow checkout.
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # A break is announced before it ships (README, How a consumer
+      # learns about a break): every incompatible change against the last
+      # tag must be named under [Unreleased]. On the tag itself there is
+      # nothing to compare.
+      - name: apidiff against the last tag
+        run: make apidiff-check
+
   vet:
     name: vet
     runs-on: ubuntu-latest

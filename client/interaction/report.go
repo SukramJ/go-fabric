@@ -73,11 +73,34 @@ type Report struct {
 	// Session is the session the report arrived over — the exchange's
 	// session matter.js takes the peer from and hands to reportStarted
 	// (ClientSubscriptionHandler.ts:89, :108-112).
-	Session       *exchange.Session
-	Attributes    []AttributeData
-	Statuses      []AttributeStatus
-	Events        []EventData
+	Session *exchange.Session
+	// Attributes are the attribute values, in report order; [Report.Values]
+	// collects one cluster's for the generated <cluster>def.StateFrom.
+	Attributes []AttributeData
+	// Statuses are the attribute paths answered with a status in place of
+	// a value (an unsupported attribute, an access refusal).
+	Statuses []AttributeStatus
+	// Events are the event records, in report order.
+	Events []EventData
+	// EventStatuses are the event paths answered with a status.
 	EventStatuses []EventStatus
+}
+
+// Values returns the values the report carries for one cluster of one
+// endpoint, by attribute id — the input of a generated
+// <cluster>def.StateFrom. A later value of an attribute replaces an
+// earlier one; a report without the cluster gives empty values.
+func (r *Report) Values(endpoint uint16, cluster uint32) spec.AttributeValues {
+	v := spec.AttributeValues{}
+	if r == nil {
+		return v
+	}
+	for i := range r.Attributes {
+		if a := &r.Attributes[i]; a.Path.Endpoint == endpoint && a.Path.Cluster == cluster {
+			v[a.Path.Attribute] = a.Value
+		}
+	}
+	return v
 }
 
 // Value returns the value the report carries for the attribute.

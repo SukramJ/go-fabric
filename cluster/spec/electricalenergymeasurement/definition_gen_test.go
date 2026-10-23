@@ -34,6 +34,11 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventCumulativeEnergyMeasured, CumulativeEnergyMeasuredEvent{EnergyImported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}), EnergyExported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})})
 	spectest.RoundTripEvent(t, Definition, EventPeriodicEnergyMeasured, PeriodicEnergyMeasuredEvent{EnergyImported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}), EnergyExported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})})
 	spectest.RoundTripAttribute(t, Definition, AttrAccuracy, MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}})
+	spectest.RoundTripAttribute(t, Definition, AttrCumulativeEnergyImported, EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})
+	spectest.RoundTripAttribute(t, Definition, AttrCumulativeEnergyExported, EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})
+	spectest.RoundTripAttribute(t, Definition, AttrPeriodicEnergyImported, EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})
+	spectest.RoundTripAttribute(t, Definition, AttrPeriodicEnergyExported, EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))})
+	spectest.RoundTripAttribute(t, Definition, AttrCumulativeEnergyReset, CumulativeEnergyResetStruct{ImportedResetTimestamp: spectest.Ptr(spec.ValueOf(uint32(1))), ExportedResetTimestamp: spectest.Ptr(spec.ValueOf(uint32(1))), ImportedResetSystime: spectest.Ptr(spec.ValueOf(uint64(1))), ExportedResetSystime: spectest.Ptr(spec.ValueOf(uint64(1)))})
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -67,6 +72,28 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		Accuracy:                 spectest.Ptr(MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}}),
+		CumulativeEnergyImported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}),
+		CumulativeEnergyExported: spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}),
+		PeriodicEnergyImported:   spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}),
+		PeriodicEnergyExported:   spectest.Ptr(EnergyMeasurementStruct{Energy: int64(1), StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), StartSystime: spectest.Ptr(uint64(1)), EndSystime: spectest.Ptr(uint64(1)), ApparentEnergy: spectest.Ptr(int64(1)), ReactiveEnergy: spectest.Ptr(int64(1))}),
+		CumulativeEnergyReset:    spectest.Ptr(CumulativeEnergyResetStruct{ImportedResetTimestamp: spectest.Ptr(spec.ValueOf(uint32(1))), ExportedResetTimestamp: spectest.Ptr(spec.ValueOf(uint32(1))), ImportedResetSystime: spectest.Ptr(spec.ValueOf(uint64(1))), ExportedResetSystime: spectest.Ptr(spec.ValueOf(uint64(1)))}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 6 {
+		t.Errorf("StateFrom(nil): %v absent, want all 6", absent)
+	}
 	if len(values) != 7 {
 		t.Errorf("a patch of every field sets %d values, want 7", len(values))
 	}

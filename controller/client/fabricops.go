@@ -14,11 +14,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // Fabric operations: commission and decommission through the registry.
@@ -140,7 +137,7 @@ type CommissionOptions struct {
 // defaultCASEConnectionTiming is the timing of the operational CASE
 // connection after commissioning unless the caller supplies one —
 // CommissioningClient.ts:775-779.
-var defaultCASEConnectionTiming = peer.Timing{
+var defaultCASEConnectionTiming = Timing{
 	DelayBeforeNextAddress:               15 * time.Second,
 	MaxDelayBetweenInitialContactRetries: 60 * time.Second,
 	DelayAfterPeerError:                  2 * time.Minute,
@@ -242,7 +239,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 // not confirmed, returns its error and keeps the node.
 func (r *Registry) Decommission(ctx context.Context, n *Node) error {
 	return r.runFabricOperation(n, opDecommission, func() error {
-		var former *handshake.PeerAddress
+		var former *PeerAddress
 		if n.IsCommissioned() {
 			addr, err := r.decommission(ctx, n)
 			if err != nil {
@@ -283,7 +280,7 @@ func (r *Registry) noteLeave(n *Node, fabricIndex uint8) {
 // seen or the session was lost to the removal (:405-417); then the peer's
 // sessions are given up (:422-427) and the record's commissioning fields
 // cleared — not the addresses (:429-435). It returns the former address.
-func (r *Registry) decommission(ctx context.Context, n *Node) (handshake.PeerAddress, error) {
+func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, error) {
 	addr, ok := n.PeerAddress()
 	if !ok {
 		return addr, ErrNotCommissioned
@@ -296,8 +293,8 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (handshake.PeerAdd
 		n.mu.RLock()
 		noFilter := n.settings.defaultSubscription != nil && n.settings.defaultSubscription.NoFabricFilter
 		n.mu.RUnlock()
-		rep, err := n.Read(ctx, ReadRequest{ReadRequest: interaction.ReadRequest{
-			Attributes:     []im.ConcreteAttributePath{{Endpoint: 0, Cluster: opCredsCluster, Attribute: opCredsAttrCurrentFabricIndex, HasEndpoint: true, HasCluster: true, HasAttribute: true}},
+		rep, err := n.Read(ctx, ReadRequest{ReadRequest: ReadPaths{
+			Attributes:     []AttributePath{{Endpoint: 0, Cluster: opCredsCluster, Attribute: opCredsAttrCurrentFabricIndex, HasEndpoint: true, HasCluster: true, HasAttribute: true}},
 			NoFabricFilter: noFilter,
 		}})
 		if err != nil {
@@ -324,7 +321,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (handshake.PeerAdd
 		r.mu.Unlock()
 	}()
 	r.log.Debug("matter.controller.client.registry.removing_fabric", slog.String("node", n.ID()), slog.String("peer", former), slog.Int("fabric_index", int(fabricIndex)))
-	res, err := n.Invoke(ctx, opCredsCommand(opCredsCmdRemoveFabric), removeFabricRequest(fabricIndex), interaction.InvokeOptions{})
+	res, err := n.Invoke(ctx, opCredsCommand(opCredsCmdRemoveFabric), removeFabricRequest(fabricIndex), InvokeOptions{})
 	if err == nil {
 		nr, derr := nocResponseOf(res)
 		if derr != nil {

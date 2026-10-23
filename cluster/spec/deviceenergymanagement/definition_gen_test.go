@@ -46,6 +46,8 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventPowerAdjustEnd, PowerAdjustEndEvent{Cause: CauseEnum(0), Duration: uint32(1), EnergyUse: int64(1)})
 	spectest.RoundTripEvent(t, Definition, EventPaused, PausedEvent{})
 	spectest.RoundTripEvent(t, Definition, EventResumed, ResumedEvent{Cause: CauseEnum(0)})
+	spectest.RoundTripAttribute(t, Definition, AttrPowerAdjustmentCapability, PowerAdjustCapabilityStruct{PowerAdjustCapability: spec.ValueOf([]PowerAdjustStruct{PowerAdjustStruct{MinPower: int64(1), MaxPower: int64(1), MinDuration: uint32(1), MaxDuration: uint32(1)}}), Cause: PowerAdjustReasonEnum(0)})
+	spectest.RoundTripAttribute(t, Definition, AttrForecast, ForecastStruct{ForecastId: uint32(1), ActiveSlotNumber: spec.ValueOf(uint16(1)), StartTime: uint32(1), EndTime: uint32(1), EarliestStartTime: spectest.Ptr(spec.ValueOf(uint32(1))), LatestEndTime: spectest.Ptr(uint32(1)), IsPausable: true, Slots: []SlotStruct{SlotStruct{MinDuration: uint32(1), MaxDuration: uint32(1), DefaultDuration: uint32(1), ElapsedSlotTime: uint32(1), RemainingSlotTime: uint32(1), SlotIsPausable: spectest.Ptr(true), MinPauseDuration: spectest.Ptr(uint32(1)), MaxPauseDuration: spectest.Ptr(uint32(1)), ManufacturerEsaState: spectest.Ptr(uint16(1)), NominalPower: spectest.Ptr(int64(1)), MinPower: spectest.Ptr(int64(1)), MaxPower: spectest.Ptr(int64(1)), NominalEnergy: spectest.Ptr(int64(1)), Costs: spectest.Ptr([]CostStruct{CostStruct{CostType: CostTypeEnum(0), Value: int32(1), DecimalPoints: uint8(1), Currency: spectest.Ptr(uint16(1))}}), MinPowerAdjustment: spectest.Ptr(int64(1)), MaxPowerAdjustment: spectest.Ptr(int64(1)), MinDurationAdjustment: spectest.Ptr(uint32(1)), MaxDurationAdjustment: spectest.Ptr(uint32(1))}}, ForecastUpdateReason: ForecastUpdateReasonEnum(0)})
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -81,6 +83,30 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		EsaType:                   spectest.Ptr(ESATypeEnum(0)),
+		EsaCanGenerate:            spectest.Ptr(true),
+		EsaState:                  spectest.Ptr(ESAStateEnum(0)),
+		AbsMinPower:               spectest.Ptr(int64(1)),
+		AbsMaxPower:               spectest.Ptr(int64(1)),
+		PowerAdjustmentCapability: spectest.Ptr(PowerAdjustCapabilityStruct{PowerAdjustCapability: spec.ValueOf([]PowerAdjustStruct{PowerAdjustStruct{MinPower: int64(1), MaxPower: int64(1), MinDuration: uint32(1), MaxDuration: uint32(1)}}), Cause: PowerAdjustReasonEnum(0)}),
+		Forecast:                  spectest.Ptr(ForecastStruct{ForecastId: uint32(1), ActiveSlotNumber: spec.ValueOf(uint16(1)), StartTime: uint32(1), EndTime: uint32(1), EarliestStartTime: spectest.Ptr(spec.ValueOf(uint32(1))), LatestEndTime: spectest.Ptr(uint32(1)), IsPausable: true, Slots: []SlotStruct{SlotStruct{MinDuration: uint32(1), MaxDuration: uint32(1), DefaultDuration: uint32(1), ElapsedSlotTime: uint32(1), RemainingSlotTime: uint32(1), SlotIsPausable: spectest.Ptr(true), MinPauseDuration: spectest.Ptr(uint32(1)), MaxPauseDuration: spectest.Ptr(uint32(1)), ManufacturerEsaState: spectest.Ptr(uint16(1)), NominalPower: spectest.Ptr(int64(1)), MinPower: spectest.Ptr(int64(1)), MaxPower: spectest.Ptr(int64(1)), NominalEnergy: spectest.Ptr(int64(1)), Costs: spectest.Ptr([]CostStruct{CostStruct{CostType: CostTypeEnum(0), Value: int32(1), DecimalPoints: uint8(1), Currency: spectest.Ptr(uint16(1))}}), MinPowerAdjustment: spectest.Ptr(int64(1)), MaxPowerAdjustment: spectest.Ptr(int64(1)), MinDurationAdjustment: spectest.Ptr(uint32(1)), MaxDurationAdjustment: spectest.Ptr(uint32(1))}}, ForecastUpdateReason: ForecastUpdateReasonEnum(0)}),
+		OptOutState:               spectest.Ptr(OptOutStateEnum(0)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 8 {
+		t.Errorf("StateFrom(nil): %v absent, want all 8", absent)
+	}
 	if len(values) != 9 {
 		t.Errorf("a patch of every field sets %d values, want 9", len(values))
 	}

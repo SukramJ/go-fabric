@@ -46,6 +46,11 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdActivateTextTrack, spec.Request, ActivateTextTrackRequest{TrackId: "x"})
 	spectest.RoundTripCommand(t, Definition, CmdDeactivateTextTrack, spec.Request, DeactivateTextTrackRequest{})
 	spectest.RoundTripEvent(t, Definition, EventStateChanged, StateChangedEvent{CurrentState: PlaybackStateEnum(0), StartTime: spectest.Ptr(uint64(1)), Duration: spectest.Ptr(uint64(1)), SampledPosition: spectest.Ptr(PlaybackPositionStruct{UpdatedAt: uint64(1), Position: spec.ValueOf(uint64(1))}), PlaybackSpeed: spectest.Ptr(float32(1.5)), SeekRangeEnd: spectest.Ptr(uint64(1)), SeekRangeStart: spectest.Ptr(uint64(1)), Data: spectest.Ptr([]byte{1}), AudioAdvanceUnmuted: spectest.Ptr(true)})
+	spectest.RoundTripAttribute(t, Definition, AttrSampledPosition, PlaybackPositionStruct{UpdatedAt: uint64(1), Position: spec.ValueOf(uint64(1))})
+	spectest.RoundTripAttribute(t, Definition, AttrActiveAudioTrack, TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}})
+	spectest.RoundTripAttribute(t, Definition, AttrAvailableAudioTracks, spec.List[TrackStruct]([]TrackStruct{TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}}))
+	spectest.RoundTripAttribute(t, Definition, AttrActiveTextTrack, TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}})
+	spectest.RoundTripAttribute(t, Definition, AttrAvailableTextTracks, spec.List[TrackStruct]([]TrackStruct{TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}}))
 }
 
 // TestTypedServer drives every method of the typed server once.
@@ -84,6 +89,33 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		CurrentState:         spectest.Ptr(PlaybackStateEnum(0)),
+		StartTime:            spectest.Ptr(uint64(1)),
+		Duration:             spectest.Ptr(uint64(1)),
+		SampledPosition:      spectest.Ptr(PlaybackPositionStruct{UpdatedAt: uint64(1), Position: spec.ValueOf(uint64(1))}),
+		PlaybackSpeed:        spectest.Ptr(float32(1.5)),
+		SeekRangeEnd:         spectest.Ptr(uint64(1)),
+		SeekRangeStart:       spectest.Ptr(uint64(1)),
+		ActiveAudioTrack:     spectest.Ptr(TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}),
+		AvailableAudioTracks: spectest.Ptr([]TrackStruct{TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}}),
+		ActiveTextTrack:      spectest.Ptr(TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}),
+		AvailableTextTracks:  spectest.Ptr([]TrackStruct{TrackStruct{Id: "x", TrackAttributes: TrackAttributesStruct{LanguageCode: "x", Characteristics: spectest.Ptr(spec.ValueOf([]CharacteristicEnum{CharacteristicEnum(0)})), DisplayName: spectest.Ptr(spec.ValueOf("x"))}}}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 11 {
+		t.Errorf("StateFrom(nil): %v absent, want all 11", absent)
+	}
 	if len(values) != 12 {
 		t.Errorf("a patch of every field sets %d values, want 12", len(values))
 	}

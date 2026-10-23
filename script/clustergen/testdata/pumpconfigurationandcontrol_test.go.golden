@@ -95,6 +95,46 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		MaxPressure:            spectest.Ptr(int16(1)),
+		MaxSpeed:               spectest.Ptr(uint16(1)),
+		MaxFlow:                spectest.Ptr(uint16(1)),
+		MinConstPressure:       spectest.Ptr(int16(1)),
+		MaxConstPressure:       spectest.Ptr(int16(1)),
+		MinCompPressure:        spectest.Ptr(int16(1)),
+		MaxCompPressure:        spectest.Ptr(int16(1)),
+		MinConstSpeed:          spectest.Ptr(uint16(1)),
+		MaxConstSpeed:          spectest.Ptr(uint16(1)),
+		MinConstFlow:           spectest.Ptr(uint16(1)),
+		MaxConstFlow:           spectest.Ptr(uint16(1)),
+		MinConstTemp:           spectest.Ptr(int16(1)),
+		MaxConstTemp:           spectest.Ptr(int16(1)),
+		PumpStatus:             spectest.Ptr(PumpStatusBitmap(1 << 0)),
+		EffectiveOperationMode: spectest.Ptr(OperationModeEnum(0)),
+		EffectiveControlMode:   spectest.Ptr(ControlModeEnum(0)),
+		Capacity:               spectest.Ptr(int16(1)),
+		Speed:                  spectest.Ptr(uint16(1)),
+		LifetimeRunningHours:   spectest.Ptr(uint32(1)),
+		Power:                  spectest.Ptr(uint32(1)),
+		LifetimeEnergyConsumed: spectest.Ptr(uint32(1)),
+		OperationMode:          spectest.Ptr(OperationModeEnum(0)),
+		ControlMode:            spectest.Ptr(ControlModeEnum(0)),
+		AlarmMask:              spectest.Ptr(uint16(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 24 {
+		t.Errorf("StateFrom(nil): %v absent, want all 24", absent)
+	}
 	if len(values) != 25 {
 		t.Errorf("a patch of every field sets %d values, want 25", len(values))
 	}

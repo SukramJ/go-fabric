@@ -125,6 +125,74 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		CurrentHue:                      spectest.Ptr(uint8(1)),
+		CurrentSaturation:               spectest.Ptr(uint8(1)),
+		RemainingTime:                   spectest.Ptr(uint16(1)),
+		CurrentX:                        spectest.Ptr(uint16(1)),
+		CurrentY:                        spectest.Ptr(uint16(1)),
+		DriftCompensation:               spectest.Ptr(DriftCompensationEnum(0)),
+		CompensationText:                spectest.Ptr("x"),
+		ColorTemperatureMireds:          spectest.Ptr(uint16(1)),
+		ColorMode:                       spectest.Ptr(ColorModeEnum(0)),
+		Options:                         spectest.Ptr(OptionsBitmap(1 << 0)),
+		NumberOfPrimaries:               spectest.Ptr(uint8(1)),
+		Primary1X:                       spectest.Ptr(uint16(1)),
+		Primary1Y:                       spectest.Ptr(uint16(1)),
+		Primary1Intensity:               spectest.Ptr(uint8(1)),
+		Primary2X:                       spectest.Ptr(uint16(1)),
+		Primary2Y:                       spectest.Ptr(uint16(1)),
+		Primary2Intensity:               spectest.Ptr(uint8(1)),
+		Primary3X:                       spectest.Ptr(uint16(1)),
+		Primary3Y:                       spectest.Ptr(uint16(1)),
+		Primary3Intensity:               spectest.Ptr(uint8(1)),
+		Primary4X:                       spectest.Ptr(uint16(1)),
+		Primary4Y:                       spectest.Ptr(uint16(1)),
+		Primary4Intensity:               spectest.Ptr(uint8(1)),
+		Primary5X:                       spectest.Ptr(uint16(1)),
+		Primary5Y:                       spectest.Ptr(uint16(1)),
+		Primary5Intensity:               spectest.Ptr(uint8(1)),
+		Primary6X:                       spectest.Ptr(uint16(1)),
+		Primary6Y:                       spectest.Ptr(uint16(1)),
+		Primary6Intensity:               spectest.Ptr(uint8(1)),
+		WhitePointX:                     spectest.Ptr(uint16(1)),
+		WhitePointY:                     spectest.Ptr(uint16(1)),
+		ColorPointRx:                    spectest.Ptr(uint16(1)),
+		ColorPointRy:                    spectest.Ptr(uint16(1)),
+		ColorPointRIntensity:            spectest.Ptr(uint8(1)),
+		ColorPointGx:                    spectest.Ptr(uint16(1)),
+		ColorPointGy:                    spectest.Ptr(uint16(1)),
+		ColorPointGIntensity:            spectest.Ptr(uint8(1)),
+		ColorPointBx:                    spectest.Ptr(uint16(1)),
+		ColorPointBy:                    spectest.Ptr(uint16(1)),
+		ColorPointBIntensity:            spectest.Ptr(uint8(1)),
+		EnhancedCurrentHue:              spectest.Ptr(uint16(1)),
+		EnhancedColorMode:               spectest.Ptr(EnhancedColorModeEnum(0)),
+		ColorLoopActive:                 spectest.Ptr(uint8(1)),
+		ColorLoopDirection:              spectest.Ptr(ColorLoopDirectionEnum(0)),
+		ColorLoopTime:                   spectest.Ptr(uint16(1)),
+		ColorLoopStartEnhancedHue:       spectest.Ptr(uint16(1)),
+		ColorLoopStoredEnhancedHue:      spectest.Ptr(uint16(1)),
+		ColorCapabilities:               spectest.Ptr(ColorCapabilitiesBitmap(1 << 0)),
+		ColorTempPhysicalMinMireds:      spectest.Ptr(uint16(1)),
+		ColorTempPhysicalMaxMireds:      spectest.Ptr(uint16(1)),
+		CoupleColorTempToLevelMinMireds: spectest.Ptr(uint16(1)),
+		StartUpColorTemperatureMireds:   spectest.Ptr(uint16(1)),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 52 {
+		t.Errorf("StateFrom(nil): %v absent, want all 52", absent)
+	}
 	if len(values) != 53 {
 		t.Errorf("a patch of every field sets %d values, want 53", len(values))
 	}

@@ -93,6 +93,33 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		Enabled:                         spectest.Ptr(true),
+		OnDemandRatings:                 spectest.Ptr([]RatingNameStruct{RatingNameStruct{RatingName: "x", RatingNameDesc: spectest.Ptr("x")}}),
+		OnDemandRatingThreshold:         spectest.Ptr("x"),
+		ScheduledContentRatings:         spectest.Ptr([]RatingNameStruct{RatingNameStruct{RatingName: "x", RatingNameDesc: spectest.Ptr("x")}}),
+		ScheduledContentRatingThreshold: spectest.Ptr("x"),
+		ScreenDailyTime:                 spectest.Ptr(uint32(1)),
+		RemainingScreenTime:             spectest.Ptr(uint32(1)),
+		BlockUnrated:                    spectest.Ptr(true),
+		BlockChannelList:                spectest.Ptr([]BlockChannelStruct{BlockChannelStruct{BlockChannelIndex: spec.ValueOf(uint16(1)), MajorNumber: uint16(1), MinorNumber: uint16(1), Identifier: spectest.Ptr("x")}}),
+		BlockApplicationList:            spectest.Ptr([]AppInfoStruct{AppInfoStruct{CatalogVendorId: uint16(1), ApplicationId: "x"}}),
+		BlockContentTimeWindow:          spectest.Ptr([]TimeWindowStruct{TimeWindowStruct{TimeWindowIndex: spec.ValueOf(uint16(1)), DayOfWeek: DayOfWeekBitmap(1 << 0), TimePeriod: []TimePeriodStruct{TimePeriodStruct{StartHour: uint8(1), StartMinute: uint8(1), EndHour: uint8(1), EndMinute: uint8(1)}}}}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 11 {
+		t.Errorf("StateFrom(nil): %v absent, want all 11", absent)
+	}
 	if len(values) != 11 {
 		t.Errorf("a patch of every field sets %d values, want 11", len(values))
 	}

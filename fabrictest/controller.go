@@ -15,7 +15,6 @@ import (
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -439,17 +438,17 @@ type Pair struct {
 	Device     *Device
 	// Address is the device's peer address on the controller's fabric;
 	// zero before commissioning.
-	Address handshake.PeerAddress
+	Address PeerAddress
 	// Peer is the controller's peer of the device, holding the CASE
 	// session; nil before commissioning.
-	Peer *peer.Peer
+	Peer *Peer
 	// Interaction is the controller's interaction with the device over
 	// Peer; nil before commissioning. A pair of [Controller.PASE] speaks
 	// over PASESession instead.
-	Interaction *interaction.Interaction
+	Interaction *Interaction
 	// PASESession is the PASE session of a pair of [Controller.PASE]; nil
 	// otherwise.
-	PASESession *exchange.Session
+	PASESession *Session
 }
 
 // Commissioned reports whether the pair's device is commissioned.

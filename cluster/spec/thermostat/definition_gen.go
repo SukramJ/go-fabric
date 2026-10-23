@@ -1535,6 +1535,13 @@ func decodeAttrThermostatSuggestions(n spec.Node) (any, error) {
 	return spec.List[ThermostatSuggestionStruct](v), err
 }
 
+func decodeAttrCurrentThermostatSuggestion(n spec.Node) (any, error) {
+	if n.El.Type == tlv.TypeNull {
+		return nil, nil
+	}
+	return spec.DecodeStruct[ThermostatSuggestionStruct](n)
+}
+
 // Definition is the Thermostat cluster definition.
 var Definition = &spec.Cluster{
 	ID: ClusterID, Name: Name, Revision: Revision,
@@ -2027,6 +2034,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "TSUGGEST", Op: spec.ConfName, Name: "TSUGGEST"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Nullable: true},
+			Decode:      decodeAttrCurrentThermostatSuggestion,
 		},
 		{
 			ID: AttrThermostatSuggestionNotFollowingReason, Name: "ThermostatSuggestionNotFollowingReason",

@@ -35,6 +35,8 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripCommand(t, Definition, CmdGetDetailedForecastRequest, spec.Request, GetDetailedForecastRequestRequest{Details: CommodityPriceDetailBitmap(1 << 0)})
 	spectest.RoundTripCommand(t, Definition, CmdGetDetailedForecastResponse, spec.Response, GetDetailedForecastResponse{PriceForecast: []CommodityPriceStruct{CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})}}})
 	spectest.RoundTripEvent(t, Definition, EventPriceChange, PriceChangeEvent{CurrentPrice: spec.ValueOf(CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})})})
+	spectest.RoundTripAttribute(t, Definition, AttrCurrency, Currency{Currency: uint16(1), DecimalPoints: uint8(1)})
+	spectest.RoundTripAttribute(t, Definition, AttrCurrentPrice, CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})})
 	spectest.RoundTripAttribute(t, Definition, AttrPriceForecast, spec.List[CommodityPriceStruct]([]CommodityPriceStruct{CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})}}))
 }
 
@@ -67,6 +69,26 @@ func TestTypedServer(t *testing.T) {
 	// The stored values read back into a State, field by field.
 	var back State
 	back.FromAttributeValues(func(id uint32) (any, bool) { v, ok := values[id]; return v, ok })
+	// A populated value of every attribute over the wire, decoded by the
+	// definition: the controller's typed read equals the State the
+	// device reads from the same stored values.
+	sample := Patch{
+		TariffUnit:    spectest.Ptr(TariffUnitEnum(0)),
+		Currency:      spectest.Ptr(Currency{Currency: uint16(1), DecimalPoints: uint8(1)}),
+		CurrentPrice:  spectest.Ptr(CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})}),
+		PriceForecast: spectest.Ptr([]CommodityPriceStruct{CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})}}),
+	}
+	stored := sample.AttributeValues()
+	var device State
+	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
+	peer, absent := StateFrom(spectest.WireValues(t, stored))
+	spectest.EqualState(t, peer, device)
+	if len(absent) != 0 {
+		t.Errorf("StateFrom: %v absent, want none", absent)
+	}
+	if _, absent := StateFrom(nil); len(absent) != 4 {
+		t.Errorf("StateFrom(nil): %v absent, want all 4", absent)
+	}
 	if len(values) != 5 {
 		t.Errorf("a patch of every field sets %d values, want 5", len(values))
 	}

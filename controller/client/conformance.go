@@ -63,11 +63,11 @@ type ConformanceReport struct {
 	// mandatory feature, attribute or command (judged on the cluster's
 	// reported FeatureMap, AttributeList and AcceptedCommandList, never on
 	// values).
-	Violations []endpoint.DeviceTypeViolation
+	Violations []DeviceTypeViolation
 	// Clients are the client cluster requirements the Descriptor's
 	// ClientList departs from — informational: they never make the status
 	// violated.
-	Clients []endpoint.DeviceTypeViolation
+	Clients []DeviceTypeViolation
 	// Unjudged are the server clusters the ServerList names that were not
 	// judged inside, in id order.
 	Unjudged []uint32

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -62,7 +61,7 @@ const (
 type Record struct {
 	// PeerAddress is our fabric index and the node's node id; nil while
 	// the node is not commissioned (:928-932).
-	PeerAddress *handshake.PeerAddress
+	PeerAddress *PeerAddress
 	// CaseAuthenticatedTags are our CATs for CASE sessions to the node,
 	// nil when unknown (:934-940).
 	CaseAuthenticatedTags []uint32
@@ -110,7 +109,7 @@ type Record struct {
 	PairingInstructions string
 	// ReportedSessionParameters are the session parameters the node
 	// reported in its most recent session, nil when none (:1061-1065).
-	ReportedSessionParameters *sessionparams.Parameters
+	ReportedSessionParameters *SessionParameters
 	// AdvertisedIntervals are the SII, SAI and SAT the node announced, nil
 	// when it announced none (:1067-1071).
 	AdvertisedIntervals *AdvertisedIntervals
@@ -120,7 +119,7 @@ type Record struct {
 	TCPUnsupported bool
 	// TCPSupport is the announced transports bitmap (T), nil when unknown
 	// (:1080-1084).
-	TCPSupport *discovery.SupportedTransports
+	TCPSupport *SupportedTransports
 	// LongIdleTimeOperatingMode is the announced ICD mode, nil when
 	// unknown (:1086-1090).
 	LongIdleTimeOperatingMode *bool
@@ -286,8 +285,8 @@ func (r Record) encode() (map[uint32][]byte, error) {
 }
 
 // encodeTransports is SupportedTransportsSchema.encode: bit 1 TCP client,
-// bit 2 TCP server (discovery.SupportedTransports).
-func encodeTransports(t discovery.SupportedTransports) uint8 {
+// bit 2 TCP server (SupportedTransports).
+func encodeTransports(t SupportedTransports) uint8 {
 	var v uint8
 	if t.TCPClient {
 		v |= 1 << 1
@@ -357,7 +356,7 @@ func (r *Record) decodeField(id uint32, n spec.Node) error {
 	}
 	switch id {
 	case recPeerAddress:
-		var a handshake.PeerAddress
+		var a PeerAddress
 		err = spec.DecodeFields(n, "peerAddress",
 			spec.Bind(0, "fabricIndex", true, &a.FabricIndex, spec.DecodeUint[uint8](8)),
 			spec.Bind(1, "nodeId", true, &a.NodeID, spec.DecodeUint[uint64](64)))
@@ -406,7 +405,7 @@ func (r *Record) decodeField(id uint32, n spec.Node) error {
 	case recTCPSupport:
 		var v uint8
 		v, err = spec.DecodeUint[uint8](8)(n)
-		r.TCPSupport = &discovery.SupportedTransports{TCPClient: v&(1<<1) != 0, TCPServer: v&(1<<2) != 0}
+		r.TCPSupport = &SupportedTransports{TCPClient: v&(1<<1) != 0, TCPServer: v&(1<<2) != 0}
 	case recLongIdleTimeOperatingMode:
 		r.LongIdleTimeOperatingMode, err = decodePtr(n, spec.DecodeBool)
 	}
@@ -445,14 +444,14 @@ func decodeNetworkAddress(n spec.Node) (NetworkAddress, error) {
 	return a, nil
 }
 
-func decodeSessionParameters(b []byte) (sessionparams.Parameters, error) {
+func decodeSessionParameters(b []byte) (SessionParameters, error) {
 	dec := tlv.NewDecoder(b)
 	el, err := dec.Next()
 	if err != nil {
-		return sessionparams.Parameters{}, err
+		return SessionParameters{}, err
 	}
 	if el.Type != tlv.TypeStructure {
-		return sessionparams.Parameters{}, fmt.Errorf("client: session parameters: %v, want a structure", el.Type)
+		return SessionParameters{}, fmt.Errorf("client: session parameters: %v, want a structure", el.Type)
 	}
 	return sessionparams.DecodeFields(dec)
 }
@@ -555,8 +554,8 @@ func advertisable(ai AdvertisedIntervals) *AdvertisedIntervals {
 // RemoteDescriptor.fromLongForm (RemoteDescriptor.ts:52-165): the
 // addresses, and the discriminator and commissioning mode only while the
 // node is not operational (:145-162).
-func (r Record) device() *discovery.Device {
-	d := &discovery.Device{TXTData: r.txt(), InstanceID: r.DeviceIdentifier, Hostname: r.Hostname}
+func (r Record) device() *Device {
+	d := &Device{TXTData: r.txt(), InstanceID: r.DeviceIdentifier, Hostname: r.Hostname}
 	for _, a := range r.Addresses {
 		d.Addresses = append(d.Addresses, discovery.Address{IP: a.IP, Port: a.Port})
 	}
@@ -578,7 +577,7 @@ func (r Record) device() *discovery.Device {
 // addresses only when there are any (:199-201), each discovered now; the
 // instance id (:203-205), the host (:210-212), the TXT keys (applyTXT),
 // the discriminator and commissioning mode (:236-242).
-func (r *Record) applyDevice(d *discovery.Device, now time.Time) {
+func (r *Record) applyDevice(d *Device, now time.Time) {
 	r.DiscoveredAt = now
 	r.TTL = 0
 	if len(d.Addresses) > 0 {
@@ -677,11 +676,11 @@ func (n *Node) Record() Record {
 
 // PeerAddress is the node's address on our fabric; ok is false while the
 // node is not commissioned.
-func (n *Node) PeerAddress() (addr handshake.PeerAddress, ok bool) {
+func (n *Node) PeerAddress() (addr PeerAddress, ok bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	if n.record.PeerAddress == nil {
-		return handshake.PeerAddress{}, false
+		return PeerAddress{}, false
 	}
 	return *n.record.PeerAddress, true
 }
@@ -735,6 +734,6 @@ func (n *Node) saveRecordLocked() {
 // peerAddressString formats a peer address as matter.js PeerAddress
 // prints it (protocol/src/peer/PeerAddress.ts:59-62): "@<fabric index>:<node
 // id>", both in hex.
-func peerAddressString(a handshake.PeerAddress) string {
+func peerAddressString(a PeerAddress) string {
 	return "@" + strconv.FormatUint(uint64(a.FabricIndex), 16) + ":" + strconv.FormatUint(a.NodeID, 16)
 }
