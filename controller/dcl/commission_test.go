@@ -9,18 +9,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
 	"net"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
-
-	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -30,7 +26,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
 	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -42,41 +37,12 @@ func (s *silentMDNS) Send([]byte) error                    { return nil }
 func (s *silentMDNS) Responses() <-chan mdns.QueryResponse { return s.out }
 func (s *silentMDNS) Close() error                         { return nil }
 
-// harnessNode starts a node.Node on loopback with chain (nil: the CSA test
-// chain), as the controller/commissioner harness does.
-func harnessNode(t *testing.T, chain *secattestation.Chain) *net.UDPAddr {
-	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
-		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
-		Advertiser:         mdns.NewNoop(),
-		Commissioning:      node.Commissioning{Passcode: 20202021, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
-		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},
-		BasicInformation: node.BasicInformation{
-			VendorName: "go-fabric test", ProductName: "dcl test", NodeLabel: "dcl", SerialNumber: "DCL-1",
-			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
-		},
-		Attestation: node.Attestation{Chain: chain},
-		Store:       node.Store{DB: db},
-		Logger:      slog.New(slog.DiscardHandler),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := n.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = n.Stop(context.Background()) })
-	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return addr
-}
+// harnessNode starts a node on loopback with chain (nil: the CSA test
+// chain), as the controller/commissioner harness does, and returns its
+// address. It is set by harness_node_test.go (package dcl_test): the node
+// imports this package (node's DCL routes), so an internal test may not
+// import the node back.
+var harnessNode func(t *testing.T, chain *secattestation.Chain) *net.UDPAddr
 
 // harnessCommissioner is the controller side with store as its trust
 // store.
