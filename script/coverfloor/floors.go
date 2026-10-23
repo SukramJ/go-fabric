@@ -84,6 +84,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller", min: 72, why: "the composition root: New, Close and the refusals of Pair are tested here; the commissioning Pair hands to Registry.Commission is covered in controller/client"},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 90},
@@ -196,6 +197,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 35, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
