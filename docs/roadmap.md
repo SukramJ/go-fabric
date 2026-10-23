@@ -236,14 +236,16 @@ ICDM / ICDB families are green or classified.
 
 | Phase | Content | Proof |
 | --- | --- | --- |
-| 26 | the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; `WebRtcTransportRequestor` with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …); Thread network diagnostics | `chipdm-check` green; every snapshot device type in a devicegen list |
+| 26 | the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; `WebRtcTransportRequestor` with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …) | `chipdm-check` green; every snapshot device type in a devicegen list |
+| 26a | a Thread Border Router over OTBR REST ([ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md), proposed): the dataset codec moves to `thread/` (layer `foundation`, `controller/thread` forwards until `v0.12.0`); `cluster/threadbr` with ThreadBorderRouterManagement (chip's rules, `ThreadBorderRouterManagementCluster.cpp` at `6170af84`, line-cited; a `by_design` entry for logic matter.js's stub does not carry) and ThreadNetworkDiagnostics (the mandatory set plus `MLECNT` / `MACCNT`); the Thread variant of NetworkCommissioning next to the Wi-Fi one, `ScanNetworks` answering the border router's own network from the active dataset; the adapter `thread/otbr` over stdlib `net/http` after `@matter/thread-br-client`'s `OtbrRestClient.ts`, no new dependency, MeshCoP out; the reference daemon's optional `--otbr` flag adds one `ThreadBorderRouter` endpoint | unit tests one per cited chip rule; adapter tests against recorded OTBR REST fixtures in both key formats; the harness's `TBRM` family (`Test_TC_TBRM_2_1` … `2_4`, `3_1_Simulated`) against the daemon with a virtual OTBR built as chip's CI builds it (`otbr-agent` with the simulation RCP), manually dispatched first; a real OTBR in the manual test plan |
 | 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty; the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree; one spot-check run of the CSA Test Harness (`project-chip/certification-tool`) against the reference daemon, report under `notes/` (owner, 2026-10-21; the harness stays outside the guards, see `docs/certifiability.md`) |
 
 Excluded by decision, restated so they are not re-opened by accident:
 **Joint Fabric** (two stub clusters and no behaviour at the pin; deferred
 past `v1.0.0`, ADR 0020 stage 6c), **ARL / managed aggregator** (no
 matter.js logic exists, `BD-Matter-ARL-NotMounted`), the **Thread radio**
-(hardware), **certification itself** ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)).
+(hardware; the border-router *client* over OTBR REST is phase 26a,
+[ADR 0027](./adr/0027-thread-border-router-over-otbr-rest.md)), **certification itself** ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)).
 
 **Value.** The claim in the first sentence of this page becomes checkable:
 135/135, 91/91, no row of the comparison older than its milestone. No
