@@ -9,21 +9,29 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
 
 ## 0. Entscheidungen des Owners (2026-10-23)
 
-Werden per Wizard eingeholt und hier nachgetragen:
-
-- **0.1 Persistenz-Port:** Form des `Store`-Ports (A.2).
-- **0.2 Metrics-Hook:** eigener Sink-Port ohne Abhängigkeit (A.3) oder
-  nur `expvar`-Zähler.
-- **0.3 Cookbook-Daemon:** welches `go-*2mqtt` der Beweis für Phase 22
-  ist (B.3).
-- **0.4 Teil B/C:** die Konzepte go-ha-matter-bridge und `go-hamatter`
-  bekommen eigene Repositories (öffentlich, leer bis auf das Konzept)
-  oder bleiben bis M5 in diesem Repo (B.4).
 - **0.0 Ein Agent:** die Implementierung läuft mit genau einem
-  Opus-Agenten zur Zeit (Owner, 2026-10-23); Wellen sind sequenziell.
-- **0.5 Versionen:** Phase 21 als `v0.10.x`-Patches je Welle, Phase 22
-  schließt mit `v0.11.0`; oder Phase 21 = `v0.11.0`, Phase 22 =
-  `v0.12.0`.
+  Opus-Agenten zur Zeit; Wellen sind sequenziell.
+- **0.1 Persistenz-Port:** Ports je Fachgebiet, Summe `store.Port`,
+  SQLite und `store/memstore` implementieren alle, Vertragstests
+  `store/storetest`, `fabrictest` auf `memstore`, `node.Config.Store`
+  nimmt den Port (A.2 Variante a).
+- **0.2 Metrics-Hook:** `node.Metrics`-Port (stdlib-only) mit
+  benanntem Zählersatz und `node/metrics/expvar` als Implementierung;
+  nil = aus (A.3).
+- **0.3 Cookbook-Daemon:** `go-zendure2mqtt` (B.3).
+- **0.4 Teil B/C:** eigene öffentliche Repositories **`SukramJ/go-habridge`**
+  (die HA-Bridge, Teil B) und **`SukramJ/go-hafabric`** (das
+  Adapter-Modul, Teil C), Apache-2.0, `CONCEPT.md`, Status „concept,
+  not started“. **Kein „matter“ im Namen:** „Matter“ ist eine Marke
+  der Connectivity Standards Alliance, deren Nutzung in Produkt- und
+  Projektnamen Mitgliedern und zertifizierten Produkten vorbehalten
+  ist (README §Legal, `licenses/NOTICE-matter.js.txt`); beschreibende
+  Nennung im Untertitel („a bridge for Matter controllers“) bleibt.
+  Dieselbe Regel gilt für jedes weitere Repository dieser Familie.
+- **0.5 Versionen:** Phase-21/22-Wellen als `v0.10.x`-Patches (der
+  Store-Port-Bruch unter dem ausgesetzten Fenster mit Guide-Zeile);
+  Phase 22 schließt mit `v0.11.0` = Meilenstein 4; danach Pause
+  (Owner, 2026-10-22).
 
 ## Teil A: Phase 21 — Observability und Persistenz als Ports
 
@@ -201,9 +209,9 @@ echten PR im gewählten Daemon, jeder Schritt mit dessen Commit.
 
 ### B.4 Teil B/C in ihre Repositories (0.4)
 
-Konzept v6 Teil B (go-ha-matter-bridge) und Teil C (`go-hamatter`,
+Konzept v6 Teil B (go-habridge) und Teil C (`go-hafabric`,
 die HA-Komponente→Cluster-Tabelle) wandern als `CONCEPT.md` in neue
-Repositories `SukramJ/go-ha-matter-bridge` und `SukramJ/go-hamatter`
+Repositories `SukramJ/go-habridge` und `SukramJ/go-hafabric`
 (Apache-2.0, README mit Status „concept, not started“, Verweis auf
 go-fabric und die Roadmap M5+). In go-fabric bleibt in v6 je ein Satz
 mit dem Link; `docs/roadmap.md` Konsumenten-Tabelle zeigt auf die
