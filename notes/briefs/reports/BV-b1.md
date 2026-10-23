@@ -36,7 +36,17 @@ Branch `m4/phase-20d-b1` from `origin/main` at e8f7eeef, after #240. Brief secti
 
 ## Guards
 
-GUARDS_TABLE
+| Guard | HEAD | Exit |
+| --- | --- | --- |
+| `make ci` (including `apidiff-check`: no incompatible change) | ebaf572a | 0 (the first run, on 54a98065, failed lint: `max` shadowed a builtin in a test) |
+| `make race` ×2 | ebaf572a | 0, 0 |
+| `make reachability` then `reachability-check` | c7800d33 | 0. Unreached fell from 4 to 3 (`endpoint.ComposeNodeLabel` is now reached through `device.ComposeNodeLabel`), so the ratchet was lowered to 3 |
+| `make cite-report` then `cite-check` | c8f6745f | 0 (drift 262, unchanged) |
+| `make testparity` then `testparity-check` | c8f6745f | 0 |
+| `go test ./script/...` | c8f6745f | 0 |
+| `mkdocs build --strict` | c8f6745f | 0 |
+
+Every commit after ebaf572a touches only the reachability and citation artefacts, the ratchet constant and this report.
 
 ## Differences from the brief
 
