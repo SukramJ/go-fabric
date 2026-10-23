@@ -452,10 +452,10 @@ func powerSourceDefaults(features uint32, initial map[uint32]any) {
 // endpoints a bridged device's power source feeds are its own, unless the
 // declaration's Initial names them. matter.js's PowerSourceServer sets no
 // EndpointList (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63
-// at 862ad75f) and the attribute is mandatory
-// (power-source-cluster.element.ts:130), so the application fills it; the
-// kit fills it as the measurement-projected PowerSource does
-// (cluster/measurement PowerSourceServer.SetEndpoint).
+// at 862ad75f), and the model makes EndpointList mandatory
+// (power-source-cluster.element.ts:130 at 862ad75f), so the application
+// fills it; the kit fills it as the measurement-projected server does
+// (cluster/measurement SetEndpoint).
 type ownEndpointList struct{ self func() (uint16, bool) }
 
 // MatterAttribute implements [spec.Source].
