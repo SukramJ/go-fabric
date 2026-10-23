@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package colorcontrol is the generated definition of the Matter
+// ColorControl cluster (definition_gen.go, server_gen.go), the colour-space
+// conversions (colorconversion.go) and the attribute scalers (values.go) a
+// host converting its device's colour needs.
 package colorcontrol
 
 import "math"

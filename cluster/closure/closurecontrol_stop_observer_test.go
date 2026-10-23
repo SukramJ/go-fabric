@@ -30,15 +30,15 @@ var _ closuredef.StopObserver = (*observingMover)(nil)
 
 // stopServer is a ControlServer on m in state, with the changes it
 // reports counted.
-func stopServer(t *testing.T, m closure.Mover, state clusterwire.ClosureMainState) (*closure.ControlServer, *int) {
+func stopServer(t *testing.T, m closure.Mover, state clusterwire.ClosureMainState) (srv *closure.ControlServer, changes *int) {
 	t.Helper()
-	srv := closure.NewControlServer(closure.Config{Mover: m})
+	srv = closure.NewControlServer(closure.Config{Mover: m})
 	srv.SetMainState(state)
 	n, ok := any(srv).(contract.AttributeChangeNotifier)
 	if !ok {
 		t.Fatal("ControlServer reports no attribute changes")
 	}
-	changes := new(int)
+	changes = new(int)
 	n.OnAttributeChange(func(contract.Change) { *changes++ })
 	return srv, changes
 }

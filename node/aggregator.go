@@ -185,7 +185,7 @@ func (a *Aggregator) partLocked(scope string) *partition {
 
 // findLocked returns the partition and index of the endpoint with key, in
 // any partition; nil, -1 for none. a.mu is held.
-func (a *Aggregator) findLocked(key string) (*partition, int) {
+func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 	for _, p := range a.parts {
 		if i := slices.IndexFunc(p.eps, func(ep Endpoint) bool {
 			k, err := keyOf(ep.Spec())

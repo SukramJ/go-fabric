@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package thermostat is the generated definition of the Matter Thermostat
+// cluster (definition_gen.go, server_gen.go) and the value helpers a host
+// encoding its temperatures needs (values.go).
 package thermostat
 
 import "math"

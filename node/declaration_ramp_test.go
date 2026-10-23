@@ -133,8 +133,8 @@ func TestDeclaredRampDimmer(t *testing.T) {
 	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{light}}})
 	ep, _ := light.EndpointNumber()
 
-	if min := light.LevelControl().Get().MinLevel; min != levelcontroldef.LightingLevelMin {
-		t.Errorf("MinLevel %d under Lighting, want %d", min, levelcontroldef.LightingLevelMin)
+	if minLevel := light.LevelControl().Get().MinLevel; minLevel != levelcontroldef.LightingLevelMin {
+		t.Errorf("MinLevel %d under Lighting, want %d", minLevel, levelcontroldef.LightingLevelMin)
 	}
 	if _, err := fabrictest.Invoke(ctx, pair, levelCmd(ep, levelcontroldef.CmdMoveToLevelWithOnOff),
 		levelcontroldef.MoveToLevelWithOnOffRequest{Level: 200}); err != nil {
@@ -169,8 +169,8 @@ func TestDeclaredRampVolume(t *testing.T) {
 	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{speaker}}})
 	ep, _ := speaker.EndpointNumber()
 
-	if min := speaker.LevelControl().Get().MinLevel; min != levelcontroldef.LevelMin {
-		t.Errorf("MinLevel %d without Lighting, want %d", min, levelcontroldef.LevelMin)
+	if minLevel := speaker.LevelControl().Get().MinLevel; minLevel != levelcontroldef.LevelMin {
+		t.Errorf("MinLevel %d without Lighting, want %d", minLevel, levelcontroldef.LevelMin)
 	}
 	if _, err := fabrictest.Invoke(ctx, pair, levelCmd(ep, levelcontroldef.CmdMove),
 		levelcontroldef.MoveRequest{MoveMode: levelcontroldef.MoveModeUp, Rate: spec.ValueOf(uint8(10)), OptionsMask: 1, OptionsOverride: 1}); err != nil {

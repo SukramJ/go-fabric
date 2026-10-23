@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package levelcontrol is the generated definition of the Matter
+// LevelControl cluster (definition_gen.go, server_gen.go) and the level
+// range and scalers a host converting a device level needs (values.go).
 package levelcontrol
 
 import "math"

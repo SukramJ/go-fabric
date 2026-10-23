@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+// Package modeselect is the generated definition of the Matter ModeSelect
+// cluster (definition_gen.go, server_gen.go) and the list and label bounds
+// a host trimming its modes needs (values.go).
 package modeselect
 
 // The ModeSelect list and label bounds, from the model, beside the

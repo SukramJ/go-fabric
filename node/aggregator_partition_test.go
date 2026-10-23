@@ -53,7 +53,8 @@ func TestPartitionCompletenessIsPerPartition(t *testing.T) {
 
 	m := newNode(t, minimalConfig(openDB(t, path)))
 	agg := m.Aggregator()
-	if agg.Partition("ccu1") != agg.Partition("ccu1") || agg.Partition("") != agg.Partition(node.Scope) {
+	first, second := agg.Partition("ccu1"), agg.Partition("ccu1")
+	if first != second || agg.Partition("") != agg.Partition(node.Scope) {
 		t.Error("Partition does not return the same handle for the same name")
 	}
 	if err := m.Start(ctx); err != nil {
@@ -216,7 +217,7 @@ func TestBatchKeepsWhatApplied(t *testing.T) {
 	n := startedAggNode(t)
 	before := node.Reassemblies(n.Aggregator())
 	err := n.Aggregator().Batch(context.Background(), func(b *node.Batch) error {
-		var errs []error
+		errs := make([]error, 0, 3)
 		for _, k := range []string{"plug:a", "plug:a", "plug:c"} {
 			errs = append(errs, b.Add(newPlug(t, k)))
 		}
