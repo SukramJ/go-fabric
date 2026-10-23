@@ -10,8 +10,7 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-No source change is required: every new name is an alias of a type the
-API already used, or a new symbol. Two behaviours changed, under Changed.
+## [0.10.3] — 2026-10-23
 
 ### Added
 
@@ -4609,7 +4608,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/SukramJ/go-fabric/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/SukramJ/go-fabric/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...v0.10.0
