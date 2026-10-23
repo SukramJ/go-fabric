@@ -39,7 +39,7 @@ pseudo-version of `main`.
 
 ### Removed
 
-- `(*store.Store).ThermostatPresets(key)`: `store.NewThermostatPresetStore(st, key)` replaces it for any implementation of the port.
+- `store.Store.ThermostatPresets(key)`: `store.NewThermostatPresetStore(st, key)` replaces it for any implementation of the port.
 
 ## [0.10.3] — 2026-10-23
 
