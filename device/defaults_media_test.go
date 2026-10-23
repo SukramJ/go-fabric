@@ -16,6 +16,7 @@ import (
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/contentcontrol"
 	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
 	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
@@ -45,6 +46,17 @@ func (mediaPort) NavigateTarget(context.Context, *media.TargetState, targetdef.N
 }
 
 func (mediaPort) Sleep(context.Context) error { return nil }
+
+// Enable and Disable are the ContentControl port: Enable sets Enabled.
+func (mediaPort) Enable(_ context.Context, st *media.ContentControlState) error {
+	st.Enabled = true
+	return nil
+}
+
+func (mediaPort) Disable(_ context.Context, st *media.ContentControlState) error {
+	st.Enabled = false
+	return nil
+}
 
 func (mediaPort) GetSetupPIN(context.Context, logindef.GetSetupPinRequest) (logindef.GetSetupPinResponse, error) {
 	return logindef.GetSetupPinResponse{}, nil
@@ -89,6 +101,7 @@ func mediaCases() []struct {
 		{lowpowerdef.ClusterID, player("lp", lowpowerdef.Declare{LowPower: p}), (*media.LowPowerServer)(nil)},
 		{logindef.ClusterID, player("login", logindef.Declare{AccountLogin: p}), (*media.AccountLoginServer)(nil)},
 		{woldef.ClusterID, player("wol", woldef.Declare{}), (*media.WakeOnLanServer)(nil)},
+		{ccdef.ClusterID, player("cc", ccdef.Declare{ContentControl: p}), (*media.ContentControlServer)(nil)},
 		{basicdef.ClusterID, func() (*Device, error) {
 			return New(&ContentAppType, testOptions("ab"), basicdef.Declare{Initial: basicdef.Patch{
 				Application: &basicdef.ApplicationStruct{CatalogVendorId: 123, ApplicationId: "exampleid"}, AllowedVendorList: &vendors,
