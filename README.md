@@ -22,7 +22,7 @@ not a claim.
 
 ## Status
 
-As of `v0.10.1` (2026-10-22); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+As of `v0.10.2` (2026-10-23); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
 
 | Area | State |
 | --- | --- |
