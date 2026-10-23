@@ -229,6 +229,12 @@ The rule behind all of the above: **a break that appears only in a commit
 message, a doc comment or a diff has not been announced.** If it is not in
 the changelog, it does not ship.
 
+A guard holds the rule: `make apidiff` compares every public package with
+the last release tag (`golang.org/x/exp/cmd/apidiff`, a tool dependency of
+the module) and prints the incompatible changes, and `make apidiff-check`,
+a CI job, fails when one of them is not named under `[Unreleased]` in
+`CHANGELOG.md` (`### Changed`, `### Removed` or `### Deprecated`).
+
 ## Licence
 
 Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)
