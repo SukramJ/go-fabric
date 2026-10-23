@@ -259,13 +259,17 @@ func (b *Bridge) disarmStatusResponseWait(sessionID, exchangeID uint16, initiato
 // for the (session, exchange) pair, it calls this so any goroutine
 // inside the chunk-streaming loop unblocks and learns the status the
 // peer answered with. Safe to call when no wait is registered — no-op.
-func (b *Bridge) signalStatusResponseRX(sessionID, exchangeID uint16, initiator bool, status im.StatusCode) {
+// waited reports whether a waiter took the status: a chunk loop that
+// sends the exchange's next message, which piggybacks the ack.
+func (b *Bridge) signalStatusResponseRX(sessionID, exchangeID uint16, initiator bool, status im.StatusCode) (waited bool) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if v, loaded := b.routing.statusResponseWaits.LoadAndDelete(key); loaded {
 		if ch, ok := v.(chan im.StatusCode); ok {
 			safeSendAndClose(ch, status)
+			return true
 		}
 	}
+	return false
 }
 
 // safeSendAndClose hands status to the waiter and closes the channel,
