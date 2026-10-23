@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-10-24
+
 ### Added
 
 - The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
