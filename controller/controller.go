@@ -218,7 +218,8 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, openNames f
 	}
 	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	served := make(chan struct{})
-	go func() { defer close(served); _ = l.Serve(serveCtx, c.mgr.HandleDatagram) }()
+	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
+	go func() { defer close(served); _ = l.Serve(serveCtx, handle) }()
 	c.stop = func() { cancel(); <-served }
 	if c.names, err = openNames(log); err != nil {
 		return err
