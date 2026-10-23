@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-package light_test
+package colorcontrol_test
 
 import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 )
 
 func closeTo(t *testing.T, what string, got, want, delta float64) {
@@ -37,11 +37,11 @@ func TestColorConversionHSVToRGBAndBack(t *testing.T) {
 		{123, 0, 255, 255, 255, 0, 0, 0, 0.05}, // "saturation of 0 means no color"
 		{42, 1, 255, 179, 0, 42, 1, 0.5, 0.05},
 	} {
-		r, g, b := light.HSVToRGB(v.h, v.s, 1)
+		r, g, b := ccdef.HSVToRGB(v.h, v.s, 1)
 		closeTo(t, "r", r*255, v.r, 0.5)
 		closeTo(t, "g", g*255, v.g, 0.5)
 		closeTo(t, "b", b*255, v.b, 0.5)
-		h, s, _ := light.RGBToHSV(r, g, b)
+		h, s, _ := ccdef.RGBToHSV(r, g, b)
 		closeTo(t, "h", h, v.backH, v.hDelta)
 		closeTo(t, "s", s, v.backS, v.sDiff)
 	}
@@ -57,11 +57,11 @@ func TestColorConversionXYToRGBAndBack(t *testing.T) {
 		{0.5621, 0.4166, 255, 166, 0},
 		{0.33, 0.33, 255, 249, 248},
 	} {
-		r, g, b := light.XYToRGB(v.x, v.y)
+		r, g, b := ccdef.XYToRGB(v.x, v.y)
 		closeTo(t, "r", r*255, v.r, 0.5)
 		closeTo(t, "g", g*255, v.g, 0.5)
 		closeTo(t, "b", b*255, v.b, 0.5)
-		x, y := light.RGBToXY(r, g, b)
+		x, y := ccdef.RGBToXY(r, g, b)
 		closeTo(t, "x", x, v.x, 0.01)
 		closeTo(t, "y", y, v.y, 0.01)
 	}
@@ -75,9 +75,9 @@ func TestColorConversionMiredsToXYAndBack(t *testing.T) {
 		{0.32208, 0.33175, 6000},
 		{0.28692, 0.29558, 9000},
 	} {
-		mireds := light.XYToMireds(v.x, v.y)
+		mireds := ccdef.XYToMireds(v.x, v.y)
 		closeTo(t, "kelvin", 1_000_000/mireds, v.kelvin, 30)
-		x, y, ok := light.MiredsToXY(mireds)
+		x, y, ok := ccdef.MiredsToXY(mireds)
 		if !ok {
 			t.Fatalf("MiredsToXY(%v) has no value", mireds)
 		}
@@ -104,15 +104,15 @@ func TestKelvinTableReach(t *testing.T) {
 		{0, 0, 0, false},    // infinite Kelvin
 		{1_000_000.0 / 20009, 0.256456439408808, 0.257628552153879, true}, // 20009 K shares 20000 K's entry
 	} {
-		x, y, ok := light.MiredsToXY(v.mireds)
+		x, y, ok := ccdef.MiredsToXY(v.mireds)
 		if ok != v.ok || x != v.x || y != v.y {
 			t.Errorf("MiredsToXY(%v) = %v, %v, %v; want %v, %v, %v", v.mireds, x, y, ok, v.x, v.y, v.ok)
 		}
 	}
-	if _, _, ok := light.MiredsToHSV(5000); ok {
+	if _, _, ok := ccdef.MiredsToHSV(5000); ok {
 		t.Error("MiredsToHSV(200 K) has a value")
 	}
-	if light.MiredsToKelvin(250) != 4000 || light.KelvinToMireds(2700) != 370 {
+	if ccdef.MiredsToKelvin(250) != 4000 || ccdef.KelvinToMireds(2700) != 370 {
 		t.Error("Kelvin / mireds are 1e6 / value, rounded half up")
 	}
 }
@@ -121,14 +121,14 @@ func TestKelvinTableReach(t *testing.T) {
 // through xyToHsv returns the hue and saturation it started from closely.
 func TestHSVToXYCrops(t *testing.T) {
 	t.Parallel()
-	x, y := light.HSVToXY(240, 1)
+	x, y := ccdef.HSVToXY(240, 1)
 	if x < 0 || x > 1 || y < 0 || y > 1 {
 		t.Fatalf("HSVToXY(240, 1) = %v, %v outside 0..1", x, y)
 	}
-	h, s := light.XYToHSV(x, y)
+	h, s := ccdef.XYToHSV(x, y)
 	closeTo(t, "hue", h, 240, 1)
 	closeTo(t, "saturation", s, 1, 0.01)
-	if m := light.HSVToMireds(30, 0.2); m <= 0 || math.IsNaN(m) {
+	if m := ccdef.HSVToMireds(30, 0.2); m <= 0 || math.IsNaN(m) {
 		t.Errorf("HSVToMireds(30, 0.2) = %v", m)
 	}
 }

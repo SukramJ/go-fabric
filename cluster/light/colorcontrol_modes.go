@@ -7,6 +7,8 @@ import (
 	"context"
 	"math"
 
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -89,29 +91,29 @@ func (s *ColorControlServer) switchColorMode(st *colorState, oldMode, newMode Co
 	case ColorModeHueSaturation:
 		switch newMode {
 		case ColorModeXY:
-			st.x, st.y = xyAttribute(HSVToXY(hue, saturation))
+			st.x, st.y = xyAttribute(ccdef.HSVToXY(hue, saturation))
 		case ColorModeColorTemperature:
-			s.setMireds(st, HSVToMireds(hue, saturation))
+			s.setMireds(st, ccdef.HSVToMireds(hue, saturation))
 		default: // nothing to convert to
 		}
 	case ColorModeXY:
 		switch newMode {
 		case ColorModeHueSaturation:
-			h, sat := XYToHSV(x, y) // matter.js: hsvToXy, see above
+			h, sat := ccdef.XYToHSV(x, y) // matter.js: hsvToXy, see above
 			st.hue, st.saturation = hueAttribute(h), saturationAttribute(sat)
 		case ColorModeColorTemperature:
-			s.setMireds(st, XYToMireds(x, y))
+			s.setMireds(st, ccdef.XYToMireds(x, y))
 		default: // nothing to convert to
 		}
 	case ColorModeColorTemperature:
 		mireds := float64(st.mireds)
 		switch newMode {
 		case ColorModeHueSaturation:
-			if h, sat, ok := MiredsToHSV(mireds); ok {
+			if h, sat, ok := ccdef.MiredsToHSV(mireds); ok {
 				st.hue, st.saturation = hueAttribute(h), saturationAttribute(sat)
 			}
 		case ColorModeXY:
-			if cx, cy, ok := MiredsToXY(mireds); ok {
+			if cx, cy, ok := ccdef.MiredsToXY(mireds); ok {
 				st.x, st.y = xyAttribute(cx, cy)
 			}
 		default: // nothing to convert to
@@ -156,3 +158,9 @@ func saturationAttribute(v float64) uint8 {
 	}
 	return uint8(cropValue(jsRound(v*254), minSaturationValue, maxSaturationValue))
 }
+
+// jsRound is JavaScript's Math.round: half rounds up.
+func jsRound(v float64) float64 { return math.Floor(v + 0.5) }
+
+// cropValue is matter.js cropValueRange.
+func cropValue(v, lo, hi float64) float64 { return min(max(v, lo), hi) }

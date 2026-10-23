@@ -341,7 +341,9 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("\t\tt.Error(err)")
 	w.p("\t}")
 	for _, port := range ports[g.c.Name].ports {
-		w.p("\tvar _ %s = d.%s", port.name, port.name)
+		if !port.optional {
+			w.p("\tvar _ %s = d.%s", port.name, port.fieldName())
+		}
 	}
 	if len(cmds) > 0 {
 		w.p("\t// Every handler declared: each is installed, and refused by the")

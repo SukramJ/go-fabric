@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-package light
+package colorcontrol
 
 // kelvinToXYTable is matter.js's colour-temperature lookup table
 // (packages/node/src/behaviors/color-control/kelvinToXy.ts at the schema

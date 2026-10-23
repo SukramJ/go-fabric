@@ -49,6 +49,21 @@ type portDecl struct {
 	name    string   // the interface and the Declare field
 	doc     []string // the interface's doc (the field's names it)
 	methods []string // the interface's method lines
+	// field is the Declare field when it is not named as the interface;
+	// fieldDoc, when set, replaces the field's standard doc line.
+	field    string
+	fieldDoc []string
+	// optional marks an optional interface of another port, found on it by
+	// type assertion: it gets no Declare field.
+	optional bool
+}
+
+// fieldName is the Declare field that carries the port.
+func (p portDecl) fieldName() string {
+	if p.field != "" {
+		return p.field
+	}
+	return p.name
 }
 
 // portSet is a cluster's host ports, with the types they need beyond the
@@ -112,7 +127,99 @@ var ports = map[string]portSet{
 			"Stop(ctx context.Context, req StopRequest) error",
 			"StopWithOnOff(ctx context.Context, req StopWithOnOffRequest) error",
 		},
-	}}},
+	}, {
+		name:  "NativeRamp",
+		field: "Ramp",
+		fieldDoc: []string{
+			"Ramp is a device that ramps its level by itself ([NativeRamp]):",
+			"the kit's server runs on cluster/levelcontrol's NativeSource over",
+			"it, coupled to the endpoint's OnOff server, so the host implements",
+			"no On/Off port; Options and OnLevel start from Initial. Refused",
+			"beside LevelSource.",
+		},
+		doc: []string{
+			"NativeRamp is a device that ramps its level by itself — a dimmer",
+			"with a ramp time, a player with a volume. It is all a host",
+			"implements to take the hand-off path: the kit builds",
+			"cluster/levelcontrol NewNativeSource on it, which keeps the Options",
+			"and OnLevel attributes, applies the ExecuteIfOff gate, turns each of",
+			"the eight commands into one target level and one duration, and",
+			"couples the endpoint's On/Off state for the \"with On/Off\" commands,",
+			"as matter.js LevelControlServer does on its own transitions. The",
+			"optional interfaces [NativeMover], [NativeSwitcher] and",
+			"[NativePersister] are found on it by type assertion. The kit couples",
+			"to the endpoint's OnOff server itself, so the host implements no",
+			"On/Off port for it. A device declares a NativeRamp or a",
+			"[LevelSource], not both.",
+		},
+		methods: []string{
+			"// Level reports the device's current level; known=false is a level",
+			"// the device has not reported, which reads as null. A level below the",
+			"// server's MinLevel (a dimmer whose 0 means off) is reported as it is:",
+			"// the source counts it as at the minimum for an owed switch-off, so a",
+			"// host need not crop it.",
+			"Level() (level uint8, known bool)",
+			"// Ramp drives the device to level over d; d == 0 is at once. withOnOff",
+			"// marks a \"with On/Off\" command: the source has already switched the",
+			"// device on before a ramp away from the minimum and switches it off",
+			"// once a ramp to the minimum has arrived, so a host needs it only when",
+			"// its device couples the two itself.",
+			"Ramp(ctx context.Context, level uint8, d time.Duration, withOnOff bool) error",
+			"// Stop halts a running ramp where it is.",
+			"Stop(ctx context.Context) error",
+		},
+	}, {
+		name:     "NativeMover",
+		optional: true,
+		doc: []string{
+			"NativeMover is an optional interface of a [NativeRamp]: a device that",
+			"implements it replaces the source's Move logic, as an implementation",
+			"overrides matter.js's \"default implementation of the Move commands\",",
+			"moveLogic (LevelControlServer.ts:378-403). Move and MoveWithOnOff call",
+			"MoveLevel after the ExecuteIfOff gate (which matter.js applies in move",
+			"before moveLogic, :351-361) instead of ramping to the bound; the On/Off",
+			"coupling of MoveWithOnOff is then the host's, as an override of",
+			"moveLogic skips transition and its couple (:529-550). A device for",
+			"which a jump to the bound is no reading of a continuous move — a",
+			"speaker's volume — returns nil and keeps its level. Stop and",
+			"StopWithOnOff are unaffected. The request is the generated",
+			"[MoveRequest], the form a host's [LevelSource] takes too.",
+		},
+		methods: []string{"MoveLevel(ctx context.Context, req MoveRequest, withOnOff bool) error"},
+	}, {
+		name:     "NativeSwitcher",
+		optional: true,
+		doc: []string{
+			"NativeSwitcher is an optional interface of a [NativeRamp] whose On/Off",
+			"and level are written together — a player that takes \"start at volume",
+			"X\" and \"stop\" as one write each. For a \"with On/Off\" command the source",
+			"calls SwitchOn(level, d) instead of switching the endpoint on and then",
+			"ramping when the command turns the device on, and SwitchOff(d) instead",
+			"of ramping to the minimum and then switching off when it ends there.",
+			"The source then sets nothing on the OnOff attribute itself: the host's",
+			"OnOff reflects what the device did. matter.js has no counterpart — it",
+			"couples On/Off and the transition in one transaction against local",
+			"state (LevelControlServer.ts:529-550, #turnOnForLevel) — so the",
+			"interface is a bridged host's affordance; a device without it keeps",
+			"matter.js's order. A [NativeMover] still takes Move and MoveWithOnOff.",
+		},
+		methods: []string{
+			"SwitchOn(ctx context.Context, level uint8, d time.Duration) error",
+			"SwitchOff(ctx context.Context, d time.Duration) error",
+		},
+	}, {
+		name:     "NativePersister",
+		optional: true,
+		doc: []string{
+			"NativePersister is an optional interface of a [NativeRamp] that keeps",
+			"the Options and OnLevel attributes across restarts: PersistLevel",
+			"receives the values a write would leave in effect, before they take",
+			"effect, and an error refuses the write and keeps the previous values",
+			"(cluster/levelcontrol NativeConfig.Persist). They start from the",
+			"declaration's Initial.",
+		},
+		methods: []string{"PersistLevel(ctx context.Context, options OptionsBitmap, onLevel *uint8) error"},
+	}}, imports: []string{"time"}},
 	"FanControl": {ports: []portDecl{{
 		name: "StateSource",
 		doc: []string{
@@ -289,8 +396,17 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 		w.p("\t%s func(ctx context.Context, req %s) (%s, error)", hc.method, hc.request, hc.response)
 	}
 	for _, p := range ps.ports {
-		w.p("\t// %s is the host port the kit's server runs on ([%s]).", p.name, p.name)
-		w.p("\t%s %s", p.name, p.name)
+		if p.optional {
+			continue
+		}
+		if len(p.fieldDoc) > 0 {
+			for _, line := range p.fieldDoc {
+				w.p("\t// %s", line)
+			}
+		} else {
+			w.p("\t// %s is the host port the kit's server runs on ([%s]).", p.fieldName(), p.name)
+		}
+		w.p("\t%s %s", p.fieldName(), p.name)
 	}
 	w.p("\t// HostServer is the host's own server for the cluster, mounted in")
 	w.p("\t// place of the kit's — also for a cluster the device type does not")

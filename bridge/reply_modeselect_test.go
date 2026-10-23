@@ -16,6 +16,8 @@ import (
 	"context"
 	"testing"
 
+	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+
 	mattermodeselect "github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -227,15 +229,15 @@ func TestDefaultAttrWriter_ModeSelectSupportedModes(t *testing.T) {
 // the wire as the server read it: matter.js trims nothing (its validator
 // refuses a list past "max 255" / "max 64" instead), so staying within
 // the bounds is the host's part of the ModeSource contract
-// (mattermodeselect.SupportedModesMaxEntries, SemanticTagsMaxEntries).
+// (msdef.SupportedModesMaxEntries, SemanticTagsMaxEntries).
 func TestDefaultAttrWriter_ModeSelectListAsGiven(t *testing.T) {
 	t.Parallel()
 
-	modes := make([]mattermodeselect.ModeOptionStruct, mattermodeselect.SupportedModesMaxEntries+1)
+	modes := make([]mattermodeselect.ModeOptionStruct, msdef.SupportedModesMaxEntries+1)
 	for i := range modes {
 		modes[i] = mattermodeselect.ModeOptionStruct{Label: "m", Mode: uint8(i)} //nolint:gosec // index bounded by the 256-entry list
 	}
-	modes[0].SemanticTags = make([]mattermodeselect.SemanticTagStruct, mattermodeselect.SemanticTagsMaxEntries+1)
+	modes[0].SemanticTags = make([]mattermodeselect.SemanticTagStruct, msdef.SemanticTagsMaxEntries+1)
 
 	got := decodeSupportedModes(t, supportedModesValue(t, modes))
 

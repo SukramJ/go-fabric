@@ -247,11 +247,11 @@ func TestUnservedAttributesAreNotResolved(t *testing.T) {
 func TestMinAndMaxLevelAreServed(t *testing.T) {
 	t.Parallel()
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: observedHost()})
-	if v, ok := srv.MatterRead(levelcontrol.AttrMinLevel); !ok || v != levelcontrol.LevelMin {
-		t.Errorf("MinLevel = %v, %v; want %d", v, ok, levelcontrol.LevelMin)
+	if v, ok := srv.MatterRead(levelcontrol.AttrMinLevel); !ok || v != lvldef.LevelMin {
+		t.Errorf("MinLevel = %v, %v; want %d", v, ok, lvldef.LevelMin)
 	}
-	if v, ok := srv.MatterRead(levelcontrol.AttrMaxLevel); !ok || v != levelcontrol.LevelMax {
-		t.Errorf("MaxLevel = %v, %v; want %d", v, ok, levelcontrol.LevelMax)
+	if v, ok := srv.MatterRead(levelcontrol.AttrMaxLevel); !ok || v != lvldef.LevelMax {
+		t.Errorf("MaxLevel = %v, %v; want %d", v, ok, lvldef.LevelMax)
 	}
 }
 

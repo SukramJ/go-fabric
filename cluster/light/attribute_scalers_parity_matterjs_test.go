@@ -7,6 +7,8 @@ import (
 	"math"
 	"testing"
 
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+
 	"github.com/SukramJ/go-fabric/cluster/light"
 )
 
@@ -63,18 +65,18 @@ func TestSaturationScalers(t *testing.T) {
 	}{
 		{0, 0}, {50, 127}, {100, 254}, {120, 254}, {-5, 0}, {0.2, 1}, {0.1, 0}, {math.NaN(), 0},
 	} {
-		if got := light.SaturationPercentToAttr(c.pct); got != c.attr {
+		if got := ccdef.SaturationPercentToAttr(c.pct); got != c.attr {
 			t.Errorf("SaturationPercentToAttr(%v) = %d, want %d", c.pct, got, c.attr)
 		}
 	}
-	if got := light.AttrToSaturationPercent(127); got != 50 {
+	if got := ccdef.AttrToSaturationPercent(127); got != 50 {
 		t.Errorf("AttrToSaturationPercent(127) = %v, want 50", got)
 	}
-	if got := light.AttrToSaturationPercent(254); got != 100 {
+	if got := ccdef.AttrToSaturationPercent(254); got != 100 {
 		t.Errorf("AttrToSaturationPercent(254) = %v, want 100", got)
 	}
 	for a := range uint8(255) {
-		if got := light.SaturationPercentToAttr(light.AttrToSaturationPercent(a)); got != a {
+		if got := ccdef.SaturationPercentToAttr(ccdef.AttrToSaturationPercent(a)); got != a {
 			t.Errorf("saturation round trip %d -> %d", a, got)
 		}
 	}
@@ -95,7 +97,7 @@ func TestCropMireds(t *testing.T) {
 		{10, 0, 500, 10},       // unset minimum: 0
 		{0xFF00, 153, 0, 0xFEFF},
 	} {
-		if got := light.CropMireds(c.mireds, c.lo, c.hi); got != c.want {
+		if got := ccdef.CropMireds(c.mireds, c.lo, c.hi); got != c.want {
 			t.Errorf("CropMireds(%d, %d, %d) = %d, want %d", c.mireds, c.lo, c.hi, got, c.want)
 		}
 	}

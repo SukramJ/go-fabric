@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
@@ -50,8 +52,8 @@ const nativeRampStep = 100 * time.Millisecond
 
 // Compile-time assertions.
 var (
-	_ levelcontrol.NativeRamp = (*nativeDimmer)(nil)
-	_ levelcontrol.OnOff      = (*nativeDimmer)(nil)
+	_ lvldef.NativeRamp  = (*nativeDimmer)(nil)
+	_ levelcontrol.OnOff = (*nativeDimmer)(nil)
 )
 
 // newDemoNativeDimmer returns a dimmable light that is off at half
@@ -88,14 +90,14 @@ func (d *nativeDimmer) device(opts device.Options) (*device.Device, error) {
 	return l.Device, nil
 }
 
-// Level implements [levelcontrol.NativeRamp].
+// Level implements [lvldef.NativeRamp].
 func (d *nativeDimmer) Level() (uint8, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.level, true
 }
 
-// Ramp implements [levelcontrol.NativeRamp]: the simulated lamp moves to
+// Ramp implements [lvldef.NativeRamp]: the simulated lamp moves to
 // level over dur in [nativeRampStep] steps, at once for a shorter dur.
 func (d *nativeDimmer) Ramp(_ context.Context, level uint8, dur time.Duration, withOnOff bool) error {
 	slog.Info("dimmer.ramp", slog.String("device", d.name), slog.Int("level", int(level)),
@@ -123,7 +125,7 @@ func (d *nativeDimmer) rampStep(ramp uint64, from, to uint8, k, n int) {
 	}
 }
 
-// Stop implements [levelcontrol.NativeRamp]: the lamp stays where it is.
+// Stop implements [lvldef.NativeRamp]: the lamp stays where it is.
 func (d *nativeDimmer) Stop(context.Context) error {
 	d.mu.Lock()
 	d.ramp++

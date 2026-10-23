@@ -315,7 +315,7 @@ func TestMoveAndStop(t *testing.T) {
 		if err := invoke(t, srv, levelcontrol.CmdMove, wire.MoveRequest{MoveMode: levelcontrol.MoveModeDown}); err != nil {
 			t.Fatal(err)
 		}
-		if l := level(t, srv); l != levelcontrol.LightingLevelMin {
+		if l := level(t, srv); l != lvldef.LightingLevelMin {
 			t.Errorf("Move down without a rate = %d, want MinLevel at once", l)
 		}
 	})
@@ -346,8 +346,8 @@ func TestStepTransition(t *testing.T) {
 		if err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 100, TransitionTime: u16(0)}); err != nil {
 			t.Fatal(err)
 		}
-		if l := level(t, srv); l != levelcontrol.LevelMax {
-			t.Errorf("CurrentLevel = %d, want %d", l, levelcontrol.LevelMax)
+		if l := level(t, srv); l != lvldef.LevelMax {
+			t.Errorf("CurrentLevel = %d, want %d", l, lvldef.LevelMax)
 		}
 		if err := invoke(t, srv, levelcontrol.CmdStep, wire.StepRequest{StepMode: levelcontrol.StepModeDown, StepSize: 54}); err != nil {
 			t.Fatal(err)

@@ -119,16 +119,16 @@ func TestUnitScaling(t *testing.T) {
 	}{
 		{0, 0}, {1, 254}, {0.5, 127}, {1.5, 254}, {-1, 0}, {math.NaN(), 0}, {1.0 / 254, 1}, {0.5 / 254, 1},
 	} {
-		if got := levelcontrol.LevelFromUnit(c.u); got != c.want {
+		if got := lvldef.LevelFromUnit(c.u); got != c.want {
 			t.Errorf("LevelFromUnit(%v) = %d, want %d", c.u, got, c.want)
 		}
 	}
 	for l := range uint8(255) {
-		if got := levelcontrol.LevelFromUnit(levelcontrol.UnitFromLevel(l)); got != l {
+		if got := lvldef.LevelFromUnit(lvldef.UnitFromLevel(l)); got != l {
 			t.Errorf("round trip %d -> %d", l, got)
 		}
 	}
-	if got := levelcontrol.UnitFromLevel(127); got != 0.5 {
+	if got := lvldef.UnitFromLevel(127); got != 0.5 {
 		t.Errorf("UnitFromLevel(127) = %v, want 0.5", got)
 	}
 }
