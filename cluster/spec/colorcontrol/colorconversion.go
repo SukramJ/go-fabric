@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-package light
+package colorcontrol
 
 import (
 	"math"
@@ -13,8 +13,9 @@ import (
 // schema pin, function for function, with JavaScript's arithmetic (its
 // Math.round rounds half up, its Number.toFixed is applied where matter.js
 // applies it). Hue is in degrees (0..360), saturation and the CIE x/y in
-// 0..1, colour temperature in mireds; the server maps them to and from the
-// attributes' Matter ranges.
+// 0..1, colour temperature in mireds; the cluster/light server maps them to
+// and from the attributes' Matter ranges. They live beside the generated
+// definition so a declaration-only host converts without a server package.
 
 // HSVToXY is matter.js hsvToXy: hue (0..360) and saturation (0..1) at full
 // value to CIE x/y, each cropped to 0..1.

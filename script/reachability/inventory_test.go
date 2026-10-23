@@ -34,7 +34,7 @@ import (
 // Set to 11 by the first measurement on this module, at the tree where the
 // analyzer landed. All eleven were verified by hand: no file in the module
 // other than the declaring one so much as spells the name. Six functions
-// (cluster/measurement.CelsiusToInt16, contract.DeviceTypeName,
+// (cluster/measurement.CelsiusToInt16 — since v0.10.2 thermostatdef.CelsiusToInt16, reached through the TemperatureMeasurement server —, contract.DeviceTypeName,
 // endpoint.ComposeNodeLabel, mdns.DeriveUniqueIDFromIdentity,
 // schema.DeviceTypeAllowsServerCluster, secure/setup.IsValidSetupPIN), one
 // type (cluster/core.SignVidVerificationResponse, named only inside two
@@ -55,7 +55,10 @@ import (
 // tests read contract.DeviceTypeName and schema.DeviceTypeAllowsServerCluster
 // (and with it the server-cluster table it consults), which no test had
 // reached before.
-const reachabilityUnreachedRatchet = 5
+// Lowered 5 -> 4 when CelsiusToInt16 moved to cluster/spec/thermostat
+// (brief BV-1): the TemperatureMeasurement server calls it there, so the
+// tests that read a temperature reach it.
+const reachabilityUnreachedRatchet = 4
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {

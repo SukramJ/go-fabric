@@ -30,7 +30,7 @@ func (d *hsDevice) SetColor(_ context.Context, c light.Color) error {
 	var deg, sat float64
 	switch c.Mode {
 	case light.ColorModeXY:
-		deg, sat = light.XYToHSV(float64(c.X)/65536, float64(c.Y)/65536)
+		deg, sat = ccdef.XYToHSV(float64(c.X)/65536, float64(c.Y)/65536)
 	case light.ColorModeHueSaturation:
 		deg, sat = float64(c.Hue)*360/254, float64(c.Saturation)/254
 	default:
@@ -108,7 +108,7 @@ func TestIssue79_ConfirmationWithinQuantisation(t *testing.T) {
 		Features: light.ColorFeatureHueSaturation | light.ColorFeatureXY, InitialColorMode: &start,
 	})
 	w := &hookWriter{onCol: func(c light.Color) {
-		deg, sat := light.XYToHSV(float64(c.X)/65536, float64(c.Y)/65536)
+		deg, sat := ccdef.XYToHSV(float64(c.X)/65536, float64(c.Y)/65536)
 		inflightHue, inflightSat = uint8(deg*254/360+0.5), uint8(sat*254+0.5)
 		srv.Set(light.Color{Mode: light.ColorModeHueSaturation, Hue: inflightHue + 1, Saturation: inflightSat})
 	}}

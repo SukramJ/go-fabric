@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 )
@@ -69,7 +71,7 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 		}
 		time.Sleep(time.Second)
 		synctest.Wait()
-		if level, _ := lamp.Level(); level != levelcontrol.LightingLevelMin || lamp.OnOff() || srv.OnOff() {
+		if level, _ := lamp.Level(); level != lvldef.LightingLevelMin || lamp.OnOff() || srv.OnOff() {
 			t.Errorf("after the ramp down: level %d, on %t (server %t), want 1 and off", level, lamp.OnOff(), srv.OnOff())
 		}
 
@@ -78,7 +80,7 @@ func TestNativeDimmerTakesTheHandOffPath(t *testing.T) {
 			wire.StepRequest{StepMode: levelcontrol.StepModeUp, StepSize: 50}); err != nil {
 			t.Fatal(err)
 		}
-		if level, _ := lamp.Level(); level != levelcontrol.LightingLevelMin {
+		if level, _ := lamp.Level(); level != lvldef.LightingLevelMin {
 			t.Errorf("a gated Step moved the level to %d", level)
 		}
 		if err := lvl.MatterWrite(ctx, levelcontrol.AttrOnLevel, uint64(100)); err != nil {

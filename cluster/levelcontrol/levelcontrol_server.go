@@ -220,22 +220,6 @@ const (
 	StepModeDown = wire.LevelStepModeDown
 )
 
-// Level bounds applied to Level and OnLevel.
-//
-// LevelMax is the MoveToLevel Level constraint "max 254" (element :74)
-// and the MaxLevel default (:38-41). LevelMin is MinLevel without the
-// Lighting feature and LightingLevelMin with it: matter.js resolves an
-// unset MinLevel to `this.features.lighting ? 1 : 0`
-// (LevelControlServer.ts:89-90, :115-116).
-const (
-	LevelMin uint8 = 0
-	LevelMax uint8 = 254
-	// LightingLevelMin is MinLevel under the Lighting feature — the only
-	// value LT allows (matter.js LevelControlServer.ts:205-220
-	// initializeLighting warns on any other).
-	LightingLevelMin uint8 = 1
-)
-
 // LevelSource is the narrow host port this server reads and drives, in the
 // generated requests of cluster/spec/levelcontrol — what
 // levelcontroldef.Declare carries. The documentation of its methods
@@ -477,9 +461,9 @@ func newServer(src source, dv *cluster.DataVersionTracker, features uint32) *Ser
 // (matter.js LevelControlServer.ts:89-91).
 func (s *Server) minLevel() uint8 {
 	if s.lighting {
-		return LightingLevelMin
+		return lvldef.LightingLevelMin
 	}
-	return LevelMin
+	return lvldef.LevelMin
 }
 
 // optionsMask is the set of Options bits the advertised FeatureMap makes
@@ -562,7 +546,7 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 	case AttrMinLevel:
 		return s.minLevel(), true
 	case AttrMaxLevel:
-		return LevelMax, true
+		return lvldef.LevelMax, true
 	case AttrRemainingTime:
 		if !s.lighting {
 			return nil, false
@@ -657,7 +641,7 @@ func (s *Server) peer(attrID uint32) (any, bool) {
 	if attrID == AttrMinLevel {
 		return s.minLevel(), true
 	}
-	return LevelMax, true
+	return lvldef.LevelMax, true
 }
 
 // storedUint8 is a validated value of the three writable attributes —
@@ -761,10 +745,10 @@ func (s *Server) invokeMoveToLevel(ctx context.Context, cmdID uint32, fields any
 	if err != nil {
 		return nil, err
 	}
-	if req.Level > LevelMax {
+	if req.Level > lvldef.LevelMax {
 		// constraint "max 254" (element :74).
 		return nil, constraintErr{fmt.Sprintf("levelcontrol: %s Level %d violates constraint max %d",
-			name, req.Level, LevelMax)}
+			name, req.Level, lvldef.LevelMax)}
 	}
 	if s.src == nil {
 		return nil, errNoSource(name)

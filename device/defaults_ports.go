@@ -111,6 +111,36 @@ func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.Clust
 	return levelcontrol.NewServer(cfg), nil
 }
 
+// nativeSource is the kit's [levelcontrol.NativeSource] on a declared
+// Ramp (levelcontroldef.Declare.Ramp): coupled to the endpoint's OnOff
+// server under the OO feature only, as the Transitions path is. matter.js
+// gates both the coupling and the ExecuteIfOff gate on
+// `this.features.onOff && this.agent.has(OnOffServer)`
+// (LevelControlServer.ts:558 couple, :728-736 #optionsAllowExecution);
+// without OO or without an OnOff server the source gets nil, so every
+// command passes the gate and none couples — with MinLevel by the Lighting
+// feature, Options and OnLevel from the declaration's Initial, and the
+// ramp's [lvldef.NativePersister], when it has one, as Persist.
+func nativeSource(b defaultBuild, ramp lvldef.NativeRamp) *levelcontrol.NativeSource {
+	cfg := levelcontrol.NativeConfig{Lighting: b.opts.Features&levelcontrol.FeatureLighting != 0, Clock: b.clock}
+	if v, ok := consume8(b.initial, lvldef.AttrOptions); ok {
+		cfg.Options = v
+	}
+	if v, ok := consume8(b.initial, lvldef.AttrOnLevel); ok {
+		cfg.OnLevel = &v
+	}
+	if p, ok := ramp.(lvldef.NativePersister); ok {
+		cfg.Persist = func(ctx context.Context, options uint8, onLevel *uint8) error {
+			return p.PersistLevel(ctx, lvldef.OptionsBitmap(options), onLevel)
+		}
+	}
+	var onOff levelcontrol.OnOff
+	if srv := b.sibling(onoffdef.ClusterID); srv != nil && b.opts.Features&levelcontrol.FeatureOnOff != 0 {
+		onOff = onOffOf(srv)
+	}
+	return levelcontrol.NewNativeSource(ramp, onOff, cfg)
+}
+
 // modePort is a ModeBase derivation's declared ModeChanger.
 type modePort interface {
 	ChangeToMode(ctx context.Context, newMode uint8) (status uint8, text string, err error)

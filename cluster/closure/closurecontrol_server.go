@@ -355,7 +355,12 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 
 // invokeStop halts motion (cluster§5.4.8.1): only a closure that is
 // Moving, WaitingForMotion or Calibrating stops and becomes Stopped; in
-// any other state the command changes nothing. SUCCESS either way.
+// any other state the command changes nothing. SUCCESS either way. A
+// mover that is also a [closuredef.StopObserver] hears of the ignored
+// Stop (StopIgnored), and its error answers FAILURE; the state stays as
+// it is. matter.js has no Stop logic to mirror here: a case-insensitive
+// grep for "stop" in packages/node/src/behaviors/closure-control/
+// ClosureControlServer.ts at the pin (862ad75f) finds nothing.
 func (s *ControlServer) invokeStop(ctx context.Context) error {
 	s.mu.RLock()
 	state := s.mainState
@@ -363,6 +368,11 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 	switch state {
 	case wire.ClosureMainStateMoving, wire.ClosureMainStateWaitingForMotion, wire.ClosureMainStateCalibrating:
 	default:
+		if o, ok := s.mover.(closuredef.StopObserver); ok {
+			if err := o.StopIgnored(ctx); err != nil {
+				return fmt.Errorf("closure: Stop: %w", err)
+			}
+		}
 		return nil
 	}
 	if s.mover == nil {

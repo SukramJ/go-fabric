@@ -10,6 +10,31 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+Upgrading **requires a source change** for a host that imports one of the
+value helpers or the `levelcontrol.Native*` interfaces listed under Removed:
+each moved, without an alias, into the generated `cluster/spec/<cluster>`
+package, and the host changes its import. A host on the facade that uses
+none of them needs no source change.
+
+### Added
+
+- `levelcontroldef.Declare.Ramp` (#228): a device that ramps its level by itself is declared without `cluster/levelcontrol`. The kit runs its LevelControl server on `levelcontrol.NewNativeSource` over the ramp, coupled under the OO feature to the device's OnOff server (no `levelcontrol.OnOff` to implement), with MinLevel from the Lighting feature and Options and OnLevel from `Initial`. `Ramp` beside `LevelSource` or beside `Transitions` is `device.ErrConfiguration`. `levelcontroldef.NativePersister` (`PersistLevel(ctx, options, onLevel)`), an optional interface of the ramp, carries `NativeConfig.Persist` to the declaration route.
+- `closurecontroldef.StopObserver` (#232), an optional interface of the declared `Mover`: the kit's ClosureControl server calls `StopIgnored` for a Stop it answers without motion (the closure is not Moving, WaitingForMotion or Calibrating, cluster §5.4.8.1), and its error answers FAILURE. Without one the idle Stop stays a SUCCESS no-op. MainState and reports are unchanged either way.
+- `node.Aggregator.Partition(name)` and `node.Partition` (#229): a named part of the set with its own snapshot scope and its own `MarkComplete`, so one source marked complete collects only its own vanished endpoint numbers. A StableKey is unique across partitions (`ErrDuplicateKey`; `Replace` and `Remove` with another partition's key are `ErrUnknownKey`). The Aggregator's own methods act on the default partition (`node.Scope`), so a host without partitions sees one snapshot as before. `Aggregator.RetirePartition(ctx, name)` collects the stored numbers of a source the host no longer has, without a handle (`ErrRetireDefault`, `ErrPartitionNotEmpty`).
+- `node.Aggregator.Batch(ctx, fn)` and `Partition.Batch` (#231): `Add`, `Replace`, `Remove` and `MarkComplete` on a `node.Batch` apply at once and return their own errors; a started node reassembles once after `fn` and then unbinds the removed and replaced devices. What applied stays applied when another change fails. `Add`, `Replace` and `Remove` are one-change batches.
+
+### Fixed
+
+- `endpoint.Assembler` moves a reused endpoint record to the scope of the snapshot that lists it now (#229). It kept its first scope while the device type was unchanged, so a source moved between scopes was never listed, and never collected, by its new scope's model-complete GC.
+
+### Removed
+
+- `measurement.CelsiusToInt16`: use `thermostatdef.CelsiusToInt16` (`cluster/spec/thermostat`) (#230).
+- `levelcontrol.LevelFromUnit`, `UnitFromLevel`, `LevelMin`, `LevelMax`, `LightingLevelMin`: use the same names in `levelcontroldef` (`cluster/spec/levelcontrol`) (#230).
+- `light.HSVToXY`, `XYToHSV`, `HSVToMireds`, `MiredsToHSV`, `HSVToRGB`, `RGBToHSV`, `RGBToXY`, `XYToRGB`, `MiredsToKelvin`, `KelvinToMireds`, `XYToMireds`, `MiredsToXY`, `SaturationPercentToAttr`, `AttrToSaturationPercent`, `CropMireds`: use the same names in `colorcontroldef` (`cluster/spec/colorcontrol`). `light.HueDegreesToAttr` and `AttrToHueDegrees` stay (#230).
+- `modeselect.LabelMaxBytes`, `SemanticTagsMaxEntries`, `SupportedModesMaxEntries`: use the same names in `modeselectdef` (`cluster/spec/modeselect`), where a test holds each to the generated definition's constraint. `modeselect.DescriptionMaxBytes` stays (#230).
+- `levelcontrol.NativeRamp`, `NativeMover`, `NativeSwitcher`: use `levelcontroldef.NativeRamp`, `NativeMover`, `NativeSwitcher`. `levelcontrol.NewNativeSource` stays for the seam route and takes a `levelcontroldef.NativeRamp`; a device the kit builds declares `levelcontroldef.Declare{Ramp: …}` instead (#228).
+
 ## [0.10.1] — 2026-10-22
 
 ### Added

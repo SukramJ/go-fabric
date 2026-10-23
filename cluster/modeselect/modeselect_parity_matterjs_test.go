@@ -20,9 +20,9 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	spectest.CheckServer(t, modeselect.NewServer(modeselect.Config{Source: coffeeSource()}), msdef.Definition, 0)
 }
 
-// TestBoundsMatchTheDefinition pins the bounds the source contract
-// documents, and Description's encode-time bound, to the constraints of
-// the element file.
+// TestBoundsMatchTheDefinition pins Description's encode-time bound to the
+// constraint of the element file; the list and label bounds are pinned in
+// cluster/spec/modeselect, where they live.
 func TestBoundsMatchTheDefinition(t *testing.T) {
 	t.Parallel()
 	maxOf := func(name string) int64 {
@@ -34,24 +34,6 @@ func TestBoundsMatchTheDefinition(t *testing.T) {
 	}
 	if got := maxOf("Description"); got != modeselect.DescriptionMaxBytes {
 		t.Errorf("Description max %d, DescriptionMaxBytes %d", got, modeselect.DescriptionMaxBytes)
-	}
-	if got := maxOf("SupportedModes"); got != modeselect.SupportedModesMaxEntries {
-		t.Errorf("SupportedModes max %d, SupportedModesMaxEntries %d", got, modeselect.SupportedModesMaxEntries)
-	}
-	fieldMax := func(name string) int64 {
-		for _, f := range msdef.ModeOptionStructDef.Fields {
-			if f.Name == name && f.Constraint.Max != nil {
-				return f.Constraint.Max.Int
-			}
-		}
-		t.Fatalf("ModeOptionStruct.%s has no max constraint", name)
-		return 0
-	}
-	if got := fieldMax("Label"); got != modeselect.LabelMaxBytes {
-		t.Errorf("ModeOptionStruct.Label max %d, LabelMaxBytes %d", got, modeselect.LabelMaxBytes)
-	}
-	if got := fieldMax("SemanticTags"); got != modeselect.SemanticTagsMaxEntries {
-		t.Errorf("ModeOptionStruct.SemanticTags max %d, SemanticTagsMaxEntries %d", got, modeselect.SemanticTagsMaxEntries)
 	}
 }
 

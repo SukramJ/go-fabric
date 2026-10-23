@@ -224,6 +224,20 @@ var devicePorts = map[string]portSet{
 			"MoveTo(ctx context.Context, position TargetPositionEnum) error",
 			"Stop(ctx context.Context) error",
 		},
+	}, {
+		name:     "StopObserver",
+		optional: true,
+		doc: []string{
+			"StopObserver is an optional interface of a [Mover]: the kit's server",
+			"calls StopIgnored for a Stop it answers without motion — the",
+			"closure is not Moving, WaitingForMotion or Calibrating, so the",
+			"command changes nothing (cluster §5.4.8.1). A bridged device whose",
+			"reported state lags its drive can halt it anyway; an error answers",
+			"FAILURE, as a Mover.Stop error does. matter.js has no counterpart:",
+			"its ClosureControlServer has no Stop logic. Without one the idle",
+			"Stop is a SUCCESS no-op (cluster/closure).",
+		},
+		methods: []string{"StopIgnored(ctx context.Context) error"},
 	}}},
 	"ClosureDimension": {ports: []portDecl{{
 		name: "DimensionHandler",

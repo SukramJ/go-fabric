@@ -17,63 +17,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 )
 
-// NativeRamp is a device that ramps its level by itself — a dimmer with a
-// ramp time, a player with a volume. It is all a host implements to take
-// the hand-off path through [NewNativeSource]: the source keeps the
-// Options and OnLevel attributes, applies the ExecuteIfOff gate, turns
-// each of the eight commands into one target level and one duration, and
-// couples the endpoint's On/Off state for the "with On/Off" commands, as
-// matter.js LevelControlServer does on its own transitions.
-type NativeRamp interface {
-	// Level reports the device's current level; known=false is a level
-	// the device has not reported, which reads as null. A level below the
-	// server's MinLevel (a dimmer whose 0 means off) is reported as it is:
-	// the source counts it as at the minimum for an owed switch-off, so a
-	// host need not crop it.
-	Level() (level uint8, known bool)
-	// Ramp drives the device to level over d; d == 0 is at once. withOnOff
-	// marks a "with On/Off" command: the source has already switched the
-	// device on before a ramp away from the minimum and switches it off
-	// once a ramp to the minimum has arrived, so a host needs it only when
-	// its device couples the two itself.
-	Ramp(ctx context.Context, level uint8, d time.Duration, withOnOff bool) error
-	// Stop halts a running ramp where it is.
-	Stop(ctx context.Context) error
-}
-
-// NativeMover is an optional interface of a [NativeRamp]: a device that
-// implements it replaces the source's Move logic, as an implementation
-// overrides matter.js's "default implementation of the Move commands",
-// moveLogic (LevelControlServer.ts:378-403). Move and MoveWithOnOff call
-// MoveLevel after the ExecuteIfOff gate (which matter.js applies in move
-// before moveLogic, :351-361) instead of ramping to the bound; the On/Off
-// coupling of MoveWithOnOff is then the host's, as an override of
-// moveLogic skips transition and its couple (:529-550). A device for
-// which a jump to the bound is no reading of a continuous move — a
-// speaker's volume — returns nil and keeps its level. Stop and
-// StopWithOnOff are unaffected. The request is the generated
-// [lvldef.MoveRequest], the form a host's [LevelSource] takes too.
-type NativeMover interface {
-	MoveLevel(ctx context.Context, req lvldef.MoveRequest, withOnOff bool) error
-}
-
-// NativeSwitcher is an optional interface of a [NativeRamp] whose On/Off
-// and level are written together — a player that takes "start at volume
-// X" and "stop" as one write each. For a "with On/Off" command the source
-// calls SwitchOn(level, d) instead of switching the endpoint on and then
-// ramping when the command turns the device on, and SwitchOff(d) instead
-// of ramping to the minimum and then switching off when it ends there.
-// The source then sets nothing on the OnOff attribute itself: the host's
-// OnOff reflects what the device did. matter.js has no counterpart — it
-// couples On/Off and the transition in one transaction against local
-// state (LevelControlServer.ts:529-550, #turnOnForLevel) — so the
-// interface is a bridged host's affordance; a device without it keeps
-// matter.js's order. A [NativeMover] still takes Move and MoveWithOnOff.
-type NativeSwitcher interface {
-	SwitchOn(ctx context.Context, level uint8, d time.Duration) error
-	SwitchOff(ctx context.Context, d time.Duration) error
-}
-
 // NativeConfig carries the construction parameters of [NewNativeSource].
 type NativeConfig struct {
 	// Lighting matches [Config.Lighting] of the server the source is
@@ -94,9 +37,9 @@ type NativeConfig struct {
 }
 
 // NativeSource is the [LevelSource] [NewNativeSource] builds. It holds the
-// two writable attributes in memory and drives a [NativeRamp].
+// two writable attributes in memory and drives a [lvldef.NativeRamp].
 type NativeSource struct {
-	dev      NativeRamp
+	dev      lvldef.NativeRamp
 	onOff    OnOff
 	minLevel uint8
 	persist  func(ctx context.Context, options uint8, onLevel *uint8) error
@@ -131,7 +74,10 @@ var (
 )
 
 // NewNativeSource returns the [LevelSource] of a device that ramps by
-// itself. onOff is the On/Off cluster of the same endpoint — the
+// itself ([lvldef.NativeRamp], with its optional [lvldef.NativeMover] and
+// [lvldef.NativeSwitcher]). It is the seam route; a device built by the
+// kit declares the ramp as levelcontroldef.Declare.Ramp instead, and the
+// kit builds the source. onOff is the On/Off cluster of the same endpoint — the
 // ExecuteIfOff gate reads it and the "with On/Off" commands drive it; nil
 // means the endpoint has none: every command executes and none couples
 // (matter.js `!this.agent.has(OnOffServer)`, LevelControlServer.ts:733 and
@@ -142,10 +88,10 @@ var (
 // under the engine the server runs the commands itself and calls
 // MoveToLevel alone, which the source then forwards ungated as an
 // immediate ramp.
-func NewNativeSource(dev NativeRamp, onOff OnOff, cfg NativeConfig) *NativeSource {
-	n := &NativeSource{dev: dev, onOff: onOff, minLevel: LevelMin, persist: cfg.Persist, options: cfg.Options, clock: clock.Or(cfg.Clock)}
+func NewNativeSource(dev lvldef.NativeRamp, onOff OnOff, cfg NativeConfig) *NativeSource {
+	n := &NativeSource{dev: dev, onOff: onOff, minLevel: lvldef.LevelMin, persist: cfg.Persist, options: cfg.Options, clock: clock.Or(cfg.Clock)}
 	if cfg.Lighting {
-		n.minLevel = LightingLevelMin
+		n.minLevel = lvldef.LightingLevelMin
 	}
 	if cfg.OnLevel != nil {
 		v := *cfg.OnLevel
@@ -285,11 +231,11 @@ func (n *NativeSource) moveWithOnOffWire(ctx context.Context, req wire.MoveReque
 // falls back to DefaultMoveRate (:309-311), which this cluster does not
 // serve. A zero Rate was refused by the server (:305-308).
 func (n *NativeSource) move(ctx context.Context, req wire.MoveRequest, withOnOff bool) error {
-	if m, ok := n.dev.(NativeMover); ok {
+	if m, ok := n.dev.(lvldef.NativeMover); ok {
 		n.cancelOff()
 		return m.MoveLevel(ctx, moveOf(req), withOnOff)
 	}
-	target := LevelMax
+	target := lvldef.LevelMax
 	if req.MoveMode == MoveModeDown {
 		target = n.minLevel
 	}
@@ -424,7 +370,7 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 	n.cancelOff()
 	coupleOnOff := withOnOff && n.onOff != nil
 	turnsOff := coupleOnOff && target <= n.minLevel
-	if sw, ok := n.dev.(NativeSwitcher); ok && coupleOnOff {
+	if sw, ok := n.dev.(lvldef.NativeSwitcher); ok && coupleOnOff {
 		current, known := n.dev.Level()
 		d := duration(current)
 		if !known {
@@ -559,13 +505,13 @@ func StepLevel(current, mode, size, minLevel uint8) uint8 {
 	if mode == StepModeUp {
 		v = int(current) + int(size)
 	}
-	return uint8(min(max(v, int(minLevel)), int(LevelMax))) //nolint:gosec // cropped to 0..254
+	return uint8(min(max(v, int(minLevel)), int(lvldef.LevelMax))) //nolint:gosec // cropped to 0..254
 }
 
 // CropLevel crops level to minLevel..[LevelMax]. Mirrors matter.js
 // LevelControlServer.ts:274 and :291 `cropValueRange(level, this.minLevel,
 // this.maxLevel)` (packages/general/src/util/Number.ts:54-56).
-func CropLevel(level, minLevel uint8) uint8 { return min(max(level, minLevel), LevelMax) }
+func CropLevel(level, minLevel uint8) uint8 { return min(max(level, minLevel), lvldef.LevelMax) }
 
 // TransitionDuration turns a TransitionTime in tenths of a second into a
 // duration; a null or zero one is at once. Mirrors matter.js
@@ -591,24 +537,6 @@ func MoveTransition(distance, rate uint8) uint16 {
 	tenths := jsRound(float64(distance) * 10 / float64(rate))
 	return uint16(min(tenths, maxTransitionTenths))
 }
-
-// LevelFromUnit maps a fraction 0..1 to the CurrentLevel range 0..254:
-// Math.round(u * 254), cropped; NaN is 0. matter.js has no level
-// counterpart: this is the attribute's range arithmetic (CurrentLevel
-// "max 254", level-control.element.ts:29-30, :74), rounded as matter.js
-// rounds its 0..1 saturation (ColorControlServer.ts:205-211). A light
-// crops the result with [CropLevel] to its MinLevel.
-func LevelFromUnit(u float64) uint8 {
-	if math.IsNaN(u) {
-		return 0
-	}
-	return uint8(min(max(jsRound(u*float64(LevelMax)), 0), float64(LevelMax)))
-}
-
-// UnitFromLevel maps a CurrentLevel 0..254 to a fraction 0..1: level /
-// 254. matter.js has no level counterpart: this is the attribute's range
-// arithmetic, as [LevelFromUnit].
-func UnitFromLevel(level uint8) float64 { return float64(level) / float64(LevelMax) }
 
 // jsRound is JavaScript's Math.round: half rounds up.
 func jsRound(v float64) float64 { return math.Floor(v + 0.5) }

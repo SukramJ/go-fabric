@@ -326,8 +326,10 @@ func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey
 	rec, err := a.store.GetEndpoint(ctx, sourceKey)
 	switch {
 	case err == nil:
-		// Already assigned — refresh device_type if it drifted.
-		if rec.DeviceType != deviceType {
+		// Already assigned — refresh device_type if it drifted, and the
+		// scope if the source moved to another snapshot: a record that
+		// kept its old scope would never be listed by the new scope's GC.
+		if rec.DeviceType != deviceType || rec.Scope != scope {
 			rec.DeviceType = deviceType
 			rec.Scope = scope
 			if _, err := a.store.UpsertEndpointAssigning(ctx, rec); err != nil {

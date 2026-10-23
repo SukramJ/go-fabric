@@ -79,29 +79,6 @@ var instance, _ = spec.New(msdef.Definition, spec.Options{Features: featureMap})
 // sees before anyone reads the host's code.
 const DescriptionMaxBytes = 64
 
-// The ModeSelect list and label bounds, from the model: the host's
-// [ModeSource.SupportedModes] must stay within them. They are not applied
-// by the server or the encoder — matter.js trims nothing either; its
-// validator refuses an out-of-bounds value with a ConstraintError
-// (packages/node/src/behavior/state/validation/constraint.ts). A list
-// returned past them goes on the wire as given.
-const (
-	// LabelMaxBytes is the ModeOptionStruct Label constraint "max 64"
-	// (mode-select-cluster.element.ts:63), in UTF-8 bytes.
-	LabelMaxBytes = 64
-
-	// SemanticTagsMaxEntries is the ModeOptionStruct SemanticTags
-	// constraint "max 64" (mode-select-cluster.element.ts:66), in list
-	// entries.
-	SemanticTagsMaxEntries = 64
-)
-
-// SupportedModesMaxEntries is the SupportedModes constraint "max 255"
-// (matter.js mode-select-cluster.element.ts:37), in list entries: a bound
-// on the host's [ModeSource.SupportedModes], which the server returns as
-// given.
-const SupportedModesMaxEntries = 255
-
 // ChangeToModeFieldNewMode is the context tag of the ChangeToMode
 // NewMode field (id 0x0, uint8, conformance M).
 //

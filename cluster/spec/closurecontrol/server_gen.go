@@ -207,6 +207,18 @@ type Mover interface {
 	Stop(ctx context.Context) error
 }
 
+// StopObserver is an optional interface of a [Mover]: the kit's server
+// calls StopIgnored for a Stop it answers without motion — the
+// closure is not Moving, WaitingForMotion or Calibrating, so the
+// command changes nothing (cluster §5.4.8.1). A bridged device whose
+// reported state lags its drive can halt it anyway; an error answers
+// FAILURE, as a Mover.Stop error does. matter.js has no counterpart:
+// its ClosureControlServer has no Stop logic. Without one the idle
+// Stop is a SUCCESS no-op (cluster/closure).
+type StopObserver interface {
+	StopIgnored(ctx context.Context) error
+}
+
 // Declare is the declaration of the ClosureControl cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)

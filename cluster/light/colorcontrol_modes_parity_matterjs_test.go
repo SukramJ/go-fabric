@@ -470,27 +470,27 @@ func TestColorModeSwitchConverts(t *testing.T) {
 	// CT → XY: 250 mireds is 4000 K, the table's x/y.
 	invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 250})
 	invoke(t, srv, ccdef.CmdStepColor, ccdef.StepColorRequest{StepX: 1})
-	wx, wy, _ := light.MiredsToXY(250)
+	wx, wy, _ := ccdef.MiredsToXY(250)
 	if x, y := read(t, srv, ccdef.AttrCurrentX), read(t, srv, ccdef.AttrCurrentY); x != uint64(jsRound(wx*65536))+1 || y != uint64(jsRound(wy*65536)) {
 		t.Errorf("CT 250 → XY gives %d/%d, want %v/%v (+1 step)", x, y, jsRound(wx*65536), jsRound(wy*65536))
 	}
 	// XY → CT: McCamy, cropped to 153..370.
 	invoke(t, srv, ccdef.CmdMoveToColor, ccdef.MoveToColorRequest{ColorX: 21000, ColorY: 21500}) // x 0.32 y 0.33
 	invoke(t, srv, ccdef.CmdStepColorTemperature, ccdef.StepColorTemperatureRequest{StepMode: ccdef.StepModeUp, StepSize: 1})
-	want := min(max(light.XYToMireds(21000.0/65536, 21500.0/65536), 153), 370) + 1
+	want := min(max(ccdef.XYToMireds(21000.0/65536, 21500.0/65536), 153), 370) + 1
 	if m := read(t, srv, ccdef.AttrColorTemperatureMireds); float64(m) != want {
 		t.Errorf("XY → CT gives %d, want %v", m, want)
 	}
 	// CT → HS through x/y.
 	invoke(t, srv, ccdef.CmdMoveSaturation, ccdef.MoveSaturationRequest{MoveMode: ccdef.MoveModeStop})
-	h, s, ok := light.MiredsToHSV(float64(read(t, srv, ccdef.AttrColorTemperatureMireds)))
+	h, s, ok := ccdef.MiredsToHSV(float64(read(t, srv, ccdef.AttrColorTemperatureMireds)))
 	if !ok || read(t, srv, ccdef.AttrCurrentHue) != uint64(jsRound(h*254/360)) || read(t, srv, ccdef.AttrCurrentSaturation) != uint64(jsRound(s*254)) {
 		t.Errorf("CT → HS gives hue %d sat %d, want %v %v", read(t, srv, ccdef.AttrCurrentHue), read(t, srv, ccdef.AttrCurrentSaturation), h, s)
 	}
 	// HS → XY.
 	invoke(t, srv, ccdef.CmdMoveToHueAndSaturation, ccdef.MoveToHueAndSaturationRequest{Hue: 85, Saturation: 254})
 	invoke(t, srv, ccdef.CmdMoveColor, ccdef.MoveColorRequest{RateX: 1})
-	hx, hy := light.HSVToXY(85.0*360/254, 1)
+	hx, hy := ccdef.HSVToXY(85.0*360/254, 1)
 	if read(t, srv, ccdef.AttrCurrentX) != uint64(jsRound(hx*65536)) || read(t, srv, ccdef.AttrCurrentY) != uint64(jsRound(hy*65536)) {
 		t.Error("HS → XY")
 	}
@@ -508,7 +508,7 @@ func TestColorModeSwitchConverts(t *testing.T) {
 	// XY → HS through xyToHsv (BD-Matter-ColorControl-XYToHS).
 	x, y := read(t, srv, ccdef.AttrCurrentX), read(t, srv, ccdef.AttrCurrentY)
 	invoke(t, srv, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: ccdef.MoveModeStop})
-	ch, cs := light.XYToHSV(float64(x)/65536, float64(y)/65536)
+	ch, cs := ccdef.XYToHSV(float64(x)/65536, float64(y)/65536)
 	if read(t, srv, ccdef.AttrCurrentHue) != uint64(jsRound(ch*254/360)) || read(t, srv, ccdef.AttrCurrentSaturation) != uint64(jsRound(cs*254)) {
 		t.Error("XY → HS does not convert with xyToHsv")
 	}
@@ -629,7 +629,7 @@ func jsRound(v float64) float64 {
 // hue near 0 — x read as degrees (BD-Matter-ColorControl-XYToHS).
 func TestXYToHueSaturationConvertsTheColour(t *testing.T) {
 	t.Parallel()
-	gx, gy := light.HSVToXY(120, 1)
+	gx, gy := ccdef.HSVToXY(120, 1)
 	mode := light.ColorModeXY
 	srv := light.NewColorControlServer(light.ColorControlServerConfig{
 		Features: allColorFeatures, InitialColorMode: &mode,

@@ -153,9 +153,11 @@ by type assertion.
 
 | Interface | On | What it does | When absent |
 | --- | --- | --- | --- |
-| `levelcontrol.NativeRamp` | the device behind `levelcontrol.NewNativeSource` | ramps its level by itself; the source keeps Options and OnLevel and turns each command into one target and one duration | — (it is the port) |
-| `levelcontrol.NativeMover` | a `NativeRamp` | replaces the Move logic; a device for which a jump to the bound means nothing (a speaker's volume) keeps its level | the source ramps to the bound |
-| `levelcontrol.NativeSwitcher` | a `NativeRamp` | writes On/Off and level together (`SwitchOn(level, d)`, `SwitchOff(d)`); the source then leaves the OnOff attribute to the host | matter.js's order: switch on, then ramp; ramp down, then switch off |
+| `levelcontroldef.NativeRamp` | the device declared as `levelcontroldef.Declare{Ramp: …}` (or behind `levelcontrol.NewNativeSource`) | ramps its level by itself; the source keeps Options and OnLevel and turns each command into one target and one duration | — (it is the port) |
+| `levelcontroldef.NativeMover` | a `NativeRamp` | replaces the Move logic; a device for which a jump to the bound means nothing (a speaker's volume) keeps its level | the source ramps to the bound |
+| `levelcontroldef.NativeSwitcher` | a `NativeRamp` | writes On/Off and level together (`SwitchOn(level, d)`, `SwitchOff(d)`); the source then leaves the OnOff attribute to the host | matter.js's order: switch on, then ramp; ramp down, then switch off |
+| `levelcontroldef.NativePersister` | a `NativeRamp` | receives Options and OnLevel before a write takes effect (`PersistLevel`); an error refuses the write | the values live in memory |
+| `closurecontroldef.StopObserver` | a `closurecontroldef.Mover` | hears of a Stop the server ignores because the closure is not in motion (`StopIgnored`); an error answers FAILURE | the idle Stop is a SUCCESS no-op |
 | `mdns.Reannouncer` | the `Advertiser` | the periodic re-announce loop (30 min default) and `Node.TriggerReannounce` | no loop; `TriggerReannounce` is a no-op |
 | `mdns.Enabled` | the `Advertiser` | says whether it publishes at all | `mdns.IsEnabled` takes the advertiser at its word |
 | `onoff.Sink` | `onoff.Config.Sink` | consents to every OnOff change before it is stored; an error answers FAILURE | changes are stored without asking |

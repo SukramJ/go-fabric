@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+
 	"github.com/SukramJ/go-fabric/cluster/wire"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -99,7 +101,7 @@ func (s *Server) initEngine(cfg Transitions, manage bool) {
 		StepInterval: cfg.StepInterval,
 		Clock:        cfg.Clock,
 		Properties: map[string]transition.Property{
-			propCurrentLevel: {Min: float64(s.minLevel()), Max: float64(LevelMax)},
+			propCurrentLevel: {Min: float64(s.minLevel()), Max: float64(lvldef.LevelMax)},
 		},
 		Read:  s.readLevel,
 		Apply: s.applyLevel,
@@ -325,7 +327,7 @@ func (s *Server) runMoveToLevel(ctx context.Context, req wire.MoveToLevelRequest
 	if !withOnOff && !s.executes(options) {
 		return nil
 	}
-	level := float64(min(max(req.Level, s.minLevel()), LevelMax))
+	level := float64(min(max(req.Level, s.minLevel()), lvldef.LevelMax))
 	var rate func(current float64) float64
 	if tt := req.TransitionTime; tt != nil && *tt != 0 {
 		tenths := float64(*tt)
@@ -433,7 +435,7 @@ func (s *Server) transition(ctx context.Context, target float64, rate func(curre
 func (s *Server) couple(ctx context.Context, withOnOff bool, options uint8, target float64) (coupling, error) {
 	coupleOnOff := withOnOff && s.onOff != nil
 	c := coupling{
-		turnsOff:         coupleOnOff && min(max(target, float64(s.minLevel())), float64(LevelMax)) <= float64(s.minLevel()),
+		turnsOff:         coupleOnOff && min(max(target, float64(s.minLevel())), float64(lvldef.LevelMax)) <= float64(s.minLevel()),
 		colorTemperature: s.lighting && options&OptionCoupleColorTempToLevel != 0 && s.ct != nil,
 	}
 	s.mu.Lock()

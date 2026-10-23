@@ -235,9 +235,19 @@ func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 // changes at once, matter.js's default (managedTransitionTimeHandling
 // false, :782-790), unless the declaration asks for Transitions. A
 // declared LevelSource (levelcontroldef.Declare) is the device's level:
-// the server drives it instead of holding one.
+// the server drives it instead of holding one. A declared Ramp is a device
+// that ramps by itself: the server drives the kit's NativeSource on it.
 func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	d, _ := b.ports.(lvldef.Declare)
+	if d.Ramp != nil && d.LevelSource != nil {
+		return nil, fmt.Errorf("%w: levelcontrol: Ramp and LevelSource are exclusive", ErrConfiguration)
+	}
+	if d.Ramp != nil && d.Transitions {
+		return nil, fmt.Errorf("%w: levelcontrol: Ramp and Transitions are exclusive", ErrConfiguration)
+	}
+	if d.Ramp != nil {
+		d.LevelSource = nativeSource(b, d.Ramp)
+	}
 	if d.LevelSource != nil {
 		return newLevelControlPortServer(b, d)
 	}

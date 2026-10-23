@@ -38,6 +38,7 @@ import (
 	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
 	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
 	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -362,30 +363,9 @@ func (s *TemperatureServer) MatterReportable() []uint32 { return []uint32{attrMe
 func (s *TemperatureServer) MatterAttributes() []uint32 { return tempInst.MatterAttributes() }
 
 // celsiusToInt16 converts a Celsius temperature to the Matter wire
-// encoding (int16 × 0.01 °C). Clamps to [−27315, 32766] rather than
-// the raw int16 limits: 32767 is the TLV-null sentinel
-// (Matter §2.3.5.1 / chip `kMaxMeasuredValueRange = 32766`) and
-// −32768 falls below the physical absolute-zero floor
-// (chip `kMinMeasuredValueRange = -27315 = -273.15 °C`).
-// Mirrors matter.js `packages/model/src/standard/elements/
-// temperature-measurement.element.ts` + chip
-// `src/app/clusters/temperature-measurement-server/
-// TemperatureMeasurementCluster.cpp:27-28`.
-//
-// Exported as [CelsiusToInt16] because the climate device profile encodes the
-// same attribute for its own thermostat clusters and carried a byte-identical
-// copy; two encoders for one wire format can round a boundary differently
-// without anything failing.
-func celsiusToInt16(c float64) int16 {
-	v := math.Round(c * 100)
-	if v > 32766 { // 32767 is the Matter NULL sentinel — must not be emitted as a real value
-		return 32766
-	}
-	if v < -27315 { // −273.15 °C absolute-zero floor per chip kMinMeasuredValueRange
-		return -27315
-	}
-	return int16(v)
-}
+// encoding through [thermostatdef.CelsiusToInt16], the one encoder the
+// thermostat attributes share with this cluster.
+func celsiusToInt16(c float64) int16 { return thermostatdef.CelsiusToInt16(c) }
 
 // --- RelativeHumidityMeasurement (0x0405) ------------------------------
 
@@ -1655,8 +1635,3 @@ func (e energyOf) OnMatterValueChanged(cb func()) func() {
 	}
 	return func() {}
 }
-
-// CelsiusToInt16 encodes a Celsius reading as Matter's centi-degree int16,
-// clamped to the range the spec allows: 32767 is the NULL sentinel and must
-// never be emitted as a value, and -27315 is absolute zero.
-func CelsiusToInt16(c float64) int16 { return celsiusToInt16(c) }
