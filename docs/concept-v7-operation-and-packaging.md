@@ -9,21 +9,36 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
 
 ## 0. Entscheidungen des Owners (2026-10-23)
 
-Werden per Wizard eingeholt und hier nachgetragen:
-
-- **0.1 Persistenz-Port:** Form des `Store`-Ports (A.2).
-- **0.2 Metrics-Hook:** eigener Sink-Port ohne Abhängigkeit (A.3) oder
-  nur `expvar`-Zähler.
-- **0.3 Cookbook-Daemon:** welches `go-*2mqtt` der Beweis für Phase 22
-  ist (B.3).
-- **0.4 Teil B/C:** die Konzepte go-ha-matter-bridge und `go-hamatter`
-  bekommen eigene Repositories (öffentlich, leer bis auf das Konzept)
-  oder bleiben bis M5 in diesem Repo (B.4).
 - **0.0 Ein Agent:** die Implementierung läuft mit genau einem
-  Opus-Agenten zur Zeit (Owner, 2026-10-23); Wellen sind sequenziell.
-- **0.5 Versionen:** Phase 21 als `v0.10.x`-Patches je Welle, Phase 22
-  schließt mit `v0.11.0`; oder Phase 21 = `v0.11.0`, Phase 22 =
-  `v0.12.0`.
+  Opus-Agenten zur Zeit; Wellen sind sequenziell.
+- **0.1 Persistenz-Port:** Ports je Fachgebiet, Summe `store.Port`,
+  SQLite und `store/memstore` implementieren alle, Vertragstests
+  `store/storetest`, `fabrictest` auf `memstore`, `node.Config.Store`
+  nimmt den Port (A.2 Variante a).
+- **0.2 Metrics-Hook:** `node.Metrics`-Port (stdlib-only) mit
+  benanntem Zählersatz und `node/metrics/expvar` als Implementierung;
+  nil = aus (A.3).
+- **0.3 Cookbook-Daemon:** `go-zendure2mqtt` (B.3).
+- **0.4 Teil B/C:** eigene öffentliche Repositories **`SukramJ/go-habridge`**
+  (die HA-Bridge, Teil B) und **`SukramJ/go-hafabric`** (das
+  Adapter-Modul, Teil C), Apache-2.0, `CONCEPT.md`, Status „concept,
+  not started“. **Kein „matter“ im Namen:** „Matter“ ist eine Marke
+  der Connectivity Standards Alliance, deren Nutzung in Produkt- und
+  Projektnamen Mitgliedern und zertifizierten Produkten vorbehalten
+  ist (README §Legal, `licenses/NOTICE-matter.js.txt`); beschreibende
+  Nennung im Untertitel („a bridge for Matter controllers“) bleibt.
+  Dieselbe Regel gilt für jedes weitere Repository dieser Familie;
+  jedes README der Familie trägt den Absatz „Why "Matter" is not in the
+  name“ mit der Referenz (go-fabric README §Not certified, Owner
+  2026-10-23). Beschreibende **Topics** (`matter`, `matter-bridge`)
+  bleiben — Topics sind Suchbegriffe, kein Name (go-fabric führt sie).
+- **0.6 Repo-Standard (Owner, 2026-10-23):** die neuen Repositories
+  werden nach dem Standard von `go-zendure2mqtt` aufgebaut — Settings,
+  Topics, About, Dateien, Workflows; die Checkliste steht in B.4.
+- **0.5 Versionen:** Phase-21/22-Wellen als `v0.10.x`-Patches (der
+  Store-Port-Bruch unter dem ausgesetzten Fenster mit Guide-Zeile);
+  Phase 22 schließt mit `v0.11.0` = Meilenstein 4; danach Pause
+  (Owner, 2026-10-22).
 
 ## Teil A: Phase 21 — Observability und Persistenz als Ports
 
@@ -201,13 +216,63 @@ echten PR im gewählten Daemon, jeder Schritt mit dessen Commit.
 
 ### B.4 Teil B/C in ihre Repositories (0.4)
 
-Konzept v6 Teil B (go-ha-matter-bridge) und Teil C (`go-hamatter`,
+Konzept v6 Teil B (go-habridge) und Teil C (`go-hafabric`,
 die HA-Komponente→Cluster-Tabelle) wandern als `CONCEPT.md` in neue
-Repositories `SukramJ/go-ha-matter-bridge` und `SukramJ/go-hamatter`
+Repositories `SukramJ/go-habridge` und `SukramJ/go-hafabric`
 (Apache-2.0, README mit Status „concept, not started“, Verweis auf
 go-fabric und die Roadmap M5+). In go-fabric bleibt in v6 je ein Satz
 mit dem Link; `docs/roadmap.md` Konsumenten-Tabelle zeigt auf die
-Repos. Alternative: beides bleibt bis M5 in `docs/history/`.
+Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
+
+**Der Repo-Standard (0.6), gelesen an `SukramJ/go-zendure2mqtt` am
+2026-10-23** — Checkliste für Welle CF, Punkt für Punkt per `gh`:
+
+- *About:* Beschreibung in einem Satz, ohne die Marke als Name
+  („Home Assistant entities as a bridge for Matter controllers, in pure
+  Go on go-fabric“ / „HA component → cluster mapping for go-fabric
+  bridges“); Homepage leer, bis es eine Pages-Site gibt; Topics
+  beschreibend (`go`, `golang`, `home-assistant`, `homeassistant`,
+  `smart-home`, `iot`, `matter`, `matter-bridge`, `home-automation`;
+  go-hafabric zusätzlich `library`).
+- *Settings:* public; Issues an, Wiki/Projects/Discussions aus; Merge
+  nur Squash (merge commit und rebase aus); „delete branch on merge“
+  an; Default-Branch `main`.
+- *Branch-Schutz `main`:* required status checks, strict (up to date):
+  `build`, `lint`, `test (ubuntu-latest)`, `test (macos-latest)`,
+  `test (windows-latest)`, `codeql (go)`, `coverage`, `fuzz-smoke`,
+  `security (vuln + licenses + secrets)` — sobald die Workflows laufen
+  (im Konzept-Repo zunächst `codeql (go)` und `lint`, der Rest beim
+  ersten Code); conversation resolution required; keine Force-Pushes,
+  keine Deletions; Reviews 0 (Owner allein); Admins nicht erzwungen.
+- *Labels:* der GitHub-Standardsatz plus `dependencies`,
+  `github_actions`, `github-actions`; in dieser Familie zusätzlich
+  `needs-integration` (wie go-fabric).
+- *Dateien im Root:* `README.md` (Kopf: Name, Badge-Block, ein Absatz
+  Zweck, „Twin of …“-Satz mit den Schwester-Repos, dann Features /
+  Quickstart / Configuration / Development / Acknowledgements / License;
+  im Konzept-Repo: Status „concept, not started“, Link auf `CONCEPT.md`
+  und go-fabric, der Absatz „Why "Matter" is not in the name“),
+  `CONCEPT.md` (Teil B bzw. C aus Konzept v6, auf Englisch), `LICENSE`
+  (**Apache-2.0** wie go-fabric — Abweichung vom MIT der 2mqtt-Familie:
+  ADR 0023 und die CLA-Pflicht), `CLA.md`, `AI_POLICY.md` (die Fassung
+  von go-zendure2mqtt, Projektname ersetzt), `CLAUDE.md` (Kurzform:
+  was es ist, Twin-Satz, Modellregeln wie go-fabric), `changelog.md` mit
+  `[Unreleased]`, `.gitignore`, `.golangci.yaml`, `Makefile`
+  (build/test/lint/race/ci), `go.mod` (go 1.27.2) mit einem `doc.go`,
+  damit `go build ./...` etwas tut; `Dockerfile` (distroless/static,
+  non-root), `addon/` und `repository.yaml` nur für go-habridge (Daemon
+  mit HA-Add-on), nicht für die Bibliothek go-hafabric.
+- *`.github/`:* `dependabot.yml` (gomod + github-actions, weekly),
+  `workflows/ci.yml` (lint, security, test-Matrix, coverage,
+  fuzz-smoke, build), `codeql.yml`, `dependabot-auto-merge.yml`,
+  `release-on-tag.yml`; go-habridge zusätzlich `docker-build-push.yml`
+  und `addon-image.yml`. Aus go-zendure2mqtt kopiert und auf den
+  Modulpfad angepasst; was ein Konzept-Repo noch nicht ausführen kann,
+  bleibt mit `if: false` deaktiviert bis zum ersten Code.
+- *Abnahme:* `gh repo view --json …` und
+  `gh api repos/…/branches/main/protection` zeigen dieselben Werte wie
+  go-zendure2mqtt (bis auf Lizenz und die Daemon-Dateien); der CF-Report
+  belegt die Checkliste mit den `gh`-Ausgaben.
 
 ### B.5 Wellen Phase 22
 
