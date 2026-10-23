@@ -40,6 +40,23 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## The node features in BV-b
+
+Nothing was removed; each route is an alias of the type it replaces or a
+one-line function over it.
+
+| Before | Route |
+| --- | --- |
+| `mattercore.OTAImage`, `OTAConsentGranted`, `OTAConsentDenied`, `bdx.FileDesignator`, `bdx.Blob` | `node.OTAImage`, `node.OTAConsentGranted`, `node.OTAConsentDenied`, `node.OTAFileDesignator`, `node.OTABlob` |
+| `otaimage.Create`, `otaimage.CreateOptions`, `otaimage.ExtractPayload`, `otaimage.Header` | `node.CreateOTAImage`, `node.OTAImageOptions`, `node.ReadOTAImage`, `node.OTAImageHeader` |
+| `dcl.NewClient`, `dcl.ProductionURL`, `dcl.TestNetURL`, `dcl.OTAVersions`, `dcl.VerifyImage` | `node.NewDCLClient`, `node.DCLProductionURL`, `node.DCLTestNetURL`, `node.DCLOTAVersions`, `node.VerifyOTAImage` |
+| `mattercore.NewActions`, `ActionsConfig`, `ActionsHost`, `ActionRequest` | `node.NewActions`, `node.ActionsConfig`, `node.ActionsHost`, `node.ActionRequest` |
+| `mattercore.EcosystemDirectory`, `NewEcosystemInformation` | `node.EcosystemDirectory`, `node.NewEcosystemInformation` |
+| `*mattercore.BasicInformation`, `*mattercore.OTASoftwareUpdateRequestor`, `*mattercore.WiFiNetworkDiagnostics`, `*mattercore.PowerSourceConfiguration` (`Node.Root()`'s fields) | `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer`, `node.PowerSourceConfigurationServer` |
+| `mattercore.NewFixedLabel(labels)` with `fixedlabeldef.Declare{HostServer: …}` | `device.FixedLabel(labels...)` |
+| `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
+| a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
+
 ## The controller side in v0.10.3
 
 Nothing was removed: the old spellings compile, since the new names are
