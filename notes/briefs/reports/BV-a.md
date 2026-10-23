@@ -63,7 +63,17 @@ Fix: a StatusResponse that no chunk loop waits for, arriving on an exchange the 
 
 ## Guards
 
-GUARDS_TABLE
+| Guard | HEAD | Exit |
+| --- | --- | --- |
+| `make ci` (build, 32-bit, vet, archcheck, apidiff-check, test, lint, cover-check, bluez-check) | f887cae2 | 0 (earlier runs failed: clustergen goldens, lint, coverage floors, bluez go.sum; each fixed in its own commit) |
+| `make race`, first | 09d0698a | 0 (the first run, on e6316172, found a race in `controller.New`: Serve read `c.mgr` while Close cleared it; fixed) |
+| `make race`, second | 1382c388 | 0 (a run on 09d0698a failed once: the quickstart's 200 ms pairing deadline also bounded `New`'s schema apply under the race detector; the test now bounds only the pairing) |
+| `make reachability` then `reachability-check` | f887cae2 | 0 (unreached 4, unchanged; `spec.Value` is reachable by instantiation, `EventAt` exercised) |
+| `make cite-check` | 4c704171 | 0 (drift 262, unchanged) |
+| `make testparity` then `testparity-check` | 4c704171 | 0 |
+| `go test ./script/...` | 4c704171 | 0 |
+| `mkdocs build --strict` | 4c704171 | 0 |
+| `make apidiff-check` | bd174c66 and in `make ci` | 0: no incompatible change against v0.10.2 |
 
 ## Differences from the brief
 
@@ -73,6 +83,7 @@ GUARDS_TABLE
 - `clock.Clock` (`Options.Clock` and `Wall`) stays unaliased, as gate 2 decided for `node` (foundation vocabulary).
 - `discovery.Identifier` (`fabrictest.Controller.Discover`) keeps its type. `controller.Pair` takes a pairing code instead.
 - Not in the brief: the teardown defect, the nullable-struct decoder, and the x/tools bump.
+- The teardown's pin is the bridge test. A `fabrictest`-level variant passed both with and without the fix, because the fake clock moves the ack pump in `Eventually`, so it was dropped.
 
 ## Decisions
 
