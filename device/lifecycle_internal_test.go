@@ -32,6 +32,8 @@ type fakeHost struct {
 	numbers   map[string]uint16
 	reachable []bool
 	names     []string
+	// hostNames record the host statements of the name.
+	hostNames []string
 }
 
 func (h *fakeHost) Clock() clock.Clock { return h.clk }
@@ -52,6 +54,12 @@ func (h *fakeHost) NotifyReachable(_ context.Context, _ endpoint.SourceKey, reac
 func (h *fakeHost) Rename(_ context.Context, _ endpoint.SourceKey, name string) {
 	h.mu.Lock()
 	h.names = append(h.names, name)
+	h.mu.Unlock()
+}
+
+func (h *fakeHost) HostName(_ context.Context, _ endpoint.SourceKey, name string) {
+	h.mu.Lock()
+	h.hostNames = append(h.hostNames, name)
 	h.mu.Unlock()
 }
 

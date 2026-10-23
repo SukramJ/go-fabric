@@ -62,7 +62,8 @@ type Device struct {
 	queue     *queue
 	reachable atomic.Bool
 
-	// mu guards parts, host and opts.Name (Rename).
+	// mu guards parts, host and the host statements of opts (Name,
+	// DeviceAddress, ChannelAddress, Reachable: Rename, Update).
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
@@ -130,6 +131,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err != nil {
 		return nil, err
 	}
+	opts.Name = endpoint.ComposeNodeLabel(opts.Name, "")
 	d := &Device{
 		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
 		clock: clk, queue: newQueue(),
@@ -635,15 +637,15 @@ func (d *Device) Parts() []*Device {
 // [endpoint.Spec.Parts].
 func (d *Device) Spec() endpoint.Spec {
 	d.mu.Lock()
-	name := d.opts.Name
+	name, deviceAddress, channelAddress := d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress
 	d.mu.Unlock()
 	s := endpoint.Spec{
 		StableKey:        d.opts.StableKey,
-		DeviceAddress:    d.opts.DeviceAddress,
+		DeviceAddress:    deviceAddress,
 		DeviceType:       uint16(d.typ.ID),
 		VendorName:       d.opts.Vendor,
 		FriendlyName:     name,
-		ChannelAddress:   d.opts.ChannelAddress,
+		ChannelAddress:   channelAddress,
 		Availability:     d.available,
 		Source:           d.source,
 		DeviceConditions: slices.Clone(d.opts.Conditions),

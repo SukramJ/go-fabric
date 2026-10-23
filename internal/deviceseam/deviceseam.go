@@ -33,6 +33,11 @@ type Host interface {
 	// Rename sets the NodeLabel of the endpoint with key and reports it;
 	// a no-op before the endpoint is assembled.
 	Rename(ctx context.Context, key endpoint.SourceKey, name string)
+	// HostName gives the endpoint with key the host's current name, served
+	// as its NodeLabel while no label is written and persisted nowhere; a
+	// no-op before the endpoint is assembled, whose assembly reads the
+	// name from the device's Spec.
+	HostName(ctx context.Context, key endpoint.SourceKey, name string)
 }
 
 // Attach binds ep — a device.Device, or a type that embeds one — to h:

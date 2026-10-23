@@ -10,9 +10,6 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-No source change is required: every new name is an alias of a type the
-API already used, or a new symbol. One value changed, under Changed.
-
 ### Added
 
 - The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
@@ -24,6 +21,19 @@ API already used, or a new symbol. One value changed, under Changed.
   - Each is an alias of the lower package's type, or a one-line function over it.
 - `device.FixedLabel(labels...)`: the FixedLabel cluster, which the Base device type allows on every endpoint, declared with its labels.
 - `contentcontroldef.Declare{ContentControl: port}` (BU-b Left out): ContentControl by declaration, on the generated port `contentcontroldef.ContentControl` and its feature interfaces, run by the kit's `cluster/media` server.
+
+### Changed
+
+- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
+- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
+- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
+
+## [0.10.3] — 2026-10-23
+
+### Added
+
+- `Device.Update(ctx, func(*device.HostStatement))` and `device.HostStatement` (#238). They change the facts the host states about a bound device: its name, its addresses and its availability probe. The new name reaches a subscribed controller at once, as the NodeLabel the device serves while no label is written. It is persisted nowhere, so a controller-written label, or `Device.Rename`'s, wins across restarts. The device stays bound: `EndpointNumber` and `SetReachable` keep working. `endpoint.Endpoint.SetHostName` and `bridge.Bridge.NotifyEndpointHostName` carry it.
+- `device.ComposeNodeLabel(base, suffix)` (#239): the facade route for the bridged NodeLabel composition, with the parameter suffix and the 32-byte cap.
 - `spec.Value[T]`, a scalar a controller writes, as a `spec.Encodable`: `spec.Uint`, `spec.Int` (they keep a generated enum or bitmap type), `spec.Uint8` … `spec.Int64`, `spec.Bool`, `spec.Float32`, `spec.Float64`, `spec.String`, `spec.Bytes`, and `spec.Null[T]()` for a nullable attribute's null. `fabrictest.Write` and `client.Node.Write` need no `tlv` (gate 2, G2-8).
 - The controller's typed reads: `<cluster>def.StateFrom(values)` in every generated package fills the cluster's `State` from a peer's values and lists the attributes absent. It is the same generated path the device's typed server reads through (`spec.StateFrom` over `State.FromAttributeValues`). `spec.Values`, `spec.AttributeValues`, `spec.DecodeAttribute` (the decode `client.Cluster.Decoded` used, moved), `spec.ErrUntyped`; `client.Report.Values(endpoint, cluster)`; `fabrictest.ReadCluster`. A nil `*client.Cluster` is empty values.
 - `controller/client` owns the role's vocabulary as aliases: `AttributePath`, `CommandPath`, `EventPath`, `DataVersionFilter`, `EventMinimumNumber`, `ReadPaths`, `SubscribeRequest`, `Subscription`, `Report`, `AttributeData`, `AttributeStatus`, `EventData`, `EventStatus`, `WriteRequest`, `WriteOptions`, `WriteStatus`, `WriteStatuses`, `InvokeOptions`, `Result`, `StatusError`, `PeerAddress`, `Device`, `SupportedTransports`, `Timing`, `SessionParameters`, `DeviceTypeViolation`; `AttributeAt`, `ClusterAt`, `CommandAt`, `EventAt`, `Interval`. `fabrictest` the same for its helpers (`ReadRequest` is `client.ReadPaths`), plus `Interaction`, `Peer`, `Session`, `Message` and `Privilege` with `PrivilegeView` … `PrivilegeAdminister` (gate 2, G2-8).
@@ -32,9 +42,7 @@ API already used, or a new symbol. One value changed, under Changed.
 
 ### Changed
 
-- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
-- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
-- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
+- `device.New`, `Device.Rename` and `Device.Update` cap a name at the NodeLabel maximum (#239), so `Options.Name` and `Spec().FriendlyName` hold what the endpoint serves. The cap is now read from the generated BridgedDeviceBasicInformation definition's constraint, not from a literal; it is still 32 bytes, cut at a rune boundary.
 - `client.Cluster.Decoded` of a nullable struct attribute returns the generated struct, as for a non-nullable one; it returned a `map[uint32]any` by field id. The generated `Attribute.Decode` now covers nullable struct and struct-list attributes, with TLV null as nil.
 
 ### Fixed
@@ -4618,7 +4626,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/SukramJ/go-fabric/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/SukramJ/go-fabric/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/SukramJ/go-fabric/compare/v0.9.1...v0.10.0

@@ -1787,7 +1787,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 556,
+    "line": 558,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -1832,7 +1832,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 675,
+    "line": 720,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",

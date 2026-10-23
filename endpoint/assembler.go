@@ -312,6 +312,10 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 // written one during this process.
 func (a *Assembler) restoredState(spec *Spec) *endpointState {
 	st := a.states.stateFor(spec.StableKey)
+	// The host's name is the Spec's again: a name set live
+	// (Endpoint.SetHostName) is what the Spec carries by now, and a stale
+	// one must not outlive the device that set it.
+	st.clearHostName()
 	if spec.NodeLabel != "" {
 		st.restoreLabel(truncateLabel(spec.NodeLabel))
 	}

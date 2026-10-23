@@ -333,6 +333,9 @@ type endpointState struct {
 	// server is rebuilt on every dispatch — a label stored on the server
 	// was lost the moment the write returned.
 	nodeLabel *string
+	// hostName is the host's current name (Endpoint.SetHostName), served
+	// while nodeLabel is nil; never persisted.
+	hostName *string
 	// configVersion is the BridgedDeviceBasicInformation
 	// ConfigurationVersion; 0 until set, served as 1.
 	configVersion uint32
@@ -380,6 +383,34 @@ func (s *endpointState) label() (string, bool) {
 		return "", false
 	}
 	return *s.nodeLabel, true
+}
+
+// setHostName stores the host's current name: what the endpoint serves
+// as its NodeLabel until a label is written. It reports whether no label
+// is written, so the served NodeLabel changed with it.
+func (s *endpointState) setHostName(n string) (served bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hostName = &n
+	return s.nodeLabel == nil
+}
+
+// clearHostName drops the host's name, so FriendlyName is served again.
+func (s *endpointState) clearHostName() {
+	s.mu.Lock()
+	s.hostName = nil
+	s.mu.Unlock()
+}
+
+// name is the host's current name, false when the host set none since
+// this state was created.
+func (s *endpointState) name() (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.hostName == nil {
+		return "", false
+	}
+	return *s.hostName, true
 }
 
 // setLabel stores a written label.
@@ -519,7 +550,21 @@ func (e *Endpoint) NodeLabel() string {
 	if l, ok := e.endpointState().label(); ok {
 		return l
 	}
+	if n, ok := e.endpointState().name(); ok {
+		return n
+	}
 	return e.FriendlyName
+}
+
+// SetHostName sets the name the host gives the endpoint (capped at the
+// Matter maximum): the NodeLabel it serves as long as no label is written,
+// in place of FriendlyName. It is a host statement, not a write: nothing
+// is persisted, and a written label — a controller's, or the host's
+// Rename — keeps winning. served reports whether the served NodeLabel is
+// the new name; the caller marks the attribute changed for subscriptions
+// then (bridge.Bridge.NotifyEndpointHostName).
+func (e *Endpoint) SetHostName(name string) (served bool) {
+	return e.endpointState().setHostName(truncateLabel(name))
 }
 
 // ConfigurationVersion returns the endpoint's
