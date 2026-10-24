@@ -167,9 +167,14 @@
     },
     {
       "path": "packages/node/test/behavior/internal/MarkChangedTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "markChanged of a computed attribute: the Go servers report a change through contract.ChangeNotifier and advance the DataVersion per write (BY-2), but a computed attribute with markChanged has no counterpart in the typed hull yet. Milestone 5 (gate 3, the hull's reporting rules).",
+      "status": "partial",
+      "go": [
+        "node:TestMarkChangedParityMatterJS"
+      ],
+      "missing": [
+        "advances the data version when a computed quieter attribute reports through its throttle"
+      ],
+      "reason": "markChanged is spec.Server.MarkChanged (typed route <cluster>def.Server.MarkChanged): the computed attribute is a spec.Source's, the refusals of an empty list, an unserved id, a changes-omitted and a quieter attribute and the peer backing's refusal (MarkChangedOf) port, and a commissioned subscriber sees the report with the advanced version (node/mark_changed_parity_matterjs_test.go on fabrictest); a computed quieter attribute's throttled report has no Go subject, since spec.Server has no throttle and the self-held servers bump the version at the change.",
       "snapshotSha": "1fb1c1b8e88dee014ba4d22ce015172f6b81706e"
     },
     {

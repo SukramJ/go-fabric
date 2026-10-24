@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 81 |
-| partial | 121 |
-| planned | 35 |
+| partial | 122 |
+| planned | 34 |
 | excluded | 87 |
 | total | 324 |
 
@@ -22,7 +22,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | ---: | ---: | ---: | ---: |
 | [node/test/behavior](#nodetestbehavior) | 4 | 0 | 0 | 0 | 4 |
 | [node/test/behavior/cluster](#nodetestbehaviorcluster) | 13 | 0 | 2 | 0 | 11 |
-| [node/test/behavior/internal](#nodetestbehaviorinternal) | 2 | 0 | 0 | 1 | 1 |
+| [node/test/behavior/internal](#nodetestbehaviorinternal) | 2 | 0 | 1 | 0 | 1 |
 | [node/test/behavior/state](#nodetestbehaviorstate) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/state/managed](#nodetestbehaviorstatemanaged) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 0 | 1 | 1 | 1 |
@@ -146,7 +146,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| MarkChangedTest.ts | 204 | planned | until M5 | markChanged of a computed attribute: the Go servers report a change through contract.ChangeNotifier and advance the DataVersion per write (BY-2), but a computed attribute with markChanged has no counterpart in the typed hull yet. Milestone 5 (gate 3, the hull's reporting rules). |
+| MarkChangedTest.ts | 204 | partial | `node:TestMarkChangedParityMatterJS` | markChanged is spec.Server.MarkChanged (typed route <cluster>def.Server.MarkChanged): the computed attribute is a spec.Source's, the refusals of an empty list, an unserved id, a changes-omitted and a quieter attribute and the peer backing's refusal (MarkChangedOf) port, and a commissioned subscriber sees the report with the advanced version (node/mark_changed_parity_matterjs_test.go on fabrictest); a computed quieter attribute's throttled report has no Go subject, since spec.Server has no throttle and the self-held servers bump the version at the change. Missing: “advances the data version when a computed quieter attribute reports through its throttle”. |
 | ReactorsTest.ts | 330 | excluded | `js-runtime-only` | The Reactors machinery (synchronous/asynchronous reactions, online/offline agents). |
 
 ## node/test/behavior/state
@@ -910,10 +910,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | TcpTransportTest.ts | 276 | partial | `transport/tcp:TestDialerRoundTrip`<br>`transport/tcp:TestListenerEchoRoundTrip`<br>`transport/tcp:TestTcpTransportOnDisconnect`<br>`transport/tcp:TestTcpTransportClose` | Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169). Missing: “returns true for TCP”; “returns false for UDP”; “returns false for BLE”; “throws for non-IP address”; “reuses existing connection for same address”; “creates different connections for different addresses”. |
 
 ## Planned
-
-### node/test/behavior/internal
-
-- `MarkChangedTest.ts` — markChanged of a computed attribute: the Go servers report a change through contract.ChangeNotifier and advance the DataVersion per write (BY-2), but a computed attribute with markChanged has no counterpart in the typed hull yet. Milestone 5 (gate 3, the hull's reporting rules).
 
 ### node/test/behavior/state/managed/values
 
