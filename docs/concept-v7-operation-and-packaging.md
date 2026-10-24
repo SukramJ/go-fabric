@@ -20,7 +20,7 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   nil = aus (A.3).
 - **0.3 Cookbook-Daemon:** `go-zendure2mqtt` (B.3).
 - **0.4 Teil B/C:** eigene öffentliche Repositories **`SukramJ/go-ha2fabric`**
-  (die HA-Bridge, Teil B) und **`SukramJ/go-hafabric`** (das
+  (die HA-Bridge, Teil B) und **`SukramJ/go-hamapping`** (das
   Adapter-Modul, Teil C), Apache-2.0, `CONCEPT.md`, Status „concept,
   not started“. **Kein „matter“ im Namen:** „Matter“ ist eine Marke
   der Connectivity Standards Alliance, deren Nutzung in Produkt- und
@@ -241,9 +241,9 @@ echten PR im gewählten Daemon, jeder Schritt mit dessen Commit.
 
 ### B.4 Teil B/C in ihre Repositories (0.4)
 
-Konzept v6 Teil B (go-ha2fabric) und Teil C (`go-hafabric`,
+Konzept v6 Teil B (go-ha2fabric) und Teil C (`go-hamapping`,
 die HA-Komponente→Cluster-Tabelle) wandern als `CONCEPT.md` in neue
-Repositories `SukramJ/go-ha2fabric` und `SukramJ/go-hafabric`
+Repositories `SukramJ/go-ha2fabric` und `SukramJ/go-hamapping`
 (Apache-2.0, README mit Status „concept, not started“, Verweis auf
 go-fabric und die Roadmap M5+). In go-fabric bleibt in v6 je ein Satz
 mit dem Link; `docs/roadmap.md` Konsumenten-Tabelle zeigt auf die
@@ -258,7 +258,7 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
   bridges“); Homepage leer, bis es eine Pages-Site gibt; Topics
   beschreibend (`go`, `golang`, `home-assistant`, `homeassistant`,
   `smart-home`, `iot`, `matter`, `matter-bridge`, `home-automation`;
-  go-hafabric zusätzlich `library`).
+  go-hamapping zusätzlich `library`).
 - *Settings:* public; Issues an, Wiki/Projects/Discussions aus; Merge
   nur Squash (merge commit und rebase aus); „delete branch on merge“
   an; **Auto-Merge erlauben** (`allow_auto_merge`, sonst scheitert der
@@ -287,7 +287,7 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
   (build/test/lint/race/ci), `go.mod` (go 1.27.2) mit einem `doc.go`,
   damit `go build ./...` etwas tut; `Dockerfile` (distroless/static,
   non-root), `addon/` und `repository.yaml` nur für go-ha2fabric (Daemon
-  mit HA-Add-on), nicht für die Bibliothek go-hafabric.
+  mit HA-Add-on), nicht für die Bibliothek go-hamapping.
 - *`.github/`:* `dependabot.yml` (gomod + github-actions, weekly),
   `workflows/ci.yml` (lint, security, test-Matrix, coverage,
   fuzz-smoke, build), `codeql.yml`, `dependabot-auto-merge.yml`,

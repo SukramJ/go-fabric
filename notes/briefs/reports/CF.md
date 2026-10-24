@@ -1,4 +1,4 @@
-# Report CF — M4 phase 22: the two repositories (go-ha2fabric, go-hafabric)
+# Report CF — M4 phase 22: the two repositories (go-ha2fabric, go-hamapping)
 
 Date 2026-10-24. Owner wave (concept v7 B.4, decisions 0.4 and 0.6; owner
 decisions of 2026-10-24: start CF parallel to CE, `CONCEPT.md` on the state
@@ -10,7 +10,7 @@ thin client, the controller role later in the same daemon).
 | Repository | Description | Status |
 | --- | --- | --- |
 | [SukramJ/go-ha2fabric](https://github.com/SukramJ/go-ha2fabric) (created as go-habridge, renamed the same evening to the family pattern `go-<source>2<target>`) | Home Assistant entities as a bridge for Matter controllers, in pure Go on go-fabric | concept, not started |
-| [SukramJ/go-hafabric](https://github.com/SukramJ/go-hafabric) | Home Assistant component to Matter cluster mapping for go-fabric bridges | concept, not started |
+| [SukramJ/go-hamapping](https://github.com/SukramJ/go-hamapping) | Home Assistant component to Matter cluster mapping for go-fabric bridges | concept, not started |
 
 Each holds: `README.md` (name, badges, purpose, twin sentence, status
 block, the paragraph "Why "Matter" is not in the name", Features /
