@@ -101,9 +101,10 @@ type Listener struct {
 	// that share an order key in arrival order (ordered.go).
 	order *orderedDispatch
 
-	// handled is the socket's [udpseam.Handled], nil for a kernel socket:
-	// called once per datagram read, when its handling ended.
-	handled func()
+	// handled is the socket as a [udpseam.Handled], nil for a kernel
+	// socket: called once per datagram read, when its handling ended. An
+	// interface, not a func, so the Listener stays comparable.
+	handled udpseam.Handled
 
 	// mu guards closed, set by the first [Listener.Close].
 	mu     sync.Mutex
@@ -156,7 +157,7 @@ func New(cfg Config) (*Listener, error) {
 func newListener(conn udpseam.PacketConn) *Listener {
 	l := &Listener{conn: conn, sem: make(chan struct{}, maxConcurrentDispatch)}
 	if h, ok := conn.(udpseam.Handled); ok {
-		l.handled = h.Handled
+		l.handled = h
 	}
 	return l
 }
@@ -164,7 +165,7 @@ func newListener(conn udpseam.PacketConn) *Listener {
 // done reports one datagram's handling ended to a counting socket.
 func (l *Listener) done() {
 	if l.handled != nil {
-		l.handled()
+		l.handled.Handled()
 	}
 }
 
