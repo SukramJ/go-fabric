@@ -300,6 +300,13 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 		t.Fatalf("sessions after PASE %+v, want one PASE session on fabric 0", sessions)
 	}
 	pase.Close()
+	// The device accepts the next PBKDFParamRequest once the PASE session
+	// is gone (matter.js PaseServer.ts:76-86 at 862ad75f: no new PASE
+	// while one exists and is not closing). Its CloseSession and the
+	// commissioner's next request travel on separate handler goroutines
+	// here, where matter.js handles them in order on one thread; the test
+	// waits for the close to land before it connects again (brief CG §3).
+	waitNoPASE(t, n)
 	s, err := c.Commission(ctx)
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
@@ -321,6 +328,26 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	}
 	if got := n.Subscriptions().CountBySession(); got[operational[0]] != 1 {
 		t.Errorf("subscriptions by session %v, want one on session %d", got, operational[0])
+	}
+}
+
+// waitNoPASE waits, on the wall clock bridgetest runs on, until the node's
+// session table holds no PASE session.
+func waitNoPASE(t *testing.T, n *node.Node) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		pase := false
+		for _, e := range n.Sessions().Sessions() {
+			pase = pase || e.IsPASE
+		}
+		if !pase {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the PASE session outlived its CloseSession: %+v", n.Sessions().Sessions())
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 

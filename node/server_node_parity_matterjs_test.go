@@ -163,7 +163,9 @@ func TestServerNodeParity(t *testing.T) {
 		// The fail-safe the commissioner armed: the device's own
 		// FailSafeExpiryLengthSeconds (900 s), where matter.js's helper arms
 		// FAILSAFE_LENGTH_S (60 s).
-		site.Fake().Advance(16 * time.Minute)
+		if err := site.Step(ctx, 16*time.Minute); err != nil {
+			t.Fatal(err)
+		}
 		if err := site.Eventually(ctx, "the fabric rolled back", func() bool { return fabrics() == 0 }); err != nil {
 			t.Fatal(err)
 		}
