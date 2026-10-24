@@ -15,7 +15,7 @@ Welle, die sie betrifft.
 - **0.1 Kein Stopp nach M4; zwei Stränge.** Die Implementierung läuft weiter.
   Bis zu zwei Opus-Agenten gleichzeitig auf Themen, die sich nicht
   blockieren: Strang 1 in go-fabric (M5 ff.), Strang 2 in der Familie
-  (go-fabric-server, go-hafabric, go-ha2fabric). Mehrere Phasen pro Brief
+  (go-fabric-server, go-hamapping, go-ha2fabric). Mehrere Phasen pro Brief
   und PR; ein Release pro gemergtem Bündel.
 - **0.2 go-ha2fabric bettet go-fabric in-process ein** (wie go-zendure2mqtt
   im Cookbook CE), kein dünner Client eines Servers. Ersetzt die
@@ -26,13 +26,14 @@ Welle, die sie betrifft.
   Matter-Integration ihn als Drop-in verwendet; (b) als
   **Geräteseiten-Server** mit einer Fern-API (Deklaration, Zustandsdeltas,
   Kommandos) für Hosts, die nicht in Go laufen. Kamera/WebRTC ausgeschlossen.
-- **0.4 go-hafabric ist ein Go-Modul**, Eingabe das go-hamqtt-Vokabular,
+- **0.4 go-hamapping ist ein Go-Modul**, Eingabe das go-hamqtt-Vokabular,
   keine JSON-Form; eigenes Repository wegen zweier Konsumenten (die
   go-*2mqtt-Daemons und go-ha2fabric).
 - **0.5 Reihenfolge Strang 2:** go-fabric-server-Kern zuerst (Protokoll,
-  Daemon, In-Process-Tests), dann go-hafabric, dann go-ha2fabric.
+  Daemon, In-Process-Tests), dann go-hamapping, dann go-ha2fabric.
 - **0.6 Name der HA-Bridge: `go-ha2fabric`** (Muster `go-<Quelle>2<Ziel>` der Familie, wie go-zendure2mqtt; am 2026-10-24 als go-habridge angelegt und am Abend umbenannt).
-- **0.7 Jedes Konzept trägt den Abschnitt „Besser als andere, besser als
+- **0.7 Name des Tabellen-Moduls: `go-hamapping`** (die Abbildung des HA-Vokabulars; als go-hafabric angelegt und am 2026-10-24 umbenannt, weil der Name zu nah an go-ha2fabric lag).
+- **0.8 Jedes Konzept trägt den Abschnitt „Besser als andere, besser als
   bisher, ist die Aufteilung richtig"** (Owner-Vorgabe für alle Konzepte;
   hier Teil E).
 
@@ -117,9 +118,9 @@ Matter-Integration. Fakten aus der Karte (Zeilen in der Karte):
 | --- | --- | --- |
 | go-fabric | Das Matter-Wissen: Wire, Cluster, Device-Kit, `node`-Facade, Controller-Facade. Bibliothek. | Importiert keinen Host; `contract/` stdlib-only. |
 | go-fabric-server | Daemon: WebSocket/JSON-API in beiden Rollen, Node-Cache, Store, Betrieb (Image, systemd, Release). | Importiert `node`, `device`, `controller`, `client`, `contract`, `parity`, `schema`, die `<cluster>def`-Pakete, `fabrictest` in Tests — **nichts darunter** (Guard wie `script/archcheck`). Kein Cluster-Wissen eigener Hand. |
-| go-hafabric | Tabelle HA-Komponente (go-hamqtt-Vokabular) → Gerätetyp + Deklaration; Kommando → Service/MQTT. Go-Modul. | Importiert `device`, `contract`, `schema`, `eligibility`, `<cluster>def`; kein `node`, kein Netz. |
-| go-ha2fabric | HA-Add-on: HA-WebSocket rein, go-hafabric, go-fabric in-process raus. | Importiert go-fabric (Facade) und go-hafabric; kein Server. |
-| go-*2mqtt | Bestehende Daemons, go-fabric in-process (CE), später über go-hafabric. | Wie go-ha2fabric. |
+| go-hamapping | Tabelle HA-Komponente (go-hamqtt-Vokabular) → Gerätetyp + Deklaration; Kommando → Service/MQTT. Go-Modul. | Importiert `device`, `contract`, `schema`, `eligibility`, `<cluster>def`; kein `node`, kein Netz. |
+| go-ha2fabric | HA-Add-on: HA-WebSocket rein, go-hamapping, go-fabric in-process raus. | Importiert go-fabric (Facade) und go-hamapping; kein Server. |
+| go-*2mqtt | Bestehende Daemons, go-fabric in-process (CE), später über go-hamapping. | Wie go-ha2fabric. |
 
 ### B.2 Innerer Aufbau von go-fabric-server
 
@@ -140,13 +141,13 @@ Ein Prozess kann eine, die andere oder beide Rollen fahren (Flags
 Kompositionswurzeln (`controller.New`, `node.New`) und teilen nur Store-
 Datei und Logger — `fabrictest` tut genau das heute schon in einem Prozess.
 
-### B.3 Was go-ha2fabric und go-hafabric aus v6/v7 behalten
+### B.3 Was go-ha2fabric und go-hamapping aus v6/v7 behalten
 
 Teil B/C von Konzept v6 bleiben inhaltlich (HA-Registry als Quelle,
 `state_changed` → Attribute, `call_service` ← Kommando; die Tabelle als
 Daten, aus denen die Go-Form generiert wird, mit Guard auf Gleichheit;
 Eligibility entscheidet den Gerätetyp). Geändert gegenüber v7-Vormittag:
-go-ha2fabric bettet ein (0.2); go-hafabric hat keine JSON-Form (0.4).
+go-ha2fabric bettet ein (0.2); go-hamapping hat keine JSON-Form (0.4).
 
 ## Teil C: Das Protokoll
 
@@ -236,7 +237,7 @@ go-ha2fabric bettet ein (0.2); go-hafabric hat keine JSON-Form (0.4).
 | S1 | Repo nach Standard (v7 B.4, inkl. Auto-Merge), `CONCEPT.md` (englisch, aus diesem Dokument), `protocol/`, `protocol/schema/`-Generator aus `go-fabric/parity`, `controllerapi` Kern (C.2 Kern), Node-Cache, Ereignisse, Backpressure, Token/Unix-Socket, `GET /health|/metrics|/schema`, Go-Client, `deploy/` (Dockerfile, systemd, release-Matrix), In-Process-Tests mit `fabrictest` (Server mit Controller-Rolle kommissioniert ein Site-Gerät; jeder Kern-Befehl eine Testzeile), Kompatibilitätstest gegen den `python_client` von matterjs-server als Fixture (Nachrichtenformen) | HA-Matter-Integration gegen den Server (owner-manuell), `v0.1.0` |
 | S2 | `bridgeapi` (C.3) mit Go-Client, Python-Beispielclient (50 Zeilen), S2-Kommandos der Controller-Hälfte soweit M5 geliefert hat | ein Python-Skript macht ein Gerät sichtbar in Apple Home (owner-manuell); `v0.2.0` |
 | S3 | Thread-Kommandos nach ADR 0027, `import_test_node`, Dashboard-Frage (separates Repo oder keins) | `v0.3.0` |
-| H1 | go-hafabric: Zeilenformat, Generator Go-Form, Guard, erste Zeilen (light, switch, sensor, binary_sensor, cover, climate, lock, fan) mit `fabrictest`-Rundlauf | jede Zeile ein Rundlauf |
+| H1 | go-hamapping: Zeilenformat, Generator Go-Form, Guard, erste Zeilen (light, switch, sensor, binary_sensor, cover, climate, lock, fan) mit `fabrictest`-Rundlauf | jede Zeile ein Rundlauf |
 | H2 | go-ha2fabric: HA-WS-Client, Registry-Adapter aufs go-hamqtt-Vokabular, Einbettung (Cookbook), Add-on | HA-Entität in Apple Home |
 
 Strang 1 liefert parallel M5 (23+24, dann 25) und damit S2s ICD-/OTA-
@@ -290,7 +291,7 @@ Geprüfte Alternativen und warum nicht:
   CHANGELOG.
 - **go-fabric-server als einzige Tür (auch für Go-Hosts).** Verworfen
   (0.2): Go-Programme bezahlen ein Protokoll für etwas, das ein Import ist.
-- **go-hafabric in go-ha2fabric.** Verworfen (0.4): die go-*2mqtt-Daemons
+- **go-hamapping in go-ha2fabric.** Verworfen (0.4): die go-*2mqtt-Daemons
   müssten ein Produkt importieren; zwei Konsumenten mit eigenem Takt
   rechtfertigen das Modul.
 - **Nur Geräteseite im Server zuerst.** Verworfen (0.3): nach 0.2 fehlt
@@ -305,7 +306,7 @@ Schichtung innerhalb des Servers: `protocol` kennt kein Matter,
 `controllerapi`/`bridgeapi` kennen go-fabric's Facaden und das Protokoll,
 `internal/wire` kennt das Schema; nichts reicht unter die Facaden. Ein
 Guard hält das. Die Familie hat damit genau eine Stelle für Matter-Wissen
-(go-fabric), eine für HA-Abbildung (go-hafabric), eine Tür nach außen
+(go-fabric), eine für HA-Abbildung (go-hamapping), eine Tür nach außen
 (go-fabric-server) und ein Produkt (go-ha2fabric) — jede Grenze folgt einem
 Konsumentenwechsel, keine ist Konvention.
 

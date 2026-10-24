@@ -12,7 +12,8 @@ pseudo-version of `main`.
 
 ### Changed
 
-- Concept v8 (`docs/concept-v8-fabric-server.md`, German): the family after milestone 4 — go-fabric-server in both roles (a controller server wire-compatible with matterjs-server's WebSocket API, and a bridge door for hosts not written in Go), go-ha2fabric embedding go-fabric in process, go-hafabric as a Go module; with the section on what is better than the reference and than our earlier split. The Home Assistant bridge repository is `go-ha2fabric` (renamed from go-habridge the same day); the roadmap and concept v7 follow.
+- The mapping module's repository is `go-hamapping` (renamed from go-hafabric, too close to go-ha2fabric); concept v7/v8, the roadmap and the README follow.
+- Concept v8 (`docs/concept-v8-fabric-server.md`, German): the family after milestone 4 — go-fabric-server in both roles (a controller server wire-compatible with matterjs-server's WebSocket API, and a bridge door for hosts not written in Go), go-ha2fabric embedding go-fabric in process, go-hamapping as a Go module; with the section on what is better than the reference and than our earlier split. The Home Assistant bridge repository is `go-ha2fabric` (renamed from go-habridge the same day); the roadmap and concept v7 follow.
 
 ## [0.10.9] — 2026-10-24
 
@@ -25,7 +26,7 @@ pseudo-version of `main`.
 ### Changed
 
 - Built with Go 1.27.3: `GO-2026-6809` (`crypto/x509`, fixed in 1.27.3) is reachable through every TLS path a host or the controller opens; `go.mod` and the workflows move together (the reference daemons move the same day).
-- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hafabric](https://github.com/SukramJ/go-hafabric)), created 2026-10-24 with their concepts (wave CF).
+- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hamapping](https://github.com/SukramJ/go-hamapping)), created 2026-10-24 with their concepts (wave CF).
 
 ### Fixed
 
