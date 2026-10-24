@@ -1674,6 +1674,14 @@ differs, because a Go topology is installed whole. Pinned by
 
 ---
 
+Since brief CT the strict mode refuses only what an addition causes
+(`DeviceTypeConformanceService.ts:295`, `:525-619` at `862ad75f`) and
+the pass judges only the endpoints of a node scope (`:480-484`); the
+counting cases of `RuntimeValidationTest.ts` (`:577`, `:617`, `:634-652`,
+`:655-778`, `:781`, `:969-1005`) and `ConstructionValidationTest.ts:101-130`
+measure the incremental index and have no subject: the Go pass is linear
+in the tree per reassembly and keeps no index.
+
 ### BD-chip-BooleanStateConfiguration-RulesInServer — the command and sensitivity rules are connectedhomeip's; matter.js has none
 
 matter.js `BooleanStateConfigurationServer` adds no logic to the generated
@@ -4023,3 +4031,44 @@ computed intervals are the same (the MRP parity fixtures hold them).
 Reasoning: a naming divergence only; renaming the exported constant is
 a break the limits page and the fixtures do not need, so the page names
 both constants side by side (brief CC).
+
+### BD-Matter-Conformance-NoOperationalExtension — a generated definition's conformance is its own; no cluster extends another
+
+matter.js validates an operational extension through `ClusterModel.extend`
+(`conformanceTest.ts:1216-1264` at `862ad75f`): a field or enum value the
+base disallows stays disallowed when the extension overrides the member,
+and a base's nullable field stays nullable. The module's generated
+definitions (`cluster/spec/<cluster>/definition_gen.go`) are one per
+cluster from the snapshot and do not extend one another, so the base's
+conformance is the definition's and the five extension cases are skipped
+(brief CT). Reasoning: the snapshot already resolves every standard
+cluster's elements; an extension mechanism would serve only manufacturer
+clusters, which the kit does not yet accept (`AccessControlCustomExtensionTest`,
+M5).
+
+### BD-Matter-Singleton-RefusedInEveryMode — a misplaced singleton is refused whenever it appears, also after a runtime change
+
+matter.js judges a runtime change with `refuse: false`
+(`DeviceTypeConformanceService.ts:295`, `:335-338` at `862ad75f`): a
+singleton an installed endpoint's device-type change misplaces is logged,
+not refused, and only a construction refuses (`#assertPlacement`, `:371`).
+The module refuses a misplaced singleton in every mode and on every
+reassembly (ADR 0016, `endpoint/devicetype_validation.go` `Validate`), so
+`RuntimeValidationTest.ts:1221` is skipped (brief CT). Reasoning: the
+reassembly is the module's unit of construction (above); the previous
+topology stays live, so a refusal costs the host nothing it had, while a
+logged singleton would answer two endpoints to one root-only cluster.
+
+### BD-Matter-UnimplementedCommand-ValidatorViolation — an unimplemented mandatory command is a device-type verdict, not a construction error
+
+matter.js's `ValidatedElements.#validateRequiredCommands`
+(`ValidatedElements.ts:357-372` at `862ad75f`) records "Implementation
+missing" when a behavior initialises; strict (`ServerBehaviorBacking.ts:101`)
+throws it, warn logs it and leaves the command out of
+`AcceptedCommandList`. The module reports it as
+`endpoint.ViolationUnimplemented` in the device-type verdict
+(`spec.Server.UnimplementedMandatoryCommands`), refused in strict and
+logged in warn and off (brief CT). Reasoning: the kit's `New` has no
+mode; the validator is where `node.Config.DeviceTypeValidation` already
+is, and the verdict names the endpoint and the command the same way it
+names a missing cluster.
