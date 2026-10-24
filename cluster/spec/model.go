@@ -157,8 +157,10 @@ type Field struct {
 	// fabrics.
 	FabricSensitive bool
 	// Default is the default value matter.js states: a float64, bool or
-	// string, [NullDefault] for a stated null, nil when none is stated (or
-	// when it is a field value the generator does not render).
+	// string (a temperature or percentage in its type's encoding units),
+	// [NullDefault] for a stated null, [EmptyListDefault] for a stated
+	// empty list, nil when none is stated (or when it is a field value the
+	// generator does not render).
 	Default any
 }
 

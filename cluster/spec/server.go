@@ -304,6 +304,12 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	// A struct's fields are held to their conformance as well (matter.js
+	// validates the written state,
+	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
+	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
+		return err
+	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	s.mu.Lock()
 	veto := s.beforeWrite
@@ -375,7 +381,18 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 // check holds a device-side value to the served attribute's type and
 // constraint — the checks of [Instance.CheckValue], list length and list
 // entries and struct fields included — and returns it in its stored form.
+//
+// The value is first patched with the defaults the feature selection
+// makes storage hold ([Instance.PatchDefaults]), as matter.js patches a
+// behavior's state over its defaults before it validates it.
 func (s *Server) check(attrID uint32, value any) (any, error) {
+	if s.Serves(attrID) {
+		patched, err := s.PatchDefaults(attrID, value)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
+		}
+		value = patched
+	}
 	return s.CheckSet(attrID, value, s.peers)
 }
 
@@ -403,9 +420,12 @@ func (i *Instance) CheckSet(attrID uint32, value any, peers Peers) (any, error) 
 // (script/clustergen/gen.go defaultLiteral); one it does not render (a
 // list, an object) or one that does not fit the attribute's kind leaves
 // the attribute without a value.
-func defaultValue(a *Attribute) (any, bool) {
-	t := a.Type
-	switch d := a.Default.(type) {
+func defaultValue(a *Attribute) (any, bool) { return defaultOf(a.Type, a.Default) }
+
+// defaultOf is the stated default d of an element of type t in its stored
+// form ([defaultValue]); false for a default it does not render.
+func defaultOf(t Type, d any) (any, bool) {
+	switch d := d.(type) {
 	case NullDefault:
 		return nil, true
 	case float64:
@@ -485,6 +505,27 @@ func (s *Server) unimplementedLocked(cmdID uint32) bool {
 	return slices.Contains(s.stubs, cmdID) && s.handlers[cmdID] == nil
 }
 
+// UnimplementedMandatoryCommands returns the request commands the
+// conformance requires for the feature selection that are still the
+// generated behavior's unimplemented stub ([ServerConfig.Unimplemented]):
+// matter.js's "Throws unimplemented exception" — a warning, and the
+// command left out of AcceptedCommandList, or under strict validation a
+// fatal ClusterImplementationError
+// (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
+// 862ad75f, #validateRequiredCommands). The device-type validator reports
+// each as a violation of the endpoint (endpoint.ViolationUnimplemented).
+func (s *Server) UnimplementedMandatoryCommands() []uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []uint32
+	for _, id := range s.stubs {
+		if slices.Contains(s.required, id) && s.handlers[id] == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // Accepts reports whether the server accepts the request command: the
 // instance accepts it and it is not an unimplemented stub.
 func (s *Server) Accepts(cmdID uint32) bool {
@@ -529,7 +570,12 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
 // goes to its handler; one not accepted, or accepted without a handler,
-// is UNSUPPORTED_COMMAND.
+// is UNSUPPORTED_COMMAND. A response that breaks its fields' types,
+// constraints or conformance — a field mandatory by the request's
+// ("TestRequest.Enable") left out — is FAILURE ([Instance.checkResponse]).
+// The request is the handler's to judge: the module's servers answer a
+// request field outside its constraint with the status matter.js's
+// behavior answers.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	s.mu.Lock()
 	fn := s.handlers[cmdID]
@@ -537,7 +583,14 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if !s.Instance.Accepts(cmdID) || fn == nil {
 		return nil, im.UnsupportedCommandf("%s: command 0x%02X is not supported", s.def.Name, cmdID)
 	}
-	return fn(ctx, fields)
+	resp, err := fn(ctx, fields)
+	if err != nil {
+		return resp, err
+	}
+	if err := s.checkResponse(cmdID, fields, resp, s.peers); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].

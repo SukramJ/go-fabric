@@ -682,6 +682,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Constraint:  spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrActionList,
 		},
 		{
@@ -690,6 +691,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Constraint:  spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrEndpointLists,
 		},
 		{

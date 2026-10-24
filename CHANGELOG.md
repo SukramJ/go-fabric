@@ -10,6 +10,20 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `spec.Server.MarkChanged(attrIDs...)` (phase 21d, brief CT): reports attributes a host computes on read (served from a `spec.Source`) — the data version advances and the change is notified as the host's; an empty list, an attribute not served and a changes-omitted ("C") or quieter ("Q") one are refused (`spec.ErrNotReportable`, `spec.ErrNotServed`). `spec.MarkChangedOf` and every generated `<cluster>def.Server.MarkChanged` are the typed route (`spec.ErrNoMarkChanged` for a server that owns no version). matter.js `ServerBehaviorBacking.markChanged`.
+- Defaults per feature set: `spec.Instance.PatchDefaults(attrID, value)` gives a struct field the host left out the default its conformance makes storage hold under the selected features (the stated default, else the null of a nullable field; nothing for an optional or disallowed one), through list entries and nested structs, and refuses a Go field the definition does not declare. `spec.Server` applies it to `Initial` and the host's `Set`. `spec.EmptyListDefault` is the stated empty list. matter.js `ValuePatcher`.
+- Field conformance on struct and command fields: `spec.Instance.CheckConformance(attrID, value, peers)` judges every struct field's conformance with the struct as the record (a sibling, else a cluster attribute), the features and the revision — a port of matter.js's conformance compiler — refusing with CONSTRAINT_ERROR (`spec.ErrConformance`, `spec.ErrEnumValueConformance`, `spec.ErrUnknownEnumValue`). `spec.Server` applies it to a controller's write and judges a command response's field presence with the request as the outer resolver ("TestRequest.Enable").
+- `endpoint.ViolationUnimplemented` and `spec.Server.UnimplementedMandatoryCommands`: a mandatory command a server leaves unimplemented is reported by the device-type validator with the endpoint's violations (`endpoint.ClusterShape.UnimplementedCommands`) — logged once in warn and off, refused in strict — as matter.js warns of it or refuses it when it constructs the behavior.
+- The ports of eight matter.js test files whose subject exists in part (`MarkChangedTest`, `ValuePatcherTest`, `conformanceTest` — its tree as `cluster/spec/testdata/conformance_matterjs.json`, extracted by `notes/parity/matter/extract-conformance-cases.js` —, `EndpointNumberConflictTest`, `ProtocolServiceTest`, `ConstructionValidationTest`, `RuntimeValidationTest`, `StandardDeviceTypeCorpusTest`); the test register's planned entries go from 35 to 27.
+
+### Changed
+
+- A controller's write of a struct attribute served by a generic `spec.Server` is held to its fields' conformance: a field the selected features make mandatory left out, one they disallow present, a disallowed or undefined enum value, or a choice group out of its count answers CONSTRAINT_ERROR where it was SUCCESS. A command response a generic `spec.Server` handler returns without a field its conformance requires (or with one it disallows) answers FAILURE where the response was sent.
+- Strict device-type validation refuses only what an addition causes: a new violation on an added endpoint, its descendants, its ancestors or its siblings. One a change of an installed endpoint leaves (a changed device type, a removed part) is logged and no longer refuses the reassembly. A misplaced-singleton refusal names the first misplacing endpoint in tree order alone. `ValidateDeviceTypes` leaves an endpoint no node endpoint is above unjudged. `node.Config.Validate` refuses a `DeviceTypeValidation` that is none of warn, strict, off.
+- The cluster generator restates a default stated with its unit in the type's encoding units (a 26 °C temperature as 2600, a percentage as its percent or percent100ths value): the generated Thermostat setpoint limits and PresetStruct setpoints and ClosureDimension's Resolution and StepValue now carry their defaults, so a generic `spec.Server` of these clusters starts at them.
+
 ## [0.10.7] — 2026-10-24
 
 ### Added

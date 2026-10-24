@@ -408,8 +408,8 @@ var PresetStructDef = &spec.Struct{Name: "PresetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PresetHandle", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "PresetScenario", Type: spec.Type{Name: "PresetScenarioEnum", Kind: spec.KindEnum, Bits: 8, Enum: PresetScenarioEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 2, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}, Default: spec.NullDefault{}},
-	{ID: 3, Name: "CoolingSetpoint", Type: spec.Type{Name: "temperature", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "COOL", Op: spec.ConfName, Name: "COOL"}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
-	{ID: 4, Name: "HeatingSetpoint", Type: spec.Type{Name: "temperature", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "HEAT", Op: spec.ConfName, Name: "HEAT"}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
+	{ID: 3, Name: "CoolingSetpoint", Type: spec.Type{Name: "temperature", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "COOL", Op: spec.ConfName, Name: "COOL"}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: float64(2600)},
+	{ID: 4, Name: "HeatingSetpoint", Type: spec.Type{Name: "temperature", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "HEAT", Op: spec.ConfName, Name: "HEAT"}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: float64(2000)},
 	{ID: 5, Name: "BuiltIn", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Default: false},
 }}
 
@@ -629,7 +629,7 @@ var ScheduleStructDef = &spec.Struct{Name: "ScheduleStruct", Fields: []spec.Fiel
 	{ID: 1, Name: "SystemMode", Type: spec.Type{Name: "SystemModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: SystemModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 2, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 	{ID: 3, Name: "PresetHandle", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
-	{ID: 4, Name: "Transitions", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ScheduleTransitionStruct", Kind: spec.KindStruct, Struct: ScheduleTransitionStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfScheduleTransitions", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfScheduleTransitions"}}},
+	{ID: 4, Name: "Transitions", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ScheduleTransitionStruct", Kind: spec.KindStruct, Struct: ScheduleTransitionStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfScheduleTransitions", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfScheduleTransitions"}}, Default: spec.EmptyListDefault{}},
 	{ID: 5, Name: "BuiltIn", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Default: false},
 }}
 
@@ -1586,6 +1586,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(700),
 		},
 		{
 			ID: AttrAbsMaxHeatSetpointLimit, Name: "AbsMaxHeatSetpointLimit",
@@ -1594,6 +1595,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(3000),
 		},
 		{
 			ID: AttrAbsMinCoolSetpointLimit, Name: "AbsMinCoolSetpointLimit",
@@ -1602,6 +1604,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(1600),
 		},
 		{
 			ID: AttrAbsMaxCoolSetpointLimit, Name: "AbsMaxCoolSetpointLimit",
@@ -1610,6 +1613,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(3200),
 		},
 		{
 			ID: AttrPiCoolingDemand, Name: "PiCoolingDemand",
@@ -1637,6 +1641,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "[!LTNE]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "LTNE"}}}}},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
+			Default:     float64(0),
 		},
 		{
 			ID: AttrOccupiedCoolingSetpoint, Name: "OccupiedCoolingSetpoint",
@@ -1645,6 +1650,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(2600),
 		},
 		{
 			ID: AttrOccupiedHeatingSetpoint, Name: "OccupiedHeatingSetpoint",
@@ -1653,6 +1659,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(2000),
 		},
 		{
 			ID: AttrUnoccupiedCoolingSetpoint, Name: "UnoccupiedCoolingSetpoint",
@@ -1661,6 +1668,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(2600),
 		},
 		{
 			ID: AttrUnoccupiedHeatingSetpoint, Name: "UnoccupiedHeatingSetpoint",
@@ -1669,6 +1677,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     float64(2000),
 		},
 		{
 			ID: AttrMinHeatSetpointLimit, Name: "MinHeatSetpointLimit",
@@ -1709,6 +1718,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R[W]", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "0 to 12.7°C", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Expr: "{\"type\":\"celsius\",\"value\":12.7}"}},
+			Default:     float64(20),
 		},
 		{
 			ID: AttrRemoteSensing, Name: "RemoteSensing",
@@ -1850,6 +1860,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage},
 			Quality:     spec.Quality{NonVolatile: true},
+			Default:     float64(255),
 		},
 		{
 			ID: AttrAcType, Name: "AcType",

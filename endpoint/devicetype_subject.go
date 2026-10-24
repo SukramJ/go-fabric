@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -65,6 +66,12 @@ type ClusterShape struct {
 
 	Events      []uint32
 	EventsKnown bool
+
+	// UnimplementedCommands are the request commands the cluster's
+	// conformance requires that its server leaves unimplemented
+	// (spec.Server.UnimplementedMandatoryCommands, matter.js
+	// Behavior.unimplemented): each is a [ViolationUnimplemented].
+	UnimplementedCommands []uint32
 }
 
 // DeviceTypeTree is a tree of endpoints to judge: every endpoint of a node
@@ -88,7 +95,46 @@ func (tree DeviceTypeTree) Validate() []DeviceTypeViolation {
 	var out []DeviceTypeViolation
 	for _, s := range tree.Endpoints {
 		if s != nil {
-			out = append(out, pass.check(s.EndpointNumber())...)
+			out = append(out, pass.judged(s.EndpointNumber())...)
+		}
+	}
+	return out
+}
+
+// unimplementedOf is a [ViolationUnimplemented] for every mandatory
+// command a server cluster of s leaves unimplemented, cluster by cluster
+// in ServerList order — not a device-type violation, so
+// [ValidateDeviceTypes] leaves it out and [DeviceTypeValidator] adds it:
+// matter.js's #validateRequiredCommands
+// (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
+// 862ad75f), which warns "Throws unimplemented exception" and, under
+// strict validation, refuses the behavior (ClusterImplementationError,
+// :26-37; strict set at ServerBehaviorBacking.ts:100-102).
+func unimplementedOf(s DeviceTypeSubject) []DeviceTypeViolation {
+	var out []DeviceTypeViolation
+	for _, cluster := range s.ServerClusterIDs() {
+		shape, ok := s.ServerClusterShape(cluster)
+		if !ok || len(shape.UnimplementedCommands) == 0 {
+			continue
+		}
+		clusterName, cmdName := fmt.Sprintf("0x%04X", cluster), func(id uint32) string { return fmt.Sprintf("0x%02X", id) }
+		if def := spec.Lookup(cluster); def != nil {
+			clusterName = def.Name
+			cmdName = func(id uint32) string {
+				if c := def.Command(id, spec.Request); c != nil {
+					return c.Name
+				}
+				return fmt.Sprintf("0x%02X", id)
+			}
+		}
+		for _, id := range shape.UnimplementedCommands {
+			out = append(out, DeviceTypeViolation{
+				Endpoint: s.EndpointNumber(), DeviceType: clusterName,
+				Requirement: clusterName + "." + cmdName(id), Kind: ViolationUnimplemented,
+				Detail:  "Throws unimplemented exception",
+				Cluster: cluster, HasCluster: true,
+				Element: schema.RequirementCommand, ElementName: cmdName(id), ElementID: id,
+			})
 		}
 	}
 	return out

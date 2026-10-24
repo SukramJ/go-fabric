@@ -272,7 +272,7 @@ func (v *ParameterStruct) DecodeTLV(n spec.Node) error {
 var ParameterStructDef = &spec.Struct{Name: "ParameterStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Type", Type: spec.Type{Name: "ParameterEnum", Kind: spec.KindEnum, Bits: 8, Enum: ParameterEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1024", Max: &spec.Bound{Int: 1024}}},
-	{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
+	{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Default: spec.EmptyListDefault{}},
 }}
 
 // ParameterEnum is the ParameterEnum enum8.
@@ -548,6 +548,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "max 100[max 1024]", Max: &spec.Bound{Int: 100}, Entry: &spec.Constraint{Text: "max 1024", Max: &spec.Bound{Int: 1024}}},
+			Default:     spec.EmptyListDefault{},
 		},
 		{
 			ID: AttrSupportedStreamingProtocols, Name: "SupportedStreamingProtocols",

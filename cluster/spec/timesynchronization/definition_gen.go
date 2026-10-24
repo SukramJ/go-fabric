@@ -648,6 +648,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "TZ", Op: spec.ConfName, Name: "TZ"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{NonVolatile: true},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrDstOffset,
 		},
 		{

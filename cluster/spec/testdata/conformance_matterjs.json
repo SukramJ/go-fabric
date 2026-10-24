@@ -1,0 +1,5619 @@
+{
+ "source": "matter.js packages/node/test/behavior/state/validation/conformanceTest.ts at 862ad75f, AllTests (from line 49), flattened by testValidation (validation-test-utils.ts:115-140)",
+ "cases": [
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "mandatory",
+    "accepts"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "M"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "mandatory",
+    "requires"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "M"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"M\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "optional",
+    "accepts"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "O"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "optional",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "O"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "mandatoryNullable",
+    "accepts"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "M",
+     "quality": "X"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "base",
+    "mandatoryNullable",
+    "allows ommission"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "M",
+     "quality": "X"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "mandatory",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "mandatory",
+    "requires if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "mandatory",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "mandatory",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "optional",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "optional",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "optional",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "optional",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated mandatory",
+    "allows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated mandatory",
+    "requires if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"!F\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated mandatory",
+    "disallows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"!F\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated mandatory",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated optional",
+    "allows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[!F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated optional",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[!F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated optional",
+    "disallows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[!F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[!F]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "feature",
+    "negated optional",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[!F]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "mandatory",
+    "allows if enabled (LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F | B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "mandatory",
+    "allows if enabled (RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F | B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "mandatory",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F | B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F | B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "mandatory",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F | B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "allows if enabled (LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "allows if enabled (RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "allows omission if enabled (LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "allows omission if enabled (RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F | B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "disjunction",
+    "optional",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F | B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "requires if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F & B\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F & B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "disallows if disabled (LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F & B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "disallows if disabled (RHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F & B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "allows omission if disabled (LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "mandatory",
+    "allows omission if disabled (RHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F & B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F & B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "disallows if disabled (LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F & B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "disallows if disabled (RHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F & B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "allows omission if disabled (LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "conjunction",
+    "optional",
+    "allows omission if disabled (RHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F & B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "with field",
+    "allows if present"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "ValueIsSet",
+     "type": "bool",
+     "conformance": "F & Value"
+    },
+    {
+     "name": "UnsupportedValueIsSet",
+     "type": "bool",
+     "conformance": "F & UnsupportedValue"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "value": 4,
+    "valueIsSet": true
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "with field",
+    "requires if present"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "ValueIsSet",
+     "type": "bool",
+     "conformance": "F & Value"
+    },
+    {
+     "name": "UnsupportedValueIsSet",
+     "type": "bool",
+     "conformance": "F & UnsupportedValue"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "value": 4
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.valueIsSet: Conformance \"F & Value\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "binary logical feature",
+    "with field",
+    "disallows if not present"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "ValueIsSet",
+     "type": "bool",
+     "conformance": "F & Value"
+    },
+    {
+     "name": "UnsupportedValueIsSet",
+     "type": "bool",
+     "conformance": "F & UnsupportedValue"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "valueIsSet": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.valueIsSet: Conformance \"F & Value\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & B & C"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "bee",
+    "see"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction",
+    "requires if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & B & C"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "bee",
+    "see"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A & B & C\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction",
+    "disallows if disabled (RHS & LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & B & C"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "see"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A & B & C\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction",
+    "allows omission if disabled (RHS & LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & B & C"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "see"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "allows if enabled (disjunction RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "bee"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "allows if enabled (disjunction LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "see"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "requires if enabled (disjunction RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "bee"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A & (B | C)\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "requires if enabled (disjunction LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye",
+    "see"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A & (B | C)\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "disallows if disabled (conjunction LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "see"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A & (B | C)\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "disjunction within conjunction",
+    "allows omission if disabled (conjunction LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A & (B | C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "see"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction within disjunction",
+    "allows if enabled (conjunction LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A | (B & C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "aye"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction within disjunction",
+    "allows if enabled (conjunction RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A | (B & C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "bee",
+    "see"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "trinary logical feature",
+    "conjunction within disjunction",
+    "disallows if disabled (conjunction LHS enabled)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "A | (B & C)"
+    }
+   ],
+   "features": [
+    {
+     "name": "A",
+     "title": "Aye"
+    },
+    {
+     "name": "B",
+     "title": "Bee"
+    },
+    {
+     "name": "C",
+     "title": "See"
+    }
+   ],
+   "supports": [
+    "bee"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"A | B & C\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly one",
+    "allows one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly one",
+    "requires one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (0 of min 1)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly one",
+    "disallows multiple fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too many fields present (2 of max 1)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly two",
+    "allows two fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test3": 4321
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly two",
+    "disallows no fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (0 of min 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly two",
+    "disallows one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (1 of min 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "exactly two",
+    "disallows three fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1,
+    "test2": 2,
+    "test3": 3
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too many fields present (3 of max 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "one or more",
+    "allows one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "one or more",
+    "requires one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (0 of min 1)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "one or more",
+    "allows multiple fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "two or more",
+    "allows two fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 4321
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "two or more",
+    "allows three fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 4321,
+    "test3": 1111
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "two or more",
+    "disallows no fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (0 of min 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "two or more",
+    "disallows one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2+"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2+"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (1 of min 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most one",
+    "allows one field"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most one",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most one",
+    "disallows multiple fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 4321
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too many fields present (2 of max 1)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most two",
+    "allows two fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 4321
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most two",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "at most two",
+    "disallows three fields"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "O.a2-"
+    },
+    {
+     "name": "Test3",
+     "type": "int16",
+     "conformance": "O.a2-"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test1": 1234,
+    "test2": 4321,
+    "test3": 1111
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too many fields present (3 of max 2)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "feature-gated group",
+    "allows omission if feature disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "[F].a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "[F].a+"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "feature-gated group",
+    "disallows field if feature disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "[F].a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "[F].a+"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test1": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test1: Conformance \"[F].a+\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "feature-gated group",
+    "allows one field if feature enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "[F].a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "[F].a+"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test1": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "choice",
+    "feature-gated group",
+    "requires one field if feature enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test1",
+     "type": "int16",
+     "conformance": "[F].a+"
+    },
+    {
+     "name": "Test2",
+     "type": "int16",
+     "conformance": "[F].a+"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test: Conformance choice \"a\": Too few fields present (0 of min 1)"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum value whose definition states no ID",
+    "requires the field where the enum holds the value named"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "uint8",
+     "conformance": "Mode == Second"
+    },
+    {
+     "name": "Mode",
+     "type": "enum8",
+     "children": [
+      {
+       "name": "First"
+      },
+      {
+       "name": "Second"
+      }
+     ]
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "mode": 1
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"Mode == Second\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum value whose definition states no ID",
+    "allows omission where it does not"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "uint8",
+     "conformance": "Mode == Second"
+    },
+    {
+     "name": "Mode",
+     "type": "enum8",
+     "children": [
+      {
+       "name": "First"
+      },
+      {
+       "name": "Second"
+      }
+     ]
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "mode": 0
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "allows without conformance"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "allows a value in a range"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 191
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "disallows a value next to a range"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 192
+   },
+   "error": {
+    "type": "UnknownEnumValueError",
+    "message": "Validating Test.test: Matter does not define the enum value 192 for Test"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "disallows a value in a non-conformant range"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 205
+   },
+   "error": {
+    "type": "EnumValueConformanceError",
+    "message": "Validating Test.test: Conformance \"FT\": Matter does not allow enum value featureValues (range 200 to 210) here"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "allows a value in a range conformant by feature"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [
+    "FT"
+   ],
+   "record": {
+    "test": 205
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "allows without mandatory"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 2
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "disallows disallowed"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 3
+   },
+   "error": {
+    "type": "EnumValueConformanceError",
+    "message": "Validating Test.test: Conformance \"X\": Matter does not allow enum value disallowed (ID 3) here"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "disallows non-conformant by feature"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 4
+   },
+   "error": {
+    "type": "EnumValueConformanceError",
+    "message": "Validating Test.test: Conformance \"FT\": Matter does not allow enum value ifFeature (ID 4) here"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "disallows undefined enum value"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 99
+   },
+   "error": {
+    "type": "UnknownEnumValueError",
+    "message": "Validating Test.test: Matter does not define the enum value 99 for Test"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum values",
+    "allows conformant by feature"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 1,
+       "name": "noConformance"
+      },
+      {
+       "id": 2,
+       "name": "mandatory",
+       "conformance": "M"
+      },
+      {
+       "id": 3,
+       "name": "disallowed",
+       "conformance": "X"
+      },
+      {
+       "id": 4,
+       "name": "ifFeature",
+       "conformance": "FT"
+      },
+      {
+       "name": "mfgValues",
+       "constraint": "128 to 191"
+      },
+      {
+       "name": "featureValues",
+       "constraint": "200 to 210",
+       "conformance": "FT"
+      }
+     ]
+    }
+   ],
+   "features": [
+    {
+     "name": "FT",
+     "title": "Feature"
+    }
+   ],
+   "supports": [
+    "FT"
+   ],
+   "record": {
+    "test": 4
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "allows if >"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5,
+    "isGreaterThan": true
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "requires if >"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.isGreaterThan: Conformance \"Value > 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "disallows if <"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4,
+    "isGreaterThan": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.isGreaterThan: Conformance \"Value > 4\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "allows if <"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 3,
+    "isLessThan": true
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "requires if <"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 3
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.isLessThan: Conformance \"Value < 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "comparisons",
+    "disallows if >"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "IsGreaterThan",
+     "type": "bool",
+     "conformance": "Value > 4"
+    },
+    {
+     "name": "IsLessThan",
+     "type": "bool",
+     "conformance": "Value < 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4,
+    "isLessThan": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.isLessThan: Conformance \"Value < 4\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "not equal",
+    "requires if unequal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value != 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value != 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "not equal",
+    "allows if unequal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value != 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5,
+    "dependent": true
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "not equal",
+    "disallows if equal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value != 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4,
+    "dependent": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value != 4\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "not equal",
+    "allows omission if equal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value != 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at least",
+    "requires if equal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at least",
+    "requires if greater"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at least",
+    "disallows if less"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 3,
+    "dependent": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 4\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at most",
+    "requires if equal"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value <= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 4
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value <= 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at most",
+    "requires if less"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value <= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 3
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value <= 4\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "at most",
+    "disallows if greater"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value <= 4"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5,
+    "dependent": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value <= 4\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "range",
+    "requires within range"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 2 & Value <= 8"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 2 & Value <= 8\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "range",
+    "allows within range"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 2 & Value <= 8"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 5,
+    "dependent": true
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "range",
+    "disallows below range"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 2 & Value <= 8"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 1,
+    "dependent": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 2 & Value <= 8\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "value operators",
+    "range",
+    "disallows above range"
+   ],
+   "fields": [
+    {
+     "name": "Value",
+     "type": "uint8"
+    },
+    {
+     "name": "Dependent",
+     "type": "bool",
+     "conformance": "Value >= 2 & Value <= 8"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "value": 9,
+    "dependent": true
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Value >= 2 & Value <= 8\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "mandatory",
+    "allows if one enabled (LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F ^ B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "mandatory",
+    "requires if one enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F ^ B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F ^ B\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "mandatory",
+    "disallows if both enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F ^ B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F ^ B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "mandatory",
+    "disallows if neither enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F ^ B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F ^ B\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "mandatory",
+    "allows omission if both enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F ^ B"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "optional",
+    "allows if one enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F ^ B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "optional",
+    "allows omission if one enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F ^ B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "exclusive or",
+    "optional",
+    "disallows if both enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F ^ B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo",
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F ^ B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional",
+    "requires if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F, O\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional",
+    "allows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional otherwise mandatory",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], M"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional otherwise mandatory",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], M"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional otherwise mandatory",
+    "requires if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], M"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F], M\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "negated mandatory otherwise optional",
+    "requires if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"!F, O\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "negated mandatory otherwise optional",
+    "allows if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "negated mandatory otherwise optional",
+    "allows omission if enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "!F, O"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional-if",
+    "requires if first enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {},
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F, [B]\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional-if",
+    "allows if second enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional-if",
+    "allows omission if second enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "mandatory otherwise optional-if",
+    "disallows if neither enabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "F, [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"F, [B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional list equals disjunction",
+    "allows if enabled (LHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "foo"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional list equals disjunction",
+    "allows if enabled (RHS)"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [
+    "bar"
+   ],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional list equals disjunction",
+    "disallows if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"[F], [B]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "otherwise",
+    "optional list equals disjunction",
+    "allows omission if disabled"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "[F], [B]"
+    }
+   ],
+   "features": [
+    {
+     "name": "F",
+     "title": "Foo"
+    },
+    {
+     "name": "B",
+     "title": "Bar"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "disallowed",
+    "disallows the field"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "X"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"X\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "disallowed",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "X"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "obsolete",
+    "disallows the field"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "Z"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.test: Conformance \"Z\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "obsolete",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "Z"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "provisional",
+    "allows the field"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "P"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "test": 1234
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "provisional",
+    "allows omission"
+   ],
+   "fields": [
+    {
+     "name": "Test",
+     "type": "int16",
+     "conformance": "P"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum equality",
+    "allows if enum matches"
+   ],
+   "fields": [
+    {
+     "name": "Status",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 0,
+       "name": "Idle"
+      },
+      {
+       "id": 1,
+       "name": "UpdateAvailable"
+      }
+     ]
+    },
+    {
+     "name": "ImageUri",
+     "type": "string",
+     "conformance": "Status == UpdateAvailable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "status": 1,
+    "imageUri": "https://example.com"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum equality",
+    "requires if enum matches"
+   ],
+   "fields": [
+    {
+     "name": "Status",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 0,
+       "name": "Idle"
+      },
+      {
+       "id": 1,
+       "name": "UpdateAvailable"
+      }
+     ]
+    },
+    {
+     "name": "ImageUri",
+     "type": "string",
+     "conformance": "Status == UpdateAvailable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "status": 1
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.imageUri: Conformance \"Status == UpdateAvailable\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum equality",
+    "disallows if enum does not match"
+   ],
+   "fields": [
+    {
+     "name": "Status",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 0,
+       "name": "Idle"
+      },
+      {
+       "id": 1,
+       "name": "UpdateAvailable"
+      }
+     ]
+    },
+    {
+     "name": "ImageUri",
+     "type": "string",
+     "conformance": "Status == UpdateAvailable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "status": 0,
+    "imageUri": "https://example.com"
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.imageUri: Conformance \"Status == UpdateAvailable\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "enum equality",
+    "allows omission if enum does not match"
+   ],
+   "fields": [
+    {
+     "name": "Status",
+     "type": "enum8",
+     "children": [
+      {
+       "id": 0,
+       "name": "Idle"
+      },
+      {
+       "id": 1,
+       "name": "UpdateAvailable"
+      }
+     ]
+    },
+    {
+     "name": "ImageUri",
+     "type": "string",
+     "conformance": "Status == UpdateAvailable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "status": 0
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "accepts neither"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "accepts CurrentArea without EstimatedEndTime"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "currentArea": 4
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "accepts CurrentArea as null without EstimatedEndTime"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "currentArea": null
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "rejects EstimatedEndTime without CurrentArea"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "estimatedEndTime": 946684804
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.estimatedEndTime: Conformance \"[CurrentArea]\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "accepts EstimatedEndTime with CurrentArea"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "currentArea": 1,
+    "estimatedEndTime": 946684804
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "optional field dependency",
+    "accepts EstimatedEndTime with null CurrentArea"
+   ],
+   "fields": [
+    {
+     "name": "CurrentArea",
+     "type": "uint32",
+     "quality": "X",
+     "conformance": "desc"
+    },
+    {
+     "name": "EstimatedEndTime",
+     "type": "epoch-s",
+     "quality": "X",
+     "conformance": "[CurrentArea]"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "currentArea": null,
+    "estimatedEndTime": 946684804
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "hairy real-world",
+    "disallows PirUnoccupiedToOccupiedDelay without HoldTime"
+   ],
+   "fields": [
+    {
+     "name": "HoldTime",
+     "type": "uint16"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedThreshold",
+     "type": "uint8"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedDelay",
+     "type": "uint8",
+     "conformance": "HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D"
+    }
+   ],
+   "features": [
+    {
+     "name": "PIR",
+     "title": "PIR"
+    },
+    {
+     "name": "US",
+     "title": "US"
+    },
+    {
+     "name": "PHY",
+     "title": "PHY"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "pirUnoccupiedToOccupiedDelay": 4
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.pirUnoccupiedToOccupiedDelay: Conformance \"HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "hairy real-world",
+    "allows PirUnoccupiedToOccupiedDelay without HoldTime"
+   ],
+   "fields": [
+    {
+     "name": "HoldTime",
+     "type": "uint16"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedThreshold",
+     "type": "uint8"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedDelay",
+     "type": "uint8",
+     "conformance": "HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D"
+    }
+   ],
+   "features": [
+    {
+     "name": "PIR",
+     "title": "PIR"
+    },
+    {
+     "name": "US",
+     "title": "US"
+    },
+    {
+     "name": "PHY",
+     "title": "PHY"
+    }
+   ],
+   "supports": [],
+   "record": {
+    "holdTime": 4,
+    "pirUnoccupiedToOccupiedDelay": 4
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "hairy real-world",
+    "allows neither PirUnoccupiedToOccupiedDelay nor HoldTime"
+   ],
+   "fields": [
+    {
+     "name": "HoldTime",
+     "type": "uint16"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedThreshold",
+     "type": "uint8"
+    },
+    {
+     "name": "PirUnoccupiedToOccupiedDelay",
+     "type": "uint8",
+     "conformance": "HoldTime & (PIR | !PIR & !US & !PHY) & PirUnoccupiedToOccupiedThreshold, [HoldTime & (PIR | !PIR & !US & !PHY)], D"
+    }
+   ],
+   "features": [
+    {
+     "name": "PIR",
+     "title": "PIR"
+    },
+    {
+     "name": "US",
+     "title": "US"
+    },
+    {
+     "name": "PHY",
+     "title": "PHY"
+    }
+   ],
+   "supports": [],
+   "record": {}
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "qualified field reference",
+    "allows if qualified ref is present"
+   ],
+   "fields": [
+    {
+     "name": "Opts",
+     "type": "struct",
+     "children": [
+      {
+       "name": "Enable",
+       "id": 0,
+       "type": "uint8"
+      },
+      {
+       "name": "Mode",
+       "id": 1,
+       "type": "uint8"
+      }
+     ]
+    },
+    {
+     "name": "Dependent",
+     "type": "uint8",
+     "conformance": "Opts.Enable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "opts": {
+     "enable": 1
+    },
+    "dependent": 42
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "qualified field reference",
+    "requires if qualified ref is present"
+   ],
+   "fields": [
+    {
+     "name": "Opts",
+     "type": "struct",
+     "children": [
+      {
+       "name": "Enable",
+       "id": 0,
+       "type": "uint8"
+      },
+      {
+       "name": "Mode",
+       "id": 1,
+       "type": "uint8"
+      }
+     ]
+    },
+    {
+     "name": "Dependent",
+     "type": "uint8",
+     "conformance": "Opts.Enable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "opts": {
+     "enable": 1
+    }
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Opts.Enable\": Matter requires you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "qualified field reference",
+    "disallows if qualified ref is absent"
+   ],
+   "fields": [
+    {
+     "name": "Opts",
+     "type": "struct",
+     "children": [
+      {
+       "name": "Enable",
+       "id": 0,
+       "type": "uint8"
+      },
+      {
+       "name": "Mode",
+       "id": 1,
+       "type": "uint8"
+      }
+     ]
+    },
+    {
+     "name": "Dependent",
+     "type": "uint8",
+     "conformance": "Opts.Enable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "opts": {
+     "mode": 1
+    },
+    "dependent": 42
+   },
+   "error": {
+    "type": "ConformanceError",
+    "message": "Validating Test.dependent: Conformance \"Opts.Enable\": Matter does not allow you to set this attribute"
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "qualified field reference",
+    "allows omission if qualified ref is absent"
+   ],
+   "fields": [
+    {
+     "name": "Opts",
+     "type": "struct",
+     "children": [
+      {
+       "name": "Enable",
+       "id": 0,
+       "type": "uint8"
+      },
+      {
+       "name": "Mode",
+       "id": 1,
+       "type": "uint8"
+      }
+     ]
+    },
+    {
+     "name": "Dependent",
+     "type": "uint8",
+     "conformance": "Opts.Enable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {
+    "opts": {
+     "mode": 1
+    }
+   }
+  },
+  {
+   "path": [
+    "conformance",
+    "conformance",
+    "qualified field reference",
+    "allows omission if parent is absent"
+   ],
+   "fields": [
+    {
+     "name": "Opts",
+     "type": "struct",
+     "children": [
+      {
+       "name": "Enable",
+       "id": 0,
+       "type": "uint8"
+      },
+      {
+       "name": "Mode",
+       "id": 1,
+       "type": "uint8"
+      }
+     ]
+    },
+    {
+     "name": "Dependent",
+     "type": "uint8",
+     "conformance": "Opts.Enable"
+    }
+   ],
+   "features": [],
+   "supports": [],
+   "record": {}
+  }
+ ]
+}

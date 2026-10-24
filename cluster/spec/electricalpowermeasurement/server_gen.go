@@ -247,6 +247,15 @@ func (s *Server) OnChanged(fn func(state State, change contract.Change)) (unsubs
 	return spec.OnChangedOf(s.Underlying(), fn)
 }
 
+// MarkChanged reports attributes the host computes on read (served from
+// a spec.Source, so no Set sees them change): the data version advances
+// and the change is reported (spec.Server.MarkChanged, which refuses an
+// empty list, an attribute not served and a changes-omitted or quieter
+// one); spec.ErrNoMarkChanged for a server that is no spec.ChangeMarker.
+func (s *Server) MarkChanged(attrIDs ...uint32) error {
+	return spec.MarkChangedOf(s.Underlying(), attrIDs...)
+}
+
 // OnChangedAsync is OnChanged with fn queued: the state and the change
 // are taken when the server reports it, and fn runs later on the
 // device's goroutine, one call after the other. A server wrapped

@@ -216,6 +216,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
+			Default:     spec.EmptyListDefault{},
 		},
 		{
 			ID: AttrClientList, Name: "ClientList",
@@ -223,12 +224,14 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
+			Default:     spec.EmptyListDefault{},
 		},
 		{
 			ID: AttrPartsList, Name: "PartsList",
 			Type:        spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}}},
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Default:     spec.EmptyListDefault{},
 		},
 		{
 			ID: AttrTagList, Name: "TagList",

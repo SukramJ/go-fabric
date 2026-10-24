@@ -28,6 +28,9 @@ type fakeEP struct {
 	clients  []uint32
 	elements map[uint32]map[schema.RequirementElement][]uint32
 	stated   []string
+	// unimplemented are the mandatory commands a server leaves
+	// unimplemented, by cluster.
+	unimplemented map[uint32][]uint32
 }
 
 // fakeTree answers dtFacts for fake endpoints.
