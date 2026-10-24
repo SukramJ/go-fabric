@@ -35,18 +35,14 @@ var (
 const DefaultMaxGroupsPerFabric = 22
 
 // Store is the persistence the manager reads its state from and writes
-// group membership to. *store.Store satisfies it.
+// group membership to: the [store.Groups] area of the persistence port and
+// the fabric and key-set reads. Every [store.Port] satisfies it.
 type Store interface {
+	store.Groups
 	GetFabric(ctx context.Context, fabricIndex uint8) (store.FabricRecord, error)
 	ListFabrics(ctx context.Context) ([]store.FabricRecord, error)
 	ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]store.GroupKeySet, error)
 	ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]store.GroupKeyMapping, error)
-	ListGroupTable(ctx context.Context, fabricIndex uint8) ([]store.GroupTableEntry, error)
-	UpsertGroupTableEntry(ctx context.Context, e store.GroupTableEntry) error
-	RemoveGroupTableEntry(ctx context.Context, fabricIndex uint8, groupID uint16) error
-	ListGroupcastGroups(ctx context.Context, fabricIndex uint8) ([]store.GroupcastGroup, error)
-	UpsertGroupcastGroup(ctx context.Context, g store.GroupcastGroup) error
-	RemoveGroupcastGroup(ctx context.Context, fabricIndex uint8, groupID uint16) error
 }
 
 // TableEntry is one group of a fabric with the local endpoints that are

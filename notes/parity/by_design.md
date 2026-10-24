@@ -2268,7 +2268,7 @@ A CASE handshake in flight holds its TCP connection open
 (`ExchangeManager.ts:674-681`); the hold ends with the handshake, a peer
 failure StatusReport, the connection dropping, or the eviction of the
 per-exchange CASE state (`Bridge.ForgetSigma1Replied`, which
-`node/security.go:327` wires to the CASE provider's one-minute TTL through
+`node/security.go:333` wires to the CASE provider's one-minute TTL through
 `SetOnEvict`). matter.js has no constant bounding the CASE exchange either;
 its unsecured session ends with the exchange. A host that wires its own
 CASE provider without `SetOnEvict` keeps an abandoned Sigma1's hold until

@@ -49,7 +49,7 @@ const stopTimeout = 5 * time.Second
 type Node struct {
 	cfg    Config
 	logger *slog.Logger
-	st     *store.Store
+	st     store.Port
 	// ownedDB is the handle opened for Config.Store.Path, closed by Stop;
 	// nil for a host's own.
 	ownedDB    *sql.DB
@@ -882,7 +882,7 @@ func (n *Node) UniqueID() string { return n.cfg.BasicInformation.UniqueID }
 func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.
-func (n *Node) Store() *store.Store { return n.st }
+func (n *Node) Store() store.Port { return n.st }
 
 // Persistence is the endpoint-level persistence (scene tables, bridged
 // NodeLabels) the facade's assembler uses: [Config].EndpointPersistence

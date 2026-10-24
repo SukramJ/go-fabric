@@ -300,7 +300,7 @@ So a host that wires `NewOperationalSessionLookup(...)` and forgets
 `.WithFabricResolver(...)` gets a bridge where **every authenticated CASE
 session bypasses the ACL entirely**, silently, with no error and no log. The
 reference wiring gets it right and even says so in a comment
-(`node/security.go:251` `WithFabricResolver`; before wave 6 `examples/reference-bridge/wiring.go:352-353`); nothing enforces it. This is
+(`node/security.go:257` `WithFabricResolver`; before wave 6 `examples/reference-bridge/wiring.go:352-353`); nothing enforces it. This is
 the single highest-value finding in this document.
 
 ### What the attacker must already have

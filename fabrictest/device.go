@@ -13,17 +13,19 @@ import (
 	"strconv"
 	"sync"
 
-	_ "modernc.org/sqlite" // the device's SQLite stores (node.Store.DB)
+	_ "modernc.org/sqlite" // the device's SQLite stores with Options.StoreOnDisk (node.Store.DB)
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/endpoint"
+	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -80,7 +82,10 @@ type Device struct {
 	site  *Site
 	index int
 	topo  Topology
-	db    *sql.DB
+	// store is the device's persistence, kept across restarts: in memory
+	// (store/memstore, endpoint/memstore), or with Options.StoreOnDisk a
+	// SQLite file the node opens the stores on.
+	store node.Store
 
 	// actMu serialises Act with Start, Stop and Restart.
 	actMu sync.Mutex
@@ -113,12 +118,17 @@ func (s *Site) AddDevice(topo Topology) *Device {
 		s.tb.Fatal("fabrictest: Topology.Bridged with a Snapshotter: the node has no Aggregator to add them to")
 	}
 	d := &Device{site: s, index: s.index(), topo: topo}
-	path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		s.tb.Fatalf("fabrictest: device store: %v", err)
+	var db *sql.DB
+	if s.opts.StoreOnDisk {
+		path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
+		var err error
+		if db, err = sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"); err != nil {
+			s.tb.Fatalf("fabrictest: device store: %v", err)
+		}
+		d.store = node.Store{DB: db}
+	} else {
+		d.store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
 	}
-	d.db = db
 	s.mu.Lock()
 	s.devices = append(s.devices, d)
 	s.mu.Unlock()
@@ -126,7 +136,9 @@ func (s *Site) AddDevice(topo Topology) *Device {
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
 		_ = d.Stop(ctx)
-		_ = db.Close()
+		if db != nil {
+			_ = db.Close()
+		}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 	defer cancel()
@@ -179,7 +191,12 @@ func (d *Device) Start(ctx context.Context) error {
 	if d.topo.Prepare != nil {
 		d.topo.Prepare(n)
 	}
-	if err := n.Start(ctx); err != nil {
+	// Under Site.Run: the node's start re-establishes its former
+	// subscriptions and waits for each peer's StatusResponse on a timer
+	// of the site's clock (bridge.ReestablishFormerSubscriptions), and a
+	// fake clock moves only while the site paces it — a start called
+	// directly would wait forever on a response that never comes.
+	if err := d.site.Run(ctx, n.Start); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
 	if operational != nil {
@@ -214,7 +231,7 @@ func (d *Device) config() node.Config {
 			VendorName: "go-fabric", ProductName: "fabrictest device", NodeLabel: "device" + i, SerialNumber: "FT-" + i,
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
 		},
-		Store:      node.Store{DB: d.db},
+		Store:      d.store,
 		Advertiser: mdns.NewNoop(),
 		Topology:   d.topo.Snapshotter,
 		Logger:     d.site.log,
@@ -277,7 +294,7 @@ func (d *Device) Stop(ctx context.Context) error {
 	if !running {
 		return nil
 	}
-	return n.Stop(ctx)
+	return d.site.Run(ctx, n.Stop) // the stop's own timers on the site's clock, as Start
 }
 
 // Restart stops the node and starts a new one on the same store and
@@ -301,8 +318,9 @@ func (d *Device) Node() *node.Node {
 func (d *Device) Bridge() *bridge.Bridge { return d.Node().Bridge() }
 
 // Store is the node's credential store: fabrics, ACL, groups,
-// subscriptions and settings.
-func (d *Device) Store() *store.Store { return d.Node().Store() }
+// subscriptions and settings — a store/memstore, or with
+// Options.StoreOnDisk SQLite's store.Store.
+func (d *Device) Store() store.Port { return d.Node().Store() }
 
 // Addr is the device's UDP address: its host address on the in-memory
 // network, its socket's on loopback.

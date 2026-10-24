@@ -385,7 +385,7 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 }
 
 // fabricLister is the optional store capability an unfiltered read of a
-// fabric-scoped list needs: every fabric's index. *store.Store has it.
+// fabric-scoped list needs: every fabric's index. Every store.Port has it.
 type fabricLister interface {
 	ListFabrics(ctx context.Context) ([]store.FabricRecord, error)
 }

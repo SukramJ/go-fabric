@@ -56,22 +56,23 @@ ON CONFLICT(endpoint_key) DO UPDATE SET
 // — the thermo.PresetStore a host hands the Thermostat server
 // (thermo.ThermostatConfig.PresetStore).
 type ThermostatPresetStore struct {
-	s   *Store
+	s   ThermostatPresets
 	key string
 }
 
-// ThermostatPresets returns the preset store of the Thermostat endpoint
-// endpointKey (the host's name for it — its StableKey).
-func (s *Store) ThermostatPresets(endpointKey string) *ThermostatPresetStore {
+// NewThermostatPresetStore returns the preset store of the Thermostat endpoint
+// endpointKey (the host's name for it — its StableKey) on s, any
+// implementation of the [ThermostatPresets] area.
+func NewThermostatPresetStore(s ThermostatPresets, endpointKey string) *ThermostatPresetStore {
 	return &ThermostatPresetStore{s: s, key: endpointKey}
 }
 
-// LoadPresets is [Store.LoadThermostatPresets] for the store's endpoint.
+// LoadPresets is [ThermostatPresets.LoadThermostatPresets] for the store's endpoint.
 func (p *ThermostatPresetStore) LoadPresets(ctx context.Context) (presets, activeHandle []byte, ok bool, err error) {
 	return p.s.LoadThermostatPresets(ctx, p.key)
 }
 
-// SavePresets is [Store.SaveThermostatPresets] for the store's endpoint.
+// SavePresets is [ThermostatPresets.SaveThermostatPresets] for the store's endpoint.
 func (p *ThermostatPresetStore) SavePresets(ctx context.Context, presets, activeHandle []byte) error {
 	return p.s.SaveThermostatPresets(ctx, p.key, presets, activeHandle)
 }

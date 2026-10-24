@@ -80,7 +80,7 @@ func (f FileStore) Save(_ context.Context, data []byte) error {
 	return os.Rename(tmp.Name(), f.Path)
 }
 
-// Settings is a string key-value store — *store.Store's GetSetting and
+// Settings is a string key-value store — store.Settings' GetSetting and
 // SetSetting, which [SettingStore] keeps the trust store under.
 type Settings interface {
 	GetSetting(ctx context.Context, key string) (string, bool, error)

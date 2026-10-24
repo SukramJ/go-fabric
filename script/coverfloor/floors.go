@@ -121,6 +121,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "test scaffolding, exercised through the packages that import it, and go credits that coverage to them; only the device type conformance helper has a test of its own",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
@@ -253,7 +254,17 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/secure/sessionparams", min: 100},
-	{pkg: "github.com/SukramJ/go-fabric/store", min: 83},
+	// Brief CA: 85.2 with the contract table (store/storetest) on SQLite.
+	{pkg: "github.com/SukramJ/go-fabric/store", min: 85},
+	// Brief CA: measured 99.5; the rest is a next-fabric-index counter a host overwrote
+	// out of range and nextFreeFrom's fall-through on a full table, which
+	// AddFabric refuses first.
+	{pkg: "github.com/SukramJ/go-fabric/store/memstore", min: 99},
+	{
+		pkg: "github.com/SukramJ/go-fabric/store/storetest",
+		min: 0,
+		why: "the contract table, exercised by store's and store/memstore's tests, and go credits that coverage to them (80.8 % of it run against memstore)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, why: "the Conn interface only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},

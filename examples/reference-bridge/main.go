@@ -51,6 +51,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // CSA test identity. 0xFFF1 is the Connectivity Standards Alliance's test
@@ -298,7 +299,7 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	}
 	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
 	devices.lock.auth = n.Store()
-	devices.thermostat.attachStore(n.Store().ThermostatPresets(thermostatStoreKey), n.Store())
+	devices.thermostat.attachStore(store.NewThermostatPresetStore(n.Store(), thermostatStoreKey), n.Store())
 
 	eps, err := devices.endpoints() //nolint:contextcheck // thermo.New takes no context; its PresetStore load runs once, at construction
 	if err != nil {

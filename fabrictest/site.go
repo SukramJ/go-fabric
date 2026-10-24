@@ -66,6 +66,13 @@ type Options struct {
 	// run on, since "nothing ran for 10 ms" is a statement about the
 	// process; nil is [clock.System].
 	Wall clock.Clock
+	// StoreOnDisk keeps each device's state in a SQLite file in the test's
+	// temporary directory, as a deployment does, instead of in memory
+	// (store/memstore and endpoint/memstore, the default). Either way the
+	// state survives [Device.Restart], which starts the new node on the
+	// same store; a test sets it to exercise the SQLite encoding across a
+	// restart.
+	StoreOnDisk bool
 	// Logger receives the logs of the hosts the site builds — the nodes,
 	// the controllers and their components; nil discards those. A
 	// component that logs to slog.Default() rather than to the logger it
@@ -82,7 +89,7 @@ type Options struct {
 type Site struct {
 	tb   testing.TB
 	opts Options
-	// dir holds the devices' stores. It is created before Close is
+	// dir holds the devices' SQLite files (Options.StoreOnDisk). It is created before Close is
 	// registered, so the test's cleanup removes it only after Close has
 	// stopped every node (cleanups run last-registered first).
 	dir  string

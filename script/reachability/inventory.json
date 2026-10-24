@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6307,
+  "entry_points": 6317,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,6 +184,7 @@
     "eligibility",
     "endpoint",
     "endpoint/endpointtest",
+    "endpoint/memstore",
     "endpoint/sqlitestore",
     "examples/host-view",
     "examples/quickstart-controller",
@@ -223,6 +224,7 @@
     "secure/sigma",
     "secure/spake2",
     "store",
+    "store/memstore",
     "tlv",
     "transport",
     "transport/btp",
@@ -232,8 +234,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14561,
-    "reachable": 10131,
+    "total_exported": 14581,
+    "reachable": 10151,
     "whitelisted": 4427,
     "unreachable": 3
   },
@@ -8455,7 +8457,7 @@
       "identifier": "AuthStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/lock/auth.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "cluster/lock",

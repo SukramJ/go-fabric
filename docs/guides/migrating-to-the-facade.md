@@ -59,6 +59,20 @@ one-line function over it.
 | `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
 | a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
 
+## The persistence port in v0.10.5
+
+The node takes a port instead of SQLite's type (`docs/guides/persistence.md`,
+the persistence port). A host that sets `Store.Path` or `Store.DB` changes
+nothing.
+
+| Before | Now |
+| --- | --- |
+| `node.Config.Store.Credentials` of type `*store.Store` | `store.Port`; `store.New(db)` still is one, `memstore.New()` (`store/memstore`) another |
+| `Node.Store()` returning `*store.Store` | `store.Port`: the same methods, no `*sql.DB` behind it guaranteed |
+| `fabrictest.Device.Store()` returning `*store.Store` | `store.Port` |
+| `(*store.Store).ThermostatPresets(key)` | `store.NewThermostatPresetStore(st, key)` over any `store.ThermostatPresets` (removed) |
+| a fabrictest device on a SQLite file | in memory by default; `fabrictest.Options{StoreOnDisk: true}` keeps the file |
+
 ## The controller side in v0.10.3
 
 Nothing was removed: the old spellings compile, since the new names are
@@ -265,4 +279,4 @@ endpoints (or `Topology.Snapshotter` for its own assembler, and
 controller reading and writing them over CASE —
 [Testing in process](testing-in-process.md).
 
-*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go:45-75`, `fabrictest/site.go:114`, `fabrictest/controller.go:496`.*
+*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go:47-77`, `fabrictest/site.go:121`, `fabrictest/controller.go:496`.*

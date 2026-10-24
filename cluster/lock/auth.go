@@ -17,10 +17,11 @@ import (
 
 // AuthStore persists a lock's users, credentials and schedules and the
 // node's credential key: the nonvolatile State of matter.js's
-// DoorLockServer (DoorLockServer.ts:1538-1574). *store.Store implements it
-// on matter_doorlock_users, matter_doorlock_credentials,
-// matter_doorlock_schedules and matter_settings; a host with its own store
-// implements the four methods.
+// DoorLockServer (DoorLockServer.ts:1538-1574): the store.DoorLocks and
+// store.Settings areas, which every store.Port implements — store.Store on
+// matter_doorlock_users, matter_doorlock_credentials,
+// matter_doorlock_schedules and matter_settings, store/memstore in memory;
+// a host with its own store implements the four methods.
 type AuthStore = lockdef.AuthStore
 
 var _ AuthStore = (*store.Store)(nil)

@@ -376,7 +376,7 @@ type Store struct {
 	// 5 s busy timeout; [Node.Stop] closes it. It excludes DB.
 	Path        string
 	DB          *sql.DB
-	Credentials *store.Store
+	Credentials store.Port
 	Endpoints   endpoint.Store
 }
 

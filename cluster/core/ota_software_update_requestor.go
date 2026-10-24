@@ -109,7 +109,7 @@ type OTARequestorConfig struct {
 	// apply fail as matter.js's unimplemented defaults do (:1293-1304).
 	Applier OtaApplier
 	// Store persists DefaultOTAProviders and the requestor state; nil keeps
-	// both in memory. *store.Store implements it.
+	// both in memory. Every store.Port implements it.
 	Store OtaRequestorStore
 	// DownloadDir is the directory the image is downloaded to. Required.
 	DownloadDir string
@@ -191,7 +191,8 @@ type OtaApplier interface {
 	ApplyUpdate(ctx context.Context, newSoftwareVersion uint32, file string) error
 }
 
-// OtaRequestorStore persists the requestor. *store.Store implements it.
+// OtaRequestorStore persists the requestor: the store.OTA area, which every
+// store.Port implements.
 type OtaRequestorStore interface {
 	ListDefaultOTAProviders(ctx context.Context) ([]store.OTAProviderLocation, error)
 	ReplaceDefaultOTAProviders(ctx context.Context, fabricIndex uint8, entries []store.OTAProviderLocation) error

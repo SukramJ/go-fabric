@@ -97,7 +97,7 @@ type rootDeps struct {
 	cfg               *Config
 	logger            *slog.Logger
 	bootReason        uint8
-	st                *store.Store
+	st                store.Port
 	groups            *groups.Manager
 	connector         mattercore.OtaProviderConnector
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
@@ -361,7 +361,7 @@ func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
 // SoftwareDiagnostics (the Go heap), the host's WiFiNetworkDiagnostics when
 // it has one, and EthernetNetworkDiagnostics (every value null).
-func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeldef.LabelStruct, locales []string,
+func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabeldef.LabelStruct, locales []string,
 	wifi *mattercore.WiFiNetworkDiagnostics,
 ) ([]contract.ClusterServer, error) {
 	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, fixed)
@@ -409,7 +409,7 @@ func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeld
 
 // buildLabels constructs one endpoint's FixedLabel and UserLabel, the
 // latter restored from and persisted under key (root_optional.go:93-127 at b4ea1f96^).
-func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
+func buildLabels(ctx context.Context, st store.Settings, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
 	fixedLabel, err = mattercore.NewFixedLabel(fixed)
 	if err != nil {
 		return nil, nil, err
@@ -440,7 +440,7 @@ func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixed
 // Descriptor, FixedLabel ("role" "aggregator"), UserLabel and the host's
 // extra servers (wiring.go:332-345 at b4ea1f96^). Identify counts down on clk, the
 // node's clock.
-func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
+func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeAggregator))}},
 		nil, nil, nil,

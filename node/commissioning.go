@@ -68,7 +68,7 @@ type commissioningHost struct {
 // wireCommissioningWindow builds the window, gives it to the bridge and the
 // cluster, and installs the hooks. Called once the session manager and the
 // configured PASE provider exist.
-func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *store.Store) {
+func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store.Fabrics) {
 	window := bridge.NewCommissioningWindow()
 	h.br.AttachCommissioningWindow(window)
 	admin := h.root.AdministratorCommissioning
@@ -288,7 +288,7 @@ func (h *commissioningHost) attachPase(p *bridge.PerExchangePaseProvider) {
 // reopenIfDecommissioned opens the node's own window once its last fabric is
 // gone and no window is open (a rolled-back first commissioning leaves the
 // node's own window open, which keeps its timer).
-func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st *store.Store) {
+func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st store.Fabrics) {
 	win := h.br.CommissioningWindow()
 	if win == nil || win.IsOpen() {
 		return

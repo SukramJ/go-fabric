@@ -23,7 +23,7 @@
 //     WDSCH, YDSCH, HDSCH) with every status matter.js answers, the
 //     LockUserChange events, auto-relock (AutoRelockTime, UnlockWithTimeout)
 //     and ExpiringUser timeouts on [clock.Clock].
-//   - The records persist through an [AuthStore] — *store.Store is one —
+//   - The records persist through an [AuthStore] — every store.Port is one —
 //     with every credential encrypted under the node's credential key.
 //
 // The lock state comes from one of two places. A server with a

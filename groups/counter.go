@@ -34,7 +34,7 @@ const (
 	rolloverInfoDifference = 100_000
 )
 
-// CounterStore persists the group data counter. *store.Store satisfies it
+// CounterStore persists the group data counter. Every store.Port satisfies it
 // (GetMetadataCounter / SetMetadataCounter on matter_metadata); a [Store]
 // that does not implement it cannot send group messages
 // ([ErrNoCounterStore]).

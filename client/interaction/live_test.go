@@ -85,8 +85,14 @@ func holdSite(t *testing.T) {
 // newLiveWith is newLive with the controller's logger.
 func newLiveWith(t *testing.T, regLog *slog.Logger) *live {
 	t.Helper()
+	return newLiveOn(t, regLog, fabrictest.Options{})
+}
+
+// newLiveOn is newLiveWith on a site of opts.
+func newLiveOn(t *testing.T, regLog *slog.Logger, opts fabrictest.Options) *live {
+	t.Helper()
 	holdSite(t)
-	site := fabrictest.NewSite(t, fabrictest.Options{})
+	site := fabrictest.NewSite(t, opts)
 	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, TimeSource: site.Clock()})
 	if err != nil {
 		t.Fatal(err)
@@ -321,7 +327,7 @@ func TestLiveLivenessTimeout(t *testing.T) {
 // priming report, then a Toggle's.
 func TestLiveSustainedSurvivesRestart(t *testing.T) {
 	t.Parallel()
-	lv := newLive(t)
+	lv := newLiveOn(t, discardLog(), fabrictest.Options{StoreOnDisk: true}) // the subscriptions survive the SQLite round trip
 	reports := make(chan *interaction.Report, 16)
 	var sub *interaction.Subscription
 	err := lv.run(context.Background(), func(ctx context.Context) error {

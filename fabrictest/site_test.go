@@ -6,6 +6,7 @@ package fabrictest_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -278,10 +279,21 @@ func TestLoopbackPair(t *testing.T) {
 }
 
 // TestDeviceRestart: a restarted device keeps its fabric and its endpoint
-// numbers, and answers the controller again.
+// numbers, and answers the controller again — on the in-memory stores and
+// on SQLite (Options.StoreOnDisk).
 func TestDeviceRestart(t *testing.T) {
 	t.Parallel()
-	_, p, _, ep := pairWithPlug(t, fabrictest.Options{})
+	for _, onDisk := range []bool{false, true} {
+		t.Run(fmt.Sprint("StoreOnDisk=", onDisk), func(t *testing.T) {
+			t.Parallel()
+			testDeviceRestart(t, fabrictest.Options{StoreOnDisk: onDisk})
+		})
+	}
+}
+
+func testDeviceRestart(t *testing.T, opts fabrictest.Options) {
+	t.Helper()
+	_, p, _, ep := pairWithPlug(t, opts)
 	ctx := testContext(t)
 	if err := p.Device.Restart(ctx); err != nil {
 		t.Fatal(err)

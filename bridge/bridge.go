@@ -102,7 +102,7 @@
 //     terminated (docs/adr/0008). Without one nothing survives a restart:
 //     every controller waits out its own subscription liveness timeout
 //     before it re-subscribes, and the device looks unresponsive for that
-//     long. *store.Store satisfies the port. SetSubscriptionPersistence
+//     long. Every store.Port satisfies the port. SetSubscriptionPersistence
 //     (false) switches recording and re-establishment off altogether —
 //     matter.js's `persistenceEnabled`; on by default.
 //
