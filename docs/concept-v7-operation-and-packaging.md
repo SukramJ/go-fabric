@@ -49,6 +49,21 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   in M4 portiert — als eigene Welle nach CC, vor Phase 22 bzw. vor
   `v0.11.0`; sie bringt die dafür nötigen Validator-Haken mit
   (ADR 0026 P12, der Zug der Kante controller/client→device bleibt M5).
+- **0.9 Welle CD entfällt in go-fabric (Owner, 2026-10-24):** eine
+  eigenständige go-fabric-Instanz ist erst mit einer Fernschnittstelle
+  sinnvoll, die echte Bridges ansprechen; die bekommt ein eigenes
+  Repository `go-fabric-server` (WebSocket-JSON-Protokoll, zuerst die
+  Geräteseite, die Controller-Rolle später im selben Daemon, Vorlage
+  matterjs-server; go-habridge als dünner Client in eigenem Repo) als
+  Konzept v8 nach der M4-Pause. Dockerfiles, systemd, Release-Matrix,
+  ghcr-Image und arm64-Job (B.2) gehören zu diesem Produkt, nicht zur
+  Bibliothek: B.2 wird nicht in go-fabric umgesetzt. Hier bleibt nur
+  `docs/guides/operations.md` (was ein Host-Daemon beim Betrieb eines
+  Nodes beachtet) und wandert in Welle CE. Das Roadmap-Item „a bridge
+  operable out of the box“ verlässt M4 und wird in M5 durch
+  go-fabric-server erfüllt. go-fabric liefert dafür später nur einen
+  Generator-Ausgang: das JSON-Schema der Cluster-Zustände und -Kommandos
+  aus `parity/schema.json`.
 
 ## Teil A: Phase 21 — Observability und Persistenz als Ports
 
@@ -288,8 +303,8 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
 
 | Welle | Modell | Inhalt | Version |
 | --- | --- | --- | --- |
-| CD | Opus | B.2: Dockerfiles, systemd, `operations.md`, release.yml-Matrix und Image, arm64-Job | Patch |
-| CE | Opus (im Daemon-Repo + hier) | B.3: der Umbau im gewählten 2mqtt-Daemon (eigener PR dort, gegen den Tag), `embed-in-a-daemon.md` hier | — |
+| ~~CD~~ | — | entfällt (Entscheidung 0.9): B.2 geht nach `go-fabric-server` (Konzept v8); `operations.md` nach CE | — |
+| CE | Opus (im Daemon-Repo + hier) | B.3: der Umbau im gewählten 2mqtt-Daemon (eigener PR dort, gegen den Tag), `embed-in-a-daemon.md` und `operations.md` hier (0.9) | — |
 | CF | Owner | B.4: die zwei Repositories mit Konzept, Verweise, Comparison-Reste (`:139` cli-tool bleibt ○ mit Begründung, `:140` ○ „host concern“), Roadmap, `v0.11.0`, M4 geschlossen | `v0.11.0` |
 
 ## Teil C: Was M4 danach erfüllt — und was nicht
@@ -310,5 +325,6 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
   (keine Auswirkung) — prüfen in #1000.
 - CE hängt an der Verfügbarkeit des gewählten Daemons und seines
   Maintainers (der Owner); die Welle ist im Daemon-Repo eine eigene PR.
-- Das Multi-Arch-Image braucht `docker buildx` in CI und ein
-  Paket-Schreibrecht auf ghcr (Repo-Einstellung des Owners).
+- ~~Das Multi-Arch-Image braucht `docker buildx` in CI und ein
+  Paket-Schreibrecht auf ghcr (Repo-Einstellung des Owners).~~ Entfällt
+  hier mit 0.9; gilt für `go-fabric-server`.
