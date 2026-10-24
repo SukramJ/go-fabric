@@ -1,7 +1,7 @@
 # Brief BT — milestone 4, phase 20b: the typed cluster layer
 
 Date 2026-10-20. Roadmap milestone 4 (`docs/roadmap.md`, phase 20) after
-[concept v6](../../docs/concept-v6-embedding-layer.md) Teil A.3, step 1
+[concept v6](../../docs/history/concept-v6-embedding-layer.md) Teil A.3, step 1
 (owner decision 0.1: generated typed accessors) and the phase-20 read map
 (`notes/briefs/reads/read-m4-phase-20.md` §4, §5). go-fabric `v0.9.0`,
 matter.js pin `862ad75f` (read with `git -C $MATTERJS_DIR show 862ad75f:<path>`).

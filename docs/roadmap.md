@@ -29,9 +29,9 @@ a paired, working Matter node. The consumers that set that bar:
 
 | Consumer | State | What it needs from this module |
 | --- | --- | --- |
-| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin; the target after milestone 4 is the facade plus the cluster packages of the servers it customises ([concept v6](./concept-v6-embedding-layer.md), decision 0.4) | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
-| go-ha-matter-bridge (working name; planned separately) | not started; its concept is written when milestone 4 is due | the declarative device kit, the in-process test pair, the adapter module below |
-| the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via a shared adapter module (working name `go-hamatter`: `go-hamqtt`'s Home-Assistant vocabulary → Matter device types; lives outside this module, so `contract/` stays stdlib-only) | not started | the same device kit; energy and appliance device types, which already exist |
+| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin; the target after milestone 4 is the facade plus the cluster packages of the servers it customises ([concept v6](./history/concept-v6-embedding-layer.md), decision 0.4) | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
+| [go-habridge](https://github.com/SukramJ/go-habridge) (Home Assistant entities as a bridge for Matter controllers) | concept, not started: its `CONCEPT.md` was written 2026-10-24 (wave CF) on the owner's decisions of that day — a thin client between the Home Assistant WebSocket API and `go-fabric-server`, the stand-alone node with a remote protocol planned after milestone 4 | `go-fabric-server` and its protocol; the mapping table of go-hafabric |
+| the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via [go-hafabric](https://github.com/SukramJ/go-hafabric) (`go-hamqtt`'s Home-Assistant vocabulary → the device kit's declarations; lives outside this module, so `contract/` stays stdlib-only) | concept, not started: `CONCEPT.md` written 2026-10-24 (wave CF); go-zendure2mqtt embeds the kit directly in the phase-22 cookbook (wave CE) | the declarative device kit, the in-process test pair; energy and appliance device types, which already exist |
 | `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5) |
 
 Priority follows from that table: a feature a consumer uses comes before
@@ -185,7 +185,7 @@ for a cluster with a hand-written matter.js server.
 
 ### Milestone 4: The embedding layer
 
-**Detail:** [concept v6](./concept-v6-embedding-layer.md) (German), written
+**Detail:** [concept v6](./history/concept-v6-embedding-layer.md) (German), written
 2026-10-20 when the milestone opened, with the owner's decisions 0.1–0.4 and
 the drafts of the go-ha-matter-bridge and adapter-module concepts (Teil B/C),
 because the three shape each other; the two drafts move to their own
@@ -290,5 +290,6 @@ needs from the owner (asked as a wizard with a recommendation), the waves
 with one agent each, and the three pillars it has to show. An architecture
 decision or a deliberate divergence inside it becomes an ADR or a
 `by_design` entry in the same pull request. The adapter module and the
-go-ha-matter-bridge get their own concept documents in their own
-repositories, written in milestone 4.
+Home Assistant bridge got their own concept documents in their own
+repositories on 2026-10-24 (wave CF): [go-hafabric](https://github.com/SukramJ/go-hafabric)
+and [go-habridge](https://github.com/SukramJ/go-habridge).

@@ -1,6 +1,6 @@
 # Brief BU — M4 phase 20c: the declaration, the lifecycle, the callback rule, the host's view
 
-Date 2026-10-21. Concept v6 Teil A.3 (`docs/concept-v6-embedding-layer.md`
+Date 2026-10-21. Concept v6 Teil A.3 (`docs/history/concept-v6-embedding-layer.md`
 "Das deklarative Device-Kit", the "Ergänzungen" block: the declaration as
 data, the lifecycle, the callback rule with `…Async`, the host's-view
 page), ADR 0025 (principles 1, 2, 3, 5, 7, 8, 11), ADR 0026, gate 1

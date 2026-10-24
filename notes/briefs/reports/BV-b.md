@@ -38,7 +38,7 @@ The decision for each name:
   - Disengaged/engaged raises EngageStateChanged.
   - The exported setters on `cluster/wire` types stay the server's methods (documented in advanced-seams). Adding closuredef-typed duplicates would be a second shape (ADR 0025 P2).
 - **eligibility**:
-  - Proposal: it stays a package of the typed surface beside `schema`, with an advanced-seams row. That is what concept v6 decided (A.3: "`schema.*`, `eligibility.*` … erlaubt; dokumentiert als Teil der typisierten Oberfläche", `docs/concept-v6-embedding-layer.md:111`). `docs/architecture.md:146-147` and `advanced-seams.md:7` already list it that way.
+  - Proposal: it stays a package of the typed surface beside `schema`, with an advanced-seams row. That is what concept v6 decided (A.3: "`schema.*`, `eligibility.*` … erlaubt; dokumentiert als Teil der typisierten Oberfläche", `docs/history/concept-v6-embedding-layer.md:111`). `docs/architecture.md:146-147` and `advanced-seams.md:7` already list it that way.
   - P3 holds because no facade signature carries its types. P4's list is the lower packages that give access below the facade, and eligibility imports only `contract` and gives no such access.
   - The alternative was a `device.Eligibility`/`node.Compat` route with the package moved under `internal/`. That would have removed a package loom imports, a break, for no gain in what a host can reach. I tried it and reverted it.
 - **EVSE** stays a seam until milestone 5. The charger is a state machine the host drives through the server's own methods (`cluster/energy.EvseServer`, 20 identifiers in the reference bridge). The typed hull does not cover that, and a declaration port for it is a design of its own.
