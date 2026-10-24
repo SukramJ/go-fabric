@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -1294,7 +1295,7 @@ func (b *Bridge) triggerSessionReannounce() {
 	}
 	go func() {
 		defer b.reannounces.Done()
-		ctx, cancel := context.WithTimeout(base, timeout)
+		ctx, cancel := clock.WithTimeout(base, b.clk(), timeout)
 		defer cancel()
 		// Zeroconf exposes a direct republish trigger; other
 		// advertisers degrade to a per-record re-publish, which the

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
@@ -59,7 +60,7 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 // 0008 attaches: [Bridge.AttachCaseInitiatorProvider] and
 // [Bridge.AttachOperationalResolver].
 func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, providerNodeID uint64) (core.OtaProviderSession, error) {
-	ctx, cancel := context.WithTimeout(ctx, otaProviderConnectTimeout)
+	ctx, cancel := clock.WithTimeout(ctx, b.clk(), otaProviderConnectTimeout)
 	defer cancel()
 	link, err := b.connectPeer(ctx, fabricIndex, providerNodeID)
 	if err != nil {
@@ -124,7 +125,7 @@ func (s *peerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	if err := ex.Send(ctx, im.InteractionModelProtocolID, im.OpcodeInvokeRequest, payload); err != nil {
 		return nil, err
 	}
-	waitCtx, cancel := context.WithTimeout(ctx, s.b.chunkStatusResponseTimeout(s.link.sessionID))
+	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(s.link.sessionID))
 	defer cancel()
 	for {
 		msg, err := ex.Receive(waitCtx)

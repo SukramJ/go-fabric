@@ -1789,7 +1789,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		// falls through immediately while the goroutine is still
 		// alive — that's the leak the original "Same context" branch
 		// was hiding.
-		pumpStopCtx, pumpStopCancel := context.WithTimeout(context.Background(), pumpStopGrace)
+		pumpStopCtx, pumpStopCancel := clock.WithTimeout(context.Background(), b.clk(), pumpStopGrace)
 		select {
 		case <-pumpDone:
 		case <-pumpStopCtx.Done():
@@ -1815,7 +1815,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		active := b.advertiser.Active()
 		for i := range active {
 			svc := &active[i]
-			withdrawCtx, withdrawCancel := context.WithTimeout(context.Background(), b.cfg.AdvertiseTimeout)
+			withdrawCtx, withdrawCancel := clock.WithTimeout(context.Background(), b.clk(), b.cfg.AdvertiseTimeout)
 			//nolint:contextcheck // shutdown path: mDNS withdraw must run on a fresh timeout ctx, not the cancelled serve ctx
 			if err := b.advertiser.Withdraw(withdrawCtx, svc.InstanceName, svc.ServiceType); err != nil {
 				b.logger.Debug("matter.mdns.withdraw",
@@ -2054,7 +2054,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 	if b.advertiser == nil {
 		return
 	}
-	pubCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
+	pubCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
 		Logger:             b.logger,
@@ -2099,7 +2099,7 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 	if b.advertiser == nil {
 		return
 	}
-	wCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
+	wCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
 		Logger:             b.logger,
@@ -2159,7 +2159,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	if b == nil || b.advertiser == nil {
 		return nil
 	}
-	pubCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
+	pubCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
 	svc := mdns.BuildCommissionableService(mdns.CommissionableServiceConfig{
 		Logger:             b.logger,
@@ -2227,7 +2227,7 @@ func (b *Bridge) WithdrawCommissioning(ctx context.Context) {
 	if instance == "" || advertiser == nil {
 		return
 	}
-	withdrawCtx, cancel := context.WithTimeout(ctx, b.cfg.AdvertiseTimeout)
+	withdrawCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
 	if err := advertiser.Withdraw(withdrawCtx, instance, mdns.ServiceTypeCommissionable); err != nil {
 		b.logger.Debug("matter.mdns.commissioning_withdraw",

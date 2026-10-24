@@ -795,7 +795,7 @@ func (n *Node) Run(ctx context.Context) error {
 		return err
 	}
 	<-ctx.Done()
-	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), stopTimeout)
+	stopCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), n.cfg.Clock, stopTimeout)
 	defer cancel()
 	return n.Stop(stopCtx)
 }

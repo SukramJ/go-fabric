@@ -11,6 +11,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -149,7 +150,7 @@ func (b *Bridge) reconcileGroupMemberships() {
 	if member == nil {
 		return // not started: Start reconciles once the socket exists
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := clock.WithTimeout(context.Background(), b.clk(), 5*time.Second)
 	defer cancel()
 	memberships, err := b.groupMessagingPort().Memberships(ctx)
 	if err != nil {
