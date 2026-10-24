@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.7] — 2026-10-24
+
 ### Added
 
 - `spec.Server.MarkChanged(attrIDs...)` (phase 21d, brief CT): reports attributes a host computes on read (served from a `spec.Source`) — the data version advances and the change is notified as the host's; an empty list, an attribute not served and a changes-omitted ("C") or quieter ("Q") one are refused (`spec.ErrNotReportable`, `spec.ErrNotServed`). `spec.MarkChangedOf` and every generated `<cluster>def.Server.MarkChanged` are the typed route (`spec.ErrNoMarkChanged` for a server that owns no version). matter.js `ServerBehaviorBacking.markChanged`.
