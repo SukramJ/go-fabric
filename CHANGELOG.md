@@ -14,8 +14,12 @@ pseudo-version of `main`.
 
 - `docs/guides/embed-in-a-daemon.md` (phase 22, brief CE): the cookbook — go-fabric inside an existing daemon, in eight steps, each citing the commit of the daemon pull request that does it (go-zendure2mqtt: one Zendure unit as a bridged ElectricalSensor with its battery, readings to attributes, reachability, the pairing code), what the daemon did not have to do and what a controller sees.
 - `docs/guides/operations.md` (phase 22, concept v7 decision 0.9): what a host daemon minds when it runs a node — the store file and its backup, the ports and IPv6, mDNS beside avahi, the log events of operation, the health probe, the first limits, the diagnostic trace for a failed pairing, factory reset and upgrading.
-
 - PowerSource by typed declaration on every bridged device (phase 22, brief CE): `powersourcedef.Declare{…}` on a device whose type does not list PowerSource mounts it, as matter.js's BridgedNode device type allows under the condition `BridgedPowerSourceInfo` (`bridged-node.element.ts:23` at 862ad75f), and the device states that condition (`device.ConditionBridgedPowerSourceInfo`, in `Spec().DeviceConditions`) so the device-type validator judges the requirement as stated. `Device.PowerSource()` is the typed server; its EndpointList names the device's own endpoint. A part with such a declaration is refused by `AddPart` (`ErrComposition`): a part is no bridged node. Found by the cookbook: an energy store as an ElectricalSensor with its battery had no typed route to its PowerSource.
+
+### Changed
+
+- Built with Go 1.27.3: `GO-2026-6809` (`crypto/x509`, fixed in 1.27.3) is reachable through every TLS path a host or the controller opens; `go.mod` and the workflows move together (the reference daemons move the same day).
+- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hafabric](https://github.com/SukramJ/go-hafabric)), created 2026-10-24 with their concepts (wave CF).
 
 ### Fixed
 

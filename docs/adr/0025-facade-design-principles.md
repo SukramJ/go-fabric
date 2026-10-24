@@ -5,7 +5,7 @@
 - **Related**: [ADR 0018 — the device layer and the node facade](./0018-device-layer-and-node-facade.md),
   [ADR 0016 — device type validation](./0016-device-type-validation.md),
   [ADR 0014 — transitions optional per endpoint](./0014-transitions-optional-per-endpoint.md),
-  [concept v6](https://github.com/SukramJ/go-fabric/blob/main/docs/concept-v6-embedding-layer.md),
+  [concept v6](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v6-embedding-layer.md),
   `README.md` §API stability, `docs/guides/concurrency.md`,
   `notes/parity/by_design.md` (`BD-Matter-Node-ObserversSynchronous`)
 

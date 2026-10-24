@@ -154,7 +154,7 @@ One non-test file: diagevent/ring.go (160 lines) + ring_test.go (140).
 - Size: `NewRing(n)` with n < 1 becomes `defaultCapacity = 200` (ring.go:110); the node builds it with 256 (node/node.go:249). Drop policy: oldest overwritten (ring.go:117-137). In-memory only; no persistence (package doc ring.go:4-21: "bounded, in-memory"; the doc says the alarm journal and audit log are the durable records).
 - Writers: bridge/securechannel.go (15 `diagevent.` references; first `b.diagRing().Record` at :388 session, :465 pairing warning, :594 pairing error, :1115 session, :1312 discovery) and bridge/conn.go:566 (session). `Bridge.AttachDiagnosticEvents(*diagevent.Ring)` bridge/bridge.go:2259; `Bridge.DiagnosticEvents() []diagevent.Event` :2268; `atomic.Pointer[diagevent.Ring]` field bridge/bridge.go:395.
 - Readers: `Bridge.DiagnosticEvents` (above); DiagnosticLogs RetrieveLogs through `ringLogs` (node/node.go:912-934; attached at node/node.go:649 `DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})`; one line per event `time kind message k=v…`, CrashLogs answers none, :917-919); facade alias `node.DiagnosticEvent = diagevent.Event` (node/facade.go:57). No `Node` method returns the ring or its snapshot (grep `DiagnosticEvents` in node/*.go non-test: none; docs/guides/advanced-seams.md:203-207 says "Reading the node's ring from the facade is milestone 4, phase 21").
-- Loom: reads `diagevent.Event` in its REST handler (docs/concept-v6-embedding-layer.md:109).
+- Loom: reads `diagevent.Event` in its REST handler (docs/history/concept-v6-embedding-layer.md:109).
 - Comparison row: docs/matterjs-comparison.md:141 "Diagnostics for a failed pairing | diagevent/ | ✅ | No matter.js equivalent".
 
 ### 1.7 Metrics and counters today
@@ -265,7 +265,7 @@ Grep for the doc column: `grep -rn 'MaxSessionsPerPeer|MaxSubscriptionsPerFabric
 - bridge/handlers.go:343-345 and :412-470 describe the PASE brute-force cap ("matter.js counts every PASE pairing failure — a malformed Pake1 included").
 - bridge/pase_provider.go: no match for `attempt|fail|lockout|retry` (grep). bridge/commissioning_window.go: `RevokeWindow` mentions :75, :96, :188, :228, :366, :634-649 (the window teardown; no counter). secure/spake2/spake2.go: only `ErrConfirmationFailed` :56 and its uses :413, :547 (no attempt state); it returns the error to the caller.
 - docs: docs/security.md:24 states 20 attempts, lockout 15 min doubling to 4 h, new window resets.
-- Roadmap row 21 says "PASE attempt limit after §5.5" (docs/roadmap.md:197); `grep -rn '§5.5\|5\.5' docs/concept-v6-embedding-layer.md` finds no section so named; I did not determine what "§5.5" refers to.
+- Roadmap row 21 says "PASE attempt limit after §5.5" (docs/roadmap.md:197); `grep -rn '§5.5\|5\.5' docs/history/concept-v6-embedding-layer.md` finds no section so named; I did not determine what "§5.5" refers to.
 
 ### 3.3 matter.js at 862ad75f: PASE attempt handling (file:line and the literal only)
 
@@ -335,7 +335,7 @@ Packages with decoders of wire or file input and no fuzz target (candidates by `
 
 ### 4.3 What docs/ says about deployment
 
-grep `deploy|container|systemd|docker|arm64|raspberry|cross-compile|GOARCH|armv7` over docs/ (excluding history, adr, reference) and the example READMEs: docs/roadmap.md:198 (phase 22 row), docs/concept-v6-embedding-layer.md:244 ("kein Container, kein Cookbook (Phase 22)"), docs/security.md:45 (an unrelated hit), examples/reference-bridge/README.md:200, examples/reference-controller/README.md:215 (ble-virtual on arm64). There is no deployment page. docs/getting-started/device.md:221 heading "What the reference daemon adds". Existing guides: docs/guides/{advanced-seams, concurrency, host-view, migrating-to-the-facade, persistence, ports, testing-in-process}.md; getting-started/{controller, device}.md.
+grep `deploy|container|systemd|docker|arm64|raspberry|cross-compile|GOARCH|armv7` over docs/ (excluding history, adr, reference) and the example READMEs: docs/roadmap.md:198 (phase 22 row), docs/history/concept-v6-embedding-layer.md:244 ("kein Container, kein Cookbook (Phase 22)"), docs/security.md:45 (an unrelated hit), examples/reference-bridge/README.md:200, examples/reference-controller/README.md:215 (ble-virtual on arm64). There is no deployment page. docs/getting-started/device.md:221 heading "What the reference daemon adds". Existing guides: docs/guides/{advanced-seams, concurrency, host-view, migrating-to-the-facade, persistence, ports, testing-in-process}.md; getting-started/{controller, device}.md.
 
 ## §5 The `go-*2mqtt` siblings as cookbook candidates
 
@@ -387,7 +387,7 @@ No sibling has a systemd unit, goreleaser file or docker-compose file (`find` fo
 ### go-hamqtt (the shared HA vocabulary layer)
 - Entity shape: `model.Entity` interface (`Key()`, `Platform() hacatalog.Platform`, `Desc() *Description`, `Bindings() []Binding`) go-hamqtt/model/entity.go:27-43; `model.Basic` :45; `model.Command` :80; capability interfaces `Commander` :107, `Invoker` :129, `Suppressor` :142, `Deriver` :152, `EntitySource` :162, `Enricher` :179; `model.Device` model/device.go:169, `Identity` :81, `Identifier` :31, `Connection` :69; `model.Description` model/description.go:180, `Availability` :113; `model.Slot` model/slot.go:78, `Binding` :217; `model.State` model/state.go:23.
 - Publisher side: `publisher.Instance` publisher/instance.go:111 (+ `InstanceConfig` :53), `CommandRouter` publisher/command.go:508, `Transport` publisher/publisher.go:79, `AvailabilityPublisher` publisher/availability.go:136.
-- Consumer shape: all five 2mqtt daemons depend on it; its `Entity` + `Device` + `Platform` are the common vocabulary a Matter projection would read (this is the repo docs/concept-v6-embedding-layer.md:273-296 calls the source of the `go-hamatter` vocabulary).
+- Consumer shape: all five 2mqtt daemons depend on it; its `Entity` + `Device` + `Platform` are the common vocabulary a Matter projection would read (this is the repo docs/history/concept-v6-embedding-layer.md:273-296 calls the source of the `go-hamatter` vocabulary).
 
 ### go-mqtt
 - A zero-dependency MQTT client (client.go, session.go, publish.go, pump.go, breaker.go, adapter_tcp.go; protocol/ subpackage). No device model.
@@ -406,7 +406,7 @@ State legend :16-22. Rows with ◐/○ (awk over lines 120-144):
 - :139 "`packages/cli-tool`, `nodejs-shell` — interactive shells" — ○ Low: "`examples/reference-bridge` covers the "run it and pair it" need."
 - :140 "`packages/mqtt`, `react-native`, `nodejs-ws` — runtime bindings" — ○ **No**: "Host concerns. This module is a library; the host owns its own surfaces."
 - Row :128 "Behaviour layer: state, transactions, events, `Behavior.with(...)` mixins" is now ✅ (it was the ◐ the roadmap's "Done when" exempts as "the behaviour-layer idiom row").
-All other rows in those two sections are ✅. Concept v6 said the same in advance: docs/concept-v6-embedding-layer.md:61-64 ("Drei ◐ … das Behaviour-Idiom (bleibt per Roadmap), die generierten Cluster-Server (ADR 0013/0017) und Pluggable Storage (Phase 21)") and :229-235 (row 129 becomes ✅ after phase 20, row 130 stays ◐ until phase 21, row 128 stays per roadmap) — the roadmap status at docs/roadmap.md:216 does not say row 129 moved; the file as read still shows ◐ at :129.
+All other rows in those two sections are ✅. Concept v6 said the same in advance: docs/history/concept-v6-embedding-layer.md:61-64 ("Drei ◐ … das Behaviour-Idiom (bleibt per Roadmap), die generierten Cluster-Server (ADR 0013/0017) und Pluggable Storage (Phase 21)") and :229-235 (row 129 becomes ✅ after phase 20, row 130 stays ◐ until phase 21, row 128 stays per roadmap) — the roadmap status at docs/roadmap.md:216 does not say row 129 moved; the file as read still shows ◐ at :129.
 The comparison cites phase 21 by name only in the "Pluggable storage" row's neighbours: docs/guides/advanced-seams.md:105 and :207.
 
 ### 6.2 docs/roadmap.md, milestone 4
@@ -420,7 +420,7 @@ The comparison cites phase 21 by name only in the "Pluggable storage" row's neig
 - Consumer table rows: docs/roadmap.md:32 loom ("imports 32 packages of this module in its product code (45 with tests) at its `v0.6.0` pin"), :33 go-ha-matter-bridge ("not started; its concept is written when milestone 4 is due"), :34 the `go-*2mqtt` family via the shared adapter module ("working name `go-hamatter` … lives outside this module, so `contract/` stays stdlib-only"; "the same device kit; energy and appliance device types, …").
 - Roadmap :190-192: concept v6 holds "the drafts of the go-ha-matter-bridge and adapter-module concepts (Teil B/C) … the two drafts move to their own repositories in phase 22."
 
-### 6.3 docs/concept-v6-embedding-layer.md (376 lines, German)
+### 6.3 docs/history/concept-v6-embedding-layer.md (376 lines, German)
 
 Headings: :1 title; :21 "## 0. Entscheidungen des Owners (2026-10-20)"; :36 "## Teil A: Phase 20"; :38 A.1; :83 A.2; :117 A.3; :202 A.4; :229 A.5 "Vergleichstabelle und Roadmap"; :238 A.6 "Was Phase 20 nicht ist"; :248 "## Teil B: go-ha-matter-bridge (Entwurf)"; :273 "## Teil C: Das Adapter-Modul `go-hamatter` (Entwurf)"; :298 "## Teil D: Wellen"; :314 "## Teil E: Was sich an Grenzen ändert"; :328 "## Teil F: Risiken"; :349 "## Ergänzungen (Owner, 2026-10-20, nach dem Review des Konzepts)".
 Sentences naming phase 21 / 22 (grep `Phase 2[12]`): :27 (decision 0.3: "Phase 22 verschiebt sie in ihre Repositories."), :64 ("Pluggable Storage (Phase 21)"), :109 ("der Ring selbst ist Phase 21 („diagnostic event ring")"), :199 ("`until` (Phase 21: Session-Limits; der Extension-Hook ist ein Sicherheitspfad und mein Lesen)"), :233 ("Zeile 130 (Storage) bleibt ◐ bis Phase 21"), :243-244 ("Kein zweiter Store, keine Metriken, keine Limits (Phase 21); kein Container, kein Cookbook (Phase 22)."), :251 (Teil B moves "mit Phase 22 in das eigene Repository"), :277 (Teil C "Zieht mit Phase 22 um."), :288 (Teil C quotes the roadmap "a 2mqtt daemon exposes one device type end to end on the kit", Phase 22), :312 ("`v0.10.0` schließt Meilenstein 4 mit Phase 22." — superseded by :373-376, "Meilenstein 4 schließt mit `v0.11.0`"), :347 (Teil F: "ACL-Anwendung … bleiben mein Lesen (Phase 21 oder später)").
