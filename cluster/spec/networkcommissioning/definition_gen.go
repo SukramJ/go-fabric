@@ -608,6 +608,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Constraint:  spec.Constraint{Text: "max maxNetworks", Max: &spec.Bound{Ref: "maxNetworks"}},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrNetworks,
 		},
 		{

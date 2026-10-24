@@ -419,6 +419,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Quieter: true},
 			Constraint:  spec.Constraint{Text: "0 to numberOfMeasurementTypes", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Ref: "numberOfMeasurementTypes"}},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrRanges,
 		},
 		{

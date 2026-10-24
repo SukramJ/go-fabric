@@ -393,8 +393,8 @@ var ProgramStructDef = &spec.Struct{Name: "ProgramStruct", Fields: []spec.Field{
 	{ID: 4, Name: "Title", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 	{ID: 5, Name: "Subtitle", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 	{ID: 6, Name: "Description", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
-	{ID: 7, Name: "AudioLanguages", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 10[max 50]", Max: &spec.Bound{Int: 10}, Entry: &spec.Constraint{Text: "max 50", Max: &spec.Bound{Int: 50}}}},
-	{ID: 8, Name: "Ratings", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+	{ID: 7, Name: "AudioLanguages", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 10[max 50]", Max: &spec.Bound{Int: 10}, Entry: &spec.Constraint{Text: "max 50", Max: &spec.Bound{Int: 50}}}, Default: spec.EmptyListDefault{}},
+	{ID: 8, Name: "Ratings", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 	{ID: 9, Name: "ThumbnailUrl", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
 	{ID: 10, Name: "PosterArtUrl", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
 	{ID: 11, Name: "DvbiUrl", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
@@ -402,9 +402,9 @@ var ProgramStructDef = &spec.Struct{Name: "ProgramStruct", Fields: []spec.Field{
 	{ID: 13, Name: "ParentalGuidanceText", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 	{ID: 14, Name: "RecordingFlag", Type: spec.Type{Name: "RecordingFlagBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: RecordingFlagBitmapDef}, Conformance: spec.Conformance{Text: "RP", Op: spec.ConfName, Name: "RP"}},
 	{ID: 15, Name: "SeriesInfo", Type: spec.Type{Name: "SeriesInfoStruct", Kind: spec.KindStruct, Struct: SeriesInfoStructDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
-	{ID: 16, Name: "CategoryList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCategoryStruct", Kind: spec.KindStruct, Struct: ProgramCategoryStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
-	{ID: 17, Name: "CastList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCastStruct", Kind: spec.KindStruct, Struct: ProgramCastStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
-	{ID: 18, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+	{ID: 16, Name: "CategoryList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCategoryStruct", Kind: spec.KindStruct, Struct: ProgramCategoryStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
+	{ID: 17, Name: "CastList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCastStruct", Kind: spec.KindStruct, Struct: ProgramCastStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
+	{ID: 18, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 }}
 
 // RecordingFlagBitmap is the RecordingFlagBitmap map8.
@@ -782,6 +782,7 @@ var Definition = &spec.Cluster{
 			Type:        spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChannelInfoStruct", Kind: spec.KindStruct, Struct: ChannelInfoStructDef}}},
 			Conformance: spec.Conformance{Text: "CL", Op: spec.ConfName, Name: "CL"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrChannelList,
 		},
 		{
@@ -855,10 +856,10 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "StartTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "EndTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "ChannelList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChannelInfoStruct", Kind: spec.KindStruct, Struct: ChannelInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 2, Name: "ChannelList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChannelInfoStruct", Kind: spec.KindStruct, Struct: ChannelInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 				{ID: 3, Name: "PageToken", Type: spec.Type{Name: "PageTokenStruct", Kind: spec.KindStruct, Struct: PageTokenStructDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
 				{ID: 5, Name: "RecordingFlag", Type: spec.Type{Name: "RecordingFlagBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: RecordingFlagBitmapDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
-				{ID: 6, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 6, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 				{ID: 7, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeGetProgramGuideRequest,
@@ -869,7 +870,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
 				{ID: 0, Name: "Paging", Type: spec.Type{Name: "ChannelPagingStruct", Kind: spec.KindStruct, Struct: ChannelPagingStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "ProgramList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramStruct", Kind: spec.KindStruct, Struct: ProgramStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+				{ID: 1, Name: "ProgramList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramStruct", Kind: spec.KindStruct, Struct: ProgramStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Default: spec.EmptyListDefault{}},
 			},
 			Decode: decodeProgramGuideResponse,
 		},
@@ -881,7 +882,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "ProgramIdentifier", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 1, Name: "ShouldRecordSeries", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 				{ID: 3, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeRecordProgramRequest,
@@ -894,7 +895,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "ProgramIdentifier", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 1, Name: "ShouldRecordSeries", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}, Default: spec.EmptyListDefault{}},
 				{ID: 3, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeCancelRecordProgramRequest,

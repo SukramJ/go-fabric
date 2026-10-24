@@ -1455,8 +1455,9 @@ func referenceOf(raw json.RawMessage) string {
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
 // DefaultValue.ts:55-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
-// scale per type name is FieldValue.ts:227-256 numericValue). A unit the
-// type name does not scale, and every other field value, is not rendered.
+// scale per type name is FieldValue.ts:227-256 numericValue); the empty
+// list as spec.EmptyListDefault. A unit the type name does not scale, and
+// every other field value or list, is not rendered.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
@@ -1474,6 +1475,10 @@ func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 		return "float64(" + strconv.FormatFloat(x, 'g', -1, 64) + ")"
 	case string:
 		return strconv.Quote(x)
+	case []any:
+		if len(x) == 0 {
+			return "spec.EmptyListDefault{}"
+		}
 	case map[string]any:
 		if n, ok := encodedUnit(x, typeName, metatype); ok {
 			return "float64(" + strconv.FormatFloat(n, 'g', -1, 64) + ")"

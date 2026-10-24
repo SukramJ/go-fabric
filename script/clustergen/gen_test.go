@@ -191,6 +191,8 @@ func TestLiterals(t *testing.T) {
 		{`{"type":"percent","value":50}`, "percent", "float64(50)"},
 		{`{"type":"celsius","value":26}`, "int16", ""},
 		{`{"type":"bytes","value":"00"}`, "octstr", ""},
+		{`[]`, "list", "spec.EmptyListDefault{}"},
+		{`[1]`, "list", ""},
 	} {
 		if got := defaultLiteral(raw(c.in), c.typ, "integer"); got != c.want {
 			t.Errorf("defaultLiteral(%s, %s) = %q, want %q", c.in, c.typ, got, c.want)

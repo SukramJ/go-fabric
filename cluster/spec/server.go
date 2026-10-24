@@ -375,7 +375,18 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 // check holds a device-side value to the served attribute's type and
 // constraint — the checks of [Instance.CheckValue], list length and list
 // entries and struct fields included — and returns it in its stored form.
+//
+// The value is first patched with the defaults the feature selection
+// makes storage hold ([Instance.PatchDefaults]), as matter.js patches a
+// behavior's state over its defaults before it validates it.
 func (s *Server) check(attrID uint32, value any) (any, error) {
+	if s.Serves(attrID) {
+		patched, err := s.PatchDefaults(attrID, value)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
+		}
+		value = patched
+	}
 	return s.CheckSet(attrID, value, s.peers)
 }
 
@@ -403,9 +414,12 @@ func (i *Instance) CheckSet(attrID uint32, value any, peers Peers) (any, error) 
 // (script/clustergen/gen.go defaultLiteral); one it does not render (a
 // list, an object) or one that does not fit the attribute's kind leaves
 // the attribute without a value.
-func defaultValue(a *Attribute) (any, bool) {
-	t := a.Type
-	switch d := a.Default.(type) {
+func defaultValue(a *Attribute) (any, bool) { return defaultOf(a.Type, a.Default) }
+
+// defaultOf is the stated default d of an element of type t in its stored
+// form ([defaultValue]); false for a default it does not render.
+func defaultOf(t Type, d any) (any, bool) {
+	switch d := d.(type) {
 	case NullDefault:
 		return nil, true
 	case float64:

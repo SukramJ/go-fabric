@@ -205,7 +205,7 @@ var LogicalSceneTableDef = &spec.Struct{Name: "LogicalSceneTable", Fields: []spe
 	{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
 	{ID: 2, Name: "SceneName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "SN", Op: spec.ConfName, Name: "SN"}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 	{ID: 3, Name: "SceneTransitionTime", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 60000000", Max: &spec.Bound{Int: 60000000}}, Default: float64(0)},
-	{ID: 4, Name: "ExtensionFields", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ExtensionFieldSetStruct", Kind: spec.KindStruct, Struct: ExtensionFieldSetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 4, Name: "ExtensionFields", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ExtensionFieldSetStruct", Kind: spec.KindStruct, Struct: ExtensionFieldSetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Default: spec.EmptyListDefault{}},
 }}
 
 // SceneInfoStruct is the SceneInfoStruct struct.
