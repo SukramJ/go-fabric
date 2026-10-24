@@ -96,6 +96,9 @@ func TestTypedServer(t *testing.T) {
 		t.Errorf("PriceForecast is stored as %T, want its spec.List", values[AttrPriceForecast])
 	}
 	s.OnChanged(func(State, contract.Change) {})()
+	if s.MarkChanged() == nil {
+		t.Error("MarkChanged without an attribute reported")
+	}
 	s.OnChangedAsync(func(State, contract.Change) { t.Error("OnChangedAsync without a queue delivered") })()
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
