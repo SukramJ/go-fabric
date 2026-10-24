@@ -86,18 +86,26 @@ func isExcluded(pkg string) bool {
 }
 
 // unreleased returns the text of the Changed, Removed and Deprecated
-// sections of [Unreleased] in a Keep-a-Changelog file.
-func unreleased(changelog string) string {
+// sections of every release newer than base in a Keep-a-Changelog file:
+// [Unreleased] and the sections above base's own. A release pull request
+// has already renamed [Unreleased] to the version it cuts while the tag
+// is still the previous one, and its lines announce the break just the
+// same; base is the tag's name (v0.10.3), the heading its version.
+func unreleased(changelog, base string) string {
 	_, rest, ok := strings.Cut(changelog, "## [Unreleased]")
 	if !ok {
 		return ""
 	}
-	if i := strings.Index(rest, "\n## "); i >= 0 {
+	if i := strings.Index(rest, "\n## ["+strings.TrimPrefix(base, "v")+"]"); i >= 0 {
 		rest = rest[:i]
 	}
 	var b strings.Builder
 	keep := false
 	for _, line := range strings.Split(rest, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			keep = false // a newer release's heading: its sections decide again
+			continue
+		}
 		if strings.HasPrefix(line, "### ") {
 			h := strings.TrimSpace(strings.TrimPrefix(line, "### "))
 			keep = h == "Changed" || h == "Removed" || h == "Deprecated"

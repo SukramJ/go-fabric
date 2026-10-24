@@ -12,15 +12,6 @@ pseudo-version of `main`.
 
 ### Added
 
-- The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
-  - OTA: `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob`, the consent states `node.OTAConsentGranted`, `OTAConsentDenied`, `OTAConsentObtaining` and `OTAConsentUnknown`, and the image file format `node.CreateOTAImage`, `node.OTAImageOptions`, `node.ReadOTAImage` and `node.OTAImageHeader`.
-  - The ledger's software versions: `node.NewDCLClient`, `node.DCLProductionURL`, `node.DCLTestNetURL`, `node.DCLOTAVersions`, `node.DCLSoftwareVersion` and `node.VerifyOTAImage`.
-  - Aggregator Actions: `node.NewActions`, `node.Actions`, `node.ActionsConfig`, `node.ActionsHost` and `node.ActionRequest`.
-  - EcosystemInformation: `node.NewEcosystemInformation`, `node.EcosystemInformation` and `node.EcosystemDirectory`.
-  - The root servers a host drives after Start: `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer` and `node.PowerSourceConfigurationServer`.
-  - Each is an alias of the lower package's type, or a one-line function over it.
-- `device.FixedLabel(labels...)`: the FixedLabel cluster, which the Base device type allows on every endpoint, declared with its labels.
-- `contentcontroldef.Declare{ContentControl: port}` (BU-b Left out): ContentControl by declaration, on the generated port `contentcontroldef.ContentControl` and its feature interfaces, run by the kit's `cluster/media` server.
 - The persistence port (phase 21a, concept v7 A.2): `store.Port`, the sum of one interface per area named after the Matter concept — `store.Fabrics`, `Identity`, `ACL`, `GroupKeys`, `Groups`, `Resumption`, `ServerSubscriptions`, `Settings`, `OTA`, `ThermostatPresets` and `DoorLocks` — with the methods the module's consumers call. `*store.Store` implements every one; `groups.Store` embeds `store.Groups`.
 - `store/memstore`: the second implementation, in memory (one mutex, copies on read and write, the fabric cascade and the fabric-index counter of the SQLite schema). For tests and for a daemon that accepts losing its state on restart.
 - `endpoint/memstore`: an in-memory `endpoint.Store` with `endpoint/sqlitestore`'s allocation rules, the pairing for `store/memstore`.
@@ -30,16 +21,34 @@ pseudo-version of `main`.
 
 ### Changed
 
-- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
-- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
-- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
-- **Break:** `node.Config.Store.Credentials` is a `store.Port` instead of a `*store.Store`, and `Node.Store()` and `fabrictest.Device.Store()` return `store.Port`. `store.New(db)` is still accepted; a host that type-asserted or passed the result as `*store.Store` keeps its own `*store.Store` instead. `Store.Path` and `Store.DB` are unchanged. Migration guide, the persistence port in v0.10.4.
+- **Break:** `node.Config.Store.Credentials` is a `store.Port` instead of a `*store.Store`, and `Node.Store()` and `fabrictest.Device.Store()` return `store.Port`. `store.New(db)` is still accepted; a host that type-asserted or passed the result as `*store.Store` keeps its own `*store.Store` instead. `Store.Path` and `Store.DB` are unchanged. Migration guide, the persistence port in v0.10.5.
 - `node.NewEndpointPersistence` takes a `store.Settings`; a `*store.Store` still fits.
 - fabrictest devices run on `store/memstore` and `endpoint/memstore` by default; state still survives `Device.Restart`. `Options.StoreOnDisk` restores the SQLite file.
 
 ### Removed
 
 - `store.Store.ThermostatPresets(key)`: `store.NewThermostatPresetStore(st, key)` replaces it for any implementation of the port.
+
+## [0.10.4] — 2026-10-24
+
+### Added
+
+- The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
+  - OTA: `node.OTAImage`, `node.OTAFileDesignator`, `node.OTABlob`, the consent states `node.OTAConsentGranted`, `OTAConsentDenied`, `OTAConsentObtaining` and `OTAConsentUnknown`, and the image file format `node.CreateOTAImage`, `node.OTAImageOptions`, `node.ReadOTAImage` and `node.OTAImageHeader`.
+  - The ledger's software versions: `node.NewDCLClient`, `node.DCLProductionURL`, `node.DCLTestNetURL`, `node.DCLOTAVersions`, `node.DCLSoftwareVersion` and `node.VerifyOTAImage`.
+  - Aggregator Actions: `node.NewActions`, `node.Actions`, `node.ActionsConfig`, `node.ActionsHost` and `node.ActionRequest`.
+  - EcosystemInformation: `node.NewEcosystemInformation`, `node.EcosystemInformation` and `node.EcosystemDirectory`.
+  - The root servers a host drives after Start: `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer` and `node.PowerSourceConfigurationServer`.
+  - Each is an alias of the lower package's type, or a one-line function over it.
+- `device.FixedLabel(labels...)`: the FixedLabel cluster, which the Base device type allows on every endpoint, declared with its labels.
+- `contentcontroldef.Declare{ContentControl: port}` (BU-b Left out): ContentControl by declaration, on the generated port `contentcontroldef.ContentControl` and its feature interfaces, run by the kit's `cluster/media` server.
+
+### Changed
+
+- A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
+- `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
+
+- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change. It also accepts an announcement under a release section newer than the last tag, the state of a release pull request before its tag.
 
 ## [0.10.3] — 2026-10-23
 

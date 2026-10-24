@@ -3958,3 +3958,19 @@ still refused with CONSTRAINT_ERROR by the definition — and a bridge
 with a long device name must not fail to assemble over its label (an
 older rule, made uniform by brief BV-b1; issue 239).
 
+### BD-Matter-PowerSource-OwnEndpointList — a declared PowerSource names its own endpoint in EndpointList
+
+`EndpointList` is mandatory (`conformance: "M"`,
+`packages/model/src/standard/elements/power-source-cluster.element.ts:130`
+at `862ad75f`), and matter.js's `PowerSourceServer.initialize` sets no
+value for it — it defaults Status, Description, BatChargeLevel,
+BatReplaceability and WiredCurrentType and leaves the list to the
+application (`packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63`).
+The device kit answers a declared PowerSource's EndpointList with the
+device's own endpoint number once the node assembled it, empty before,
+unless the declaration's `Initial` names the list
+(`device/device.go`, `ownEndpointList`). Reasoning: a bridged device's
+power source feeds its own endpoint in every composition the kit
+builds, and the kit already fills the list this way for the
+measurement-projected server (`cluster/measurement`, `SetEndpoint`); a
+host with another topology declares it (brief BV-b).

@@ -59,7 +59,7 @@ one-line function over it.
 | `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
 | a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
 
-## The persistence port in v0.10.4
+## The persistence port in v0.10.5
 
 The node takes a port instead of SQLite's type (`docs/guides/persistence.md`,
 the persistence port). A host that sets `Store.Path` or `Store.DB` changes
