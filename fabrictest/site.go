@@ -282,9 +282,9 @@ func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil, s.wa
 // ([clocktest.Fake.Advance]) — and waits until the site is quiet again. A
 // test that drives the clock by hand steps it with Step, never with
 // [Site.Fake]().Advance while the stack may be working: the clock would
-// move under a host still handling a message. It is matter.js's
-// `await MockTime.advance(ms)` (packages/testing/src/mocks/time.ts:638-663
-// at 862ad75f) between two waits for the task queue to drain. Without a
+// move under a host still handling a message. It is matter.js's mock
+// clock `advance(ms)`, awaited (packages/testing/src/mocks/time.ts:638-663
+// at 862ad75f), between two waits for the task queue to drain. Without a
 // fake clock it fails.
 func (s *Site) Step(ctx context.Context, d time.Duration) error {
 	if s.fake == nil {

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6382,
+  "entry_points": 6392,
   "entry_packages": [
     ".",
     "bdx",
@@ -198,6 +198,7 @@
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
+    "internal/inflight",
     "internal/paritytest",
     "internal/serialqueue",
     "mdns",
@@ -237,8 +238,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14656,
-    "reachable": 10197,
+    "total_exported": 14670,
+    "reachable": 10211,
     "whitelisted": 4456,
     "unreachable": 3
   },
