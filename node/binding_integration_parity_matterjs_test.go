@@ -248,7 +248,7 @@ func TestBindingIntegrationGroupSendsParityMatterJS(t *testing.T) {
 		}
 		found := false
 		for _, rec := range b.log.records() {
-			if rec.msg == "matter.groups.invoke" && rec.attrs["group"] == "5" && rec.attrs["dest"] != "" &&
+			if rec.msg == "matter.groups.invoke" && rec.attrs["group_id"] == "5" && rec.attrs["address"] != "" &&
 				rec.attrs["cluster"] == "OnOff" && rec.attrs["command"] == "0x01" {
 				found = true
 			}

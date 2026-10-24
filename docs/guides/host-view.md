@@ -127,7 +127,7 @@ func run(ctx context.Context) error {
 	b.light.Rename(ctx, "Kitchen ceiling")
 	b.door.SetReachable(ctx, true)
 	if err := b.doorMoved(false); err != nil {
-		slog.Warn("door", slog.String("err", err.Error()))
+		slog.Warn("door", slog.Any("err", err))
 	}
 	if qr, manual, err := n.PairingCodes(); err == nil {
 		fmt.Printf("QR code: %s\nManual code: %s\n", qr, manual)

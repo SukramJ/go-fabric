@@ -55,7 +55,7 @@ one-line function over it.
 | `mattercore.NewActions`, `ActionsConfig`, `ActionsHost`, `ActionRequest` | `node.NewActions`, `node.ActionsConfig`, `node.ActionsHost`, `node.ActionRequest` |
 | `mattercore.EcosystemDirectory`, `NewEcosystemInformation` | `node.EcosystemDirectory`, `node.NewEcosystemInformation` |
 | `*mattercore.BasicInformation`, `*mattercore.OTASoftwareUpdateRequestor`, `*mattercore.WiFiNetworkDiagnostics`, `*mattercore.PowerSourceConfiguration` (`Node.Root()`'s fields) | `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer`, `node.PowerSourceConfigurationServer` |
-| `mattercore.NewFixedLabel(labels)` with `fixedlabeldef.Declare{HostServer: …}` | `device.FixedLabel(labels...)` |
+| `mattercore.NewFixedLabel(labels)` with `fixedlabeldef.Declare{HostServer: …}` | `device.FixedLabel(labels...)` (removed in v0.10.5: the declaration below) |
 | `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
 | a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
 
@@ -72,6 +72,16 @@ nothing.
 | `fabrictest.Device.Store()` returning `*store.Store` | `store.Port` |
 | `(*store.Store).ThermostatPresets(key)` | `store.NewThermostatPresetStore(st, key)` over any `store.ThermostatPresets` (removed) |
 | a fabrictest device on a SQLite file | in memory by default; `fabrictest.Options{StoreOnDisk: true}` keeps the file |
+
+Observability and the Base device type's clusters in the same release
+([Observability](observability.md)):
+
+| Before | Now |
+| --- | --- |
+| `device.FixedLabel(labels...)` | `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` on any device type (removed); `userlabeldef.Declare{}` mounts UserLabel the same way |
+| `diagevent.Event` imported for the node's trace, read through `Node.Bridge().DiagnosticEvents()` | `node.DiagnosticEvent` and `Node.DiagnosticEvents()`; `Node.OnDiagnosticEvent` and `OnDiagnosticEventAsync` observe it |
+| a log query on `session`, `exchange`, `fabric`, `subscription`, `group`, `peer_node`, `endpoint_id`, or an `err` holding the error's text | the keys of the observability guide's table: `session_id`, `exchange_id`, `fabric_index`, `subscription_id`, `group_id`, `node_id`, `endpoint`; `err` holds the error value |
+| a nil logger on a `client/*` component (handshake, exchange, interaction, peer) discarded its lines | it is `slog.Default()`, as everywhere else in the module; pass `slog.New(slog.DiscardHandler)` to keep it quiet |
 
 ## The controller side in v0.10.3
 
