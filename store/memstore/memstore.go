@@ -216,7 +216,10 @@ func (s *Store) GetFabric(_ context.Context, fabricIndex uint8) (store.FabricRec
 func (s *Store) ListFabrics(_ context.Context) ([]store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []store.FabricRecord
+	if len(s.fabrics) == 0 {
+		return nil, nil
+	}
+	out := make([]store.FabricRecord, 0, len(s.fabrics))
 	for _, idx := range sortedKeys(s.fabrics) {
 		out = append(out, cloneFabric(s.fabrics[idx]))
 	}
@@ -307,7 +310,10 @@ func (s *Store) GetIdentity(_ context.Context, fabricIndex uint8) (store.Identit
 func (s *Store) ListACL(_ context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []store.ACLEntry
+	if len(s.acl[fabricIndex]) == 0 {
+		return nil, nil
+	}
+	out := make([]store.ACLEntry, 0, len(s.acl[fabricIndex]))
 	for _, e := range s.acl[fabricIndex] {
 		out = append(out, cloneACLEntry(e))
 	}
@@ -608,7 +614,10 @@ func (s *Store) LoadServerSubscriptions(_ context.Context) ([][]byte, error) {
 		rows = append(rows, sub)
 	}
 	slices.SortFunc(rows, func(a, b subscription) int { return cmp.Compare(a.seq, b.seq) })
-	var out [][]byte
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	out := make([][]byte, 0, len(rows))
 	for _, sub := range rows {
 		out = append(out, bytes.Clone(sub.payload))
 	}
@@ -626,7 +635,7 @@ func (s *Store) ClearServerSubscriptions(_ context.Context) error {
 // --- Settings ---
 
 // GetSetting implements [store.Settings].
-func (s *Store) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (s *Store) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.settings[key]
@@ -642,7 +651,7 @@ func (s *Store) SetSetting(_ context.Context, key, value string) error {
 }
 
 // GetMetadataCounter implements [store.Settings].
-func (s *Store) GetMetadataCounter(_ context.Context, key string) (uint64, bool, error) {
+func (s *Store) GetMetadataCounter(_ context.Context, key string) (value uint64, ok bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.metadata[key]
@@ -694,7 +703,7 @@ func (s *Store) ReplaceDefaultOTAProviders(_ context.Context, fabricIndex uint8,
 
 // LoadOTARequestorState implements [store.OTA]; the state is a setting, as
 // in SQLite.
-func (s *Store) LoadOTARequestorState(ctx context.Context) ([]byte, bool, error) {
+func (s *Store) LoadOTARequestorState(ctx context.Context) (state []byte, ok bool, err error) {
 	v, ok, err := s.GetSetting(ctx, otaRequestorStateKey)
 	if err != nil || !ok {
 		return nil, ok, err

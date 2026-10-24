@@ -292,6 +292,7 @@ func TestDeviceRestart(t *testing.T) {
 }
 
 func testDeviceRestart(t *testing.T, opts fabrictest.Options) {
+	t.Helper()
 	_, p, _, ep := pairWithPlug(t, opts)
 	ctx := testContext(t)
 	if err := p.Device.Restart(ctx); err != nil {

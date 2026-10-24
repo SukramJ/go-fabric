@@ -17,6 +17,8 @@
 // fabric cascade, the forward-only fabric-index counter, the refusal of rows
 // for an unknown fabric, copies on read and write, and safety under
 // concurrent use. They do not check SQLite's encodings or timestamps.
+//
+//nolint:thelper // each case is a test body that Run runs as a subtest, not a helper: its failures belong to its own lines
 package storetest
 
 import (
@@ -25,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -41,14 +44,14 @@ func Run(t *testing.T, open Open) {
 	t.Helper()
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			c.run(t, context.Background(), open(t))
+			c.run(context.Background(), t, open(t))
 		})
 	}
 }
 
 type testCase struct {
 	name string
-	run  func(t *testing.T, ctx context.Context, p store.Port)
+	run  func(ctx context.Context, t *testing.T, p store.Port)
 }
 
 var cases = []testCase{
@@ -94,7 +97,7 @@ func fabric(n byte) store.FabricRecord {
 	}
 }
 
-func addFabric(t *testing.T, ctx context.Context, p store.Port, n byte) uint8 {
+func addFabric(ctx context.Context, t *testing.T, p store.Port, n byte) uint8 {
 	t.Helper()
 	idx, err := p.AddFabric(ctx, fabric(n))
 	if err != nil {
@@ -117,14 +120,14 @@ func wantEqual(t *testing.T, what string, got, want any) {
 	}
 }
 
-func fabricsRoundTrip(t *testing.T, ctx context.Context, p store.Port) {
+func fabricsRoundTrip(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err := p.ListFabrics(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("ListFabrics on an empty store = %v, %v", got, err)
 	}
-	if idx := addFabric(t, ctx, p, 1); idx != 1 {
+	if idx := addFabric(ctx, t, p, 1); idx != 1 {
 		t.Fatalf("first fabric index = %d, want 1", idx)
 	}
-	if idx := addFabric(t, ctx, p, 2); idx != 2 {
+	if idx := addFabric(ctx, t, p, 2); idx != 2 {
 		t.Fatalf("second fabric index = %d, want 2", idx)
 	}
 	want := fabric(1)
@@ -156,7 +159,7 @@ func fabricsRoundTrip(t *testing.T, ctx context.Context, p store.Port) {
 	}
 }
 
-func fabricsNotFound(t *testing.T, ctx context.Context, p store.Port) {
+func fabricsNotFound(ctx context.Context, t *testing.T, p store.Port) {
 	for name, err := range map[string]error{
 		"GetFabric":            func() error { _, err := p.GetFabric(ctx, 7); return err }(),
 		"UpdateFabricLabel":    p.UpdateFabricLabel(ctx, 7, "x"),
@@ -173,16 +176,16 @@ func fabricsNotFound(t *testing.T, ctx context.Context, p store.Port) {
 // fabricsCounterDoesNotReuse is matter.js FabricManager #nextFabricIndex
 // (FabricManager.ts:178-179): a removed index is not handed out again until
 // the counter wraps.
-func fabricsCounterDoesNotReuse(t *testing.T, ctx context.Context, p store.Port) {
-	addFabric(t, ctx, p, 1)
-	second := addFabric(t, ctx, p, 2)
+func fabricsCounterDoesNotReuse(ctx context.Context, t *testing.T, p store.Port) {
+	addFabric(ctx, t, p, 1)
+	second := addFabric(ctx, t, p, 2)
 	must(t, p.RemoveFabric(ctx, second))
-	if idx := addFabric(t, ctx, p, 3); idx != 3 {
+	if idx := addFabric(ctx, t, p, 3); idx != 3 {
 		t.Fatalf("index after removing %d = %d, want 3", second, idx)
 	}
 }
 
-func fabricsExplicitIndex(t *testing.T, ctx context.Context, p store.Port) {
+func fabricsExplicitIndex(ctx context.Context, t *testing.T, p store.Port) {
 	rec := fabric(1)
 	rec.FabricIndex = 9
 	idx, err := p.AddFabric(ctx, rec)
@@ -199,14 +202,14 @@ func fabricsExplicitIndex(t *testing.T, ctx context.Context, p store.Port) {
 		t.Fatal("AddFabric(index 255) succeeded")
 	}
 	// An explicit index does not move the counter.
-	if idx := addFabric(t, ctx, p, 3); idx != 1 {
+	if idx := addFabric(ctx, t, p, 3); idx != 1 {
 		t.Fatalf("auto index after an explicit 9 = %d, want 1", idx)
 	}
 }
 
-func fabricsExhaustedAndWrap(t *testing.T, ctx context.Context, p store.Port) {
+func fabricsExhaustedAndWrap(ctx context.Context, t *testing.T, p store.Port) {
 	for i := 1; i <= 254; i++ {
-		if idx := addFabric(t, ctx, p, byte(i)); int(idx) != i {
+		if idx := addFabric(ctx, t, p, byte(i)); int(idx) != i {
 			t.Fatalf("fabric %d took index %d", i, idx)
 		}
 	}
@@ -214,20 +217,20 @@ func fabricsExhaustedAndWrap(t *testing.T, ctx context.Context, p store.Port) {
 		t.Fatalf("AddFabric on a full table = %v, want ErrFabricExhausted", err)
 	}
 	must(t, p.RemoveFabric(ctx, 5))
-	if idx := addFabric(t, ctx, p, 0); idx != 5 {
+	if idx := addFabric(ctx, t, p, 0); idx != 5 {
 		t.Fatalf("index after the wrap = %d, want the free 5", idx)
 	}
 }
 
-func fabricsDuplicate(t *testing.T, ctx context.Context, p store.Port) {
-	addFabric(t, ctx, p, 1)
+func fabricsDuplicate(ctx context.Context, t *testing.T, p store.Port) {
+	addFabric(ctx, t, p, 1)
 	if _, err := p.AddFabric(ctx, fabric(1)); err == nil {
 		t.Fatal("AddFabric of the same FabricID under the same root succeeded")
 	}
 }
 
-func identityCase(t *testing.T, ctx context.Context, p store.Port) {
-	idx := addFabric(t, ctx, p, 1)
+func identityCase(ctx context.Context, t *testing.T, p store.Port) {
+	idx := addFabric(ctx, t, p, 1)
 	if _, err := p.GetIdentity(ctx, idx); !errors.Is(err, store.ErrIdentityNotFound) {
 		t.Fatalf("GetIdentity before an upsert = %v, want ErrIdentityNotFound", err)
 	}
@@ -250,9 +253,9 @@ func identityCase(t *testing.T, ctx context.Context, p store.Port) {
 func u32(v uint32) *uint32 { return &v }
 func u16(v uint16) *uint16 { return &v }
 
-func aclCase(t *testing.T, ctx context.Context, p store.Port) {
-	one := addFabric(t, ctx, p, 1)
-	two := addFabric(t, ctx, p, 2)
+func aclCase(ctx context.Context, t *testing.T, p store.Port) {
+	one := addFabric(ctx, t, p, 1)
+	two := addFabric(ctx, t, p, 2)
 	entries := []store.ACLEntry{
 		{Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE, Subjects: []uint64{0x1122}, Position: 40},
 		{
@@ -296,12 +299,12 @@ func aclCase(t *testing.T, ctx context.Context, p store.Port) {
 func keySet(fabric uint8, id uint16) store.GroupKeySet {
 	return store.GroupKeySet{
 		FabricIndex: fabric, GroupKeySetID: id, SecurityPolicy: store.SecurityPolicyTrustFirst,
-		EpochKey0: bytes.Repeat([]byte{byte(id)}, 16), EpochStart0: 100 + uint64(id),
+		EpochKey0: bytes.Repeat([]byte{byte(id)}, 16), EpochStart0: 100 + uint64(id), //nolint:gosec // the key bytes only need to differ per id
 	}
 }
 
-func groupKeysCase(t *testing.T, ctx context.Context, p store.Port) {
-	f := addFabric(t, ctx, p, 1)
+func groupKeysCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
 	if _, err := p.GetGroupKeySet(ctx, f, 1); !errors.Is(err, store.ErrGroupKeySetNotFound) {
 		t.Fatalf("GetGroupKeySet on a missing set = %v, want ErrGroupKeySetNotFound", err)
 	}
@@ -376,16 +379,16 @@ func groupKeysCase(t *testing.T, ctx context.Context, p store.Port) {
 
 // groupKeysOrdering is the order ListGroupKeySets promises: by
 // GroupKeySetID ascending, whatever the order of the writes.
-func groupKeysOrdering(t *testing.T, ctx context.Context, p store.Port) {
-	f := addFabric(t, ctx, p, 1)
-	other := addFabric(t, ctx, p, 2)
+func groupKeysOrdering(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
+	other := addFabric(ctx, t, p, 2)
 	for _, id := range []uint16{3, 0, 0xFFFF, 1} {
 		must(t, p.UpsertGroupKeySet(ctx, keySet(f, id)))
 	}
 	must(t, p.UpsertGroupKeySet(ctx, keySet(other, 2)))
 	sets, err := p.ListGroupKeySets(ctx, f)
 	must(t, err)
-	var ids []uint16
+	ids := make([]uint16, 0, len(sets))
 	for _, s := range sets {
 		if s.FabricIndex != f {
 			t.Fatalf("ListGroupKeySets(%d) returned fabric %d's set", f, s.FabricIndex)
@@ -395,8 +398,8 @@ func groupKeysOrdering(t *testing.T, ctx context.Context, p store.Port) {
 	wantEqual(t, "ListGroupKeySets order", ids, []uint16{0, 1, 3, 0xFFFF})
 }
 
-func groupsCase(t *testing.T, ctx context.Context, p store.Port) {
-	f := addFabric(t, ctx, p, 1)
+func groupsCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
 	if err := p.UpsertGroupTableEntry(ctx, store.GroupTableEntry{FabricIndex: f, GroupID: 1}); err == nil {
 		t.Fatal("UpsertGroupTableEntry without endpoints succeeded")
 	}
@@ -434,8 +437,8 @@ func resumptionRec(fabric uint8, peer uint64, id byte) store.ResumptionRecord {
 	}
 }
 
-func resumptionCase(t *testing.T, ctx context.Context, p store.Port) {
-	f := addFabric(t, ctx, p, 1)
+func resumptionCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
 	if _, err := p.GetResumptionByPeer(ctx, f, 5); !errors.Is(err, store.ErrResumptionNotFound) {
 		t.Fatalf("GetResumptionByPeer on a miss = %v, want ErrResumptionNotFound", err)
 	}
@@ -492,7 +495,7 @@ func resumptionCase(t *testing.T, ctx context.Context, p store.Port) {
 // subscriptions in (ADR 0008): the least recently saved first. Rows saved
 // within one tick of a store's clock are ordered by subscription id, so the
 // case saves them in id order.
-func serverSubscriptionsCase(t *testing.T, ctx context.Context, p store.Port) {
+func serverSubscriptionsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if got, err := p.LoadServerSubscriptions(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("LoadServerSubscriptions on an empty store = %v, %v", got, err)
 	}
@@ -517,7 +520,7 @@ func serverSubscriptionsCase(t *testing.T, ctx context.Context, p store.Port) {
 	}
 }
 
-func settingsCase(t *testing.T, ctx context.Context, p store.Port) {
+func settingsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if v, ok, err := p.GetSetting(ctx, store.SettingNodeLabel); err != nil || ok || v != "" {
 		t.Fatalf("GetSetting on a missing key = %q, %v, %v", v, ok, err)
 	}
@@ -547,9 +550,9 @@ func settingsCase(t *testing.T, ctx context.Context, p store.Port) {
 	}
 }
 
-func otaCase(t *testing.T, ctx context.Context, p store.Port) {
-	one := addFabric(t, ctx, p, 1)
-	two := addFabric(t, ctx, p, 2)
+func otaCase(ctx context.Context, t *testing.T, p store.Port) {
+	one := addFabric(ctx, t, p, 1)
+	two := addFabric(ctx, t, p, 2)
 	if got, err := p.ListDefaultOTAProviders(ctx); err != nil || len(got) != 0 {
 		t.Fatalf("ListDefaultOTAProviders on an empty store = %v, %v", got, err)
 	}
@@ -580,7 +583,7 @@ func otaCase(t *testing.T, ctx context.Context, p store.Port) {
 	}
 }
 
-func presetsCase(t *testing.T, ctx context.Context, p store.Port) {
+func presetsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if pr, act, ok, err := p.LoadThermostatPresets(ctx, "t1"); err != nil || ok || pr != nil || act != nil {
 		t.Fatalf("LoadThermostatPresets before a save = %v, %v, %v, %v", pr, act, ok, err)
 	}
@@ -606,7 +609,7 @@ func presetsCase(t *testing.T, ctx context.Context, p store.Port) {
 	}
 }
 
-func doorLocksCase(t *testing.T, ctx context.Context, p store.Port) {
+func doorLocksCase(ctx context.Context, t *testing.T, p store.Port) {
 	if auth, saved, err := p.LoadDoorLockAuth(ctx, "lock"); err != nil || saved || !reflect.DeepEqual(auth, store.DoorLockAuth{}) {
 		t.Fatalf("LoadDoorLockAuth before a save = %+v, %v, %v", auth, saved, err)
 	}
@@ -673,7 +676,7 @@ func doorLocksCase(t *testing.T, ctx context.Context, p store.Port) {
 }
 
 // unknownFabricRefused is the foreign key of every fabric-owned row.
-func unknownFabricRefused(t *testing.T, ctx context.Context, p store.Port) {
+func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 	const missing = 42
 	for name, err := range map[string]error{
 		"UpsertIdentity":             p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: missing, NOC: []byte{1}, PrivateKey: []byte{2}, IPK: []byte{3}}),
@@ -697,9 +700,9 @@ func unknownFabricRefused(t *testing.T, ctx context.Context, p store.Port) {
 // fabricCascade is the removal of a fabric: everything it owns goes, the
 // other fabric's rows and the rows no fabric owns stay. matter.js clears the
 // fabric's StorageContext (FabricManager.ts:262-271).
-func fabricCascade(t *testing.T, ctx context.Context, p store.Port) {
-	one := addFabric(t, ctx, p, 1)
-	two := addFabric(t, ctx, p, 2)
+func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
+	one := addFabric(ctx, t, p, 1)
+	two := addFabric(ctx, t, p, 2)
 	for _, f := range []uint8{one, two} {
 		must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
 		must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
@@ -769,7 +772,7 @@ func fabricCascade(t *testing.T, ctx context.Context, p store.Port) {
 
 // copiesCase: a caller that mutates what it wrote or what it read does not
 // change the store.
-func copiesCase(t *testing.T, ctx context.Context, p store.Port) {
+func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	rec := fabric(1)
 	idx, err := p.AddFabric(ctx, rec)
 	must(t, err)
@@ -844,8 +847,8 @@ func copiesCase(t *testing.T, ctx context.Context, p store.Port) {
 
 // concurrentCase runs writers and readers of several areas at once; under
 // the race detector it is the check that the implementation synchronises.
-func concurrentCase(t *testing.T, ctx context.Context, p store.Port) {
-	fabrics := []uint8{addFabric(t, ctx, p, 1), addFabric(t, ctx, p, 2), addFabric(t, ctx, p, 3), addFabric(t, ctx, p, 4)}
+func concurrentCase(ctx context.Context, t *testing.T, p store.Port) {
+	fabrics := []uint8{addFabric(ctx, t, p, 1), addFabric(ctx, t, p, 2), addFabric(ctx, t, p, 3), addFabric(ctx, t, p, 4)}
 	var wg sync.WaitGroup
 	errs := make(chan error, 64)
 	for i, f := range fabrics {
@@ -854,7 +857,7 @@ func concurrentCase(t *testing.T, ctx context.Context, p store.Port) {
 			defer wg.Done()
 			for j := range 10 {
 				key := fmt.Sprintf("k%d", i)
-				if err := p.SetSetting(ctx, key, fmt.Sprint(j)); err != nil {
+				if err := p.SetSetting(ctx, key, strconv.Itoa(j)); err != nil {
 					errs <- err
 					return
 				}
@@ -904,8 +907,8 @@ func concurrentCase(t *testing.T, ctx context.Context, p store.Port) {
 // entry's privilege and auth mode outside their enums, one resumption id
 // for two peers, and every door-lock record index used twice. A refused
 // write changes nothing.
-func constraintsCase(t *testing.T, ctx context.Context, p store.Port) {
-	f := addFabric(t, ctx, p, 1)
+func constraintsCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
 	for _, e := range []store.ACLEntry{
 		{Privilege: 0, AuthMode: store.AuthModeCASE},
 		{Privilege: 6, AuthMode: store.AuthModeCASE},

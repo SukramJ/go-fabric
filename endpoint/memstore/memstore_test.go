@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -102,7 +103,7 @@ func TestExplicitNumber(t *testing.T) {
 func TestWrapAndExhaustion(t *testing.T) {
 	s := memstore.New()
 	for i := 2; i <= 65534; i++ {
-		if id := upsert(t, s, fmt.Sprint(i), 0); int(id) != i {
+		if id := upsert(t, s, strconv.Itoa(i), 0); int(id) != i {
 			t.Fatalf("allocation %d took %d", i, id)
 		}
 	}

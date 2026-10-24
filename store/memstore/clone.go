@@ -107,7 +107,10 @@ func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 // sortedValues returns copies of m's values by key ascending; nil when m is
 // empty, as a query without rows returns.
 func sortedValues[V any](m map[uint16]V, clone func(V) V) []V {
-	var out []V
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]V, 0, len(m))
 	for _, k := range sortedKeys(m) {
 		out = append(out, clone(m[k]))
 	}

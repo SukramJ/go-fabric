@@ -13,7 +13,10 @@ import (
 // TestStoreContract holds SQLite's Store to the port's contract, the same
 // table store/memstore runs.
 func TestStoreContract(t *testing.T) {
-	storetest.Run(t, func(t *testing.T) store.Port { return store.New(openTestDB(t)) })
+	storetest.Run(t, func(t *testing.T) store.Port {
+		t.Helper()
+		return store.New(openTestDB(t))
+	})
 }
 
 // TestStoreImplementsEveryArea: SQLite's Store is each area of the port, the
