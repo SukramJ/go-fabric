@@ -413,12 +413,6 @@ Device side:
   (`session/case/CaseServer.ts:294-299`, `TlvSignedData.encode` with
   `responderIcac`), so a peer that sends an empty ICAC (`300200`) signs a
   TBS this side does not rebuild. (Milestone 3.)
-- **IPK rotation through KeySetWrite does not reach CASE.**
-  `cluster/core/group_key_management.go:705` writes key set 0 into the
-  groups store like any other set, `store/identity.go` holds one IPK and
-  `groups/manager.go:271` skips key set 0, so CASE keeps the first IPK;
-  matter.js selects the epoch key per Core § 4.14.2.6.1
-  (`groups/KeySets.ts:113-120`). (Brief BH, KeySetsTest port; milestone 3.)
 - **The group sender keeps its node id after UpdateNOC.**
   `groups/sender.go:208,225` captures the fabric's node id when the sender
   is created; matter.js reads it per message from the current fabric
