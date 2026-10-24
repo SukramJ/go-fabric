@@ -117,6 +117,7 @@ nav:
           - "ADR 0025 — Design principles of the facade": adr/0025-facade-design-principles.md
           - "ADR 0026 — Architecture principles of the module": adr/0026-architecture-principles.md
           - "ADR 0027 — A Thread Border Router over OTBR REST (proposed)": adr/0027-thread-border-router-over-otbr-rest.md
+          - "ADR 0028 — The test site paces by counted in-flight work": adr/0028-site-paces-by-counted-work.md
       - Device types: reference/device-types.md
       - matter.js comparison: matterjs-comparison.md
       - Parity contract: matter-parity-contract.md
