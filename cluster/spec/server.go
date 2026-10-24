@@ -304,6 +304,11 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
+	// A struct's fields are held to their conformance as well (matter.js
+	// validates the written state, ValueValidator.ts:392-467).
+	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
+		return err
+	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	s.mu.Lock()
 	veto := s.beforeWrite
@@ -543,7 +548,12 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
 // goes to its handler; one not accepted, or accepted without a handler,
-// is UNSUPPORTED_COMMAND.
+// is UNSUPPORTED_COMMAND. A response that breaks its fields' types,
+// constraints or conformance — a field mandatory by the request's
+// ("TestRequest.Enable") left out — is FAILURE ([Instance.checkResponse]).
+// The request is the handler's to judge: the module's servers answer a
+// request field outside its constraint with the status matter.js's
+// behavior answers.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	s.mu.Lock()
 	fn := s.handlers[cmdID]
@@ -551,7 +561,14 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if !s.Instance.Accepts(cmdID) || fn == nil {
 		return nil, im.UnsupportedCommandf("%s: command 0x%02X is not supported", s.def.Name, cmdID)
 	}
-	return fn(ctx, fields)
+	resp, err := fn(ctx, fields)
+	if err != nil {
+		return resp, err
+	}
+	if err := s.checkResponse(cmdID, fields, resp, s.peers); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
