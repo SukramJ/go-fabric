@@ -37,10 +37,10 @@ import "context"
 // file, SQLite, memory (MemoryStorageDriver.ts:13) — behind the abstract
 // StorageDriver get/set/values (StorageDriver.ts:26-42), and the server
 // node receives it through its environment (packages/node/src/node/server/
-// ServerEnvironment.ts:158, :171-174). Each fabric's state lives in its own
-// StorageContext ("fabric-<index>", FabricManager.ts:251) that is cleared
-// when the fabric is deleted (FabricManager.ts:262-271); the cascade above
-// is that clearAll. Go types the port by area instead of by key-value
+// ServerEnvironment.ts:158, :171-174). Each fabric's state lives in a
+// context of its own (createContext("fabric-<index>"), FabricManager.ts:251)
+// whose clearAll runs when the fabric is deleted (FabricManager.ts:262-271);
+// the cascade above is that clearAll. Go types the port by area instead of by key-value
 // context, so a backend stores records, not opaque values.
 
 // Fabrics is the fabric table (Matter §11.18.5, FabricDescriptorStruct).

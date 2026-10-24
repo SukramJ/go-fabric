@@ -698,8 +698,8 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 }
 
 // fabricCascade is the removal of a fabric: everything it owns goes, the
-// other fabric's rows and the rows no fabric owns stay. matter.js clears the
-// fabric's StorageContext (FabricManager.ts:262-271).
+// other fabric's rows and the rows no fabric owns stay. matter.js runs the
+// fabric storage's clearAll (FabricManager.ts:262-271).
 func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 	one := addFabric(ctx, t, p, 1)
 	two := addFabric(ctx, t, p, 2)
