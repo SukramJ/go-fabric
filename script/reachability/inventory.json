@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6377,
+  "entry_points": 6382,
   "entry_packages": [
     ".",
     "bdx",
@@ -237,9 +237,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14654,
-    "reachable": 10196,
-    "whitelisted": 4455,
+    "total_exported": 14656,
+    "reachable": 10197,
+    "whitelisted": 4456,
     "unreachable": 3
   },
   "by_package": [
@@ -8537,7 +8537,7 @@
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1577
+      "line": 1602
     },
     {
       "package": "cluster/measurement",
@@ -21228,21 +21228,21 @@
       "identifier": "TestBaseOptionalConformsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 77
+      "line": 79
     },
     {
       "package": "device",
       "identifier": "TestBaseOptionalOnEveryType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "device",
       "identifier": "TestBaseOptionalServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 21
+      "line": 23
     },
     {
       "package": "device",
@@ -21250,6 +21250,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
       "line": 295
+    },
+    {
+      "package": "device",
+      "identifier": "TestBridgedPowerSourceServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/base_test.go",
+      "line": 106
     },
     {
       "package": "device",

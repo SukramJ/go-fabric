@@ -9,6 +9,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -64,6 +65,63 @@ func withBaseOptional(t *Type, s *settings) *Type {
 	return &eff
 }
 
+// ConditionBridgedPowerSourceInfo is the Base device type's condition a
+// bridged device states when it carries power-source information
+// (matter.js packages/model/src/standard/elements/base.element.ts:40 at
+// 862ad75f, `Condition({ name: "BridgedPowerSourceInfo" })`). The kit
+// states it for a device whose declarations mount PowerSource through the
+// BridgedNode rule ([withBridgedPowerSource]).
+const ConditionBridgedPowerSourceInfo = "BridgedPowerSourceInfo"
+
+// bridgedPowerSourceServers are the server clusters the BridgedNode device
+// type lists under the condition BridgedPowerSourceInfo alone: PowerSource
+// (0x002F) at the pin. Every endpoint the node's Aggregator serves lists
+// BridgedNode beside its own device type (endpoint listedDeviceTypes), so
+// a bridged device of any type may carry them; the type's own list does
+// not name them.
+//
+// Mirrors matter.js packages/model/src/standard/elements/bridged-node.element.ts:23
+// at 862ad75f (`Requirement({ name: "PowerSource", id: 0x2f, conformance:
+// "BridgedPowerSourceInfo", element: "serverCluster" })`). Read from the
+// generated BridgedNode type, not hand-coded. PowerSourceConfiguration
+// (`BridgedPowerSourceInfo, D`, :22) is deprecated where the condition
+// does not hold and stays out, as the Base rule leaves out what is not
+// plain optional.
+var bridgedPowerSourceServers = sync.OnceValue(func() []ClusterRequirement {
+	var out []ClusterRequirement
+	for _, r := range typeBridgedNode.Servers {
+		if r.Conformance != ConditionBridgedPowerSourceInfo || r.Definition == nil {
+			continue
+		}
+		out = append(out, ClusterRequirement{ID: r.ID, Name: r.Name, Conformance: r.Conformance, Definition: r.Definition})
+	}
+	return out
+})
+
+// withBridgedPowerSource returns t with the BridgedNode clusters under
+// BridgedPowerSourceInfo the declarations name and t does not list
+// appended, as optional requirements, and whether it appended any: a
+// declared PowerSource on a device is the device stating the condition
+// for the bridged node it becomes, which [New] records in the device's
+// conditions so the device-type validator judges the BridgedNode
+// requirement as stated (endpoint StatedConditions). t itself, false when
+// there are none.
+func withBridgedPowerSource(t *Type, s *settings) (*Type, bool) {
+	var extra []ClusterRequirement
+	for _, r := range bridgedPowerSourceServers() {
+		if _, listed := t.Server(r.ID); listed || !s.names(r.ID) {
+			continue
+		}
+		extra = append(extra, r)
+	}
+	if len(extra) == 0 {
+		return t, false
+	}
+	eff := *t
+	eff.Servers = append(slices.Clone(t.Servers), extra...)
+	return &eff, true
+}
+
 // names reports whether a declaration states anything about cluster id: a
 // typed declaration, an opt-in, a server, initial values or elements.
 func (s *settings) names(id uint32) bool {
@@ -79,6 +137,17 @@ func (s *settings) names(id uint32) bool {
 // …Async callbacks run on the device's goroutine.
 func (d *Device) FixedLabel() *fixedlabeldef.Server {
 	return fixedlabeldef.WrapOn(d.Server(fixedlabeldef.ClusterID), d.queue)
+}
+
+// PowerSource is the device's typed PowerSource server — a cluster the
+// BridgedNode device type allows on every bridged device under the
+// condition BridgedPowerSourceInfo, mounted when a declaration names it
+// (powersourcedef.Declare) and then stating that condition; nil when the
+// device does not mount it. Its EndpointList names the device's own
+// endpoint unless the declaration's Initial names others. Its …Async
+// callbacks run on the device's goroutine.
+func (d *Device) PowerSource() *powersourcedef.Server {
+	return powersourcedef.WrapOn(d.Server(powersourcedef.ClusterID), d.queue)
 }
 
 // UserLabel is the device's typed UserLabel server — a cluster the Base

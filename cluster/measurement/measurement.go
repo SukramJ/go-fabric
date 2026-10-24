@@ -1408,6 +1408,31 @@ func NewPowerSourceServerFromFloat(src contract.FloatMeasurementSource) *PowerSo
 	return &PowerSourceServer{floatSrc: src}
 }
 
+// OnMatterValueChanged implements [contract.ChangeNotifier] by forwarding
+// the wrapped source's notifier, as [ElectricalPowerServer] does: a
+// battery that rides as a device's PowerSource beside a measurement of
+// another class ([endpoint.Spec.PowerSource]) is neither the endpoint's
+// Source nor its Measurement, so without this the bridge never hears its
+// changes and a subscribed controller sees BatPercentRemaining or
+// BatReplacementNeeded only on a read. matter.js reports every change of a
+// behavior's state through its own Datasource
+// (packages/node/src/behavior/state/managed/Datasource.ts:268-270 at
+// 862ad75f, the onChange callback). Returns a no-op unsubscribe when the
+// source cannot notify.
+func (s *PowerSourceServer) OnMatterValueChanged(cb func()) func() {
+	var src any
+	switch {
+	case s.floatSrc != nil:
+		src = s.floatSrc
+	case s.src != nil:
+		src = s.src
+	}
+	if n, ok := src.(contract.ChangeNotifier); ok && n != nil {
+		return n.OnMatterValueChanged(cb)
+	}
+	return func() {}
+}
+
 // inst is the definition bound to what this instance serves:
 // BatPercentRemaining joins the attributes with a percentage source.
 func (s *PowerSourceServer) inst() *spec.Instance {
