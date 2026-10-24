@@ -270,8 +270,13 @@ func ReadHeader(r io.Reader) (Header, Prefix, []byte, error) {
 		return Header{}, Prefix{}, nil, invalid("Invalid OTA file identifier")
 	}
 	p := Prefix{TotalSize: binary.LittleEndian.Uint64(prefix[4:12]), HeaderSize: binary.LittleEndian.Uint32(prefix[12:16])}
-	headerTLV := make([]byte, p.HeaderSize)
-	if _, err := io.ReadFull(r, headerTLV); err != nil {
+	// The header is collected as it arrives, never allocated at the size
+	// the prefix claims: matter.js #processHeader appends each chunk until
+	// remainingBytesCount reaches headerSize
+	// (packages/protocol/src/ota/OtaImageReader.ts:157-191 at 862ad75f), so
+	// a prefix claiming 4 GiB costs what the stream delivers.
+	headerTLV, err := io.ReadAll(io.LimitReader(r, int64(p.HeaderSize)))
+	if err != nil || len(headerTLV) != int(p.HeaderSize) {
 		return Header{}, Prefix{}, nil, invalid("OTA file ended unexpectedly")
 	}
 	h, err := DecodeHeader(headerTLV)
