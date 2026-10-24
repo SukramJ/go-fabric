@@ -71,6 +71,7 @@ nav:
   - Getting started:
       - The device side: getting-started/device.md
       - "A host's view": guides/host-view.md
+      - Embed in a daemon: guides/embed-in-a-daemon.md
       - The controller side: getting-started/controller.md
   - Architecture: architecture.md
   - Roadmap: roadmap.md
@@ -82,6 +83,7 @@ nav:
       - Persistence: guides/persistence.md
       - Observability: guides/observability.md
       - Limits: guides/limits.md
+      - Operations: guides/operations.md
       - Testing in process: guides/testing-in-process.md
       - Security: security.md
   - Reference:
