@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.5] — 2026-10-24
+
 ### Added
 
 - The persistence port (phase 21a, concept v7 A.2): `store.Port`, the sum of one interface per area named after the Matter concept — `store.Fabrics`, `Identity`, `ACL`, `GroupKeys`, `Groups`, `Resumption`, `ServerSubscriptions`, `Settings`, `OTA`, `ThermostatPresets` and `DoorLocks` — with the methods the module's consumers call. `*store.Store` implements every one; `groups.Store` embeds `store.Groups`.
@@ -23,6 +25,7 @@ pseudo-version of `main`.
 
 - **Break:** `node.Config.Store.Credentials` is a `store.Port` instead of a `*store.Store`, and `Node.Store()` and `fabrictest.Device.Store()` return `store.Port`. `store.New(db)` is still accepted; a host that type-asserted or passed the result as `*store.Store` keeps its own `*store.Store` instead. `Store.Path` and `Store.DB` are unchanged. Migration guide, the persistence port in v0.10.5.
 - `node.NewEndpointPersistence` takes a `store.Settings`; a `*store.Store` still fits.
+- `fabrictest.Device.Start`, `Stop` and `Restart` run under `Site.Run`: a fake site clock moves while the node starts or stops, so a restart whose subscription re-establishment waits for a peer's StatusResponse no longer hangs the test when that response never comes.
 - fabrictest devices run on `store/memstore` and `endpoint/memstore` by default; state still survives `Device.Restart`. `Options.StoreOnDisk` restores the SQLite file.
 
 ### Removed

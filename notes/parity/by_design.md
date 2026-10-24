@@ -3974,3 +3974,22 @@ power source feeds its own endpoint in every composition the kit
 builds, and the kit already fills the list this way for the
 measurement-projected server (`cluster/measurement`, `SetEndpoint`); a
 host with another topology declares it (brief BV-b).
+
+### BD-Matter-StorePort-TypedByArea — the persistence port is typed by area and record, not by key-value contexts
+
+matter.js persists through a key-value driver: `StorageDriver.get/set/values(contexts, key)`
+(`packages/general/src/storage/StorageDriver.ts:26-42` at `862ad75f`), a
+`StorageContext` per component (`StorageContext.ts:15`), one context per
+fabric (`FabricManager.ts:251`, `fabric-${fabricIndex}`) and `clearAll()`
+on that context when the fabric goes (`FabricManager.ts:262-271`). The
+module's port is `store.Port`, the sum of one interface per area named
+after the Matter concept — `store.Fabrics`, `Identity`, `ACL`,
+`GroupKeys`, `Groups`, `Resumption`, `ServerSubscriptions`, `Settings`,
+`OTA`, `ThermostatPresets`, `DoorLocks` — over typed records, and the
+fabric cascade is each implementation's (SQLite's schema, memstore's
+`RemoveFabric`), held to the same contract table `store/storetest`.
+Reasoning: a Go backend keeps typed records with its schema's
+constraints, and a consumer names only the area it uses (ADR 0026 P1);
+what matter.js guarantees — a fabric's state goes with the fabric, the
+counters move forward — the contract table proves for every
+implementation (brief CA).
