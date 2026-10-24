@@ -20,7 +20,7 @@ import (
 // them.
 func TestBaseOptionalServers(t *testing.T) {
 	t.Parallel()
-	var ids []uint32
+	ids := make([]uint32, 0, len(baseOptionalServers()))
 	for _, r := range baseOptionalServers() {
 		ids = append(ids, r.ID)
 		if r.Conformance != "O" || r.Definition == nil {

@@ -133,7 +133,7 @@ func (b *Bridge) sendReplyOpts(
 ) error {
 	if requestProto.ProtocolID == im.InteractionModelProtocolID {
 		b.load.imSent.Add(1)
-		b.count(contract.MetricIMSent, 1)
+		b.count(contract.MetricIMSent)
 	}
 	b.mu.RLock()
 	listener := b.listener

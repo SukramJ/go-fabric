@@ -45,16 +45,16 @@ const (
 	MetricPanicsRecovered = contract.MetricPanicsRecovered
 )
 
-// count adds delta to the counter name of the configured port.
-func (n *Node) count(name string, delta int64) {
+// count adds one to the counter name of the configured port.
+func (n *Node) count(name string) {
 	if n.cfg.Metrics != nil {
-		n.cfg.Metrics.Counter(name, delta)
+		n.cfg.Metrics.Counter(name, 1)
 	}
 }
 
 // panicRecovered is the hook of the node's own sockets (the client and the
 // group sender): one recovered panic.
-func (n *Node) panicRecovered() { n.count(MetricPanicsRecovered, 1) }
+func (n *Node) panicRecovered() { n.count(MetricPanicsRecovered) }
 
 // retransmitted is the client exchanges' hook: one retransmission.
-func (n *Node) retransmitted() { n.count(MetricMRPRetransmits, 1) }
+func (n *Node) retransmitted() { n.count(MetricMRPRetransmits) }

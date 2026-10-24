@@ -34,10 +34,10 @@ func (b *Bridge) AttachMetrics(m contract.Metrics) {
 	b.metrics.Store(&metricsPort{m: m})
 }
 
-// count adds delta to the counter name when a port is attached.
-func (b *Bridge) count(name string, delta int64) {
+// count adds one to the counter name when a port is attached.
+func (b *Bridge) count(name string) {
 	if p := b.metrics.Load(); p != nil {
-		p.m.Counter(name, delta)
+		p.m.Counter(name, 1)
 	}
 }
 
@@ -49,7 +49,7 @@ func (b *Bridge) gauge(name string, value int64) {
 }
 
 // panicRecovered is the listeners' panic hook: one recovered panic.
-func (b *Bridge) panicRecovered() { b.count(contract.MetricPanicsRecovered, 1) }
+func (b *Bridge) panicRecovered() { b.count(contract.MetricPanicsRecovered) }
 
 // sessionCounter is the optional capability of a [SessionRegistry] to
 // count its sessions (secure/operational.Manager.Active).

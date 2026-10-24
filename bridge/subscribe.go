@@ -876,7 +876,7 @@ func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
 
 func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byte) (uint32, error) {
 	b.load.imSent.Add(1)
-	b.count(contract.MetricIMSent, 1)
+	b.count(contract.MetricIMSent)
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions

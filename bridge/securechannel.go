@@ -579,7 +579,7 @@ func (b *Bridge) releasePaseInFlight(exchangeID uint16) {
 // error path for genuine pairing failures only (not missing-handler or
 // state-replay retransmits).
 func (b *Bridge) recordPaseFailure() {
-	b.count(contract.MetricPASEFailures, 1)
+	b.count(contract.MetricPASEFailures)
 	if b.paseFailures.Add(1) != paseMaxErrors {
 		// Below the cap, or a straggler arriving between the cap and the
 		// lockout taking effect. Only the transition to exactly
@@ -588,7 +588,7 @@ func (b *Bridge) recordPaseFailure() {
 		return
 	}
 	cooldown := b.engagePaseLockout()
-	b.count(contract.MetricPASELockouts, 1)
+	b.count(contract.MetricPASELockouts)
 	win := b.CommissioningWindow()
 	b.logger.Warn("matter.rx.sc.pase_bruteforce",
 		slog.Int("max_errors", paseMaxErrors),

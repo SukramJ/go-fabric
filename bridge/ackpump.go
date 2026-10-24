@@ -370,7 +370,7 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	for _, r := range results {
 		if r.Err == nil {
 			// A retransmission sent.
-			b.count(contract.MetricMRPRetransmits, 1)
+			b.count(contract.MetricMRPRetransmits)
 			continue
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {

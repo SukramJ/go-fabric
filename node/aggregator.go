@@ -582,7 +582,7 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
 	a.reassemblies.Add(1)
-	a.n.count(MetricAggregatorReassemblies, 1)
+	a.n.count(MetricAggregatorReassemblies)
 	return nil
 }
 

@@ -425,7 +425,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //     `Bridge.checkTimedGate` per Matter §8.7.
 func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	b.load.imReceived.Add(1)
-	b.count(contract.MetricIMReceived, 1)
+	b.count(contract.MetricIMReceived)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
 	case imGateProceed:
 		// fall through to decode + dispatch below

@@ -414,7 +414,7 @@ func f(l *slog.Logger, err error) {
 		t.Errorf("checked %d attributes, want 6", n)
 	}
 	want := []string{"x.go:6", "x.go:7", "x.go:8"}
-	var at []string
+	at := make([]string, 0, len(got))
 	for _, f := range got {
 		at = append(at, f.pos)
 	}
