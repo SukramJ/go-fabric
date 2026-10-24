@@ -390,11 +390,14 @@ type DeviceTypeVerdict struct {
 // persists, and is reported again after it went away and came back. Safe
 // for concurrent use.
 type DeviceTypeValidator struct {
-	// mu guards recorded and reported.
+	// mu guards known, recorded and reported.
 	mu       sync.Mutex
 	mode     DeviceTypeValidationMode
 	reported map[uint16]map[string]bool
 	recorded []DeviceTypeViolation
+	// known are the endpoints of the last recorded validation; one not
+	// among them is an addition. Nil before the first.
+	known map[uint16]bool
 }
 
 // NewDeviceTypeValidator returns a validator in mode.
@@ -405,16 +408,36 @@ func NewDeviceTypeValidator(mode DeviceTypeValidationMode) *DeviceTypeValidator 
 // Mode returns the validator's mode.
 func (v *DeviceTypeValidator) Mode() DeviceTypeValidationMode { return v.mode }
 
-// Validate judges t (see [ValidateDeviceTypes]). In mode warn an endpoint
-// with a new misplaced singleton, in mode strict an endpoint with any new
-// violation, is refused: Validate returns a *DeviceTypeConformanceError
-// with the refused endpoints' new violations and records nothing, so the
-// next validation reports them again. Otherwise the verdict is recorded
-// and returned; its Fresh violations are the ones to log. In mode off only
-// singleton placement is judged, and nothing is recorded.
+// Validate judges t (see [ValidateDeviceTypes]). A topology is a set of
+// changes to the one validated before: endpoints it adds (an endpoint
+// number the last recorded validation did not hold — every endpoint, the
+// first time), and endpoints it changes or removes. An endpoint with a new
+// misplaced singleton is refused in every mode (ADR 0016). Strict refuses
+// any other new violation only where an addition may have caused it, as
+// matter.js refuses only at construction:
 //
-// Mirrors DeviceTypeConformanceService #validate (packages/node/src/node/
-// server/DeviceTypeConformanceService.ts) for a construction pass.
+//   - the endpoints an addition may cause a violation on are the added
+//     endpoint and its descendants, its ancestors and its siblings
+//     (matter.js #affectedBy for an "added" change: the subtree, the
+//     ancestors, the siblings whose Duplicate condition flips);
+//   - a new violation anywhere else — one a change of an endpoint already
+//     installed caused, a changed device type list or server set, a
+//     removed part — is reported and refuses nothing, as matter.js logs
+//     rather than refuses a violation after construction.
+//
+// A refusal returns a *DeviceTypeConformanceError with the refused
+// endpoints' new violations and records nothing, so the next validation
+// judges them again. Otherwise the verdict is recorded and returned; its
+// Fresh violations are the ones to log. In mode off only singleton
+// placement is judged, and nothing is recorded.
+//
+// Mirrors packages/node/src/node/server/DeviceTypeConformanceService.ts at
+// 862ad75f: #validate (:384-454, refusal only where refuse holds, atomic for
+// a construction pass), constructed (:159-173, an addition judged with
+// refusal over #affectedBy :525-619), the runtime triggers judged with
+// `{ refuse: false }` (:295, :335-338). matter.js logs a singleton a
+// runtime change misplaces; the module refuses it in every mode
+// (ADR 0016).
 func (v *DeviceTypeValidator) Validate(t *Topology) (DeviceTypeVerdict, error) {
 	all := ValidateDeviceTypes(t)
 	v.mu.Lock()
@@ -431,6 +454,7 @@ func (v *DeviceTypeValidator) Validate(t *Topology) (DeviceTypeVerdict, error) {
 		}
 		return DeviceTypeVerdict{}, nil
 	}
+	affected := v.affectedByAdditions(t)
 	verdict := DeviceTypeVerdict{Violations: all}
 	byEndpoint := map[uint16]map[string]bool{}
 	refused := map[uint16]bool{}
@@ -444,7 +468,7 @@ func (v *DeviceTypeValidator) Validate(t *Topology) (DeviceTypeVerdict, error) {
 			continue
 		}
 		verdict.Fresh = append(verdict.Fresh, *viol)
-		if v.mode == DeviceTypeValidationStrict || viol.Kind == ViolationSingletonMisplaced {
+		if viol.Kind == ViolationSingletonMisplaced || (v.mode == DeviceTypeValidationStrict && affected[viol.Endpoint]) {
 			refused[viol.Endpoint] = true
 		}
 	}
@@ -459,7 +483,78 @@ func (v *DeviceTypeValidator) Validate(t *Topology) (DeviceTypeVerdict, error) {
 	}
 	v.reported = byEndpoint
 	v.recorded = all
+	v.known = endpointsOf(t)
 	return verdict, nil
+}
+
+// affectedByAdditions returns the endpoints of t an addition may cause a
+// violation on: each endpoint the last recorded validation did not hold,
+// its descendants, its ancestors and its siblings.
+func (v *DeviceTypeValidator) affectedByAdditions(t *Topology) map[uint16]bool {
+	added, affected := map[uint16]bool{}, map[uint16]bool{}
+	if t == nil {
+		return affected
+	}
+	byID := map[uint16]*Endpoint{}
+	for _, ep := range t.Endpoints {
+		if ep != nil {
+			byID[ep.ID] = ep
+		}
+	}
+	parent := map[uint16]uint16{}
+	children := map[uint16][]uint16{}
+	for _, ep := range t.Endpoints {
+		if ep == nil {
+			continue
+		}
+		if p, ok := assembledParentOf(byID, ep); ok {
+			parent[ep.ID] = p
+			children[p] = append(children[p], ep.ID)
+		}
+	}
+	var subtree func(id uint16)
+	subtree = func(id uint16) {
+		if affected[id] && added[id] {
+			return
+		}
+		affected[id] = true
+		added[id] = true
+		for _, c := range children[id] {
+			subtree(c)
+		}
+	}
+	for _, ep := range t.Endpoints {
+		if ep != nil && !v.known[ep.ID] {
+			subtree(ep.ID)
+		}
+	}
+	for id := range added {
+		p, ok := parent[id]
+		if !ok {
+			continue
+		}
+		for _, sibling := range children[p] {
+			affected[sibling] = true
+		}
+		for seen := map[uint16]bool{}; ok && !seen[p]; p, ok = parent[p] {
+			seen[p] = true
+			affected[p] = true
+		}
+	}
+	return affected
+}
+
+// endpointsOf is the set of t's endpoint numbers.
+func endpointsOf(t *Topology) map[uint16]bool {
+	out := map[uint16]bool{}
+	if t != nil {
+		for _, ep := range t.Endpoints {
+			if ep != nil {
+				out[ep.ID] = true
+			}
+		}
+	}
+	return out
 }
 
 // Violations returns what the last recorded validation found (matter.js
