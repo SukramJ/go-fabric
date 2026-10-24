@@ -81,6 +81,7 @@ nav:
       - Concurrency: guides/concurrency.md
       - Persistence: guides/persistence.md
       - Observability: guides/observability.md
+      - Limits: guides/limits.md
       - Testing in process: guides/testing-in-process.md
       - Security: security.md
   - Reference:
