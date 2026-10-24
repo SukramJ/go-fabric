@@ -264,7 +264,7 @@ type ICDManagement struct {
 	// the sender, a port or a callback.
 	mu            sync.Mutex
 	counter       *icd.Counter
-	clients       []icdClient                   // registeredClients with icdKeys, in registration order
+	clients       []icdClient                  // registeredClients with icdKeys, in registration order
 	fabrics       map[uint8]*icd.Registrations // fabric.icd, the operational view
 	forced        *icddef.OperatingModeEnum
 	operatingMode icddef.OperatingModeEnum
