@@ -245,9 +245,11 @@
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/ValuePatcherTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Feature-dependent default fallbacks per feature set: the kit applies the device type's defaults and the declaration's Initial, not matter.js's ValuePatcher fallbacks per feature; a port needs the patcher's rules first. Milestone 5.",
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestValuePatcherParityMatterJS"
+      ],
+      "reason": "The patcher is spec.Instance.PatchDefaults, applied where Initial and the host's Set enter a spec.Server: a left-out struct field receives the stated default only when its conformance is mandatory under the selected features, an empty-list default as a list of its own, a bitmap default as its Go bitmap type, a temperature in encoding units (the generator restates unit defaults, EncodedValue.ts), and a Go field the definition does not declare is refused; the Widgets cluster is a synthetic definition, the preset cases run on the committed Thermostat (cluster/spec/value_patcher_parity_matterjs_test.go).",
       "snapshotSha": "8d16b9842415d25a12a7a5dbb46d7ab8b3db411b"
     },
     {

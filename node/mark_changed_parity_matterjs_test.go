@@ -97,17 +97,17 @@ func serverOf(t *testing.T, def *spec.Cluster) *spec.Server {
 // computedPair commissions a device whose bridged light serves the
 // computed OnOff server and subscribes to onOff; the reports arrive on
 // the returned channel.
-func computedPair(t *testing.T, c *computedServer) (*fabrictest.Site, *fabrictest.Pair, uint16, chan *interaction.Report) {
+func computedPair(t *testing.T, c *computedServer) (site *fabrictest.Site, p *fabrictest.Pair, ep uint16, reports chan *interaction.Report) {
 	t.Helper()
-	site := quietSite(t)
-	p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
+	site = quietSite(t)
+	p = site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
 		Bridged: []node.Endpoint{fabrictest.Endpoint("computed:1", onoff.DeviceTypeOnOffLight, c.srv)},
 	}})
 	ep, ok := p.Device.EndpointOf("computed:1")
 	if !ok {
 		t.Fatal("the light has no endpoint")
 	}
-	reports := make(chan *interaction.Report, 16)
+	reports = make(chan *interaction.Report, 16)
 	sub, err := fabrictest.Subscribe(parityCtx(t), p, interaction.SubscribeRequest{
 		Attributes: []fabrictest.AttributePath{client.AttributeAt(ep, onoffdef.ClusterID, onoffdef.AttrOnOff)},
 		Updated:    func(r *interaction.Report) { reports <- r },
@@ -126,9 +126,9 @@ func awaitOnOff(t *testing.T, site *fabrictest.Site, ep uint16, reports chan *in
 	err := site.Eventually(parityCtx(t), "the onOff report", func() bool {
 		select {
 		case r := <-reports:
-			for _, a := range r.Attributes {
-				if a.Path.Endpoint == ep && a.Path.Cluster == onoffdef.ClusterID && a.Path.Attribute == onoffdef.AttrOnOff && a.Value.El.Bool == want {
-					got = a
+			for i := range r.Attributes {
+				if a := &r.Attributes[i]; a.Path.Endpoint == ep && a.Path.Cluster == onoffdef.ClusterID && a.Path.Attribute == onoffdef.AttrOnOff && a.Value.El.Bool == want {
+					got = *a
 					return true
 				}
 			}

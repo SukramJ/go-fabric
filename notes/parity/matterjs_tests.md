@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 81 |
+| ported | 82 |
 | partial | 122 |
-| planned | 34 |
+| planned | 33 |
 | excluded | 87 |
 | total | 324 |
 
@@ -25,7 +25,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/internal](#nodetestbehaviorinternal) | 2 | 0 | 1 | 0 | 1 |
 | [node/test/behavior/state](#nodetestbehaviorstate) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/state/managed](#nodetestbehaviorstatemanaged) | 2 | 0 | 0 | 0 | 2 |
-| [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 0 | 1 | 1 | 1 |
+| [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 1 | 1 | 0 | 1 |
 | [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 2 | 3 | 0 | 1 |
@@ -168,7 +168,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | --- | --- | --- |
 | ListManagerTest.ts | 690 | partial | `cluster/core:TestFabricFilteredFabricsRead`<br>`bridge:TestAccessControlUnfilteredReadsRedactOtherFabrics`<br>`cluster/core:TestBindingFabricScopedWrite` | The managed list proxy; its fabric-filtered read and fabric-preserving write are Matter-visible and covered on the Go read/write paths, its array-proxy and fabricIndex-supply cases are not. Missing: “basic get/set with primitive datatype”; “basic get/set with struct”; “basic array functions”; “basic array iteration”; “does not filter a list in a fabric-sensitive struct field”; “returns all entries to a command handler”; “fabric-scoped get/set”; “fabric-scoped basic array methods”; “fabric scoped array iteration”; “accepts an entry assigned by index”; “accepts a whole list assigned to a member that had none”; “rejects an invalid entry assigned by index”; “leaves a member that had no list absent when an entry is rejected”; “supplies no fabric for an entry that omits a mandatory fabricIndex”; “accepts an entry appended with push”; “accepts a whole list assigned over an existing one”; “refuses an entry stored with no session to supply the fabric”; “supplies the accessing fabric for an entry that omits it”. |
 | StructManagerTest.ts | 792 | excluded | `js-runtime-only` | The managed struct proxy: nested defaults, id-keyed references, default synthesis for unreported client values and rollback. |
-| ValuePatcherTest.ts | 145 | planned | until M5 | Feature-dependent default fallbacks per feature set: the kit applies the device type's defaults and the declaration's Initial, not matter.js's ValuePatcher fallbacks per feature; a port needs the patcher's rules first. Milestone 5. |
+| ValuePatcherTest.ts | 145 | ported | `cluster/spec:TestValuePatcherParityMatterJS` | The patcher is spec.Instance.PatchDefaults, applied where Initial and the host's Set enter a spec.Server: a left-out struct field receives the stated default only when its conformance is mandatory under the selected features, an empty-list default as a list of its own, a bitmap default as its Go bitmap type, a temperature in encoding units (the generator restates unit defaults, EncodedValue.ts), and a Go field the definition does not declare is refused; the Widgets cluster is a synthetic definition, the preset cases run on the committed Thermostat (cluster/spec/value_patcher_parity_matterjs_test.go). |
 
 ## node/test/behavior/state/validation
 
@@ -910,10 +910,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | TcpTransportTest.ts | 276 | partial | `transport/tcp:TestDialerRoundTrip`<br>`transport/tcp:TestListenerEchoRoundTrip`<br>`transport/tcp:TestTcpTransportOnDisconnect`<br>`transport/tcp:TestTcpTransportClose` | Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169). Missing: “returns true for TCP”; “returns false for UDP”; “returns false for BLE”; “throws for non-IP address”; “reuses existing connection for same address”; “creates different connections for different addresses”. |
 
 ## Planned
-
-### node/test/behavior/state/managed/values
-
-- `ValuePatcherTest.ts` — Feature-dependent default fallbacks per feature set: the kit applies the device type's defaults and the declaration's Initial, not matter.js's ValuePatcher fallbacks per feature; a port needs the patcher's rules first. Milestone 5.
 
 ### node/test/behavior/state/validation
 
