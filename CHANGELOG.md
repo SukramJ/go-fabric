@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.9] — 2026-10-24
+
 ### Added
 
 - `docs/guides/embed-in-a-daemon.md` (phase 22, brief CE): the cookbook — go-fabric inside an existing daemon, in eight steps, each citing the commit of the daemon pull request that does it (go-zendure2mqtt: one Zendure unit as a bridged ElectricalSensor with its battery, readings to attributes, reachability, the pairing code), what the daemon did not have to do and what a controller sees.
