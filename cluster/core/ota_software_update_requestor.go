@@ -668,7 +668,7 @@ func (r *OTASoftwareUpdateRequestor) removeOtaProvider(ctx context.Context, p ot
 				rows[i] = store.OTAProviderLocation{FabricIndex: d.FabricIndex, ProviderNodeID: d.ProviderNodeId, Endpoint: d.Endpoint}
 			}
 			if err := r.cfg.Store.ReplaceDefaultOTAProviders(context.WithoutCancel(ctx), p.FabricIndex, rows); err != nil {
-				r.logger.Warn("matter.ota.persist_defaults", slog.String("err", err.Error()))
+				r.logger.Warn("matter.ota.persist_defaults", slog.Any("err", err))
 			}
 		}
 		r.changed(otadef.AttrDefaultOtaProviders)
@@ -897,7 +897,7 @@ func (r *OTASoftwareUpdateRequestor) load(ctx context.Context) error {
 	var st persistedState
 	if ok {
 		if err := json.Unmarshal(raw, &st); err != nil {
-			r.logger.Warn("matter.ota.state_unreadable", slog.String("err", err.Error()))
+			r.logger.Warn("matter.ota.state_unreadable", slog.Any("err", err))
 			st = persistedState{}
 		}
 	}
@@ -944,7 +944,7 @@ func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
 		err = r.cfg.Store.SaveOTARequestorState(context.WithoutCancel(ctx), b)
 	}
 	if err != nil {
-		r.logger.Warn("matter.ota.persist_state", slog.String("err", err.Error()))
+		r.logger.Warn("matter.ota.persist_state", slog.Any("err", err))
 	}
 }
 

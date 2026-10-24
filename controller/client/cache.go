@@ -109,7 +109,7 @@ func (c *cache) discard() {
 func (c *cache) erase() {
 	c.discard()
 	if err := c.p.store.EraseCluster(c.p.nodeID, c.ep, c.cluster); err != nil {
-		c.p.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.String("err", err.Error()))
+		c.p.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
 	}
 }
 
@@ -157,7 +157,7 @@ func (p *persister) save(c *cache, keys []uint32) {
 		err = p.store.Save(p.nodeID, c.ep, c.cluster, values, c.versionPtr())
 	}
 	if err != nil {
-		p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.String("err", err.Error()))
+		p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
 	}
 }
 
@@ -231,7 +231,7 @@ func (p *persister) flush() {
 		job := flushJob{c: c, keys: slices.Sorted(maps.Keys(c.dirty)), version: c.versionDirty, ver: c.versionPtr()}
 		values, err := c.encode(job.keys)
 		if err != nil {
-			p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.String("err", err.Error()))
+			p.log.Warn("matter.controller.client.store_write_failed", slog.Int("endpoint", int(c.ep)), slog.Uint64("cluster", uint64(c.cluster)), slog.Any("err", err))
 			continue
 		}
 		job.values = values
@@ -244,7 +244,7 @@ func (p *persister) flush() {
 	var failed []flushJob
 	for _, j := range jobs {
 		if err := p.store.Save(p.nodeID, j.c.ep, j.c.cluster, j.values, j.ver); err != nil {
-			p.log.Warn("matter.controller.client.store_flush_failed", slog.Int("endpoint", int(j.c.ep)), slog.Uint64("cluster", uint64(j.c.cluster)), slog.String("err", err.Error()))
+			p.log.Warn("matter.controller.client.store_flush_failed", slog.Int("endpoint", int(j.c.ep)), slog.Uint64("cluster", uint64(j.c.cluster)), slog.Any("err", err))
 			failed = append(failed, j)
 		}
 	}

@@ -19,6 +19,8 @@
 package diagevent
 
 import (
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -79,6 +81,37 @@ type Ring struct {
 	next   int
 	full   bool
 	clock  clock.Clock // stamps an event recorded without At; nil is clock.System
+
+	// obsMu guards observers and nextObserver; it is never held while an
+	// observer runs.
+	obsMu        sync.Mutex
+	observers    map[uint64]func(Event)
+	nextObserver uint64
+}
+
+// Observe registers fn to receive every event [Ring.Record] records from
+// now on, stamped and defaulted as the ring stores it. fn runs inline on
+// the recording goroutine — the receive path — after the ring's lock is
+// released, so it may call [Ring.Snapshot] but must not block. It returns
+// the function that removes fn. Safe on a nil receiver, which never calls
+// fn.
+func (r *Ring) Observe(fn func(Event)) (unsubscribe func()) {
+	if r == nil || fn == nil {
+		return func() {}
+	}
+	r.obsMu.Lock()
+	defer r.obsMu.Unlock()
+	if r.observers == nil {
+		r.observers = map[uint64]func(Event){}
+	}
+	id := r.nextObserver
+	r.nextObserver++
+	r.observers[id] = fn
+	return func() {
+		r.obsMu.Lock()
+		delete(r.observers, id)
+		r.obsMu.Unlock()
+	}
 }
 
 // SetClock sets the clock that stamps an event recorded without At; nil
@@ -128,12 +161,35 @@ func (r *Ring) Record(e Event) {
 		e.Severity = SeverityInfo
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.events[r.next] = e
 	r.next = (r.next + 1) % len(r.events)
 	if r.next == 0 {
 		r.full = true
 	}
+	r.mu.Unlock()
+	// The observers run outside both locks, in registration order: one
+	// that records or reads the ring does not deadlock it.
+	r.obsMu.Lock()
+	if len(r.observers) == 0 {
+		r.obsMu.Unlock()
+		return
+	}
+	ids := slices.Sorted(maps.Keys(r.observers))
+	fns := make([]func(Event), 0, len(ids))
+	for _, id := range ids {
+		fns = append(fns, r.observers[id])
+	}
+	r.obsMu.Unlock()
+	for _, fn := range fns {
+		fn(cloneEvent(e))
+	}
+}
+
+// cloneEvent copies e's Detail, so an observer that keeps or changes the
+// map does not change the ring's entry.
+func cloneEvent(e Event) Event {
+	e.Detail = maps.Clone(e.Detail)
+	return e
 }
 
 // Snapshot returns the recorded events, newest first.

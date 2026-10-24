@@ -61,12 +61,12 @@ type Conn struct {
 	// idle timer reads it (TcpTransport.ts:89-104 receivedData).
 	received atomic.Bool
 
-	recoveredPanics *atomic.Uint64
+	recoveredPanics *panicCounter
 }
 
 var _ transport.Conn = (*Conn)(nil)
 
-func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger, panics *atomic.Uint64) *Conn {
+func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger, panics *panicCounter) *Conn {
 	if maxPayloadSize <= FramingHeaderSize {
 		maxPayloadSize = DefaultMaxPayloadSize
 	}
@@ -74,7 +74,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 		logger = slog.Default()
 	}
 	if panics == nil {
-		panics = new(atomic.Uint64)
+		panics = new(panicCounter)
 	}
 	return &Conn{
 		nc:              nc,
@@ -237,7 +237,7 @@ func (c *Conn) serve(handler Handler) {
 			if ferr != nil {
 				c.logger.Warn("matter.tcp.frame",
 					slog.String("conn", c.String()),
-					slog.String("err", ferr.Error()))
+					slog.Any("err", ferr))
 				c.awaitDelivery(prev)
 				c.close(ferr)
 				return
@@ -247,7 +247,7 @@ func (c *Conn) serve(handler Handler) {
 			if !c.isClosed() && !errors.Is(err, net.ErrClosed) {
 				c.logger.Debug("matter.tcp.read",
 					slog.String("conn", c.String()),
-					slog.String("err", err.Error()))
+					slog.Any("err", err))
 				c.awaitDelivery(prev)
 				c.close(err)
 			}
@@ -277,7 +277,7 @@ func (c *Conn) awaitDelivery(last <-chan struct{}) {
 func (c *Conn) safeHandle(handler Handler, msg []byte, release func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			total := c.recoveredPanics.Add(1)
+			total := c.recoveredPanics.add()
 			c.logger.Error("matter.tcp.dispatch_panic",
 				slog.Any("panic", r),
 				slog.String("conn", c.String()),
@@ -287,4 +287,30 @@ func (c *Conn) safeHandle(handler Handler, msg []byte, release func()) {
 		}
 	}()
 	handler(c, msg, release)
+}
+
+// panicCounter counts the panics the connections of one listener or
+// dialer recovered and calls the hook [Listener.OnPanicRecovered] or
+// [Dialer.OnPanicRecovered] set, once per panic.
+type panicCounter struct {
+	n    atomic.Uint64
+	hook atomic.Pointer[func()]
+}
+
+// add counts one recovered panic, calls the hook, and returns the total.
+func (p *panicCounter) add() uint64 {
+	total := p.n.Add(1)
+	if fn := p.hook.Load(); fn != nil {
+		(*fn)()
+	}
+	return total
+}
+
+// set installs fn as the hook; nil removes it.
+func (p *panicCounter) set(fn func()) {
+	if fn == nil {
+		p.hook.Store(nil)
+		return
+	}
+	p.hook.Store(&fn)
 }

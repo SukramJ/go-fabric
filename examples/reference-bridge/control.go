@@ -92,7 +92,7 @@ func serveAppPipe(ctx context.Context, f *fleet, path string, logger *slog.Logge
 		for ctx.Err() == nil {
 			fh, err := os.OpenFile(path, os.O_RDONLY, 0) //nolint:gosec // the operator-chosen pipe path
 			if err != nil {
-				logger.Warn("apppipe.open", slog.String("err", err.Error()))
+				logger.Warn("apppipe.open", slog.Any("err", err))
 				return
 			}
 			readPipe(f, fh, logger) //nolint:contextcheck // each command is applied to completion; ctx only ends the reading loop
@@ -117,11 +117,11 @@ func readPipe(f *fleet, r io.Reader, logger *slog.Logger) {
 		}
 		var cmd pipeCommand
 		if err := json.Unmarshal([]byte(line), &cmd); err != nil {
-			logger.Warn("apppipe.error", slog.String("line", line), slog.String("err", err.Error()))
+			logger.Warn("apppipe.error", slog.String("line", line), slog.Any("err", err))
 			continue
 		}
 		if err := f.applyPipeCommand(cmd); err != nil {
-			logger.Warn("apppipe.error", slog.String("name", cmd.Name), slog.String("err", err.Error()))
+			logger.Warn("apppipe.error", slog.String("name", cmd.Name), slog.Any("err", err))
 			continue
 		}
 		logger.Info("apppipe.applied", slog.String("name", cmd.Name))

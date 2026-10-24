@@ -68,14 +68,14 @@ func (s *ledgerCheckedImages) QueryImage(ctx context.Context, peer node.OTAPeer,
 	v, found, lerr := s.versions.Lookup(ctx, req.VendorId, req.ProductId, img.SoftwareVersion)
 	switch {
 	case lerr != nil:
-		s.logger.Warn("dcl.ota.lookup_failed", append(attrs, slog.String("err", lerr.Error()))...)
+		s.logger.Warn("dcl.ota.lookup_failed", append(attrs, slog.Any("err", lerr))...)
 	case !found:
 		s.logger.Warn("dcl.ota.not_in_ledger", attrs...)
 	case v.OTAChecksum == "":
 		s.logger.Info("dcl.ota.in_ledger", append(attrs, slog.Bool("checksum", false))...)
 	default:
 		if _, verr := node.VerifyOTAImage(bytes.NewReader(s.image(string(img.FileDesignator))), v, s.logger); verr != nil {
-			s.logger.Warn("dcl.ota.ledger_mismatch", append(attrs, slog.String("err", verr.Error()))...)
+			s.logger.Warn("dcl.ota.ledger_mismatch", append(attrs, slog.Any("err", verr))...)
 		} else {
 			s.logger.Info("dcl.ota.in_ledger", append(attrs, slog.Bool("checksum", true))...)
 		}

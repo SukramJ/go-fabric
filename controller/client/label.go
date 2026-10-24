@@ -53,12 +53,12 @@ func (r *Registry) reconcileLabel(n *Node) {
 	}
 	res, err := n.Invoke(r.ctx, opCredsCommand(opCredsCmdUpdateFabricLabel), updateFabricLabelRequest(label), InvokeOptions{})
 	if err != nil {
-		r.log.Info("matter.controller.client.registry.label_reconcile_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
+		r.log.Info("matter.controller.client.registry.label_reconcile_failed", slog.String("node", n.ID()), slog.Any("err", err))
 		return
 	}
 	nr, err := nocResponseOf(res)
 	if err != nil {
-		r.log.Info("matter.controller.client.registry.label_not_reconciled", slog.String("node", n.ID()), slog.String("err", err.Error()))
+		r.log.Info("matter.controller.client.registry.label_not_reconciled", slog.String("node", n.ID()), slog.Any("err", err))
 		return
 	}
 	if nr.status != nocStatusOk {

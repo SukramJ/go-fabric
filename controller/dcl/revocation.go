@@ -225,7 +225,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 			s.log.Debug("dcl.revocation.none", slog.String("akid", akid))
 			return empty, nil
 		}
-		s.log.Warn("dcl.revocation.lookup_failed", slog.String("akid", akid), slog.String("err", err.Error()),
+		s.log.Warn("dcl.revocation.lookup_failed", slog.String("akid", akid), slog.Any("err", err),
 			slog.String("message", "DCL revocation lookup failed for AKID "+akid+" (will retry on next check)"))
 		return revocationLookup{}, err
 	}
@@ -281,7 +281,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 			verb = "Ignoring"
 		}
 		s.log.Warn("dcl.revocation.point_failed", slog.String("akid", crlPoints[i].IssuerSubjectKeyID), slog.String("url", crlPoints[i].DataURL),
-			slog.String("err", r.err.Error()), slog.String("message", verb+" revocation point for "+crlPoints[i].IssuerSubjectKeyID+" at "+crlPoints[i].DataURL))
+			slog.Any("err", r.err), slog.String("message", verb+" revocation point for "+crlPoints[i].IssuerSubjectKeyID+" at "+crlPoints[i].DataURL))
 	}
 	if len(lookup.entries) == 0 && transient > 0 {
 		return revocationLookup{}, dclErrorf("All CRL downloads failed for AKID %s", akid)

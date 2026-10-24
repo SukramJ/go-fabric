@@ -396,6 +396,7 @@ func (b *Bridge) bindEstablishedSession(src net.Addr, h any) {
 	}
 	if sid, ok := rep.establishedSession(); ok && sid != 0 {
 		b.bindSessionRoute(sid, src)
+		b.recordSessionsOpen()
 	}
 }
 
@@ -426,6 +427,7 @@ func (b *Bridge) closeConnRoute(r *connRoute) {
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	b.unbindSessionRoute(sessionID)
+	b.recordSessionsOpen()
 }
 
 // receive is the transport-neutral receive entry: buf is one complete
@@ -560,7 +562,7 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	if err := reg.Close(sid); err != nil {
 		b.logger.Debug("matter.tcp.evict.miss",
 			slog.Int("session_id", int(sid)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	b.diagRing().Record(diagevent.Event{

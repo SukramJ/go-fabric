@@ -328,7 +328,7 @@ func (c *CommissionerControl) approve(request CommissioningApprovalRequest) {
 	case d := <-done:
 		switch {
 		case d.err != nil:
-			c.log.Warn("matter.commissioner_control.approval_failed", slog.Uint64("request_id", request.RequestID), slog.String("err", d.err.Error()))
+			c.log.Warn("matter.commissioner_control.approval_failed", slog.Uint64("request_id", request.RequestID), slog.Any("err", d.err))
 		case d.approved:
 			status = commctrldef.StatusSuccess
 		}
@@ -351,7 +351,7 @@ func (c *CommissionerControl) approve(request CommissioningApprovalRequest) {
 	if err := c.Emit(endpoint, commctrldef.EventCommissioningRequestResult, commctrldef.CommissioningRequestResultEvent{
 		RequestId: request.RequestID, ClientNodeId: request.ClientNodeID, StatusCode: status, FabricIndex: request.FabricIndex,
 	}); err != nil {
-		c.log.Warn("matter.commissioner_control.event_failed", slog.String("err", err.Error()))
+		c.log.Warn("matter.commissioner_control.event_failed", slog.Any("err", err))
 	}
 }
 
@@ -483,7 +483,7 @@ func (c *CommissionerControl) commission(rc ReverseCommissioning) {
 	ctx, cancel := context.WithTimeout(c.ctx, rc.CommissioningTimeout)
 	defer cancel()
 	if err := c.cfg.Commissioner.CommissionNode(ctx, rc); err != nil {
-		c.log.Warn("matter.commissioner_control.commission_failed", slog.Uint64("request_id", rc.Request.RequestID), slog.String("err", err.Error()),
+		c.log.Warn("matter.commissioner_control.commission_failed", slog.Uint64("request_id", rc.Request.RequestID), slog.Any("err", err),
 			slog.String("message", "Failed to reverse commission the fabric bridge"))
 		return
 	}

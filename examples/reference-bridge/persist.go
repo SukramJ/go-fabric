@@ -38,7 +38,7 @@ func restoreBlind(ctx context.Context, st settings, b *demoBlind, logger *slog.L
 	}
 	b.persist = func(pos uint16) {
 		if err := st.SetSetting(context.WithoutCancel(ctx), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
-			logger.Warn("blind.persist", slog.String("err", err.Error()))
+			logger.Warn("blind.persist", slog.Any("err", err))
 		}
 	}
 }

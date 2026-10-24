@@ -419,7 +419,7 @@ func (r *SubtypeResponder) answerHost(buf []byte, ifIndex int, src net.Addr) {
 	}
 	out, err := reply.msg.Pack()
 	if err != nil {
-		r.logger.Debug("matter.mdns.host.pack_err", slog.String("err", err.Error()))
+		r.logger.Debug("matter.mdns.host.pack_err", slog.Any("err", err))
 		return
 	}
 	if reply.unicast {

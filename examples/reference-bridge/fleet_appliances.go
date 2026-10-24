@@ -329,7 +329,7 @@ func (w *demoWasher) reportError(id opdef.ErrorStateEnum) error {
 	// AllClustersTestInstance.ts OnFault: startBlocked for 1 and 2).
 	w.startBlocked = id != opdef.ErrorStateNoError
 	w.mu.Unlock()
-	slog.Info("washer.error", slog.String("device", w.name), slog.Int("error", int(id)))
+	slog.Info("washer.error", slog.String("device", w.name), slog.Int("error_state", int(id)))
 	return ops.Set(opdef.Patch{OperationalError: &opdef.ErrorStateStruct{ErrorStateId: id}})
 }
 
@@ -585,7 +585,7 @@ func (v *demoVacuum) reportError(id rvcopdef.ErrorStateEnum) error {
 	if d == nil {
 		return errNotBuilt
 	}
-	slog.Info("vacuum.error", slog.String("device", v.name), slog.Int("error", int(id)))
+	slog.Info("vacuum.error", slog.String("device", v.name), slog.Int("error_state", int(id)))
 	return d.RvcOperationalState().Set(rvcopdef.Patch{OperationalError: &rvcopdef.ErrorStateStruct{ErrorStateId: id}})
 }
 

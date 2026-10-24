@@ -135,7 +135,7 @@ func (r *Responder) EnablePeerForScope(peer Peer, scope string, storage Storage,
 	if existing, ok := r.scopes[key]; ok {
 		if !sameStorage(existing.storage, storage) || !reflect.DeepEqual(existing.cfg, cfg) {
 			if r.activeForLocked(key) != nil {
-				r.logger.Warn("bdx.enable_refused", slog.String("scope", scope), slog.Uint64("peer", peer.NodeID),
+				r.logger.Warn("bdx.enable_refused", slog.String("scope", scope), slog.Uint64("node_id", peer.NodeID),
 					slog.String("reason", "different storage or config while a transfer is active"))
 				return false
 			}
@@ -304,7 +304,7 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 	r.register(s)
 	_, err = Serve(sessCtx, m, opts)
 	if err != nil {
-		r.logger.Warn("bdx.transfer_failed", slog.String("scope", scope), slog.Uint64("peer", peer.NodeID), slog.String("err", err.Error()))
+		r.logger.Warn("bdx.transfer_failed", slog.String("scope", scope), slog.Uint64("node_id", peer.NodeID), slog.Any("err", err))
 	}
 	r.unregister(s)
 }
@@ -320,7 +320,7 @@ func (r *Responder) refuse(ctx context.Context, ex Exchange, m *Messenger, err e
 		}
 		_ = m.SendError(ctx, be.Code)
 	}
-	r.logger.Warn("bdx.session_failed", slog.String("err", err.Error()))
+	r.logger.Warn("bdx.session_failed", slog.Any("err", err))
 }
 
 func (r *Responder) register(s *ServerSession) {

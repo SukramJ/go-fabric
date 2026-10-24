@@ -175,7 +175,16 @@ type Config struct {
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.
 	Observers Observers
+	// Metrics receives the node's named counters and gauges ([Metrics],
+	// the Metric… constants); nil records nothing. node/metrics/expvar
+	// publishes them on expvar.
+	Metrics Metrics
+	// Diagnostics sizes the node's diagnostic trace ([Diagnostics],
+	// [Node.DiagnosticEvents]); the zero value keeps 256 events.
+	Diagnostics Diagnostics
 	// Logger is the node's logger; nil is slog.Default().
+	// docs/guides/observability.md names the attribute keys and event
+	// prefixes the module logs with.
 	Logger *slog.Logger
 	// Clock is the node's time source; nil is [clock.System]. The node
 	// hands it to the bridge (every device-side interval: the ack pump,

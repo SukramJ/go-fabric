@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -260,6 +261,8 @@ func TestListenerRecoversHandlerPanic(t *testing.T) {
 			panic("boom")
 		}
 	}, 0)
+	var hooked atomic.Int32
+	l.OnPanicRecovered(func() { hooked.Add(1) })
 	c := dialRaw(t, l)
 	if _, err := c.Write(append(frameOf([]byte{1}), frameOf([]byte{2})...)); err != nil {
 		t.Fatal(err)
@@ -269,6 +272,10 @@ func TestListenerRecoversHandlerPanic(t *testing.T) {
 	if l.RecoveredPanics() != 1 {
 		t.Fatalf("recovered = %d", l.RecoveredPanics())
 	}
+	if hooked.Load() != 1 {
+		t.Errorf("OnPanicRecovered hook ran %d times, want 1", hooked.Load())
+	}
+	l.OnPanicRecovered(nil)
 }
 
 func TestListenNilHandlerAndBadAddress(t *testing.T) {

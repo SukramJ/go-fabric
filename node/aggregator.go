@@ -107,7 +107,8 @@ type Aggregator struct {
 	// snapshot could install last, dropping a just-added device and, on a
 	// model-complete set, releasing its endpoint number.
 	reassembleMu sync.Mutex
-	// reassemblies counts the successful reassemblies (tests).
+	// reassemblies counts the successful reassemblies (tests; the
+	// aggregator.reassemblies metric counts beside it).
 	reassemblies atomic.Int64
 }
 
@@ -310,7 +311,7 @@ func (p *Partition) Remove(ctx context.Context, key device.SourceKey) error {
 func (p *Partition) MarkComplete() {
 	err := p.Batch(context.Background(), func(b *Batch) error { b.MarkComplete(); return nil })
 	if err != nil {
-		p.a.n.logger.Warn("node.aggregator.mark_complete", slog.String("scope", p.scope), slog.String("err", err.Error()))
+		p.a.n.logger.Warn("node.aggregator.mark_complete", slog.String("scope", p.scope), slog.Any("err", err))
 	}
 }
 
@@ -581,6 +582,7 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
 	a.reassemblies.Add(1)
+	a.n.count(MetricAggregatorReassemblies)
 	return nil
 }
 

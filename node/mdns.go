@@ -50,7 +50,7 @@ func (n *Node) defaultAdvertiser() mdns.Advertiser {
 	zc.HostName = m.HostName
 	responder, err := mdns.NewSubtypeResponder(n.logger)
 	if err != nil {
-		n.logger.Warn("mdns.subtype_responder", slog.String("err", err.Error()),
+		n.logger.Warn("mdns.subtype_responder", slog.Any("err", err),
 			slog.String("hint", "discriminator-filtered browse will find nothing"))
 		return zc
 	}

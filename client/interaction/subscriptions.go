@@ -16,7 +16,7 @@ import (
 type SubscriptionsConfig struct {
 	// Clock paces the liveness timer; nil is the system clock.
 	Clock exchange.Clock
-	// Logger receives the diagnostics; nil discards them.
+	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 	// ReportStarted is called when a report the peer pushes starts
 	// arriving on one of its subscriptions, with the session it arrived
@@ -65,7 +65,7 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 		r.clock = exchange.SystemClock{}
 	}
 	if r.log == nil {
-		r.log = slog.New(slog.DiscardHandler)
+		r.log = slog.Default()
 	}
 	r.readingCtx, r.readingCancel = context.WithCancel(context.Background())
 	return r
@@ -337,8 +337,8 @@ func (s *Subscription) timeout() time.Duration {
 // timedOut closes a subscription past its deadline (PeerSubscription.ts:42-53).
 func (s *Subscription) timedOut() {
 	s.log.Info("matter.controller.interaction.subscription_timed_out",
-		slog.Uint64("subscription", uint64(s.ID())), slog.Int("fabric_index", int(s.peer.FabricIndex)),
-		slog.Uint64("peer_node", s.peer.NodeID), slog.Duration("timeout", s.timeout()))
+		slog.Uint64("subscription_id", uint64(s.ID())), slog.Int("fabric_index", int(s.peer.FabricIndex)),
+		slog.Uint64("node_id", s.peer.NodeID), slog.Duration("timeout", s.timeout()))
 	s.Close()
 }
 

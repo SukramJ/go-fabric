@@ -438,17 +438,17 @@ type CommissioningCompleteResponse struct {
 func (g *GeneralCommissioning) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	cmdName := gencommCmdName(cmdID)
 	g.logger().Info("matter.gencomm.cmd",
-		slog.String("cmd", cmdName),
-		slog.String("cmdID", fmt.Sprintf("0x%02X", cmdID)))
+		slog.String("command_name", cmdName),
+		slog.String("command", fmt.Sprintf("0x%02X", cmdID)))
 	resp, err := g.dispatchCmd(ctx, cmdID, fields)
 	if err != nil {
 		g.logger().Warn("matter.gencomm.cmd_err",
-			slog.String("cmd", cmdName),
-			slog.String("err", err.Error()))
+			slog.String("command_name", cmdName),
+			slog.Any("err", err))
 	} else {
 		g.logger().Info("matter.gencomm.cmd_ok",
-			slog.String("cmd", cmdName),
-			slog.String("respType", fmt.Sprintf("%T", resp)))
+			slog.String("command_name", cmdName),
+			slog.String("response_type", fmt.Sprintf("%T", resp)))
 	}
 	return resp, err
 }

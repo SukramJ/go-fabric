@@ -160,7 +160,7 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
 	acl, err := n.st.ListACL(ctx, fabricIndex)
 	if err != nil {
-		n.logger.Warn("ota.provider.acl_list", slog.String("err", err.Error()))
+		n.logger.Warn("ota.provider.acl_list", slog.Any("err", err))
 		return
 	}
 	cluster := provdef.ClusterID
@@ -177,7 +177,7 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 		Targets: []store.ACLTarget{{Endpoint: &ep, Cluster: &cluster}},
 	}
 	if err := n.st.ReplaceACL(ctx, fabricIndex, append(acl, entry)); err != nil {
-		n.logger.Warn("ota.provider.acl_add", slog.String("err", err.Error()))
+		n.logger.Warn("ota.provider.acl_add", slog.Any("err", err))
 		return
 	}
 	// The ACL changed: DataVersion and AccessControlEntryChanged, as

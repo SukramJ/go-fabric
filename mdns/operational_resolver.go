@@ -96,7 +96,7 @@ func (r *OperationalResolver) ResolveOperational(ctx context.Context, compressed
 	res := newResolution(OperationalInstanceQName(compressedFabricID, nodeID))
 	send := func() {
 		if err := conn.Send(res.query()); err != nil {
-			r.logger.Debug("matter.mdns.resolve.send", slog.String("instance", res.instance), slog.String("err", err.Error()))
+			r.logger.Debug("matter.mdns.resolve.send", slog.String("instance", res.instance), slog.Any("err", err))
 		}
 	}
 	send()

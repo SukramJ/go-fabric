@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6317,
+  "entry_points": 6335,
   "entry_packages": [
     ".",
     "bdx",
@@ -199,8 +199,10 @@
     "internal/chiptool",
     "internal/clockvar",
     "internal/paritytest",
+    "internal/serialqueue",
     "mdns",
     "node",
+    "node/metrics/expvar",
     "parity",
     "schema",
     "script/apidiff",
@@ -212,6 +214,7 @@
     "script/docscheck",
     "script/errprefix",
     "script/reachability",
+    "script/slogkeys",
     "script/testparity",
     "secure",
     "secure/aesccm",
@@ -234,9 +237,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14581,
-    "reachable": 10151,
-    "whitelisted": 4427,
+    "total_exported": 14614,
+    "reachable": 10178,
+    "whitelisted": 4433,
     "unreachable": 3
   },
   "by_package": [
@@ -890,77 +893,77 @@
       "identifier": "TestBridge_PaseAbortedByPeerStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 359
+      "line": 369
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_BelowCapKeepsWindowOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 82
+      "line": 92
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_NoWindowIsNilSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 123
+      "line": 133
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_ResetGivesFreshBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 101
+      "line": 111
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_RevokesWindowAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 66
+      "line": 67
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedBeforePake3Reply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 407
+      "line": 417
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedOnPake1Failure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 244
+      "line": 254
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockedOutAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 141
+      "line": 151
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutBacksOffOnRepeatedCaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 305
+      "line": 315
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutExpiresOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 272
+      "line": 282
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockout_SurvivesInternalRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 198
+      "line": 208
     },
     {
       "package": "bridge",
@@ -3645,6 +3648,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestMetricsPortAttach",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/metrics_internal_test.go",
+      "line": 47
+    },
+    {
+      "package": "bridge",
       "identifier": "TestModeBaseOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/appliance_clusters_wire_test.go",
@@ -5937,49 +5947,49 @@
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 403
+      "line": 409
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseSessionSendsCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 643
+      "line": 649
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseTimerExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 481
+      "line": 487
     },
     {
       "package": "client/exchange",
       "identifier": "TestDefaultsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 752
+      "line": 758
     },
     {
       "package": "client/exchange",
       "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 157
+      "line": 158
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 506
+      "line": 512
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "client/exchange",
@@ -6126,7 +6136,7 @@
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 365
+      "line": 371
     },
     {
       "package": "client/exchange",
@@ -6196,7 +6206,7 @@
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 590
+      "line": 596
     },
     {
       "package": "client/exchange",
@@ -6238,49 +6248,49 @@
       "identifier": "TestRetransmissionOptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 300
+      "line": 306
     },
     {
       "package": "client/exchange",
       "identifier": "TestRetransmissionSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 245
+      "line": 246
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 193
+      "line": 194
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondSendWhileUnackedIsFlowError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 138
+      "line": 139
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecureSessionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 551
+      "line": 557
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 336
+      "line": 342
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "client/exchange",
@@ -6294,7 +6304,7 @@
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 670
+      "line": 676
     },
     {
       "package": "client/exchange",
@@ -6322,21 +6332,21 @@
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 220
+      "line": 221
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 715
+      "line": 721
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 69
+      "line": 70
     },
     {
       "package": "client/exchange",
@@ -21022,14 +21032,14 @@
       "identifier": "TestADeclaredSelectionTheServerDoesNotServeIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 133
+      "line": 140
     },
     {
       "package": "device",
       "identifier": "TestADefaultSelectionKeepsTheGeneratedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 154
+      "line": 161
     },
     {
       "package": "device",
@@ -21079,6 +21089,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_internal_test.go",
       "line": 142
+    },
+    {
+      "package": "device",
+      "identifier": "TestBaseOptionalConformsAndRefuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/base_test.go",
+      "line": 77
+    },
+    {
+      "package": "device",
+      "identifier": "TestBaseOptionalOnEveryType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/base_test.go",
+      "line": 38
+    },
+    {
+      "package": "device",
+      "identifier": "TestBaseOptionalServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/base_test.go",
+      "line": 21
     },
     {
       "package": "device",
@@ -21197,7 +21228,7 @@
       "identifier": "TestDimmableLightCouplesItsServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 177
+      "line": 184
     },
     {
       "package": "device",
@@ -21597,6 +21628,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
       "line": 51
+    },
+    {
+      "package": "diagevent",
+      "identifier": "TestObserve",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 146
     },
     {
       "package": "diagevent",
@@ -26612,6 +26650,13 @@
     },
     {
       "package": "node",
+      "identifier": "Metrics",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "node/metrics.go",
+      "line": 12
+    },
+    {
+      "package": "node",
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
@@ -30913,7 +30958,7 @@
       "identifier": "TestBindAddrDefaultsIPv6First",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 291
+      "line": 298
     },
     {
       "package": "transport/tcp",
@@ -30927,7 +30972,7 @@
       "identifier": "TestDialerRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 300
+      "line": 307
     },
     {
       "package": "transport/tcp",
@@ -30955,70 +31000,70 @@
       "identifier": "TestListenNilHandlerAndBadAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 274
+      "line": 281
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerCloseClosesConnectionsAndNotifies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 215
+      "line": 216
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerClosesOnMalformedLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 150
+      "line": 151
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerDeliversInOrderAndReleaseLetsNextThrough",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 110
+      "line": 111
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerEchoRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 80
+      "line": 81
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerIdleTimeoutClosesSilentConnection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 171
+      "line": 172
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerIdleTimeoutStopsAtFirstMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 180
+      "line": 181
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerPeerCloseNotifies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 241
+      "line": 242
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerPerPeerIPCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 194
+      "line": 195
     },
     {
       "package": "transport/tcp",
       "identifier": "TestListenerRecoversHandlerPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/listener_test.go",
-      "line": 255
+      "line": 256
     },
     {
       "package": "transport/tcp",

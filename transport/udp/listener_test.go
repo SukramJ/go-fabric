@@ -187,6 +187,9 @@ func TestPanicInHandlerIsRecoveredCountedAndLogged(t *testing.T) {
 	// The listener logs through the logger it was built with (Config.Logger,
 	// slog.Default() at construction), so the test hands it one.
 	a.log = slog.New(slog.NewTextHandler(&lockedWriter{mu: &logMu, w: &logBuf}, &slog.HandlerOptions{Level: slog.LevelError}))
+	// The hook a metrics port counts with runs once per recovered panic.
+	hooked := make(chan struct{}, 2)
+	a.OnPanicRecovered(func() { hooked <- struct{}{} })
 
 	survived := make(chan struct{}, 1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -246,6 +249,14 @@ func TestPanicInHandlerIsRecoveredCountedAndLogged(t *testing.T) {
 			}
 			if !strings.Contains(logged, "handler exploded") {
 				t.Errorf("panic value missing from log; log = %q", logged)
+			}
+			select {
+			case <-hooked:
+			case <-time.After(time.Second):
+				t.Error("OnPanicRecovered's hook did not run")
+			}
+			if len(hooked) != 0 {
+				t.Error("the hook ran twice for one panic")
 			}
 			return
 		case <-time.After(50 * time.Millisecond):

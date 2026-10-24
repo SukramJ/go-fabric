@@ -149,7 +149,7 @@ func (st *sustainedState) logLocalFailure(what string, err error) {
 	if first {
 		logf = st.log.Warn
 	}
-	logf("matter.controller.interaction.sustain_local_failure", slog.String("what", what), slog.String("err", err.Error()))
+	logf("matter.controller.interaction.sustain_local_failure", slog.String("what", what), slog.Any("err", err))
 }
 
 // delivering is the consumer reached through deliver, nil without one
@@ -277,7 +277,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if !trusted {
 			if !c.provider.VerifyReachability(ctx) && ctx.Err() == nil {
 				// Probing failed, so we get a new session anyway.
-				c.log.Info("matter.controller.interaction.sustain_probe_failed", slog.Uint64("peer_node", outer.peer.NodeID))
+				c.log.Info("matter.controller.interaction.sustain_probe_failed", slog.Uint64("node_id", outer.peer.NodeID))
 			}
 			if ctx.Err() != nil {
 				return
@@ -305,7 +305,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			outer.setActive(false)
 			retry := schedule.next()
 			c.log.Info("matter.controller.interaction.sustain_retry",
-				slog.Uint64("peer_node", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("err", err.Error()))
+				slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.Any("err", err))
 			if !c.sleep(ctx, retry) {
 				return
 			}
@@ -320,7 +320,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if ctx.Err() != nil {
 			return
 		}
-		c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("peer_node", outer.peer.NodeID))
+		c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
 	}
 }
 

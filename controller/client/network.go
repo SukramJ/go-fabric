@@ -249,7 +249,7 @@ func (n *Node) deliverEvent(e *EventData) {
 		if v, err := ev.Decode(e.Value); err == nil {
 			value = v
 		} else {
-			n.log.Warn("matter.controller.client.event_undecodable", slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("event", uint64(path.Event)), slog.String("err", err.Error()))
+			n.log.Warn("matter.controller.client.event_undecodable", slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("event", uint64(path.Event)), slog.Any("err", err))
 		}
 	}
 	if h := n.cfg.Hooks.Event; h != nil {

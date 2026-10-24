@@ -29,7 +29,7 @@ const groupSendAddr = "[::]:0"
 func (n *Node) startGroupSender() {
 	l, err := udp.New(udp.Config{LocalAddr: groupSendAddr, Logger: n.logger})
 	if err != nil {
-		n.logger.Warn("matter.groups.send_socket", slog.String("err", err.Error()))
+		n.logger.Warn("matter.groups.send_socket", slog.Any("err", err))
 		return
 	}
 	n.groupTx = l

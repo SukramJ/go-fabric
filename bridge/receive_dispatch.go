@@ -58,8 +58,8 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	if sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(payload)); err != nil {
 		b.logger.Warn("matter.rx.im.status_decode",
 			slog.String("src", srcString(src)),
-			slog.Int("exchange", int(proto.ExchangeID)),
-			slog.String("err", err.Error()))
+			slog.Int("exchange_id", int(proto.ExchangeID)),
+			slog.Any("err", err))
 	} else {
 		status = sr.Status
 	}
@@ -113,7 +113,7 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	}
 	b.logger.Debug("matter.rx.im.status_ack",
 		slog.String("src", srcString(src)),
-		slog.Int("exchange", int(proto.ExchangeID)),
+		slog.Int("exchange_id", int(proto.ExchangeID)),
 		slog.String("status", status.String()))
 	return nil
 }
@@ -125,7 +125,7 @@ func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, proto message.ProtocolHea
 	b.logger.Debug("matter.rx.im.unsupported",
 		slog.String("src", srcString(src)),
 		slog.Int("opcode", int(proto.Opcode)),
-		slog.String("err", err.Error()))
+		slog.Any("err", err))
 	return err
 }
 
@@ -226,7 +226,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// Diagnostic: show what we returned per path.
 	for i, r := range report.Reports {
 		b.logger.Debug("matter.tx.im.read_report",
-			slog.Int("idx", i),
+			slog.Int("path_index", i),
 			slog.Any("endpoint", r.Path.Endpoint),
 			slog.Any("cluster", r.Path.Cluster),
 			slog.Any("attribute", r.Path.Attribute),
@@ -330,7 +330,7 @@ func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string
 		b.logger.Debug("matter.tx."+op+".chunk_rejected",
 			slog.String("src", srcString(src)),
 			slog.Int("chunk", chunkIdx),
-			slog.Int("exchange", int(exchangeID)),
+			slog.Int("exchange_id", int(exchangeID)),
 			slog.String("status", status.String()))
 		return fmt.Errorf("%w: %s", errChunkRejected, status.String())
 	case <-timer.C():
@@ -338,7 +338,7 @@ func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string
 		b.logger.Debug("matter.tx."+op+".chunk_ack_timeout",
 			slog.String("src", srcString(src)),
 			slog.Int("chunk", chunkIdx),
-			slog.Int("exchange", int(exchangeID)),
+			slog.Int("exchange_id", int(exchangeID)),
 			slog.Bool("final", !chunk.MoreChunkedMessages),
 			slog.String("timeout", timeout.String()))
 		return fmt.Errorf("%w: exchange %d chunk %d after %s", errChunkUnanswered, exchangeID, chunkIdx, timeout)
@@ -453,7 +453,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, request
 			slog.Any("attribute", r.Path.Attribute),
 			slog.Any("status_code", uint8(r.Status.Status)),
 			slog.String("status_name", r.Status.Status.String()),
-			slog.Uint64("fabric", uint64(writeFabricIndex)))
+			slog.Uint64("fabric_index", uint64(writeFabricIndex)))
 	}
 	return nil
 }
@@ -909,7 +909,7 @@ func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeRespon
 		}
 		if err := adopter.AdoptFabricIndex(sessionID, noc.FabricIndex); err != nil {
 			b.logger.Debug("matter.rx.im.addnoc.adopt_failed",
-				slog.Int("session_id", int(sessionID)), slog.String("err", err.Error()))
+				slog.Int("session_id", int(sessionID)), slog.Any("err", err))
 		}
 	}
 }

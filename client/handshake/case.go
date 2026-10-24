@@ -65,7 +65,7 @@ type CASEOptions struct {
 	// before Sigma1 goes out — the exchange whose retransmission count a
 	// connection process's kick reads (PeerConnection.ts:568-594).
 	OnExchange func(x *exchange.Exchange)
-	// Logger receives the warnings and debug diagnostics; nil discards them.
+	// Logger receives the warnings and debug diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
 
@@ -101,7 +101,7 @@ type CASEOptions struct {
 func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric Fabric, peerNodeID uint64, opts CASEOptions) (*exchange.Session, bool, error) {
 	log := opts.Logger
 	if log == nil {
-		log = slog.New(slog.DiscardHandler)
+		log = slog.Default()
 	}
 	if fabric.Identity == nil || fabric.Verifier == nil {
 		return nil, false, errors.New("handshake: CASE needs an identity and a verifier")
@@ -123,7 +123,7 @@ func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric 
 	if err != nil {
 		if ctx.Err() == nil && reportsFailureToPeer(x, err) {
 			if serr := sendStatus(context.WithoutCancel(ctx), x, mrp.SCStatusGeneralFailure, statusInvalidParam); serr != nil {
-				log.Debug("matter.controller.case.invalid_param_failed", slog.String("err", serr.Error()))
+				log.Debug("matter.controller.case.invalid_param_failed", slog.Any("err", serr))
 			}
 		}
 		x.Close()
@@ -132,7 +132,7 @@ func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric 
 	x.Close()
 	if opts.Resumption != nil {
 		if err := opts.Resumption.SaveResumptionRecord(rec); err != nil {
-			log.Warn("matter.controller.case.resumption_save_failed", slog.String("err", err.Error()))
+			log.Warn("matter.controller.case.resumption_save_failed", slog.Any("err", err))
 		}
 	}
 	return s, resumed, nil
@@ -264,7 +264,7 @@ func (c *caseClient) resume(ctx context.Context, init *sigma.Initiator, record *
 	// The session is registered before Success goes out; a failure to
 	// send Success leaves it valid (:220-233).
 	if err := sendStatus(context.WithoutCancel(ctx), c.x, mrp.SCStatusGeneralSuccess, mrp.SCStatusProtocolSessionEstablishmentSuccess); err != nil {
-		c.log.Info("matter.controller.case.resume_success_failed", slog.String("err", err.Error()))
+		c.log.Info("matter.controller.case.resume_success_failed", slog.Any("err", err))
 	}
 	return s, rec, nil
 }

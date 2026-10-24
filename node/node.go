@@ -27,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/serialqueue"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -52,16 +53,19 @@ type Node struct {
 	st     store.Port
 	// ownedDB is the handle opened for Config.Store.Path, closed by Stop;
 	// nil for a host's own.
-	ownedDB    *sql.DB
-	groups     *groups.Manager
-	assembler  *endpoint.Assembler
-	br         *bridge.Bridge
-	root       *RootClusters
-	agg        *Aggregator
-	caseIDs    *caseIdentities
-	sec        *security
-	window     *commissioningHost
-	diagRing   *diagevent.Ring
+	ownedDB   *sql.DB
+	groups    *groups.Manager
+	assembler *endpoint.Assembler
+	br        *bridge.Bridge
+	root      *RootClusters
+	agg       *Aggregator
+	caseIDs   *caseIdentities
+	sec       *security
+	window    *commissioningHost
+	diagRing  *diagevent.Ring
+	// callbacks is the node's serial goroutine of the `…Async` callbacks
+	// it owns (OnDiagnosticEventAsync), running from Start to Stop.
+	callbacks  *serialqueue.Queue
 	advertiser mdns.Advertiser
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
@@ -86,6 +90,9 @@ type Node struct {
 	client   *clientStack
 	bindings *binding.Manager
 	bindSync bindingSync
+	// userLabels keeps the bridged endpoints' UserLabel lists in the
+	// store (user_labels.go).
+	userLabels userLabelSync
 	// bdx serves the BDX transfers peers open (the provider's images) and
 	// otaProvider is the OTA Software Update Provider; both nil without
 	// Config.OTAProvider (ota_provider.go).
@@ -147,7 +154,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: serialqueue.New(), bootReason: mattercore.BootReasonPowerOnReboot,
 		attestationErr: attestationErr,
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
@@ -246,9 +253,12 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.br.AttachAuxiliaryACL(n.groups)
 	// A bounded trace of the moments that explain a failed pairing
 	// (main.go:247-251 at b4ea1f96^).
-	n.diagRing = diagevent.NewRing(256)
+	n.diagRing = diagevent.NewRing(n.cfg.Diagnostics.capacity())
 	n.diagRing.SetClock(n.cfg.Clock)
 	n.br.AttachDiagnosticEvents(n.diagRing)
+	// The named counters and gauges (metrics.go), before the bridge
+	// opens a socket so its listeners' panic hook counts.
+	n.br.AttachMetrics(n.cfg.Metrics)
 
 	// --- root + Aggregator endpoints (main.go:253-321 at b4ea1f96^) ------------------
 	// UniqueID is pinned before the root is built: the host's value, or
@@ -329,7 +339,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.br.EventLog().SetCounterPersistence(func(ceiling uint64) {
 		if err := n.st.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
-			n.logger.Warn("eventlog.persist_ceiling", slog.String("err", err.Error()))
+			n.logger.Warn("eventlog.persist_ceiling", slog.Any("err", err))
 		}
 	}, 0)
 
@@ -356,7 +366,7 @@ func (n *Node) blockOnAttestationError(ctx context.Context) {
 	if n.attestationErr == nil {
 		return
 	}
-	n.logger.Error("attestation.files", slog.String("err", n.attestationErr.Error()),
+	n.logger.Error("attestation.files", slog.Any("err", n.attestationErr),
 		slog.String("hint", "new commissioning is refused until the files load; paired controllers keep working"))
 	n.SetCommissioningBlocked(ctx, n.attestationErr)
 }
@@ -408,7 +418,7 @@ func (n *Node) closeOwnedDB() {
 		return
 	}
 	if err := n.ownedDB.Close(); err != nil {
-		n.logger.Warn("node.store.close", slog.String("err", err.Error()))
+		n.logger.Warn("node.store.close", slog.Any("err", err))
 	}
 }
 
@@ -449,7 +459,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 // (main.go:263-289 at b4ea1f96^).
 func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
-		n.logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
 		return
 	}
 	compressedID, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
@@ -526,7 +536,7 @@ func (n *Node) reopenWhenIdle() {
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
-		n.logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
 		return
 	}
 	if newCompressed, newNode, ok := n.caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
@@ -639,6 +649,7 @@ func (n *Node) Start(ctx context.Context) error {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	n.started.Store(true)
+	n.callbacks.Start()
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
@@ -667,13 +678,13 @@ func (n *Node) Start(ctx context.Context) error {
 	// re-establishes before entering operational mode (main.go:461-489 at b4ea1f96^).
 	fabrics, err := n.st.ListFabrics(ctx)
 	if err != nil {
-		n.logger.Warn("fabrics.list_failed", slog.String("err", err.Error()))
+		n.logger.Warn("fabrics.list_failed", slog.Any("err", err))
 	}
 	stored := len(fabrics)
 	loaded := make([]store.FabricRecord, 0, stored)
 	for _, fabric := range fabrics {
 		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
-			n.logger.Warn("case.identity.boot_load_failed", slog.String("err", err.Error()))
+			n.logger.Warn("case.identity.boot_load_failed", slog.Any("err", err))
 			continue
 		}
 		loaded = append(loaded, fabric)
@@ -681,7 +692,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.br.ReestablishFormerSubscriptions(ctx)
 	if n.root.OTARequestor != nil {
 		if err := n.root.OTARequestor.Start(ctx); err != nil {
-			n.logger.Warn("ota.requestor_start", slog.String("err", err.Error()))
+			n.logger.Warn("ota.requestor_start", slog.Any("err", err))
 		}
 	}
 	for _, fabric := range loaded {
@@ -702,7 +713,7 @@ func (n *Node) Start(ctx context.Context) error {
 	case err != nil:
 	case stored == 0:
 		if err := n.br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
-			n.logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
+			n.logger.Warn("commissioning.own_window", slog.Any("err", err))
 		}
 	case len(loaded) == 0:
 		n.logger.Error("commissioning.no_fabric_loaded",
@@ -735,7 +746,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	}
 	if n.started.Load() {
 		if err := storeOperationalTime(ctx, n.st, n.root.GeneralDiagnostics); err != nil {
-			n.logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+			n.logger.Warn("gendiag.operational_hours.persist", slog.Any("err", err))
 		}
 		n.root.BasicInformation.EmitShutDown()
 	}
@@ -765,6 +776,8 @@ func (n *Node) Stop(ctx context.Context) error {
 	if n.agg != nil {
 		n.agg.detachAll()
 	}
+	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
+	n.callbacks.Stop()
 	_ = n.advertiser.Close()
 	n.cancel()
 	n.keeperWG.Wait()

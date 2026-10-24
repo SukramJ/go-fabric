@@ -173,6 +173,7 @@ var floors = []packageFloor{
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/internal/deviceseam",
 		min: 0,
@@ -195,6 +196,7 @@ var floors = []packageFloor{
 		min: 83,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
@@ -212,6 +214,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
 	{pkg: "github.com/SukramJ/go-fabric/script/docscheck", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/errprefix", min: 0, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, why: "test only, no statements to cover: the guard is the test"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",
 		min: 0,

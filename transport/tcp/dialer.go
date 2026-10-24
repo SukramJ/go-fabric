@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"sync/atomic"
 )
 
 // Dialer opens outgoing Matter TCP connections — the client role of
@@ -24,8 +23,13 @@ type Dialer struct {
 	// slog.Default.
 	Logger *slog.Logger
 
-	recoveredPanics atomic.Uint64
+	recoveredPanics panicCounter
 }
+
+// OnPanicRecovered sets fn to run once per handler panic a connection of
+// the dialer recovers, after it is logged; nil removes it. Safe while
+// connections serve; fn runs on the connection's reader goroutine.
+func (d *Dialer) OnPanicRecovered(fn func()) { d.recoveredPanics.set(fn) }
 
 // Dial connects to addr ("host:port"; IPv6 first, as net.Dialer
 // resolves) and starts reading it, handing every message to handler.

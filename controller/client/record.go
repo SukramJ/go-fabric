@@ -727,7 +727,7 @@ func (n *Node) saveRecordLocked() {
 		err = n.store.Save(n.cfg.ID, 0, recordCluster, values, nil)
 	}
 	if err != nil {
-		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "record"), slog.String("err", err.Error()))
+		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "record"), slog.Any("err", err))
 	}
 }
 

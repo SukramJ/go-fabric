@@ -124,7 +124,7 @@ func (c *caseIdentities) ipkCandidates(ctx context.Context, fabricIndex uint8, a
 	}
 	keys, err := c.groups.IPKKeys(ctx, fabricIndex)
 	if err != nil {
-		c.logger.Warn("case.identity.ipk_keys_failed", slog.Int("fabric_index", int(fabricIndex)), slog.String("err", err.Error()))
+		c.logger.Warn("case.identity.ipk_keys_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 	}
 	for _, k := range keys {
 		if len(k) != sigma.OperationalIPKSize {
@@ -447,7 +447,7 @@ func wireSecurity(
 	paseProvider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapter(sessions, root, pase, responderParams)
 		if err != nil {
-			logger.Warn("pase.build_failed", slog.String("err", err.Error()))
+			logger.Warn("pase.build_failed", slog.Any("err", err))
 			return nil
 		}
 		return adapter
@@ -463,7 +463,7 @@ func wireSecurity(
 	caseProvider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
 		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger)
 		if err != nil {
-			logger.Warn("case.build_failed", slog.String("err", err.Error()))
+			logger.Warn("case.build_failed", slog.Any("err", err))
 			return nil
 		}
 		return adapter
@@ -539,7 +539,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 					entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 				}
 				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
-					logger.Debug("case.initiator.resumption_persist", slog.String("err", err.Error()))
+					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
 				}
 				return nil
 			},
@@ -705,14 +705,14 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		logger.Info("case.session_established",
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
-			slog.Uint64("peer_node_id", peerNodeID))
+			slog.Uint64("node_id", peerNodeID))
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
 		// carried) with the session's shared secret.
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
 				if err := sessions.PersistResumption(context.Background(), fabricIndex, peerNodeID, id, secret, peerCATs); err != nil {
-					logger.Warn("case.resumption.persist_failed", slog.String("err", err.Error()))
+					logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
 				}
 			}
 		}

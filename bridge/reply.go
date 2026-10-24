@@ -13,6 +13,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
 	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -132,6 +133,7 @@ func (b *Bridge) sendReplyOpts(
 ) error {
 	if requestProto.ProtocolID == im.InteractionModelProtocolID {
 		b.load.imSent.Add(1)
+		b.count(contract.MetricIMSent)
 	}
 	b.mu.RLock()
 	listener := b.listener
@@ -1340,7 +1342,7 @@ func debugReplyError(logger *slog.Logger, stage string, src net.Addr, err error)
 	logger.Debug("matter.tx.reply",
 		slog.String("stage", stage),
 		slog.String("src", srcString(src)),
-		slog.String("err", err.Error()))
+		slog.Any("err", err))
 }
 
 // encodeACLEntryFields writes fields 1-4 of an AccessControlEntryStruct.

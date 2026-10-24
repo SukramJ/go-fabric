@@ -138,3 +138,49 @@ func TestSetClockStampsUnstampedEvents(t *testing.T) {
 	var nilRing *Ring
 	nilRing.SetClock(clocktest.New(at(0)))
 }
+
+// TestObserve: an observer sees every event recorded after it registered,
+// stamped as the ring stores it and in registration order; it may read
+// and record into the ring (it runs outside the lock); its copy of
+// Detail is its own; unsubscribe stops it; a nil ring never calls it.
+func TestObserve(t *testing.T) {
+	r := NewRing(4)
+	r.Record(Event{Message: "before"})
+	var order []string
+	var seen []Event
+	stopFirst := r.Observe(func(e Event) {
+		order = append(order, "first")
+		seen = append(seen, e)
+		if len(r.Snapshot()) == 0 {
+			t.Error("the observer reads an empty ring")
+		}
+		if e.Detail != nil {
+			e.Detail["changed"] = "yes"
+		}
+		if e.Message == "trigger" {
+			r.Record(Event{Message: "nested"})
+		}
+	})
+	r.Observe(func(Event) { order = append(order, "second") })
+	r.Record(Event{Message: "trigger", Detail: map[string]string{"k": "v"}})
+	if len(seen) != 2 || seen[0].Message != "trigger" || seen[1].Message != "nested" {
+		t.Fatalf("seen %+v", seen)
+	}
+	if seen[0].At.IsZero() || seen[0].Severity != SeverityInfo {
+		t.Errorf("the observer's event is not stamped: %+v", seen[0])
+	}
+	if got := r.Snapshot()[1].Detail; got["changed"] != "" {
+		t.Errorf("the observer changed the ring's Detail: %v", got)
+	}
+	if len(order) < 2 || order[0] != "first" {
+		t.Errorf("order %v", order)
+	}
+	stopFirst()
+	r.Record(Event{Message: "after"})
+	if len(seen) != 2 {
+		t.Errorf("an unsubscribed observer saw %d events", len(seen))
+	}
+	var nilRing *Ring
+	nilRing.Observe(func(Event) { t.Error("a nil ring called its observer") })()
+	r.Observe(nil)()
+}

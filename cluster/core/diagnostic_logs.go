@@ -558,13 +558,13 @@ func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector,
 	d.mu.Unlock()
 	session, ts, err := c.StartLogCollection(ctx, intent) // :65
 	if err != nil {
-		logger.Info("diaglogs.bdx.start_failed", slog.String("err", err.Error()))
+		logger.Info("diaglogs.bdx.start_failed", slog.Any("err", err))
 		return RetrieveLogsResponse{}, false
 	}
 	ex, err := opener.OpenSessionExchange(ctx, sessionID) // :67-70
 	if err != nil {
 		session.EndLogCollection(err)
-		logger.Info("diaglogs.bdx.exchange_failed", slog.String("err", err.Error()))
+		logger.Info("diaglogs.bdx.exchange_failed", slog.Any("err", err))
 		return RetrieveLogsResponse{}, false
 	}
 	m := bdx.NewMessenger(ex, logTransferTimeout)
@@ -577,7 +577,7 @@ func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector,
 	if err != nil {
 		_ = ex.Close()
 		session.EndLogCollection(err)
-		logger.Info("diaglogs.bdx.not_accepted", slog.String("err", err.Error()))
+		logger.Info("diaglogs.bdx.not_accepted", slog.Any("err", err))
 		return RetrieveLogsResponse{}, false
 	}
 	// The transfer's goroutine ends in done, which MatterQuiesce waits
@@ -588,7 +588,7 @@ func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector,
 			_ = ex.Close() // :271-278, Reset
 			session.EndLogCollection(err)
 			if err != nil {
-				logger.Info("diaglogs.bdx.transfer_failed", slog.String("err", err.Error()))
+				logger.Info("diaglogs.bdx.transfer_failed", slog.Any("err", err))
 			}
 			d.done()
 		}()

@@ -192,7 +192,7 @@ func (s *Scanner) isReachable(address string) bool {
 func (s *Scanner) handleDiscovered(p Peripheral, serviceData []byte) {
 	adv, err := btp.DecodeAdvertisementServiceData(serviceData)
 	if err != nil {
-		s.log.Debug("matter.ble.scan.not_matter", slog.String("address", p.Address), slog.String("err", err.Error()))
+		s.log.Debug("matter.ble.scan.not_matter", slog.String("address", p.Address), slog.Any("err", err))
 		return
 	}
 	dev := Device{Peripheral: p, Discriminator: adv.Discriminator, VendorID: adv.VendorID, ProductID: adv.ProductID, HasAdditionalAdvertisementData: adv.HasAdditionalAdvertisementData}
@@ -346,7 +346,7 @@ func (s *Scanner) reconcileScan(ctx context.Context, starting bool) error {
 			s.finishLocked(w, err)
 		}
 	} else {
-		s.log.Warn("matter.ble.scan.stop_failed", slog.String("err", err.Error()))
+		s.log.Warn("matter.ble.scan.stop_failed", slog.Any("err", err))
 	}
 	if starting {
 		return err

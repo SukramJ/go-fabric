@@ -153,7 +153,7 @@ func (r *OTASoftwareUpdateRequestor) runUpdateQuery(ctx context.Context) (pendin
 		// matter.js's wait for its transaction (MatterInvoke).
 		for _, a := range announced {
 			if err := r.announceOtaProvider(a.ctx, a.fabric, a.req); err != nil {
-				r.logger.Info("matter.ota.announcement_failed", slog.String("err", err.Error()))
+				r.logger.Info("matter.ota.announcement_failed", slog.Any("err", err))
 			}
 		}
 	}()
@@ -185,7 +185,7 @@ func (r *OTASoftwareUpdateRequestor) queryForUpdate(ctx context.Context) {
 	if _, err := os.Stat(path); err == nil {
 		header, verr := r.validateUpdateFile(nil)
 		if verr != nil {
-			r.logger.Info("matter.ota.file_invalid", slog.String("err", verr.Error()))
+			r.logger.Info("matter.ota.file_invalid", slog.Any("err", verr))
 			_ = os.Remove(path)
 		} else {
 			r.logger.Info("matter.ota.file_ready", slog.Uint64("version", uint64(header.SoftwareVersion)))
@@ -218,7 +218,7 @@ func (r *OTASoftwareUpdateRequestor) queryForUpdate(ctx context.Context) {
 	}
 	if err != nil {
 		// :632-637: handled as no update available.
-		r.logger.Warn("matter.ota.provider_failed", slog.Uint64("provider", provider.ProviderNodeId), slog.String("err", err.Error()))
+		r.logger.Warn("matter.ota.provider_failed", slog.Uint64("provider", provider.ProviderNodeId), slog.Any("err", err))
 		r.markActiveOtaProviderNoUpdate(ctx, *provider)
 	}
 	if outcome == outcomeFinished {
@@ -378,7 +378,7 @@ func (r *OTASoftwareUpdateRequestor) validateApplyUpdate(ctx context.Context, re
 		}
 	}
 	if err != nil {
-		r.logger.Info("matter.ota.apply_request_failed", slog.String("err", err.Error()))
+		r.logger.Info("matter.ota.apply_request_failed", slog.Any("err", err))
 		r.resetStateToIdle(otadef.ChangeReasonFailure)
 		return false
 	}
@@ -386,7 +386,7 @@ func (r *OTASoftwareUpdateRequestor) validateApplyUpdate(ctx context.Context, re
 	switch resp.Action {
 	case provdef.ApplyUpdateActionDiscontinue:
 		if err := os.Remove(r.downloadPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
-			r.logger.Warn("matter.ota.file_delete_failed", slog.String("err", err.Error()))
+			r.logger.Warn("matter.ota.file_delete_failed", slog.Any("err", err))
 		}
 		r.resetStateToIdle(otadef.ChangeReasonSuccess)
 		return false
@@ -439,7 +439,7 @@ func (r *OTASoftwareUpdateRequestor) queryOtaProvider(ctx context.Context, sess 
 		r.updateState(otadef.UpdateStateDelayedOnUserConsent, otadef.ChangeReasonSuccess, nil)
 		ok, err := r.requestUserConsent(ctx, details.softwareVersion, details.softwareVersionString)
 		if err != nil {
-			r.logger.Warn("matter.ota.consent_failed", slog.String("err", err.Error()))
+			r.logger.Warn("matter.ota.consent_failed", slog.Any("err", err))
 			r.markActiveOtaProviderNoUpdate(ctx, loc)
 			r.resetStateToIdle(otadef.ChangeReasonFailure)
 			return outcomeFinished, nil
@@ -465,14 +465,14 @@ func (r *OTASoftwareUpdateRequestor) queryOtaProvider(ctx context.Context, sess 
 	// :920-938: download.
 	file, err := r.handleDownload(ctx, sess, details.imageURI, details.softwareVersion)
 	if err != nil {
-		r.logger.Info("matter.ota.download_failed", slog.String("err", err.Error()))
+		r.logger.Info("matter.ota.download_failed", slog.Any("err", err))
 		var de *otaDownloadError
 		if errors.As(err, &de) {
 			r.emitDownloadErrorEvent(details.softwareVersion, de.bytesTransferred, de.code)
 		}
 		r.resetStateToIdle(otadef.ChangeReasonFailure)
 		if err := os.Remove(r.downloadPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
-			r.logger.Warn("matter.ota.partial_delete_failed", slog.String("err", err.Error()))
+			r.logger.Warn("matter.ota.partial_delete_failed", slog.Any("err", err))
 		}
 		return outcomeFinished, nil
 	}
@@ -547,7 +547,7 @@ func (r *OTASoftwareUpdateRequestor) handleBdxDownload(ctx context.Context, sess
 		if err == nil {
 			return nil
 		}
-		r.logger.Info("matter.ota.bdx_attempt_failed", slog.Int("attempt", attempt), slog.String("err", err.Error()))
+		r.logger.Info("matter.ota.bdx_attempt_failed", slog.Int("attempt", attempt), slog.Any("err", err))
 		if attempt >= otaBdxDownloadAttempts || ctx.Err() != nil {
 			code := int64(otadef.UpdateStateUnknown)
 			if be, ok := bdx.AsError(err); ok {
@@ -731,7 +731,7 @@ func (r *OTASoftwareUpdateRequestor) applyPreparedUpdate(ctx context.Context, ve
 		err = r.cfg.Applier.ApplyUpdate(ctx, version, file)
 	}
 	if err != nil {
-		r.logger.Error("matter.ota.apply_failed", slog.Uint64("version", uint64(version)), slog.String("err", err.Error()))
+		r.logger.Error("matter.ota.apply_failed", slog.Uint64("version", uint64(version)), slog.Any("err", err))
 		r.mu.Lock()
 		r.inProgress = nil
 		r.mu.Unlock()
@@ -774,7 +774,7 @@ func (r *OTASoftwareUpdateRequestor) handlePreviousUpdateOnStart(ctx context.Con
 	}
 	if err != nil {
 		// :308-312: the call is not mandatory.
-		r.logger.Info("matter.ota.notify_applied_failed", slog.String("err", err.Error()))
+		r.logger.Info("matter.ota.notify_applied_failed", slog.Any("err", err))
 		return
 	}
 	r.logger.Info("matter.ota.notified_applied", slog.Uint64("version", uint64(d.NewSoftwareVersion)))

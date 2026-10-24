@@ -4,13 +4,13 @@ Pin: `862ad75f4d3c7ab528b8a3954168146082cad8a6` (parity/schema.json matter.sourc
 
 | Metric | Count |
 |---|---|
-| Citations | 4888 |
-| Go files citing | 898 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 989 |
+| Citations | 4892 |
+| Go files citing | 901 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 993 |
 | Resolved: unique suffix | 144 |
 | Resolved: unique basename | 3755 |
-| Checked at their own `at <sha>` | 381 |
-| Drift-checked (the sentence names a name the file contains) | 2365 |
+| Checked at their own `at <sha>` | 385 |
+| Drift-checked (the sentence names a name the file contains) | 2369 |
 | Hard-checked only | 2523 |
 | **Hard errors** | 0 |
 | **Drift** | 262 |
