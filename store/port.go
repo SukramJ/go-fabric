@@ -179,6 +179,21 @@ type DoorLocks interface {
 	SaveDoorLockAuth(ctx context.Context, endpointKey string, auth DoorLockAuth) error
 }
 
+// ICD is the ICD Management server's nonvolatile state: the registered
+// Check-In clients with their keys, per fabric, and the ICDCounter. A
+// node that is no ICD never touches it.
+type ICD interface {
+	// ListICDRegistrations returns every fabric's registrations, by
+	// fabric and then in the order they first registered.
+	ListICDRegistrations(ctx context.Context) ([]ICDRegistration, error)
+	// ReplaceICDRegistrations replaces one fabric's registrations; a
+	// removed fabric takes its registrations along.
+	ReplaceICDRegistrations(ctx context.Context, fabricIndex uint8, regs []ICDRegistration) error
+	// LoadICDCounter returns ok false before the first SaveICDCounter.
+	LoadICDCounter(ctx context.Context) (counter uint32, ok bool, err error)
+	SaveICDCounter(ctx context.Context, counter uint32) error
+}
+
 // Port is the whole persistence port: every area. [Store] and
 // store/memstore implement it; node.Config.Store.Credentials takes one.
 type Port interface {
@@ -193,6 +208,7 @@ type Port interface {
 	OTA
 	ThermostatPresets
 	DoorLocks
+	ICD
 }
 
 var _ Port = (*Store)(nil)

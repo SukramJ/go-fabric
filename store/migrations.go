@@ -54,7 +54,9 @@ type Migration struct {
 //   - v5 — v0.8.3: matter_thermostat_presets.
 //   - v6 — brief BM (milestone 3, phase 17d): matter_doorlock_users,
 //     matter_doorlock_credentials, matter_doorlock_schedules.
-var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6"}
+//   - v7 — brief CH (milestone 5, phases 23 and 24):
+//     matter_icd_registrations.
+var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7"}
 
 // Migrations returns the schema's steps in order. Applied to an empty
 // database one after the other, they produce the schema [Apply] produces —

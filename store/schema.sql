@@ -347,3 +347,20 @@ CREATE TABLE IF NOT EXISTS matter_doorlock_schedules (
     operating_mode      INTEGER  NOT NULL DEFAULT 0,
     PRIMARY KEY(endpoint_key, kind, user_index, schedule_index)
 );
+
+-- matter_icd_registrations persists the ICD Management server's registered
+-- Check-In clients with their ICDToken keys: the fabric-scoped
+-- RegisteredClients (quality "N") and matter.js's nonvolatile icdKeys beside
+-- it (IcdManagementServer.ts State :787-791). position keeps the order the
+-- clients first registered; a removed fabric takes its registrations along.
+-- New in brief CH (migration v7).
+CREATE TABLE IF NOT EXISTS matter_icd_registrations (
+    fabric_index        INTEGER  NOT NULL,
+    position            INTEGER  NOT NULL,
+    check_in_node_id    BLOB     NOT NULL,
+    monitored_subject   BLOB     NOT NULL,
+    icd_key             BLOB     NOT NULL,
+    client_type         INTEGER  NOT NULL CHECK(client_type BETWEEN 0 AND 255),
+    PRIMARY KEY(fabric_index, position),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
