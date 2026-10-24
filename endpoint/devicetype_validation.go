@@ -42,7 +42,7 @@ const (
 	ViolationUnknownCondition ViolationKind = "unknownCondition"
 	// ViolationUnimplemented: a command the conformance of a server
 	// cluster requires is the server's unimplemented stub — matter.js's
-	// ClusterElementError "Throws unimplemented exception"
+	// "Throws unimplemented exception" of #validateRequiredCommands
 	// (ValidatedElements.ts:357-372 at 862ad75f), which matter.js logs, and
 	// under strict validation refuses, when it constructs the behavior,
 	// not as a device-type violation. Its DeviceType names the cluster,

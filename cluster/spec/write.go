@@ -304,7 +304,7 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // with CONSTRAINT_ERROR ([ErrConformance], [ErrEnumValueConformance],
 // [ErrUnknownEnumValue]). Mirrors matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
-// (createStructValidator) over conformance.ts:19-60
+// (createStructValidator) over conformance.ts:19-55
 // (createConformanceValidator) and conformance-compiler.ts:87-220
 // (astToFunction) at 862ad75f.
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {

@@ -305,7 +305,8 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		return err
 	}
 	// A struct's fields are held to their conformance as well (matter.js
-	// validates the written state, ValueValidator.ts:392-467).
+	// validates the written state,
+	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
 	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
 		return err
 	}

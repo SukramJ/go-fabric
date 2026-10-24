@@ -1454,7 +1454,7 @@ func referenceOf(raw json.RawMessage) string {
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
-// DefaultValue.ts:55-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault. A unit the type name does not scale, and
 // every other field value or list, is not rendered.

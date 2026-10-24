@@ -121,7 +121,7 @@ type confChoice struct {
 // confLocation is what a struct's validation hands each field's
 // validator: the struct the field sits in (siblings), the choice counts,
 // and the resolvers of a name the struct does not hold
-// (ValueValidator.ts:411-418 sublocation).
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:411-418 sublocation).
 type confLocation struct {
 	siblings reflect.Value
 	fields   *Struct
@@ -645,7 +645,7 @@ func literalOf(text string) confValue {
 }
 
 // fieldValidator judges one field's presence and, for an enum, its value
-// against the conformance (astToFunction, conformance-compiler.ts:126-220,
+// against the conformance (astToFunction, conformance-compiler.ts:87-220,
 // with addEnumMemberValidation :763-868).
 type fieldValidator func(own confValue, loc *confLocation) error
 
@@ -787,7 +787,9 @@ func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main
 
 // checkFieldConformance judges every field of the struct value rv against
 // its conformance with the struct as the record, then the choice groups'
-// counts (createStructValidator, ValueValidator.ts:392-467 at 862ad75f).
+// counts (createStructValidator,
+// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467 at
+// 862ad75f).
 func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Value, scope nameScope) error {
 	loc := &confLocation{siblings: rv, fields: s, choices: map[string]*confChoice{}, scope: scope}
 	for fi := range s.Fields {
@@ -830,7 +832,7 @@ func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Val
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
-// (createStructValidator) over conformance.ts:19-60
+// (createStructValidator) over conformance.ts:19-55
 // (createConformanceValidator) and conformance-compiler.ts:87-220
 // (astToFunction), :763-868 (addEnumMemberValidation) at 862ad75f.
 func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error {
