@@ -257,10 +257,13 @@ type OperationalServiceConfig struct {
 	TCPClient bool
 	TCPServer bool
 	// ICD, when non-nil, emits the `ICD` TXT key in the operational
-	// record. The bridge is not an ICD so this is always nil for the
-	// default deployment; the field is present for completeness and
-	// future ICD-proxy support.
+	// record: the node's ICD operating mode, 0 SIT or 1 LIT (matter.js
+	// MdnsAdvertisement.ts:209-211). nil for a node that is no ICD.
 	ICD *uint8
+	// OmitSessionIdleInterval leaves the SII key out: a LIT ICD SHOULD
+	// NOT advertise it (Core §9.15.1.6.2; matter.js
+	// IcdManagementServer.ts:490-494 sets no idleInterval for LIT).
+	OmitSessionIdleInterval bool
 	// Logger receives the builder's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
@@ -321,12 +324,14 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 		{Key: "SAI", Value: strconv.FormatUint(uint64(sai), 10)},
 		{Key: "SAT", Value: strconv.FormatUint(uint64(sat), 10)},
 	}
+	if cfg.OmitSessionIdleInterval {
+		txt = txt[1:]
+	}
 	if tcpFlag != 0 {
 		txt = append(txt, TXTRecord{Key: "T", Value: strconv.FormatUint(uint64(tcpFlag), 10)})
 	}
 	// ICD operating-mode hint per Matter §4.3.1.6, matter.js
-	// MdnsAdvertisement.ts:191-193. Non-ICD bridges omit this key
-	// (nil); ICD-proxy support can supply it in future.
+	// MdnsAdvertisement.ts:209-211. A node that is no ICD omits it (nil).
 	if cfg.ICD != nil {
 		txt = append(txt, TXTRecord{Key: "ICD", Value: strconv.FormatUint(uint64(*cfg.ICD), 10)})
 	}

@@ -400,6 +400,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 	}
 	if rx {
 		marker.MarkActiveRx(sessionID)
+		b.noteInboundActivity()
 		return
 	}
 	marker.MarkActiveTx(sessionID)

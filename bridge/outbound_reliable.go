@@ -9,6 +9,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -68,6 +69,12 @@ type outboundReliableTracker struct {
 	baseIntervalFor func(sessionID uint16, now time.Time) time.Duration
 	// clock stamps sentWall for the round-trip diagnostic.
 	clock clock.Clock
+	// fixedBackoff (nanoseconds) pads every wait after the exponential
+	// backoff, unamplified: an ICD's fast-poll interval (matter.js
+	// MRP.ts:134-139 fixedBackoff, :188; SessionManager
+	// localFixedMrpBackoff, set by IcdManagementServer.ts:257). Zero for a
+	// node that is no ICD.
+	fixedBackoff atomic.Int64
 }
 
 // outboundEntry captures one in-flight reliable datagram and the
@@ -131,7 +138,7 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 	// formula at transmission 0 — matter.js MRP.ts:129 evaluates the
 	// peer-appropriate base interval for every transmission including
 	// the first.
-	delay := mrp.BackoffDuration(t.baseInterval(sessionID, now), 0, rand.Float64)
+	delay := mrp.BackoffDuration(t.baseInterval(sessionID, now), 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pending[outboundKey{sessionID, counter}] = &outboundEntry{
@@ -355,7 +362,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// may have gone idle since the last attempt), margin,
 		// exponential growth past the threshold, and jitter. Mirrors
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
-		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now), p.retries, rand.Float64)
+		delay := mrp.BackoffDuration(t.baseInterval(p.sessionID, now), p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 		p.nextSendAt = now.Add(delay)
 		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram, due: due})
 	}

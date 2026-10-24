@@ -464,6 +464,10 @@ type Bridge struct {
 	// AckTracker is wired (test paths).
 	outboundReliable *outboundReliableTracker
 
+	// icd is the ICD state of a node that is an ICD (icd.go): the MRP
+	// pad, the inbound-activity hook and the advertisement source.
+	icd icdPorts
+
 	// sigma1Replied tracks the SHA-256 hash of the Sigma1 payload we
 	// already produced a Sigma2 reply for, keyed by exchangeID. Apple
 	// iOS multicasts the same Sigma1 onto IPv4 + IPv6-LL + IPv6-Global
@@ -2056,7 +2060,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 	}
 	pubCtx, cancel := clock.WithTimeout(ctx, b.clk(), b.cfg.AdvertiseTimeout)
 	defer cancel()
-	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{
+	opCfg := mdns.OperationalServiceConfig{
 		Logger:             b.logger,
 		CompressedFabricID: compressedFabricID,
 		NodeID:             nodeID,
@@ -2069,7 +2073,17 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 		// for the operational advertisement only (MdnsAdvertisement.ts:205-206).
 		TCPClient: b.cfg.TCP.Outgoing,
 		TCPServer: b.cfg.TCP.Incoming,
-	})
+	}
+	// An ICD governs its own advertised intervals: the ICD key, its
+	// threshold as SAT, and no SII while LIT (DeviceAdvertiser.ts:361-364,
+	// IcdManagementServer.ts:482-495).
+	if a, ok := b.icdAdvertisement(); ok {
+		mode := a.Mode
+		opCfg.ICD = &mode
+		opCfg.SessionActiveThreshold = uint32(a.ActiveThreshold.Milliseconds()) //nolint:gosec // G115: a uint16 of milliseconds
+		opCfg.OmitSessionIdleInterval = a.OmitIdleInterval
+	}
+	svc := mdns.BuildOperationalService(opCfg)
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Debug("matter.mdns.fabric_publish",
 			slog.String("instance", svc.InstanceName),
