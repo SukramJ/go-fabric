@@ -55,11 +55,29 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // math alone).
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
+// The defaults a zero [Config] field takes.
+const (
+	// DefaultMaxSubscriptionsPerFabric is the per-fabric subscription
+	// cap. The module's own: matter.js keeps no per-fabric quota (see
+	// notes/parity/by_design.md, "Subscribe per-fabric quota eviction");
+	// 16 is above the Matter floor of 3 (§8.5.4) with room for a home's
+	// controllers.
+	DefaultMaxSubscriptionsPerFabric = 16
+	// DefaultMaxIntervalCeilingSeconds is the publisher's ceiling on a
+	// subscription's MaxInterval: one hour, matter.js's
+	// MAX_INTERVAL_PUBLISHER_LIMIT (packages/node/src/node/server/
+	// ServerSubscription.ts:71 at 862ad75f) and chip's
+	// kSubscriptionMaxIntervalPublisherLimit.
+	DefaultMaxIntervalCeilingSeconds = 3600
+	// DefaultTickInterval is the report sweeper's period.
+	DefaultTickInterval = 250 * time.Millisecond
+)
+
 // Config tunes the manager.
 type Config struct {
 	// MaxSubscriptionsPerFabric caps the number of active
-	// subscriptions per fabric. Matter floor is 3 (§8.5.4); v1.1
-	// defaults to 16.
+	// subscriptions per fabric. Matter floor is 3 (§8.5.4); 0 is
+	// [DefaultMaxSubscriptionsPerFabric].
 	MaxSubscriptionsPerFabric int
 	// MinIntervalFloorSeconds lifts the MinIntervalFloor a subscriber
 	// requests to at least this many seconds. Zero (the default) honours
@@ -73,8 +91,8 @@ type Config struct {
 	MinIntervalFloorSeconds uint16
 	// MaxIntervalCeilingSeconds is the upper bound the bridge will
 	// accept. The bridge negotiates *down* to this value if the
-	// commissioner asked for more. Default 3600 s (1 h) — Apple Home
-	// and Google Home both stay well below.
+	// commissioner asked for more. 0 is [DefaultMaxIntervalCeilingSeconds]
+	// (1 h) — Apple Home and Google Home both stay well below.
 	MaxIntervalCeilingSeconds uint16
 	// TickInterval drives the engine's report sweeper. Smaller =
 	// finer-grained MinIntervalFloor enforcement; larger = lower
@@ -181,13 +199,13 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 // out (useful for tests of the cadence math alone).
 func NewManager(cfg Config, reporter Reporter, logger *slog.Logger) *Manager {
 	if cfg.MaxSubscriptionsPerFabric == 0 {
-		cfg.MaxSubscriptionsPerFabric = 16
+		cfg.MaxSubscriptionsPerFabric = DefaultMaxSubscriptionsPerFabric
 	}
 	if cfg.MaxIntervalCeilingSeconds == 0 {
-		cfg.MaxIntervalCeilingSeconds = 3600
+		cfg.MaxIntervalCeilingSeconds = DefaultMaxIntervalCeilingSeconds
 	}
 	if cfg.TickInterval == 0 {
-		cfg.TickInterval = 250 * time.Millisecond
+		cfg.TickInterval = DefaultTickInterval
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	if logger == nil {

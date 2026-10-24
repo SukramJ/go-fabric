@@ -81,6 +81,9 @@ type AccessControl struct {
 	// sources in a row, so it is evaluated once, as matter.js derives once
 	// per command transaction.
 	auxBatch int
+
+	// limits is what [AccessControl.SetLimits] set; a zero field is the constant.
+	limits AccessControlLimits
 }
 
 // AuxiliaryACLSource supplies the auxiliary access control entries of the
@@ -465,11 +468,11 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 		copy(out, exts)
 		return out, true
 	case accessControlAttrSubjectsPerAccessControl:
-		return accessControlSubjectsPerEntry, true
+		return a.subjectsPerEntry(), true
 	case accessControlAttrTargetsPerAccessControl:
-		return accessControlTargetsPerEntry, true
+		return a.targetsPerEntry(), true
 	case accessControlAttrAccessControlEntriesPerFabric:
-		return accessControlEntriesPerFabricLimit, true
+		return a.entriesPerFabric(), true
 	case cluster.AttrGlobalFeatureMap:
 		// FeatureMap = EXTS (Extension, bit 0). chip's MTRBaseClusters.h
 		// declares MTRAccessControlFeatureExtension = 0x1 (iOS 18.4)
@@ -710,15 +713,15 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// it; counting the client's own value here instead let a list of
 		// entries tagged with a foreign index pass the limit and then be
 		// stored, all of them, on the writer's fabric.
-		if fabricACLs := len(entries); fabricACLs > int(accessControlEntriesPerFabricLimit) {
-			return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, accessControlEntriesPerFabricLimit)
+		if fabricACLs := len(entries); fabricACLs > int(a.entriesPerFabric()) {
+			return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, a.entriesPerFabric())
 		}
 		for i, e := range entries {
-			if len(e.Subjects) > int(accessControlSubjectsPerEntry) {
-				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), accessControlSubjectsPerEntry)
+			if len(e.Subjects) > int(a.subjectsPerEntry()) {
+				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: SubjectsPerAccessControlEntry=%d > limit=%d", i, len(e.Subjects), a.subjectsPerEntry())
 			}
-			if len(e.Targets) > int(accessControlTargetsPerEntry) {
-				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), accessControlTargetsPerEntry)
+			if len(e.Targets) > int(a.targetsPerEntry()) {
+				return spec.Errorf(im.StatusResourceExhausted, "core: AccessControl.ACL[%d] write: resource exhausted: TargetsPerAccessControlEntry=%d > limit=%d", i, len(e.Targets), a.targetsPerEntry())
 			}
 			// Enum validity: reject out-of-range Privilege / AuthMode values
 			// before the semantic checks below. matter.js enforces these via

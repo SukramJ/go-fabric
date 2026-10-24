@@ -161,6 +161,9 @@ type Config struct {
 	// the host sets wins (CapabilityMinimaTest.ts "caller-provided values
 	// win").
 	CapabilityMinima CapabilityMinimaStruct
+	// Limits are the capacity limits a host may set ([Limits]); the zero
+	// value keeps every default.
+	Limits Limits
 	// Client is the node's client stack ([Client]): the socket, exchanges
 	// and peers its Binding entries reach other nodes through. The zero
 	// value runs without one.
@@ -512,6 +515,7 @@ func (c *Config) Validate() error {
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
+	errs = append(errs, c.Limits.validate()...)
 	if at := c.Attestation; at.Files != nil && (at.Chain != nil || at.CertificationDeclaration != nil) {
 		errs = append(errs, errors.New("node: Attestation.Files excludes Chain and CertificationDeclaration"))
 	} else if at.Files == nil && at.BlockCommissioningOnError {
