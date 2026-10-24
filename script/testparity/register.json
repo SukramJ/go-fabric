@@ -1537,9 +1537,17 @@
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "The node's protocol service as one unit (fabric-filtered reads and writes, subscribe/notify, feature-map publication, deprecated globals, command-field validation): covered piecemeal by the bridge and im ports; the unit port waits for the protocol service's own seam. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "node:TestProtocolServiceParityMatterJS"
+      ],
+      "missing": [
+        "tags manufacturer-specific attributes in a standard cluster with skipCustomElements",
+        "shares one state reference between local reads without a transaction",
+        "requires a transaction to read cluster state for a remote subject",
+        "rejects request with constraint violation"
+      ],
+      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse) (node/protocol_service_parity_matterjs_test.go); wildcard path flags and the transaction model have no Go subject, and a Go server leaves a request field's constraint to its handler where matter.js's ad-hoc request TLV schema refuses it.",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
