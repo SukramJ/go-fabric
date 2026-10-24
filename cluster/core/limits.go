@@ -10,15 +10,17 @@ package core
 // GroupKeyManagementServer.ts:609-610 at 862ad75f); the constants below are
 // those defaults.
 const (
-	// DefaultAccessControlEntriesPerFabric is AccessControl's
-	// AccessControlEntriesPerFabric when unset (matter.js
-	// AccessControlServer.ts:64-66).
+	// DefaultAccessControlEntriesPerFabric is the attribute's value when
+	// unset. matter.js: accessControlEntriesPerFabric = 4
+	// (AccessControlServer.ts:64-66).
 	DefaultAccessControlEntriesPerFabric = accessControlEntriesPerFabricLimit
-	// DefaultSubjectsPerAccessControlEntry is AccessControl's
-	// SubjectsPerAccessControlEntry when unset (AccessControlServer.ts:58-60).
+	// DefaultSubjectsPerAccessControlEntry is the attribute's value when
+	// unset. matter.js: subjectsPerAccessControlEntry = 4
+	// (AccessControlServer.ts:58-60).
 	DefaultSubjectsPerAccessControlEntry = accessControlSubjectsPerEntry
-	// DefaultTargetsPerAccessControlEntry is AccessControl's
-	// TargetsPerAccessControlEntry when unset (AccessControlServer.ts:61-63).
+	// DefaultTargetsPerAccessControlEntry is the attribute's value when
+	// unset. matter.js: targetsPerAccessControlEntry = 4
+	// (AccessControlServer.ts:61-63).
 	DefaultTargetsPerAccessControlEntry = accessControlTargetsPerEntry
 	// DefaultMaxGroupsPerFabric is GroupKeyManagement's MaxGroupsPerFabric
 	// when [GroupKeyMgmtConfig] leaves it 0 (GroupKeyManagementServer.ts:610).

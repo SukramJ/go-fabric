@@ -63,11 +63,10 @@ const (
 	// 16 is above the Matter floor of 3 (§8.5.4) with room for a home's
 	// controllers.
 	DefaultMaxSubscriptionsPerFabric = 16
-	// DefaultMaxIntervalCeilingSeconds is the publisher's ceiling on a
-	// subscription's MaxInterval: one hour, matter.js's
-	// MAX_INTERVAL_PUBLISHER_LIMIT (packages/node/src/node/server/
-	// ServerSubscription.ts:71 at 862ad75f) and chip's
-	// kSubscriptionMaxIntervalPublisherLimit.
+	// DefaultMaxIntervalCeilingSeconds is the publisher's ceiling: one
+	// hour. matter.js: MAX_INTERVAL_PUBLISHER_LIMIT = Hours.one
+	// (packages/node/src/node/server/ServerSubscription.ts:71 at
+	// 862ad75f); chip: kSubscriptionMaxIntervalPublisherLimit.
 	DefaultMaxIntervalCeilingSeconds = 3600
 	// DefaultTickInterval is the report sweeper's period.
 	DefaultTickInterval = 250 * time.Millisecond

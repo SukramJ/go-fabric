@@ -866,7 +866,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 204,
+    "line": 207,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -875,7 +875,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 1082,
+    "line": 1085,
     "citation": "packages/types/src/datatype/CaseAuthenticatedTag.ts:31-33",
     "resolved": "packages/types/src/datatype/CaseAuthenticatedTag.ts",
     "identifier": "getVersion",
@@ -2086,7 +2086,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 217,
+    "line": 220,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2113,7 +2113,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 669,
+    "line": 670,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",
