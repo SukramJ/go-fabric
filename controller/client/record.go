@@ -722,6 +722,9 @@ func (n *Node) updateRecord(f func(r *Record)) {
 // saveRecordLocked persists the record; a store error is logged. The
 // caller holds n.mu (or owns n exclusively).
 func (n *Node) saveRecordLocked() {
+	if n.erased {
+		return
+	}
 	values, err := n.record.encode()
 	if err == nil {
 		err = n.store.Save(n.cfg.ID, 0, recordCluster, values, nil)
