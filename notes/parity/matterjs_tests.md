@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 83 |
-| partial | 128 |
-| planned | 26 |
+| ported | 87 |
+| partial | 129 |
+| planned | 21 |
 | excluded | 87 |
 | total | 324 |
 
@@ -53,7 +53,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [node/test/behaviors/groupcast](#nodetestbehaviorsgroupcast) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/groups](#nodetestbehaviorsgroups) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/behaviors/hepa-filter-monitoring](#nodetestbehaviorshepa-filter-monitoring) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 0 | 2 | 0 |
+| [node/test/behaviors/icd-management](#nodetestbehaviorsicd-management) | 2 | 0 | 1 | 1 | 0 |
 | [node/test/behaviors/identify](#nodetestbehaviorsidentify) | 1 | 0 | 1 | 0 | 0 |
 | [node/test/behaviors/level-control](#nodetestbehaviorslevel-control) | 4 | 1 | 3 | 0 | 0 |
 | [node/test/behaviors/measurement](#nodetestbehaviorsmeasurement) | 1 | 0 | 1 | 0 | 0 |
@@ -102,7 +102,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/groups](#protocoltestgroups) | 5 | 4 | 1 | 0 | 0 |
-| [protocol/test/icd](#protocoltesticd) | 8 | 1 | 0 | 5 | 2 |
+| [protocol/test/icd](#protocoltesticd) | 8 | 5 | 0 | 1 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 1 | 2 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
@@ -365,7 +365,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | IcdManagementServerTest.ts | 1415 | planned | until M5 phase 23 | The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds. |
-| IcdModeTest.ts | 180 | planned | until M5 phase 23 | The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23. |
+| IcdModeTest.ts | 180 | partial | `icd:TestIcdModeState` | The machine on the fake clock: start, the may-enter-idle signal without a transition, the forced idle, the two wakes, the window that is never shortened, stop, the promise from one clock reading and in whole milliseconds (icd/mode_parity_matterjs_test.go). Missing: the two wall-clock steps ‚Äî MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move. Missing: ‚Äúkeeps the active deadline and promise across a forward step‚Äù; ‚Äúkeeps the active deadline and promise across a backward step‚Äù. |
 
 ## node/test/behaviors/identify
 
@@ -802,10 +802,10 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | --- | ---: | --- | --- | --- |
 | CheckInMessageTest.ts | 154 | ported | `icd/checkin:TestCheckInMessage` | The nonce, the encoding and the decoding against the CHIP SDK's three vectors, the tampered-nonce, tampered-ciphertext, wrong-key and short-payload refusals as ErrMalformed, the ICD round trip with its two-byte threshold, and the counter validation with the uint32 wrap and the refresh boundary at 2^31 (icd/checkin/checkin_parity_matterjs_test.go). |
 | FabricIcdTest.ts | 463 | planned | until M5 phase 23 | The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24. |
-| IcdCheckInBackOffTest.ts | 63 | planned | until M5 phase 23 | The device's doubling Check-In back-off, milestone 5 phase 23. |
-| IcdCheckInSenderTest.ts | 97 | planned | until M5 phase 23 | The device's Check-In sender, milestone 5 phase 23. |
-| IcdCheckInSuppressionTest.ts | 32 | planned | until M5 phase 23 | Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23. |
-| IcdCounterTest.ts | 60 | planned | until M5 phase 23 | The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23. |
+| IcdCheckInBackOffTest.ts | 63 | ported | `icd:TestDoublingCheckInBackOff` | The doubling gap capped at the maximum back-off, the one-cycle cap, recordAnswered, resetAll and forget, keyed by icd.ClientKey for matter.js's string key (icd/backoff_parity_matterjs_test.go). |
+| IcdCheckInSenderTest.ts | 97 | ported | `icd:TestIcdCheckInSender` | A decodable 0x50 to the resolved address, and false without an error for an unresolvable client, a failed send and a failing collaborator ‚Äî matter.js's throw is a returned error (icd/sender_parity_matterjs_test.go). |
+| IcdCheckInSuppressionTest.ts | 32 | ported | `icd:TestIsMonitoredSubjectCovered` | A monitored subject covered by a subscription's node id or by a CAT of a later version, and not covered otherwise; Go carries a session's CATs as the 32-bit tags (icd/suppression_parity_matterjs_test.go). |
+| IcdCounterTest.ts | 60 | ported | `icd:TestIcdCounter` | The boot bump, the change callback on increment and advance, the wrap at 2^32, and the refused advance as ErrCounterAdvance; the fractional and NaN advances are not representable in the Go signature, so the refusal holds the two ends of the range (icd/counter_parity_matterjs_test.go). |
 | IcdPeerScheduleTest.ts | 101 | excluded | `controller-stage` until M5 phase 24 | The controller's schedule of an ICD peer's active mode. |
 | IcdPeerWakefulnessTest.ts | 340 | excluded | `controller-stage` until M5 phase 24 | The controller's view of whether an ICD peer is awake and available. |
 
@@ -930,7 +930,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### node/test/behaviors/icd-management
 
 - `IcdManagementServerTest.ts` ‚Äî The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.
-- `IcdModeTest.ts` ‚Äî The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.
 
 ### node/test/behaviors/thread-network-diagnostics
 
@@ -966,10 +965,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### protocol/test/icd
 
 - `FabricIcdTest.ts` ‚Äî The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.
-- `IcdCheckInBackOffTest.ts` ‚Äî The device's doubling Check-In back-off, milestone 5 phase 23.
-- `IcdCheckInSenderTest.ts` ‚Äî The device's Check-In sender, milestone 5 phase 23.
-- `IcdCheckInSuppressionTest.ts` ‚Äî Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23.
-- `IcdCounterTest.ts` ‚Äî The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23.
 
 ### protocol/test/peer
 

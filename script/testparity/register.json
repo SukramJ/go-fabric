@@ -999,9 +999,15 @@
     },
     {
       "path": "packages/node/test/behaviors/icd-management/IcdModeTest.ts",
-      "status": "planned",
-      "until": "M5 phase 23",
-      "reason": "The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.",
+      "status": "partial",
+      "go": [
+        "icd:TestIcdModeState"
+      ],
+      "missing": [
+        "keeps the active deadline and promise across a forward step",
+        "keeps the active deadline and promise across a backward step"
+      ],
+      "reason": "The machine on the fake clock: start, the may-enter-idle signal without a transition, the forced idle, the two wakes, the window that is never shortened, stop, the promise from one clock reading and in whole milliseconds (icd/mode_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move.",
       "snapshotSha": "7b99feb752196c8cda93148580223886a42c2b95"
     },
     {
@@ -4053,31 +4059,39 @@
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInBackOffTest.ts",
-      "status": "planned",
-      "reason": "The device's doubling Check-In back-off, milestone 5 phase 23.",
-      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestDoublingCheckInBackOff"
+      ],
+      "reason": "The doubling gap capped at the maximum back-off, the one-cycle cap, recordAnswered, resetAll and forget, keyed by icd.ClientKey for matter.js's string key (icd/backoff_parity_matterjs_test.go).",
+      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSenderTest.ts",
-      "status": "planned",
-      "reason": "The device's Check-In sender, milestone 5 phase 23.",
-      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIcdCheckInSender"
+      ],
+      "reason": "A decodable 0x50 to the resolved address, and false without an error for an unresolvable client, a failed send and a failing collaborator — matter.js's throw is a returned error (icd/sender_parity_matterjs_test.go).",
+      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSuppressionTest.ts",
-      "status": "planned",
-      "reason": "Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23.",
-      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIsMonitoredSubjectCovered"
+      ],
+      "reason": "A monitored subject covered by a subscription's node id or by a CAT of a later version, and not covered otherwise; Go carries a session's CATs as the 32-bit tags (icd/suppression_parity_matterjs_test.go).",
+      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7"
     },
     {
       "path": "packages/protocol/test/icd/IcdCounterTest.ts",
-      "status": "planned",
-      "reason": "The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23.",
-      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIcdCounter"
+      ],
+      "reason": "The boot bump, the change callback on increment and advance, the wrap at 2^32, and the refused advance as ErrCounterAdvance; the fractional and NaN advances are not representable in the Go signature, so the refusal holds the two ends of the range (icd/counter_parity_matterjs_test.go).",
+      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250"
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerScheduleTest.ts",

@@ -47,6 +47,12 @@ const (
 	// the IM status surface (Spec §4.10.4).
 	SCOpcodeStatusReport uint8 = 0x40
 
+	// SCOpcodeIcdCheckIn is the ICD Check-In message an intermittently
+	// connected device sends unsecured and unreliably to a registered
+	// client (Spec §4.22.3; matter.js SecureMessageType.IcdCheckInMessage,
+	// IcdCheckInSender.ts:31-37).
+	SCOpcodeIcdCheckIn uint8 = 0x50
+
 	// DefaultStandaloneAckDelay is the typical piggyback grace window
 	// before a sender must emit a standalone ACK. Matter §4.12.7 leaves
 	// the exact delay implementation-defined but recommends ~200 ms so
