@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 82 |
-| partial | 127 |
-| planned | 28 |
+| partial | 128 |
+| planned | 27 |
 | excluded | 87 |
 | total | 324 |
 
@@ -78,7 +78,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/properties](#nodetestendpointproperties) | 5 | 0 | 0 | 0 | 5 |
 | [node/test/endpoint/server](#nodetestendpointserver) | 3 | 0 | 3 | 0 | 0 |
 | [node/test/endpoint/type](#nodetestendpointtype) | 4 | 0 | 1 | 1 | 2 |
-| [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 6 | 1 | 2 |
+| [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 7 | 0 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 1 | 2 | 0 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/node](#nodetestnode) | 50 | 14 | 24 | 2 | 10 |
@@ -546,7 +546,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | NodeScopeIndexTest.ts | 590 | excluded | `js-runtime-only` | An incremental index matter.js keeps to avoid rescanning the tree for node scopes. |
 | RuntimeValidationTest.ts | 1421 | partial | `endpoint:TestRuntimeValidationParityMatterJS`<br>`node:TestDeviceTypeValidationNodeParityMatterJS` | A runtime change is a new snapshot judged as one reassembly: each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree (endpoint/runtime_validation_parity_matterjs_test.go) — a destroyed child, a changed device type list, duplicate siblings, conditions asserted on the node endpoint in the test's synthetic models, a refused addition, and a later addition in strict mode refused only for what it causes; the default-configuration cases run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). The counts of judged and read endpoints, crashed endpoints, throwing judgements, peers, the observers, teardown and a factory reset of a followed endpoint have no Go subject (whole-tree pass, ADR 0016), and a singleton a runtime change misplaces is refused in every mode (ADR 0016). Missing: “judges nothing when the owner crashed”; “logs rather than fails the destruction when judging it throws”; “follows the list again after a factory reset”; “logs rather than fails the change when judging it throws”; “judges nothing for a device type an endpoint adds while it is constructed”; “judges a constant number of endpoints per identical bridged light”; “judges only above the owner when a bridged device with a part is deleted”; “judges a constant number of endpoints per deleted bridged light”; “reads no earlier light when a light asserting a condition on the node endpoint is added”; “judges the whole node scope when an endpoint supporting a network interface is added”; “judges the whole node scope when a subtree with such an endpoint is added”; “judges the whole node scope when an endpoint declaring a singleton is added”; “judges the whole node scope when an endpoint without a recorded judgement changes”; “judges the whole node scope when an endpoint without a recorded judgement is destroyed”; “judges the whole node scope when a destroyed descendant has no recorded judgement”; “judges only the node endpoint when a nested node endpoint with such a descendant is destroyed”; “judges the whole node scope when an endpoint above such an endpoint becomes a node endpoint”; “judges the whole node scope when a subtree with such an endpoint is destroyed”; “judges a constant number of endpoints per bridged lock”; “leaves an unrelated sibling's descendants unread when an addition adds nothing that reaches the node scope”; “walks the node scope again after a reset instead of reusing what an earlier pass kept”; “drops an endpoint whose addition it refused, left crashed”; “is not refused for a singleton a runtime change misplaced in an ancestor”; “judges and logs nothing and forgets every endpoint”; “judges nothing when an endpoint of a peer is destroyed”; “refuses to validate an endpoint of a peer”; “follows no endpoint”. |
 | ServerEndpointFactsTest.ts | 177 | partial | `endpoint:TestTopologyFacts`<br>`endpoint:TestParityMatterJSNodeConditions` | The facts the validator reads from a mounted endpoint are covered for device types and parts; feature codes, implemented elements and the network node conditions are not. Missing: “names server and client clusters by their model name”; “reports the features a server supports by code”; “reports the attributes, commands and events a server implements”; “answers the conditions an endpoint states”; “answers CustomNetworkConfig for a node that does not commission over BLE”; “does not answer CustomNetworkConfig for a node that commissions over BLE”; “reports the ${feature} feature of the root's NetworkCommissioning server”; “reports the network interface of a secondary interface's NetworkCommissioning server”; “reports no network interface for a node without NetworkCommissioning”. |
-| StandardDeviceTypeCorpusTest.ts | 605 | planned | until M5 | Every standard device type judged as built, with per-type state: the devicegen test builds every committed type, but judging each with matter.js's per-type state (door lock, fan, operational state, RVC modes) and the Closure TagList refusal needs the validator's corpus form. Milestone 5. |
+| StandardDeviceTypeCorpusTest.ts | 605 | partial | `device:TestStandardDeviceTypeCorpusParityMatterJS` | Every committed kit type is built with the host statements of the device fixtures but without their parts, assembled as a bridged device and judged; it may carry only the corpus's pinned components, a mandatory server only a feature selection completes, and what its Go fixture tolerates with a reason (device/standard_device_type_corpus_parity_matterjs_test.go); the names devicegen does not commit are skipped with its reason, the node's root and Aggregator, BridgedNode and OtaRequestor with the fixture table's, and the Closure TagList refusal waits for a TagList declaration (milestone 5). Missing: “refuses a Closure endpoint without the tags its Descriptor TagList requires”; “judges Aggregator”; “judges AudioDoorbell”; “judges BridgedNode”; “judges Camera”; “judges CameraController”; “judges CastingVideoClient”; “judges Chime”; “judges FloodlightCamera”; “judges Intercom”; “judges JointFabricAdministrator”; “judges NetworkInfrastructureManager”; “judges OtaRequestor”; “judges RootNode as the root endpoint of a node, which carries the standard RootNode type”; “judges SnapshotCamera”; “judges ThreadBorderRouter”; “judges VideoDoorbell”. |
 | ValidationPassTest.ts | 61 | excluded | `js-runtime-only` | A model-scoped lookup cache leaking between validation passes in matter.js. |
 
 ## node/test/endpoints
@@ -943,10 +943,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/endpoint/type
 
 - `SemanticNamespaceTest.ts` — Semantic tag namespaces as values (standard tags, custom namespaces): schema and device carry no namespace table and the device kit no TagList declaration; the subject is missing. Milestone 5.
-
-### node/test/endpoint/validation
-
-- `StandardDeviceTypeCorpusTest.ts` — Every standard device type judged as built, with per-type state: the devicegen test builds every committed type, but judging each with matter.js's per-type state (door lock, fan, operational state, RVC modes) and the Closure TagList refusal needs the validator's corpus form. Milestone 5.
 
 ### node/test/node
 

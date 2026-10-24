@@ -1839,9 +1839,30 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Every standard device type judged as built, with per-type state: the devicegen test builds every committed type, but judging each with matter.js's per-type state (door lock, fan, operational state, RVC modes) and the Closure TagList refusal needs the validator's corpus form. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "device:TestStandardDeviceTypeCorpusParityMatterJS"
+      ],
+      "missing": [
+        "refuses a Closure endpoint without the tags its Descriptor TagList requires",
+        "judges Aggregator",
+        "judges AudioDoorbell",
+        "judges BridgedNode",
+        "judges Camera",
+        "judges CameraController",
+        "judges CastingVideoClient",
+        "judges Chime",
+        "judges FloodlightCamera",
+        "judges Intercom",
+        "judges JointFabricAdministrator",
+        "judges NetworkInfrastructureManager",
+        "judges OtaRequestor",
+        "judges RootNode as the root endpoint of a node, which carries the standard RootNode type",
+        "judges SnapshotCamera",
+        "judges ThreadBorderRouter",
+        "judges VideoDoorbell"
+      ],
+      "reason": "Every committed kit type is built with the host statements of the device fixtures but without their parts, assembled as a bridged device and judged; it may carry only the corpus's pinned components, a mandatory server only a feature selection completes, and what its Go fixture tolerates with a reason (device/standard_device_type_corpus_parity_matterjs_test.go); the names devicegen does not commit are skipped with its reason, the node's root and Aggregator, BridgedNode and OtaRequestor with the fixture table's, and the Closure TagList refusal waits for a TagList declaration (milestone 5).",
       "snapshotSha": "bdfc8d3f028840052f223b3e3b1fb0f15f088d93"
     },
     {
