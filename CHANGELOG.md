@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.9] — 2026-10-24
+
 ### Added
 
 - `clock.WithTimeout(ctx, c, d)` and `clock.WithDeadline(ctx, c, at)` (brief CG): a context deadline measured on a `clock.Clock` — `context.WithTimeout` itself on `nil` and `clock.System`, a timer of the clock otherwise, so a deadline under a test's `clocktest.Fake` expires when the fake is advanced, never on the machine's time. Its `Err` and `context.Cause` are `context.DeadlineExceeded` on expiry.
