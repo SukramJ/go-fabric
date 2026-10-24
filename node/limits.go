@@ -53,8 +53,9 @@ type Limits struct {
 	// uint16 range.
 	MaxGroupsPerFabric uint16
 	// MaxGroupKeysPerFabric is GroupKeyManagement's attribute of that name
-	// and the most group key sets one fabric may hold; KeySetWrite beyond
-	// it fails with ResourceExhausted. 0 is 20
+	// and the most group key sets one fabric may hold, the IPK's implicit
+	// key set 0 counted as one (GroupKeyManagementServer.ts:379-380);
+	// KeySetWrite beyond it fails with ResourceExhausted. 0 is 20
 	// (mattercore.DefaultMaxGroupKeysPerFabric,
 	// GroupKeyManagementServer.ts:609). Bound: 1 to 65535.
 	MaxGroupKeysPerFabric uint16
