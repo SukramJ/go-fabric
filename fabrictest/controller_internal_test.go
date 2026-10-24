@@ -33,7 +33,7 @@ func TestControllerFailedStartReleasesItsAddress(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "client registry") {
 		t.Fatalf("Restart with a broken registry: %v, want the registry's error", err)
 	}
-	l, err := site.listen(c.index)
+	l, err := site.listen(c.index, nil)
 	if err != nil {
 		t.Fatalf("the failed start still holds the address: %v", err)
 	}

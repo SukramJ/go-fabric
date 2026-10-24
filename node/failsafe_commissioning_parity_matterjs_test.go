@@ -115,7 +115,9 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		}
 		spy.arm()
 		// The PASE auto-arm is 60 s (PaseSessionAutoArmSeconds).
-		site.Fake().Advance(61 * time.Second)
+		if err := site.Step(ctx, 61*time.Second); err != nil {
+			t.Fatal(err)
+		}
 		if err := site.Eventually(ctx, "the fail-safe expired", func() bool { return !armed(u) }); err != nil {
 			t.Fatal(err)
 		}
@@ -146,7 +148,9 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 		spy.arm()
 		// The commissioner armed the device's own FailSafeExpiryLengthSeconds,
 		// 900 s (flow.go defaultFailSafe from BasicCommissioningInfo).
-		site.Fake().Advance(16 * time.Minute)
+		if err := site.Step(ctx, 16*time.Minute); err != nil {
+			t.Fatal(err)
+		}
 		if err := site.Eventually(ctx, "the fail-safe expired and the fabric rolled back", func() bool {
 			return !armed(u) && fabrics(t, u) == 0
 		}); err != nil {

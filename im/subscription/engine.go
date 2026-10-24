@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 )
 
 // run is the engine's tick loop. Iterates the live subscription set
@@ -46,7 +47,9 @@ func (m *Manager) run(ctx context.Context) {
 		case <-m.stopCh:
 			return
 		case now := <-ticker.C():
+			m.inflight.Enter(inflight.SubscriptionPending)
 			m.tick(ctx, now)
+			m.inflight.Leave(inflight.SubscriptionPending)
 		}
 	}
 }
@@ -84,9 +87,11 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 		}
 		m.wg.Add(1)
 		started.Add(1)
+		m.inflight.Enter(inflight.SubscriptionPending)
 		go func() {
 			defer m.wg.Done()
 			defer started.Done()
+			defer m.inflight.Leave(inflight.SubscriptionPending)
 			defer sub.reporting.Store(false)
 			work()
 		}()

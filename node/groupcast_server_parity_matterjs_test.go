@@ -396,8 +396,7 @@ func TestGroupcastMulticastJoinFailuresParityMatterJS(t *testing.T) {
 	}
 	retry := func(t *testing.T, s setup) {
 		t.Helper()
-		s.site.Fake().Advance(30 * time.Second)
-		if err := s.site.Settle(parityCtx(t)); err != nil {
+		if err := s.site.Step(parityCtx(t), 30*time.Second); err != nil {
 			t.Fatal(err)
 		}
 	}

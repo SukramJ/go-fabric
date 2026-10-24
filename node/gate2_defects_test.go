@@ -243,16 +243,14 @@ func subscribeLevel(t *testing.T, pair *fabrictest.Pair, ep uint16) *reportedLev
 	return r
 }
 
-// waitFor advances the site's clock past the quieter's interval and waits
-// until cond holds.
+// waitFor waits until cond holds, the site moving its clock deadline by
+// deadline while it is quiet (Site.Eventually) — past the quieter's
+// interval too. The condition only reads: a clock it advanced itself
+// would move beside the site's, under a host still working (brief CG
+// §0.3).
 func waitFor(t *testing.T, site *fabrictest.Site, what string, cond func() bool) {
 	t.Helper()
-	short, cancel := context.WithTimeout(parityCtx(t), 10*time.Second)
-	defer cancel()
-	if err := site.Eventually(short, what, func() bool {
-		site.Fake().Advance(100 * time.Millisecond)
-		return cond()
-	}); err != nil {
+	if err := site.Eventually(parityCtx(t), what, cond); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -455,8 +453,7 @@ func TestThermostatControllerWriteReachesOnChanged(t *testing.T) {
 		defer rmu.Unlock()
 		return len(reported) > 0
 	})
-	site.Fake().Advance(2 * time.Second)
-	if err := site.Settle(ctx); err != nil {
+	if err := site.Step(ctx, 2*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	rmu.Lock()

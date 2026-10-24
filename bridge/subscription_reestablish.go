@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
@@ -162,7 +163,7 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 			slog.Int("fabric_index", int(k.fabricIndex)), slog.Uint64("node_id", k.nodeID))
 		return nil
 	}
-	connCtx, cancel := context.WithTimeout(ctx, subscription.ReestablishTimeout)
+	connCtx, cancel := clock.WithTimeout(ctx, b.clk(), subscription.ReestablishTimeout)
 	link, err := b.connectPeer(connCtx, k.fabricIndex, k.nodeID)
 	cancel()
 	if err != nil {

@@ -158,15 +158,21 @@ func connectPASE(ctx context.Context, cfg connectionConfig) (connectionResult, e
 	c.schedule() //nolint:contextcheck // every attempt derives its context from abortCtx
 	c.mu.Unlock()
 
-	// Drain until a winner is picked or the abort fires (:208-210).
+	// Drain until a winner is picked or the abort fires (:208-210). The
+	// winner and the abort are read in one look under c.mu: the winner's
+	// attempt records itself and aborts the others with errWon under it,
+	// so a look at the winner before and at the abort after that instant
+	// read the winner's own abort as the run's failure (the errWon flake,
+	// brief CG §3) — matter.js reads both in one turn of its event loop
+	// (CommissioningConnection.ts:208-212 at 862ad75f).
 	for {
 		c.mu.Lock()
-		winner, pending := c.winner, c.pending
+		winner, pending, aborted := c.winner, c.pending, abortCtx.Err() != nil
 		c.mu.Unlock()
 		if winner != nil {
 			return *winner, nil
 		}
-		if pending == 0 || abortCtx.Err() != nil {
+		if pending == 0 || aborted {
 			break
 		}
 		select {

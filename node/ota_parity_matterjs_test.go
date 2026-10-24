@@ -339,28 +339,30 @@ func (s *otaSite) storedInProgress(t *testing.T, d *fabrictest.Device) bool {
 // matter.js's MockTime.advance stepping the timers in order.
 const otaStep = time.Second
 
-// eventually waits for cond, moving the site's clock a step at a time.
+// eventually waits for cond, moving the site's clock a step at a time
+// (Site.Step: quiet, advance, quiet).
 func (s *otaSite) eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	ctx := parityCtx(t)
+	if err := s.site.Settle(ctx); err != nil {
+		t.Fatalf("waiting for %s: %v", what, err)
+	}
 	for !cond() {
-		if err := s.site.Settle(ctx); err != nil {
+		if err := s.site.Step(ctx, otaStep); err != nil {
 			t.Fatalf("waiting for %s: %v", what, err)
 		}
-		if cond() {
-			return
-		}
-		s.site.Fake().Advance(otaStep)
 	}
 }
 
-// advance moves the site's clock by d a step at a time.
+// advance moves the site's clock by d a step at a time (Site.Step). The
+// first step waits for the site to be quiet before it moves the clock: a
+// provider the test just released answers before time passes (the
+// TestOtaParityMatterJS flake, brief CG §3).
 func (s *otaSite) advance(t *testing.T, d time.Duration) {
 	t.Helper()
 	ctx := parityCtx(t)
 	for ; d > 0; d -= otaStep {
-		s.site.Fake().Advance(min(d, otaStep))
-		if err := s.site.Settle(ctx); err != nil {
+		if err := s.site.Step(ctx, min(d, otaStep)); err != nil {
 			t.Fatal(err)
 		}
 	}

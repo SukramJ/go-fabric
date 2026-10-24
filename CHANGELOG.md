@@ -10,10 +10,27 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `clock.WithTimeout(ctx, c, d)` and `clock.WithDeadline(ctx, c, at)` (brief CG): a context deadline measured on a `clock.Clock` — `context.WithTimeout` itself on `nil` and `clock.System`, a timer of the clock otherwise, so a deadline under a test's `clocktest.Fake` expires when the fake is advanced, never on the machine's time. Its `Err` and `context.Cause` are `context.DeadlineExceeded` on expiry.
+- `fabrictest.Site.Step(ctx, d)`: moves the site's fake clock by `d` under the quiet protocol — quiet, advance, quiet — matter.js's `await MockTime.advance(ms)`. A test that drives the clock by hand steps with it rather than with `Fake().Advance`.
+- `make stress PKG=… TESTS=…` (race detector, `golang.org/x/tools/cmd/stress`, `-p 8`, 50 runs; `STRESS_INPROC` instances per process) and `make stress-flakes`, the tests brief CG fixed; the nightly workflow runs the latter in a `flakes` job (not a required check).
+
 ### Changed
 
+- A `fabrictest` site judges quiet by its hosts' work in hand, not only by the process's goroutine states (brief CG): each device and controller counts a datagram being handled, a message an exchange's reader has not finished with, a report being sent, a host callback queued and a node's start or stop (`internal/inflight`, found on the clock the site hands the host); counted work that holds the clock a second with nothing moving no longer holds it, and the site logs it (matter.js MockTime's `MAX_HOST_ASYNC_MS`) — but for a site device's building of its node (`node.build`), which waits on no clock and holds it until done. On an in-memory site with a fake clock the process-wide goroutine check now delays a step by at most 50 ms, so other tests in the binary no longer starve a site's clock; on loopback and wall-clock sites it holds as before. `Site.Settle`'s `ErrWaited` names the work still in hand.
+- The deadlines the device's stack sets for its own work run on the component's clock (`clock.WithTimeout`): the bridge's store writes of subscriptions, mDNS publishes and withdrawals, group-membership reconcile, OTA provider connect and chunk waits, the session re-announce, the ACK pump's stop grace, a subscription's re-establishment (`subscription.ReestablishTimeout`), and `node.Node.Run`'s stop budget. On the system clock nothing changes; a host that passed `Config.Clock` now also paces those. `clock/nowalldeadline_test.go` fails the build on a `context.WithTimeout` or `context.WithDeadline` in non-test code of `bridge`, `node`, `im`, `client`, `groups`, `transport` and `mdns` (`bridge/bridgetest` excepted).
+- `fabrictest.Device.Stop` (and `Restart`) returns once the network and the hosts' counters are quiet after the node's stop, holding the clock meanwhile, so the controllers have handled the CloseSession farewells; `Device.Start` holds the clock while it builds the node.
 - The mapping module's repository is `go-hamapping` (renamed from go-hafabric, too close to go-ha2fabric); concept v7/v8, the roadmap and the README follow.
 - Concept v8 (`docs/concept-v8-fabric-server.md`, German): the family after milestone 4 — go-fabric-server in both roles (a controller server wire-compatible with matterjs-server's WebSocket API, and a bridge door for hosts not written in Go), go-ha2fabric embedding go-fabric in process, go-hamapping as a Go module; with the section on what is better than the reference and than our earlier split. The Home Assistant bridge repository is `go-ha2fabric` (renamed from go-habridge the same day); the roadmap and concept v7 follow.
+
+### Fixed
+
+- `controller/client`: a decommissioned or erased node no longer comes back into the host's store. A peer's descriptor save notifies its observers on the peer's worker goroutine from a snapshot taken before the registry unbound the node; its record write landed after `Node.Erase` (`TestRegistryDecommission`, brief CG). An erased node saves neither record nor settings.
+- `controller/commissioner`: a PASE connection whose winning attempt landed while the drain loop looked no longer fails with the losing attempt's error. The loop read the winner and the abort at two instants and took the winner's own `errWon` abort for the run's failure; both are now read in one look (the `errWon` flake; matter.js `CommissioningConnection.ts:208-212`).
+- `fabrictest`: a read right after `Device.Restart` no longer goes out on the session the device's stop just ended ("exchange: session ended by peer", `TestHostStatementName`): `Stop` waits for the controllers to handle the CloseSession.
+- `client/interaction` `TestLiveSustainedSurvivesRestart`: a restart under an outer `Site.Run` no longer lets the clock run past the controller's subscription timeout while `node.New` builds the restarted node, which replaced the sustained subscription instead of taking the node's re-established one (matter.js `SubscriptionsServerTest.ts:36-38`: the controller resubscribes only once its subscription times out).
+- Tests that drove the fake clock beside the site — `Fake().Advance` inside an `Eventually` condition (`node` `waitFor`, `TestLevelControlTransitionReachesHostAndSubscriber`), or right after releasing a held provider (`TestOtaParityMatterJS`) — step it with `Site.Step` or let `Eventually` move it; `TestSessionAndSubscriptionDiagnostics` waits for the device's PASE session to end before it connects again.
 
 ## [0.10.9] — 2026-10-24
 

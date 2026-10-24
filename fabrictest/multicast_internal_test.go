@@ -24,7 +24,7 @@ func TestMulticastModelDelivery(t *testing.T) {
 	n := newNetwork(clock.System{}, NetOptions{})
 	open := func(i int) *socketUnderTest {
 		t.Helper()
-		l, err := n.listen(hostAddr(i))
+		l, err := n.listen(hostAddr(i), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +116,7 @@ func TestMulticastModelGroupSend(t *testing.T) {
 	n := newNetwork(clock.System{}, NetOptions{})
 	open := func(i int) *socketUnderTest {
 		t.Helper()
-		l, err := n.listen(hostAddr(i))
+		l, err := n.listen(hostAddr(i), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

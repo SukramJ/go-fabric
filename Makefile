@@ -41,6 +41,34 @@ BENCH_SMOKE_TIME ?= 10x
 # committed (script/coverfloor/floors.go), the measurement never is.
 COVER_REPORT ?= coverage.out
 
+# Stress budget (make stress, make stress-flakes). -p 8 on a developer
+# machine is the load of a CI runner that runs the race job beside its
+# siblings: a test whose waits depend on the machine's speed fails here
+# rather than in a pull request. STRESS_COUNT runs per test; every run is
+# its own process, the race detector on.
+STRESS_COUNT   ?= 50
+STRESS_P       ?= 8
+STRESS_TIMEOUT ?= 10m
+# STRESS_INPROC instances of the test run in each process (-test.count): a
+# parallel test runs them side by side, the load of its package siblings.
+STRESS_INPROC  ?= 1
+
+# The tests the flake sweep (brief CG) fixed at their root, one line each:
+# <package>:<-run regexp>. make stress-flakes runs every line under make
+# stress; the nightly workflow runs it, a red line is a signal, not a gate.
+# Each line is quoted: the recipe's shell reads the list, and ( in a
+# regexp is shell syntax.
+STRESS_FLAKES = \
+	'./fabrictest:^TestHostStatementName$$' \
+	'./controller/client:^TestTypedReadsConsumer$$' \
+	'./node:^TestLevelControlTransitionReachesHostAndSubscriber$$' \
+	'./client/interaction:^TestLiveSustainedSurvivesRestart$$' \
+	'./controller/client:^TestLiveClientNode$$' \
+	'./controller/client:^TestRegistryDecommission$$' \
+	'./node:^TestOtaParityMatterJS$$' \
+	'./node:^TestSessionAndSubscriptionDiagnostics$$' \
+	'./controller/commissioner:^Test(Commissioning)?Connection'
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -88,6 +116,22 @@ test: ## run the test suite
 .PHONY: race
 race: ## run the test suite under the race detector (needs CGO)
 	CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+
+.PHONY: stress
+stress: ## run TESTS of PKG under x/tools/cmd/stress with -race, -p $(STRESS_P), -count $(STRESS_COUNT); fails on any failure
+	@test -n "$(PKG)" -a -n "$(TESTS)" || { echo "usage: make stress PKG=./node TESTS='^TestFoo$$'"; exit 2; }
+	@dir=$$(mktemp -d) && trap 'rm -rf "$$dir"' EXIT && \
+	$(GO) build -o "$$dir/stress" golang.org/x/tools/cmd/stress && \
+	CGO_ENABLED=1 $(GO) test -race -c -o "$$dir/pkg.test" $(PKG) && \
+	echo "stress $(PKG) $(TESTS): -p $(STRESS_P) -count $(STRESS_COUNT)" && \
+	cd $(PKG) && "$$dir/stress" -p $(STRESS_P) -count $(STRESS_COUNT) -timeout $(STRESS_TIMEOUT) \
+		-o "$${STRESS_OUT:-$$dir/fail-}" "$$dir/pkg.test" -test.run '$(TESTS)' -test.count=$(STRESS_INPROC)
+
+.PHONY: stress-flakes
+stress-flakes: ## make stress for every line of STRESS_FLAKES (the tests brief CG fixed); fails on the first line with a failure
+	@for line in $(STRESS_FLAKES); do \
+		$(MAKE) --no-print-directory stress PKG="$${line%%:*}" TESTS="$${line#*:}" || exit 1; \
+	done
 
 .PHONY: cover
 cover: ## run the suite with per-package statement coverage

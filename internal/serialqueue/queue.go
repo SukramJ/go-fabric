@@ -6,7 +6,11 @@
 // OnDiagnosticEventAsync). One type, so both follow one rule.
 package serialqueue
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/SukramJ/go-fabric/internal/inflight"
+)
 
 // Queue is a serial goroutine: the `…Async` callbacks run on it, one
 // after the other, in the order they were enqueued. Its owner (ADR 0026
@@ -22,9 +26,28 @@ type Queue struct {
 	// mu guards items, running and stopped; cond waits on mu.
 	mu      sync.Mutex
 	cond    *sync.Cond
-	items   []func()
+	items   []item
 	running bool
 	stopped chan struct{} // closed when the goroutine of this run exits
+	// group, when set, is the in-flight group a callback counts in from
+	// its Enqueue until it returned (internal/inflight DeviceCallbacks).
+	group func() *inflight.Group
+}
+
+// item is one queued callback and the group it is counted in.
+type item struct {
+	fn func()
+	g  *inflight.Group
+}
+
+// CountIn makes every callback enqueued from now on count as work of the
+// group group returns at its Enqueue, until it returned: a fabrictest
+// site does not move its clock while a host callback waits or runs.
+// group may return nil (no group: nothing is counted).
+func (q *Queue) CountIn(group func() *inflight.Group) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.group = group
 }
 
 // New returns a queue that is not running.
@@ -44,7 +67,12 @@ func (q *Queue) Enqueue(fn func()) {
 	if !q.running {
 		return
 	}
-	q.items = append(q.items, fn)
+	it := item{fn: fn}
+	if q.group != nil {
+		it.g = q.group()
+		it.g.Enter(inflight.DeviceCallbacks)
+	}
+	q.items = append(q.items, it)
 	q.cond.Signal()
 }
 
@@ -90,10 +118,13 @@ func (q *Queue) run(done chan struct{}) {
 			q.mu.Unlock()
 			return
 		}
-		fn := q.items[0]
-		q.items[0] = nil
+		it := q.items[0]
+		q.items[0] = item{}
 		q.items = q.items[1:]
 		q.mu.Unlock()
-		fn()
+		func() {
+			defer it.g.Leave(inflight.DeviceCallbacks)
+			it.fn()
+		}()
 	}
 }

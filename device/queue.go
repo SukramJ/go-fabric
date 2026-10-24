@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 )
 
@@ -21,7 +22,14 @@ import (
 // that called it.
 type queue = serialqueue.Queue
 
-func newQueue() *queue { return serialqueue.New() }
+// A callback counts as work of the node's in-flight group from its queuing
+// until it returned (internal/inflight DeviceCallbacks): a fabrictest site
+// does not move its clock while the host's code for a change still runs.
+func newQueue(clk *deviceClock) *queue {
+	q := serialqueue.New()
+	q.CountIn(clk.InflightGroup)
+	return q
+}
 
 // deviceClock is the time source of the servers a device builds: the
 // node's once the device is added, [clock.System] before. A timer keeps
@@ -49,6 +57,11 @@ func (c *deviceClock) setNode(n clock.Clock) {
 
 // Now implements [clock.Clock].
 func (c *deviceClock) Now() time.Time { return c.get().Now() }
+
+// InflightGroup is the in-flight group the node's clock carries
+// (internal/inflight.Of), nil before the device is added or on a clock
+// that carries none.
+func (c *deviceClock) InflightGroup() *inflight.Group { return inflight.Of(c.get()) }
 
 // AfterFunc implements [clock.Clock].
 func (c *deviceClock) AfterFunc(d time.Duration, f func()) clock.Timer {

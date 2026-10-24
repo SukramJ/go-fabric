@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
@@ -136,7 +137,7 @@ func (b *Bridge) beginSubscriptionRun() {
 		return
 	}
 	st := b.resumption.storeLocked()
-	ctx, cancel := context.WithTimeout(context.Background(), subscriptionStoreTimeout)
+	ctx, cancel := clock.WithTimeout(context.Background(), b.clk(), subscriptionStoreTimeout)
 	defer cancel()
 	rows, err := st.LoadServerSubscriptions(ctx)
 	if err != nil {
@@ -210,7 +211,7 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 		b.logger.Warn("matter.subscription.persist.encode", slog.Any("err", err))
 		return
 	}
-	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), subscriptionStoreTimeout)
+	saveCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), b.clk(), subscriptionStoreTimeout)
 	defer cancel()
 	if err := b.resumption.storeLocked().SaveServerSubscription(saveCtx, rec.SubscriptionID, rec.FabricIndex, rec.PeerNodeID, payload); err != nil {
 		b.logger.Warn("matter.subscription.persist.save",
@@ -229,7 +230,7 @@ func (b *Bridge) forgetPersistedSubscription(subID uint32) {
 	if b.resumption.disabled {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), subscriptionStoreTimeout)
+	ctx, cancel := clock.WithTimeout(context.Background(), b.clk(), subscriptionStoreTimeout)
 	defer cancel()
 	if err := b.resumption.storeLocked().DeleteServerSubscription(ctx, subID); err != nil {
 		b.logger.Warn("matter.subscription.persist.delete",
@@ -250,7 +251,7 @@ func (b *Bridge) forgetFabricSubscriptions(ctx context.Context, fabricIndex uint
 		}
 	}
 	b.resumption.former = kept
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), subscriptionStoreTimeout)
+	ctx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), b.clk(), subscriptionStoreTimeout)
 	defer cancel()
 	if err := b.resumption.storeLocked().DeleteServerSubscriptionsByFabric(ctx, fabricIndex); err != nil {
 		b.logger.Warn("matter.subscription.persist.delete_fabric",

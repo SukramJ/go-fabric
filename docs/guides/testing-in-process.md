@@ -162,16 +162,15 @@ the first test above.
 The fake moves only when the test moves it, or inside `Site.Run` and
 `Site.Eventually`, which every wire helper and `Commission` use. While the
 work has not finished they advance the clock to its next deadline each time
-the site has been quiet for the settle period (`Options.Settle`, default
-10 ms): no datagram sent or queued on the network, and no goroutine of the
-test process runnable, running or in a system call. A timer the work waits
-on — a standalone acknowledgement, a retransmission, a report interval —
-then fires; a computation in progress does not see time move under it.
-`Eventually` and `Settle` wait as long as their context allows; a context
-without a deadline is bounded by the site's own, `Options.Wait` (default
-`fabrictest.DefaultWait`, 30 s on the wall clock), after which they return
-`fabrictest.ErrWaited` — a condition that never holds fails the test
-instead of hanging it.
+the site has been quiet (see [The pacing model](#the-pacing-model)). A
+timer the work waits on — a standalone acknowledgement, a retransmission, a
+report interval — then fires; a computation in progress does not see time
+move under it. `Eventually` and `Settle` wait as long as their context
+allows; a context without a deadline is bounded by the site's own,
+`Options.Wait` (default `fabrictest.DefaultWait`, 30 s on the wall clock),
+after which they return `fabrictest.ErrWaited`, naming the work the hosts
+still hold — a condition that never holds fails the test instead of
+hanging it.
 
 ```go
 // A change made locally reaches the subscriber once the clock passes the
@@ -184,9 +183,12 @@ err := site.Eventually(ctx, "the report", func() bool { return reported() })
 `github.com/SukramJ/go-fabric/cluster/spec/onoff`); its `Set` is the
 device's own change, stored and reported.
 
-A test that steps the clock itself calls `site.Fake().Advance`. A ticker
-drops a tick its receiver has not taken, as a real one does, so a countdown
-on a ticker (Identify) is stepped one period at a time. A site given
+A test that steps the clock itself calls `site.Step(ctx, d)`: it waits
+until the site is quiet, advances the fake by `d` — every timer due in it
+fires in deadline order, each callback awaited — and waits until the site
+is quiet again (matter.js's `await MockTime.advance(ms)`). A ticker drops a
+tick its receiver has not taken, as a real one does, so a countdown on a
+ticker (Identify) is stepped one period at a time. A site given
 `Options{Clock: clock.System{}}` runs on the wall clock, and `Run` only runs
 the work.
 
@@ -194,7 +196,72 @@ The controller's DNS-SD cache (`discovery.Names`) keeps its record TTLs on
 the wall clock; the site's answers carry 120 s and 4500 s, longer than a
 test.
 
-*Source: `fabrictest/site.go` (`Run`, `Eventually`, `Settle`, `busy`),
+### The pacing model
+
+The site is quiet once, for the settle period (`Options.Settle`, default
+10 ms, on the wall clock), nothing moved, and:
+
+- no datagram waits unread on the in-memory network;
+- no host holds counted work. Each device and controller has its own
+  counters, which the components it builds find on the clock the site
+  hands them:
+
+  | Counter | From | Until |
+  | --- | --- | --- |
+  | `udp.datagrams` | the host's socket handed a datagram to its listener | the listener's handler for it returned (or the listener dropped it) |
+  | `exchange.delivered` | a client exchange queued a message for its reader | the reader's next `Next`, `Send`, `Close` or `Abort`, or the exchange's end |
+  | `subscription.pending` | the subscription engine took a tick, or started a report | the tick was walked, the report returned |
+  | `device.callbacks` | a host `…Async` callback was queued (device or node) | it returned |
+  | `node.start`, `node.stop` | a node's `Start` or `Stop` began | it returned — but for its waits on peers (re-establishing subscriptions, the client stack's close) |
+  | `node.build` | a site device's `Device.Start` began building the node | the node's own `Start` took over |
+
+  A component counts work it accepted and finishes on its own, never a
+  wait on its peer or on the clock: the peer may need the clock to move
+  (a standalone acknowledgement's timer, a retransmission after a loss).
+  Counted work that holds the clock for a second with nothing moving no
+  longer holds it, and the site logs it — matter.js MockTime abandons a
+  host operation after `MAX_HOST_ASYNC_MS` the same way. A `node.build`
+  is exempt: it waits on no clock, and under the race detector on a
+  loaded machine it can take longer than the second;
+- no goroutine of the test process is runnable, running (but the waiting
+  one) or in a system call. On an in-memory site with a fake clock this
+  check delays a step by at most 50 ms after the site's last change: it
+  stands in for work no counter names, and its bound keeps the goroutines
+  of tests running beside this one from starving the site's clock. On
+  loopback sockets, whose kernel work no counter sees, and on a wall-clock
+  site it holds as long as a goroutine works.
+
+`Device.Stop` (and `Restart`) returns once the network and every host's
+counters are quiet after the node's stop, holding the clock meanwhile: the
+controllers have handled the CloseSession farewells, so a request the test
+sends next does not go out on a session its controller is about to learn
+the device ended, and a restart under an outer `Run` does not let the
+controllers' timers run while the device is down.
+
+Two rules follow for code a site paces:
+
+- **No wall-clock deadline in paced code.** A deadline in the device's
+  stack or the client machinery is a deadline of the component's clock:
+  `clock.WithTimeout(ctx, c, d)` and `clock.WithDeadline` end the context
+  when `c` passes it — on the system clock they are `context.WithTimeout`
+  itself, on a fake when the fake is advanced. A wall-clock deadline would
+  expire on a loaded machine while the site's clock stands.
+  `clock/nowalldeadline_test.go` fails the build on a
+  `context.WithTimeout` or `context.WithDeadline` in non-test code of
+  `bridge`, `node`, `im`, `client`, `groups`, `transport` and `mdns`
+  (`bridge/bridgetest`, a wall-clock test helper by design, excepted).
+- **No `Fake().Advance` inside a condition, or while the stack may be
+  working.** A condition only reads; the site moves the clock. A test
+  that steps the clock uses `Step`, `Run` or `Eventually`.
+
+`make stress PKG=./node TESTS='^TestFoo$'` runs a test under the race
+detector in `STRESS_P` (8) processes at once, `STRESS_COUNT` (50) times,
+through `golang.org/x/tools/cmd/stress`; `STRESS_INPROC` runs that many
+instances side by side in each process. `make stress-flakes` runs the
+tests the flake sweep fixed, and the nightly workflow runs it.
+
+*Source: `fabrictest/site.go` (`Run`, `Eventually`, `Settle`, `Step`,
+`quiet`, `busy`), `internal/inflight`, `clock/context.go` (`WithTimeout`),
 `node/config.go` (`Config.Clock`), `device/queue.go` (`deviceClock`),
 `endpoint/assembler.go` (`Config.Clock`), `node/root.go`
 (`buildAggregatorClusters`), `client/discovery/names.go` (`newNames`).*
@@ -257,7 +324,8 @@ wall clock; `Topology.Configure` may set the device's listen address
 - BLE commissioning has its own in-memory pair:
   `controller/ble/bletest` with `bridgetest.ServeConn`.
 - `Run` reads goroutine states for the whole test process, so the work of a
-  parallel test in the same binary delays a clock step until it is idle.
+  parallel test in the same binary delays a clock step — by at most 50 ms
+  on an in-memory site with a fake clock, until it is idle on loopback.
 - Devices carry the CSA test attestation chain, the controllers trust the
   CSA test PAAs, and every credential is fixed and public: the package is
   for tests.

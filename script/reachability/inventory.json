@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6382,
+  "entry_points": 6398,
   "entry_packages": [
     ".",
     "bdx",
@@ -198,6 +198,7 @@
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
+    "internal/inflight",
     "internal/paritytest",
     "internal/serialqueue",
     "mdns",
@@ -237,9 +238,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14656,
-    "reachable": 10197,
-    "whitelisted": 4456,
+    "total_exported": 14676,
+    "reachable": 10212,
+    "whitelisted": 4461,
     "unreachable": 3
   },
   "by_package": [
@@ -23640,10 +23641,31 @@
     },
     {
       "package": "fabrictest",
+      "identifier": "TestBuildHoldsTheClockPastTheBudget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/pacing_internal_test.go",
+      "line": 163
+    },
+    {
+      "package": "fabrictest",
       "identifier": "TestControllerFailedStartReleasesItsAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/controller_internal_test.go",
       "line": 20
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestCountedWorkHoldsTheClock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/pacing_internal_test.go",
+      "line": 57
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestDrainHoldsTheClock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/pacing_internal_test.go",
+      "line": 122
     },
     {
       "package": "fabrictest",
@@ -23672,6 +23694,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/wall_internal_test.go",
       "line": 31
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestStep",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/pacing_internal_test.go",
+      "line": 36
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestWaitNamesTheWorkInHand",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/pacing_internal_test.go",
+      "line": 107
     },
     {
       "package": "groups",

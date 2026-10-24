@@ -27,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
@@ -154,7 +155,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	ctx := context.Background()
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: serialqueue.New(), bootReason: mattercore.BootReasonPowerOnReboot,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: mattercore.BootReasonPowerOnReboot,
 		attestationErr: attestationErr,
 	}
 	n.life, n.cancel = context.WithCancel(ctx)
@@ -632,6 +633,12 @@ func (n *Node) Start(ctx context.Context) error {
 	case n.started.Load():
 		return nil
 	}
+	// The start is work in hand of the node's in-flight group but for its
+	// wait on the controllers of re-established subscriptions: a
+	// fabrictest site does not move its clock under the start's own work,
+	// and does move it for the start's peer waits (internal/inflight).
+	work := countWork(n.cfg.Clock, inflight.NodeStart)
+	defer work.pause()
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
 	// anything goes online. Mirrors matter.js
 	// packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts
@@ -689,7 +696,9 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 		loaded = append(loaded, fabric)
 	}
+	work.pause()
 	n.br.ReestablishFormerSubscriptions(ctx)
+	work.resume()
 	if n.root.OTARequestor != nil {
 		if err := n.root.OTARequestor.Start(ctx); err != nil {
 			n.logger.Warn("ota.requestor_start", slog.Any("err", err))
@@ -738,6 +747,10 @@ func (n *Node) Stop(ctx context.Context) error {
 		return nil
 	}
 	n.stopped = true
+	// The stop is work in hand of the node's in-flight group but for the
+	// client stack's close, which waits on its peers (see Start).
+	work := countWork(n.cfg.Clock, inflight.NodeStop)
+	defer work.pause()
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
@@ -754,7 +767,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	// (BindingServer.ts:52, :160-163).
 	n.bindings.Close()
 	if n.client != nil {
+		work.pause()
 		n.client.close(ctx)
+		work.resume()
 	}
 	n.sec.pase.Stop()
 	n.window.stop()
@@ -788,6 +803,47 @@ func (n *Node) Stop(ctx context.Context) error {
 	return nil
 }
 
+// countedWork is one unit of a node's work in hand on the in-flight group
+// its clock carries (internal/inflight), paused around a wait on peers.
+type countedWork struct {
+	g    *inflight.Group
+	name string
+	held bool
+}
+
+// countWork counts one unit of name on the group clk carries.
+func countWork(clk clock.Clock, name string) *countedWork {
+	w := &countedWork{g: inflight.Of(clk), name: name}
+	w.resume()
+	return w
+}
+
+// pause stops counting the unit; a no-op when it is not counted.
+func (w *countedWork) pause() {
+	if w.held {
+		w.held = false
+		w.g.Leave(w.name)
+	}
+}
+
+// resume counts the unit again; a no-op when it is counted.
+func (w *countedWork) resume() {
+	if !w.held {
+		w.held = true
+		w.g.Enter(w.name)
+	}
+}
+
+// newCallbackQueue is the node's own `…Async` callback queue; a callback
+// counts as work of the in-flight group clk carries until it returned
+// (internal/inflight DeviceCallbacks).
+func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
+	q := serialqueue.New()
+	g := inflight.Of(clk)
+	q.CountIn(func() *inflight.Group { return g })
+	return q
+}
+
 // Run starts the node, waits for ctx to end and stops it — matter.js
 // Node.run (Node.ts:183-186).
 func (n *Node) Run(ctx context.Context) error {
@@ -795,7 +851,7 @@ func (n *Node) Run(ctx context.Context) error {
 		return err
 	}
 	<-ctx.Done()
-	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), stopTimeout)
+	stopCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), n.cfg.Clock, stopTimeout)
 	defer cancel()
 	return n.Stop(stopCtx)
 }

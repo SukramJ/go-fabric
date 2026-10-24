@@ -187,8 +187,7 @@ func TestTypedReadsConsumer(t *testing.T) {
 	// Let the site go quiet: the last reports' acknowledgements run on
 	// its fake clock, and a teardown with one in flight waits it out.
 	sub.Close()
-	site.Fake().Advance(time.Second)
-	if err := site.Settle(ctx); err != nil {
+	if err := site.Step(ctx, time.Second); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -370,7 +370,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1147,
+    "line": 1148,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -379,7 +379,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 1186,
+    "line": 1187,
     "citation": "ExchangeManager.ts:663-671",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sendCloseSession",
@@ -532,7 +532,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 53,
+    "line": 54,
     "citation": "MessageExchange.ts:1272-1273",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "suppressPeerLoss",
@@ -550,7 +550,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 194,
+    "line": 201,
     "citation": "ExchangeManager.ts:391-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "addProtocolHandler",
@@ -559,7 +559,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 201,
+    "line": 208,
     "citation": "SecureChannelProtocol.ts:146-148",
     "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
     "identifier": "CaseServer",
@@ -1643,7 +1643,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 47,
+    "line": 54,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -1652,7 +1652,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 55,
+    "line": 62,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -1661,7 +1661,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 309,
+    "line": 319,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",

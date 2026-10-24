@@ -519,7 +519,9 @@ func TestOperationalCredentialsUpdateNOC(t *testing.T) {
 		}
 
 		// The fail-safe runs out on the site's clock.
-		g.site.Fake().Advance(time.Duration(failsafeLengthS) * time.Second)
+		if err := g.site.Step(parityCtx(t), time.Duration(failsafeLengthS)*time.Second); err != nil {
+			t.Fatal(err)
+		}
 		restored := func() bool { return bytes.Equal(identity(t, dev, g.fabric).NOC, previous.NOC) }
 		if err := g.site.Eventually(parityCtx(t), "the previous credentials restored", restored); err != nil {
 			t.Fatal(err)

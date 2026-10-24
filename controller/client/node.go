@@ -44,6 +44,13 @@ type Node struct {
 	frozen bool
 	// closing: Close began; events are dropped (ClientEventEmitter.ts:47-53).
 	closing bool
+	// erased: Erase forgot the node, its store included. The record and
+	// the settings are saved no longer: a peer's descriptor save runs its
+	// observers on the peer's worker goroutine from a snapshot taken
+	// before the registry unbound the node, and its record write would
+	// land after the erase and bring the node back into the store (the
+	// TestRegistryDecommission flake, brief CG §3).
+	erased bool
 	// newlyCommissioned is Internal.isNewlyCommissioned (NetworkClient.ts:385-391).
 	newlyCommissioned bool
 	// sub is the default subscription, activeSubscription (:380-382).
@@ -296,6 +303,9 @@ func (n *Node) Endpoint(number uint16) *Endpoint {
 // saveSettingsLocked persists the settings; a store error is logged. The
 // caller holds n.mu (or owns n exclusively).
 func (n *Node) saveSettingsLocked() {
+	if n.erased {
+		return
+	}
 	values, err := n.settings.encode()
 	if err == nil {
 		err = n.store.Save(n.cfg.ID, 0, settingsCluster, values, nil)
@@ -435,6 +445,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	n.props = nil
 	n.frozen = false
+	n.erased = true
 	n.mu.Unlock()
 	// The store is the host's (SQLite in the reference controller): it is
 	// erased with the node's lock released (ADR 0026 P6).
