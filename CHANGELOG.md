@@ -10,16 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-## [0.10.5] — 2026-10-24
-
 ### Added
 
-- The persistence port (phase 21a, concept v7 A.2): `store.Port`, the sum of one interface per area named after the Matter concept — `store.Fabrics`, `Identity`, `ACL`, `GroupKeys`, `Groups`, `Resumption`, `ServerSubscriptions`, `Settings`, `OTA`, `ThermostatPresets` and `DoorLocks` — with the methods the module's consumers call. `*store.Store` implements every one; `groups.Store` embeds `store.Groups`.
-- `store/memstore`: the second implementation, in memory (one mutex, copies on read and write, the fabric cascade and the fabric-index counter of the SQLite schema). For tests and for a daemon that accepts losing its state on restart.
-- `endpoint/memstore`: an in-memory `endpoint.Store` with `endpoint/sqlitestore`'s allocation rules, the pairing for `store/memstore`.
-- `store/storetest`: the contract table. `storetest.Run(t, open)` runs every case against any `store.Port`; `store` runs it against SQLite and `store/memstore` against itself, and a host's own backend proves itself with it.
-- `fabrictest.Options.StoreOnDisk`: a device keeps its state in a SQLite file instead of the in-memory stores, the new default.
-- `store.NewThermostatPresetStore(st, key)`: the preset store of one Thermostat endpoint over any `store.ThermostatPresets`.
 - The metrics port (phase 21b, concept v7 A.3): `contract.Metrics` (`Counter(name, delta)`, `Gauge(name, value)`; standard library only), `node.Metrics` as its alias and `node.Config.Metrics` (nil records nothing). The named set, as `contract.Metric…` and `node.Metric…` constants and `contract.MetricNames()`: `sessions.open` and `subscriptions.active` (gauges), `im.received`, `im.sent`, `pase.failures`, `pase.lockouts`, `aggregator.reassemblies`, `mrp.retransmits` and `panics.recovered` (counters). The existing counters keep their readers (`Bridge.DeviceLoad`, `RecoveredPanics`). `bridge.Bridge.AttachMetrics` is the seam below the facade.
 - `node/metrics/expvar` (package `expvarmetrics`): `expvarmetrics.New(prefix)` implements the port on the standard library's `expvar`. The reference bridge serves it with `--metrics-expvar <addr>` on `/debug/vars`.
 - The hooks the port is fed through: `udp.Listener.OnPanicRecovered`, `tcp.Listener.OnPanicRecovered`, `tcp.Dialer.OnPanicRecovered` and `client/exchange.Config.Retransmitted`.
@@ -30,18 +22,35 @@ pseudo-version of `main`.
 
 ### Changed
 
-- **Break:** `node.Config.Store.Credentials` is a `store.Port` instead of a `*store.Store`, and `Node.Store()` and `fabrictest.Device.Store()` return `store.Port`. `store.New(db)` is still accepted; a host that type-asserted or passed the result as `*store.Store` keeps its own `*store.Store` instead. `Store.Path` and `Store.DB` are unchanged. Migration guide, the persistence port in v0.10.5.
-- `node.NewEndpointPersistence` takes a `store.Settings`; a `*store.Store` still fits.
-- `fabrictest.Device.Start`, `Stop` and `Restart` run under `Site.Run`: a fake site clock moves while the node starts or stops, so a restart whose subscription re-establishment waits for a peer's StatusResponse no longer hangs the test when that response never comes.
-- fabrictest devices run on `store/memstore` and `endpoint/memstore` by default; state still survives `Device.Restart`. `Options.StoreOnDisk` restores the SQLite file.
 - Log attribute keys follow one table (docs/guides/observability.md). A host that greps or indexes the logs reads the new keys: `fabric` → `fabric_index` (`fabric_id` where it was a fabric id), `session` → `session_id`, `exchange` → `exchange_id`, `endpoint_id` → `endpoint`, `subscription` and the subscription table's `id` → `subscription_id`, `group` → `group_id`, `peer_node`, `peer_node_id` and a node id under `node` or `peer` → `node_id`, a peer's address under `dst` or `address` (the commissioner's) → `peer`, `why` → `reason`, `vid`/`pid` → `vendor_id`/`product_id`, `cmd`/`cmdID`/`respType` → `command_name`/`command`/`response_type`, `idx` → `path_index`. `err` now holds the error value (`slog.Any`) instead of its text: a text handler prints the same line, and a JSON handler prints the error's text as before. The event names (messages) are unchanged.
 - A nil logger on `client/handshake`, `client/exchange`, `client/interaction`, `client/peer` and `transport/btp` components is `slog.Default()`, as everywhere else in the module, instead of discarding. A fabrictest site stays quiet.
 - **Break:** `device.FixedLabel(labels...)` is removed (rule of 2026-10-21): `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` declares the cluster on any device type. Migration guide, observability and the Base device type's clusters in v0.10.6.
 
 ### Removed
 
-- `store.Store.ThermostatPresets(key)`: `store.NewThermostatPresetStore(st, key)` replaces it for any implementation of the port.
 - `device.FixedLabel`: the declaration `fixedlabeldef.Declare` replaces it on every device type.
+
+## [0.10.5] — 2026-10-24
+
+### Added
+
+- The persistence port (phase 21a, concept v7 A.2): `store.Port`, the sum of one interface per area named after the Matter concept — `store.Fabrics`, `Identity`, `ACL`, `GroupKeys`, `Groups`, `Resumption`, `ServerSubscriptions`, `Settings`, `OTA`, `ThermostatPresets` and `DoorLocks` — with the methods the module's consumers call. `*store.Store` implements every one; `groups.Store` embeds `store.Groups`.
+- `store/memstore`: the second implementation, in memory (one mutex, copies on read and write, the fabric cascade and the fabric-index counter of the SQLite schema). For tests and for a daemon that accepts losing its state on restart.
+- `endpoint/memstore`: an in-memory `endpoint.Store` with `endpoint/sqlitestore`'s allocation rules, the pairing for `store/memstore`.
+- `store/storetest`: the contract table. `storetest.Run(t, open)` runs every case against any `store.Port`; `store` runs it against SQLite and `store/memstore` against itself, and a host's own backend proves itself with it.
+- `fabrictest.Options.StoreOnDisk`: a device keeps its state in a SQLite file instead of the in-memory stores, the new default.
+- `store.NewThermostatPresetStore(st, key)`: the preset store of one Thermostat endpoint over any `store.ThermostatPresets`.
+
+### Changed
+
+- **Break:** `node.Config.Store.Credentials` is a `store.Port` instead of a `*store.Store`, and `Node.Store()` and `fabrictest.Device.Store()` return `store.Port`. `store.New(db)` is still accepted; a host that type-asserted or passed the result as `*store.Store` keeps its own `*store.Store` instead. `Store.Path` and `Store.DB` are unchanged. Migration guide, the persistence port in v0.10.5.
+- `node.NewEndpointPersistence` takes a `store.Settings`; a `*store.Store` still fits.
+- `fabrictest.Device.Start`, `Stop` and `Restart` run under `Site.Run`: a fake site clock moves while the node starts or stops, so a restart whose subscription re-establishment waits for a peer's StatusResponse no longer hangs the test when that response never comes.
+- fabrictest devices run on `store/memstore` and `endpoint/memstore` by default; state still survives `Device.Restart`. `Options.StoreOnDisk` restores the SQLite file.
+
+### Removed
+
+- `store.Store.ThermostatPresets(key)`: `store.NewThermostatPresetStore(st, key)` replaces it for any implementation of the port.
 
 ## [0.10.4] — 2026-10-24
 
