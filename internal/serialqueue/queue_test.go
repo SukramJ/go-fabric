@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/serialqueue"
 )
 
@@ -32,4 +33,28 @@ func TestQueue(t *testing.T) {
 	q.Enqueue(func() { close(done) })
 	q.Stop()
 	<-done
+}
+
+// TestQueueCountsIn: with CountIn a callback is work of the group from its
+// Enqueue until it returned.
+func TestQueueCountsIn(t *testing.T) {
+	g := inflight.New("device 1")
+	q := serialqueue.New()
+	q.CountIn(func() *inflight.Group { return g })
+	q.Start()
+	release, running := make(chan struct{}), make(chan struct{})
+	q.Enqueue(func() {
+		close(running)
+		<-release
+	})
+	q.Enqueue(func() {})
+	<-running
+	if got := g.Snapshot()[inflight.DeviceCallbacks]; got != 2 {
+		t.Fatalf("counted %d callbacks, want the running and the queued one", got)
+	}
+	close(release)
+	q.Stop()
+	if g.Busy() {
+		t.Fatalf("counted %v after the queue drained", g.Snapshot())
+	}
 }

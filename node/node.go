@@ -637,14 +637,8 @@ func (n *Node) Start(ctx context.Context) error {
 	// wait on the controllers of re-established subscriptions: a
 	// fabrictest site does not move its clock under the start's own work,
 	// and does move it for the start's peer waits (internal/inflight).
-	work := inflight.Of(n.cfg.Clock)
-	work.Enter(inflight.NodeStart)
-	counted := true
-	defer func() {
-		if counted {
-			work.Leave(inflight.NodeStart)
-		}
-	}()
+	work := countWork(n.cfg.Clock, inflight.NodeStart)
+	defer work.pause()
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
 	// anything goes online. Mirrors matter.js
 	// packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts
@@ -702,11 +696,9 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 		loaded = append(loaded, fabric)
 	}
-	work.Leave(inflight.NodeStart)
-	counted = false
+	work.pause()
 	n.br.ReestablishFormerSubscriptions(ctx)
-	work.Enter(inflight.NodeStart)
-	counted = true
+	work.resume()
 	if n.root.OTARequestor != nil {
 		if err := n.root.OTARequestor.Start(ctx); err != nil {
 			n.logger.Warn("ota.requestor_start", slog.Any("err", err))
@@ -757,14 +749,8 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.stopped = true
 	// The stop is work in hand of the node's in-flight group but for the
 	// client stack's close, which waits on its peers (see Start).
-	work := inflight.Of(n.cfg.Clock)
-	work.Enter(inflight.NodeStop)
-	counted := true
-	defer func() {
-		if counted {
-			work.Leave(inflight.NodeStop)
-		}
-	}()
+	work := countWork(n.cfg.Clock, inflight.NodeStop)
+	defer work.pause()
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}
@@ -781,11 +767,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	// (BindingServer.ts:52, :160-163).
 	n.bindings.Close()
 	if n.client != nil {
-		work.Leave(inflight.NodeStop)
-		counted = false
+		work.pause()
 		n.client.close(ctx)
-		work.Enter(inflight.NodeStop)
-		counted = true
+		work.resume()
 	}
 	n.sec.pase.Stop()
 	n.window.stop()
@@ -817,6 +801,37 @@ func (n *Node) Stop(ctx context.Context) error {
 		return fmt.Errorf("node: bridge stop: %w", err)
 	}
 	return nil
+}
+
+// countedWork is one unit of a node's work in hand on the in-flight group
+// its clock carries (internal/inflight), paused around a wait on peers.
+type countedWork struct {
+	g    *inflight.Group
+	name string
+	held bool
+}
+
+// countWork counts one unit of name on the group clk carries.
+func countWork(clk clock.Clock, name string) *countedWork {
+	w := &countedWork{g: inflight.Of(clk), name: name}
+	w.resume()
+	return w
+}
+
+// pause stops counting the unit; a no-op when it is not counted.
+func (w *countedWork) pause() {
+	if w.held {
+		w.held = false
+		w.g.Leave(w.name)
+	}
+}
+
+// resume counts the unit again; a no-op when it is counted.
+func (w *countedWork) resume() {
+	if !w.held {
+		w.held = true
+		w.g.Enter(w.name)
+	}
 }
 
 // newCallbackQueue is the node's own `…Async` callback queue; a callback
