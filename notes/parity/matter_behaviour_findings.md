@@ -326,6 +326,7 @@ light and plug types (RootNode `GroupcastListenerCond`) — is built:
 PerGroup and, since wave 20 (report AN), Sender — FeatureMap 0x07, the
 group sender in `groups/`. What remains:
 
+- **Groupcast's membership quota does not follow a raised `MaxGroupsPerFabric`.** matter.js derives `MaxMembershipCount` from `maxGroupsPerFabric × 2` (`GroupcastServer.ts:928` at `862ad75f`), so the Groupcast per-fabric quota `floor(MaxMembershipCount/2)` always equals the group cap. The module's `groupcastMaxMembershipCount = 44` is a constant (`cluster/core/groupcast.go:52`); since brief CC a host can set `node.Config.Limits.MaxGroupsPerFabric` above 22 and is then still held to Groupcast's quota of 22. Route: derive the Groupcast constants from the configured group limit when the Groupcast server is composed (the wave that next touches `groups/`; M5).
 - **Groupcast has not met a real controller.** The evidence is the in-process
   end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
   matter.js produced (`bridge/testdata/groupcast-wire-fixtures.json`).

@@ -114,7 +114,7 @@ func (groupKeyExhaustedErr) MatterStatusCode() im.StatusCode { return im.StatusR
 var _ im.StatusCodeError = groupKeyExhaustedErr{}
 
 // GroupKeyMgmtConfig drives [NewGroupKeyManagement]. Defaults mirror
-// matter.js HEAD GroupKeyManagementServer.ts:615-616
+// matter.js GroupKeyManagementServer.ts:609-610 at 862ad75f
 // (maxGroupKeysPerFabric = 20, maxGroupsPerFabric = 22). Spec floors
 // per Matter §11.2.4 are maxGroupKeysPerFabric ≥ 3 and
 // maxGroupsPerFabric ≥ 4.
