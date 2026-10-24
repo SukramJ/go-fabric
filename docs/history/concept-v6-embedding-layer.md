@@ -248,7 +248,7 @@ Cluster-Pakete".
 ## Teil B: go-ha-matter-bridge (Entwurf)
 
 > Umgezogen am 2026-10-24 (Welle CF) als `CONCEPT.md` nach
-> [SukramJ/go-habridge](https://github.com/SukramJ/go-habridge), auf dem
+> [SukramJ/go-ha2fabric](https://github.com/SukramJ/go-ha2fabric), auf dem
 > Stand der Owner-Entscheidungen vom selben Tag (dünner Client von
 > `go-fabric-server`, Konzept v8). Der Text unten ist der Entwurf vom 2026-10-20.
 

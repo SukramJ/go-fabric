@@ -1,15 +1,15 @@
-# Report CF — M4 phase 22: the two repositories (go-habridge, go-hafabric)
+# Report CF — M4 phase 22: the two repositories (go-ha2fabric, go-hafabric)
 
 Date 2026-10-24. Owner wave (concept v7 B.4, decisions 0.4 and 0.6; owner
 decisions of 2026-10-24: start CF parallel to CE, `CONCEPT.md` on the state
-of concept v8 — `go-fabric-server` as an own repository, go-habridge as its
+of concept v8 — `go-fabric-server` as an own repository, go-ha2fabric as its
 thin client, the controller role later in the same daemon).
 
 ## Repositories
 
 | Repository | Description | Status |
 | --- | --- | --- |
-| [SukramJ/go-habridge](https://github.com/SukramJ/go-habridge) | Home Assistant entities as a bridge for Matter controllers, in pure Go on go-fabric | concept, not started |
+| [SukramJ/go-ha2fabric](https://github.com/SukramJ/go-ha2fabric) (created as go-habridge, renamed the same evening to the family pattern `go-<source>2<target>`) | Home Assistant entities as a bridge for Matter controllers, in pure Go on go-fabric | concept, not started |
 | [SukramJ/go-hafabric](https://github.com/SukramJ/go-hafabric) | Home Assistant component to Matter cluster mapping for go-fabric bridges | concept, not started |
 
 Each holds: `README.md` (name, badges, purpose, twin sentence, status
@@ -27,7 +27,7 @@ licenses / ci), `go.mod` (go 1.27.2) with a `doc.go`; `.github/dependabot.yml`
 (lint, security, test matrix, build; coverage and fuzz-smoke present with
 `if: false` until the first code), `codeql.yml` (go-zendure2mqtt's),
 `dependabot-auto-merge.yml` (non-major), `release-on-tag.yml` (`if: false`
-until the first release). go-habridge additionally: `cmd/habridge/main.go`
+until the first release). go-ha2fabric additionally: `cmd/habridge/main.go`
 (a placeholder that states the status and exits 2), `Dockerfile`
 (distroless, non-root), `addon/README.md` (placeholder),
 `docker-build-push.yml` and `addon-image.yml` (`if: false`).

@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- Concept v8 (`docs/concept-v8-fabric-server.md`, German): the family after milestone 4 — go-fabric-server in both roles (a controller server wire-compatible with matterjs-server's WebSocket API, and a bridge door for hosts not written in Go), go-ha2fabric embedding go-fabric in process, go-hafabric as a Go module; with the section on what is better than the reference and than our earlier split. The Home Assistant bridge repository is `go-ha2fabric` (renamed from go-habridge the same day); the roadmap and concept v7 follow.
+
 ## [0.10.9] — 2026-10-24
 
 ### Added
