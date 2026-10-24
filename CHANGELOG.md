@@ -10,24 +10,17 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
-## [0.10.9] — 2026-10-24
-
 ### Added
 
 - `clock.WithTimeout(ctx, c, d)` and `clock.WithDeadline(ctx, c, at)` (brief CG): a context deadline measured on a `clock.Clock` — `context.WithTimeout` itself on `nil` and `clock.System`, a timer of the clock otherwise, so a deadline under a test's `clocktest.Fake` expires when the fake is advanced, never on the machine's time. Its `Err` and `context.Cause` are `context.DeadlineExceeded` on expiry.
 - `fabrictest.Site.Step(ctx, d)`: moves the site's fake clock by `d` under the quiet protocol — quiet, advance, quiet — matter.js's `await MockTime.advance(ms)`. A test that drives the clock by hand steps with it rather than with `Fake().Advance`.
 - `make stress PKG=… TESTS=…` (race detector, `golang.org/x/tools/cmd/stress`, `-p 8`, 50 runs; `STRESS_INPROC` instances per process) and `make stress-flakes`, the tests brief CG fixed; the nightly workflow runs the latter in a `flakes` job (not a required check).
-- `docs/guides/embed-in-a-daemon.md` (phase 22, brief CE): the cookbook — go-fabric inside an existing daemon, in eight steps, each citing the commit of the daemon pull request that does it (go-zendure2mqtt: one Zendure unit as a bridged ElectricalSensor with its battery, readings to attributes, reachability, the pairing code), what the daemon did not have to do and what a controller sees.
-- `docs/guides/operations.md` (phase 22, concept v7 decision 0.9): what a host daemon minds when it runs a node — the store file and its backup, the ports and IPv6, mDNS beside avahi, the log events of operation, the health probe, the first limits, the diagnostic trace for a failed pairing, factory reset and upgrading.
-- PowerSource by typed declaration on every bridged device (phase 22, brief CE): `powersourcedef.Declare{…}` on a device whose type does not list PowerSource mounts it, as matter.js's BridgedNode device type allows under the condition `BridgedPowerSourceInfo` (`bridged-node.element.ts:23` at 862ad75f), and the device states that condition (`device.ConditionBridgedPowerSourceInfo`, in `Spec().DeviceConditions`) so the device-type validator judges the requirement as stated. `Device.PowerSource()` is the typed server; its EndpointList names the device's own endpoint. A part with such a declaration is refused by `AddPart` (`ErrComposition`): a part is no bridged node. Found by the cookbook: an energy store as an ElectricalSensor with its battery had no typed route to its PowerSource.
 
 ### Changed
 
 - A `fabrictest` site judges quiet by its hosts' work in hand, not only by the process's goroutine states (brief CG): each device and controller counts a datagram being handled, a message an exchange's reader has not finished with, a report being sent, a host callback queued and a node's start or stop (`internal/inflight`, found on the clock the site hands the host); counted work that holds the clock a second with nothing moving no longer holds it, and the site logs it (matter.js MockTime's `MAX_HOST_ASYNC_MS`). On an in-memory site with a fake clock the process-wide goroutine check now delays a step by at most 50 ms, so other tests in the binary no longer starve a site's clock; on loopback and wall-clock sites it holds as before. `Site.Settle`'s `ErrWaited` names the work still in hand.
 - The deadlines the device's stack sets for its own work run on the component's clock (`clock.WithTimeout`): the bridge's store writes of subscriptions, mDNS publishes and withdrawals, group-membership reconcile, OTA provider connect and chunk waits, the session re-announce, the ACK pump's stop grace, a subscription's re-establishment (`subscription.ReestablishTimeout`), and `node.Node.Run`'s stop budget. On the system clock nothing changes; a host that passed `Config.Clock` now also paces those. `clock/nowalldeadline_test.go` fails the build on a `context.WithTimeout` or `context.WithDeadline` in non-test code of `bridge`, `node`, `im`, `client`, `groups`, `transport` and `mdns` (`bridge/bridgetest` excepted).
 - `fabrictest.Device.Stop` (and `Restart`) returns once the network and the hosts' counters are quiet after the node's stop, holding the clock meanwhile, so the controllers have handled the CloseSession farewells; `Device.Start` holds the clock while it builds the node.
-- Built with Go 1.27.3: `GO-2026-6809` (`crypto/x509`, fixed in 1.27.3) is reachable through every TLS path a host or the controller opens; `go.mod` and the workflows move together (the reference daemons move the same day).
-- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hafabric](https://github.com/SukramJ/go-hafabric)), created 2026-10-24 with their concepts (wave CF).
 
 ### Fixed
 
@@ -36,6 +29,22 @@ pseudo-version of `main`.
 - `fabrictest`: a read right after `Device.Restart` no longer goes out on the session the device's stop just ended ("exchange: session ended by peer", `TestHostStatementName`): `Stop` waits for the controllers to handle the CloseSession.
 - `client/interaction` `TestLiveSustainedSurvivesRestart`: a restart under an outer `Site.Run` no longer lets the clock run past the controller's subscription timeout while `node.New` builds the restarted node, which replaced the sustained subscription instead of taking the node's re-established one (matter.js `SubscriptionsServerTest.ts:36-38`: the controller resubscribes only once its subscription times out).
 - Tests that drove the fake clock beside the site — `Fake().Advance` inside an `Eventually` condition (`node` `waitFor`, `TestLevelControlTransitionReachesHostAndSubscriber`), or right after releasing a held provider (`TestOtaParityMatterJS`) — step it with `Site.Step` or let `Eventually` move it; `TestSessionAndSubscriptionDiagnostics` waits for the device's PASE session to end before it connects again.
+
+## [0.10.9] — 2026-10-24
+
+### Added
+
+- `docs/guides/embed-in-a-daemon.md` (phase 22, brief CE): the cookbook — go-fabric inside an existing daemon, in eight steps, each citing the commit of the daemon pull request that does it (go-zendure2mqtt: one Zendure unit as a bridged ElectricalSensor with its battery, readings to attributes, reachability, the pairing code), what the daemon did not have to do and what a controller sees.
+- `docs/guides/operations.md` (phase 22, concept v7 decision 0.9): what a host daemon minds when it runs a node — the store file and its backup, the ports and IPv6, mDNS beside avahi, the log events of operation, the health probe, the first limits, the diagnostic trace for a failed pairing, factory reset and upgrading.
+- PowerSource by typed declaration on every bridged device (phase 22, brief CE): `powersourcedef.Declare{…}` on a device whose type does not list PowerSource mounts it, as matter.js's BridgedNode device type allows under the condition `BridgedPowerSourceInfo` (`bridged-node.element.ts:23` at 862ad75f), and the device states that condition (`device.ConditionBridgedPowerSourceInfo`, in `Spec().DeviceConditions`) so the device-type validator judges the requirement as stated. `Device.PowerSource()` is the typed server; its EndpointList names the device's own endpoint. A part with such a declaration is refused by `AddPart` (`ErrComposition`): a part is no bridged node. Found by the cookbook: an energy store as an ElectricalSensor with its battery had no typed route to its PowerSource.
+
+### Changed
+
+- Built with Go 1.27.3: `GO-2026-6809` (`crypto/x509`, fixed in 1.27.3) is reachable through every TLS path a host or the controller opens; `go.mod` and the workflows move together (the reference daemons move the same day).
+- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hafabric](https://github.com/SukramJ/go-hafabric)), created 2026-10-24 with their concepts (wave CF).
+
+### Fixed
+
 - A battery that rides as a device's PowerSource beside a measurement of another class (`device.Measurement` with a `contract.MeasurementBattery` source) reaches a controller's subscription when its source notifies (`contract.ChangeNotifier`): the kit's PowerSource server forwards the source's notifier, as the electrical power server does. Before, the bridge never heard it — the battery was neither the endpoint's Source nor its Measurement — and a subscriber saw `BatPercentRemaining` move only on a read; a host relayed it with `device.WithChangeNotifier`. Found by the cookbook (phase 22, brief CE).
 
 ## [0.10.8] — 2026-10-24
