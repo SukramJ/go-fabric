@@ -34,6 +34,7 @@ import (
 	griddef "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	washerdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -43,6 +44,7 @@ import (
 	tadef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -133,6 +135,8 @@ var selfHeldDefaults = map[uint32]serverFactory{
 	thermostatdef.ClusterID: newThermostatServer,           // Thermostat: cluster/thermo, matter.js ThermostatServer.ts.
 	ccdef.ClusterID:         newColorControlServer,         // ColorControl: cluster/light, matter.js ColorControlServer.ts.
 	ecodef.ClusterID:        newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+	fixedlabeldef.ClusterID: newFixedLabelServer,           // FixedLabel: cluster/core.NewFixedLabel, matter.js FixedLabelServer.ts.
+	userlabeldef.ClusterID:  newUserLabelServer,            // UserLabel: cluster/core.NewUserLabel, matter.js UserLabelServer.ts.
 
 	// The servers that run on a host port the declaration carries
 	// (defaults_ports.go).
@@ -184,6 +188,22 @@ func buildOrder(reqs []ClusterRequirement) []int {
 // its own list and data version.
 func newBindingServer(defaultBuild) (contract.ClusterServer, error) {
 	return core.NewBinding(), nil
+}
+
+// newFixedLabelServer is the module's FixedLabel server
+// ([core.NewFixedLabel]), empty; the declaration's Initial.LabelList is
+// set on it as its labels. Base-optional on every device type (base.go).
+func newFixedLabelServer(defaultBuild) (contract.ClusterServer, error) {
+	return core.NewFixedLabel(nil)
+}
+
+// newUserLabelServer is the module's UserLabel server
+// ([core.NewUserLabel]): a controller's write is held to the label limit
+// (UserLabelServer.ts), the declaration's Initial.LabelList is its first
+// list, and a node persists the list under the device's key
+// (node/persist.go, persistUserLabels). Base-optional on every device type.
+func newUserLabelServer(defaultBuild) (contract.ClusterServer, error) {
+	return core.NewUserLabel(core.UserLabelConfig{})
 }
 
 // newEcosystemInformationServer is the module's EcosystemInformation

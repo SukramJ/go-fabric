@@ -55,6 +55,10 @@ func TestSelfHeldDefaults(t *testing.T) {
 		{0x0300, func() (*Device, error) { return New(&ColorTemperatureLightType, testOptions("cc")) }, (*light.ColorControlServer)(nil)},
 		{0x001E, func() (*Device, error) { return New(&OnOffLightSwitchType, testOptions("bind")) }, (*core.Binding)(nil)},
 		{0x0750, func() (*Device, error) { return New(&BridgedNodeType, testOptions("eco"), withOptional(0x0750)) }, (*core.EcosystemInformation)(nil)},
+		// The Base device type's optional clusters, on a type that does not
+		// list them (base.go).
+		{0x0040, func() (*Device, error) { return New(&OnOffLightType, testOptions("fl"), withOptional(0x0040)) }, (*spec.Server)(nil)},
+		{0x0041, func() (*Device, error) { return New(&OnOffLightType, testOptions("ul"), withOptional(0x0041)) }, (*spec.Server)(nil)},
 		{0x003B, func() (*Device, error) {
 			return New(&GenericSwitchType, testOptions("sw"), withFeatures(0x003B, uint32(swdef.FeatureMomentarySwitch)))
 		}, (*switchserver.Server)(nil)},
@@ -98,10 +102,13 @@ func TestSelfHeldDefaults(t *testing.T) {
 			if reflect.TypeOf(srv) != reflect.TypeOf(tc.want) {
 				t.Fatalf("mounts %T, want the self-held %T", srv, tc.want)
 			}
-			req, _ := d.Type().Server(tc.cluster)
+			def := spec.Lookup(tc.cluster)
+			if req, listed := d.Type().Server(tc.cluster); listed {
+				def = req.Definition
+			}
 			fm, _ := srv.MatterRead(spec.AttrFeatureMap)
 			features, _ := fm.(uint32)
-			inst, err := spec.New(req.Definition, spec.Options{Features: features})
+			inst, err := spec.New(def, spec.Options{Features: features})
 			if err != nil {
 				t.Fatal(err)
 			}

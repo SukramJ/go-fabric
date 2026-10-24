@@ -90,6 +90,9 @@ type Node struct {
 	client   *clientStack
 	bindings *binding.Manager
 	bindSync bindingSync
+	// userLabels keeps the bridged endpoints' UserLabel lists in the
+	// store (user_labels.go).
+	userLabels userLabelSync
 	// bdx serves the BDX transfers peers open (the provider's images) and
 	// otaProvider is the OTA Software Update Provider; both nil without
 	// Config.OTAProvider (ota_provider.go).

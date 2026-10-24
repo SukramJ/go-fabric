@@ -238,6 +238,7 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 			return t, err
 		}
 		n.persistBindings(ctx, t)
+		n.persistUserLabels(ctx, t)
 		n.bindSync.mu.Lock()
 		n.bindSync.topo = t
 		running := n.bindSync.running
