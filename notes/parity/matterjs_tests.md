@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 82 |
-| partial | 122 |
-| planned | 33 |
+| partial | 123 |
+| planned | 32 |
 | excluded | 87 |
 | total | 324 |
 
@@ -26,7 +26,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behavior/state](#nodetestbehaviorstate) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/state/managed](#nodetestbehaviorstatemanaged) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/behavior/state/managed/values](#nodetestbehaviorstatemanagedvalues) | 3 | 1 | 1 | 0 | 1 |
-| [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 2 | 1 | 0 |
+| [node/test/behavior/state/validation](#nodetestbehaviorstatevalidation) | 3 | 0 | 3 | 0 | 0 |
 | [node/test/behavior/supervision](#nodetestbehaviorsupervision) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/behavior/system/commissioning](#nodetestbehaviorsystemcommissioning) | 6 | 2 | 3 | 0 | 1 |
 | [node/test/behavior/system/controller/discovery](#nodetestbehaviorsystemcontrollerdiscovery) | 6 | 0 | 1 | 5 | 0 |
@@ -175,7 +175,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | ValueValidatorTest.ts | 567 | partial | `cluster/spec:TestValidateWrite`<br>`cluster/spec:TestRanges`<br>`cluster:TestNegativeWriteParity`<br>`cluster:TestEnumManufacturerRangeParity` | Server-write validation of numeric ranges, enums, reserved and feature-gated bitmap bits is covered by the Go write validator and the negative-write parity table; the client-peer leniency, obsolete-element and id-slot cases are not. Missing: “accepts defined multi-bit field values”; “rejects a reserved gap bit”; “skips enforcement when no encoded value is carried”; “throws on a constraint violation stored only at the field's id slot”; “satisfies conformance for a mandatory field present only at its id slot”; “substitutes in place when the sentinel is stored at the field's id slot”; “substitutes in place when the sentinel is stored at the field's name slot”; “accepts a bit the value leaves clear”; “accepts a bit that states no gate”; “accepts a deprecated bit”; “rejects a bit whose choice is gated on an unsupported feature”; “rejects a bit a group disallows once its gate fails”; “rejects a bit the specification disallows”; “accepts a bit whose conformance names something a value would decide”; “accepts a bit whose conformance the compiler cannot read”; “judges a range of bits by whether the write sets any of them”; “judges a range of a shipped cluster by its feature alone”; “does not judge the bits of a feature map”; “is suppressed where conformance validation is turned off for the attribute”; “ignores the bit on a write from the wire”; “forwards the bit on a client peer write”; “still rejects a structurally invalid bit alongside a non-conformant one on a peer write”; “accepts a list within the bound”; “rejects a list beyond the bound and names the bound”; “rejects an obsolete attribute on a server write”; “forwards an obsolete attribute on a client peer write”; “rejects an obsolete enum value on a server write”; “forwards an obsolete enum value on a client peer write”; “forwards a feature-gated enum value on a client peer write”; “forwards an undefined enum value on a client peer write”; “forwards reserved bitmap bits on a client peer write”; “still rejects a structurally invalid bitmap field even alongside reserved bits on a peer write”; “still rejects a wrong-datatype value on a client peer write”; “still rejects a value-range constraint on a client peer write”; “still rejects a schema-constraint violation on a client peer write”; “rejects a feature-disallowed attribute on a server write”; “forwards a feature-disallowed attribute with a valid value on a client peer write”; “still validates datatype when a forwarded conformance failure would otherwise skip it”. |
-| conformanceTest.ts | 1307 | planned | until M5 | Field conformance of struct and command fields through matter.js's validation tables: spec checks field conformance per field, but the tables' element-reference and revision cases need the validator's table form. Milestone 5 (the validator, P12's move of gate 2). |
+| conformanceTest.ts | 1307 | partial | `cluster/spec:TestConformanceParityMatterJS` | Field conformance is spec.Instance.CheckConformance, a port of the conformance compiler over a struct's fields: the AllTests tree runs as a table over testdata/conformance_matterjs.json (the tree flattened at the pin, 170 cases), and outerResolve (the cluster's attributes through peers), element references and revision port as explicit cases (cluster/spec/conformance_parity_matterjs_test.go); the operational-extension describe has no Go subject, since the generated definitions do not extend one another (ClusterModel.extend). Missing: “disallows a field its base disallows”; “disallows a field its base disallows when the field is overridden”; “disallows an enum value its base disallows when the member is overridden”; “treats a field its base declares nullable as nullable”; “names the conformance it judged”. |
 | constraintTest.ts | 573 | partial | `cluster/spec:TestValidateWrite`<br>`cluster/spec:TestRanges`<br>`cluster/spec:TestConstraintInParityMatterJS`<br>`cluster/spec:TestServerListAndStructConstraints` | A table of constraint cases (its it names are the table's group and case keys); literal min/max/range, string length, list-entry and bitmap bounds are covered by the Go write validator, the groups named below are not. Missing: “min with reference”; “min with expression”; “max with reference”; “max with reference (sibling keyed by id)”; “range with expression”; “range with dot-qualified reference”; “percentage bound”; “percentage bound of a list entry”; “bound on a duration”; “entry of a list of durations”; “string length with codepoints”. |
 
 ## node/test/behavior/supervision
@@ -910,10 +910,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | TcpTransportTest.ts | 276 | partial | `transport/tcp:TestDialerRoundTrip`<br>`transport/tcp:TestListenerEchoRoundTrip`<br>`transport/tcp:TestTcpTransportOnDisconnect`<br>`transport/tcp:TestTcpTransportClose` | Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169). Missing: “returns true for TCP”; “returns false for UDP”; “returns false for BLE”; “throws for non-IP address”; “reuses existing connection for same address”; “creates different connections for different addresses”. |
 
 ## Planned
-
-### node/test/behavior/state/validation
-
-- `conformanceTest.ts` — Field conformance of struct and command fields through matter.js's validation tables: spec checks field conformance per field, but the tables' element-reference and revision cases need the validator's table form. Milestone 5 (the validator, P12's move of gate 2).
 
 ### node/test/behavior/system/controller/discovery
 

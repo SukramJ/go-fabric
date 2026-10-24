@@ -306,9 +306,18 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/conformanceTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Field conformance of struct and command fields through matter.js's validation tables: spec checks field conformance per field, but the tables' element-reference and revision cases need the validator's table form. Milestone 5 (the validator, P12's move of gate 2).",
+      "status": "partial",
+      "go": [
+        "cluster/spec:TestConformanceParityMatterJS"
+      ],
+      "missing": [
+        "disallows a field its base disallows",
+        "disallows a field its base disallows when the field is overridden",
+        "disallows an enum value its base disallows when the member is overridden",
+        "treats a field its base declares nullable as nullable",
+        "names the conformance it judged"
+      ],
+      "reason": "Field conformance is spec.Instance.CheckConformance, a port of the conformance compiler over a struct's fields: the AllTests tree runs as a table over testdata/conformance_matterjs.json (the tree flattened at the pin, 170 cases), and outerResolve (the cluster's attributes through peers), element references and revision port as explicit cases (cluster/spec/conformance_parity_matterjs_test.go); the operational-extension describe has no Go subject, since the generated definitions do not extend one another (ClusterModel.extend).",
       "snapshotSha": "6d5d6808f5881ec2dc21fc9ce2a86a816027c9d9"
     },
     {
