@@ -36,6 +36,8 @@ const DefaultSettle = 10 * time.Millisecond
 // after MAX_HOST_ASYNC_MS (packages/testing/src/mocks/time.ts:63-70 and
 // :169-180 at 862ad75f), measured on the host's clock for the same
 // reason: counted in turns it would shrink when the machine is loaded.
+// A node.build (inflight.NodeBuild) holds the clock without a budget: it
+// waits on no clock, so it cannot stall the site, and it can take longer.
 const holdBudget = time.Second
 
 // busyGrace bounds the process-wide goroutine check on an in-memory site
@@ -331,7 +333,7 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 		}
 		return false
 	}
-	last, _ := s.state()
+	last, _, _ := s.state()
 	since := wall.Now()
 	for {
 		select {
@@ -343,7 +345,7 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 		if !until.IsZero() && !now.Before(until) {
 			return ErrWaited
 		}
-		cur, _ := s.state()
+		cur, _, pinned := s.state()
 		switch {
 		case cur != last || s.pending() > 0:
 			last, since = cur, now
@@ -351,7 +353,7 @@ func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
 			since = now
 		default:
 			stable := now.Sub(since)
-			if stable >= s.opts.Settle && (!busyWork() || stable >= holdBudget) {
+			if stable >= s.opts.Settle && (!busyWork() || (stable >= holdBudget && !pinned)) {
 				return nil
 			}
 		}
@@ -386,7 +388,10 @@ type siteState struct {
 	changes uint64
 }
 
-func (s *Site) state() (st siteState, held bool) {
+// state is the site's look for the quiet check: held reports counted
+// work beyond its abandoned level, pinned a node.build, which holds the
+// clock without a budget.
+func (s *Site) state() (st siteState, held, pinned bool) {
 	st.sent = s.sent()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -399,6 +404,9 @@ func (s *Site) state() (st siteState, held bool) {
 				held = true
 			}
 		}
+		if snap[inflight.NodeBuild] > 0 {
+			pinned = true
+		}
 		for c, a := range ab {
 			if v := snap[c]; v < a {
 				if v <= 0 {
@@ -409,7 +417,7 @@ func (s *Site) state() (st siteState, held bool) {
 			}
 		}
 	}
-	return st, held
+	return st, held, pinned
 }
 
 // abandon stops the work the site's hosts hold now from holding the
@@ -429,6 +437,9 @@ func (s *Site) abandon() {
 			s.abandoned[g] = map[string]int64{}
 		}
 		for c, v := range snap {
+			if c == inflight.NodeBuild {
+				continue
+			}
 			s.abandoned[g][c] = max(s.abandoned[g][c], v)
 		}
 	}
@@ -481,7 +492,7 @@ func (s *Site) waitUntil(ctx context.Context) time.Time {
 func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time) error {
 	wall := s.wall
 	since := wall.Now()
-	last, _ := s.state()
+	last, _, _ := s.state()
 	samples := make([]metrics.Sample, len(busyMetrics))
 	for i, name := range busyMetrics {
 		samples[i].Name = name
@@ -501,7 +512,7 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 			}
 			return ErrWaited
 		}
-		cur, held := s.state()
+		cur, held, pinned := s.state()
 		strict := s.strictBusy()
 		switch {
 		case cur != last || s.pending() > 0:
@@ -513,7 +524,7 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 			if stable < s.opts.Settle {
 				break
 			}
-			if held && stable < holdBudget {
+			if held && (pinned || stable < holdBudget) {
 				break
 			}
 			if !strict && stable < busyGrace && busy(samples, &s.inSyscall) {

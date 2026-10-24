@@ -212,14 +212,17 @@ The site is quiet once, for the settle period (`Options.Settle`, default
   | `exchange.delivered` | a client exchange queued a message for its reader | the reader's next `Next`, `Send`, `Close` or `Abort`, or the exchange's end |
   | `subscription.pending` | the subscription engine took a tick, or started a report | the tick was walked, the report returned |
   | `device.callbacks` | a host `…Async` callback was queued (device or node) | it returned |
-  | `node.start`, `node.stop` | a node's `Start` or `Stop` began (on a site device: `Device.Start` began building the node) | it returned — but for its waits on peers (re-establishing subscriptions, the client stack's close) |
+  | `node.start`, `node.stop` | a node's `Start` or `Stop` began | it returned — but for its waits on peers (re-establishing subscriptions, the client stack's close) |
+  | `node.build` | a site device's `Device.Start` began building the node | the node's own `Start` took over |
 
   A component counts work it accepted and finishes on its own, never a
   wait on its peer or on the clock: the peer may need the clock to move
   (a standalone acknowledgement's timer, a retransmission after a loss).
   Counted work that holds the clock for a second with nothing moving no
   longer holds it, and the site logs it — matter.js MockTime abandons a
-  host operation after `MAX_HOST_ASYNC_MS` the same way;
+  host operation after `MAX_HOST_ASYNC_MS` the same way. A `node.build`
+  is exempt: it waits on no clock, and under the race detector on a
+  loaded machine it can take longer than the second;
 - no goroutine of the test process is runnable, running (but the waiting
   one) or in a system call. On an in-memory site with a fake clock this
   check delays a step by at most 50 ms after the site's last change: it

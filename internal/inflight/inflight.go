@@ -51,6 +51,13 @@ const (
 	// its waits on a peer.
 	NodeStart = "node.start"
 	NodeStop  = "node.stop"
+	// NodeBuild: a test site building a host's node before its Start
+	// (fabrictest Device.Start: node.New and the endpoints' assembly).
+	// The construction is synchronous and waits on no clock, so a site
+	// holds its clock for it without a budget: under the race detector
+	// on a loaded machine it outlasts any budget a waiting operation
+	// gets.
+	NodeBuild = "node.build"
 )
 
 // Group is one host's counters. Its methods are safe for concurrent use;

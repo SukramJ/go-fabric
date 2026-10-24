@@ -171,12 +171,14 @@ func (d *Device) Start(ctx context.Context) error {
 	// counts itself: a restart under an outer Site.Run must not let the
 	// clock run — the controllers' subscription timeouts with it — while
 	// node.New assembles the endpoints (the TestLiveSustainedSurvivesRestart
-	// flake, brief CG §3).
-	d.group.Enter(inflight.NodeStart)
+	// flake, brief CG §3). It is a node.build, which holdBudget does not
+	// end: the build waits on no clock and under -race on a loaded machine
+	// takes longer than a second.
+	d.group.Enter(inflight.NodeBuild)
 	building := true
 	defer func() {
 		if building {
-			d.group.Leave(inflight.NodeStart)
+			d.group.Leave(inflight.NodeBuild)
 		}
 	}()
 	cfg := d.config()
@@ -216,7 +218,7 @@ func (d *Device) Start(ctx context.Context) error {
 	if err := d.site.Run(ctx, func(ctx context.Context) error {
 		// The node's Start counts its own work from here.
 		building = false
-		d.group.Leave(inflight.NodeStart)
+		d.group.Leave(inflight.NodeBuild)
 		return n.Start(ctx)
 	}); err != nil {
 		return fmt.Errorf("start: %w", err)

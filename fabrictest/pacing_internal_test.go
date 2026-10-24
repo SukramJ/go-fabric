@@ -155,3 +155,41 @@ func TestDrainHoldsTheClock(t *testing.T) {
 		t.Fatalf("drain with a short wait: %v", err)
 	}
 }
+
+// TestBuildHoldsTheClockPastTheBudget: a node.build holds Settle until it
+// ends, past holdBudget, and is not abandoned — a node's construction
+// waits on no clock and under -race on a loaded machine outlasts the
+// budget (the TestLiveSustainedSurvivesRestart failure, brief CG).
+func TestBuildHoldsTheClockPastTheBudget(t *testing.T) {
+	t.Parallel()
+	rec := &recordingTB{TB: t}
+	site := NewSite(rec, Options{Logger: slog.New(slog.DiscardHandler)})
+	g := site.newGroup("device 4")
+	g.Enter(inflight.NodeBuild)
+	var ended atomic.Bool
+	go func() {
+		time.Sleep(holdBudget + 200*time.Millisecond)
+		ended.Store(true)
+		g.Leave(inflight.NodeBuild)
+	}()
+	if err := site.Settle(pacingCtx(t)); err != nil {
+		t.Fatal(err)
+	}
+	if !ended.Load() || rec.logs.Load() != 0 {
+		t.Fatalf("Settle returned with the build in hand (ended %v, %d logs)", ended.Load(), rec.logs.Load())
+	}
+	own := site.newGroup("device 5")
+	g.Enter(inflight.NodeBuild)
+	ended.Store(false)
+	go func() {
+		time.Sleep(holdBudget + 200*time.Millisecond)
+		ended.Store(true)
+		g.Leave(inflight.NodeBuild)
+	}()
+	if err := site.drain(pacingCtx(t), own); err != nil {
+		t.Fatal(err)
+	}
+	if !ended.Load() {
+		t.Fatal("drain returned with another host's build in hand")
+	}
+}
