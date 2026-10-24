@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 82 |
-| partial | 125 |
-| planned | 30 |
+| partial | 126 |
+| planned | 29 |
 | excluded | 87 |
 | total | 324 |
 
@@ -74,7 +74,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/behaviors/web-rtc-transport-requestor](#nodetestbehaviorsweb-rtc-transport-requestor) | 1 | 0 | 0 | 1 | 0 |
 | [node/test/behaviors/window-covering](#nodetestbehaviorswindow-covering) | 1 | 1 | 0 | 0 | 0 |
 | [node/test/devices](#nodetestdevices) | 1 | 1 | 0 | 0 | 0 |
-| [node/test/endpoint](#nodetestendpoint) | 8 | 0 | 0 | 1 | 7 |
+| [node/test/endpoint](#nodetestendpoint) | 8 | 0 | 1 | 0 | 7 |
 | [node/test/endpoint/properties](#nodetestendpointproperties) | 5 | 0 | 0 | 0 | 5 |
 | [node/test/endpoint/server](#nodetestendpointserver) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/endpoint/type](#nodetestendpointtype) | 4 | 0 | 1 | 1 | 2 |
@@ -503,7 +503,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | EndpointGetClientTest.ts | 192 | excluded | `js-runtime-only` | The TypeScript Endpoint.get/getStateOf API on a client endpoint. |
 | EndpointGetServerTest.ts | 154 | excluded | `js-runtime-only` | The TypeScript Endpoint.get/getStateOf API on a server endpoint. |
 | EndpointGetTypesTest.ts | 159 | excluded | `js-runtime-only` | Compile-time type checks of the Endpoint get helpers. |
-| EndpointNumberConflictTest.ts | 352 | planned | until M5 | An endpoint claiming a live, root or sibling number: the assembler numbers endpoints itself and a host cannot claim one, so the refusals have no direct subject; the retry after a failed add is the Aggregator's, to port with the endpoint model. Milestone 5. |
+| EndpointNumberConflictTest.ts | 352 | partial | `node:TestEndpointNumberConflictParityMatterJS` | A failed essential add is a strict refusal and its retry a Replace under the same key and number, the index collision the node's ErrDuplicateKey guard, a preset number a number the production store already holds beside a new allocation, and the removal one PartsList change (node/endpoint_number_conflict_parity_matterjs_test.go on fabrictest and endpoint/memstore); a host claims no endpoint number in Go, so the claimant refusals have no subject, and a refused part refuses its parent with it, so no parent is installed without its child. Missing: “keeps the live endpoint in the node's index”; “keeps the live endpoint's number in the node's PartsList”; “keeps refusing further claimants”; “reports no deletion of the live endpoint's number”; “is refused by a running node”; “is refused before the node starts”; “refuses an added subtree whose leaves share a number”; “refuses an automatic id that duplicates a sibling's id”; “refuses a duplicate preset number in a tree built before start”; “refuses a nested preset number another endpoint holds”; “does not list a refused child of a parent without an index”. |
 | EndpointTest.ts | 456 | excluded | `js-runtime-only` | The TypeScript Endpoint class: agent type, construction options, deep set of state. |
 | EndpointVariableServiceTest.ts | 125 | excluded | `js-runtime-only` | Endpoint properties from the environment, command line and config files. |
 | ErrorsTest.ts | 43 | excluded | `js-runtime-only` | Messages of the TypeScript endpoint error classes. |
@@ -939,10 +939,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 ### node/test/behaviors/web-rtc-transport-requestor
 
 - `WebRtcTransportRequestorServerTest.ts` — The WebRTC transport requestor server, which milestone 6 phase 26 builds.
-
-### node/test/endpoint
-
-- `EndpointNumberConflictTest.ts` — An endpoint claiming a live, root or sibling number: the assembler numbers endpoints itself and a host cannot claim one, so the refusals have no direct subject; the retry after a failed add is the Aggregator's, to port with the endpoint model. Milestone 5.
 
 ### node/test/endpoint/server
 

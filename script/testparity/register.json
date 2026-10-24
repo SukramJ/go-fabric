@@ -1397,9 +1397,24 @@
     },
     {
       "path": "packages/node/test/endpoint/EndpointNumberConflictTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "An endpoint claiming a live, root or sibling number: the assembler numbers endpoints itself and a host cannot claim one, so the refusals have no direct subject; the retry after a failed add is the Aggregator's, to port with the endpoint model. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "node:TestEndpointNumberConflictParityMatterJS"
+      ],
+      "missing": [
+        "keeps the live endpoint in the node's index",
+        "keeps the live endpoint's number in the node's PartsList",
+        "keeps refusing further claimants",
+        "reports no deletion of the live endpoint's number",
+        "is refused by a running node",
+        "is refused before the node starts",
+        "refuses an added subtree whose leaves share a number",
+        "refuses an automatic id that duplicates a sibling's id",
+        "refuses a duplicate preset number in a tree built before start",
+        "refuses a nested preset number another endpoint holds",
+        "does not list a refused child of a parent without an index"
+      ],
+      "reason": "A failed essential add is a strict refusal and its retry a Replace under the same key and number, the index collision the node's ErrDuplicateKey guard, a preset number a number the production store already holds beside a new allocation, and the removal one PartsList change (node/endpoint_number_conflict_parity_matterjs_test.go on fabrictest and endpoint/memstore); a host claims no endpoint number in Go, so the claimant refusals have no subject, and a refused part refuses its parent with it, so no parent is installed without its child.",
       "snapshotSha": "cdf30f5cc5585c8ac49ee6a4f72e1fd52ba4bd61"
     },
     {
