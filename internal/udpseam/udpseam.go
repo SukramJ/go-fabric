@@ -25,6 +25,15 @@ type PacketConn interface {
 	Close() error
 }
 
+// Handled is the optional method of a PacketConn that counts the
+// datagrams it handed out: the listener calls Handled once for every
+// datagram ReadFromUDP returned, once the handler for it returned or the
+// listener dropped it. fabrictest's in-memory socket counts a datagram as
+// work of its host from the read to this call (internal/inflight
+// UDPDatagrams), so a site does not move its clock while a host handles
+// one.
+type Handled interface{ Handled() }
+
 // NewListener returns a *udp.Listener (as any: this package must not import
 // udp, which imports it to install the hook) serving conn. Installed by
 // package udp's init.

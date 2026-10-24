@@ -79,6 +79,7 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 		if len(q.items) == 0 && !q.running {
 			delete(o.queues, key)
 		}
+		l.done()
 		return
 	}
 	o.pending++
@@ -113,6 +114,7 @@ func (o *orderedDispatch) drain(l *Listener, key uint32, q *orderedQueue) {
 		release := func() { once.Do(func() { close(turn) }) }
 		go func() {
 			defer l.inflight.Done()
+			defer l.done()
 			defer func() {
 				o.mu.Lock()
 				o.pending--

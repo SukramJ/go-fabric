@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/nodeseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -101,6 +102,9 @@ type Device struct {
 	// built at the first start with node.Client.Enabled, kept across
 	// restarts and closed with the site.
 	names *discovery.Names
+	// group counts the work in hand of every node the device runs
+	// (internal/inflight), kept across restarts.
+	group *inflight.Group
 }
 
 // clientPort is the port of a device's client socket on its host address
@@ -118,6 +122,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 		s.tb.Fatal("fabrictest: Topology.Bridged with a Snapshotter: the node has no Aggregator to add them to")
 	}
 	d := &Device{site: s, index: s.index(), topo: topo}
+	d.group = s.newGroup("device " + strconv.Itoa(d.index))
 	var db *sql.DB
 	if s.opts.StoreOnDisk {
 		path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
@@ -162,6 +167,18 @@ func (d *Device) Start(ctx context.Context) error {
 	if running {
 		return errors.New("fabrictest: the device is running")
 	}
+	// Building the node is the device's work in hand until its own start
+	// counts itself: a restart under an outer Site.Run must not let the
+	// clock run — the controllers' subscription timeouts with it — while
+	// node.New assembles the endpoints (the TestLiveSustainedSurvivesRestart
+	// flake, brief CG §3).
+	d.group.Enter(inflight.NodeStart)
+	building := true
+	defer func() {
+		if building {
+			d.group.Leave(inflight.NodeStart)
+		}
+	}()
 	cfg := d.config()
 	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
 	if err != nil {
@@ -173,7 +190,7 @@ func (d *Device) Start(ctx context.Context) error {
 	if nw := d.site.net; nw != nil {
 		addr := hostAddr(d.index)
 		if !bridgeseam.UseListener(n.Bridge(), func() (*udp.Listener, error) {
-			l, err := nw.listen(addr)
+			l, err := nw.listen(addr, d.group)
 			operational = l
 			return l, err
 		}) {
@@ -196,7 +213,12 @@ func (d *Device) Start(ctx context.Context) error {
 	// of the site's clock (bridge.ReestablishFormerSubscriptions), and a
 	// fake clock moves only while the site paces it — a start called
 	// directly would wait forever on a response that never comes.
-	if err := d.site.Run(ctx, n.Start); err != nil {
+	if err := d.site.Run(ctx, func(ctx context.Context) error {
+		// The node's Start counts its own work from here.
+		building = false
+		d.group.Leave(inflight.NodeStart)
+		return n.Start(ctx)
+	}); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
 	if operational != nil {
@@ -235,7 +257,7 @@ func (d *Device) config() node.Config {
 		Advertiser: mdns.NewNoop(),
 		Topology:   d.topo.Snapshotter,
 		Logger:     d.site.log,
-		Clock:      d.site.clk,
+		Clock:      d.site.hostClock(d.group),
 	}
 	if d.topo.Configure != nil {
 		d.topo.Configure(&cfg)
@@ -274,7 +296,7 @@ func (d *Device) siteClient(cfg *node.Config) {
 	}
 	addr := hostAddr(d.index)
 	addr.Port = clientPort
-	nodeseam.UseClientListener(cfg, func() (*udp.Listener, error) { return nw.listen(addr) })
+	nodeseam.UseClientListener(cfg, func() (*udp.Listener, error) { return nw.listen(addr, d.group) })
 }
 
 // Peers is the node's client stack ([node.Node.Peers]): the nodes of its
@@ -294,7 +316,17 @@ func (d *Device) Stop(ctx context.Context) error {
 	if !running {
 		return nil
 	}
-	return d.site.Run(ctx, n.Stop) // the stop's own timers on the site's clock, as Start
+	if err := d.site.Run(ctx, n.Stop); err != nil { // the stop's own timers on the site's clock, as Start
+		return err
+	}
+	// The stop's CloseSession farewells are in the network or in the
+	// controllers' hands when it returns: Stop returns once they handled
+	// them, so a request a test sends next does not go out on a session
+	// its controller is about to learn the device ended (the
+	// TestHostStatementName flake, brief CG §0.4). The clock stands
+	// meanwhile: a Restart under an outer Site.Run would otherwise let
+	// the controllers' reconnection timers run while the device is down.
+	return d.site.drain(ctx, d.group)
 }
 
 // Restart stops the node and starts a new one on the same store and

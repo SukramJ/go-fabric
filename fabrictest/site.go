@@ -16,6 +16,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -26,6 +27,24 @@ var DefaultStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // DefaultSettle is the quiet period of [Site.Settle], and of [Site.Run]
 // before it moves a fake clock to its next deadline.
 const DefaultSettle = 10 * time.Millisecond
+
+// holdBudget is how long, on the wall clock, a host's counted work holds
+// a fake site clock while nothing on the site moves — no datagram sent,
+// no counter changed. Past it the work no longer holds the clock (the
+// site logs it): work that waits on the clock while counted would
+// otherwise stall the site. matter.js MockTime abandons a host operation
+// after MAX_HOST_ASYNC_MS (packages/testing/src/mocks/time.ts:63-70 and
+// :169-180 at 862ad75f), measured on the host's clock for the same
+// reason: counted in turns it would shrink when the machine is loaded.
+const holdBudget = time.Second
+
+// busyGrace bounds the process-wide goroutine check on an in-memory site
+// with a fake clock: a runnable goroutine delays a step by at most this
+// long after the site's last change. The check stands in for the work no
+// counter names (the goroutine a fired channel timer woke, a handshake's
+// first message being computed); bounding it keeps the goroutines of the
+// tests running beside this one from starving the site's clock.
+const busyGrace = 50 * time.Millisecond
 
 // DefaultWait is how long [Site.Eventually] and [Site.Settle] wait, on the
 // site's wall clock ([Options].Wall), when their context has no deadline
@@ -98,6 +117,16 @@ type Site struct {
 	fake *clocktest.Fake
 	net  *Network
 	log  *slog.Logger
+
+	// groups are the in-flight counters of the site's hosts, one per
+	// device and controller (internal/inflight); guarded by mu.
+	groups []*inflight.Group
+	// abandoned is, per group, the work that held the clock past
+	// holdBudget and no longer holds it: a counter holds the site only
+	// above its abandoned level, and the level follows the counter down
+	// (matter.js marks the operation abandoned, time.ts:169-180). Guarded
+	// by mu.
+	abandoned map[*inflight.Group]map[string]int64
 
 	// inSyscall is the number of the process's standing goroutines in a
 	// system call (os/signal's loop, once a test of the binary called
@@ -225,19 +254,211 @@ func (s *Site) Close() {
 
 // listen opens a host's UDP listener: on the in-memory network at the
 // host's address, or on a loopback socket.
-func (s *Site) listen(index int) (*udp.Listener, error) {
+func (s *Site) listen(index int, g *inflight.Group) (*udp.Listener, error) {
 	if s.net != nil {
-		return s.net.listen(hostAddr(index))
+		return s.net.listen(hostAddr(index), g)
 	}
 	return udp.New(udp.Config{LocalAddr: "[::1]:0"})
 }
 
 // Settle waits until the site is quiet for the settle period
 // ([Options].Settle): no datagram sent and none queued unread on the
-// in-memory network, and no goroutine of the test process runnable,
-// running (but the one waiting) or in a system call. It moves no clock.
-// A ctx without a deadline is bounded by [Options].Wait ([ErrWaited]).
+// in-memory network, no work in hand on any host — a datagram being
+// handled, a message an exchange took and its reader has not finished
+// with, a report being sent, a host callback queued, a node's start or
+// stop (internal/inflight) — and no goroutine of the test process
+// runnable, running (but the one waiting) or in a system call. On an
+// in-memory site with a fake clock the last check delays it by at most a
+// short grace after the site's last change, so the goroutines of other
+// tests in the binary do not starve the site; on loopback sockets and on
+// any other clock it holds as long as a goroutine works. It moves no
+// clock. A ctx without a deadline is bounded by [Options].Wait
+// ([ErrWaited]).
 func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil, s.waitUntil(ctx)) }
+
+// Step moves a fake site clock by d under the quiet protocol: it waits
+// until the site is quiet ([Site.Settle]), advances the clock by d —
+// firing every timer due in it, in deadline order, each callback awaited
+// ([clocktest.Fake.Advance]) — and waits until the site is quiet again. A
+// test that drives the clock by hand steps it with Step, never with
+// [Site.Fake]().Advance while the stack may be working: the clock would
+// move under a host still handling a message. It is matter.js's
+// `await MockTime.advance(ms)` (packages/testing/src/mocks/time.ts:638-663
+// at 862ad75f) between two waits for the task queue to drain. Without a
+// fake clock it fails.
+func (s *Site) Step(ctx context.Context, d time.Duration) error {
+	if s.fake == nil {
+		return errors.New("fabrictest: Step needs a fake site clock (Options.Clock is not a clocktest.Fake)")
+	}
+	if err := s.quiet(ctx, nil, s.waitUntil(ctx)); err != nil {
+		return fmt.Errorf("fabrictest: step: %w", err)
+	}
+	s.fake.Advance(d)
+	if err := s.quiet(ctx, nil, s.waitUntil(ctx)); err != nil {
+		return fmt.Errorf("fabrictest: step: %w", err)
+	}
+	return nil
+}
+
+// drain waits until the network and every host's counted work are quiet
+// for the settle period, holding the clock meanwhile: it counts a
+// node.stop in own, which an outer [Site.Run] or [Site.Eventually] sees
+// as work, and does not count it itself. It reads no goroutine states
+// but on loopback sockets, whose kernel work no counter sees. Counted work
+// that stands for holdBudget with nothing moving ends the wait, as it ends
+// a quiet period's hold.
+func (s *Site) drain(ctx context.Context, own *inflight.Group) error {
+	own.Enter(inflight.NodeStop)
+	defer own.Leave(inflight.NodeStop)
+	until := s.waitUntil(ctx)
+	wall := s.wall
+	samples := make([]metrics.Sample, len(busyMetrics))
+	for i, name := range busyMetrics {
+		samples[i].Name = name
+	}
+	busyWork := func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for _, g := range s.groups {
+			for c, v := range g.Snapshot() {
+				if g == own && c == inflight.NodeStop {
+					v--
+				}
+				if v > 0 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	last, _ := s.state()
+	since := wall.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		now := wall.Now()
+		if !until.IsZero() && !now.Before(until) {
+			return ErrWaited
+		}
+		cur, _ := s.state()
+		switch {
+		case cur != last || s.pending() > 0:
+			last, since = cur, now
+		case s.opts.Loopback && busy(samples, &s.inSyscall):
+			since = now
+		default:
+			stable := now.Sub(since)
+			if stable >= s.opts.Settle && (!busyWork() || stable >= holdBudget) {
+				return nil
+			}
+		}
+		clock.Sleep(wall, time.Millisecond, nil)
+	}
+}
+
+// newGroup registers the in-flight counters of a new host named name.
+func (s *Site) newGroup(name string) *inflight.Group {
+	g := inflight.New(name)
+	s.mu.Lock()
+	s.groups = append(s.groups, g)
+	s.mu.Unlock()
+	return g
+}
+
+// hostClock is the clock a host of the site is built with: on a fake
+// site clock the fake carrying the host's counters, so every component
+// the host builds on it counts its work there (internal/inflight); the
+// site's clock as it is otherwise.
+func (s *Site) hostClock(g *inflight.Group) clock.Clock {
+	if s.fake == nil {
+		return s.clk
+	}
+	return inflight.WithGroup(s.clk, g)
+}
+
+// siteState is what the quiet check compares between two looks: a
+// change of any field is the site moving.
+type siteState struct {
+	sent    uint64
+	changes uint64
+}
+
+func (s *Site) state() (st siteState, held bool) {
+	st.sent = s.sent()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, g := range s.groups {
+		st.changes += g.Changes()
+		snap := g.Snapshot()
+		ab := s.abandoned[g]
+		for c, v := range snap {
+			if v > ab[c] {
+				held = true
+			}
+		}
+		for c, a := range ab {
+			if v := snap[c]; v < a {
+				if v <= 0 {
+					delete(ab, c)
+				} else {
+					ab[c] = v
+				}
+			}
+		}
+	}
+	return st, held
+}
+
+// abandon stops the work the site's hosts hold now from holding the
+// clock; work counted later holds it again.
+func (s *Site) abandon() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.abandoned == nil {
+		s.abandoned = map[*inflight.Group]map[string]int64{}
+	}
+	for _, g := range s.groups {
+		snap := g.Snapshot()
+		if len(snap) == 0 {
+			continue
+		}
+		if s.abandoned[g] == nil {
+			s.abandoned[g] = map[string]int64{}
+		}
+		for c, v := range snap {
+			s.abandoned[g][c] = max(s.abandoned[g][c], v)
+		}
+	}
+}
+
+// inflightString names the work the site's hosts hold, for a wait's
+// error; empty when they hold none.
+func (s *Site) inflightString() string {
+	s.mu.Lock()
+	groups := s.groups
+	s.mu.Unlock()
+	var out string
+	for _, g := range groups {
+		snap := g.Snapshot()
+		if len(snap) == 0 {
+			continue
+		}
+		if out != "" {
+			out += "; "
+		}
+		out += fmt.Sprintf("%s %v", g.Name(), snap)
+	}
+	return out
+}
+
+// strictBusy reports whether the process-wide goroutine check holds the
+// site as long as a goroutine works: on loopback sockets, whose kernel
+// work no counter sees, and on a clock that is not a fake, which nothing
+// starves.
+func (s *Site) strictBusy() bool { return s.opts.Loopback || s.fake == nil }
 
 // waitUntil is the wall-clock instant a wait on ctx gives up at: the zero
 // time for a ctx with a deadline (ctx bounds it), now plus [Options].Wait
@@ -251,10 +472,16 @@ func (s *Site) waitUntil(ctx context.Context) time.Time {
 
 // quiet is Settle that also returns, with nil, once done is closed, and
 // with [ErrWaited] once the wall clock passes until (none when zero).
+//
+// The site is quiet once, for the settle period on the wall clock, nothing
+// moved — no datagram sent, no in-flight counter changed — and no datagram
+// waits unread, no host holds counted work (or the work held the clock
+// past holdBudget with nothing moving), and the process-wide goroutine
+// check passed (strictBusy) or its grace ran out.
 func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time) error {
 	wall := s.wall
 	since := wall.Now()
-	lastSent := s.sent()
+	last, _ := s.state()
 	samples := make([]metrics.Sample, len(busyMetrics))
 	for i, name := range busyMetrics {
 		samples[i].Name = name
@@ -267,12 +494,35 @@ func (s *Site) quiet(ctx context.Context, done <-chan struct{}, until time.Time)
 			return ctx.Err()
 		default:
 		}
-		if !until.IsZero() && !wall.Now().Before(until) {
+		now := wall.Now()
+		if !until.IsZero() && !now.Before(until) {
+			if held := s.inflightString(); held != "" {
+				return fmt.Errorf("%w (in flight: %s)", ErrWaited, held)
+			}
 			return ErrWaited
 		}
-		if sent := s.sent(); sent != lastSent || s.pending() > 0 || busy(samples, &s.inSyscall) {
-			lastSent, since = sent, wall.Now()
-		} else if clock.Since(wall, since) >= s.opts.Settle {
+		cur, held := s.state()
+		strict := s.strictBusy()
+		switch {
+		case cur != last || s.pending() > 0:
+			last, since = cur, now
+		case strict && busy(samples, &s.inSyscall):
+			since = now
+		default:
+			stable := now.Sub(since)
+			if stable < s.opts.Settle {
+				break
+			}
+			if held && stable < holdBudget {
+				break
+			}
+			if !strict && stable < busyGrace && busy(samples, &s.inSyscall) {
+				break
+			}
+			if held {
+				s.tb.Logf("fabrictest: counted work held the clock %v with nothing moving; the site moves on without it (in flight: %s)", holdBudget, s.inflightString())
+				s.abandon()
+			}
 			return nil
 		}
 		clock.Sleep(wall, time.Millisecond, done)
@@ -290,9 +540,11 @@ var busyMetrics = []string{
 // running or in a system call: a host still working on a message, a
 // handshake's cryptography, a store write. It is the Go reading of
 // MockTime's "the task queue is empty" — the process-wide count, so the
-// work of a parallel test in the same binary delays the step too. The
-// standing goroutines in a system call (standing, the fewest seen) are not
-// work; a reading below it lowers it.
+// work of a parallel test in the same binary reads as busy too, which is
+// why an in-memory site with a fake clock bounds it (busyGrace) and
+// relies on its hosts' counters (internal/inflight) for the work they
+// name. The standing goroutines in a system call (standing, the fewest
+// seen) are not work; a reading below it lowers it.
 func busy(samples []metrics.Sample, standing *atomic.Uint64) bool {
 	metrics.Read(samples)
 	var n, inSyscall uint64
@@ -334,10 +586,11 @@ func (s *Site) pending() int {
 // report's interval — fires. It returns fn's error, or ctx's when ctx ends
 // first. With a clock that is not a [clocktest.Fake] it only runs fn.
 //
-// This is MockTime.resolve (packages/testing/src/mocks/time.ts), under
-// which the matter.js site commissions (mock-site.ts:156): time moves only
-// while nothing else can, read in Go as "no datagram in the network and no
-// goroutine working".
+// This is MockTime.resolve (packages/testing/src/mocks/time.ts:537-622 at
+// 862ad75f), under which the matter.js site commissions (mock-site.ts:156):
+// time moves only while nothing else can — no host operation pending
+// (:603, withholdVirtualTime) — read in Go as "no datagram in the
+// network, no counted work on a host, no goroutine working" ([Site.Settle]).
 func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) error {
 	if s.fake == nil {
 		return fn(ctx)

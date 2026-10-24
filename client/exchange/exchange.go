@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -191,6 +192,40 @@ type Exchange struct {
 	receivedCount   int
 	lastActive      time.Time
 	createdAt       time.Time
+	// queuedCounted are the queued messages counted as delivered work
+	// (Manager.inflight), held the ones the reader took and has not yet
+	// come back from: its next Next, Send, Close or Abort ends their
+	// count, as the exchange's end ends every count.
+	queuedCounted int
+	held          int
+}
+
+// countQueuedLocked counts a message queued for the reader as work in
+// hand. The caller holds x.mu.
+func (x *Exchange) countQueuedLocked() {
+	if x.closed {
+		return
+	}
+	x.queuedCounted++
+	x.m.inflight.Enter(inflight.ExchangeDelivered)
+}
+
+// takeCountedLocked moves one queued message's count to the reader. The
+// caller holds x.mu.
+func (x *Exchange) takeCountedLocked() {
+	if x.queuedCounted > 0 {
+		x.queuedCounted--
+		x.held++
+	}
+}
+
+// releaseHeldLocked ends the count of the messages the reader took: it
+// is back on the exchange. The caller holds x.mu.
+func (x *Exchange) releaseHeldLocked() {
+	if x.held > 0 {
+		x.m.inflight.Add(inflight.ExchangeDelivered, -int64(x.held))
+		x.held = 0
+	}
 }
 
 // newExchange builds an exchange we initiate (initiator) or one the peer
@@ -299,6 +334,7 @@ func (x *Exchange) takeFirst(msg *Message) {
 	for i, q := range x.queue {
 		if q == msg {
 			x.queue = append(x.queue[:i], x.queue[i+1:]...)
+			x.takeCountedLocked()
 			return
 		}
 	}
@@ -339,6 +375,7 @@ func (x *Exchange) notifySentLocked() {
 // unacknowledged (:793-805). Both return ctx's error.
 func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions) error {
 	x.mu.Lock()
+	x.releaseHeldLocked()
 	if x.closed {
 		cause := x.closeCause
 		x.mu.Unlock()
@@ -721,6 +758,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.ackTimer = x.m.clock.AfterFunc(StandaloneAckTimeout, func() { x.ackTimeout(msg) })
 	}
 	x.queue = append(x.queue, msg)
+	x.countQueuedLocked()
 	select {
 	case x.signal <- struct{}{}:
 	default:
@@ -795,11 +833,15 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 		t := x.m.clock.AfterFunc(timeout, func() { close(expired) })
 		defer t.Stop()
 	}
+	x.mu.Lock()
+	x.releaseHeldLocked()
+	x.mu.Unlock()
 	for {
 		x.mu.Lock()
 		if len(x.queue) > 0 {
 			msg := x.queue[0]
 			x.queue = x.queue[1:]
+			x.takeCountedLocked()
 			x.mu.Unlock()
 			return msg, nil
 		}
@@ -833,6 +875,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 // without waiting; [Exchange.Done] reports the end. It is idempotent.
 func (x *Exchange) Close() {
 	x.mu.Lock()
+	x.releaseHeldLocked()
 	if x.closed || x.closeTimer != nil {
 		x.mu.Unlock()
 		return
@@ -871,6 +914,7 @@ func (x *Exchange) Abort(cause error) {
 
 func (x *Exchange) abort(cause error) {
 	x.mu.Lock()
+	x.releaseHeldLocked()
 	if x.closed {
 		x.mu.Unlock()
 		return
@@ -905,6 +949,11 @@ func (x *Exchange) finalClose(cause error) {
 	}
 	if p := x.sentToAck; p != nil {
 		p.resolve(nil, nil)
+	}
+	x.releaseHeldLocked()
+	if x.queuedCounted > 0 {
+		x.m.inflight.Add(inflight.ExchangeDelivered, -int64(x.queuedCounted))
+		x.queuedCounted = 0
 	}
 	x.closed = true
 	close(x.done)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/internal/udpseam"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -133,12 +134,18 @@ func hostAddr(i int) *net.UDPAddr {
 // listen opens the socket of addr and returns the production listener
 // over it. An address is held by one open socket at a time; a host that
 // stopped may listen on its address again.
-func (n *Network) listen(addr *net.UDPAddr) (*udp.Listener, error) {
+//
+// The socket counts every datagram its listener read as work of g from
+// the read until the listener reports it handled (udpseam.Handled,
+// internal/inflight UDPDatagrams): a datagram is in the network until it
+// is read and in the host's hands until its handler returned, so a site
+// never sees it nowhere.
+func (n *Network) listen(addr *net.UDPAddr, g *inflight.Group) (*udp.Listener, error) {
 	key, ok := addrPort(addr)
 	if !ok {
 		return nil, fmt.Errorf("fabrictest: %v is not an address of the network", addr)
 	}
-	s := &socket{net: n, key: key, local: cloneAddr(addr), in: make(chan Datagram, queueDepth), done: make(chan struct{})}
+	s := &socket{net: n, key: key, local: cloneAddr(addr), in: make(chan Datagram, queueDepth), done: make(chan struct{}), group: g}
 	n.mu.Lock()
 	if _, taken := n.sockets[key]; taken {
 		n.mu.Unlock()
@@ -245,11 +252,17 @@ type socket struct {
 	in    chan Datagram
 	done  chan struct{}
 	once  sync.Once
+	// group counts the datagrams read and not yet handled.
+	group *inflight.Group
 }
 
 func (s *socket) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 	select {
 	case d := <-s.in:
+		// From here the datagram is the host's work, no longer the
+		// network's (pending); the instant between the receive and the
+		// count is the settle period's to cover.
+		s.group.Enter(inflight.UDPDatagrams)
 		return copy(b, d.Payload), d.From, nil
 	case <-s.done:
 		return 0, nil, net.ErrClosed
@@ -267,6 +280,10 @@ func (s *socket) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
 }
 
 func (s *socket) LocalAddr() net.Addr { return cloneAddr(s.local) }
+
+// Handled implements udpseam.Handled: the listener finished with one
+// datagram this socket handed it.
+func (s *socket) Handled() { s.group.Leave(inflight.UDPDatagrams) }
 
 func (s *socket) Close() error {
 	s.once.Do(func() {

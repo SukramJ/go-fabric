@@ -101,6 +101,10 @@ type Listener struct {
 	// that share an order key in arrival order (ordered.go).
 	order *orderedDispatch
 
+	// handled is the socket's [udpseam.Handled], nil for a kernel socket:
+	// called once per datagram read, when its handling ended.
+	handled func()
+
 	// mu guards closed, set by the first [Listener.Close].
 	mu     sync.Mutex
 	closed bool
@@ -150,7 +154,18 @@ func New(cfg Config) (*Listener, error) {
 
 // newListener returns a Listener ready to Serve on conn.
 func newListener(conn udpseam.PacketConn) *Listener {
-	return &Listener{conn: conn, sem: make(chan struct{}, maxConcurrentDispatch)}
+	l := &Listener{conn: conn, sem: make(chan struct{}, maxConcurrentDispatch)}
+	if h, ok := conn.(udpseam.Handled); ok {
+		l.handled = h.Handled
+	}
+	return l
+}
+
+// done reports one datagram's handling ended to a counting socket.
+func (l *Listener) done() {
+	if l.handled != nil {
+		l.handled()
+	}
 }
 
 // The in-memory network of fabrictest builds its listeners through this
@@ -243,10 +258,12 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 			l.inflight.Add(1)
 			go func() {
 				defer l.inflight.Done()
+				defer l.done()
 				defer func() { <-l.sem }()
 				l.safeDispatch(handler, datagram, src)
 			}()
 		default:
+			l.done()
 		}
 	}
 }

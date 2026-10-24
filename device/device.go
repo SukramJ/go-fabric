@@ -146,7 +146,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	}
 	d := &Device{
 		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
-		clock: clk, queue: newQueue(), bridgedPowerSource: bridgedPS,
+		clock: clk, queue: newQueue(clk), bridgedPowerSource: bridgedPS,
 	}
 	d.reachable.Store(true)
 	for id := range optInMounted {

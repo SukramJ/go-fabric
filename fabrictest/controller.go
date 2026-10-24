@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -73,6 +75,9 @@ type Controller struct {
 	site  *Site
 	index int
 	opts  ControllerOptions
+	// group counts the work in hand of the controller's stack
+	// (internal/inflight), kept across restarts.
+	group *inflight.Group
 
 	listener *udp.Listener
 	mgr      *exchange.Manager
@@ -121,6 +126,7 @@ func (s *Site) AddController(opts ControllerOptions) *Controller {
 		opts.Logger = s.log
 	}
 	c := &Controller{site: s, index: s.index(), opts: opts, caStore: &ca.MemoryStore{}, resume: &peer.MemoryResumptionStore{}, regStore: &client.MemoryStore{}}
+	c.group = s.newGroup("controller " + strconv.Itoa(c.index))
 	if err := c.start(); err != nil {
 		c.Close()
 		s.tb.Fatalf("fabrictest: controller %d: %v", c.index, err)
@@ -171,9 +177,9 @@ type stack struct {
 // error the stack returned holds what was built before it, for the caller
 // to close.
 func (c *Controller) build() (*stack, error) {
-	clk, log := c.site.clk, c.opts.Logger
+	clk, log := c.site.hostClock(c.group), c.opts.Logger
 	st := &stack{}
-	l, err := c.site.listen(c.index)
+	l, err := c.site.listen(c.index, c.group)
 	if err != nil {
 		return st, fmt.Errorf("listen: %w", err)
 	}

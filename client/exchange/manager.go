@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -100,6 +101,11 @@ type Manager struct {
 	retransmitted func()
 	reliable      bool
 
+	// inflight counts the messages delivered to an exchange whose reader
+	// has not finished with them (internal/inflight ExchangeDelivered):
+	// the group the clock carries, nil outside a fabrictest site.
+	inflight *inflight.Group
+
 	// counter is the global unencrypted message counter every unsecured
 	// session sends with (SessionManager.ts:265, :439).
 	counter *mrp.Counter
@@ -164,6 +170,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 	if m.clock == nil {
 		m.clock = SystemClock{}
 	}
+	m.inflight = inflight.Of(m.clock)
 	if m.rand == nil {
 		m.rand = mrand.Float64
 	}

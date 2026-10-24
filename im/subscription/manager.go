@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -109,6 +110,10 @@ type Manager struct {
 	logger        *slog.Logger
 	reporter      Reporter
 	eventReporter EventReporter
+	// inflight counts a tick being walked and every report it started
+	// until the report returned (internal/inflight SubscriptionPending):
+	// the group the clock carries, nil outside a fabrictest site.
+	inflight *inflight.Group
 
 	// mu guards byID, eventReporter, nextID, onClosed, onTerminated and perFabric.
 	mu        sync.RWMutex
@@ -214,6 +219,7 @@ func NewManager(cfg Config, reporter Reporter, logger *slog.Logger) *Manager {
 		cfg:       cfg,
 		logger:    logger,
 		reporter:  reporter,
+		inflight:  inflight.Of(cfg.Clock),
 		byID:      make(map[uint32]*Subscription),
 		perFabric: make(map[uint8]int),
 		// SubscriptionId is a uint32 carried on every ReportData chunk
