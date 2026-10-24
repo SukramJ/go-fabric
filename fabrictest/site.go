@@ -128,6 +128,9 @@ func NewSite(tb testing.TB, opts Options) *Site {
 		s.fake = f
 	}
 	if s.log == nil {
+		// A test site is quiet by design: its hosts log only to a logger
+		// the test hands it (Options.Logger), never to slog.Default() as a
+		// library component's nil logger does (docs/guides/observability.md).
 		s.log = slog.New(slog.DiscardHandler)
 	}
 	if s.opts.Wait <= 0 {

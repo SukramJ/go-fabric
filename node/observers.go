@@ -134,7 +134,7 @@ func observe(logger *slog.Logger, event string, fn func() error) {
 		}
 	}()
 	if err := fn(); err != nil {
-		logger.Warn("node.observer.failed", slog.String("event", event), slog.String("err", err.Error()))
+		logger.Warn("node.observer.failed", slog.String("event", event), slog.Any("err", err))
 	}
 }
 

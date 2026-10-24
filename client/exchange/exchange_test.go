@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -244,7 +245,8 @@ func TestStatusReportTravelsOnSecureChannel(t *testing.T) {
 // final wait of MessageExchange.ts:894-918, then PeerUnresponsiveError.
 func TestRetransmissionSchedule(t *testing.T) {
 	t.Parallel()
-	m, conn, clock := newTestManager(t, Config{})
+	var retransmitted atomic.Int32
+	m, conn, clock := newTestManager(t, Config{Retransmitted: func() { retransmitted.Add(1) }})
 	s, _ := newUnsecured(t, m)
 	if s.IsPeerActive() {
 		t.Fatal("the initiator's unsecured session starts with the peer active")
@@ -290,6 +292,10 @@ func TestRetransmissionSchedule(t *testing.T) {
 	}
 	if conn.count() != MaxTransmissions || !x.HasUnackedMessage() {
 		t.Fatalf("%d transmissions (unacked %v), want %d", conn.count(), x.HasUnackedMessage(), MaxTransmissions)
+	}
+	// Config.Retransmitted counts every transmission after the first.
+	if got := retransmitted.Load(); got != MaxTransmissions-1 {
+		t.Errorf("Retransmitted ran %d times, want %d", got, MaxTransmissions-1)
 	}
 }
 

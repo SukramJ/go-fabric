@@ -112,13 +112,13 @@ func NewSubtypeResponder(logger *slog.Logger) (*SubtypeResponder, error) {
 
 	pc4, err4 := joinMcast4()
 	if err4 != nil {
-		logger.Debug("matter.mdns.subtype.udp4_join_failed", slog.String("err", err4.Error()))
+		logger.Debug("matter.mdns.subtype.udp4_join_failed", slog.Any("err", err4))
 	} else {
 		r.pc4 = pc4
 	}
 	pc6, err6 := joinMcast6()
 	if err6 != nil {
-		logger.Debug("matter.mdns.subtype.udp6_join_failed", slog.String("err", err6.Error()))
+		logger.Debug("matter.mdns.subtype.udp6_join_failed", slog.Any("err", err6))
 	} else {
 		r.pc6 = pc6
 	}
@@ -205,7 +205,7 @@ func (r *SubtypeResponder) Announce() {
 func (r *SubtypeResponder) multicastPTRs(ptrs map[string]string, ttl uint32) {
 	out, err := packSubtypePTRs(ptrs, ttl)
 	if err != nil {
-		r.logger.Debug("matter.mdns.subtype.announce_pack_err", slog.String("err", err.Error()))
+		r.logger.Debug("matter.mdns.subtype.announce_pack_err", slog.Any("err", err))
 		return
 	}
 	r.lifecycleMu.Lock()
@@ -423,21 +423,21 @@ func (r *SubtypeResponder) survivesReadError(ctx context.Context, family string,
 	if errors.Is(err, net.ErrClosed) || ctx.Err() != nil {
 		r.logger.Debug("matter.mdns.subtype.read_closed",
 			slog.String("family", family),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return false
 	}
 	*consecutive++
 	if *consecutive >= maxConsecutiveReadErrors {
 		r.logger.Error("matter.mdns.subtype.read_giving_up",
 			slog.String("family", family),
-			slog.String("err", err.Error()),
+			slog.Any("err", err),
 			slog.Int("consecutive_errors", *consecutive),
 			slog.String("hint", "subtype PTR answering stopped; Apple Home / Google Home discovery of this bridge will fail until the daemon restarts"))
 		return false
 	}
 	r.logger.Warn("matter.mdns.subtype.read_err",
 		slog.String("family", family),
-		slog.String("err", err.Error()),
+		slog.Any("err", err),
 		slog.Int("consecutive_errors", *consecutive))
 	select {
 	case <-ctx.Done():
@@ -500,7 +500,7 @@ func (r *SubtypeResponder) writeMulticastV4(out []byte, cm *ipv4.ControlMessage,
 		ocm := &ipv4.ControlMessage{IfIndex: ifi.Index}
 		if _, werr := r.pc4.WriteTo(out, ocm, dst); werr != nil {
 			r.logger.Debug("matter.mdns.subtype.write4_err",
-				slog.String("err", werr.Error()),
+				slog.Any("err", werr),
 				slog.String("iface", ifi.Name))
 			continue
 		}
@@ -531,7 +531,7 @@ func (r *SubtypeResponder) writeMulticastV6(out []byte, cm *ipv6.ControlMessage,
 		ocm := &ipv6.ControlMessage{IfIndex: ifi.Index}
 		if _, werr := r.pc6.WriteTo(out, ocm, dst); werr != nil {
 			r.logger.Debug("matter.mdns.subtype.write6_err",
-				slog.String("err", werr.Error()),
+				slog.Any("err", werr),
 				slog.String("iface", ifi.Name))
 			continue
 		}

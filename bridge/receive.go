@@ -128,7 +128,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		// chip-tool retransmits per MRP if it cares.
 		b.logger.Debug("matter.rx.privacy_unmask",
 			slog.String("src", srcString(src)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return err
 	}
 	hdr, hdrLen, err := message.UnmarshalHeader(buf)
@@ -136,14 +136,14 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		b.logger.Warn("matter.rx.header",
 			slog.String("src", srcString(src)),
 			slog.Int("bytes", len(buf)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return err
 	}
 	if hdrLen > len(buf) {
 		// Defensive — UnmarshalHeader should already fail in this
 		// case, but the dispatch loop must never index past the slice.
 		err := fmt.Errorf("bridge: header consumed %d > %d bytes", hdrLen, len(buf))
-		b.logger.Warn("matter.rx.header_overflow", slog.String("err", err.Error()))
+		b.logger.Warn("matter.rx.header_overflow", slog.Any("err", err))
 		return err
 	}
 	body := buf[hdrLen:]
@@ -174,7 +174,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if err != nil {
 		b.logger.Warn("matter.rx.protocol_header",
 			slog.String("src", srcString(src)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return err
 	}
 
@@ -229,7 +229,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	bodyOffset := protocolHeaderSize(proto)
 	if bodyOffset > len(plain) {
 		err := fmt.Errorf("bridge: protocol header consumed %d > %d bytes", bodyOffset, len(plain))
-		b.logger.Warn("matter.rx.protocol_overflow", slog.String("err", err.Error()))
+		b.logger.Warn("matter.rx.protocol_overflow", slog.Any("err", err))
 		return err
 	}
 	payload := plain[bodyOffset:]
@@ -276,7 +276,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.String("src", srcString(src)),
 			slog.Int("protocol_id", int(proto.ProtocolID)),
 			slog.Int("opcode", int(proto.Opcode)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return err
 	}
 }
@@ -340,7 +340,7 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 		err := fmt.Errorf("%w: id=%d", ErrSessionMissing, hdr.SessionID)
 		b.logger.Debug("matter.rx.session_miss",
 			slog.Int("session_id", int(hdr.SessionID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		// Burst-detector emits a single INFO row when the same
 		// session-id arrives repeatedly within a short window — the
 		// classic fingerprint of an iPhone holding a stale
@@ -370,7 +370,7 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 		// MRP retries fade out naturally.
 		b.logger.Debug("matter.rx.decrypt",
 			slog.Int("session_id", int(hdr.SessionID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return nil, false, err
 	}
 	// Single inbound-activity chokepoint: every message that decrypted
@@ -425,6 +425,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //     `Bridge.checkTimedGate` per Matter §8.7.
 func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	b.load.imReceived.Add(1)
+	b.count(contract.MetricIMReceived, 1)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
 	case imGateProceed:
 		// fall through to decode + dispatch below
@@ -449,14 +450,14 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	case im.OpcodeReadRequest:
 		req, err := im.UnmarshalReadRequestTLV(dec)
 		if err != nil {
-			b.logger.Warn("matter.rx.im.read_decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.rx.im.read_decode", slog.Any("err", err))
 			return b.replyDecodeError(src, requestHdr, proto, "read", err)
 		}
 		return b.dispatchReadRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeWriteRequest:
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
-			b.logger.Warn("matter.rx.im.write_decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.rx.im.write_decode", slog.Any("err", err))
 			if im.SuppressResponseOf(payload) {
 				b.suppressStatus(src, requestHdr, proto, "write_decode", im.StatusInvalidAction)
 				return err
@@ -467,7 +468,7 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	case im.OpcodeInvokeRequest:
 		req, err := im.UnmarshalInvokeRequestTLV(dec, commandFieldsReader)
 		if err != nil {
-			b.logger.Warn("matter.rx.im.invoke_decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.rx.im.invoke_decode", slog.Any("err", err))
 			if im.SuppressResponseOf(payload) {
 				b.suppressStatus(src, requestHdr, proto, "invoke_decode", im.StatusInvalidAction)
 				return err
@@ -478,14 +479,14 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *m
 	case im.OpcodeSubscribeRequest:
 		req, err := im.UnmarshalSubscribeRequestTLV(dec)
 		if err != nil {
-			b.logger.Warn("matter.rx.im.subscribe_decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.rx.im.subscribe_decode", slog.Any("err", err))
 			return b.replyDecodeError(src, requestHdr, proto, "subscribe", err)
 		}
 		return b.handleSubscribeRequest(ctx, src, requestHdr, proto, req)
 	case im.OpcodeTimedRequest:
 		req, err := im.UnmarshalTimedRequestTLV(dec)
 		if err != nil {
-			b.logger.Warn("matter.rx.im.timed_decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.rx.im.timed_decode", slog.Any("err", err))
 			return b.replyDecodeError(src, requestHdr, proto, "timed", err)
 		}
 		return b.dispatchTimedRequest(src, requestHdr, proto, req)
@@ -706,7 +707,7 @@ func (b *Bridge) notifyReachable(ep *endpoint.Endpoint, reachable bool) {
 		})
 	}
 	b.logger.Debug("matter.bridge.reachable_changed",
-		slog.Int("endpoint_id", int(ep.ID)),
+		slog.Int("endpoint", int(ep.ID)),
 		slog.String("scope", ep.Scope),
 		slog.String("address", ep.DeviceAddress),
 		slog.Bool("reachable", reachable))

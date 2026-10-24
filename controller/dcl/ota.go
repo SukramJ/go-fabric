@@ -122,7 +122,7 @@ func (o *OTAVersions) CheckForUpdate(ctx context.Context, vid, pid uint16, curre
 // alone, or every listed version above current, highest first, until one
 // is applicable.
 func (o *OTAVersions) queryDCLForUpdate(ctx context.Context, c *Client, source string, vid, pid uint16, current uint32, target *uint32) (SoftwareVersion, bool) {
-	attrs := []any{slog.String("source", source), slog.Int("vid", int(vid)), slog.Int("pid", int(pid)), slog.Uint64("current", uint64(current))}
+	attrs := []any{slog.String("source", source), slog.Int("vendor_id", int(vid)), slog.Int("product_id", int(pid)), slog.Uint64("current", uint64(current))}
 	if target != nil {
 		v, ok, err := o.CheckVersion(ctx, c, vid, pid, *target, current)
 		if err != nil {
@@ -147,7 +147,7 @@ func (o *OTAVersions) queryDCLForUpdate(ctx context.Context, c *Client, source s
 	for _, version := range newer {
 		v, ok, err := o.CheckVersion(ctx, c, vid, pid, version, current)
 		if err != nil {
-			o.log().Info("dcl.ota.check_failed", append(attrs, slog.String("err", err.Error()))...)
+			o.log().Info("dcl.ota.check_failed", append(attrs, slog.Any("err", err))...)
 			continue
 		}
 		if ok {
@@ -166,7 +166,7 @@ func (o *OTAVersions) logLookupFailure(err error, vid, pid uint16, attrs []any) 
 		o.log().Debug("dcl.ota.no_applicable_update", attrs...)
 		return
 	}
-	o.log().Info("dcl.ota.check_failed", append(attrs, slog.String("err", err.Error()),
+	o.log().Info("dcl.ota.check_failed", append(attrs, slog.Any("err", err),
 		slog.String("message", fmt.Sprintf("Failed to check for updates for VID: %d, PID: %d", vid, pid)))...)
 }
 
@@ -246,7 +246,7 @@ func (o *OTAVersions) Download(ctx context.Context, u SoftwareVersion, w io.Writ
 	if scheme := strings.ToLower(parsed.Scheme); scheme != "https" && scheme != "http" {
 		return &OTAError{Message: fmt.Sprintf(`Unsupported protocol "%s:" in OTA URL. Only "https:", "http:" are supported`, scheme)}
 	}
-	o.log().Info("dcl.ota.download", slog.String("url", u.OTAURL), slog.Int("vid", int(u.VID)), slog.Int("pid", int(u.PID)),
+	o.log().Info("dcl.ota.download", slog.String("url", u.OTAURL), slog.Int("vendor_id", int(u.VID)), slog.Int("product_id", int(u.PID)),
 		slog.String("version", fmt.Sprintf("%d (%s)", u.SoftwareVersion, u.SoftwareVersionString)))
 	ctx, cancel := context.WithTimeout(ctx, DefaultDownloadTimeout)
 	defer cancel()

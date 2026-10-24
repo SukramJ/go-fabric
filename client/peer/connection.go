@@ -575,7 +575,7 @@ func (c *connection) deleteAddressLocked(a discovery.Address, why string, force 
 		return
 	}
 	if att, ok := c.attempts[key]; ok {
-		c.p.log.Debug("matter.controller.peer.attempt_aborted", slog.String("address", a.String()), slog.String("why", why))
+		c.p.log.Debug("matter.controller.peer.attempt_aborted", slog.String("address", a.String()), slog.String("reason", why))
 		att.cancel()
 		delete(c.attempts, key)
 	}
@@ -680,7 +680,7 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	}()
 
 	p.log.Info("matter.controller.peer.connecting",
-		slog.String("address", att.addr.String()), slog.Int("addr", att.addrNo), slog.Int("attempt", attemptNo),
+		slog.String("address", att.addr.String()), slog.Int("address_index", att.addrNo), slog.Int("attempt", attemptNo),
 		slog.Bool("fallback", markedFallback))
 	params := p.SessionParameters()
 	opts := handshake.CASEOptions{
@@ -725,7 +725,7 @@ func (c *connection) onKickLocked(origin kickOrigin, att *attempt, restart conte
 	log := c.p.log.With(slog.String("address", att.addr.String()), slog.String("origin", origin.String()))
 	if ok, why := kickGate(c.setTiming, x.RetransmissionCount(), x.RetransmissionRestartSaving()); !ok {
 		if why != "" {
-			log.Debug("matter.controller.peer.kick_suppressed", slog.String("why", why))
+			log.Debug("matter.controller.peer.kick_suppressed", slog.String("reason", why))
 		}
 		return
 	}
@@ -787,7 +787,7 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	if hasDelay && c.handleError != nil {
 		d, replace, fatal := c.handleError(err)
 		if fatal != nil {
-			log.Error("matter.controller.peer.fatal", slog.String("err", fatal.Error()))
+			log.Error("matter.controller.peer.fatal", slog.Any("err", fatal))
 			c.mu.Lock()
 			c.fatal = fatal
 			c.mu.Unlock()
@@ -804,7 +804,7 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	case "resumption":
 		log.Warn("matter.controller.peer.resumption_rejected")
 	default:
-		log.Warn("matter.controller.peer.connect_error", slog.String("category", category), slog.Duration("retry_in", delay), slog.String("err", err.Error()))
+		log.Warn("matter.controller.peer.connect_error", slog.String("category", category), slog.Duration("retry_in", delay), slog.Any("err", err))
 	}
 	if att.ctx.Err() != nil || delay <= 0 {
 		return
@@ -856,7 +856,7 @@ func (c *connection) deleteResumptionRecord() bool {
 	}
 	ok, err := r.DeleteResumptionRecord(c.p.address)
 	if err != nil {
-		c.p.log.Error("matter.controller.peer.resumption_delete_failed", slog.String("err", err.Error()))
+		c.p.log.Error("matter.controller.peer.resumption_delete_failed", slog.Any("err", err))
 	}
 	return ok
 }

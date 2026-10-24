@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -67,7 +66,7 @@ type Listener struct {
 	idleTimeout    time.Duration
 	clock          clock.Clock
 
-	recoveredPanics atomic.Uint64
+	recoveredPanics panicCounter
 
 	// work is the goroutines of the accepted connections — each one's
 	// reader and its close watcher — added under mu while the listener
@@ -134,7 +133,13 @@ func (l *Listener) Addr() *net.TCPAddr {
 
 // RecoveredPanics reports how many handler panics the listener's
 // connections recovered.
-func (l *Listener) RecoveredPanics() uint64 { return l.recoveredPanics.Load() }
+func (l *Listener) RecoveredPanics() uint64 { return l.recoveredPanics.n.Load() }
+
+// OnPanicRecovered sets fn to run once per handler panic a connection of
+// the listener recovers, after it is counted and logged — the hook a
+// metrics port counts with. nil removes it. Safe while the listener
+// serves; fn runs on the connection's reader goroutine and must not block.
+func (l *Listener) OnPanicRecovered(fn func()) { l.recoveredPanics.set(fn) }
 
 // Conns reports the number of open connections.
 func (l *Listener) Conns() int {

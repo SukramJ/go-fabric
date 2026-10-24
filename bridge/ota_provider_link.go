@@ -352,8 +352,8 @@ func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, asOf time.Time, wha
 		b.logger.Info("matter.session.peer_lost",
 			slog.Int("session_id", int(sessionID)),
 			slog.Int("exchange_id", int(exchangeID)),
-			slog.Int("fabric", int(fabricIndex)),
-			slog.Uint64("peer_node", peerNodeID),
+			slog.Int("fabric_index", int(fabricIndex)),
+			slog.Uint64("node_id", peerNodeID),
 			slog.Int("closed", closed),
 			slog.String("hint", "max retransmissions reached on "+what+"; the peer's sessions are force-closed"))
 	}

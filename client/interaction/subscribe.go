@@ -156,7 +156,7 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 	if req.ReplaceSubscriptions {
 		for _, s := range c.subs.Active() {
 			if s.peer == peer {
-				c.log.Debug("matter.controller.interaction.subscription_replaced", slog.Uint64("subscription", uint64(s.ID())))
+				c.log.Debug("matter.controller.interaction.subscription_replaced", slog.Uint64("subscription_id", uint64(s.ID())))
 				s.Close()
 			}
 		}
@@ -222,7 +222,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	sub.maxPeerResponseTime = c.provider.MaximumPeerResponseTime(SubscriptionProcessingTime, false)
 	c.subs.AddPeer(sub)
 	c.log.Info("matter.controller.interaction.subscribed",
-		slog.Uint64("subscription", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))
+		slog.Uint64("subscription_id", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))
 	return sub, nil
 }
 

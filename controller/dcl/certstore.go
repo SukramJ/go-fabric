@@ -347,14 +347,14 @@ func (s *CertificateStore) CertificateDER(ctx context.Context, skid string, o Ge
 		return nil, err
 	}
 	if _, err := parseTrustStoreCertificate(e.DER, e.kind()); err != nil {
-		s.log.Info("dcl.certificates.cached_unparseable", slog.String("skid", id), slog.String("err", err.Error()),
+		s.log.Info("dcl.certificates.cached_unparseable", slog.String("skid", id), slog.Any("err", err),
 			slog.String("message", "Cached certificate failed to parse; attempting one re-fetch from DCL to recover"))
 		refetched, ok := s.tryRefetchRootCertificate(ctx, id, e.IsProduction, s.considers(o))
 		if !ok {
 			return e.DER, nil
 		}
 		if _, err := parseTrustStoreCertificate(refetched, e.kind()); err != nil {
-			s.log.Warn("dcl.certificates.refetched_unparseable", slog.String("skid", id), slog.String("err", err.Error()),
+			s.log.Warn("dcl.certificates.refetched_unparseable", slog.String("skid", id), slog.Any("err", err),
 				slog.String("message", "Re-fetched certificate also failed to parse"))
 			return e.DER, nil
 		}
@@ -395,7 +395,7 @@ func (s *CertificateStore) GetOrFetchCertificate(ctx context.Context, skid strin
 	isProduction := o.IsProduction == nil || *o.IsProduction
 	stored, err := s.fetchAndStoreRootCertificateBySkid(ctx, id, isProduction, false)
 	if err != nil {
-		s.log.Debug("dcl.certificates.fetch_failed", slog.String("skid", id), slog.String("err", err.Error()))
+		s.log.Debug("dcl.certificates.fetch_failed", slog.String("skid", id), slog.Any("err", err))
 		return CertificateMetadata{}, false
 	}
 	if !stored {
@@ -442,7 +442,7 @@ func (s *CertificateStore) tryRefetchRootCertificate(ctx context.Context, id str
 	defer s.fetchMu.Unlock()
 	stored, err := s.fetchAndStoreRootCertificateBySkid(ctx, id, isProduction, true)
 	if err != nil {
-		s.log.Warn("dcl.certificates.refetch_failed", slog.String("skid", id), slog.String("err", err.Error()))
+		s.log.Warn("dcl.certificates.refetch_failed", slog.String("skid", id), slog.Any("err", err))
 		return nil, false
 	}
 	if !stored {
@@ -493,7 +493,7 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	if e, ok := s.lookup(id); ok && e.kind() == KindCDSigner {
 		c, err := parseCert(e.DER, false)
 		if err != nil {
-			s.log.Info("dcl.certificates.cd_signer_unparseable", slog.String("skid", id), slog.String("err", err.Error()))
+			s.log.Info("dcl.certificates.cd_signer_unparseable", slog.String("skid", id), slog.Any("err", err))
 			return nil, false
 		}
 		k, err := attestation.P256Key(c.x509)
@@ -504,7 +504,7 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	}
 	key, err := s.fetchCDSigner(context.Background(), id)
 	if err != nil {
-		s.log.Info("dcl.certificates.cd_signer_fetch_failed", slog.String("skid", id), slog.String("err", err.Error()),
+		s.log.Info("dcl.certificates.cd_signer_fetch_failed", slog.String("skid", id), slog.Any("err", err),
 			slog.String("message", "Failed to fetch CD signer "+id+" from DCL"))
 		return nil, false
 	}
@@ -611,7 +611,7 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 		err = s.store.Save(ctx, data)
 	}
 	if err != nil {
-		s.log.Warn("dcl.certificates.save_failed", slog.String("err", err.Error()))
+		s.log.Warn("dcl.certificates.save_failed", slog.Any("err", err))
 	}
 }
 
@@ -646,7 +646,7 @@ func (s *CertificateStore) Update(ctx context.Context, force bool) bool {
 	defer s.fetchMu.Unlock()
 	s.log.Debug("dcl.certificates.update", slog.Bool("force", force))
 	if err := s.fetchCertificates(ctx, force); err != nil {
-		s.log.Info("dcl.certificates.update_failed", slog.String("err", err.Error()), slog.String("message", "Certificate update failed"))
+		s.log.Info("dcl.certificates.update_failed", slog.Any("err", err), slog.String("message", "Certificate update failed"))
 		return false
 	}
 	return true
@@ -733,7 +733,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 	}
 	certs, err := client.RootCertificateBySubject(ctx, ref)
 	if err != nil {
-		s.log.Info("dcl.certificates.fetch_failed", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID), slog.String("err", err.Error()))
+		s.log.Info("dcl.certificates.fetch_failed", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID), slog.Any("err", err))
 		return false
 	}
 	stored := false
@@ -746,7 +746,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		id := normalizeKeyID(cert.SubjectKeyID)
 		der, err := pemToDER(cert.PEMCert)
 		if err != nil {
-			s.log.Info("dcl.certificates.unusable", slog.String("skid", id), slog.String("err", err.Error()),
+			s.log.Info("dcl.certificates.unusable", slog.String("skid", id), slog.Any("err", err),
 				slog.String("message", "DCL: certificate cannot be used as a PAA, skipped"))
 			continue
 		}
@@ -768,7 +768,7 @@ func (s *CertificateStore) parseAndCheckSkid(der []byte, kind Kind, statedSkid, 
 	c, err := parseTrustStoreCertificate(der, kind)
 	if err != nil {
 		s.log.Info("dcl.certificates.unusable", slog.String("source", source), slog.String("kind", string(kind)),
-			slog.String("skid", statedSkid), slog.String("err", err.Error()))
+			slog.String("skid", statedSkid), slog.Any("err", err))
 		return false
 	}
 	if derived := hexUpper(c.x509.SubjectKeyId); derived != statedSkid {
@@ -806,7 +806,7 @@ func (s *CertificateStore) logGitHubFetchFailure(ctx context.Context, message st
 	if rateLimited && s.hasTestCertificatesOfKind(kind) {
 		level = slog.LevelDebug
 	}
-	s.log.Log(ctx, level, "dcl.certificates.github_failed", slog.String("message", message), slog.String("err", err.Error()))
+	s.log.Log(ctx, level, "dcl.certificates.github_failed", slog.String("message", message), slog.Any("err", err))
 }
 
 func (s *CertificateStore) rateLimited() bool {
@@ -878,7 +878,7 @@ func (s *CertificateStore) fetchGitHubCertificate(ctx context.Context, dir *gith
 		c, err = parseTrustStoreCertificate(der, kind)
 	}
 	if err != nil {
-		s.log.Info("dcl.certificates.github_certificate_failed", slog.String("file", name), slog.String("err", err.Error()))
+		s.log.Info("dcl.certificates.github_certificate_failed", slog.String("file", name), slog.Any("err", err))
 		return
 	}
 	id := hexUpper(c.x509.SubjectKeyId)

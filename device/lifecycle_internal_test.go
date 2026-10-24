@@ -157,12 +157,12 @@ func TestDeviceClockAndQueue(t *testing.T) {
 	q := newQueue()
 	q.Enqueue(func() { t.Error("ran on a stopped queue") })
 	q.Enqueue(nil)
-	q.stop() // not running: a no-op
-	q.start()
-	q.start() // running: a no-op
+	q.Stop() // not running: a no-op
+	q.Start()
+	q.Start() // running: a no-op
 	done := make(chan struct{})
 	q.Enqueue(func() { close(done) })
-	q.stop()
+	q.Stop()
 	<-done
 }
 

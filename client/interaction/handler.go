@@ -67,7 +67,7 @@ func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Mes
 			r.log.Debug("matter.controller.interaction.report_aborted")
 			return
 		}
-		r.log.Info("matter.controller.interaction.report_failed", slog.String("err", err.Error()))
+		r.log.Info("matter.controller.interaction.report_failed", slog.Any("err", err))
 	}
 }
 
@@ -75,7 +75,7 @@ func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Mes
 // (ClientSubscriptionHandler.ts:150-156) and the InvalidAction answer.
 func (r *Subscriptions) sendStatus(ctx context.Context, m *messenger, status im.StatusCode) {
 	if err := m.sendStatus(context.WithoutCancel(ctx), status); err != nil {
-		r.log.Debug("matter.controller.interaction.status_failed", slog.String("err", err.Error()))
+		r.log.Debug("matter.controller.interaction.status_failed", slog.Any("err", err))
 	}
 }
 
@@ -94,7 +94,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 	peer := exchange.PeerAddress{FabricIndex: session.FabricIndex(), NodeID: session.PeerNodeID()}
 	sub := r.GetPeer(peer, initial.SubscriptionID)
 	if sub == nil {
-		r.log.Info("matter.controller.interaction.report_for_unknown_subscription", slog.Uint64("subscription", uint64(initial.SubscriptionID)))
+		r.log.Info("matter.controller.interaction.report_for_unknown_subscription", slog.Uint64("subscription_id", uint64(initial.SubscriptionID)))
 		r.sendStatus(ctx, m, im.StatusInvalidSubscription)
 		return nil
 	}
@@ -117,7 +117,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		return readDataReports(ctx, r.log, m, initial, func(*im.ReportData) error {
 			chunk++
 			if chunk > 1 {
-				r.log.Warn("matter.controller.interaction.data_after_keepalive", slog.Uint64("subscription", uint64(initial.SubscriptionID)))
+				r.log.Warn("matter.controller.interaction.data_after_keepalive", slog.Uint64("subscription_id", uint64(initial.SubscriptionID)))
 			}
 			return nil
 		})
@@ -126,7 +126,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 	a.report.Session = session
 	return readDataReports(ctx, r.log, m, initial, func(rd *im.ReportData) error {
 		if rd != initial && (!rd.HasSubscription || rd.SubscriptionID != initial.SubscriptionID) {
-			r.log.Debug("matter.controller.interaction.report_for_another_subscription", slog.Uint64("subscription", uint64(rd.SubscriptionID)))
+			r.log.Debug("matter.controller.interaction.report_for_another_subscription", slog.Uint64("subscription_id", uint64(rd.SubscriptionID)))
 			r.sendStatus(ctx, m, im.StatusInvalidSubscription)
 			return errStopReports
 		}

@@ -305,7 +305,7 @@ func (s *Session) HandleIncoming(data []byte) error {
 	if err == nil {
 		return nil
 	}
-	s.log.Warn("matter.btp.rx_error", slog.String("err", err.Error()))
+	s.log.Warn("matter.btp.rx_error", slog.Any("err", err))
 	if cerr := s.Close(); cerr != nil {
 		return cerr
 	}
@@ -538,16 +538,16 @@ func (s *Session) Close() error {
 // A write that fails after the session ended is only logged.
 func (s *Session) handleFailedWriteLocked(err error) error {
 	if !s.active {
-		s.log.Debug("matter.btp.write_failed_after_end", slog.String("err", err.Error()))
+		s.log.Debug("matter.btp.write_failed_after_end", slog.Any("err", err))
 		return nil
 	}
 	s.mu.Unlock()
 	if cerr := s.Close(); cerr != nil {
-		s.log.Debug("matter.btp.close_after_write_failed", slog.String("err", cerr.Error()))
+		s.log.Debug("matter.btp.close_after_write_failed", slog.Any("err", cerr))
 	}
 	s.mu.Lock()
 	if errors.Is(err, ErrDisconnected) {
-		s.log.Debug("matter.btp.write_disconnected", slog.String("err", err.Error()))
+		s.log.Debug("matter.btp.write_disconnected", slog.Any("err", err))
 		return nil
 	}
 	return err
@@ -578,7 +578,7 @@ func (s *Session) sendAckTimeoutTriggered() {
 		return
 	}
 	if err := s.sendStandaloneAckLocked(); err != nil {
-		s.log.Warn("matter.btp.standalone_ack_failed", slog.String("err", err.Error()))
+		s.log.Warn("matter.btp.standalone_ack_failed", slog.Any("err", err))
 	}
 }
 

@@ -94,6 +94,8 @@ type Listener struct {
 	// surface can report "datagrams were dropped by a panic" instead of
 	// leaving the operator with an unexplained silence.
 	recoveredPanics atomic.Uint64
+	// panicHook is [Listener.OnPanicRecovered]'s fn; nil runs none.
+	panicHook atomic.Pointer[func()]
 
 	// order, when set by [Listener.ServeOrdered], keeps the datagrams
 	// that share an order key in arrival order (ordered.go).
@@ -265,6 +267,9 @@ func (l *Listener) safeDispatch(handler Handler, buf []byte, src *net.UDPAddr) {
 	defer func() {
 		if r := recover(); r != nil {
 			total := l.recoveredPanics.Add(1)
+			if fn := l.panicHook.Load(); fn != nil {
+				defer (*fn)()
+			}
 			peer := "<nil>"
 			if src != nil {
 				peer = src.String()
@@ -302,6 +307,18 @@ func (l *Listener) WaitIdle(ctx context.Context) error {
 // recovered since it was created. Non-zero means a wire-triggered bug
 // in the parsing or crypto layer swallowed at least one datagram.
 func (l *Listener) RecoveredPanics() uint64 { return l.recoveredPanics.Load() }
+
+// OnPanicRecovered sets fn to run once per handler panic the listener
+// recovers, after it is counted and logged — the hook a metrics port
+// counts with. nil removes it. Safe while the listener serves; fn runs on
+// the dispatch goroutine and must not block.
+func (l *Listener) OnPanicRecovered(fn func()) {
+	if fn == nil {
+		l.panicHook.Store(nil)
+		return
+	}
+	l.panicHook.Store(&fn)
+}
 
 // Send transmits a datagram to dst. Returns [ErrPayloadTooLarge] if
 // the payload exceeds [MaxDatagramSize] and [ErrListenerClosed] after

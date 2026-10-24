@@ -183,7 +183,7 @@ func (a *assembler) emitAttributes(rd *im.ReportData) {
 		if !entry.IsStatus {
 			resolved, err := resolvePath(entry, last)
 			if err != nil {
-				a.log.Warn("matter.controller.interaction.malformed_attribute_entry", slog.String("err", err.Error()))
+				a.log.Warn("matter.controller.interaction.malformed_attribute_entry", slog.Any("err", err))
 				continue
 			}
 			// :196-201: a compressed entry without a version takes the
@@ -208,7 +208,7 @@ func (a *assembler) emitAttributes(rd *im.ReportData) {
 		}
 		resolved, err := resolvePath(entry, last)
 		if err != nil {
-			a.log.Warn("matter.controller.interaction.malformed_attribute_entry", slog.String("err", err.Error()))
+			a.log.Warn("matter.controller.interaction.malformed_attribute_entry", slog.Any("err", err))
 			continue
 		}
 		if !entry.TagCompression {
@@ -300,7 +300,7 @@ func (a *assembler) flush(g *group) {
 	if err != nil {
 		a.log.Warn("matter.controller.interaction.malformed_attribute",
 			slog.Int("endpoint", int(g.path.path.Endpoint)), slog.Uint64("cluster", uint64(g.path.path.Cluster)),
-			slog.Uint64("attribute", uint64(g.path.path.Attribute)), slog.String("err", err.Error()))
+			slog.Uint64("attribute", uint64(g.path.path.Attribute)), slog.Any("err", err))
 		return
 	}
 	a.report.Attributes = append(a.report.Attributes, AttributeData{Path: g.path.path, DataVersion: g.version, Value: value})
@@ -497,7 +497,7 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 		}
 		if !rd.SuppressResponse {
 			if err := m.sendStatus(context.WithoutCancel(ctx), im.StatusSuccess); err != nil {
-				log.Info("matter.controller.interaction.final_status_failed", slog.String("err", err.Error()))
+				log.Info("matter.controller.interaction.final_status_failed", slog.Any("err", err))
 			}
 		}
 		return nil

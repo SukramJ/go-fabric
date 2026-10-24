@@ -76,7 +76,7 @@ func (r *Registry) onExpirationIntervalElapsed() {
 		r.op.Lock()
 		defer r.op.Unlock()
 		if err := r.cull(r.ctx); err != nil {
-			r.log.Warn("matter.controller.client.registry.cull_failed", slog.String("err", err.Error()))
+			r.log.Warn("matter.controller.client.registry.cull_failed", slog.Any("err", err))
 		}
 		r.mu.Lock()
 		r.timer = nil

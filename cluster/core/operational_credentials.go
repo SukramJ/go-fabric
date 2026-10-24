@@ -1182,17 +1182,17 @@ type SignVidVerificationResponse struct {
 func (o *OperationalCredentials) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	cmdName := opcredsCmdName(cmdID)
 	o.logger().Info("matter.opcreds.cmd",
-		slog.String("cmd", cmdName),
-		slog.String("cmdID", fmt.Sprintf("0x%02X", cmdID)))
+		slog.String("command_name", cmdName),
+		slog.String("command", fmt.Sprintf("0x%02X", cmdID)))
 	resp, err := o.dispatchCmd(ctx, cmdID, fields)
 	if err != nil {
 		o.logger().Warn("matter.opcreds.cmd_err",
-			slog.String("cmd", cmdName),
-			slog.String("err", err.Error()))
+			slog.String("command_name", cmdName),
+			slog.Any("err", err))
 	} else {
 		o.logger().Info("matter.opcreds.cmd_ok",
-			slog.String("cmd", cmdName),
-			slog.String("respType", fmt.Sprintf("%T", resp)))
+			slog.String("command_name", cmdName),
+			slog.String("response_type", fmt.Sprintf("%T", resp)))
 	}
 	return resp, err
 }
@@ -1827,7 +1827,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		// error. Matches chip's tolerant handling of secondary state.
 		o.logger().Warn("matter.opcreds.addnoc.ipk_gkm_write_failed",
 			slog.Int("fabric_index", int(idx)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 	}
 
 	// Per Matter Core §11.18.6.8.1 the AddNOC implementation MUST
@@ -2135,8 +2135,8 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	}
 	o.logger().Debug("matter.opcreds.update_fabric_label",
 		slog.Int("ctx_fabric_index", int(ctxIdx)),
-		slog.Int("current_fabric", int(curIdx)),
-		slog.Int("resolved_idx", int(idx)),
+		slog.Int("current_fabric_index", int(curIdx)),
+		slog.Int("fabric_index", int(idx)),
 		slog.String("label", req.Label))
 	if idx == 0 {
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil

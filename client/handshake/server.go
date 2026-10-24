@@ -77,7 +77,7 @@ type CASEServerConfig struct {
 	// :316-328), which a peer set observes to adopt the session. Nil
 	// ignores it.
 	OnSession func(s *exchange.Session, fabricIndex uint8)
-	// Logger receives the diagnostics; nil discards them.
+	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
 
@@ -110,7 +110,7 @@ func NewCASEServer(mgr *exchange.Manager, cfg CASEServerConfig) (*CASEServer, er
 	}
 	log := cfg.Logger
 	if log == nil {
-		log = slog.New(slog.DiscardHandler)
+		log = slog.Default()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &CASEServer{mgr: mgr, cfg: cfg, log: log, ctx: ctx, cancel: cancel}, nil
@@ -159,7 +159,7 @@ func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 	if err == nil {
 		return
 	}
-	c.log.Info("matter.controller.case_server.failed", slog.String("err", err.Error()))
+	c.log.Info("matter.controller.case_server.failed", slog.Any("err", err))
 	if c.ctx.Err() != nil || x.ConsiderClosed() || x.HasUnackedMessage() {
 		return
 	}
@@ -173,7 +173,7 @@ func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 		code = statusInvalidParam
 	}
 	if serr := c.sendStatus(c.ctx, x, mrp.SCStatusGeneralFailure, code); serr != nil {
-		c.log.Debug("matter.controller.case_server.status_failed", slog.String("err", serr.Error()))
+		c.log.Debug("matter.controller.case_server.status_failed", slog.Any("err", serr))
 	}
 }
 
@@ -407,11 +407,11 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 // client logs it (CaseClient.ts:369-381).
 func (c *CASEServer) established(s *exchange.Session, fabric Fabric, rec ResumptionRecord) {
 	c.log.Info("matter.controller.case_server.session",
-		slog.Int("session", int(s.ID())), slog.Bool("resumed", s.Resumed()),
-		slog.Int("fabric_index", int(fabric.Identity.FabricIndex)), slog.Uint64("peer_node", s.PeerNodeID()))
+		slog.Int("session_id", int(s.ID())), slog.Bool("resumed", s.Resumed()),
+		slog.Int("fabric_index", int(fabric.Identity.FabricIndex)), slog.Uint64("node_id", s.PeerNodeID()))
 	if c.cfg.Resumption != nil {
 		if err := c.cfg.Resumption.SaveResumptionRecord(rec); err != nil {
-			c.log.Warn("matter.controller.case_server.resumption_save_failed", slog.String("err", err.Error()))
+			c.log.Warn("matter.controller.case_server.resumption_save_failed", slog.Any("err", err))
 		}
 	}
 	if c.cfg.OnSession != nil {

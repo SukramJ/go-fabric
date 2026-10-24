@@ -79,7 +79,7 @@ func (s *Sender) logInvoke(path im.ConcreteCommandPath) {
 		cluster = fmt.Sprintf("0x%x", path.Cluster)
 	}
 	s.m.logger.Info("matter.groups.invoke",
-		slog.Int("group", int(s.groupID)), slog.String("dest", s.address.String()),
+		slog.Int("group_id", int(s.groupID)), slog.String("address", s.address.String()),
 		slog.Int("fabric_index", int(s.fabricIndex)), slog.String("cluster", cluster),
 		slog.String("command", fmt.Sprintf("0x%02x", path.Command)), slog.Bool("suppress_response", true))
 }

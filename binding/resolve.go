@@ -5,6 +5,7 @@ package binding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -47,7 +48,7 @@ func (m *Manager) entryAttrs(it *item) []any {
 	e := it.entry
 	return []any{
 		slog.Int("source_endpoint", int(it.source)), slog.Int("fabric_index", int(e.FabricIndex)),
-		slog.Uint64("node", e.Node), slog.Int("group", int(e.Group)),
+		slog.Uint64("node_id", e.Node), slog.Int("group_id", int(e.Group)),
 		slog.Int("endpoint", int(e.Endpoint)), slog.Uint64("cluster", uint64(e.Cluster)),
 	}
 }
@@ -103,7 +104,7 @@ func (m *Manager) resolveAndEmit(it *item) {
 			if err == nil {
 				err = fmt.Errorf("binding: no peer for %d:%d", e.FabricIndex, e.Node)
 			}
-			m.drop(reasonClientPeerFailed, it, slog.String("err", err.Error()))
+			m.drop(reasonClientPeerFailed, it, slog.Any("err", err))
 			return
 		}
 		res.Kind, res.Peer, res.Endpoint = KindClient, p, e.Endpoint
@@ -245,20 +246,27 @@ func (m *Manager) clearDormant(source uint16, key string) bool {
 	return true
 }
 
+// errNoGroupSender and errNoGroupTarget are the reasons a group entry
+// is dropped without an error of the sender's: the node has none, or it
+// answered no target.
+var (
+	errNoGroupSender = errors.New("binding: the node has no group sender")
+	errNoGroupTarget = errors.New("binding: no group sender")
+)
+
 // resolveGroup is a group entry's sender — matter.js #resolveGroup
 // (BindingManager.ts:452-474).
 func (m *Manager) resolveGroup(it *item) (GroupTarget, bool) {
 	if m.cfg.Groups == nil {
-		m.drop(reasonGroupPeerFailed, it, slog.String("err", "the node has no group sender"))
+		m.drop(reasonGroupPeerFailed, it, slog.Any("err", errNoGroupSender))
 		return nil, false
 	}
 	target, err := m.cfg.Groups.Sender(m.life, it.entry.FabricIndex, it.entry.Group)
 	if err != nil || target == nil {
-		msg := "no group sender"
-		if err != nil {
-			msg = err.Error()
+		if err == nil {
+			err = errNoGroupTarget
 		}
-		m.drop(reasonGroupPeerFailed, it, slog.String("err", msg))
+		m.drop(reasonGroupPeerFailed, it, slog.Any("err", err))
 		return nil, false
 	}
 	return target, true
@@ -323,7 +331,7 @@ func (m *Manager) establishClientKind(it *item, res Resolution) {
 	go func() {
 		defer m.wg.Done()
 		if err := m.link.connect(m.life, p); err != nil && m.life.Err() == nil {
-			m.log.Debug("binding.peer.connect_failed", append([]any{slog.String("err", err.Error())}, m.entryAttrs(it)...)...)
+			m.log.Debug("binding.peer.connect_failed", append([]any{slog.Any("err", err)}, m.entryAttrs(it)...)...)
 		}
 	}()
 

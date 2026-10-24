@@ -160,7 +160,7 @@ func (b *Bridge) buildInitialReport(
 			valuePreview = r.Value.Value
 		}
 		b.logger.Debug("matter.tx.subscribe.initial_report",
-			slog.Int("idx", idx),
+			slog.Int("path_index", idx),
 			slog.Any("endpoint", r.Path.Endpoint),
 			slog.Any("cluster", r.Path.Cluster),
 			slog.Any("attribute", r.Path.Attribute),
@@ -228,8 +228,8 @@ func (b *Bridge) registerSubscription(
 				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
 					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
 						slog.String("src", srcString(src)),
-						slog.Int("fabric", int(fabricIndex)),
-						slog.Uint64("peer_node", peerNodeID),
+						slog.Int("fabric_index", int(fabricIndex)),
+						slog.Uint64("node_id", peerNodeID),
 						slog.Int("cleared", cleared))
 				}
 			} else {
@@ -287,7 +287,7 @@ func (b *Bridge) registerSubscription(
 		if err != nil {
 			b.logger.Warn("matter.rx.im.subscribe.manager",
 				slog.String("src", srcString(src)),
-				slog.String("err", err.Error()))
+				slog.Any("err", err))
 			return 0, err
 		}
 		subID = sub.ID
@@ -515,6 +515,7 @@ func (b *Bridge) sendSubscribeResponse(
 		}
 	}
 	b.load.subscriptionsSucceeded.Add(1)
+	b.recordSubscriptionsActive(b.subscriptionManagerLocked())
 	if err := b.sendReplyReliable(src, &subRespHdr, proto, im.OpcodeSubscribeResponse, respBody); err != nil {
 		debugReplyError(b.logger, "send_subscribe_response", src, err)
 		return err

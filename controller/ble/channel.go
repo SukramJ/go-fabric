@@ -86,7 +86,7 @@ func (h *handshakeState) onC2(data []byte) {
 		return
 	}
 	if err := s.HandleIncoming(data); err != nil {
-		h.log.Info("matter.ble.rx_error", slog.String("address", h.address), slog.String("err", err.Error()))
+		h.log.Info("matter.ble.rx_error", slog.String("address", h.address), slog.Any("err", err))
 	}
 }
 
@@ -130,7 +130,7 @@ func Dial(ctx context.Context, central Central, p Peripheral, opts DialOptions) 
 			// Unsubscribing C2 closes the BTP session (§4.19.4.10), then
 			// the connection goes (NobleBleChannel.ts:784-800).
 			if err := conn.UnsubscribeC2(gattCtx); err != nil {
-				c.log.Debug("matter.ble.unsubscribe_failed", slog.String("err", err.Error()))
+				c.log.Debug("matter.ble.unsubscribe_failed", slog.Any("err", err))
 			}
 			return conn.Disconnect()
 		},
