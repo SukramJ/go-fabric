@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -67,6 +68,8 @@ func TestBridge_PaseFailures_RevokesWindowAtCap(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	w := openedWindow(t, b)
+	m := &recordingMetrics{}
+	b.AttachMetrics(m)
 
 	for range paseMaxErrors {
 		b.recordPaseFailure()
@@ -74,6 +77,13 @@ func TestBridge_PaseFailures_RevokesWindowAtCap(t *testing.T) {
 
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
 		t.Errorf("Status after %d failures = %v, want Closed (revoked)", paseMaxErrors, got)
+	}
+	// Every failure counts, the cap engages one lockout.
+	if got := m.counter(contract.MetricPASEFailures); got != paseMaxErrors {
+		t.Errorf("pase.failures = %d, want %d", got, paseMaxErrors)
+	}
+	if got := m.counter(contract.MetricPASELockouts); got != 1 {
+		t.Errorf("pase.lockouts = %d, want 1", got)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -368,6 +369,8 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	})
 	for _, r := range results {
 		if r.Err == nil {
+			// A retransmission sent.
+			b.count(contract.MetricMRPRetransmits)
 			continue
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
@@ -382,7 +385,7 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		}
 		b.logger.Debug("matter.tx.reliable.retransmit",
 			slog.Int("counter", int(r.Counter)),
-			slog.String("err", r.Err.Error()))
+			slog.Any("err", r.Err))
 	}
 }
 
@@ -489,7 +492,7 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 			b.logger.Warn("matter.tx.ack_pump.encrypt",
 				slog.Int("exchange_id", int(obl.ExchangeID)),
 				slog.Int("session_id", int(target.sessionID)),
-				slog.String("err", err.Error()))
+				slog.Any("err", err))
 			return
 		}
 		datagram = append(hdr.Marshal(), enc.Ciphertext...)
@@ -499,7 +502,7 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 		b.logger.Warn("matter.tx.ack_pump.send",
 			slog.Int("exchange_id", int(obl.ExchangeID)),
 			slog.String("src", target.src.String()),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	b.logger.Debug("matter.tx.ack_pump.emitted",

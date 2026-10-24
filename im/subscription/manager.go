@@ -339,8 +339,8 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 
 	m.logger.Debug(
 		"im.subscription.added",
-		slog.Uint64("id", uint64(id)),
-		slog.Int("fabric", int(req.FabricIndex)),
+		slog.Uint64("subscription_id", uint64(id)),
+		slog.Int("fabric_index", int(req.FabricIndex)),
 		slog.Int("min", int(minFloor)),
 		slog.Int("max", int(maxCeil)),
 		slog.Int("paths", len(req.AttributePaths)),

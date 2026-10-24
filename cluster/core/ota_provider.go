@@ -398,7 +398,7 @@ func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequ
 		if delay == 0 {
 			delay = otaConsentRetry
 		}
-		p.logger.Info("ota.provider.consent", slog.Uint64("peer", peer.NodeID), slog.String("token", hex.EncodeToString(token)), slog.Int("state", int(state)))
+		p.logger.Info("ota.provider.consent", slog.Uint64("node_id", peer.NodeID), slog.String("token", hex.EncodeToString(token)), slog.Int("state", int(state)))
 		switch state {
 		case OTAConsentGranted:
 			p.updateInProgress(peer, token, OTAUpdateQuerying, &img.SoftwareVersion, true)
@@ -471,13 +471,13 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 		// stands in for its session's last activity. The old transfer is
 		// cancelled and the query proceeds.
 		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
-			p.logger.Warn("ota.provider.reboot_cancel_failed", slog.String("err", err.Error()))
+			p.logger.Warn("ota.provider.reboot_cancel_failed", slog.Any("err", err))
 			return busy, true
 		}
 		p.removeInProgress(peer)
 		return provdef.QueryImageResponse{}, false
 	}
-	p.logger.Info("ota.provider.busy", slog.Uint64("peer", peer.NodeID))
+	p.logger.Info("ota.provider.busy", slog.Uint64("node_id", peer.NodeID))
 	return busy, true
 }
 
@@ -492,7 +492,7 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string
 		MaxBlockSize:         p.cfg.BDXMaxBlockSize,
 	}) {
 		// OP:299-305.
-		p.logger.Info("ota.provider.bdx_not_enabled", slog.Uint64("peer", peer.NodeID))
+		p.logger.Info("ota.provider.bdx_not_enabled", slog.Uint64("node_id", peer.NodeID))
 		return "", provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(otaBdxBusyRetry)}, true
 	}
 	version := img.SoftwareVersion
@@ -567,7 +567,7 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 	}
 	newVersion := req.NewVersion
 	if newVersion == 0 && tokenVersion != nil {
-		p.logger.Info("ota.provider.apply_version_adjusted", slog.Uint64("peer", peer.NodeID),
+		p.logger.Info("ota.provider.apply_version_adjusted", slog.Uint64("node_id", peer.NodeID),
 			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("version", uint64(*tokenVersion)))
 		newVersion = *tokenVersion
 	}
@@ -576,7 +576,7 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 		// to have completed.
 		force := details == nil || details.lastState != OTAUpdateWaitForApply
 		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, force); err != nil {
-			p.logger.Info("ota.provider.bdx_close_failed", slog.String("err", err.Error()))
+			p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
 		}
 	}
 	// A version other than the token's is refused, consent or not, and so
@@ -584,7 +584,7 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 	// version (OtaSoftwareUpdateProviderServer.ts:444-464).
 	matchesToken := tokenVersion == nil || newVersion == *tokenVersion
 	if !matchesToken {
-		p.logger.Info("ota.provider.apply_version_mismatch", slog.Uint64("peer", peer.NodeID),
+		p.logger.Info("ota.provider.apply_version_mismatch", slog.Uint64("node_id", peer.NodeID),
 			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("requested", uint64(newVersion)),
 			slog.Uint64("token_version", uint64(*tokenVersion)))
 	}
@@ -656,7 +656,7 @@ func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress 
 	check := func(key string, d *otaInProgress) {
 		if d.timestamp.Add(otaProgressTimeout).Before(now) {
 			// OP:536-548.
-			p.logger.Info("ota.provider.stale_entry", slog.Uint64("peer", peer.NodeID), slog.Duration("age", now.Sub(d.timestamp)))
+			p.logger.Info("ota.provider.stale_entry", slog.Uint64("node_id", peer.NodeID), slog.Duration("age", now.Sub(d.timestamp)))
 			cleanup = d.cleanup
 			delete(p.inProgress, key)
 			return
@@ -749,7 +749,7 @@ func (p *OTAProvider) updateInProgress(peer OTAPeer, token []byte, state OTAUpda
 		applied = *d.versionToApply
 	}
 	p.mu.Unlock()
-	p.logger.Info("ota.provider.status", slog.Uint64("peer", peer.NodeID), slog.String("state", state.String()), slog.String("previous", previous.String()))
+	p.logger.Info("ota.provider.status", slog.Uint64("node_id", peer.NodeID), slog.String("state", state.String()), slog.String("previous", previous.String()))
 	if fn := p.cfg.OnStatusChange; fn != nil {
 		fn(peer, state, applied)
 	}

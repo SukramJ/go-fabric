@@ -65,13 +65,18 @@ type Config struct {
 	Clock Clock
 	// Rand returns the MRP jitter draw in [0, 1); nil is math/rand/v2.Float64.
 	Rand func() float64
-	// Logger receives debug diagnostics; nil discards them.
+	// Logger receives debug diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 	// PeerLost is called when a send or a wait on an exchange of a secure
 	// session fails in a way that shows the peer is gone — matter.js
 	// MessageExchangeContext.peerLost (ExchangeManager.ts:556-579), fired
 	// from MessageExchange.ts:613-621 and :822-832. Nil ignores it.
 	PeerLost func(s *Session, cause error)
+	// Retransmitted is called once per message the manager sends again
+	// because its acknowledgement did not arrive in time — the hook a
+	// metrics port counts mrp.retransmits with. It runs on the exchange's
+	// timer goroutine and must not block. Nil ignores it.
+	Retransmitted func()
 	// Reliable marks the manager's carrier as reliable (BTP): its sessions
 	// do not use MRP — no acknowledgement requested, none sent, no
 	// retransmission — and a wait for the peer is the reliable channel's.
@@ -91,7 +96,9 @@ type Manager struct {
 	log      *slog.Logger
 	local    sessionparams.Parameters
 	peerLost func(s *Session, cause error)
-	reliable bool
+	// retransmitted is [Config.Retransmitted].
+	retransmitted func()
+	reliable      bool
 
 	// counter is the global unencrypted message counter every unsecured
 	// session sends with (SessionManager.ts:265, :439).
@@ -130,15 +137,16 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		return nil, fmt.Errorf("exchange: seed: %w", err)
 	}
 	m := &Manager{
-		conn:     conn,
-		clock:    cfg.Clock,
-		rand:     cfg.Rand,
-		log:      cfg.Logger,
-		local:    DefaultLocalParameters(),
-		peerLost: cfg.PeerLost,
-		reliable: cfg.Reliable,
-		counter:  counter,
-		sessions: make(map[uint16]*Session),
+		conn:          conn,
+		clock:         cfg.Clock,
+		rand:          cfg.Rand,
+		log:           cfg.Logger,
+		local:         DefaultLocalParameters(),
+		peerLost:      cfg.PeerLost,
+		retransmitted: cfg.Retransmitted,
+		reliable:      cfg.Reliable,
+		counter:       counter,
+		sessions:      make(map[uint16]*Session),
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
 		unsecured: make(map[uint64]*Session),
@@ -160,7 +168,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		m.rand = mrand.Float64
 	}
 	if m.log == nil {
-		m.log = slog.New(slog.DiscardHandler)
+		m.log = slog.Default()
 	}
 	return m, nil
 }
@@ -435,7 +443,7 @@ func (m *Manager) CloseSession(ctx context.Context, s *Session) {
 				ProtocolCode: statusCloseSession,
 			}
 			if err := x.Send(ctx, mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{SuppressAck: true}); err != nil {
-				m.log.Debug("matter.controller.close_session_failed", slog.Int("session", int(s.id)), slog.String("err", err.Error()))
+				m.log.Debug("matter.controller.close_session_failed", slog.Int("session_id", int(s.id)), slog.Any("err", err))
 			}
 			x.Close()
 		}
@@ -557,7 +565,7 @@ func (m *Manager) cleanupSessionExchanges(s *Session) {
 			lru = x
 		}
 	}
-	m.log.Debug("matter.controller.exchange_evicted", slog.Int("session", int(s.id)), slog.Int("exchange", int(lru.id)))
+	m.log.Debug("matter.controller.exchange_evicted", slog.Int("session_id", int(s.id)), slog.Int("exchange_id", int(lru.id)))
 	// On a goroutine of the manager: the caller is the receive path or an
 	// Initiate. A closed manager closed the session's exchanges already.
 	m.goWork(lru.Close)
@@ -574,7 +582,7 @@ func (m *Manager) cleanupSessionExchanges(s *Session) {
 func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 	hdr, hl, err := message.UnmarshalHeader(buf)
 	if err != nil {
-		m.log.Debug("matter.controller.drop", slog.String("reason", "header"), slog.String("err", err.Error()))
+		m.log.Debug("matter.controller.drop", slog.String("reason", "header"), slog.Any("err", err))
 		return
 	}
 	if hdr.SessionType != message.SessionUnsecured || hdr.Privacy {
@@ -595,7 +603,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 	}
 	proto, pl, err := message.UnmarshalProtocolHeader(body)
 	if err != nil {
-		m.log.Debug("matter.controller.drop", slog.String("reason", "protocol header"), slog.String("err", err.Error()))
+		m.log.Debug("matter.controller.drop", slog.String("reason", "protocol header"), slog.Any("err", err))
 		return
 	}
 	// Every decoded message proves the peer active, a duplicate too
@@ -653,12 +661,12 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 		return s, !s.window.Accept(hdr.MessageCounter), inbound, true
 	}
 	if s = m.Session(hdr.SessionID); s == nil {
-		m.log.Debug("matter.controller.drop", slog.String("reason", "unknown session"), slog.Int("session", int(hdr.SessionID)))
+		m.log.Debug("matter.controller.drop", slog.String("reason", "unknown session"), slog.Int("session_id", int(hdr.SessionID)))
 		return nil, false, false, false
 	}
 	plain, dup, err := s.secure.Decrypt(hdr, hdr.NonceSecurityFlags(), *body)
 	if err != nil {
-		m.log.Debug("matter.controller.drop", slog.String("reason", "decrypt"), slog.String("err", err.Error()))
+		m.log.Debug("matter.controller.drop", slog.String("reason", "decrypt"), slog.Any("err", err))
 		return nil, false, false, false
 	}
 	*body = plain
@@ -734,7 +742,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 	// A new exchange on a closing session is declined
 	// (ExchangeManager.ts:386-389).
 	if s.IsClosed() || s.IsPeerLost() {
-		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session", int(s.id)))
+		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session_id", int(s.id)))
 		return
 	}
 	// A Secure Channel message that opens an exchange on a secure session
@@ -742,7 +750,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 	// unsolicited standalone ack opens nothing (:413-420).
 	if s.secure != nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Initiator && !duplicate {
 		if msg.isStandaloneAck() && !msg.RequiresAck {
-			m.log.Debug("matter.controller.drop", slog.String("reason", "unsolicited standalone ack"), slog.Int("session", int(s.id)))
+			m.log.Debug("matter.controller.drop", slog.String("reason", "unsolicited standalone ack"), slog.Int("session_id", int(s.id)))
 			return
 		}
 		x := m.accept(s, msg)
@@ -765,8 +773,8 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 		m.sendAck(s, msg, 0)
 	}
 	m.log.Debug("matter.controller.unsolicited",
-		slog.Int("session", int(s.id)), slog.Int("exchange", int(msg.ExchangeID)),
-		slog.Int("protocol", int(msg.ProtocolID)), slog.Int("opcode", int(msg.Opcode)), slog.Bool("duplicate", duplicate))
+		slog.Int("session_id", int(s.id)), slog.Int("exchange_id", int(msg.ExchangeID)),
+		slog.Int("protocol_id", int(msg.ProtocolID)), slog.Int("opcode", int(msg.Opcode)), slog.Bool("duplicate", duplicate))
 }
 
 // handlerFor is the handler of the exchange msg opens on s, nil for
@@ -826,7 +834,7 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 func (m *Manager) refusePASE(x *Exchange, _ *Message) {
 	report := StatusReport{GeneralCode: mrp.SCStatusGeneralFailure, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: mrp.SCStatusProtocolInvalidParameter}
 	if err := x.Send(context.Background(), mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{}); err != nil {
-		m.log.Debug("matter.controller.pase_refusal_failed", slog.Int("exchange", int(x.id)), slog.String("err", err.Error()))
+		m.log.Debug("matter.controller.pase_refusal_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
 	}
 }
 
@@ -976,20 +984,20 @@ func (m *Manager) handleSecureChannel(x *Exchange, msg *Message) {
 		r, ok := DecodeStatusReport(msg.Payload)
 		if !ok || r.GeneralCode != mrp.SCStatusGeneralSuccess || r.ProtocolCode != statusCloseSession {
 			m.log.Debug("matter.controller.secure_channel.ignored_status",
-				slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)),
-				slog.Int("general", int(r.GeneralCode)), slog.Int("protocol", int(r.ProtocolCode)))
+				slog.Int("session_id", int(x.session.id)), slog.Int("exchange_id", int(x.id)),
+				slog.Int("general_code", int(r.GeneralCode)), slog.Int("protocol_code", int(r.ProtocolCode)))
 			x.Close()
 			return
 		}
-		m.log.Debug("matter.controller.secure_channel.closed_by_peer", slog.Int("session", int(x.session.id)))
+		m.log.Debug("matter.controller.secure_channel.closed_by_peer", slog.Int("session_id", int(x.session.id)))
 		x.session.handlePeerLoss(&PeerInitiatedCloseError{}, x)
 		x.Close()
 	case msg.isStandaloneAck():
 		x.Close()
 	default:
 		m.log.Warn("matter.controller.secure_channel.unexpected",
-			slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)), slog.Int("opcode", int(msg.Opcode)),
-			slog.String("err", ErrFlow.Error()))
+			slog.Int("session_id", int(x.session.id)), slog.Int("exchange_id", int(x.id)), slog.Int("opcode", int(msg.Opcode)),
+			slog.Any("err", ErrFlow))
 		x.Close()
 	}
 }

@@ -243,11 +243,11 @@ func (f *flow) execute(ctx context.Context) error {
 			}
 		}
 		if ce, ok := err.(*CommissioningError); ok && ce.Kind == errRecoverable { //nolint:errorlint // instanceof RecoverableCommissioningError (:431)
-			f.log.Warn("matter.controller.commissioning.step_failed_recoverable", slog.String("name", s.name), slog.String("err", err.Error()))
+			f.log.Warn("matter.controller.commissioning.step_failed_recoverable", slog.String("name", s.name), slog.Any("err", err))
 			continue
 		}
 		if isCommissioningError(err) || isStatusError(err) {
-			f.log.Error("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.String("err", err.Error()))
+			f.log.Error("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.Any("err", err))
 			f.resetFailsafeTimer(ctx)
 			// StatusResponseError.accept rethrows anything else as is
 			// (:459, general/src/MatterError.ts:87-92); a status error
@@ -595,7 +595,7 @@ func (f *flow) resetFailsafeTimer(ctx context.Context) {
 		return
 	}
 	if _, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{Breadcrumb: f.breadcrumb(), ExpiryLengthSeconds: 0}, false); err != nil {
-		f.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.String("err", err.Error()))
+		f.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.Any("err", err))
 		return
 	}
 	f.setFailSafeEnd(time.Time{})
@@ -889,7 +889,7 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 	f.log.Debug("matter.controller.commissioning.reconnecting", slog.Bool("concurrent", concurrent))
 	if concurrent {
 		if err := f.ensureFailsafeTimerFor(ctx, CASEReconnectTimeout); err != nil {
-			f.log.Info("matter.controller.commissioning.rearm_before_reconnect_failed", slog.String("err", err.Error()))
+			f.log.Info("matter.controller.commissioning.rearm_before_reconnect_failed", slog.Any("err", err))
 		}
 	} else {
 		f.stopArmInterval()

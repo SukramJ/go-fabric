@@ -48,7 +48,7 @@ type Context struct {
 	// HandleError is the set's [ErrorHandler]; nil uses the delays as they
 	// are.
 	HandleError ErrorHandler
-	// Logger receives the diagnostics; nil discards them.
+	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 	// Clock paces the connection process and the address monitor; nil is
 	// the system clock.
@@ -104,7 +104,7 @@ func NewSet(c Context) (*Set, error) {
 		s.timing = Merge(s.timing, *c.Timing)
 	}
 	if s.log == nil {
-		s.log = slog.New(slog.DiscardHandler)
+		s.log = slog.Default()
 	}
 	if s.clock == nil {
 		s.clock = exchange.SystemClock{}
@@ -234,7 +234,7 @@ func (s *Set) Adopt(session *exchange.Session) *Peer {
 	addr := handshake.PeerAddress{FabricIndex: session.FabricIndex(), NodeID: session.PeerNodeID()}
 	p, err := s.AddKnownPeer(Descriptor{Address: addr, OperationalAddress: session.Addr()})
 	if err != nil {
-		s.log.Debug("matter.controller.peer.adopt_failed", slog.String("peer", addressString(addr)), slog.String("err", err.Error()))
+		s.log.Debug("matter.controller.peer.adopt_failed", slog.String("peer", addressString(addr)), slog.Any("err", err))
 		return nil
 	}
 	p.addSession(session)

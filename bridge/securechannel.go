@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -578,6 +579,7 @@ func (b *Bridge) releasePaseInFlight(exchangeID uint16) {
 // error path for genuine pairing failures only (not missing-handler or
 // state-replay retransmits).
 func (b *Bridge) recordPaseFailure() {
+	b.count(contract.MetricPASEFailures)
 	if b.paseFailures.Add(1) != paseMaxErrors {
 		// Below the cap, or a straggler arriving between the cap and the
 		// lockout taking effect. Only the transition to exactly
@@ -586,6 +588,7 @@ func (b *Bridge) recordPaseFailure() {
 		return
 	}
 	cooldown := b.engagePaseLockout()
+	b.count(contract.MetricPASELockouts)
 	win := b.CommissioningWindow()
 	b.logger.Warn("matter.rx.sc.pase_bruteforce",
 		slog.Int("max_errors", paseMaxErrors),
@@ -741,7 +744,7 @@ func (b *Bridge) handlePase(
 		b.logger.Log(context.Background(), level, "matter.rx.sc.pase_err",
 			slog.String("stage", stage),
 			slog.String("src", srcString(src)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 
 		// Send a StatusReport on genuine PASE failures so the
 		// commissioner learns the exchange is rejected rather than
@@ -767,7 +770,7 @@ func (b *Bridge) handlePase(
 			if sendErr := b.sendReply(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.pase_err.status_report_send_failed",
 					slog.String("stage", stage),
-					slog.String("err", sendErr.Error()))
+					slog.Any("err", sendErr))
 			}
 			// Brute-force protection: a genuine pairing failure (bad Pake1
 			// decode, confirmation mismatch, …). Count it and lock PASE
@@ -840,7 +843,7 @@ func (b *Bridge) handleCase(
 		b.logger.Log(context.Background(), level, "matter.rx.sc.case_err",
 			slog.String("stage", stage),
 			slog.String("src", srcString(src)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 
 		// Send a StatusReport so the peer learns the exchange is rejected
 		// rather than waiting through MRP retransmission timeouts. Skip
@@ -863,7 +866,7 @@ func (b *Bridge) handleCase(
 			if sendErr := b.sendReply(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.case_err.status_report_send_failed",
 					slog.String("stage", stage),
-					slog.String("err", sendErr.Error()))
+					slog.Any("err", sendErr))
 			}
 		}
 		return err
@@ -996,6 +999,11 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	b.mu.Lock()
 	b.sessionRegistry = reg
 	b.mu.Unlock()
+	if c, ok := reg.(sessionCounter); ok {
+		b.sessionCount.Store(&sessionCounterRef{c: c})
+	} else {
+		b.sessionCount.Store(nil)
+	}
 	if reg == nil {
 		return
 	}
@@ -1106,7 +1114,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 		// Already gone — racing a local reap / fabric teardown.
 		b.logger.Debug("matter.rx.sc.close_session.miss",
 			slog.Int("session_id", int(requestHdr.SessionID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return nil
 	}
 	b.logger.Info("matter.rx.sc.close_session",
@@ -1236,18 +1244,18 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 	if err != nil {
 		b.logger.Debug("matter.tx.sc.close_session.encrypt",
 			slog.Int("session_id", int(sessionID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if err := sendVia(listener, dst, datagram); err != nil {
 		b.logger.Debug("matter.tx.sc.close_session.send",
 			slog.Int("session_id", int(sessionID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	b.logger.Debug("matter.tx.sc.close_session",
-		slog.String("dst", srcString(dst)),
+		slog.String("peer", srcString(dst)),
 		slog.Int("session_id", int(sessionID)))
 }
 
@@ -1299,7 +1307,7 @@ func (b *Bridge) triggerSessionReannounce() {
 				if err := advertiser.Publish(ctx, active[i]); err != nil {
 					b.logger.Debug("matter.mdns.session_reannounce",
 						slog.String("instance", active[i].InstanceName),
-						slog.String("err", err.Error()))
+						slog.Any("err", err))
 				}
 			}
 		}

@@ -94,7 +94,7 @@ type Config struct {
 	// ([NewSubscriptions]); Subscribe needs it — matter.js takes it from
 	// the environment (ClientInteraction.ts:188-190, :252-257).
 	Subscriptions *Subscriptions
-	// Logger receives the diagnostics; nil discards them.
+	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 	// Clock paces the sustained subscriptions' retries; nil is the
 	// system clock.
@@ -115,7 +115,7 @@ func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interact
 func Bind(p Provider, cfg Config) *Interaction {
 	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand}
 	if c.log == nil {
-		c.log = slog.New(slog.DiscardHandler)
+		c.log = slog.Default()
 	}
 	if c.clock == nil {
 		c.clock = exchange.SystemClock{}

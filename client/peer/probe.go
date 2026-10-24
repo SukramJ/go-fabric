@@ -49,7 +49,7 @@ func probe(ctx context.Context, mgr *exchange.Manager, s *exchange.Session, over
 	err = readEmpty(ctx, x)
 	if err != nil {
 		if ctx.Err() == nil {
-			log.Info("matter.controller.peer.probe", slog.String("result", "failed"), slog.String("err", err.Error()))
+			log.Info("matter.controller.peer.probe", slog.String("result", "failed"), slog.Any("err", err))
 		}
 		x.Close()
 		return false

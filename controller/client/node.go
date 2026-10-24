@@ -301,7 +301,7 @@ func (n *Node) saveSettingsLocked() {
 		err = n.store.Save(n.cfg.ID, 0, settingsCluster, values, nil)
 	}
 	if err != nil {
-		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "settings"), slog.String("err", err.Error()))
+		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "settings"), slog.Any("err", err))
 	}
 }
 
@@ -439,7 +439,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	// The store is the host's (SQLite in the reference controller): it is
 	// erased with the node's lock released (ADR 0026 P6).
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
-		n.log.Warn("matter.controller.client.store_erase_failed", slog.String("err", err.Error()))
+		n.log.Warn("matter.controller.client.store_erase_failed", slog.Any("err", err))
 	}
 	return nil
 }

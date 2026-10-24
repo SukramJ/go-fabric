@@ -320,7 +320,7 @@ func (c *Commissioner) closePASE(s *exchange.Session, ch Channel, cause error) {
 // timeout, peer loss suppressed; a lost channel force-closes the PASE
 // session so its exchanges end at once (Ble.ts:17-22, :44-55).
 func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, timeout time.Duration, passcode uint32) (*exchange.Session, error) {
-	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("address", ch.PeerAddress().String()), slog.String("channel", "ble"))
+	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("peer", ch.PeerAddress().String()), slog.String("channel", "ble"))
 	pctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	s, err := handshake.PASE(pctx, ch.Exchanges(), ch.PeerAddress(), passcode, handshake.PASEOptions{SuppressPeerLoss: true, Logger: c.log})
@@ -379,7 +379,7 @@ func (c *Commissioner) establishFromCandidates(ctx context.Context, devices []*c
 // (:413-492): PASE over UDP with the device's TXT session parameters
 // (:454-463); a wrong passcode is handshake.ErrPasscodeMismatch.
 func (c *Commissioner) establishEphemeralNodeSession(ctx context.Context, addr *net.UDPAddr, passcode uint32, cand *candidate, suppressPeerLoss bool, onPBKDF func()) (*exchange.Session, error) {
-	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("address", addr.String()), slog.String("device", cand.identifier))
+	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("peer", addr.String()), slog.String("candidate", cand.identifier))
 	return handshake.PASE(ctx, c.ctx.Exchanges, addr, passcode, handshake.PASEOptions{
 		PeerParameters:       txtParameters(cand.device.TXTData),
 		SuppressPeerLoss:     suppressPeerLoss,
@@ -498,7 +498,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 	if err != nil {
 		return Result{}, err
 	}
-	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node", address.NodeID), slog.Uint64("fabric", opts.Fabric.FabricID))
+	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node_id", address.NodeID), slog.Uint64("fabric_id", opts.Fabric.FabricID))
 	mgr := c.ctx.Exchanges
 	if opts.Channel != nil {
 		mgr = opts.Channel.Exchanges()

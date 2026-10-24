@@ -80,7 +80,9 @@ these interfaces does not drag the host's dependencies into the module.
 | `Topology` | the host's own `bridge.Snapshotter` | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
 | `Observers` | the host's callbacks on fabric, commissioning and window events | nothing observes. An observer's error or panic is logged, never returned |
-| `Logger` | the node's logger | `slog.Default()` |
+| `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |
+| `Diagnostics` | the capacity of the diagnostic trace (`Node.DiagnosticEvents`) | 256 events |
+| `Logger` | the node's logger; the attribute keys and event names are in [Observability](observability.md) | `slog.Default()` |
 
 Ports the facade leaves to the host are reached through `Node.Root()` and
 `Node.Bridge()`:

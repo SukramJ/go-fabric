@@ -113,7 +113,7 @@ func threadNetworkNameOf(dataset []byte) (name string, ok bool, err error) {
 func resolveThreadNetworkName(t *ThreadNetwork, log *slog.Logger) (string, error) {
 	datasetName, has, err := threadNetworkNameOf(t.OperationalDataset)
 	if err != nil {
-		log.Warn("matter.controller.commissioning.thread_dataset_undecodable", slog.String("err", err.Error()))
+		log.Warn("matter.controller.commissioning.thread_dataset_undecodable", slog.Any("err", err))
 		return t.NetworkName, nil
 	}
 	if t.NetworkName == "" {
@@ -528,7 +528,7 @@ func isChannelDrop(err error) bool {
 // handleChannelDrop is #handleCommissioningChannelDrop (:999-1012): the
 // device is taken as non-concurrent and the re-arm timer stops.
 func (f *flow) handleChannelDrop(err error) {
-	f.log.Warn("matter.controller.commissioning.channel_dropped", slog.String("err", err.Error()))
+	f.log.Warn("matter.controller.commissioning.channel_dropped", slog.Any("err", err))
 	concurrent := false
 	f.data.supportsConcurrentConnection = &concurrent
 	f.stopArmInterval()
@@ -625,7 +625,7 @@ func (f *flow) scheduleArm(ctx context.Context, ai *armInterval) {
 		}
 		f.mu.Unlock()
 		if _, err := f.armFailsafe(ctx, max(f.defaultFailSafe, f.failSafeTimeLeft())); err != nil {
-			f.log.Warn("matter.controller.commissioning.rearm_periodic_failed", slog.String("err", err.Error()))
+			f.log.Warn("matter.controller.commissioning.rearm_periodic_failed", slog.Any("err", err))
 			f.stopArmInterval()
 		}
 	})

@@ -8,97 +8,20 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/serialqueue"
 )
 
-// queue is a device's serial goroutine: the `…Async` callbacks run on it,
-// one after the other, in the order the changes were reported. The device
-// owns it (ADR 0026 principle 5): the node starts it when it adds the
-// device and stops it — waiting until every queued callback ran — when it
-// removes the device or stops. Enqueue never blocks the goroutine that
-// reports a change; a callback handed to a queue that is not running is
-// dropped. A callback must not remove its own device or stop its node:
-// the stop would wait for the callback that called it.
-type queue struct {
-	// life serialises start and stop, so a start waits for a stop's
-	// drain; it is taken before mu.
-	life sync.Mutex
-	// mu guards items, running and stopped; cond waits on mu.
-	mu      sync.Mutex
-	cond    *sync.Cond
-	items   []func()
-	running bool
-	stopped chan struct{} // closed when the goroutine of this run exits
-}
+// queue is a device's serial goroutine (serialqueue.Queue): the `…Async`
+// callbacks run on it, one after the other, in the order the changes were
+// reported. The device owns it (ADR 0026 principle 5): the node starts it
+// when it adds the device and stops it — waiting until every queued
+// callback ran — when it removes the device or stops. A callback handed
+// to a queue that is not running is dropped. A callback must not remove
+// its own device or stop its node: the stop would wait for the callback
+// that called it.
+type queue = serialqueue.Queue
 
-func newQueue() *queue {
-	q := &queue{}
-	q.cond = sync.NewCond(&q.mu)
-	return q
-}
-
-// Enqueue implements spec.Queue.
-func (q *queue) Enqueue(fn func()) {
-	if fn == nil {
-		return
-	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if !q.running {
-		return
-	}
-	q.items = append(q.items, fn)
-	q.cond.Signal()
-}
-
-// start runs the queue's goroutine; a no-op while it runs.
-func (q *queue) start() {
-	q.life.Lock()
-	defer q.life.Unlock()
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.running {
-		return
-	}
-	q.running = true
-	q.stopped = make(chan struct{})
-	go q.run(q.stopped)
-}
-
-// stop ends the goroutine once it ran every queued callback and waits for
-// it; a no-op when it does not run.
-func (q *queue) stop() {
-	q.life.Lock()
-	defer q.life.Unlock()
-	q.mu.Lock()
-	if !q.running {
-		q.mu.Unlock()
-		return
-	}
-	q.running = false
-	done := q.stopped
-	q.cond.Signal()
-	q.mu.Unlock()
-	<-done
-}
-
-func (q *queue) run(done chan struct{}) {
-	defer close(done)
-	for {
-		q.mu.Lock()
-		for len(q.items) == 0 && q.running {
-			q.cond.Wait()
-		}
-		if len(q.items) == 0 {
-			q.mu.Unlock()
-			return
-		}
-		fn := q.items[0]
-		q.items[0] = nil
-		q.items = q.items[1:]
-		q.mu.Unlock()
-		fn()
-	}
-}
+func newQueue() *queue { return serialqueue.New() }
 
 // deviceClock is the time source of the servers a device builds: the
 // node's once the device is added, [clock.System] before. A timer keeps

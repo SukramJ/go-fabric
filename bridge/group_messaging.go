@@ -153,7 +153,7 @@ func (b *Bridge) reconcileGroupMemberships() {
 	defer cancel()
 	memberships, err := b.groupMessagingPort().Memberships(ctx)
 	if err != nil {
-		b.logger.Warn("matter.groups.memberships", slog.String("err", err.Error()))
+		b.logger.Warn("matter.groups.memberships", slog.Any("err", err))
 		return
 	}
 	wanted := make(map[string]net.IP, len(memberships))
@@ -176,7 +176,7 @@ func (b *Bridge) reconcileGroupMemberships() {
 			continue
 		}
 		if err := member.LeaveGroup(addr); err != nil {
-			b.logger.Warn("matter.groups.leave", slog.String("address", key), slog.String("err", err.Error()))
+			b.logger.Warn("matter.groups.leave", slog.String("address", key), slog.Any("err", err))
 			continue
 		}
 		delete(b.groupJoined, key)
@@ -195,7 +195,7 @@ func (b *Bridge) reconcileGroupMemberships() {
 			}
 			b.groupJoinFailed[key] = struct{}{}
 			b.logger.Log(ctx, level, "matter.groups.join_failed",
-				slog.String("address", key), slog.String("err", err.Error()),
+				slog.String("address", key), slog.Any("err", err),
 				slog.Duration("retry_in", groupJoinRetryInterval))
 			continue
 		}
@@ -243,7 +243,7 @@ func (b *Bridge) stopGroupNetworking() {
 	}
 	for key, addr := range joined {
 		if err := member.LeaveGroup(addr); err != nil {
-			b.logger.Debug("matter.groups.leave_on_stop", slog.String("address", key), slog.String("err", err.Error()))
+			b.logger.Debug("matter.groups.leave_on_stop", slog.String("address", key), slog.Any("err", err))
 		}
 	}
 }
@@ -285,7 +285,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 	}
 	msg, err := port.Decode(ctx, buf)
 	if err != nil {
-		b.logger.Debug("matter.rx.group.drop", slog.String("src", srcString(src)), slog.String("err", err.Error()))
+		b.logger.Debug("matter.rx.group.drop", slog.String("src", srcString(src)), slog.Any("err", err))
 		if ev, ok := decodeFailureEvent(buf, srcIP, err); ok {
 			port.ReportGroupMessage(ev)
 		}

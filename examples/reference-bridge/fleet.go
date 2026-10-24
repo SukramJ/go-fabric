@@ -102,15 +102,12 @@ func newDemoLight(name string) *demoLight { return &demoLight{name: name} }
 // written against the CHIP all-clusters app's endpoint 1
 // (TC_FLABEL_2_1.py `--endpoint 1`) at the daemon's first bridged light,
 // and that app serves FixedLabel there. Base allows the cluster on any
-// endpoint.
+// endpoint, so the light declares it as it declares OnOff.
 func (d *demoLight) device(opts device.Options) (*device.OnOffLight, error) {
-	fixedLabel, err := device.FixedLabel(fixedlabeldef.LabelStruct{Label: "room", Value: "demo"})
-	if err != nil {
-		return nil, fmt.Errorf("light FixedLabel: %w", err)
-	}
+	labels := []fixedlabeldef.LabelStruct{{Label: "room", Value: "demo"}}
 	dev, err := device.NewOnOffLight(opts,
 		onoffdef.Declare{Initial: onoffdef.Patch{GlobalSceneControl: new(true)}},
-		fixedLabel)
+		fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}})
 	if err != nil {
 		return nil, err
 	}

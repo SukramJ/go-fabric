@@ -174,6 +174,7 @@ facade's own state.
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |
 | `binding.<key>`, `binding.@<endpoint>` | the facade | an endpoint's Binding list; `@` and the number for an endpoint without a stable key |
 | `user_label.root`, `user_label.aggregator` | the facade | the UserLabel lists of the root and the Aggregator |
+| `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster |
 | `gendiag.reboot_count` | the facade | RebootCount: 0 on a database's first boot, then one more per boot |
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |

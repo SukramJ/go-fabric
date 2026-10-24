@@ -43,7 +43,7 @@ type PASEOptions struct {
 	// OnPBKDFParamResponse is called once the device answered the
 	// PBKDFParamRequest (PaseClient.ts:156, :226-227).
 	OnPBKDFParamResponse func()
-	// Logger receives debug diagnostics; nil discards them.
+	// Logger receives debug diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
 
@@ -77,7 +77,7 @@ type PASEOptions struct {
 func PASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, passcode uint32, opts PASEOptions) (*exchange.Session, error) {
 	log := opts.Logger
 	if log == nil {
-		log = slog.New(slog.DiscardHandler)
+		log = slog.Default()
 	}
 	us, err := mgr.NewUnsecuredSession(addr, opts.PeerParameters)
 	if err != nil {
@@ -91,7 +91,7 @@ func PASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, passcod
 	s, err := pairPASE(ctx, mgr, us, x, passcode, opts)
 	if err != nil && reportsFailureToPeer(x, err) {
 		if serr := sendStatus(context.WithoutCancel(ctx), x, mrp.SCStatusGeneralFailure, statusInvalidParam); serr != nil {
-			log.Debug("matter.controller.pase.invalid_param_failed", slog.String("err", serr.Error()))
+			log.Debug("matter.controller.pase.invalid_param_failed", slog.Any("err", serr))
 		}
 	}
 	x.Close()

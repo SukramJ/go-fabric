@@ -227,7 +227,7 @@ func TestLiveWrite(t *testing.T) {
 func TestLiveSubscribe(t *testing.T) {
 	t.Parallel()
 	unknown := make(chan uint64, 8)
-	lv := newLiveWith(t, slog.New(&recordHandler{msg: "matter.controller.interaction.report_for_unknown_subscription", key: "subscription", seen: unknown}))
+	lv := newLiveWith(t, slog.New(&recordHandler{msg: "matter.controller.interaction.report_for_unknown_subscription", key: "subscription_id", seen: unknown}))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	reports := make(chan *interaction.Report, 16)

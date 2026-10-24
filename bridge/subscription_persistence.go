@@ -140,20 +140,20 @@ func (b *Bridge) beginSubscriptionRun() {
 	defer cancel()
 	rows, err := st.LoadServerSubscriptions(ctx)
 	if err != nil {
-		b.logger.Warn("matter.subscription.persist.load", slog.String("err", err.Error()))
+		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
 		return
 	}
 	for _, row := range rows {
 		rec, err := subscription.UnmarshalPeerSubscription(row)
 		if err != nil {
-			b.logger.Warn("matter.subscription.persist.decode", slog.String("err", err.Error()))
+			b.logger.Warn("matter.subscription.persist.decode", slog.Any("err", err))
 			continue
 		}
 		b.resumption.former = append(b.resumption.former, rec)
 	}
 	if len(rows) > 0 {
 		if err := st.ClearServerSubscriptions(ctx); err != nil {
-			b.logger.Warn("matter.subscription.persist.clear", slog.String("err", err.Error()))
+			b.logger.Warn("matter.subscription.persist.clear", slog.Any("err", err))
 		}
 	}
 	b.logger.Debug("matter.subscription.persist.loaded", slog.Int("former", len(b.resumption.former)))
@@ -207,7 +207,7 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 	rec.PeerNodeID = target.subjectNodeID
 	payload, err := subscription.MarshalPeerSubscription(rec)
 	if err != nil {
-		b.logger.Warn("matter.subscription.persist.encode", slog.String("err", err.Error()))
+		b.logger.Warn("matter.subscription.persist.encode", slog.Any("err", err))
 		return
 	}
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), subscriptionStoreTimeout)
@@ -215,7 +215,7 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 	if err := b.resumption.storeLocked().SaveServerSubscription(saveCtx, rec.SubscriptionID, rec.FabricIndex, rec.PeerNodeID, payload); err != nil {
 		b.logger.Warn("matter.subscription.persist.save",
 			slog.Int("subscription_id", int(subID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 	}
 }
 
@@ -234,7 +234,7 @@ func (b *Bridge) forgetPersistedSubscription(subID uint32) {
 	if err := b.resumption.storeLocked().DeleteServerSubscription(ctx, subID); err != nil {
 		b.logger.Warn("matter.subscription.persist.delete",
 			slog.Int("subscription_id", int(subID)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 	}
 }
 
@@ -255,6 +255,6 @@ func (b *Bridge) forgetFabricSubscriptions(ctx context.Context, fabricIndex uint
 	if err := b.resumption.storeLocked().DeleteServerSubscriptionsByFabric(ctx, fabricIndex); err != nil {
 		b.logger.Warn("matter.subscription.persist.delete_fabric",
 			slog.Int("fabric_index", int(fabricIndex)),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 	}
 }

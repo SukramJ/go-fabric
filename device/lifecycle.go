@@ -58,7 +58,7 @@ func (d *Device) attach(h deviceseam.Host) error {
 	parts := d.parts
 	d.mu.Unlock()
 	d.clock.setNode(h.Clock())
-	d.queue.start()
+	d.queue.Start()
 	for _, p := range parts {
 		if err := p.attach(h); err != nil {
 			d.detach()
@@ -75,7 +75,7 @@ func (d *Device) detach() {
 	d.host = nil
 	parts := d.parts
 	d.mu.Unlock()
-	d.queue.stop()
+	d.queue.Stop()
 	for _, p := range parts {
 		p.detach()
 	}

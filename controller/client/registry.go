@@ -152,7 +152,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 		r.reserveID(id)
 		n, err := r.restore(id)
 		if err != nil {
-			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.String("err", err.Error()))
+			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.Any("err", err))
 			continue
 		}
 		r.add(n)
@@ -363,7 +363,7 @@ func (r *Registry) Start(ctx context.Context) error {
 				continue
 			}
 			if err := n.Start(ctx); err != nil {
-				r.log.Warn("matter.controller.client.registry.start_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
+				r.log.Warn("matter.controller.client.registry.start_failed", slog.String("node", n.ID()), slog.Any("err", err))
 			}
 		}
 	}
@@ -424,9 +424,9 @@ func (r *Registry) Erase(ctx context.Context) {
 		if err == nil {
 			continue
 		}
-		r.log.Warn("matter.controller.client.registry.delete_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
+		r.log.Warn("matter.controller.client.registry.delete_failed", slog.String("node", n.ID()), slog.Any("err", err))
 		if err := n.Close(ctx); err != nil {
-			r.log.Warn("matter.controller.client.registry.close_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
+			r.log.Warn("matter.controller.client.registry.close_failed", slog.String("node", n.ID()), slog.Any("err", err))
 		}
 		r.remove(n)
 	}

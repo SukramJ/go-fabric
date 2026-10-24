@@ -1,14 +1,14 @@
 {
   "reading_order": "Layers are listed lowest first. A package belongs to the layer of the most specific pattern matching it, whatever the order here: the longest base path wins, and an exact name wins over an x/... pattern of the same base (so cluster in model-and-protocol beats cluster/... in servers).",
   "layers": [
-    {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar"]},
+    {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar", "internal/serialqueue"]},
     {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
     {"name": "security-and-storage", "packages": ["secure/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
     {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "client/..."]},
     {"name": "servers", "packages": ["cluster/...", "binding"]},
     {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam"]},
     {"name": "roles", "packages": ["bridge", "controller/...", "internal/bridgeseam", "internal/nodeseam"]},
-    {"name": "facade", "packages": ["node"]},
+    {"name": "facade", "packages": ["node", "node/metrics/..."]},
     {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "store/storetest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/..."]}
   ],
   "exceptions": []

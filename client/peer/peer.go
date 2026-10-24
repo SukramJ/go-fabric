@@ -233,7 +233,7 @@ func (p *Peer) save() {
 	p.mu.Unlock()
 	if st := p.set.ctx.Store; st != nil {
 		if err := st.SavePeer(d); err != nil {
-			p.log.Error("matter.controller.peer.save_failed", slog.String("err", err.Error()))
+			p.log.Error("matter.controller.peer.save_failed", slog.Any("err", err))
 		}
 	}
 	if h := p.set.ctx.Updated; h != nil {
@@ -439,12 +439,12 @@ func (p *Peer) Delete(ctx context.Context) {
 	p.Close(ctx)
 	if r := p.set.ctx.Resumption; r != nil {
 		if _, err := r.DeleteResumptionRecord(p.address); err != nil {
-			p.log.Error("matter.controller.peer.resumption_delete_failed", slog.String("err", err.Error()))
+			p.log.Error("matter.controller.peer.resumption_delete_failed", slog.Any("err", err))
 		}
 	}
 	if st := p.set.ctx.Store; st != nil {
 		if err := st.DeletePeer(p.address); err != nil {
-			p.log.Error("matter.controller.peer.delete_failed", slog.String("err", err.Error()))
+			p.log.Error("matter.controller.peer.delete_failed", slog.Any("err", err))
 		}
 	}
 }

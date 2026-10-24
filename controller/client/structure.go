@@ -125,7 +125,7 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 				n, err := decodeValue(b)
 				if err != nil {
 					s.log.Warn("matter.controller.client.cache_value_unreadable", slog.Int("endpoint", int(se.Number)),
-						slog.Uint64("cluster", uint64(sc.ID)), slog.Uint64("attribute", uint64(id)), slog.String("err", err.Error()))
+						slog.Uint64("cluster", uint64(sc.ID)), slog.Uint64("attribute", uint64(id)), slog.Any("err", err))
 					continue
 				}
 				values[id] = n
@@ -722,7 +722,7 @@ func (s *structure) erase(ep *Endpoint) {
 		c.cache.discard()
 	}
 	if err := s.p.store.EraseEndpoint(s.p.nodeID, ep.number); err != nil {
-		s.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(ep.number)), slog.String("err", err.Error()))
+		s.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(ep.number)), slog.Any("err", err))
 	}
 }
 

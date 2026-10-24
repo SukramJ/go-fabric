@@ -124,7 +124,11 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	}
 	clk := &deviceClock{}
 	s.clock = clk
-	if err := checkOptedClusters(t, s); err != nil {
+	// The Base device type's optional clusters (FixedLabel, UserLabel)
+	// are the type's too when a declaration names them (base.go); eff is
+	// the type the servers are built from, t stays the device's type.
+	eff := withBaseOptional(t, s)
+	if err := checkOptedClusters(eff, s); err != nil {
 		return nil, err
 	}
 	m, err := resolveMeasurements(t, s)
@@ -151,10 +155,10 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	// The defaults are built in [buildOrder] — a default that couples to
 	// the endpoint's other servers after them — and mounted in the type's
 	// order.
-	built := make(map[uint32]contract.ClusterServer, len(t.Servers))
+	built := make(map[uint32]contract.ClusterServer, len(eff.Servers))
 	sibling := func(id uint32) contract.ClusterServer { return built[id] }
-	for _, i := range buildOrder(t.Servers) {
-		r := &t.Servers[i]
+	for _, i := range buildOrder(eff.Servers) {
+		r := &eff.Servers[i]
 		if _, ok := assemblerMounted[r.ID]; ok || m.ids[r.ID] {
 			continue
 		}
@@ -164,21 +168,21 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		}
 		if !ok {
 			var err error
-			if srv, err = defaultServer(t, r, s, sibling); err != nil {
+			if srv, err = defaultServer(eff, r, s, sibling); err != nil {
 				return nil, err
 			}
 		}
 		built[r.ID] = srv
 	}
-	for i := range t.Servers {
-		if srv, ok := built[t.Servers[i].ID]; ok {
+	for i := range eff.Servers {
+		if srv, ok := built[eff.Servers[i].ID]; ok {
 			d.servers = append(d.servers, srv)
 		}
 	}
 	// Host servers for clusters the type does not list, after the type's
 	// own (MutableEndpoint.ts:95-110 extends the type's behaviors).
 	for _, id := range s.serverOrder {
-		if _, listed := t.Server(id); !listed {
+		if _, listed := eff.Server(id); !listed {
 			d.servers = append(d.servers, s.servers[id])
 		}
 	}

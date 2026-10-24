@@ -119,8 +119,8 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 
 	m.logger.Debug(
 		"im.subscription.restored",
-		slog.Uint64("id", uint64(sub.ID)),
-		slog.Int("fabric", int(sub.FabricIndex)),
+		slog.Uint64("subscription_id", uint64(sub.ID)),
+		slog.Int("fabric_index", int(sub.FabricIndex)),
 		slog.Int("max", int(sub.MaxIntervalCeiling)),
 		slog.Duration("send_interval", p.SendInterval),
 	)

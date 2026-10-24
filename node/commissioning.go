@@ -237,7 +237,7 @@ func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierCo
 // advertises.
 func (h *commissioningHost) announce(ctx context.Context, adv bridge.CommissioningAdvertisement, event string) {
 	if err := h.br.AnnounceCommissioning(ctx, adv); err != nil {
-		h.logger.Warn(event, slog.String("err", err.Error()))
+		h.logger.Warn(event, slog.Any("err", err))
 		return
 	}
 	h.setAnnounced(adv.CommissioningMode, adv.Discriminator)
@@ -297,7 +297,7 @@ func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st store
 		return
 	}
 	if err := win.OpenOwnWindow(ctx, 0); err != nil {
-		h.logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
+		h.logger.Warn("commissioning.own_window", slog.Any("err", err))
 	}
 }
 
@@ -322,7 +322,7 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
 		if err != nil {
-			h.logger.Warn("pase.window.build_failed", slog.String("err", err.Error()))
+			h.logger.Warn("pase.window.build_failed", slog.Any("err", err))
 			return nil
 		}
 		return adapter

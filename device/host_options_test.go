@@ -19,17 +19,17 @@ import (
 // a server for a cluster the assembler mounts, stays refused.
 func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 	t.Parallel()
-	fixed := &hostServer{id: 0x0040}    // FixedLabel: not an OnOffLight requirement
+	fixed := &hostServer{id: 0x0045}    // BooleanState: neither an OnOffLight requirement nor Base-optional
 	eco := &hostServer{id: 0x0750}      // EcosystemInformation: BridgedNode's, not the light's
 	levelCtl := &hostServer{id: 0x0008} // LevelControl: an optional requirement
 	d, err := NewOnOffLight(testOptions("l"), withServer(eco), withServer(levelCtl), withServer(fixed))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := serverIDs(d.Servers()), []uint32{0x0006, 0x0008, 0x0750, 0x0040}; !slices.Equal(got, want) {
+	if got, want := serverIDs(d.Servers()), []uint32{0x0006, 0x0008, 0x0750, 0x0045}; !slices.Equal(got, want) {
 		t.Fatalf("servers %#04x, want %#04x (the type's clusters, then the unlisted ones in call order)", got, want)
 	}
-	if d.Server(0x0040) != fixed || d.Server(0x0750) != eco {
+	if d.Server(0x0045) != fixed || d.Server(0x0750) != eco {
 		t.Error("the host's servers for unlisted clusters are not the ones mounted")
 	}
 	// A second WithServer for the same unlisted cluster replaces the first
@@ -39,13 +39,13 @@ func TestWithServerMountsAClusterTheTypeDoesNotList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := serverIDs(d.Servers()); !slices.Equal(got, []uint32{0x0006, 0x0750, 0x0040}) || d.Server(0x0750) != other {
+	if got := serverIDs(d.Servers()); !slices.Equal(got, []uint32{0x0006, 0x0750, 0x0045}) || d.Server(0x0750) != other {
 		t.Errorf("servers %#04x after a replacing WithServer", got)
 	}
 	for name, with := range map[string][]Option{
-		"opt-in":      {withServer(fixed), withOptional(0x0040)},
-		"initial":     {withServer(fixed), withInitial(0x0040, map[uint32]any{0: true})},
-		"no server":   {withOptional(0x0040)},
+		"opt-in":      {withServer(fixed), withOptional(0x0045)},
+		"initial":     {withServer(fixed), withInitial(0x0045, map[uint32]any{0: true})},
+		"no server":   {withOptional(0x0045)},
 		"assembler's": {withServer(&hostServer{id: 0x0039})},
 	} {
 		_, err := NewOnOffLight(testOptions("l"), with...)

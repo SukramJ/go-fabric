@@ -309,15 +309,15 @@ var errWon = errors.New("commissioner: another PASE attempt won")
 func (c *connection) classify(q queued, dev *deviceAbort, err error) {
 	switch {
 	case errors.Is(err, handshake.ErrPasscodeMismatch):
-		c.cfg.log.Info("matter.controller.commissioning.device_dropped", slog.String("device", q.device.identifier), slog.String("err", err.Error()))
+		c.cfg.log.Info("matter.controller.commissioning.device_dropped", slog.String("candidate", q.device.identifier), slog.Any("err", err))
 		c.lastNonRetryable = err
 		dev.cancel(err)
 	case errors.Is(err, handshake.ErrUnexpectedData):
-		c.cfg.log.Info("matter.controller.commissioning.address_failed", slog.String("address", q.addr.String()), slog.String("device", q.device.identifier), slog.String("err", err.Error()))
+		c.cfg.log.Info("matter.controller.commissioning.address_failed", slog.String("peer", q.addr.String()), slog.String("candidate", q.device.identifier), slog.Any("err", err))
 		c.lastNonRetryable = err
 	case isRetryable(err):
 		c.lastErr = err
-		c.cfg.log.Warn("matter.controller.commissioning.address_unreachable", slog.String("address", q.addr.String()), slog.String("device", q.device.identifier))
+		c.cfg.log.Warn("matter.controller.commissioning.address_unreachable", slog.String("peer", q.addr.String()), slog.String("candidate", q.device.identifier))
 	default:
 		c.abort(err)
 		c.lastNonRetryable = err

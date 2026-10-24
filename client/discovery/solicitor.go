@@ -358,7 +358,7 @@ func (s *Solicitor) emit() {
 		err = s.names.conn.Send(msg)
 	}
 	if err != nil {
-		s.names.logger.Warn("matter.discovery.solicit", slog.String("err", err.Error()))
+		s.names.logger.Warn("matter.discovery.solicit", slog.Any("err", err))
 	}
 }
 

@@ -281,7 +281,7 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 		ks, err := deriveKeySet(s, rec.CompressedID)
 		if err != nil {
 			m.logger.Warn("groups.keyset.derive_failed",
-				slog.Int("fabric_index", int(idx)), slog.Int("key_set", int(s.GroupKeySetID)), slog.String("err", err.Error()))
+				slog.Int("fabric_index", int(idx)), slog.Int("key_set", int(s.GroupKeySetID)), slog.Any("err", err))
 			continue
 		}
 		// Key set 0 is the IPK. matter.js keeps it in KeySets but never

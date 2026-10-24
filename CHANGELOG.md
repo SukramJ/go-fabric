@@ -10,6 +10,26 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- The metrics port (phase 21b, concept v7 A.3): `contract.Metrics` (`Counter(name, delta)`, `Gauge(name, value)`; standard library only), `node.Metrics` as its alias and `node.Config.Metrics` (nil records nothing). The named set, as `contract.Metric…` and `node.Metric…` constants and `contract.MetricNames()`: `sessions.open` and `subscriptions.active` (gauges), `im.received`, `im.sent`, `pase.failures`, `pase.lockouts`, `aggregator.reassemblies`, `mrp.retransmits` and `panics.recovered` (counters). The existing counters keep their readers (`Bridge.DeviceLoad`, `RecoveredPanics`). `bridge.Bridge.AttachMetrics` is the seam below the facade.
+- `node/metrics/expvar` (package `expvarmetrics`): `expvarmetrics.New(prefix)` implements the port on the standard library's `expvar`. The reference bridge serves it with `--metrics-expvar <addr>` on `/debug/vars`.
+- The hooks the port is fed through: `udp.Listener.OnPanicRecovered`, `tcp.Listener.OnPanicRecovered`, `tcp.Dialer.OnPanicRecovered` and `client/exchange.Config.Retransmitted`.
+- The diagnostic trace on the facade: `node.Config.Diagnostics{Capacity}` (0 is `node.DefaultDiagnosticsCapacity`, 256), `Node.DiagnosticEvents()` (newest first), and `Node.OnDiagnosticEvent(fn)` (inline) and `Node.OnDiagnosticEventAsync(fn)` (on the node's callback goroutine, drained by `Stop`). `diagevent.Ring.Observe` carries both.
+- `fabrictest.Metrics` and `fabrictest.NewMetrics()`: a recording metrics port for a test.
+- `docs/guides/observability.md`: the logger rule, the event-name prefixes, the attribute-key table, the metric set with its sources, and the trace. The guard `script/slogkeys` holds library code to the key table, checks that `err` is `slog.Any`, and checks that a call states each key once. It also generates the page's key section.
+- The Base device type's optional clusters by declaration (owner decision 0.7, matter.js `base.element.ts:46-47`): `fixedlabeldef.Declare` and `userlabeldef.Declare` work on every device type and mount the module's FixedLabel and UserLabel servers. `Device.FixedLabel()` and `Device.UserLabel()` return their typed servers. A node keeps a bridged device's UserLabel list in its store, under `bridged_user_label.<stable key>`.
+
+### Changed
+
+- Log attribute keys follow one table (docs/guides/observability.md). A host that greps or indexes the logs reads the new keys: `fabric` → `fabric_index` (`fabric_id` where it was a fabric id), `session` → `session_id`, `exchange` → `exchange_id`, `endpoint_id` → `endpoint`, `subscription` and the subscription table's `id` → `subscription_id`, `group` → `group_id`, `peer_node`, `peer_node_id` and a node id under `node` or `peer` → `node_id`, a peer's address under `dst` or `address` (the commissioner's) → `peer`, `why` → `reason`, `vid`/`pid` → `vendor_id`/`product_id`, `cmd`/`cmdID`/`respType` → `command_name`/`command`/`response_type`, `idx` → `path_index`. `err` now holds the error value (`slog.Any`) instead of its text: a text handler prints the same line, and a JSON handler prints the error's text as before. The event names (messages) are unchanged.
+- A nil logger on `client/handshake`, `client/exchange`, `client/interaction`, `client/peer` and `transport/btp` components is `slog.Default()`, as everywhere else in the module, instead of discarding. A fabrictest site stays quiet.
+- **Break:** `device.FixedLabel(labels...)` is removed (rule of 2026-10-21): `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` declares the cluster on any device type. Migration guide, observability and the Base device type's clusters in v0.10.6.
+
+### Removed
+
+- `device.FixedLabel`: the declaration `fixedlabeldef.Declare` replaces it on every device type.
+
 ## [0.10.5] — 2026-10-24
 
 ### Added

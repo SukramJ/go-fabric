@@ -106,7 +106,10 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// routing entry outlives every cleanly-closed subscription —
 		// re-subscribe, endpoint removal, fabric teardown and session
 		// reap all terminate subscriptions the bridge never hears about.
-		m.SetOnSubscriptionClosed(b.releaseSubscriptionRouting)
+		m.SetOnSubscriptionClosed(func(subID uint32) {
+			b.releaseSubscriptionRouting(subID)
+			b.recordSubscriptionsActive(m)
+		})
 		// A terminated subscription is forgotten; one closed with its
 		// session stays recorded for re-establishment after a restart
 		// (matter.js SubscriptionsServer.#subscriptionCancelled).
@@ -518,7 +521,7 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 				slog.Int("subscription_id", int(subID)),
 				slog.Int("send_failures", failures),
 				slog.Int("retry_limit", sendErrorRetryLimit),
-				slog.String("err", err.Error()))
+				slog.Any("err", err))
 		}
 		return
 	}
@@ -873,6 +876,7 @@ func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
 
 func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byte) (uint32, error) {
 	b.load.imSent.Add(1)
+	b.count(contract.MetricIMSent)
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions

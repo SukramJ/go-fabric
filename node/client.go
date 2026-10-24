@@ -85,12 +85,13 @@ func (n *Node) newClientStack() (*clientStack, error) {
 	if err != nil {
 		return nil, fmt.Errorf("node: client socket: %w", err)
 	}
+	l.OnPanicRecovered(n.panicRecovered)
 	cs := &clientStack{listener: l, names: cfg.Names}
 	fail := func(err error) (*clientStack, error) {
 		cs.close(n.life)
 		return nil, err
 	}
-	cs.exchanges, err = exchange.NewManager(l, exchange.Config{Clock: n.cfg.Clock, Logger: n.logger})
+	cs.exchanges, err = exchange.NewManager(l, exchange.Config{Clock: n.cfg.Clock, Logger: n.logger, Retransmitted: n.retransmitted})
 	if err != nil {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
 	}
@@ -237,6 +238,7 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 			return t, err
 		}
 		n.persistBindings(ctx, t)
+		n.persistUserLabels(ctx, t)
 		n.bindSync.mu.Lock()
 		n.bindSync.topo = t
 		running := n.bindSync.running
@@ -287,7 +289,7 @@ func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
 			if !n.bindSync.persisted[b] {
 				key := bindingKey(ep)
 				if err := b.Persist(n.persisted.bindingConfig(context.WithoutCancel(ctx), key)); err != nil {
-					n.logger.Warn("binding.restore", slog.String("key", key), slog.String("err", err.Error()))
+					n.logger.Warn("binding.restore", slog.String("key", key), slog.Any("err", err))
 					continue
 				}
 			}
@@ -403,7 +405,7 @@ func (t nodeTopology) ClientClusters(id uint16) []uint32 {
 func (t nodeTopology) HasGroupKey(fabricIndex uint8, groupID uint16) bool {
 	ok, err := t.n.groups.HasUsableKey(context.Background(), fabricIndex, groupID)
 	if err != nil && !errors.Is(err, context.Canceled) {
-		t.n.logger.Debug("binding.group_key.lookup_failed", slog.String("err", err.Error()))
+		t.n.logger.Debug("binding.group_key.lookup_failed", slog.Any("err", err))
 	}
 	return err == nil && ok
 }

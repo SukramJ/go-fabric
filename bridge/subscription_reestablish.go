@@ -159,7 +159,7 @@ func (b *Bridge) ReestablishFormerSubscriptions(ctx context.Context) Reestablish
 func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscription.PeerSubscription, block *peerBlockList) []uint32 {
 	if block.has(k) {
 		b.logger.Debug("matter.subscription.reestablish.skip_peer",
-			slog.Int("fabric_index", int(k.fabricIndex)), slog.Uint64("peer_node", k.nodeID))
+			slog.Int("fabric_index", int(k.fabricIndex)), slog.Uint64("node_id", k.nodeID))
 		return nil
 	}
 	connCtx, cancel := context.WithTimeout(ctx, subscription.ReestablishTimeout)
@@ -168,8 +168,8 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 	if err != nil {
 		block.add(k)
 		b.logger.Debug("matter.subscription.reestablish.connect_failed",
-			slog.Int("fabric_index", int(k.fabricIndex)), slog.Uint64("peer_node", k.nodeID),
-			slog.String("err", err.Error()))
+			slog.Int("fabric_index", int(k.fabricIndex)), slog.Uint64("node_id", k.nodeID),
+			slog.Any("err", err))
 		return nil
 	}
 
@@ -187,8 +187,8 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 		}
 		b.logger.Debug("matter.subscription.reestablish.failed",
 			slog.Int("subscription_id", int(rec.SubscriptionID)),
-			slog.Uint64("peer_node", k.nodeID),
-			slog.String("err", err.Error()))
+			slog.Uint64("node_id", k.nodeID),
+			slog.Any("err", err))
 		var rejected *chunkStatusError
 		switch {
 		case errors.Is(err, errPeerGone):
@@ -240,6 +240,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	if err != nil {
 		return err
 	}
+	b.recordSubscriptionsActive(m)
 	target := subTarget{
 		src:            link.addr,
 		sessionID:      link.sessionID,

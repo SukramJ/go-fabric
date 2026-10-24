@@ -301,7 +301,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		// matter.js CaseClient: "Error sending Sigma2Resume-Success,
 		// assume session still valid" — a send failure is not fatal.
 		if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeStatusReport, ok, &reply.counter); err != nil {
-			b.logger.Debug("matter.case.initiator.resume_success_send", slog.String("err", err.Error()))
+			b.logger.Debug("matter.case.initiator.resume_success_send", slog.Any("err", err))
 		}
 	}
 
@@ -316,6 +316,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	}
 	sessionID := init.Initiator.SessionID()
 	b.sessionPeerAddrs.Store(sessionID, addr)
+	b.recordSessionsOpen()
 	b.logger.Info("matter.case.initiator.established",
 		slog.String("peer", addr.String()),
 		slog.Int("session_id", int(sessionID)),
@@ -367,7 +368,7 @@ func statusReportSuccessOr(payload []byte, failure error) error {
 func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32) {
 	report := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
 	if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeStatusReport, report, &ackCounter); err != nil {
-		b.logger.Debug("matter.case.initiator.error_send", slog.String("err", err.Error()))
+		b.logger.Debug("matter.case.initiator.error_send", slog.Any("err", err))
 	}
 }
 
@@ -445,7 +446,7 @@ func (b *Bridge) sendInitiatedAck(addr *net.UDPAddr, exchangeID uint16, ephemera
 	}
 	datagram := append(hdr.Marshal(), proto.Marshal()...) //nolint:gocritic // single-allocation join
 	if err := listener.Send(addr, datagram); err != nil {
-		b.logger.Debug("matter.case.initiator.ack_send", slog.String("err", err.Error()))
+		b.logger.Debug("matter.case.initiator.ack_send", slog.Any("err", err))
 	}
 	b.dischargeOwedAck(0, exchangeID, true)
 }

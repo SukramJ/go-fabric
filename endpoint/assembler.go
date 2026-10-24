@@ -402,7 +402,7 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 				"endpoint.gc",
 				slog.String("scope", snap.Scope),
 				slog.String("source", rec.Key.String()),
-				slog.Int("endpoint_id", int(rec.EndpointID)),
+				slog.Int("endpoint", int(rec.EndpointID)),
 			)
 		}
 	}

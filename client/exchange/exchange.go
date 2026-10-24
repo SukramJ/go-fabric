@@ -602,10 +602,13 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	if onSend != nil {
 		onSend(count)
 	}
-	if err := x.m.conn.Send(x.dest(), p.datagram); err != nil {
-		x.m.log.Debug("matter.controller.retransmit_failed", slog.Int("exchange", int(x.id)), slog.String("err", err.Error()))
+	if x.m.retransmitted != nil {
+		x.m.retransmitted()
 	}
-	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
+	if err := x.m.conn.Send(x.dest(), p.datagram); err != nil {
+		x.m.log.Debug("matter.controller.retransmit_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
+	}
+	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange_id", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
 	x.mu.Lock()
 	if x.retransmitsLocked(p) {
 		x.armRetransLocked(p, backoff, expectedProcessingTime)
@@ -660,7 +663,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	standalone := msg.isStandaloneAck()
 	if msg.ProtocolID != x.protocol && !standalone && !msg.isStatusReport() {
 		x.mu.Unlock()
-		x.m.log.Debug("matter.controller.drop", slog.String("reason", "unexpected protocol"), slog.Int("exchange", int(x.id)))
+		x.m.log.Debug("matter.controller.drop", slog.String("reason", "unexpected protocol"), slog.Int("exchange_id", int(x.id)))
 		return
 	}
 	x.lastActive = x.m.clock.Now()
@@ -684,12 +687,12 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		switch {
 		case !msg.HasAck:
 			x.mu.Unlock()
-			x.m.log.Debug("matter.controller.drop", slog.String("reason", ErrFlow.Error()+": previous message ack is missing"), slog.Int("exchange", int(x.id)))
+			x.m.log.Debug("matter.controller.drop", slog.String("reason", ErrFlow.Error()+": previous message ack is missing"), slog.Int("exchange_id", int(x.id)))
 			return
 		case msg.AckCounter != p.counter:
 			if !standalone {
 				x.mu.Unlock()
-				x.m.log.Debug("matter.controller.drop", slog.String("reason", ErrFlow.Error()+": incorrect ack"), slog.Int("exchange", int(x.id)))
+				x.m.log.Debug("matter.controller.drop", slog.String("reason", ErrFlow.Error()+": incorrect ack"), slog.Int("exchange_id", int(x.id)))
 				return
 			}
 		default:

@@ -122,7 +122,7 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 	ctx := context.Background()
 	set := func(k string, n uint32) {
 		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
-			p.logger.Warn("configuration_version.persist", slog.String("err", err.Error()))
+			p.logger.Warn("configuration_version.persist", slog.Any("err", err))
 		}
 	}
 	if v.Node != 0 {
@@ -145,7 +145,7 @@ func (p persisted) OnNodeLabelWritten(key device.SourceKey, label string) {
 		return
 	}
 	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+k, label); err != nil {
-		p.logger.Warn("label.persist", slog.String("err", err.Error()))
+		p.logger.Warn("label.persist", slog.Any("err", err))
 	}
 }
 
@@ -176,7 +176,7 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	b.SetOnPersistentWrite(func(nodeLabel, location string) {
 		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
 			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
-				p.logger.Warn("label.persist", slog.String("err", err.Error()))
+				p.logger.Warn("label.persist", slog.Any("err", err))
 			}
 		}
 	})
@@ -202,7 +202,7 @@ func (p persisted) SaveScenes(key device.SourceKey, table []byte) {
 		return
 	}
 	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+k, string(table)); err != nil {
-		p.logger.Warn("scenes.persist", slog.String("err", err.Error()))
+		p.logger.Warn("scenes.persist", slog.Any("err", err))
 	}
 }
 
@@ -309,7 +309,7 @@ func keepOperationalTime(ctx context.Context, clk clock.Clock, st store.Settings
 			return
 		case <-tick.C():
 			if err := storeOperationalTime(ctx, st, g); err != nil {
-				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+				logger.Warn("gendiag.operational_hours.persist", slog.Any("err", err))
 			}
 		}
 	}
@@ -357,7 +357,7 @@ func (p persisted) bindingConfig(ctx context.Context, key string) mattercore.Bin
 			if err := json.Unmarshal([]byte(v), &stored); err != nil {
 				// A list that does not decode restores nothing; the next
 				// change overwrites it.
-				p.logger.Warn("binding.restore", slog.String("key", key), slog.String("err", err.Error()))
+				p.logger.Warn("binding.restore", slog.String("key", key), slog.Any("err", err))
 				return nil, nil
 			}
 			out := make([]mattercore.TargetStruct, 0, len(stored))
@@ -376,7 +376,7 @@ func (p persisted) bindingConfig(ctx context.Context, key string) mattercore.Bin
 				err = p.st.SetSetting(context.WithoutCancel(ctx), key, string(b))
 			}
 			if err != nil {
-				p.logger.Warn("binding.persist", slog.String("key", key), slog.String("err", err.Error()))
+				p.logger.Warn("binding.persist", slog.String("key", key), slog.Any("err", err))
 			}
 			return err
 		},

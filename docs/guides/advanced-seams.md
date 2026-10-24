@@ -44,7 +44,7 @@ A host names none of the packages below for these:
 | The ledger's software versions | `node.NewDCLClient(node.DCLProductionURL)`, `node.DCLOTAVersions` (Lookup, CheckForUpdate, Download), `node.VerifyOTAImage`, `node.DCLSoftwareVersion` |
 | Aggregator Actions, EcosystemInformation | `node.NewActions(node.ActionsConfig{Host})` for `Config.AggregatorServers` (`node.ActionsHost`, `ActionRequest`); `node.NewEcosystemInformation(dir)` over a `node.EcosystemDirectory`, declared with `ecosysteminformationdef.Declare{HostServer: …}` |
 | Root servers a host drives after Start | `Node.Root()`'s fields, named `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer`, `node.PowerSourceConfigurationServer` (its `SetSourcesProvider`) — `RootClusters` itself stays the seam |
-| FixedLabel on a device | `device.FixedLabel(labels...)`: the cluster the Base device type allows on every endpoint |
+| FixedLabel and UserLabel on a device | `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` and `userlabeldef.Declare{…}` on any device type: the clusters the Base device type allows on every endpoint; `Device.FixedLabel()` and `Device.UserLabel()` are their typed servers, and a node keeps a UserLabel list under the device's stable key |
 | A PowerSource's EndpointList | a declared PowerSource names its own endpoint unless `powersourcedef.Declare{Initial: Patch{EndpointList: …}}` names others; Status, Description, BatChargeLevel, BatReplaceability and WiredCurrentType take matter.js's defaults |
 | ContentControl | `contentcontroldef.Declare{ContentControl: port}` (Enable/Disable, each feature's commands a further interface of the port) |
 | ClosureControl's host state | `closurecontroldef.Server.Set(Patch{MainState, CurrentErrorList, OverallCurrentState})`: the typed Set reaches the server's own setters (MainState Error with a list raises OperationalError, Disengaged the EngageStateChanged event); `closure.ControlServer`'s `SetCurrentPosition`, `SetMainState`, `SetErrorList` and `ReportError` stay its server methods on `cluster/wire` types |
@@ -222,9 +222,11 @@ request.
 alias of `diagevent.Event`): the moments that explain a failed pairing,
 which the node also serves as DiagnosticLogs.
 
-**When.** A host that shows the trace. Reading the node's ring from the
-facade is milestone 4, phase 21.
+**When.** A host that shows the trace. Since v0.10.6 the ring is read
+on the facade: `Node.DiagnosticEvents`, `Node.OnDiagnosticEvent` and
+`Node.OnDiagnosticEventAsync`, sized by `Config.Diagnostics`
+([Observability](observability.md)).
 
 **Costs.** None beyond the type: the ring is the node's.
 
-*Source: `node/facade.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go:56`.*
+*Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go:58`.*

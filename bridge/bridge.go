@@ -170,6 +170,9 @@
 //     acknowledged and dropped as a protocol without a handler
 //     ([ErrUnknownProtocol]), and a requestor's download fails.
 //   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
+//   - AttachMetrics — silent. Without a port the named counters and
+//     gauges (contract.MetricNames) are recorded nowhere; the bridge's own
+//     readers (DeviceLoad, RecoveredPanics) count on.
 //   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
 //     nil-safe observer hooks.
 //   - SetDeviceTypeValidation — visible either way. Start and every
@@ -393,6 +396,13 @@ type Bridge struct {
 	// bridge, and taking b.mu per datagram would put the whole receive
 	// path behind the bridge's topology lock.
 	diagEvents atomic.Pointer[diagevent.Ring]
+	// metrics is the attached metrics port ([Bridge.AttachMetrics]); nil
+	// records nothing. sessionCount is the session registry's counter
+	// for the sessions.open gauge. Both atomic for the same reason as
+	// diagEvents.
+	metrics      atomic.Pointer[metricsPort]
+	sessionCount atomic.Pointer[sessionCounterRef]
+
 	subManager *subscription.Manager // optional; when set Subscribe is fully wired
 
 	// groupMessaging authenticates group messages and names the
@@ -817,6 +827,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("bridge: udp: %w", err)
 	}
+	// A recovered panic counts in the listener and, through the hook, in
+	// the attached metrics port (panics.recovered).
+	listener.OnPanicRecovered(b.panicRecovered)
+	if tcpListener != nil {
+		tcpListener.OnPanicRecovered(b.panicRecovered)
+	}
 
 	// The previous run's subscriptions become the former ones before any
 	// subscription of this run can be established — the serve loop below
@@ -834,7 +850,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 			// Closed-listener errors during shutdown are expected; log
 			// at debug level. Real bind / IO errors come through
 			// before serveCancel fires, so they remain at warn.
-			b.logger.Debug("matter.udp.serve.exit", slog.String("err", err.Error()))
+			b.logger.Debug("matter.udp.serve.exit", slog.Any("err", err))
 		}
 	}()
 
@@ -847,7 +863,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 		go func() {
 			defer close(tcpDone)
 			if err := tcpListener.Serve(serveCtx, b.handleTCPMessage, b.handleTCPClose); err != nil {
-				b.logger.Debug("matter.tcp.serve.exit", slog.String("err", err.Error()))
+				b.logger.Debug("matter.tcp.serve.exit", slog.Any("err", err))
 			}
 		}()
 	}
@@ -887,12 +903,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 
 	b.logger.Info(
 		"matter.bridge.started",
-		slog.String("addr", listener.LocalAddr().String()),
+		slog.String("listen", listener.LocalAddr().String()),
 		slog.Int("endpoints", b.endpointCount()),
 	)
 	if tcpListener != nil {
 		b.logger.Info("matter.tcp.listening",
-			slog.String("addr", tcpListener.Addr().String()),
+			slog.String("listen", tcpListener.Addr().String()),
 			slog.Bool("incoming", b.cfg.TCP.Incoming),
 			slog.Bool("outgoing", b.cfg.TCP.Outgoing))
 	}
@@ -903,7 +919,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 		// commissioner can still find it via direct addressing. Log
 		// loudly so operators know to investigate.
 		b.logger.Warn("matter.mdns.publish",
-			slog.String("err", err.Error()),
+			slog.Any("err", err),
 			slog.String("hint", "bridge is operational; commissioners may need a direct address until DNS-SD recovers"))
 	}
 
@@ -1099,7 +1115,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 				}
 				if reaped := m.CloseEndpoint(ep.ID); reaped > 0 {
 					b.logger.Info("matter.bridge.reassemble.endpoint_removed",
-						slog.Int("endpoint_id", int(ep.ID)),
+						slog.Int("endpoint", int(ep.ID)),
 						slog.Int("subscriptions_reaped", reaped))
 				}
 			}
@@ -1789,7 +1805,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// A BDX responder (an OTA image transfer) runs under the handler
 	// context the cancel above ended; it is gone before Stop returns.
 	if !b.waitBDXResponders(ctx) {
-		b.logger.Warn("matter.bridge.stop.bdx_responder_timeout", slog.String("err", ctx.Err().Error()))
+		b.logger.Warn("matter.bridge.stop.bdx_responder_timeout", slog.Any("err", ctx.Err()))
 	}
 
 	// Best-effort mDNS withdraw + close. Errors here are logged but
@@ -1804,12 +1820,12 @@ func (b *Bridge) Stop(ctx context.Context) error {
 			if err := b.advertiser.Withdraw(withdrawCtx, svc.InstanceName, svc.ServiceType); err != nil {
 				b.logger.Debug("matter.mdns.withdraw",
 					slog.String("instance", svc.InstanceName),
-					slog.String("err", err.Error()))
+					slog.Any("err", err))
 			}
 			withdrawCancel()
 		}
 		if err := b.advertiser.Close(); err != nil {
-			b.logger.Debug("matter.mdns.close", slog.String("err", err.Error()))
+			b.logger.Debug("matter.mdns.close", slog.Any("err", err))
 		}
 	}
 
@@ -1839,24 +1855,24 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, t
 		select {
 		case <-done:
 		case <-ctx.Done():
-			b.logger.Warn("matter.bridge.stop.serve_timeout", slog.String("err", ctx.Err().Error()))
+			b.logger.Warn("matter.bridge.stop.serve_timeout", slog.Any("err", ctx.Err()))
 		}
 	}
 	if listener != nil {
 		if err := listener.WaitIdle(ctx); err != nil {
-			b.logger.Warn("matter.bridge.stop.handlers_timeout", slog.String("err", err.Error()))
+			b.logger.Warn("matter.bridge.stop.handlers_timeout", slog.Any("err", err))
 		}
 	}
 	if tcpDone != nil {
 		select {
 		case <-tcpDone:
 		case <-ctx.Done():
-			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.String("err", ctx.Err().Error()))
+			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.Any("err", ctx.Err()))
 		}
 	}
 	if tcpListener != nil {
 		if err := tcpListener.WaitIdle(ctx); err != nil {
-			b.logger.Warn("matter.bridge.stop.tcp_handlers_timeout", slog.String("err", err.Error()))
+			b.logger.Warn("matter.bridge.stop.tcp_handlers_timeout", slog.Any("err", err))
 		}
 	}
 }
@@ -2057,7 +2073,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Debug("matter.mdns.fabric_publish",
 			slog.String("instance", svc.InstanceName),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	if b.advertiserIsNoop() {
@@ -2097,7 +2113,7 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 	if err := b.advertiser.Withdraw(wCtx, svc.InstanceName, svc.ServiceType); err != nil {
 		b.logger.Debug("matter.mdns.fabric_withdraw",
 			slog.String("instance", svc.InstanceName),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	b.logger.Info("matter.mdns.fabric_withdrawn",
@@ -2165,7 +2181,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Warn("matter.mdns.commissioning_publish_err",
 			slog.String("instance", svc.InstanceName),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return fmt.Errorf("matter.mdns.commissioning_publish: %w", err)
 	}
 	b.mu.Lock()
@@ -2216,7 +2232,7 @@ func (b *Bridge) WithdrawCommissioning(ctx context.Context) {
 	if err := advertiser.Withdraw(withdrawCtx, instance, mdns.ServiceTypeCommissionable); err != nil {
 		b.logger.Debug("matter.mdns.commissioning_withdraw",
 			slog.String("instance", instance),
-			slog.String("err", err.Error()))
+			slog.Any("err", err))
 		return
 	}
 	b.logger.Info("matter.mdns.commissioning_withdrawn",

@@ -137,7 +137,7 @@ func (r *Registry) onLeave(n *Node, fabricIndex uint8) {
 		p.Disconnect(r.ctx, ErrPeerLeft)
 	}
 	if err := r.deleteNode(r.ctx, n, nil); err != nil {
-		r.log.Warn("matter.controller.client.registry.delete_failed", slog.String("node", n.ID()), slog.String("err", err.Error()))
+		r.log.Warn("matter.controller.client.registry.delete_failed", slog.String("node", n.ID()), slog.Any("err", err))
 	}
 }
 
