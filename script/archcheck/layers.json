@@ -3,7 +3,7 @@
   "layers": [
     {"name": "foundation", "packages": ["clock", "clock/clocktest", "tlv", "schema", "parity", "internal/clockvar", "internal/inflight", "internal/serialqueue"]},
     {"name": "transport", "packages": ["transport/...", "mdns", "internal/udpseam", "internal/channelseam"]},
-    {"name": "security-and-storage", "packages": ["secure/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
+    {"name": "security-and-storage", "packages": ["secure/...", "icd", "icd/...", "commissioning", "store", "store/memstore", "bdx/...", "diagevent", "bootid"]},
     {"name": "model-and-protocol", "packages": ["im", "im/...", "groups", "cluster", "cluster/spec", "cluster/spec/...", "cluster/wire", "contract", "eligibility", "client/..."]},
     {"name": "servers", "packages": ["cluster/...", "binding"]},
     {"name": "endpoints", "packages": ["endpoint", "endpoint/...", "device", "device/...", "internal/deviceseam"]},

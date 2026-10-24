@@ -4037,10 +4037,12 @@
     },
     {
       "path": "packages/protocol/test/icd/CheckInMessageTest.ts",
-      "status": "planned",
-      "reason": "The ICD Check-In message nonce, encoding and decoding against the specification vectors, built with the ICD server in milestone 5 phase 23.",
-      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd/checkin:TestCheckInMessage"
+      ],
+      "reason": "The nonce, the encoding and the decoding against the CHIP SDK's three vectors, the tampered-nonce, tampered-ciphertext, wrong-key and short-payload refusals as ErrMalformed, the ICD round trip with its two-byte threshold, and the counter validation with the uint32 wrap and the refresh boundary at 2^31 (icd/checkin/checkin_parity_matterjs_test.go).",
+      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af"
     },
     {
       "path": "packages/protocol/test/icd/FabricIcdTest.ts",

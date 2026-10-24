@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 82 |
+| ported | 83 |
 | partial | 128 |
-| planned | 27 |
+| planned | 26 |
 | excluded | 87 |
 | total | 324 |
 
@@ -102,7 +102,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/groups](#protocoltestgroups) | 5 | 4 | 1 | 0 | 0 |
-| [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
+| [protocol/test/icd](#protocoltesticd) | 8 | 1 | 0 | 5 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 1 | 2 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
@@ -800,7 +800,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| CheckInMessageTest.ts | 154 | planned | until M5 phase 23 | The ICD Check-In message nonce, encoding and decoding against the specification vectors, built with the ICD server in milestone 5 phase 23. |
+| CheckInMessageTest.ts | 154 | ported | `icd/checkin:TestCheckInMessage` | The nonce, the encoding and the decoding against the CHIP SDK's three vectors, the tampered-nonce, tampered-ciphertext, wrong-key and short-payload refusals as ErrMalformed, the ICD round trip with its two-byte threshold, and the counter validation with the uint32 wrap and the refresh boundary at 2^31 (icd/checkin/checkin_parity_matterjs_test.go). |
 | FabricIcdTest.ts | 463 | planned | until M5 phase 23 | The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24. |
 | IcdCheckInBackOffTest.ts | 63 | planned | until M5 phase 23 | The device's doubling Check-In back-off, milestone 5 phase 23. |
 | IcdCheckInSenderTest.ts | 97 | planned | until M5 phase 23 | The device's Check-In sender, milestone 5 phase 23. |
@@ -965,7 +965,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 ### protocol/test/icd
 
-- `CheckInMessageTest.ts` â€” The ICD Check-In message nonce, encoding and decoding against the specification vectors, built with the ICD server in milestone 5 phase 23.
 - `FabricIcdTest.ts` â€” The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.
 - `IcdCheckInBackOffTest.ts` â€” The device's doubling Check-In back-off, milestone 5 phase 23.
 - `IcdCheckInSenderTest.ts` â€” The device's Check-In sender, milestone 5 phase 23.
