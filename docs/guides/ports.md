@@ -144,7 +144,19 @@ the next `Reassemble`.
 | `AttachBDXResponder` | BDX exchanges are dropped; an OTA download fails (fails closed) |
 | `AttachDiagnosticEvents` | `Bridge.DiagnosticEvents` stays empty |
 | `SetOnReassembled`, `SetOnFabricAdded`, `SetOnFabricRemoved` | nil-safe observer hooks |
-| `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses; off judges only singleton placement |
+| `SetDeviceTypeValidation` | warn mode: each new violation is logged once; strict refuses what an addition causes; off judges only singleton placement |
+
+Strict refuses only what an addition causes. Each `Start` and `Reassemble`
+is judged as a set of changes to the topology validated before: an endpoint
+number the last validation did not hold is an addition, and strict refuses a
+new violation on the added endpoint, its descendants, its ancestors or its
+siblings. A new violation that a change of an installed endpoint left behind —
+a changed device type, a removed part — is logged and refuses nothing, as
+matter.js refuses only at construction. A misplaced singleton is refused in
+every mode, the first misplacing endpoint in tree order alone. A mandatory
+command a server leaves unimplemented is `endpoint.ViolationUnimplemented`:
+logged in warn and off, refused in strict. A mode that is none of the three
+fails `node.New`.
 
 *Source: `bridge/bridge.go:29-177`, `bridge/securechannel.go:242-262`, `bridge/ackpump.go:36-58`.*
 
