@@ -470,6 +470,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.EmptyListDefault{},
 		},
 		{
 			ID: AttrCurrentArea, Name: "CurrentArea",
@@ -494,6 +495,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PROG", Op: spec.ConfName, Name: "PROG"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Constraint:  spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrProgress,
 		},
 	},

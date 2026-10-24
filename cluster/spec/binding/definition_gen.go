@@ -93,6 +93,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeManage, Fabric: "F"},
 			Quality:     spec.Quality{NonVolatile: true},
 			Constraint:  spec.Constraint{Text: "desc", Desc: true},
+			Default:     spec.EmptyListDefault{},
 			Decode:      decodeAttrBinding,
 		},
 	},

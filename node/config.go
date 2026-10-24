@@ -506,6 +506,15 @@ func (c *Config) Validate() error {
 	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
 		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
 	}
+	// A mode that is none of warn, strict and off fails the node's
+	// construction. Mirrors matter.js
+	// packages/node/src/node/server/DeviceTypeConformanceService.ts:674-685
+	// at 862ad75f (modeOf: an unknown endpoint.validation value throws).
+	switch c.DeviceTypeValidation {
+	case endpoint.DeviceTypeValidationWarn, endpoint.DeviceTypeValidationStrict, endpoint.DeviceTypeValidationOff:
+	default:
+		errs = append(errs, fmt.Errorf("node: DeviceTypeValidation %d is not a mode; it must be one of warn, strict, off", int(c.DeviceTypeValidation)))
+	}
 	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
 		errs = append(errs, fmt.Errorf("node: LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
 	}

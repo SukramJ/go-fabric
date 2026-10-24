@@ -1200,7 +1200,7 @@ func (g *generator) writeDefinition(w *writer) {
 			if lit := constraintLiteral(v.Constraint); lit != "" {
 				w.p("\t\t\tConstraint: %s,", lit)
 			}
-			if lit := defaultLiteral(v.Default); lit != "" {
+			if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
 				w.p("\t\t\tDefault: %s,", lit)
 			}
 			if g.attrDecoder(a) != "" {
@@ -1333,7 +1333,7 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		if f.v.Access != nil && f.v.Access.Fabric == "S" {
 			parts = append(parts, "FabricSensitive: true")
 		}
-		if lit := defaultLiteral(f.v.Default); lit != "" {
+		if lit := defaultLiteral(f.v.Default, f.v.Type, f.v.Metatype); lit != "" {
 			parts = append(parts, "Default: "+lit)
 		}
 	}
@@ -1450,7 +1450,15 @@ func referenceOf(raw json.RawMessage) string {
 	return ref.Name
 }
 
-func defaultLiteral(raw json.RawMessage) string {
+// defaultLiteral renders a stated default: a scalar as itself, null as
+// spec.NullDefault, and a temperature or percentage stated with its unit
+// ({"type":"celsius","value":26}) in the encoding units of the type that
+// carries it, as matter.js restates it (packages/model/src/logic/
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
+// scale per type name is FieldValue.ts:227-256 numericValue); the empty
+// list as spec.EmptyListDefault. A unit the type name does not scale, and
+// every other field value or list, is not rendered.
+func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
 	}
@@ -1467,8 +1475,52 @@ func defaultLiteral(raw json.RawMessage) string {
 		return "float64(" + strconv.FormatFloat(x, 'g', -1, 64) + ")"
 	case string:
 		return strconv.Quote(x)
+	case []any:
+		if len(x) == 0 {
+			return "spec.EmptyListDefault{}"
+		}
+	case map[string]any:
+		if n, ok := encodedUnit(x, typeName, metatype); ok {
+			return "float64(" + strconv.FormatFloat(n, 'g', -1, 64) + ")"
+		}
 	}
 	return ""
+}
+
+// encodedUnit is a celsius or percent field value in the encoding units of
+// typeName — matter.js FieldValue.numericValue (FieldValue.ts:227-256 at
+// 862ad75f) — rounded to the unit an integer encoding counts
+// (EncodedValue.ts:27-40).
+func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
+	value, ok := fv["value"].(float64)
+	if !ok {
+		return 0, false
+	}
+	var scale float64
+	switch fv["type"] {
+	case "celsius":
+		switch typeName {
+		case "temperature", "temp-diff", "TemperatureDifference":
+			scale = 100
+		case "temp-u8", "UnsignedTemperature", "temp-s8", "SignedTemperature":
+			scale = 10
+		}
+	case "percent":
+		switch typeName {
+		case "percent100ths":
+			scale = 100
+		case "percent":
+			scale = 1
+		}
+	}
+	if scale == 0 {
+		return 0, false
+	}
+	n := value * scale
+	if metatype == "integer" {
+		n = math.Round(n)
+	}
+	return n, true
 }
 
 // confLiteral renders a conformance AST as a spec.Conformance literal.

@@ -849,8 +849,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "[WIRED]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "WIRED"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Fields: []spec.Field{
-				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WiredFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: WiredFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
-				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WiredFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: WiredFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
+				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WiredFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: WiredFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}, Default: spec.EmptyListDefault{}},
+				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "WiredFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: WiredFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}, Default: spec.EmptyListDefault{}},
 			},
 			Decode: decodeWiredFaultChangeEvent,
 		},
@@ -859,8 +859,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "[BAT]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "BAT"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Fields: []spec.Field{
-				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
-				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
+				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}, Default: spec.EmptyListDefault{}},
+				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}, Default: spec.EmptyListDefault{}},
 			},
 			Decode: decodeBatFaultChangeEvent,
 		},
@@ -869,8 +869,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "[RECHG]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "RECHG"}}},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Fields: []spec.Field{
-				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatChargeFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatChargeFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
-				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatChargeFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatChargeFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
+				{ID: 0, Name: "Current", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatChargeFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatChargeFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}, Default: spec.EmptyListDefault{}},
+				{ID: 1, Name: "Previous", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "BatChargeFaultEnum", Kind: spec.KindEnum, Bits: 8, Enum: BatChargeFaultEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}, Default: spec.EmptyListDefault{}},
 			},
 			Decode: decodeBatChargeFaultChangeEvent,
 		},

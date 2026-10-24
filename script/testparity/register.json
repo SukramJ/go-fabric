@@ -167,9 +167,14 @@
     },
     {
       "path": "packages/node/test/behavior/internal/MarkChangedTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "markChanged of a computed attribute: the Go servers report a change through contract.ChangeNotifier and advance the DataVersion per write (BY-2), but a computed attribute with markChanged has no counterpart in the typed hull yet. Milestone 5 (gate 3, the hull's reporting rules).",
+      "status": "partial",
+      "go": [
+        "node:TestMarkChangedParityMatterJS"
+      ],
+      "missing": [
+        "advances the data version when a computed quieter attribute reports through its throttle"
+      ],
+      "reason": "markChanged is spec.Server.MarkChanged (typed route <cluster>def.Server.MarkChanged): the computed attribute is a spec.Source's, the refusals of an empty list, an unserved id, a changes-omitted and a quieter attribute and the peer backing's refusal (MarkChangedOf) port, and a commissioned subscriber sees the report with the advanced version (node/mark_changed_parity_matterjs_test.go on fabrictest); a computed quieter attribute's throttled report has no Go subject, since spec.Server has no throttle and the self-held servers bump the version at the change.",
       "snapshotSha": "1fb1c1b8e88dee014ba4d22ce015172f6b81706e"
     },
     {
@@ -240,9 +245,11 @@
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/ValuePatcherTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Feature-dependent default fallbacks per feature set: the kit applies the device type's defaults and the declaration's Initial, not matter.js's ValuePatcher fallbacks per feature; a port needs the patcher's rules first. Milestone 5.",
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestValuePatcherParityMatterJS"
+      ],
+      "reason": "The patcher is spec.Instance.PatchDefaults, applied where Initial and the host's Set enter a spec.Server: a left-out struct field receives the stated default only when its conformance is mandatory under the selected features, an empty-list default as a list of its own, a bitmap default as its Go bitmap type, a temperature in encoding units (the generator restates unit defaults, EncodedValue.ts), and a Go field the definition does not declare is refused; the Widgets cluster is a synthetic definition, the preset cases run on the committed Thermostat (cluster/spec/value_patcher_parity_matterjs_test.go).",
       "snapshotSha": "8d16b9842415d25a12a7a5dbb46d7ab8b3db411b"
     },
     {
@@ -299,9 +306,18 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/conformanceTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Field conformance of struct and command fields through matter.js's validation tables: spec checks field conformance per field, but the tables' element-reference and revision cases need the validator's table form. Milestone 5 (the validator, P12's move of gate 2).",
+      "status": "partial",
+      "go": [
+        "cluster/spec:TestConformanceParityMatterJS"
+      ],
+      "missing": [
+        "disallows a field its base disallows",
+        "disallows a field its base disallows when the field is overridden",
+        "disallows an enum value its base disallows when the member is overridden",
+        "treats a field its base declares nullable as nullable",
+        "names the conformance it judged"
+      ],
+      "reason": "Field conformance is spec.Instance.CheckConformance, a port of the conformance compiler over a struct's fields: the AllTests tree runs as a table over testdata/conformance_matterjs.json (the tree flattened at the pin, 170 cases), and outerResolve (the cluster's attributes through peers), element references and revision port as explicit cases (cluster/spec/conformance_parity_matterjs_test.go); the operational-extension describe has no Go subject, since the generated definitions do not extend one another (ClusterModel.extend).",
       "snapshotSha": "6d5d6808f5881ec2dc21fc9ce2a86a816027c9d9"
     },
     {
@@ -1381,9 +1397,24 @@
     },
     {
       "path": "packages/node/test/endpoint/EndpointNumberConflictTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "An endpoint claiming a live, root or sibling number: the assembler numbers endpoints itself and a host cannot claim one, so the refusals have no direct subject; the retry after a failed add is the Aggregator's, to port with the endpoint model. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "node:TestEndpointNumberConflictParityMatterJS"
+      ],
+      "missing": [
+        "keeps the live endpoint in the node's index",
+        "keeps the live endpoint's number in the node's PartsList",
+        "keeps refusing further claimants",
+        "reports no deletion of the live endpoint's number",
+        "is refused by a running node",
+        "is refused before the node starts",
+        "refuses an added subtree whose leaves share a number",
+        "refuses an automatic id that duplicates a sibling's id",
+        "refuses a duplicate preset number in a tree built before start",
+        "refuses a nested preset number another endpoint holds",
+        "does not list a refused child of a parent without an index"
+      ],
+      "reason": "A failed essential add is a strict refusal and its retry a Replace under the same key and number, the index collision the node's ErrDuplicateKey guard, a preset number a number the production store already holds beside a new allocation, and the removal one PartsList change (node/endpoint_number_conflict_parity_matterjs_test.go on fabrictest and endpoint/memstore); a host claims no endpoint number in Go, so the claimant refusals have no subject, and a refused part refuses its parent with it, so no parent is installed without its child.",
       "snapshotSha": "cdf30f5cc5585c8ac49ee6a4f72e1fd52ba4bd61"
     },
     {
@@ -1506,9 +1537,17 @@
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "The node's protocol service as one unit (fabric-filtered reads and writes, subscribe/notify, feature-map publication, deprecated globals, command-field validation): covered piecemeal by the bridge and im ports; the unit port waits for the protocol service's own seam. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "node:TestProtocolServiceParityMatterJS"
+      ],
+      "missing": [
+        "tags manufacturer-specific attributes in a standard cluster with skipCustomElements",
+        "shares one state reference between local reads without a transaction",
+        "requires a transaction to read cluster state for a remote subject",
+        "rejects request with constraint violation"
+      ],
+      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse) (node/protocol_service_parity_matterjs_test.go); wildcard path flags and the transaction model have no Go subject, and a Go server leaves a request field's constraint to its handler where matter.js's ad-hoc request TLV schema refuses it.",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
@@ -1585,9 +1624,22 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/ConstructionValidationTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Device-type validation at construction (one pass per tree, strict refusal, singleton placement, crashed endpoints): endpoint.DeviceTypeValidation judges an assembled tree, the per-tree pass and the crash semantics need the validator's construction hook. Milestone 5 (P12's validator move).",
+      "status": "partial",
+      "go": [
+        "endpoint:TestConstructionValidationParityMatterJS",
+        "node:TestDeviceTypeValidationNodeParityMatterJS"
+      ],
+      "missing": [
+        "reads nothing of an endpoint that crashed",
+        "does not count a crashed endpoint as a present component",
+        "judges an addition under a constructed part without its ancestors still under construction",
+        "judges no endpoint under construction below a sibling whose duplicate status changes",
+        "reads nothing of a sibling whose behaviors are still initializing",
+        "never judges a peer's endpoints",
+        "never refuses a peer's misplaced singleton",
+        "refuses a strict node that commissions over BLE without NetworkCommissioning"
+      ],
+      "reason": "Each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree judged as one reassembly (endpoint/construction_validation_parity_matterjs_test.go): what is logged, refused and recorded, the strict refusal of an addition, the singleton refusal of the first misplacing endpoint, the unimplemented mandatory command (ViolationUnimplemented) in strict, warn and off; the whole-node cases (a strict node, an unknown mode, default configuration) run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). Crashed endpoints, construction phases, peers and BLE have no Go subject, and the counts of validations and passes are not ported (whole-tree pass, ADR 0016).",
       "snapshotSha": "945b895c82bab2343b9c27d8ea03b9f8bc2b1b59"
     },
     {
@@ -1727,9 +1779,41 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/RuntimeValidationTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Device-type validation after construction (destroyed children, changed device-type lists, added parts, factory reset): the validator runs at assembly; its runtime triggers are milestone 5's (P12's validator move).",
+      "status": "partial",
+      "go": [
+        "endpoint:TestRuntimeValidationParityMatterJS",
+        "node:TestDeviceTypeValidationNodeParityMatterJS"
+      ],
+      "missing": [
+        "judges nothing when the owner crashed",
+        "logs rather than fails the destruction when judging it throws",
+        "follows the list again after a factory reset",
+        "logs rather than fails the change when judging it throws",
+        "judges nothing for a device type an endpoint adds while it is constructed",
+        "judges a constant number of endpoints per identical bridged light",
+        "judges only above the owner when a bridged device with a part is deleted",
+        "judges a constant number of endpoints per deleted bridged light",
+        "reads no earlier light when a light asserting a condition on the node endpoint is added",
+        "judges the whole node scope when an endpoint supporting a network interface is added",
+        "judges the whole node scope when a subtree with such an endpoint is added",
+        "judges the whole node scope when an endpoint declaring a singleton is added",
+        "judges the whole node scope when an endpoint without a recorded judgement changes",
+        "judges the whole node scope when an endpoint without a recorded judgement is destroyed",
+        "judges the whole node scope when a destroyed descendant has no recorded judgement",
+        "judges only the node endpoint when a nested node endpoint with such a descendant is destroyed",
+        "judges the whole node scope when an endpoint above such an endpoint becomes a node endpoint",
+        "judges the whole node scope when a subtree with such an endpoint is destroyed",
+        "judges a constant number of endpoints per bridged lock",
+        "leaves an unrelated sibling's descendants unread when an addition adds nothing that reaches the node scope",
+        "walks the node scope again after a reset instead of reusing what an earlier pass kept",
+        "drops an endpoint whose addition it refused, left crashed",
+        "is not refused for a singleton a runtime change misplaced in an ancestor",
+        "judges and logs nothing and forgets every endpoint",
+        "judges nothing when an endpoint of a peer is destroyed",
+        "refuses to validate an endpoint of a peer",
+        "follows no endpoint"
+      ],
+      "reason": "A runtime change is a new snapshot judged as one reassembly: each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree (endpoint/runtime_validation_parity_matterjs_test.go) — a destroyed child, a changed device type list, duplicate siblings, conditions asserted on the node endpoint in the test's synthetic models, a refused addition, and a later addition in strict mode refused only for what it causes; the default-configuration cases run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). The counts of judged and read endpoints, crashed endpoints, throwing judgements, peers, the observers, teardown and a factory reset of a followed endpoint have no Go subject (whole-tree pass, ADR 0016), and a singleton a runtime change misplaces is refused in every mode (ADR 0016).",
       "snapshotSha": "7dceb4c71f56ffe843b5c70f4448f6c89ce701e8"
     },
     {
@@ -1755,9 +1839,30 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Every standard device type judged as built, with per-type state: the devicegen test builds every committed type, but judging each with matter.js's per-type state (door lock, fan, operational state, RVC modes) and the Closure TagList refusal needs the validator's corpus form. Milestone 5.",
+      "status": "partial",
+      "go": [
+        "device:TestStandardDeviceTypeCorpusParityMatterJS"
+      ],
+      "missing": [
+        "refuses a Closure endpoint without the tags its Descriptor TagList requires",
+        "judges Aggregator",
+        "judges AudioDoorbell",
+        "judges BridgedNode",
+        "judges Camera",
+        "judges CameraController",
+        "judges CastingVideoClient",
+        "judges Chime",
+        "judges FloodlightCamera",
+        "judges Intercom",
+        "judges JointFabricAdministrator",
+        "judges NetworkInfrastructureManager",
+        "judges OtaRequestor",
+        "judges RootNode as the root endpoint of a node, which carries the standard RootNode type",
+        "judges SnapshotCamera",
+        "judges ThreadBorderRouter",
+        "judges VideoDoorbell"
+      ],
+      "reason": "Every committed kit type is built with the host statements of the device fixtures but without their parts, assembled as a bridged device and judged; it may carry only the corpus's pinned components, a mandatory server only a feature selection completes, and what its Go fixture tolerates with a reason (device/standard_device_type_corpus_parity_matterjs_test.go); the names devicegen does not commit are skipped with its reason, the node's root and Aggregator, BridgedNode and OtaRequestor with the fixture table's, and the Closure TagList refusal waits for a TagList declaration (milestone 5).",
       "snapshotSha": "bdfc8d3f028840052f223b3e3b1fb0f15f088d93"
     },
     {

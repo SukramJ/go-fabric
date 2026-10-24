@@ -496,6 +496,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Expr: "{\"type\":\"percent\",\"value\":0.01}"}, Max: &spec.Bound{Int: 10000}},
+			Default:     float64(1),
 		},
 		{
 			ID: AttrStepValue, Name: "StepValue",
@@ -504,6 +505,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
 			Quality:     spec.Quality{Fixed: true},
 			Constraint:  spec.Constraint{Text: "0.01% to 10000", Min: &spec.Bound{Expr: "{\"type\":\"percent\",\"value\":0.01}"}, Max: &spec.Bound{Int: 10000}},
+			Default:     float64(1),
 		},
 		{
 			ID: AttrUnit, Name: "Unit",

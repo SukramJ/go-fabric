@@ -145,6 +145,12 @@ func (i *Instance) CheckValue(attrID uint32, value any, peers Peers) (any, error
 }
 
 func (i *Instance) checkValue(name string, t Type, nullable bool, c Constraint, value any, peers Peers) (any, error) {
+	return i.checkValueIn(name, t, nullable, c, value, peers, nameScope{peers: peers})
+}
+
+// checkValueIn is checkValue with the scope a struct field's conformance
+// resolves a name in that is not a sibling ([nameScope]).
+func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint, value any, peers Peers, scope nameScope) (any, error) {
 	if value == nil {
 		if nullable {
 			return nil, nil
@@ -170,12 +176,12 @@ func (i *Instance) checkValue(name string, t Type, nullable bool, c Constraint, 
 	case KindString, KindBytes:
 		v, why = i.checkLength(t, c, value, peers)
 	case KindList:
-		if err := i.checkList(name, t, c, value, peers); err != nil {
+		if err := i.checkList(name, t, c, value, peers, scope); err != nil {
 			return nil, err
 		}
 		return value, nil
 	case KindStruct:
-		if err := i.checkStruct(name, t.Struct, value); err != nil {
+		if err := i.checkStruct(name, t.Struct, value, scope); err != nil {
 			return nil, err
 		}
 		return value, nil
@@ -256,7 +262,7 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 // constraint ("max 16[2]", "all[min 1]") — the list checks of matter.js's
 // packages/node/src/behavior/state/validation/ValueValidator.ts and
 // constraint.ts.
-func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers Peers) error {
+func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers Peers, scope nameScope) error {
 	rv := reflect.ValueOf(value)
 	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
 		return Errorf(im.StatusConstraintError, "%s: %s %v is not a list", i.def.Name, name, value)
@@ -272,7 +278,7 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 		entry = *c.Entry
 	}
 	for n := range rv.Len() {
-		if _, err := i.checkValue(fmt.Sprintf("%s[%d]", name, n), t.Entry.Type, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil); err != nil {
+		if _, err := i.checkValueIn(fmt.Sprintf("%s[%d]", name, n), t.Entry.Type, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil, scope); err != nil {
 			return err
 		}
 	}
@@ -286,7 +292,22 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // in script/clustergen/gen.go); an optional field is a pointer, nil when
 // absent (gen.go writePayload); a nullable one a [Nullable]
 // (fieldInfo.goType). A field constraint naming a sibling is not resolved.
-func (i *Instance) checkStruct(name string, s *Struct, value any) error {
+//
+// With scope.conformance (the [Server]'s own paths, [nameScope]), each
+// field is first judged against its conformance, with the struct as
+// the record its names resolve in — a sibling field, else an attribute of
+// the cluster, else scope's outer resolver — and the selected features and
+// the cluster's revision ([Instance.checkFieldConformance]): a field the
+// conformance requires and the value leaves out, one it does not allow and
+// the value carries, an enum value it does not allow or the enum does not
+// define, and a choice group with too few or too many fields are refused
+// with CONSTRAINT_ERROR ([ErrConformance], [ErrEnumValueConformance],
+// [ErrUnknownEnumValue]). Mirrors matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
+// (createStructValidator) over conformance.ts:19-55
+// (createConformanceValidator) and conformance-compiler.ts:87-220
+// (astToFunction) at 862ad75f.
+func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
 	rv := reflect.ValueOf(value)
 	if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 		rv = rv.Elem()
@@ -296,6 +317,11 @@ func (i *Instance) checkStruct(name string, s *Struct, value any) error {
 	}
 	if s == nil {
 		return nil
+	}
+	if scope.conformance {
+		if err := i.checkFieldConformance(i.def.Name+": "+name, s, rv, scope); err != nil {
+			return err
+		}
 	}
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
@@ -309,7 +335,7 @@ func (i *Instance) checkStruct(name string, s *Struct, value any) error {
 			}
 			fv = fv.Elem()
 		}
-		if _, err := i.checkValue(name+"."+f.Name, f.Type, f.Quality.Nullable, f.Constraint, entryValue(fv.Interface()), nil); err != nil {
+		if _, err := i.checkValueIn(name+"."+f.Name, f.Type, f.Quality.Nullable, f.Constraint, entryValue(fv.Interface()), nil, scope); err != nil {
 			return err
 		}
 	}
