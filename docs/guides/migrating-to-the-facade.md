@@ -55,7 +55,7 @@ one-line function over it.
 | `mattercore.NewActions`, `ActionsConfig`, `ActionsHost`, `ActionRequest` | `node.NewActions`, `node.ActionsConfig`, `node.ActionsHost`, `node.ActionRequest` |
 | `mattercore.EcosystemDirectory`, `NewEcosystemInformation` | `node.EcosystemDirectory`, `node.NewEcosystemInformation` |
 | `*mattercore.BasicInformation`, `*mattercore.OTASoftwareUpdateRequestor`, `*mattercore.WiFiNetworkDiagnostics`, `*mattercore.PowerSourceConfiguration` (`Node.Root()`'s fields) | `node.BasicInformationServer`, `node.OTARequestorServer`, `node.WiFiNetworkDiagnosticsServer`, `node.PowerSourceConfigurationServer` |
-| `mattercore.NewFixedLabel(labels)` with `fixedlabeldef.Declare{HostServer: …}` | `device.FixedLabel(labels...)` (removed in v0.10.5: the declaration below) |
+| `mattercore.NewFixedLabel(labels)` with `fixedlabeldef.Declare{HostServer: …}` | `device.FixedLabel(labels...)` (removed in v0.10.6: the declaration below) |
 | `media.NewContentControl` with `device.HostServer` | `contentcontroldef.Declare{ContentControl: port}` |
 | a PowerSource's EndpointList filled by the host | a declared PowerSource names its own endpoint; `Initial.EndpointList` names others |
 
@@ -73,8 +73,10 @@ nothing.
 | `(*store.Store).ThermostatPresets(key)` | `store.NewThermostatPresetStore(st, key)` over any `store.ThermostatPresets` (removed) |
 | a fabrictest device on a SQLite file | in memory by default; `fabrictest.Options{StoreOnDisk: true}` keeps the file |
 
-Observability and the Base device type's clusters in the same release
-([Observability](observability.md)):
+## Observability and the Base device type's clusters in v0.10.6
+
+The keys, the metrics port and the trace are in the
+[Observability](observability.md) guide:
 
 | Before | Now |
 | --- | --- |

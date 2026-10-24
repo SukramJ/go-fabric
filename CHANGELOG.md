@@ -32,8 +32,8 @@ pseudo-version of `main`.
 - `node.NewEndpointPersistence` takes a `store.Settings`; a `*store.Store` still fits.
 - fabrictest devices run on `store/memstore` and `endpoint/memstore` by default; state still survives `Device.Restart`. `Options.StoreOnDisk` restores the SQLite file.
 - Log attribute keys follow one table (docs/guides/observability.md). A host that greps or indexes the logs reads the new keys: `fabric` → `fabric_index` (`fabric_id` where it was a fabric id), `session` → `session_id`, `exchange` → `exchange_id`, `endpoint_id` → `endpoint`, `subscription` and the subscription table's `id` → `subscription_id`, `group` → `group_id`, `peer_node`, `peer_node_id` and a node id under `node` or `peer` → `node_id`, a peer's address under `dst` or `address` (the commissioner's) → `peer`, `why` → `reason`, `vid`/`pid` → `vendor_id`/`product_id`, `cmd`/`cmdID`/`respType` → `command_name`/`command`/`response_type`, `idx` → `path_index`. `err` now holds the error value (`slog.Any`) instead of its text: a text handler prints the same line, and a JSON handler prints the error's text as before. The event names (messages) are unchanged.
-- A nil logger on `client/handshake`, `client/exchange`, `client/interaction` and `client/peer` components is `slog.Default()`, as everywhere else in the module, instead of discarding. A fabrictest site stays quiet.
-- **Break:** `device.FixedLabel(labels...)` is removed (rule of 2026-10-21): `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` declares the cluster on any device type. Migration guide, the persistence port in v0.10.5.
+- A nil logger on `client/handshake`, `client/exchange`, `client/interaction`, `client/peer` and `transport/btp` components is `slog.Default()`, as everywhere else in the module, instead of discarding. A fabrictest site stays quiet.
+- **Break:** `device.FixedLabel(labels...)` is removed (rule of 2026-10-21): `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` declares the cluster on any device type. Migration guide, observability and the Base device type's clusters in v0.10.6.
 
 ### Removed
 

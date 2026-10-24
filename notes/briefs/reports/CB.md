@@ -55,7 +55,7 @@ serial goroutine, started at `Start`, drained at `Stop` after the bridge
 stopped — the device kit's queue, moved to `internal/serialqueue`
 (foundation layer) so both owners use one type. `Bridge.DiagnosticEvents`
 and `AttachDiagnosticEvents` stay. `advanced-seams.md` row: "Since
-v0.10.5 the ring is read on the facade"; `matterjs-comparison.md:141`
+v0.10.6 the ring is read on the facade"; `matterjs-comparison.md:141`
 unchanged. Migration guide: `diagevent` import → `node.DiagnosticEvent` /
 `Node.DiagnosticEvents()`. Test: `TestDiagnosticEventsOnTheFacade`
 (capacity 2, three events from a commissioning and the controller's

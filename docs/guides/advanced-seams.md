@@ -222,7 +222,7 @@ request.
 alias of `diagevent.Event`): the moments that explain a failed pairing,
 which the node also serves as DiagnosticLogs.
 
-**When.** A host that shows the trace. Since v0.10.5 the ring is read
+**When.** A host that shows the trace. Since v0.10.6 the ring is read
 on the facade: `Node.DiagnosticEvents`, `Node.OnDiagnosticEvent` and
 `Node.OnDiagnosticEventAsync`, sized by `Config.Diagnostics`
 ([Observability](observability.md)).

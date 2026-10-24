@@ -233,7 +233,7 @@ func newSession(role Role, version, fragmentSize, windowSize int, cb Callbacks, 
 		return nil, protocolError(fmt.Sprintf("Unsupported BTP version %d", version))
 	}
 	if opts.Logger == nil {
-		opts.Logger = slog.New(slog.DiscardHandler)
+		opts.Logger = slog.Default() // the module's logger rule (ADR 0026 P9), as client/*
 	}
 	s := &Session{
 		role: role, cb: cb, clock: clock.Or(opts.TimeSource), log: opts.Logger,
