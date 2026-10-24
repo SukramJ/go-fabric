@@ -1601,9 +1601,22 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/ConstructionValidationTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Device-type validation at construction (one pass per tree, strict refusal, singleton placement, crashed endpoints): endpoint.DeviceTypeValidation judges an assembled tree, the per-tree pass and the crash semantics need the validator's construction hook. Milestone 5 (P12's validator move).",
+      "status": "partial",
+      "go": [
+        "endpoint:TestConstructionValidationParityMatterJS",
+        "node:TestDeviceTypeValidationNodeParityMatterJS"
+      ],
+      "missing": [
+        "reads nothing of an endpoint that crashed",
+        "does not count a crashed endpoint as a present component",
+        "judges an addition under a constructed part without its ancestors still under construction",
+        "judges no endpoint under construction below a sibling whose duplicate status changes",
+        "reads nothing of a sibling whose behaviors are still initializing",
+        "never judges a peer's endpoints",
+        "never refuses a peer's misplaced singleton",
+        "refuses a strict node that commissions over BLE without NetworkCommissioning"
+      ],
+      "reason": "Each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree judged as one reassembly (endpoint/construction_validation_parity_matterjs_test.go): what is logged, refused and recorded, the strict refusal of an addition, the singleton refusal of the first misplacing endpoint, the unimplemented mandatory command (ViolationUnimplemented) in strict, warn and off; the whole-node cases (a strict node, an unknown mode, default configuration) run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). Crashed endpoints, construction phases, peers and BLE have no Go subject, and the counts of validations and passes are not ported (whole-tree pass, ADR 0016).",
       "snapshotSha": "945b895c82bab2343b9c27d8ea03b9f8bc2b1b59"
     },
     {
@@ -1743,9 +1756,41 @@
     },
     {
       "path": "packages/node/test/endpoint/validation/RuntimeValidationTest.ts",
-      "status": "planned",
-      "until": "M5",
-      "reason": "Device-type validation after construction (destroyed children, changed device-type lists, added parts, factory reset): the validator runs at assembly; its runtime triggers are milestone 5's (P12's validator move).",
+      "status": "partial",
+      "go": [
+        "endpoint:TestRuntimeValidationParityMatterJS",
+        "node:TestDeviceTypeValidationNodeParityMatterJS"
+      ],
+      "missing": [
+        "judges nothing when the owner crashed",
+        "logs rather than fails the destruction when judging it throws",
+        "follows the list again after a factory reset",
+        "logs rather than fails the change when judging it throws",
+        "judges nothing for a device type an endpoint adds while it is constructed",
+        "judges a constant number of endpoints per identical bridged light",
+        "judges only above the owner when a bridged device with a part is deleted",
+        "judges a constant number of endpoints per deleted bridged light",
+        "reads no earlier light when a light asserting a condition on the node endpoint is added",
+        "judges the whole node scope when an endpoint supporting a network interface is added",
+        "judges the whole node scope when a subtree with such an endpoint is added",
+        "judges the whole node scope when an endpoint declaring a singleton is added",
+        "judges the whole node scope when an endpoint without a recorded judgement changes",
+        "judges the whole node scope when an endpoint without a recorded judgement is destroyed",
+        "judges the whole node scope when a destroyed descendant has no recorded judgement",
+        "judges only the node endpoint when a nested node endpoint with such a descendant is destroyed",
+        "judges the whole node scope when an endpoint above such an endpoint becomes a node endpoint",
+        "judges the whole node scope when a subtree with such an endpoint is destroyed",
+        "judges a constant number of endpoints per bridged lock",
+        "leaves an unrelated sibling's descendants unread when an addition adds nothing that reaches the node scope",
+        "walks the node scope again after a reset instead of reusing what an earlier pass kept",
+        "drops an endpoint whose addition it refused, left crashed",
+        "is not refused for a singleton a runtime change misplaced in an ancestor",
+        "judges and logs nothing and forgets every endpoint",
+        "judges nothing when an endpoint of a peer is destroyed",
+        "refuses to validate an endpoint of a peer",
+        "follows no endpoint"
+      ],
+      "reason": "A runtime change is a new snapshot judged as one reassembly: each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree (endpoint/runtime_validation_parity_matterjs_test.go) — a destroyed child, a changed device type list, duplicate siblings, conditions asserted on the node endpoint in the test's synthetic models, a refused addition, and a later addition in strict mode refused only for what it causes; the default-configuration cases run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). The counts of judged and read endpoints, crashed endpoints, throwing judgements, peers, the observers, teardown and a factory reset of a followed endpoint have no Go subject (whole-tree pass, ADR 0016), and a singleton a runtime change misplaces is refused in every mode (ADR 0016).",
       "snapshotSha": "7dceb4c71f56ffe843b5c70f4448f6c89ce701e8"
     },
     {
