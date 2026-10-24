@@ -191,7 +191,12 @@ func (d *Device) Start(ctx context.Context) error {
 	if d.topo.Prepare != nil {
 		d.topo.Prepare(n)
 	}
-	if err := n.Start(ctx); err != nil {
+	// Under Site.Run: the node's start re-establishes its former
+	// subscriptions and waits for each peer's StatusResponse on a timer
+	// of the site's clock (bridge.ReestablishFormerSubscriptions), and a
+	// fake clock moves only while the site paces it — a start called
+	// directly would wait forever on a response that never comes.
+	if err := d.site.Run(ctx, n.Start); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
 	if operational != nil {
@@ -289,7 +294,7 @@ func (d *Device) Stop(ctx context.Context) error {
 	if !running {
 		return nil
 	}
-	return n.Stop(ctx)
+	return d.site.Run(ctx, n.Stop) // the stop's own timers on the site's clock, as Start
 }
 
 // Restart stops the node and starts a new one on the same store and
