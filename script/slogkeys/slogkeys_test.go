@@ -165,6 +165,7 @@ func TestAttributeKeys(t *testing.T) {
 	var checked int
 	var findings []finding
 	unknown := map[string]int{}
+	used := map[string]bool{}
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -179,7 +180,7 @@ func TestAttributeKeys(t *testing.T) {
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		n, fs, perr := checkFile(path, filepath.ToSlash(rel), ok, unknown)
+		n, fs, perr := checkFile(path, filepath.ToSlash(rel), ok, unknown, used)
 		if perr != nil {
 			return perr
 		}
@@ -204,24 +205,6 @@ func TestAttributeKeys(t *testing.T) {
 		slices.Sort(keys)
 		t.Logf("keys outside the table: %q", keys)
 	}
-	// A row nothing uses any more is dropped from the table.
-	used := map[string]bool{}
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(root, path)
-		if d.IsDir() {
-			if rel != "." && (skippedTop[strings.SplitN(rel, string(filepath.Separator), 2)[0]] || d.Name() == "testdata") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
-			collectKeys(path, used)
-		}
-		return nil
-	})
 	for _, k := range areaKeys {
 		if !used[k] {
 			t.Errorf("area key %q is used nowhere: drop it from areaKeys", k)
@@ -262,7 +245,7 @@ func parse(path string) (*token.FileSet, *ast.File, error) {
 }
 
 // checkFile judges one file and returns how many attributes it checked.
-func checkFile(path, rel string, ok map[string]bool, unknown map[string]int) (int, []finding, error) {
+func checkFile(path, rel string, ok map[string]bool, unknown map[string]int, used map[string]bool) (int, []finding, error) {
 	fset, f, err := parse(path)
 	if err != nil {
 		return 0, nil, fmt.Errorf("slogkeys: parse %s: %w", rel, err)
@@ -280,6 +263,7 @@ func checkFile(path, rel string, ok map[string]bool, unknown map[string]int) (in
 		}
 		if fn, k, pos, isAttr := keyOf(call); isAttr {
 			n++
+			used[k] = true
 			switch {
 			case !ok[k]:
 				unknown[k]++
@@ -301,22 +285,6 @@ func checkFile(path, rel string, ok map[string]bool, unknown map[string]int) (in
 		return true
 	})
 	return n, out, nil
-}
-
-// collectKeys adds every literal key of the file's attribute calls to used.
-func collectKeys(path string, used map[string]bool) {
-	_, f, err := parse(path)
-	if err != nil || f.Name.Name == "main" {
-		return
-	}
-	ast.Inspect(f, func(node ast.Node) bool {
-		if e, isExpr := node.(ast.Expr); isExpr {
-			if _, k, _, isAttr := keyOf(e); isAttr {
-				used[k] = true
-			}
-		}
-		return true
-	})
 }
 
 const (
@@ -406,7 +374,7 @@ func f(l *slog.Logger, err error) {
 	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	n, got, err := checkFile(path, "x.go", allowed(), map[string]int{})
+	n, got, err := checkFile(path, "x.go", allowed(), map[string]int{}, map[string]bool{})
 	if err != nil {
 		t.Fatal(err)
 	}
