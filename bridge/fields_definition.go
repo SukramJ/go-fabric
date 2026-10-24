@@ -8,6 +8,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -36,7 +37,11 @@ func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.El
 		return nil, true, fmt.Errorf("%s.%s: %w", def.Name, cmd.Name, err)
 	}
 	n = withFallbacks(path, n)
-	fields, err = cmd.Decode(n)
+	if path.Cluster == icddef.ClusterID {
+		fields, err = decodeICDRequest(path, n, cmd.Decode)
+	} else {
+		fields, err = cmd.Decode(n)
+	}
 	if err != nil && path.Cluster == lockdef.ClusterID {
 		fields, err = refineDoorLockRequest(path.Command, n, err)
 	}

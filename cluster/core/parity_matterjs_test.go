@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	matterparity "github.com/SukramJ/go-fabric/parity"
 	gschema "github.com/SukramJ/go-fabric/schema"
 )
@@ -292,13 +293,13 @@ func parityCases() []parityCase {
 			},
 		},
 		{
-			jsID:          icdClusterID, // 0x0046
-			codeClusterID: icdClusterID,
-			codeRevision:  icdClusterRevision,
+			jsID:          ICDManagementClusterID, // 0x0046
+			codeClusterID: ICDManagementClusterID,
+			codeRevision:  icddef.Revision,
 			// All other attrs (RegisteredClients, IcdCounter, etc.) are
 			// conformance "CIP", "UAT" or "LITS" — feature-conditional.
 			codeAttrIDs: []uint32{
-				icdAttrIdleModeDuration, icdAttrActiveModeDuration, icdAttrActiveModeThresh,
+				0x0000, 0x0001, 0x0002, // IdleModeDuration, ActiveModeDuration, ActiveModeThreshold
 			},
 		},
 		{

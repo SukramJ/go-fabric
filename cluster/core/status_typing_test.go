@@ -54,6 +54,10 @@ func dispatched(t *testing.T, srv contract.ClusterServer, attrID, cmdID uint32) 
 // FAILURE.
 func TestRefusalsAnswerTheirStatus(t *testing.T) {
 	t.Parallel()
+	icd, err := core.NewICDManagement(core.ICDManagementConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	scenes, err := core.NewScenesManagement(core.ScenesConfig{State: core.NewScenesState(nil)})
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +67,7 @@ func TestRefusalsAnswerTheirStatus(t *testing.T) {
 		srv    contract.ClusterServer
 		attrID uint32
 	}{
-		{"ICDManagement", core.NewICDManagement(), 0x0000},
+		{"ICDManagement", icd, 0x0000},
 		{"NetworkCommissioning", core.NewNetworkCommissioning(core.NetworkCommissioningConfig{}), 0x0000},
 		{"Groups", newGroupsFixture(t, 4).ep3, 0x0000},
 		{"ScenesManagement", scenes, 0x0001},
