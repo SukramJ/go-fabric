@@ -59,7 +59,7 @@ terms are restated in [`licenses/NOTICE-matter.js.txt`](./licenses/NOTICE-matter
 "Only the Alliance and its members may use Alliance trademarks and logos,
 including, without limitation, the Matter trademarks and logos"). This
 project is neither, so the mark is not part of its name or of the names of
-the repositories built on it (`go-habridge`, `go-hafabric`); the word
+the repositories built on it (`go-ha2fabric`, `go-hamapping`); the word
 appears only descriptively — a library that implements the Matter
 specification, a bridge for Matter controllers — and never to suggest
 certification or endorsement. The name `go-fabric` is the specification's

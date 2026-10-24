@@ -4072,3 +4072,54 @@ logged in warn and off (brief CT). Reasoning: the kit's `New` has no
 mode; the validator is where `node.Config.DeviceTypeValidation` already
 is, and the verdict names the endpoint and the command the same way it
 names a missing cluster.
+
+### BD-Matter-MdnsSocketReadDeadline — the mDNS receive loops' socket read deadlines stay on the wall clock
+
+The two multicast receive loops bound their blocking reads with
+`SetReadDeadline(time.Now().Add(time.Second))`
+(`mdns/subtype_responder.go:361`, `:389`). Every other deadline of paced
+code moved to the component's clock in brief CG (`clock.WithTimeout`), and
+a guard refuses a new wall-clock deadline there; these two are on its
+allow list. Reasoning: a socket deadline is the kernel's, not the stack's —
+it only ends a blocking read so the loop can observe its context, and a
+fake clock has nothing to pace on a real socket.
+
+### BD-Matter-BridgetestWallClock — `bridge/bridgetest` keeps its own wall-clock timeouts
+
+`bridge/bridgetest` (`commissioner.go:275`, `:609`, `session.go:65`) bounds
+its helpers with `context.WithTimeout` on the wall clock while the module's
+paced code uses `clock.WithTimeout` (brief CG). Reasoning: bridgetest is a
+test helper that drives a bridge over real sockets and paces no stack of
+its own; a wall-clock bound there is the test's guard against a hang, as
+matter.js's test timeouts are Mocha's, not MockTime's.
+
+### BD-Matter-SitePacingByCountedWork — the site judges quiet by the stack's counted work, with a bounded process check
+
+matter.js's `MockTime.resolve` moves the clock only when every ready task
+has run — JavaScript's one thread makes "nothing is ready" observable
+(`packages/testing/src/mocks/time.ts:35-75` at `862ad75f`, with the
+host-async budget `MAX_HOST_ASYNC_MS` counted in yields, `:63-70`). Go has
+no such observation per test, so `fabrictest` counts the stack's work
+through `internal/inflight` (datagrams, delivered exchanges, pending
+reports, device callbacks, node start/stop/build) and declares quiet when
+the counts and the network stood still for `Settle`; the process-wide
+goroutine check remains only as a 50 ms grace on an in-memory site and
+as the rule on a `Loopback` site with real sockets (`fabrictest/site.go`
+`quiet`, `holdBudget`, `busyGrace`). Reasoning: counted work is what the
+stack can state about itself; the runtime metrics are the only view of
+goroutines the stack did not count, and they are bounded so that another
+test's goroutines cannot starve a site (brief CG, the three CI-only
+flakes of 2026-10-24).
+
+### BD-Matter-SiteBuildWithoutBudget — a device's construction holds the site's clock without the host-async budget
+
+matter.js bounds host-side asynchronous work during mock time with
+`MAX_HOST_ASYNC_MS` and abandons an operation over budget
+(`packages/testing/src/mocks/time.ts:63-70` at `862ad75f`). The site mirrors
+that with `holdBudget` (one second with nothing moving) for counted work,
+except `node.build` (`inflight.NodeBuild`): `fabrictest.Device.Start`
+builds the node synchronously and waits on no clock, and under `-race`
+with eight processes beside it the build took up to 1.27 s (brief CG), so
+the budget would move the fake clock mid-build. Reasoning: the budget
+exists to end work that waits for a clock nobody moves; a construction
+waits for the CPU, and `Options.Wait` still ends one that never returns.

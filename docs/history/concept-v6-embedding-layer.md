@@ -248,7 +248,7 @@ Cluster-Pakete".
 ## Teil B: go-ha-matter-bridge (Entwurf)
 
 > Umgezogen am 2026-10-24 (Welle CF) als `CONCEPT.md` nach
-> [SukramJ/go-habridge](https://github.com/SukramJ/go-habridge), auf dem
+> [SukramJ/go-ha2fabric](https://github.com/SukramJ/go-ha2fabric), auf dem
 > Stand der Owner-Entscheidungen vom selben Tag (dünner Client von
 > `go-fabric-server`, Konzept v8). Der Text unten ist der Entwurf vom 2026-10-20.
 
@@ -278,7 +278,7 @@ Repository um; hier steht, was Phase 20 für ihn festlegt.
 ## Teil C: Das Adapter-Modul `go-hamatter` (Entwurf)
 
 > Umgezogen am 2026-10-24 (Welle CF) als `CONCEPT.md` nach
-> [SukramJ/go-hafabric](https://github.com/SukramJ/go-hafabric); der Name
+> [SukramJ/go-hamapping](https://github.com/SukramJ/go-hamapping); der Name
 > folgt der Markenregel (Konzept v7, 0.4). Der Text unten ist der Entwurf vom 2026-10-20.
 
 Arbeitsname (`docs/roadmap.md:34`): `go-hamqtt`'s Home-Assistant-Vokabular
