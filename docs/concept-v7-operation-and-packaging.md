@@ -261,7 +261,8 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
   go-hafabric zusätzlich `library`).
 - *Settings:* public; Issues an, Wiki/Projects/Discussions aus; Merge
   nur Squash (merge commit und rebase aus); „delete branch on merge“
-  an; Default-Branch `main`.
+  an; **Auto-Merge erlauben** (`allow_auto_merge`, sonst scheitert der
+  Dependabot-Auto-Merge-Workflow — in CF nachgetragen); Default-Branch `main`.
 - *Branch-Schutz `main`:* required status checks, strict (up to date):
   `build`, `lint`, `test (ubuntu-latest)`, `test (macos-latest)`,
   `test (windows-latest)`, `codeql (go)`, `coverage`, `fuzz-smoke`,

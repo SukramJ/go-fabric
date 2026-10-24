@@ -1,7 +1,7 @@
 # Brief BS — milestone 4, phase 20a: the node facade complete
 
 Date 2026-10-20. Roadmap milestone 4 (`docs/roadmap.md`, phase 20) after
-[concept v6](../../docs/concept-v6-embedding-layer.md) Teil A.2 (owner
+[concept v6](../../docs/history/concept-v6-embedding-layer.md) Teil A.2 (owner
 decisions 0.1–0.4, 2026-10-20) and the phase-20 read map
 (`notes/briefs/reads/read-m4-phase-20.md` §1, §2: every loom symbol with
 its file, the facade's exported surface with lines). go-fabric `v0.9.0`.

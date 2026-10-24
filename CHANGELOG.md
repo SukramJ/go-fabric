@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- Concept v6 (the embedding layer, phase 20) moved to `docs/history/`; the roadmap's consumer table points to the repositories of the Home Assistant bridge ([go-habridge](https://github.com/SukramJ/go-habridge)) and the mapping module ([go-hafabric](https://github.com/SukramJ/go-hafabric)), created 2026-10-24 with their concepts (wave CF).
+
 ## [0.10.8] — 2026-10-24
 
 ### Added
