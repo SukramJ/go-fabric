@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node.Config.Limits` (`node.Limits`, phase 21c, concept v7 A.4): the capacity limits matter.js keeps configurable. `SubscriptionMaxInterval` (the longest MaxInterval a subscription is granted; 0 is one hour, bound 1 s to 1 h in whole seconds), `AccessControlEntriesPerFabric`, `SubjectsPerAccessControlEntry`, `TargetsPerAccessControlEntry` (0 is 4; bounds 4, 4 and 3 to 65534), `MaxGroupsPerFabric` (0 is 22) and `MaxGroupKeysPerFabric` (0 is 20). The zero value keeps every default the node had. `Config.Validate` refuses a value outside its bound with `ErrInvalidConfig`, naming the field. Below the facade: `mattercore.AccessControl.SetLimits(mattercore.AccessControlLimits{...})`, the defaults `mattercore.DefaultAccessControlEntriesPerFabric`, `DefaultSubjectsPerAccessControlEntry`, `DefaultTargetsPerAccessControlEntry`, `DefaultMaxGroupsPerFabric`, `DefaultMaxGroupKeysPerFabric`, and `subscription.DefaultMaxSubscriptionsPerFabric`, `DefaultMaxIntervalCeilingSeconds`, `DefaultTickInterval`.
+- `docs/guides/limits.md`: every limit of the node with its value, constant, matter.js reference, what a peer sees at it and whether a host sets it. `TestLimitsPage` (`script/docscheck`) holds each value on the page to the constant it names.
+- Fuzz targets for the decoders the controller side runs on a peer's or a file's bytes: `FuzzDecodeReport` (client/interaction, with the SubscribeResponse decoder), `FuzzParseTXTData`, `FuzzParseTxtDecimal`, `FuzzDecodeSupportedTransports` (client/discovery), `FuzzParseDNSMessage` (mdns), `FuzzDecodeStatusReport` (client/exchange), `FuzzParseRevocationSet`, `FuzzParseCRL` (controller/dcl), `FuzzDecodeCDContent`, `FuzzDecodeAttestationElements`, `FuzzParseAttCert` (controller/attestation), `FuzzDecodeCertificateChainResponse`, `FuzzDecodeNOCResponse`, `FuzzDecodeCertSigningRequest`, `FuzzDecodeNetworks` (controller/commissioner) and `FuzzReadHeader` (bdx/otaimage). `make fuzz` discovers them.
+
+### Fixed
+
+- `bdx/otaimage.ReadHeader` no longer allocates the header size a 16-byte prefix claims before the header arrives. A truncated image claiming a 4 GiB header cost 4 GiB; the header is now collected as it arrives, as matter.js `OtaImageReader` does. Found by `FuzzReadHeader`.
+
 ## [0.10.6] — 2026-10-24
 
 ### Added
@@ -21,19 +31,12 @@ pseudo-version of `main`.
 - `fabrictest.Metrics` and `fabrictest.NewMetrics()`: a recording metrics port for a test.
 - `docs/guides/observability.md`: the logger rule, the event-name prefixes, the attribute-key table, the metric set with its sources, and the trace. The guard `script/slogkeys` holds library code to the key table, checks that `err` is `slog.Any`, and checks that a call states each key once. It also generates the page's key section.
 - The Base device type's optional clusters by declaration (owner decision 0.7, matter.js `base.element.ts:46-47`): `fixedlabeldef.Declare` and `userlabeldef.Declare` work on every device type and mount the module's FixedLabel and UserLabel servers. `Device.FixedLabel()` and `Device.UserLabel()` return their typed servers. A node keeps a bridged device's UserLabel list in its store, under `bridged_user_label.<stable key>`.
-- `node.Config.Limits` (`node.Limits`, phase 21c, concept v7 A.4): the capacity limits matter.js keeps configurable. `SubscriptionMaxInterval` (the longest MaxInterval a subscription is granted; 0 is one hour, bound 1 s to 1 h in whole seconds), `AccessControlEntriesPerFabric`, `SubjectsPerAccessControlEntry`, `TargetsPerAccessControlEntry` (0 is 4; bounds 4, 4 and 3 to 65534), `MaxGroupsPerFabric` (0 is 22) and `MaxGroupKeysPerFabric` (0 is 20). The zero value keeps every default the node had. `Config.Validate` refuses a value outside its bound with `ErrInvalidConfig`, naming the field. Below the facade: `mattercore.AccessControl.SetLimits(mattercore.AccessControlLimits{...})`, the defaults `mattercore.DefaultAccessControlEntriesPerFabric`, `DefaultSubjectsPerAccessControlEntry`, `DefaultTargetsPerAccessControlEntry`, `DefaultMaxGroupsPerFabric`, `DefaultMaxGroupKeysPerFabric`, and `subscription.DefaultMaxSubscriptionsPerFabric`, `DefaultMaxIntervalCeilingSeconds`, `DefaultTickInterval`.
-- `docs/guides/limits.md`: every limit of the node with its value, constant, matter.js reference, what a peer sees at it and whether a host sets it. `TestLimitsPage` (`script/docscheck`) holds each value on the page to the constant it names.
-- Fuzz targets for the decoders the controller side runs on a peer's or a file's bytes: `FuzzDecodeReport` (client/interaction, with the SubscribeResponse decoder), `FuzzParseTXTData`, `FuzzParseTxtDecimal`, `FuzzDecodeSupportedTransports` (client/discovery), `FuzzParseDNSMessage` (mdns), `FuzzDecodeStatusReport` (client/exchange), `FuzzParseRevocationSet`, `FuzzParseCRL` (controller/dcl), `FuzzDecodeCDContent`, `FuzzDecodeAttestationElements`, `FuzzParseAttCert` (controller/attestation), `FuzzDecodeCertificateChainResponse`, `FuzzDecodeNOCResponse`, `FuzzDecodeCertSigningRequest`, `FuzzDecodeNetworks` (controller/commissioner) and `FuzzReadHeader` (bdx/otaimage). `make fuzz` discovers them.
 
 ### Changed
 
 - Log attribute keys follow one table (docs/guides/observability.md). A host that greps or indexes the logs reads the new keys: `fabric` → `fabric_index` (`fabric_id` where it was a fabric id), `session` → `session_id`, `exchange` → `exchange_id`, `endpoint_id` → `endpoint`, `subscription` and the subscription table's `id` → `subscription_id`, `group` → `group_id`, `peer_node`, `peer_node_id` and a node id under `node` or `peer` → `node_id`, a peer's address under `dst` or `address` (the commissioner's) → `peer`, `why` → `reason`, `vid`/`pid` → `vendor_id`/`product_id`, `cmd`/`cmdID`/`respType` → `command_name`/`command`/`response_type`, `idx` → `path_index`. `err` now holds the error value (`slog.Any`) instead of its text: a text handler prints the same line, and a JSON handler prints the error's text as before. The event names (messages) are unchanged.
 - A nil logger on `client/handshake`, `client/exchange`, `client/interaction`, `client/peer` and `transport/btp` components is `slog.Default()`, as everywhere else in the module, instead of discarding. A fabrictest site stays quiet.
 - **Break:** `device.FixedLabel(labels...)` is removed (rule of 2026-10-21): `fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &labels}}` declares the cluster on any device type. Migration guide, observability and the Base device type's clusters in v0.10.6.
-
-### Fixed
-
-- `bdx/otaimage.ReadHeader` no longer allocates the header size a 16-byte prefix claims before the header arrives. A truncated image claiming a 4 GiB header cost 4 GiB; the header is now collected as it arrives, as matter.js `OtaImageReader` does. Found by `FuzzReadHeader`.
 
 ### Removed
 

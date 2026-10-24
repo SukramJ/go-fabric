@@ -145,6 +145,8 @@ Summary log: one exit line per guard, HEAD per guard.
 
 `make race` re-run at `64670ce4`, after the build temp directory was cleared: exit 0 (397 s), no DATA RACE.
 
+The merge of `origin/main` (`400d2611` release v0.10.6, `28219397` workflow bump) brought only `CHANGELOG.md`, `README.md`, `docs/roadmap.md` and `.github/workflows/codeql.yml`; no guard was re-run for it. My CHANGELOG lines landed in `[0.10.6]` and were moved back under `[Unreleased]`.
+
 `make race` ran once because §2 adds no lock. `SetLimits` is called once,
 before the node serves.
 
