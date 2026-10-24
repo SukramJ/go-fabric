@@ -367,6 +367,7 @@ func wireSecurity(
 	ids *caseIdentities,
 	pase paseParams,
 	responderParams *sessionparams.Parameters,
+	limits Limits,
 	logger *slog.Logger,
 ) *security {
 	sessions := operational.NewManager(st)
@@ -424,7 +425,7 @@ func wireSecurity(
 	br.AttachSessionLookup(lookup)
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
-	subs := subscription.NewManager(subscription.Config{Clock: br.Clock()}, br.SubscriptionReporter(), logger)
+	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
 	subs.Start(ctx)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
 	br.AttachSubscriptionManager(subs)

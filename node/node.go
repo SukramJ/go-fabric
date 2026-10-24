@@ -313,7 +313,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
-	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), n.logger)
+	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), cfg.Limits, n.logger)
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
 	advert, err := n.advertisement()

@@ -3993,3 +3993,33 @@ constraints, and a consumer names only the area it uses (ADR 0026 P1);
 what matter.js guarantees — a fabric's state goes with the fabric, the
 counters move forward — the contract table proves for every
 implementation (brief CA).
+
+### BD-Matter-Subscription-DefaultMaxInterval — the publisher grants up to one hour by default, where matter.js's internal default is three minutes
+
+matter.js caps a subscription's MaxInterval at `MAX_INTERVAL_PUBLISHER_LIMIT`
+(one hour, `packages/node/src/node/server/ServerSubscription.ts:71` at
+`862ad75f`) but applies `INTERNAL_INTERVAL_PUBLISHER_LIMIT` of three
+minutes by default (`:72`), with the reasoning at `:61-70`: after a
+reboot a controller may take the whole interval to notice, and chip-tool
+does not choose its own; a host that wants the specification's hour sets
+`subscriptionOptions.maxInterval`. The module grants up to
+`subscription.DefaultMaxIntervalCeilingSeconds = 3600`
+(`im/subscription/manager.go:70`, the chip value) and a host lowers it
+through `node.Config.Limits.SubscriptionMaxInterval` (brief CC).
+Reasoning: the ceiling is the specification's, a shorter default is a
+product choice the host makes per deployment (a battery device wants
+the hour, a mains bridge may want minutes), and the knob is on the
+facade with the matter.js reasoning in its doc comment.
+
+### BD-Matter-MRP-BackoffNames — `MRPBackoffThreshold` is matter.js's `BACKOFF_BASE`; its `BACKOFF_THRESHOLD` has no named counterpart
+
+matter.js names the exponential base `MRP.BACKOFF_BASE = 1.6`
+(`packages/protocol/src/protocol/MRP.ts:36` at `862ad75f`) and the
+retransmission count before the backoff turns exponential
+`BACKOFF_THRESHOLD = 1` (`:45`). The module's `transport/mrp` names the
+base `MRPBackoffThreshold = 1.6` (`transport/mrp/retransmit.go:24`) and
+applies the threshold of one inline in the backoff computation. The
+computed intervals are the same (the MRP parity fixtures hold them).
+Reasoning: a naming divergence only; renaming the exported constant is
+a break the limits page and the fixtures do not need, so the page names
+both constants side by side (brief CC).

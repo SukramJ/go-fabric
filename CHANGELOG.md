@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node.Config.Limits` (`node.Limits`, phase 21c, concept v7 A.4): the capacity limits matter.js keeps configurable. `SubscriptionMaxInterval` (the longest MaxInterval a subscription is granted; 0 is one hour, bound 1 s to 1 h in whole seconds), `AccessControlEntriesPerFabric`, `SubjectsPerAccessControlEntry`, `TargetsPerAccessControlEntry` (0 is 4; bounds 4, 4 and 3 to 65534), `MaxGroupsPerFabric` (0 is 22) and `MaxGroupKeysPerFabric` (0 is 20). The zero value keeps every default the node had. `Config.Validate` refuses a value outside its bound with `ErrInvalidConfig`, naming the field. Below the facade: `mattercore.AccessControl.SetLimits(mattercore.AccessControlLimits{...})`, the defaults `mattercore.DefaultAccessControlEntriesPerFabric`, `DefaultSubjectsPerAccessControlEntry`, `DefaultTargetsPerAccessControlEntry`, `DefaultMaxGroupsPerFabric`, `DefaultMaxGroupKeysPerFabric`, and `subscription.DefaultMaxSubscriptionsPerFabric`, `DefaultMaxIntervalCeilingSeconds`, `DefaultTickInterval`.
+- `docs/guides/limits.md`: every limit of the node with its value, constant, matter.js reference, what a peer sees at it and whether a host sets it. `TestLimitsPage` (`script/docscheck`) holds each value on the page to the constant it names.
+- Fuzz targets for the decoders the controller side runs on a peer's or a file's bytes: `FuzzDecodeReport` (client/interaction, with the SubscribeResponse decoder), `FuzzParseTXTData`, `FuzzParseTxtDecimal`, `FuzzDecodeSupportedTransports` (client/discovery), `FuzzParseDNSMessage` (mdns), `FuzzDecodeStatusReport` (client/exchange), `FuzzParseRevocationSet`, `FuzzParseCRL` (controller/dcl), `FuzzDecodeCDContent`, `FuzzDecodeAttestationElements`, `FuzzParseAttCert` (controller/attestation), `FuzzDecodeCertificateChainResponse`, `FuzzDecodeNOCResponse`, `FuzzDecodeCertSigningRequest`, `FuzzDecodeNetworks` (controller/commissioner) and `FuzzReadHeader` (bdx/otaimage). `make fuzz` discovers them.
+
+### Fixed
+
+- `bdx/otaimage.ReadHeader` no longer allocates the header size a 16-byte prefix claims before the header arrives. A truncated image claiming a 4 GiB header cost 4 GiB; the header is now collected as it arrives, as matter.js `OtaImageReader` does. Found by `FuzzReadHeader`.
+
 ## [0.10.6] — 2026-10-24
 
 ### Added

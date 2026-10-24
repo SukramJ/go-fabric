@@ -227,7 +227,12 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		return nil, fmt.Errorf("access control: %w", err)
 	}
 	r.AccessControl.SetLogger(d.logger)
-	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{Groups: d.groups})
+	r.AccessControl.SetLimits(cfg.Limits.accessControl())
+	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{
+		MaxGroupsPerFabric:    cfg.Limits.MaxGroupsPerFabric,
+		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,
+		Groups:                d.groups,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)
 	}
