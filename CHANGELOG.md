@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.6] — 2026-10-24
+
 ### Added
 
 - The metrics port (phase 21b, concept v7 A.3): `contract.Metrics` (`Counter(name, delta)`, `Gauge(name, value)`; standard library only), `node.Metrics` as its alias and `node.Config.Metrics` (nil records nothing). The named set, as `contract.Metric…` and `node.Metric…` constants and `contract.MetricNames()`: `sessions.open` and `subscriptions.active` (gauges), `im.received`, `im.sent`, `pase.failures`, `pase.lockouts`, `aggregator.reassemblies`, `mrp.retransmits` and `panics.recovered` (counters). The existing counters keep their readers (`Bridge.DeviceLoad`, `RecoveredPanics`). `bridge.Bridge.AttachMetrics` is the seam below the facade.
