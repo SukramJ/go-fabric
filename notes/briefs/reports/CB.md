@@ -161,7 +161,7 @@ store — the last fails with `persistUserLabels` disabled).
 | `make testparity-check` | `f6453faf` | exit 0 |
 | `go test ./script/...` | `f6453faf` | exit 0 |
 | `mkdocs build --strict` | `f6453faf` | exit 0 |
-| `make ci` at the final HEAD | FINALHEAD | FINALCI |
+| `make ci`, `make reachability-check` at the final code HEAD | `331f6986` | exit 0, exit 0 |
 
 Race history, for the record: at `f6453faf`/`bb2fc0cc` four of five
 `make race` runs failed under full-suite load, each in a different
