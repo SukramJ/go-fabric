@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-10-24
+
 ### Added
 
 - The node-feature routes the reference bridge still reached below the facade (gate 2, G2-9):
@@ -26,7 +28,7 @@ pseudo-version of `main`.
 
 - A declared PowerSource names its own endpoint in EndpointList, unless the declaration's `Initial.EndpointList` names others. Where the state leaves them unset, it also takes matter.js's PowerSourceServer.initialize defaults: Status Unspecified; Description "Mains power" with WIRED, else "Battery power"; with BAT, BatChargeLevel Ok and BatReplaceability Unspecified; with WIRED, WiredCurrentType AC (`PowerSourceServer.ts:37-62`). Before, a declared PowerSource served these mandatory attributes without a value.
 - `media.ContentControlState`, `media.ContentControl`, `media.ContentControlPIN`, `media.ContentControlScreenTime`, `media.ContentControlUnrated`, `media.ContentControlOnDemandRating`, `media.ContentControlScheduledRating`, `media.ContentControlChannels`, `media.ContentControlApps` and `media.ContentControlTimeWindows` are now aliases of the generated `contentcontroldef` types, with the same fields and methods. `media.ContentControlConfig.Initial` and `ContentControlConfig.Port` change type with them. Code that names them compiles; code that reflects on the type's package does not. The other media servers took the same step in v0.10.0.
-- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change.
+- `make apidiff-check` ignores a promoted method of an unexported type: apidiff reports the exported type's own change. It also accepts an announcement under a release section newer than the last tag, the state of a release pull request before its tag.
 
 ## [0.10.3] — 2026-10-23
 

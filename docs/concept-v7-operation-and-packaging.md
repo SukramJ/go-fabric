@@ -39,6 +39,16 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   Store-Port-Bruch unter dem ausgesetzten Fenster mit Guide-Zeile);
   Phase 22 schließt mit `v0.11.0` = Meilenstein 4; danach Pause
   (Owner, 2026-10-22).
+- **0.7 Base-Cluster in der Deklaration (Owner, 2026-10-23, BV-b Frage 1):**
+  die typisierte Deklaration nimmt die optionalen Cluster des
+  Base-Device-Types an (FixedLabel, matter.js `base.element.ts:46`);
+  `fixedlabeldef.Declare{Initial}` funktioniert, `device.FixedLabel`
+  entfällt mit Guide-Zeile. Umsetzung in Welle CB.
+- **0.8 Die acht M5-Ports (Owner, 2026-10-23, BV-b Frage 2):** die acht
+  Test-Ports, deren Gegenstand erst in M5 vollständig ist, werden noch
+  in M4 portiert — als eigene Welle nach CC, vor Phase 22 bzw. vor
+  `v0.11.0`; sie bringt die dafür nötigen Validator-Haken mit
+  (ADR 0026 P12, der Zug der Kante controller/client→device bleibt M5).
 
 ## Teil A: Phase 21 — Observability und Persistenz als Ports
 
