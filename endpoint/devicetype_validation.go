@@ -40,6 +40,14 @@ const (
 	// ViolationUnknownCondition: a condition the host states for the
 	// endpoint names no condition in its scope.
 	ViolationUnknownCondition ViolationKind = "unknownCondition"
+	// ViolationUnimplemented: a command the conformance of a server
+	// cluster requires is the server's unimplemented stub — matter.js's
+	// ClusterElementError "Throws unimplemented exception"
+	// (ValidatedElements.ts:357-372 at 862ad75f), which matter.js logs, and
+	// under strict validation refuses, when it constructs the behavior,
+	// not as a device-type violation. Its DeviceType names the cluster,
+	// its Requirement "<cluster>.<command>".
+	ViolationUnimplemented ViolationKind = "unimplemented"
 )
 
 // DeviceTypeViolation is one departure of an endpoint from a requirement of
@@ -269,6 +277,9 @@ func (s *assembledSubject) ServerClusterShape(clusterID uint32) (ClusterShape, b
 	if lister, ok := srv.(contract.ClusterEventLister); ok {
 		sh.Events = lister.MatterEvents()
 	}
+	if u, ok := srv.(interface{ UnimplementedMandatoryCommands() []uint32 }); ok {
+		sh.UnimplementedCommands = u.UnimplementedMandatoryCommands()
+	}
 	return sh, true
 }
 
@@ -408,7 +419,9 @@ func NewDeviceTypeValidator(mode DeviceTypeValidationMode) *DeviceTypeValidator 
 // Mode returns the validator's mode.
 func (v *DeviceTypeValidator) Mode() DeviceTypeValidationMode { return v.mode }
 
-// Validate judges t (see [ValidateDeviceTypes]). A topology is a set of
+// Validate judges t (see [ValidateDeviceTypes]), and reports each mandatory
+// command a server leaves unimplemented ([ViolationUnimplemented]) with the
+// endpoint's violations. A topology is a set of
 // changes to the one validated before: endpoints it adds (an endpoint
 // number the last recorded validation did not hold — every endpoint, the
 // first time), and endpoints it changes or removes. An endpoint with a new
@@ -439,7 +452,7 @@ func (v *DeviceTypeValidator) Mode() DeviceTypeValidationMode { return v.mode }
 // runtime change misplaces; the module refuses it in every mode
 // (ADR 0016).
 func (v *DeviceTypeValidator) Validate(t *Topology) (DeviceTypeVerdict, error) {
-	all := ValidateDeviceTypes(t)
+	all := withUnimplemented(t, ValidateDeviceTypes(t))
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.mode == DeviceTypeValidationOff {
@@ -542,6 +555,27 @@ func (v *DeviceTypeValidator) affectedByAdditions(t *Topology) map[uint16]bool {
 		}
 	}
 	return affected
+}
+
+// withUnimplemented adds to an endpoint's device-type violations the
+// [ViolationUnimplemented] of its servers, after its own, keeping the
+// topology order.
+func withUnimplemented(t *Topology, all []DeviceTypeViolation) []DeviceTypeViolation {
+	if t == nil {
+		return all
+	}
+	tree := topologyTree(t)
+	out := make([]DeviceTypeViolation, 0, len(all))
+	i := 0
+	for _, s := range tree.Endpoints {
+		ep := s.EndpointNumber()
+		for i < len(all) && all[i].Endpoint == ep {
+			out = append(out, all[i])
+			i++
+		}
+		out = append(out, unimplementedOf(s)...)
+	}
+	return append(out, all[i:]...)
 }
 
 // endpointsOf is the set of t's endpoint numbers.

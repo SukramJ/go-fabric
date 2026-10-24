@@ -504,6 +504,27 @@ func (s *Server) unimplementedLocked(cmdID uint32) bool {
 	return slices.Contains(s.stubs, cmdID) && s.handlers[cmdID] == nil
 }
 
+// UnimplementedMandatoryCommands returns the request commands the
+// conformance requires for the feature selection that are still the
+// generated behavior's unimplemented stub ([ServerConfig.Unimplemented]):
+// matter.js's "Throws unimplemented exception" — a warning, and the
+// command left out of AcceptedCommandList, or under strict validation a
+// fatal ClusterImplementationError
+// (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
+// 862ad75f, #validateRequiredCommands). The device-type validator reports
+// each as a violation of the endpoint (endpoint.ViolationUnimplemented).
+func (s *Server) UnimplementedMandatoryCommands() []uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []uint32
+	for _, id := range s.stubs {
+		if slices.Contains(s.required, id) && s.handlers[id] == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // Accepts reports whether the server accepts the request command: the
 // instance accepts it and it is not an unimplemented stub.
 func (s *Server) Accepts(cmdID uint32) bool {
