@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
@@ -122,5 +125,91 @@ func TestPartRefusesBridgedPowerSource(t *testing.T) {
 	}
 	if err := owner.AddPart(part.Device); !errors.Is(err, device.ErrComposition) {
 		t.Fatalf("AddPart: %v, want ErrComposition", err)
+	}
+}
+
+// notifyingBattery is a battery-class measurement source that tells its
+// subscribers when its level moves.
+type notifyingBattery struct {
+	mu    sync.Mutex
+	level float64
+	cbs   []func()
+}
+
+func (b *notifyingBattery) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementBattery
+}
+
+func (b *notifyingBattery) MatterFloatValue() (float64, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.level, true
+}
+
+func (b *notifyingBattery) OnMatterValueChanged(cb func()) func() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.cbs = append(b.cbs, cb)
+	return func() {}
+}
+
+func (b *notifyingBattery) set(level float64) {
+	b.mu.Lock()
+	b.level = level
+	cbs := slices.Clone(b.cbs)
+	b.mu.Unlock()
+	for _, cb := range cbs {
+		cb()
+	}
+}
+
+// TestMeasurementBatteryReportsItsChanges: a battery riding as a device's
+// PowerSource beside a measurement of the device's own (device.Measurement
+// with a battery-class source) reaches a controller's subscription when its
+// source notifies — the kit's PowerSource server forwards the source's
+// notifier (cluster/measurement PowerSourceServer.OnMatterValueChanged).
+func TestMeasurementBatteryReportsItsChanges(t *testing.T) {
+	bat := &notifyingBattery{level: 50}
+	sensor, err := device.NewElectricalSensor(device.Options{StableKey: device.StringKey("store"), Name: "store"},
+		ptdef.Declare{Features: ptdef.FeatureNodeTopology},
+		epmdef.Declare{Features: epmdef.FeatureAlternatingCurrent},
+		device.Measurement(bat))
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	pair := site.CommissionedPair(fabrictest.PairOptions{
+		Device: fabrictest.Topology{Bridged: []node.Endpoint{sensor}},
+	})
+	ep, _ := sensor.EndpointNumber()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	reports := make(chan *fabrictest.Report, 16)
+	sub, err := fabrictest.Subscribe(ctx, pair, fabrictest.SubscribeRequest{
+		Attributes: []fabrictest.AttributePath{client.AttributeAt(ep, psdef.ClusterID, psdef.AttrBatPercentRemaining)},
+		Updated:    func(r *fabrictest.Report) { reports <- r },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Close()
+	if err := pair.Device.Act(func(*node.Node) error { bat.set(81); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	reported := func() bool {
+		for {
+			select {
+			case r := <-reports:
+				if st, _ := psdef.StateFrom(r.Values(ep, psdef.ClusterID)); st.BatPercentRemaining != nil && *st.BatPercentRemaining == 162 {
+					return true
+				}
+			default:
+				return false
+			}
+		}
+	}
+	if err := site.Eventually(ctx, "the battery report", reported); err != nil {
+		t.Fatal(err)
 	}
 }
