@@ -177,8 +177,23 @@ func TestLiterals(t *testing.T) {
 	for in, want := range map[string]string{
 		"null": "spec.NullDefault{}", "true": "true", "3": "float64(3)", `"x"`: `"x"`, `{"type":"x"}`: "", "": "", "[": "",
 	} {
-		if got := defaultLiteral(raw(in)); got != want {
+		if got := defaultLiteral(raw(in), "uint8", "integer"); got != want {
 			t.Errorf("defaultLiteral(%s) = %q, want %q", in, got, want)
+		}
+	}
+	// A unit stated with the default is restated in the type's encoding
+	// units (EncodedValue.ts at 862ad75f); a unit the type does not scale is
+	// not rendered.
+	for _, c := range []struct{ in, typ, want string }{
+		{`{"type":"celsius","value":26}`, "temperature", "float64(2600)"},
+		{`{"type":"celsius","value":25.5}`, "UnsignedTemperature", "float64(255)"},
+		{`{"type":"percent","value":0.07}`, "percent100ths", "float64(7)"},
+		{`{"type":"percent","value":50}`, "percent", "float64(50)"},
+		{`{"type":"celsius","value":26}`, "int16", ""},
+		{`{"type":"bytes","value":"00"}`, "octstr", ""},
+	} {
+		if got := defaultLiteral(raw(c.in), c.typ, "integer"); got != c.want {
+			t.Errorf("defaultLiteral(%s, %s) = %q, want %q", c.in, c.typ, got, c.want)
 		}
 	}
 	if got := boundLiteral(raw(`{"type":"-","lhs":1}`)); !strings.Contains(got, "Expr") {
