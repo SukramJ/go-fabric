@@ -76,6 +76,12 @@ GitHub set plus `dependencies`, `github_actions`, `github-actions`, `go`,
   handles a credential; the job name and its required-check context are
   already the final ones.
 - The `go` label is added (Dependabot's gomod group labels with it).
+- The checklist lacked one setting the reference repository has: **allow
+  auto-merge** (`allow_auto_merge`). Without it the `Dependabot auto-merge`
+  workflow fails on the first Dependabot pull request (`Auto merge is not
+  allowed for this repository`), which it did on both repositories.
+  Enabled on both; the two Dependabot pull requests are on auto-merge;
+  the checklist in concept v7 B.4 names it now.
 
 ## Left out
 
