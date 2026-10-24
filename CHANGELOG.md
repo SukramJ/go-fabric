@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.10.7] — 2026-10-24
+
 ### Added
 
 - `node.Config.Limits` (`node.Limits`, phase 21c, concept v7 A.4): the capacity limits matter.js keeps configurable. `SubscriptionMaxInterval` (the longest MaxInterval a subscription is granted; 0 is one hour, bound 1 s to 1 h in whole seconds), `AccessControlEntriesPerFabric`, `SubjectsPerAccessControlEntry`, `TargetsPerAccessControlEntry` (0 is 4; bounds 4, 4 and 3 to 65534), `MaxGroupsPerFabric` (0 is 22) and `MaxGroupKeysPerFabric` (0 is 20). The zero value keeps every default the node had. `Config.Validate` refuses a value outside its bound with `ErrInvalidConfig`, naming the field. Below the facade: `mattercore.AccessControl.SetLimits(mattercore.AccessControlLimits{...})`, the defaults `mattercore.DefaultAccessControlEntriesPerFabric`, `DefaultSubjectsPerAccessControlEntry`, `DefaultTargetsPerAccessControlEntry`, `DefaultMaxGroupsPerFabric`, `DefaultMaxGroupKeysPerFabric`, and `subscription.DefaultMaxSubscriptionsPerFabric`, `DefaultMaxIntervalCeilingSeconds`, `DefaultTickInterval`.
