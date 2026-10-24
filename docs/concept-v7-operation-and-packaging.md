@@ -19,7 +19,7 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   benanntem Zählersatz und `node/metrics/expvar` als Implementierung;
   nil = aus (A.3).
 - **0.3 Cookbook-Daemon:** `go-zendure2mqtt` (B.3).
-- **0.4 Teil B/C:** eigene öffentliche Repositories **`SukramJ/go-habridge`**
+- **0.4 Teil B/C:** eigene öffentliche Repositories **`SukramJ/go-ha2fabric`**
   (die HA-Bridge, Teil B) und **`SukramJ/go-hafabric`** (das
   Adapter-Modul, Teil C), Apache-2.0, `CONCEPT.md`, Status „concept,
   not started“. **Kein „matter“ im Namen:** „Matter“ ist eine Marke
@@ -54,7 +54,7 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   sinnvoll, die echte Bridges ansprechen; die bekommt ein eigenes
   Repository `go-fabric-server` (WebSocket-JSON-Protokoll, zuerst die
   Geräteseite, die Controller-Rolle später im selben Daemon, Vorlage
-  matterjs-server; go-habridge als dünner Client in eigenem Repo) als
+  matterjs-server; go-ha2fabric als dünner Client in eigenem Repo) als
   Konzept v8 nach der M4-Pause. Dockerfiles, systemd, Release-Matrix,
   ghcr-Image und arm64-Job (B.2) gehören zu diesem Produkt, nicht zur
   Bibliothek: B.2 wird nicht in go-fabric umgesetzt. Hier bleibt nur
@@ -241,9 +241,9 @@ echten PR im gewählten Daemon, jeder Schritt mit dessen Commit.
 
 ### B.4 Teil B/C in ihre Repositories (0.4)
 
-Konzept v6 Teil B (go-habridge) und Teil C (`go-hafabric`,
+Konzept v6 Teil B (go-ha2fabric) und Teil C (`go-hafabric`,
 die HA-Komponente→Cluster-Tabelle) wandern als `CONCEPT.md` in neue
-Repositories `SukramJ/go-habridge` und `SukramJ/go-hafabric`
+Repositories `SukramJ/go-ha2fabric` und `SukramJ/go-hafabric`
 (Apache-2.0, README mit Status „concept, not started“, Verweis auf
 go-fabric und die Roadmap M5+). In go-fabric bleibt in v6 je ein Satz
 mit dem Link; `docs/roadmap.md` Konsumenten-Tabelle zeigt auf die
@@ -286,12 +286,12 @@ Repos. (Entscheidung 0.4: die Repositories werden angelegt.)
   `[Unreleased]`, `.gitignore`, `.golangci.yaml`, `Makefile`
   (build/test/lint/race/ci), `go.mod` (go 1.27.2) mit einem `doc.go`,
   damit `go build ./...` etwas tut; `Dockerfile` (distroless/static,
-  non-root), `addon/` und `repository.yaml` nur für go-habridge (Daemon
+  non-root), `addon/` und `repository.yaml` nur für go-ha2fabric (Daemon
   mit HA-Add-on), nicht für die Bibliothek go-hafabric.
 - *`.github/`:* `dependabot.yml` (gomod + github-actions, weekly),
   `workflows/ci.yml` (lint, security, test-Matrix, coverage,
   fuzz-smoke, build), `codeql.yml`, `dependabot-auto-merge.yml`,
-  `release-on-tag.yml`; go-habridge zusätzlich `docker-build-push.yml`
+  `release-on-tag.yml`; go-ha2fabric zusätzlich `docker-build-push.yml`
   und `addon-image.yml`. Aus go-zendure2mqtt kopiert und auf den
   Modulpfad angepasst; was ein Konzept-Repo noch nicht ausführen kann,
   bleibt mit `if: false` deaktiviert bis zum ersten Code.
