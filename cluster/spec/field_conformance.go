@@ -774,7 +774,9 @@ func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main
 		}
 		code := m.node.code
 		if code == codeEvaluate {
-			code = m.node.eval(confValue{v: true, defined: true}, loc).code
+			// A value node counts by whether it is defined; matter.js
+			// leaves that case unsupported (conformance-compiler.ts:829-830).
+			code = asConformance(m.node.eval(confValue{v: true, defined: true}, loc)).code
 		}
 		if code == codeNonconformant || code == codeDisallowed {
 			return Errorf(im.StatusConstraintError, "%s.%s: Conformance %q: Matter does not allow enum value %s (%s) here: %w", where, f.Name, m.text, m.name, m.what, ErrEnumValueConformance)

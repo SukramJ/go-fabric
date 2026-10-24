@@ -121,9 +121,6 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 	if s == nil {
 		return v, false, nil
 	}
-	if v.Kind() == reflect.Interface {
-		v = v.Elem()
-	}
 	ptr := v.Kind() == reflect.Pointer
 	if ptr {
 		if v.IsNil() {
@@ -173,16 +170,24 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 			}
 			continue
 		}
-		target := fv
-		if target.Kind() == reflect.Pointer {
-			target = target.Elem()
+		// A pointer field is replaced by a pointer to the patched copy, so
+		// the value the host handed over keeps its own.
+		target, isPtr := fv, fv.Kind() == reflect.Pointer
+		if isPtr {
+			target = fv.Elem()
 		}
 		p, ok, err := i.patchValue(ctx, fname, f.Type, target)
 		if err != nil {
 			return v, false, err
 		}
 		if ok {
-			target.Set(p)
+			if isPtr {
+				np := reflect.New(target.Type())
+				np.Elem().Set(p)
+				fv.Set(np)
+			} else {
+				fv.Set(p)
+			}
 			changed = true
 		}
 	}
