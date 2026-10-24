@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- PowerSource by typed declaration on every bridged device (phase 22, brief CE): `powersourcedef.Declare{…}` on a device whose type does not list PowerSource mounts it, as matter.js's BridgedNode device type allows under the condition `BridgedPowerSourceInfo` (`bridged-node.element.ts:23` at 862ad75f), and the device states that condition (`device.ConditionBridgedPowerSourceInfo`, in `Spec().DeviceConditions`) so the device-type validator judges the requirement as stated. `Device.PowerSource()` is the typed server; its EndpointList names the device's own endpoint. A part with such a declaration is refused by `AddPart` (`ErrComposition`): a part is no bridged node. Found by the cookbook: an energy store as an ElectricalSensor with its battery had no typed route to its PowerSource.
+
 ## [0.10.8] — 2026-10-24
 
 ### Added

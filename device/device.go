@@ -55,6 +55,10 @@ type Device struct {
 	// measured is what the [Measurement] declarations resolved to: the
 	// sources Spec hands the assembler and the clusters they serve.
 	measured measured
+	// bridgedPowerSource is true when the device mounts PowerSource
+	// through the BridgedNode rule ([withBridgedPowerSource]): it is a
+	// bridged node's, so the device is no part ([Device.AddPart]).
+	bridgedPowerSource bool
 	// clock is the time source of the servers the device built; queue
 	// runs the device's asynchronous callbacks; reachable is what
 	// [Device.SetReachable] set.
@@ -128,6 +132,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	// are the type's too when a declaration names them (base.go); eff is
 	// the type the servers are built from, t stays the device's type.
 	eff := withBaseOptional(t, s)
+	eff, bridgedPS := withBridgedPowerSource(eff, s)
 	if err := checkOptedClusters(eff, s); err != nil {
 		return nil, err
 	}
@@ -136,9 +141,12 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 		return nil, err
 	}
 	opts.Name = endpoint.ComposeNodeLabel(opts.Name, "")
+	if bridgedPS && !slices.Contains(opts.Conditions, ConditionBridgedPowerSourceInfo) {
+		opts.Conditions = append(slices.Clone(opts.Conditions), ConditionBridgedPowerSourceInfo)
+	}
 	d := &Device{
 		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
-		clock: clk, queue: newQueue(),
+		clock: clk, queue: newQueue(), bridgedPowerSource: bridgedPS,
 	}
 	d.reachable.Store(true)
 	for id := range optInMounted {
@@ -566,6 +574,10 @@ func (d *Device) AddPart(p *Device) error {
 	}
 	if p == d || p.contains(d) {
 		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
+	}
+	if p.bridgedPowerSource {
+		return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
+			ErrComposition, d.typ.Name, p.typ.Name)
 	}
 	if !composes(d.typ, p.typ) {
 		return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",

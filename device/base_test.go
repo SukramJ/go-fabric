@@ -10,7 +10,9 @@ import (
 
 	boolstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // TestBaseOptionalServers: the Base device type's plain optional server
@@ -93,4 +95,24 @@ func TestBaseOptionalConformsAndRefuses(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no server cluster requirement for cluster 0x0045") {
 		t.Errorf("BooleanState on an OnOffLight: %v, want the refusal", err)
 	}
+}
+
+// TestBridgedPowerSourceServers: the BridgedNode device type's servers
+// under the condition BridgedPowerSourceInfo alone are PowerSource —
+// matter.js packages/model/src/standard/elements/bridged-node.element.ts:23
+// at 862ad75f — read from the generated type; PowerSourceConfiguration
+// (:22, `BridgedPowerSourceInfo, D`) is not among them, and the condition
+// is the Base device type's (base.element.ts:40).
+func TestBridgedPowerSourceServers(t *testing.T) {
+	t.Parallel()
+	got := bridgedPowerSourceServers()
+	if len(got) != 1 || got[0].ID != powersourcedef.ClusterID || got[0].Mandatory || got[0].Definition == nil {
+		t.Fatalf("bridged power-source servers %+v, want PowerSource alone, optional, with its definition", got)
+	}
+	for _, b := range schema.BaseDeviceTypes() {
+		if slices.Contains(b.Conditions, ConditionBridgedPowerSourceInfo) {
+			return
+		}
+	}
+	t.Errorf("no Base device type declares the condition %s", ConditionBridgedPowerSourceInfo)
 }
