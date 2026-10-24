@@ -56,16 +56,18 @@ STRESS_INPROC  ?= 1
 # The tests the flake sweep (brief CG) fixed at their root, one line each:
 # <package>:<-run regexp>. make stress-flakes runs every line under make
 # stress; the nightly workflow runs it, a red line is a signal, not a gate.
+# Each line is quoted: the recipe's shell reads the list, and ( in a
+# regexp is shell syntax.
 STRESS_FLAKES = \
-	./fabrictest:^TestHostStatementName$$ \
-	./controller/client:^TestTypedReadsConsumer$$ \
-	./node:^TestLevelControlTransitionReachesHostAndSubscriber$$ \
-	./client/interaction:^TestLiveSustainedSurvivesRestart$$ \
-	./controller/client:^TestLiveClientNode$$ \
-	./controller/client:^TestRegistryDecommission$$ \
-	./node:^TestOtaParityMatterJS$$ \
-	./node:^TestSessionAndSubscriptionDiagnostics$$ \
-	./controller/commissioner:^Test(Commissioning)?Connection
+	'./fabrictest:^TestHostStatementName$$' \
+	'./controller/client:^TestTypedReadsConsumer$$' \
+	'./node:^TestLevelControlTransitionReachesHostAndSubscriber$$' \
+	'./client/interaction:^TestLiveSustainedSurvivesRestart$$' \
+	'./controller/client:^TestLiveClientNode$$' \
+	'./controller/client:^TestRegistryDecommission$$' \
+	'./node:^TestOtaParityMatterJS$$' \
+	'./node:^TestSessionAndSubscriptionDiagnostics$$' \
+	'./controller/commissioner:^Test(Commissioning)?Connection'
 
 .DEFAULT_GOAL := help
 
