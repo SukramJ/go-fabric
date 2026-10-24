@@ -641,7 +641,6 @@ func withUnimplemented(t *Topology, all []DeviceTypeViolation) []DeviceTypeViola
 	return append(out, all[i:]...)
 }
 
-
 // Violations returns what the last recorded validation found (matter.js
 // violationsOf, for every endpoint at once). Empty in mode off.
 func (v *DeviceTypeValidator) Violations() []DeviceTypeViolation {

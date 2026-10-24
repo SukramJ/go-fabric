@@ -599,6 +599,19 @@ type dtContext struct {
 // check is DeviceTypeConformance.check: the departures of ep from the
 // requirements of its device types and of Base, each reported once by key,
 // the first device type's report kept, never Base's.
+// judged is check for an endpoint in a node scope, and nothing for one no
+// node endpoint is above: matter.js's service judges the endpoints of a
+// node scope and leaves any other unjudged
+// (packages/node/src/node/server/DeviceTypeConformanceService.ts:480-484
+// at 862ad75f, #judge). check judges any endpoint, as
+// DeviceTypeConformance.check does.
+func (p *dtPass) judged(ep uint16) []DeviceTypeViolation {
+	if _, ok := p.nodeEndpointOf(ep); !ok {
+		return nil
+	}
+	return p.check(ep)
+}
+
 func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 	facts := p.of(ep)
 	scopeRoot, ok := p.nodeEndpointOf(ep)

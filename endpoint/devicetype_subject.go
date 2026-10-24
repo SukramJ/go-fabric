@@ -95,7 +95,7 @@ func (tree DeviceTypeTree) Validate() []DeviceTypeViolation {
 	var out []DeviceTypeViolation
 	for _, s := range tree.Endpoints {
 		if s != nil {
-			out = append(out, pass.check(s.EndpointNumber())...)
+			out = append(out, pass.judged(s.EndpointNumber())...)
 		}
 	}
 	return out
