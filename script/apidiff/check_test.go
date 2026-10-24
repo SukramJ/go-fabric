@@ -45,12 +45,21 @@ const changelog = "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- `spec.Bool`,
 	"## [0.10.2] — 2026-10-23\n\n### Removed\n\n- `spec.Bool`.\n"
 
 func TestUnannounced(t *testing.T) {
-	text := unreleased(changelog)
+	text := unreleased(changelog, "v0.10.2")
 	missing := unannounced(parse(report), text)
 	if len(missing) != 1 || missing[0].Symbol != "Bool" {
 		t.Errorf("missing %+v, want only Bool: Added does not announce a break, and an older release's line does not count", missing)
 	}
-	if unreleased("# no section\n") != "" {
+	if unreleased("# no section\n", "v0.10.2") != "" {
 		t.Error("a changelog without [Unreleased] announces something")
+	}
+	// A release pull request: [Unreleased] is empty, the cut version above
+	// the base tag carries the lines, the base's own section does not count.
+	cut := "# Changelog\n\n## [Unreleased]\n\n## [0.10.3] — 2026-10-24\n\n### Added\n\n- `spec.Bool`, new.\n\n" +
+		"### Changed\n\n- `client.Cluster.Decoded` returns one value.\n\n### Removed\n\n- `node/old`: gone.\n\n" +
+		"## [0.10.2] — 2026-10-23\n\n### Removed\n\n- `spec.Bool`.\n"
+	missing = unannounced(parse(report), unreleased(cut, "v0.10.2"))
+	if len(missing) != 1 || missing[0].Symbol != "Bool" {
+		t.Errorf("release cut: missing %+v, want only Bool", missing)
 	}
 }

@@ -104,12 +104,12 @@ func run(check bool, base string) error {
 	if err != nil {
 		return err
 	}
-	missing := unannounced(changes, unreleased(string(changelog)))
+	missing := unannounced(changes, unreleased(string(changelog), base))
 	if len(missing) == 0 {
-		fmt.Println("apidiff: every incompatible change is named under [Unreleased]")
+		fmt.Println("apidiff: every incompatible change is named under [Unreleased] or a release newer than " + base)
 		return nil
 	}
-	fmt.Println("apidiff: not named under [Unreleased] (### Changed, ### Removed or ### Deprecated) in CHANGELOG.md:")
+	fmt.Printf("apidiff: not named under [Unreleased] or a release newer than %s (### Changed, ### Removed or ### Deprecated) in CHANGELOG.md:\n", base)
 	for _, c := range missing {
 		fmt.Printf("  %s (name %q)\n", c.Line, c.Symbol)
 	}
