@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-25
+
 ### Added
 
 - ICD on the device side (brief CH, milestone 5 phase 23): `node.Config.ICD` (`node.ICDConfig`: SIT or LIT, the timings, `ClientsSupportedPerFabric`, `UserActiveModeTrigger`, `DynamicSITLIT`) mounts ICD Management on the root endpoint; `Node.ICD()` returns the host's handle on the mode machine (`RequestActiveMode`, `EnterIdleMode`, `TriggerUserActiveMode`, `Active`, `Mode`, `SetOperatingMode`, `WithdrawForcedOperatingMode`, `OnModeChange`, `OnModeChangeAsync`). An ICD node sends Check-Ins at every wake, advertises `ICD`/`SAT`, pads its MRP backoff by 200 ms and keeps no subscription across a restart. [ICD guide](docs/guides/icd.md).
@@ -4763,7 +4765,15 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/SukramJ/go-fabric/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/SukramJ/go-fabric/compare/v0.10.9...v0.11.0
+[0.10.9]: https://github.com/SukramJ/go-fabric/compare/v0.10.8...v0.10.9
+[0.10.8]: https://github.com/SukramJ/go-fabric/compare/v0.10.7...v0.10.8
+[0.10.7]: https://github.com/SukramJ/go-fabric/compare/v0.10.6...v0.10.7
+[0.10.6]: https://github.com/SukramJ/go-fabric/compare/v0.10.5...v0.10.6
+[0.10.5]: https://github.com/SukramJ/go-fabric/compare/v0.10.4...v0.10.5
+[0.10.4]: https://github.com/SukramJ/go-fabric/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/SukramJ/go-fabric/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/SukramJ/go-fabric/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/SukramJ/go-fabric/compare/v0.10.0...v0.10.1
