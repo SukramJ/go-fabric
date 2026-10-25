@@ -73,8 +73,14 @@ func Apply(ctx context.Context, db *sql.DB) error {
 //     the write (GroupKeyManagementServer.ts #validateGroupKeyMap, the
 //     key-set check left commented out because certification tests write
 //     the map first) — and the constraint turned that write into a Failure.
+//   - matter_icd_registrations' icd_key, stored in clear before v0.12.1,
+//     is sealed under the store's ICD key ([SettingICDKey]); the schema is
+//     unchanged, so the step has no migration of its own.
 func Upgrade(ctx context.Context, db *sql.DB) error {
 	if err := dropGroupKeyMapKeySetForeignKey(ctx, db); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
+	if err := sealClearICDKeys(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	return nil

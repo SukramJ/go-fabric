@@ -17,6 +17,8 @@ pseudo-version of `main`.
 
 - `cluster/cover`'s WindowCovering server serves an axis without its position-aware feature (§1.22): a FeatureMap of Lift and/or Tilt, each with or without PositionAware, as matter.js's `WindowCoveringServer` serves it; such an axis has no position attributes and no GoTo command, UpOrOpen and DownOrClose set its OperationalStatus (and hand a Mover 0 or 10000 as the direction), StopMotion stops it. `device.NewWindowCovering` with `windowcoveringdef.Declare{Features: windowcoveringdef.FeatureLift}` no longer fails with "FeatureMap names features this server does not serve: 0x1"; only a FeatureMap with a feature the model does not name or a position-aware feature without its axis is refused.
 
+- ICD keys encrypted at rest (§1.25, ADR 0029): `store.Store` seals the `icd_key` column of `matter_icd_registrations` with AES-128-GCM under a key of its own (`store.SettingICDKey`, `icd_management.key` in `matter_settings`, created with the first registration), each key bound to its fabric, check-in node and monitored subject, as the DoorLock credentials are sealed. `store.Upgrade` (and so `store.Apply`) seals the keys v0.12.0 stored in clear; the schema and the `store.ICD` port are unchanged and `ICDRegistration.Key` stays clear in memory. No break.
+
 ### Added
 
 - The testing guide says that `fabrictest.ReadCluster` on a removed endpoint returns no values and no error (§1.24), and a test holds it.
