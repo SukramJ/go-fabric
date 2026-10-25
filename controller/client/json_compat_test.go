@@ -308,4 +308,13 @@ func TestJSONForms(t *testing.T) {
 	if e, err := client.EncodeJSON(client.CommandField(onoffdef.ClusterID, onoffdef.CmdToggle), nil); err != nil || e == nil {
 		t.Fatalf("an empty payload: %v", err)
 	}
+	// Groups' AddGroupResponse (0x0004/0x00): Status, GroupID, name-based.
+	resp := client.ResponseField(0x0004, 0x00)
+	if !resp.Typed() {
+		t.Fatal("AddGroupResponse is untyped")
+	}
+	roundTrip(t, "AddGroupResponse", resp, json.RawMessage(`{"status":0,"groupId":7}`), client.NameBased)
+	if client.ResponseField(0x0004, 0x7F).Typed() {
+		t.Fatal("an unknown response command is typed")
+	}
 }

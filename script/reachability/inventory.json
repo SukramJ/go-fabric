@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6427,
+  "entry_points": 6453,
   "entry_packages": [
     ".",
     "bdx",
@@ -240,9 +240,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14799,
-    "reachable": 10321,
-    "whitelisted": 4475,
+    "total_exported": 14838,
+    "reachable": 10358,
+    "whitelisted": 4477,
     "unreachable": 3
   },
   "by_package": [
@@ -19429,6 +19429,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "CommandRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/surface.go",
+      "line": 99
+    },
+    {
+      "package": "controller/client",
       "identifier": "ConnectionStateFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
@@ -19453,14 +19460,21 @@
       "identifier": "Device",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 115
+      "line": 118
     },
     {
       "package": "controller/client",
       "identifier": "DeviceTypeViolation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 125
+      "line": 128
+    },
+    {
+      "package": "controller/client",
+      "identifier": "Encodable",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/json.go",
+      "line": 48
     },
     {
       "package": "controller/client",
@@ -19509,7 +19523,7 @@
       "identifier": "InvokeOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 100
+      "line": 103
     },
     {
       "package": "controller/client",
@@ -19537,7 +19551,7 @@
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 112
+      "line": 115
     },
     {
       "package": "controller/client",
@@ -19565,7 +19579,7 @@
       "identifier": "Result",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 104
+      "line": 107
     },
     {
       "package": "controller/client",
@@ -19586,7 +19600,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 123
+      "line": 126
     },
     {
       "package": "controller/client",
@@ -19607,7 +19621,7 @@
       "identifier": "StatusError",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 108
+      "line": 111
     },
     {
       "package": "controller/client",
@@ -19628,7 +19642,7 @@
       "identifier": "SupportedTransports",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 118
+      "line": 121
     },
     {
       "package": "controller/client",
@@ -19856,6 +19870,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestPakePasscodeVerifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/window_internal_test.go",
+      "line": 16
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestPeerBehaviorDiscoveredParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/peer_behavior_parity_matterjs_internal_test.go",
@@ -19916,6 +19937,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/properties_internal_test.go",
       "line": 153
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRandomWindowCredentials",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/window_internal_test.go",
+      "line": 40
     },
     {
       "package": "controller/client",
@@ -20118,7 +20146,7 @@
       "identifier": "Timing",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
-      "line": 121
+      "line": 124
     },
     {
       "package": "controller/client",
@@ -20126,6 +20154,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 79
+    },
+    {
+      "package": "controller/client",
+      "identifier": "Value",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/client/json.go",
+      "line": 45
     },
     {
       "package": "controller/client",
@@ -21259,7 +21294,7 @@
       "identifier": "TestADefaultSelectionKeepsTheGeneratedServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 161
+      "line": 164
     },
     {
       "package": "device",
@@ -21294,7 +21329,7 @@
       "identifier": "TestAlarmDelegateOfTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 254
+      "line": 260
     },
     {
       "package": "device",
@@ -21315,35 +21350,35 @@
       "identifier": "TestBaseOptionalConformsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 79
+      "line": 80
     },
     {
       "package": "device",
       "identifier": "TestBaseOptionalOnEveryType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "device",
       "identifier": "TestBaseOptionalServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "device",
       "identifier": "TestBooleanStateConfigurationDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 295
+      "line": 301
     },
     {
       "package": "device",
       "identifier": "TestBridgedPowerSourceServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 106
+      "line": 107
     },
     {
       "package": "device",
@@ -21455,7 +21490,7 @@
       "identifier": "TestDimmableLightCouplesItsServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 184
+      "line": 187
     },
     {
       "package": "device",
@@ -21469,7 +21504,7 @@
       "identifier": "TestDoorLockDefaultTakesTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 235
+      "line": 241
     },
     {
       "package": "device",
@@ -21518,14 +21553,14 @@
       "identifier": "TestFilterDefaultResetsAndReplacementProducts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 335
+      "line": 341
     },
     {
       "package": "device",
       "identifier": "TestFilterPortsOfTheDeclarations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 314
+      "line": 320
     },
     {
       "package": "device",
@@ -21574,7 +21609,7 @@
       "identifier": "TestLaundryWasherControlsWithoutItsRinses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 366
+      "line": 372
     },
     {
       "package": "device",
@@ -21735,7 +21770,7 @@
       "identifier": "TestSelfHeldDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_test.go",
-      "line": 46
+      "line": 45
     },
     {
       "package": "device",
@@ -21777,21 +21812,21 @@
       "identifier": "TestTemperatureAlarmWithoutItsThresholds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 280
+      "line": 286
     },
     {
       "package": "device",
       "identifier": "TestThermostatDefaultTakesTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 199
+      "line": 205
     },
     {
       "package": "device",
       "identifier": "TestThermostatUIDefaultTakesItsSettingStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
-      "line": 380
+      "line": 386
     },
     {
       "package": "device",
@@ -23517,13 +23552,6 @@
     },
     {
       "package": "examples/reference-controller/cli",
-      "identifier": "TestCommissioningWindowParityMatterJS",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/cli/window_parity_matterjs_test.go",
-      "line": 114
-    },
-    {
-      "package": "examples/reference-controller/cli",
       "identifier": "TestGlobalAttributeNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/globals_test.go",
@@ -23549,20 +23577,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/pair_ble_test.go",
       "line": 68
-    },
-    {
-      "package": "examples/reference-controller/cli",
-      "identifier": "TestPakePasscodeVerifier",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/cli/window_test.go",
-      "line": 21
-    },
-    {
-      "package": "examples/reference-controller/cli",
-      "identifier": "TestRandomWindowCredentials",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/cli/window_test.go",
-      "line": 45
     },
     {
       "package": "examples/reference-controller/cli",
@@ -23597,14 +23611,14 @@
       "identifier": "TestReferenceControllerWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/window_test.go",
-      "line": 67
+      "line": 26
     },
     {
       "package": "examples/reference-controller/cli",
       "identifier": "TestWindowTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/window_test.go",
-      "line": 142
+      "line": 101
     },
     {
       "package": "fabrictest",
