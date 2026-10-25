@@ -760,6 +760,7 @@ func TestIcdClientParity(t *testing.T) {
 		})
 		t.Run("flips requiresAwait when a registered DSLS peer switches SIT→LIT at runtime", func(t *testing.T) {
 			p := newICDPair(t, icdPairOptions{cfg: icdLITConfig(true)})
+			forceSIT(t, p)
 			p.register(t, uncovered)
 			if p.wakefulness(t).RequiresAwait() {
 				t.Fatal("awaited before the flip")
@@ -771,6 +772,7 @@ func TestIcdClientParity(t *testing.T) {
 		})
 		t.Run("arms the awake window on a report-driven SIT→LIT flip so the recreate lands in-window", func(t *testing.T) {
 			p := newICDPair(t, icdPairOptions{cfg: icdLITConfig(true)})
+			forceSIT(t, p)
 			p.register(t, uncovered)
 			w := p.wakefulness(t)
 			if err := p.device().ICD().SetOperatingMode(node.ICDModeLIT); err != nil {
@@ -913,4 +915,15 @@ func (p *icdPair) deviceKeyNoT() []byte {
 		return nil
 	}
 	return regs[0].Key
+}
+
+// forceSIT holds a DSLS device in SIT, so the registration that follows
+// does not drive it to LIT on its own: matter.js asserts the SIT state
+// right after register() on MockTime, before the registration's mode
+// report arrives; on the site that report races the assertion.
+func forceSIT(t *testing.T, p *icdPair) {
+	t.Helper()
+	if err := p.device().ICD().SetOperatingMode(node.ICDModeSIT); err != nil {
+		t.Fatal(err)
+	}
 }
