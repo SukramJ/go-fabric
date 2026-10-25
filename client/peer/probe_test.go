@@ -64,7 +64,9 @@ func probeAsync(h *harness, s *exchange.Session) <-chan bool { return probeVia(h
 
 func probeVia(h *harness, s *exchange.Session, override *net.UDPAddr) <-chan bool {
 	out := make(chan bool, 1)
-	go func() { out <- probe(context.Background(), h.mgr, s, override, slog.New(slog.DiscardHandler)) }()
+	go func() {
+		out <- probe(context.Background(), h.mgr, s, override, slog.New(slog.DiscardHandler), nil, nil)
+	}()
 	return out
 }
 
@@ -134,7 +136,7 @@ func TestProbeFailures(t *testing.T) {
 	h := newHarness(t, nil)
 	closed := h.secureSession(t, 0x41, udpAddr(addr1))
 	closed.Close()
-	if probe(context.Background(), h.mgr, closed, nil, slog.New(slog.DiscardHandler)) {
+	if probe(context.Background(), h.mgr, closed, nil, slog.New(slog.DiscardHandler), nil, nil) {
 		t.Fatal("probed a closed session")
 	}
 	s, ch := h.securePair(t, 0x42, udpAddr(addr1))

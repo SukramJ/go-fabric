@@ -74,6 +74,11 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
+	// Networks are the network profiles that throttle the peers'
+	// connections and exchanges and pad their MRP backoff; nil is
+	// NewNetworkProfiles over the defaults on Clock (matter.js PeerSet's
+	// env.get(NetworkProfiles), PeerSet.ts:212 at 862ad75f).
+	Networks *NetworkProfiles
 }
 
 // Set manages the peers on our fabrics and their operational connections.
@@ -85,6 +90,9 @@ type Set struct {
 	log   *slog.Logger
 	clock exchange.Clock
 	rand  func() float64
+
+	// networks is [Context].Networks or the default profiles.
+	networks *NetworkProfiles
 
 	// mu guards disconnected, handleError, peers and timing.
 	mu           sync.Mutex
@@ -112,8 +120,15 @@ func NewSet(c Context) (*Set, error) {
 	if s.rand == nil {
 		s.rand = rand.Float64
 	}
+	s.networks = c.Networks
+	if s.networks == nil {
+		s.networks = NewNetworkProfiles(s.clock, nil, s.log)
+	}
 	return s, nil
 }
+
+// Networks are the set's network profiles.
+func (s *Set) Networks() *NetworkProfiles { return s.networks }
 
 // Timing is the set's timing (PeerSet.ts:226-228).
 func (s *Set) Timing() Timing {

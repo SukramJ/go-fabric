@@ -85,6 +85,17 @@ type Config struct {
 	// (`usesMrp = supportsMRP && !channel?.isReliable`) for a manager whose
 	// one channel is a BleChannel (packages/protocol/src/ble/Ble.ts:38).
 	Reliable bool
+	// LocalAdditionalMrpDelay is the MRP margin of our own network, the
+	// sender-side axis every exchange's backoff takes the larger of it and
+	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
+	// set from the node's own network profile ("fast" by default, so 0;
+	// ServerNetworkRuntime.ts:405-406, NetworkServer.ts:242 at 862ad75f).
+	LocalAdditionalMrpDelay time.Duration
+	// LocalFixedMrpBackoff is the flat pad added after every exchange's
+	// backoff, not amplified by it — matter.js
+	// SessionManager.localFixedMrpBackoff (SessionManager.ts:238-242), an
+	// ICD sender's fast-polling grace; 0 for a controller.
+	LocalFixedMrpBackoff time.Duration
 }
 
 // Manager is the controller's exchange manager: one socket, the session
@@ -100,6 +111,10 @@ type Manager struct {
 	// retransmitted is [Config.Retransmitted].
 	retransmitted func()
 	reliable      bool
+	// localAdditional and localFixed are [Config].LocalAdditionalMrpDelay
+	// and LocalFixedMrpBackoff.
+	localAdditional time.Duration
+	localFixed      time.Duration
 
 	// inflight counts the messages delivered to an exchange whose reader
 	// has not finished with them (internal/inflight ExchangeDelivered):
@@ -144,16 +159,18 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		return nil, fmt.Errorf("exchange: seed: %w", err)
 	}
 	m := &Manager{
-		conn:          conn,
-		clock:         cfg.Clock,
-		rand:          cfg.Rand,
-		log:           cfg.Logger,
-		local:         DefaultLocalParameters(),
-		peerLost:      cfg.PeerLost,
-		retransmitted: cfg.Retransmitted,
-		reliable:      cfg.Reliable,
-		counter:       counter,
-		sessions:      make(map[uint16]*Session),
+		conn:            conn,
+		clock:           cfg.Clock,
+		rand:            cfg.Rand,
+		log:             cfg.Logger,
+		local:           DefaultLocalParameters(),
+		peerLost:        cfg.PeerLost,
+		retransmitted:   cfg.Retransmitted,
+		reliable:        cfg.Reliable,
+		counter:         counter,
+		localAdditional: cfg.LocalAdditionalMrpDelay,
+		localFixed:      cfg.LocalFixedMrpBackoff,
+		sessions:        make(map[uint16]*Session),
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
 		unsecured: make(map[uint64]*Session),
@@ -180,6 +197,11 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 	}
 	return m, nil
 }
+
+// LocalAdditionalMrpDelay is our own network's MRP margin
+// ([Config].LocalAdditionalMrpDelay) — matter.js
+// SessionManager.localAdditionalMrpDelay.
+func (m *Manager) LocalAdditionalMrpDelay() time.Duration { return m.localAdditional }
 
 // LocalParameters is our session parameters.
 func (m *Manager) LocalParameters() sessionparams.Parameters { return m.local }

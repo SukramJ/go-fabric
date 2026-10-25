@@ -2484,22 +2484,16 @@
       "status": "partial",
       "go": [
         "client/peer:TestParityTimingDefaults",
-        "client/peer:TestParityTimingMerge"
+        "client/peer:TestParityTimingMerge",
+        "controller/client:TestClientTuningParity"
       ],
       "missing": [
-        "ethernet-operational peers use the fast profile with no MRP margin",
         "wifi-operational peers use the wifi profile with a 1s MRP margin",
-        "exposes the peer's MRP margin on the session so peer-initiated exchanges inherit it",
         "adopts sessions that predate its construction",
-        "custom profiles propagate to NetworkProfiles",
-        "a configured bdxAdditionalMrpDelay propagates to NetworkProfiles",
-        "ownNetworkProfileId sets the sender-side MRP margin",
-        "ownNetworkProfileId defaults to fast (no sender-side margin)",
         "connection timeout limits retransmission packets",
-        "connect concurrency 1 serializes peer connections",
         "thread devices on different channels use independent profiles"
       ],
-      "reason": "Default and configured connection timing are covered; the network profiles and MRP margins are not.",
+      "reason": "Default and configured connection timing, the medium profile of an Ethernet peer and its session margin (on the site's Ethernet device; matter.js checks the session margin on a Wi-Fi one), configured profiles and BDX margins reaching the controller's NetworkProfiles, and the own profile's sender-side margin (fabrictest.ControllerOptions.Networks, OwnNetworkProfile; controller.Config.Networks, OwnNetworkProfile) are covered. Missing: a Wi-Fi-operational and a Thread device (the site's devices are Ethernet-attached: node.Config.WiFiCommissioning needs a driver and the node has no Thread interface), a peer set built after the sessions it should adopt (the Go set is built once, with the controller), and the packet count against the connection timeout, a runtime-dependent characterisation.",
       "snapshotSha": "0cad53772922911f1cb81cb2bd3eb8892bb20694"
     },
     {
@@ -2921,14 +2915,12 @@
     },
     {
       "path": "packages/node/test/node/client/ClientNodeInteractionIcdTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "controller/client:TestClientNodeInteractionIcdLitRouting",
         "controller/client:TestClientNodeInteractionIcdParity"
       ],
-      "missing": [
-        "routes a woken LIT read through the icdLit network profile"
-      ],
-      "reason": "A read, write and invoke of a sleeping LIT peer held until its Check-In, a non-ICD peer passed through (controller/client/icd_hold_parity_matterjs_test.go). Missing: the icdLit network profile — this module has no network profiles; the priority intent travels with the sustained subscription's connection.",
+      "reason": "A read, write and invoke of a sleeping LIT peer held until its Check-In, a non-ICD peer passed through (controller/client/icd_hold_parity_matterjs_test.go), and a woken LIT read routed through the icdLit network profile (icd_lit_routing_parity_matterjs_test.go).",
       "snapshotSha": "9da38fcd797e58ae516b293033782ad23ec8d803"
     },
     {
@@ -4302,9 +4294,13 @@
     },
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
-      "status": "planned",
-      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: client/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
-      "until": "M5 phase 25",
+      "status": "ported",
+      "go": [
+        "client/peer:TestNetworkProfilesParity",
+        "client/peer:TestNetworkProfilesForMedium",
+        "client/peer:TestSemaphoreParity"
+      ],
+      "reason": "NetworkProfiles (client/peer/network.go): the templates and their margins, the BDX margin, the connect and probe sub-profiles inheriting the parent's margin, layered defaults and the refusal of unknown ids; TestNetworkProfilesForMedium and TestSemaphoreParity hold forPeer's medium selection and the throttle semaphore.",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
     {
@@ -4500,27 +4496,18 @@
     },
     {
       "path": "packages/protocol/test/protocol/MRPTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
-        "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
-        "transport/mrp:TestBackoffDuration_TransmissionExponent",
-        "client/exchange:TestMRPRetransmissionIntervalOf",
+        "client/exchange:TestMRPMarginFor",
+        "client/exchange:TestMRPMaxPeerResponseTimeOf",
         "client/exchange:TestMRPMaxRetransmissionIntervalOf",
-        "client/exchange:TestMRPMaxPeerResponseTimeOf"
+        "client/exchange:TestMRPRetransmissionIntervalOf",
+        "client/exchange:TestMRPRetransmissionIntervalPadded",
+        "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
+        "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
+        "transport/mrp:TestBackoffDuration_TransmissionExponent"
       ],
-      "missing": [
-        "selects the bdx margin for bulk transfer",
-        "selects the messaging margin for other protocols",
-        "has no margin to offer when the peer's medium is unknown",
-        "uses the active interval for retransmissions while the peer is active",
-        "uses the idle interval for retransmissions when the peer is no longer active",
-        "adds fixedBackoff as a flat pad after the backoff, not amplified by the exponent",
-        "applies additionalDelay (amplified) and fixedBackoff (flat) independently",
-        "includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends",
-        "adds our sender-side fixedBackoff to the local return leg only"
-      ],
-      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against client/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
+      "reason": "The retransmission interval with and without its pad (RetransmissionInterval, RetransmissionIntervalPadded with Pad{Additional, Fixed}), its maximum, MarginFor and the peer response time of the udp (with the padded local leg), tcp and ble channels, against client/exchange.",
       "snapshotSha": "bed8f378fbba434e2451dcd1446b4815d0730193"
     },
     {
@@ -4561,33 +4548,24 @@
       "path": "packages/protocol/test/protocol/MessageExchangeTest.ts",
       "status": "partial",
       "go": [
-        "client/exchange:TestMessageExchangePeerLossDeclaration",
+        "client/exchange:TestMessageExchangeAckWaitAbort",
+        "client/exchange:TestMessageExchangeActivityTracking",
+        "client/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
+        "client/exchange:TestMessageExchangeCloseNotification",
+        "client/exchange:TestMessageExchangeClosingNotification",
+        "client/exchange:TestMessageExchangeCrossProtocolStatusReport",
         "client/exchange:TestMessageExchangeHasUnackedMessage",
         "client/exchange:TestMessageExchangeLivenessKickOnDuplicate",
-        "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
-        "client/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
-        "client/exchange:TestMessageExchangeActivityTracking",
-        "client/exchange:TestMessageExchangeCloseNotification",
-        "client/exchange:TestMessageExchangeCrossProtocolStatusReport",
-        "client/exchange:TestMessageExchangeAckWaitAbort"
+        "client/exchange:TestMessageExchangeMRPBackoffMargin",
+        "client/exchange:TestMessageExchangePaddedBDXCap",
+        "client/exchange:TestMessageExchangePeerLossDeclaration",
+        "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage"
       ],
       "missing": [
-        "retransmits a BDX message within the peer's response budget",
-        "leaves a non-BDX schedule uncapped",
-        "emits closing once when close is invoked again after the exchange completed its close",
         "emits closed but not closing when destroyed",
-        "uses peerAdditionalMrpDelay and ignores the throttle profile margin",
-        "falls back to localAdditionalMrpDelay as a floor when no peer margin is given",
-        "applies no margin when neither local nor peer margin is set",
-        "applies the session's peer margin to peer-initiated exchanges",
-        "applies the session's peer margin to initiated exchanges without an explicit margin",
-        "prefers the explicit peer margin over the session's",
-        "selects the BDX margin for BDX exchanges, in either direction",
-        "selects the messaging margin for other protocols",
-        "passes localFixedMrpBackoff through as the fixed backoff pad, separate from additionalDelay",
         "does not wake a sleeping LIT peer on an outbound message"
       ],
-      "reason": "Peer loss, the unacked state, the BDX liveness kick and idle-cadence cap, timers that outlive their message, activity, the close/destroy end, cross-protocol StatusReports and the ack-wait abort are ported against the controller exchange; the network-profile margins (localAdditionalMrpDelay, peer margins, localFixedMrpBackoff, and the two cap cases that pad with a 20 s margin) do not exist in Go, the exchange has no closing notification (Done reports only the end), and ICD wakefulness is not in the controller exchange.",
+      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange.",
       "snapshotSha": "cb0854d0c154eff327c28217659b4cdc6fb1bdbf"
     },
     {

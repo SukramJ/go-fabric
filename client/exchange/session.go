@@ -6,6 +6,7 @@ package exchange
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -37,6 +38,9 @@ type Session struct {
 	createdAt            time.Time
 	closing              chan struct{}
 	closingOnce          sync.Once
+	// peerMargins resolves the MRP margins of the peer's network medium
+	// (SetPeerMargins).
+	peerMargins atomic.Pointer[func() *Margins]
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
 	// or the peer's on an inbound session — and the reception window of
@@ -234,6 +238,34 @@ func (s *Session) ActiveTimestamp() time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.activeTimestamp
+}
+
+// SetPeerMargins sets the resolver of the MRP margins of the peer's
+// network medium, which an exchange of the session pads its sends with
+// unless the exchange carries its own (Options.PeerAdditionalMrpDelay).
+// A resolver that returns nil, or none, pads nothing. Mirrors matter.js
+// Session.peerMrpMarginsResolver, which the peer sets on each of its
+// sessions to its network profile's margins once its medium is known
+// (packages/protocol/src/peer/Peer.ts:184-186 at 862ad75f).
+func (s *Session) SetPeerMargins(fn func() *Margins) {
+	if fn == nil {
+		s.peerMargins.Store(nil)
+		return
+	}
+	s.peerMargins.Store(&fn)
+}
+
+// PeerMargins are the MRP margins of the peer's medium the session's
+// exchanges pad their sends with, nil when none is known — matter.js
+// Session.peerMrpMargins.
+func (s *Session) PeerMargins() *Margins { return s.peerMarginsNow() }
+
+// peerMarginsNow is the resolver's margins, nil without one.
+func (s *Session) peerMarginsNow() *Margins {
+	if fn := s.peerMargins.Load(); fn != nil {
+		return (*fn)()
+	}
+	return nil
 }
 
 // timing is the peer's intervals and whether the peer is active now.

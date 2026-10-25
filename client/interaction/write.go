@@ -57,6 +57,8 @@ type WriteOptions struct {
 	// default a list is written as REPLACE-ALL with the empty list and one
 	// append per element (chunkLists = true, Write.ts:59, :149-171).
 	DisableListChunking bool
+	// ClientRequest names the write exchange's network profile and margin.
+	ClientRequest
 }
 
 // WriteStatus is the peer's status for one written path — matter.js
@@ -152,7 +154,7 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 			return nil, fmt.Errorf("%w: a timed write whose statuses take up to %d bytes, at most %d", ErrRequestTooLarge, size, exchange.MaxPayloadSize)
 		}
 	}
-	m, err := c.begin(ctx, ExchangeOptions{})
+	m, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}

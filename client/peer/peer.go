@@ -21,9 +21,10 @@ import (
 // Peer is a node on one of our fabrics: its descriptor, its sessions, its
 // operational DNS-SD service and the work that keeps a session to it. It
 // is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-674 at
-// 0ceb202d) without the transport preference, the network profile, the
-// BasicInformation and physical-properties inputs, and the client
-// interaction (stages 3 and 4). It is safe for concurrent use.
+// 0ceb202d) without the transport preference, the BasicInformation input
+// and the client interaction (stages 3 and 4); of its physical
+// properties it takes the medium ([Peer.SetMedium]) its network profile
+// is selected by. It is safe for concurrent use.
 type Peer struct {
 	set     *Set
 	address handshake.PeerAddress
@@ -54,7 +55,39 @@ type Peer struct {
 	// litOperating reports the peer's physical property
 	// isLongIdleTimeOperating (SetLongIdleTimeOperating).
 	litOperating atomic.Pointer[func() bool]
+	// mediumOf reports the peer's network medium (SetMedium).
+	mediumOf atomic.Pointer[func() Medium]
 }
+
+// SetMedium sets the report of the peer's network medium, the physical
+// properties its network profile is selected by — matter.js
+// Peer.physicalProperties, which the client node sets
+// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
+// 862ad75f). nil removes it: the peer's medium is unknown.
+func (p *Peer) SetMedium(fn func() Medium) {
+	if fn == nil {
+		p.mediumOf.Store(nil)
+		return
+	}
+	p.mediumOf.Store(&fn)
+}
+
+// medium is the peer's medium, nil while unknown.
+func (p *Peer) medium() *Medium {
+	fn := p.mediumOf.Load()
+	if fn == nil {
+		return nil
+	}
+	m := (*fn)()
+	return &m
+}
+
+// Networks are the network profiles of the peer's set.
+func (p *Peer) Networks() *NetworkProfiles { return p.set.networks }
+
+// Network is the profile of the peer's medium — matter.js Peer.network
+// (Peer.ts:330-332), NetworkProfiles.forPeer.
+func (p *Peer) Network() *NetworkProfile { return p.set.networks.ForPeer(p) }
 
 // LITMinIdleInterval is the idle interval a LIT ICD peer is assumed to
 // have when no source gives its SII: the 500 ms default is too aggressive
@@ -300,6 +333,16 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.followAddressLocked(s)
+	// Only a known medium pads the session's exchanges: the unknown
+	// fallback would inflate every exchange of a peer never characterised
+	// (Peer.ts:182-186).
+	s.SetPeerMargins(func() *exchange.Margins {
+		if p.medium() == nil {
+			return nil
+		}
+		m := p.Network().Margins
+		return &m
+	})
 	if r := s.ReportedParameters(); r != nil && (p.desc.ReportedSessionParameters == nil || *p.desc.ReportedSessionParameters != *r) {
 		p.desc.ReportedSessionParameters = r
 		p.changedLocked()

@@ -41,10 +41,33 @@ type ExchangeOptions struct {
 	// 0 is the peer set's default, negative waits without bound (matter.js
 	// Forever, ClientInteraction.ts:1095).
 	ConnectionTimeout time.Duration
-	// Priority is the connection's peer.ConnectOptions.Priority — the
-	// "icdLit" priority network of a sustained subscription to a LIT ICD
-	// peer (SustainedSubscription.ts:133-149).
-	Priority bool
+	// Network names the network profile whose throttle the exchange (and a
+	// connection it starts) takes a slot of; "" is the peer's medium
+	// profile — matter.js ClientRequest.network
+	// (packages/protocol/src/action/client/ClientRequest.ts:14-24 at
+	// 862ad75f), "unlimited" disabling the throttle, "icdLit" the priority
+	// network of an await-mode LIT ICD (SustainedSubscription.ts:133-149).
+	Network string
+	// AdditionalMrpDelay, when set, overrides the peer-medium MRP margin of
+	// the exchange (ClientRequest.ts:26-32).
+	AdditionalMrpDelay *time.Duration
+}
+
+// ClientRequest is what every interaction request carries for its
+// exchange — matter.js ClientRequest (action/client/ClientRequest.ts:12-90
+// at 862ad75f): the network profile and the MRP margin override. It is
+// embedded in [ReadRequest], [SubscribeRequest], [WriteOptions] and
+// [InvokeOptions].
+type ClientRequest struct {
+	// Network is [ExchangeOptions].Network.
+	Network string
+	// AdditionalMrpDelay is [ExchangeOptions].AdditionalMrpDelay.
+	AdditionalMrpDelay *time.Duration
+}
+
+// exchangeOptions are the exchange options of the request.
+func (r ClientRequest) exchangeOptions() ExchangeOptions {
+	return ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay}
 }
 
 // Provider gives an interaction its exchanges — matter.js ExchangeProvider
@@ -133,15 +156,34 @@ type peerProvider struct {
 	p *peer.Peer
 }
 
+// The exchange takes a slot of the network profile opts names (the
+// peer's medium profile by default), released when it closes, and pads
+// its sends with opts.AdditionalMrpDelay, else the medium profile's
+// messaging margin (:85-141): the throttle follows the named profile, the
+// margin always the medium's.
 func (p *peerProvider) InitiateExchange(ctx context.Context, opts ExchangeOptions) (*exchange.Exchange, error) {
 	for {
 		if !opts.RequireExistingSession {
-			if _, err := p.p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: opts.ConnectionTimeout, Priority: opts.Priority}); err != nil {
+			if _, err := p.p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: opts.ConnectionTimeout, Network: opts.Network, AdditionalMrpDelay: opts.AdditionalMrpDelay}); err != nil {
 				return nil, err
 			}
 		}
+		networks := p.p.Networks()
+		network, err := networks.Select(p.p, opts.Network)
+		if err != nil {
+			return nil, err
+		}
+		margin, _ := exchange.MarginFor(&networks.ForPeer(p.p).Margins, im.InteractionModelProtocolID)
+		if opts.AdditionalMrpDelay != nil {
+			margin = *opts.AdditionalMrpDelay
+		}
+		slot, err := network.Semaphore.Obtain(ctx)
+		if err != nil {
+			return nil, err
+		}
 		s := p.p.NewestSession()
 		if s == nil {
+			slot.Close()
 			if opts.RequireExistingSession {
 				return nil, ErrNoSession
 			}
@@ -152,7 +194,12 @@ func (p *peerProvider) InitiateExchange(ctx context.Context, opts ExchangeOption
 			}
 			continue
 		}
-		x, err := p.p.Exchanges().Initiate(s, im.InteractionModelProtocolID, exchange.Options{AddressOverride: opts.AddressOverride})
+		x, err := p.p.Exchanges().Initiate(s, im.InteractionModelProtocolID, exchange.Options{
+			AddressOverride: opts.AddressOverride, PeerAdditionalMrpDelay: &margin, OnClosing: slot.Close,
+		})
+		if err != nil {
+			slot.Close()
+		}
 		if errors.Is(err, exchange.ErrSessionClosed) && !opts.RequireExistingSession {
 			continue
 		}

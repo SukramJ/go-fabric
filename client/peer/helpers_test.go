@@ -205,6 +205,13 @@ const testNode uint64 = 0x1234
 
 var testAddr = handshake.PeerAddress{FabricIndex: 1, NodeID: testNode}
 
+// harnessNetworks are the default profiles with "unknown" the fast one.
+func harnessNetworks(clk exchange.Clock) *NetworkProfiles {
+	t := DefaultTemplates()
+	t.Unknown = t.Fast
+	return NewNetworkProfiles(clk, &t, slog.New(slog.DiscardHandler))
+}
+
 func newHarness(t *testing.T, edit func(*Context)) *harness {
 	t.Helper()
 	h := &harness{udp: newFakeUDP(), mdns: newFakeMDNS(), clock: newFakeClock(), fabric: testFabric(t), store: &MemoryStore{}, resume: &MemoryResumptionStore{}}
@@ -222,6 +229,10 @@ func newHarness(t *testing.T, edit func(*Context)) *harness {
 		Store:      h.store,
 		Clock:      h.clock,
 		Rand:       func() float64 { return 0.5 },
+		// The harness peers report no medium; their "unknown" profile is
+		// the fast one, so the connection tests see neither a throttle nor
+		// an MRP margin (network_parity tests hold the profiles themselves).
+		Networks: harnessNetworks(h.clock),
 	}
 	if edit != nil {
 		edit(&c)

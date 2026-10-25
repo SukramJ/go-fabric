@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	clientpeer "github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -302,7 +303,14 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	recreatePriority := false
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
-		priority := recreatePriority || requiresAwait(wakefulness())
+		// The attempt's network: a mode-flip recreate's goes out on the
+		// priority network, and so does every attempt to a peer that
+		// requires awaiting when the caller pinned none (:139-149).
+		if recreatePriority {
+			req.Network = priorityNetwork
+		} else if req.Network == "" && requiresAwait(wakefulness()) {
+			req.Network = priorityNetwork
+		}
 		recreatePriority = false
 
 		if !c.sustainGate(ctx, outer, wakefulness(), &awaitFreshSignal) {
@@ -311,7 +319,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 
 		schedule := newRetries(DefaultSustainRetries, c.rand)
 		for {
-			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh, priority)
+			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
 				established(outer, inner, wakefulness())
 				break
@@ -403,6 +411,10 @@ func innerRequest(outer *Subscription, updated func(*Report)) (SubscribeRequest,
 	}
 	return req, closed, deliberate
 }
+
+// priorityNetwork is the network profile of a time-critical attempt
+// (SustainedSubscription.ts:136).
+const priorityNetwork = clientpeer.NetworkICDLit
 
 // requiresAwait reports a peer whose interactions wait for its wake; every
 // connection to it is the priority one (SustainedSubscription.ts:145-149).
@@ -556,7 +568,7 @@ func (c *Interaction) nextWake(ctx context.Context, w *icd.PeerWakefulness) bool
 // after it (:187-204), then the subscription. Each refresh asks for the
 // events above the highest one delivered (SustainedSubscription.ts:125-126
 // at 862ad75f).
-func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool, priority bool) (*Subscription, error) {
+func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
 	if *needRefresh {
 		*req = st.requestNewEvents(refreshed(*req))
 	}
@@ -568,7 +580,8 @@ func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, pe
 		*bootstrap = nil
 		*req = st.requestNewEvents(refreshed(*req))
 	}
-	opts := ExchangeOptions{ConnectionTimeout: -1, Priority: priority}
+	opts := req.exchangeOptions()
+	opts.ConnectionTimeout = -1
 	if c.attemptHook != nil {
 		return c.attemptHook(ctx, *req, opts)
 	}

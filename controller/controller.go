@@ -27,6 +27,7 @@
 package controller
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"crypto/rand"
@@ -138,6 +139,18 @@ type Config struct {
 	// ([Advertise]); nil publishes none, as matter.js advertises a
 	// commissioner only when asked.
 	Advertise *Advertise
+	// Networks overrides the network profiles' templates field-wise — the
+	// throttles and MRP margins the peers' connections and exchanges use
+	// (client/peer NetworkProfiles; matter.js NetworkServer.State.profiles,
+	// packages/node/src/behavior/system/network/NetworkServer.ts:162-183,
+	// :248 at 862ad75f). nil keeps the defaults.
+	Networks *peer.ProfilesConfig
+	// OwnNetworkProfile is the profile of our own network, whose margin
+	// pads every exchange's sends: matter.js ownNetworkProfileId
+	// (NetworkServer.ts:238-242, "fast" by default, "thread" on a Thread
+	// node; applied at ServerNetworkRuntime.ts:405-406). "" is "fast"; a
+	// name no profile has is [ErrConfiguration].
+	OwnNetworkProfile string
 	// Advertiser publishes the Advertise record; nil is
 	// mdns.NewZeroconf(), which Close closes. A test passes
 	// mdns.NewNoop().
@@ -221,7 +234,15 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
 		return nil, err
 	}
-	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames); err != nil {
+	networks := peer.NewNetworkProfiles(clk, nil, log)
+	if cfg.Networks != nil {
+		networks.SetDefaults(*cfg.Networks)
+	}
+	own, err := networks.Get(cmp.Or(cfg.OwnNetworkProfile, peer.NetworkFast))
+	if err != nil {
+		return nil, fmt.Errorf("%w: OwnNetworkProfile: %w", ErrConfiguration, err)
+	}
+	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames, own.AdditionalMrpDelay); err != nil {
 		return nil, err
 	}
 	if cfg.Advertise != nil {
@@ -231,7 +252,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}
 	resumption := &peer.MemoryResumptionStore{}
 	fabrics := []*commissioner.Fabric{c.fabric}
-	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk}); err != nil {
+	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks}); err != nil {
 		return nil, err
 	}
 	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk})
@@ -267,7 +288,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 // openNetwork opens the socket (or takes the one [Config].Listener
 // gives), the exchanges over it and DNS-SD: the steps of [New] between
 // the fabric and the peers.
-func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.Listener, openNames func(*slog.Logger) (*discovery.Names, error)) error {
+func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.Listener, openNames func(*slog.Logger) (*discovery.Names, error), ownMargin time.Duration) error {
 	log := c.log
 	if l == nil {
 		var err error
@@ -277,7 +298,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	}
 	c.udp = l
 	var err error
-	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log, Clock: c.clock}); err != nil {
+	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log, Clock: c.clock, LocalAdditionalMrpDelay: ownMargin}); err != nil {
 		_ = l.Close()
 		return err
 	}

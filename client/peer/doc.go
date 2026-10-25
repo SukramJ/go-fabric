@@ -12,9 +12,13 @@
 // DNS-SD service and its status), client/exchange (the sessions and
 // exchanges) and client/handshake (the CASE client).
 //
+// The network profiles (network.go, NetworkProfile.ts at 862ad75f)
+// throttle the peers' connections, exchanges and probes per network and
+// pad their MRP backoff with the network's margin; a peer's profile
+// follows its medium ([Peer.SetMedium]).
+//
 // Out of scope here, by ADR 0020's stage split: TCP and transport
-// preference, group peers, network profiles (the LAN is the one network;
-// MRP margins are 0), the BasicInformation and LIT ICD inputs of the
+// preference, group peers, the BasicInformation and LIT ICD inputs of the
 // session parameters (stage 4), the ICD branch of the address monitor,
 // and the client interaction (stage 3) beyond the liveness probe.
 package peer

@@ -92,9 +92,14 @@ func peerSet(t *testing.T, s *scripted) *peer.Set {
 	}
 	fabric := handshake.Fabric{Identity: &id, RootPublicKey: c.RootPublicKey(), Verifier: v}
 	names := discovery.NewNames(&fakeMDNS{out: make(chan mdns.QueryResponse)}, nil)
+	// The peer reports no medium: its "unknown" profile is the fast one, so
+	// the scripted clock, which does not run, holds no cooldown.
+	templates := peer.DefaultTemplates()
+	templates.Unknown = templates.Fast
 	set, err := peer.NewSet(peer.Context{
 		Exchanges: s.mgr, Names: names, Clock: s.clock,
-		Fabrics: func(a handshake.PeerAddress) (handshake.Fabric, bool) { return fabric, a.FabricIndex == 1 },
+		Fabrics:  func(a handshake.PeerAddress) (handshake.Fabric, bool) { return fabric, a.FabricIndex == 1 },
+		Networks: peer.NewNetworkProfiles(s.clock, &templates, nil),
 	})
 	if err != nil {
 		t.Fatal(err)

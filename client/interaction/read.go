@@ -31,6 +31,8 @@ type ReadRequest struct {
 	// NoFabricFilter reads fabric-scoped lists unfiltered; a read is
 	// fabric-filtered by default (fabricFilter = true, Read.ts:40).
 	NoFabricFilter bool
+	// ClientRequest names the read exchange's network profile and margin.
+	ClientRequest
 }
 
 // ErrRequestTooLarge is a request that does not fit one message even
@@ -64,7 +66,7 @@ func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, err
 	if err != nil {
 		return nil, err
 	}
-	m, err := c.begin(ctx, ExchangeOptions{})
+	m, err := c.begin(ctx, r.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}

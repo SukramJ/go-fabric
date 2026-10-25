@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6538,
+  "entry_points": 6550,
   "entry_packages": [
     ".",
     "bdx",
@@ -257,9 +257,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16010,
-    "reachable": 11316,
-    "whitelisted": 4691,
+    "total_exported": 16051,
+    "reachable": 11347,
+    "whitelisted": 4701,
     "unreachable": 3
   },
   "by_package": [
@@ -6104,6 +6104,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestMRPMarginFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/margins_parity_matterjs_test.go",
+      "line": 26
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestMRPMaxPeerResponseTimeOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/mrp_parity_matterjs_test.go",
@@ -6122,6 +6129,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/mrp_parity_matterjs_test.go",
       "line": 33
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMRPRetransmissionIntervalPadded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/margins_parity_matterjs_test.go",
+      "line": 55
     },
     {
       "package": "client/exchange",
@@ -6167,6 +6181,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestMessageExchangeClosingNotification",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/margins_parity_matterjs_test.go",
+      "line": 235
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestMessageExchangeCrossProtocolStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
@@ -6185,6 +6206,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
       "line": 319
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeMRPBackoffMargin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/margins_parity_matterjs_test.go",
+      "line": 140
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangePaddedBDXCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/margins_parity_matterjs_test.go",
+      "line": 216
     },
     {
       "package": "client/exchange",
@@ -6583,7 +6618,7 @@
       "identifier": "TestSustainedSubscriptionICD",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/sustained_icd_parity_matterjs_test.go",
-      "line": 276
+      "line": 277
     },
     {
       "package": "client/peer",
@@ -6654,6 +6689,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/connection_test.go",
       "line": 189
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectionOnANamedNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/network_profile_parity_matterjs_test.go",
+      "line": 293
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestConnectionThrottledByTheConnectProfile",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/network_profile_parity_matterjs_test.go",
+      "line": 269
     },
     {
       "package": "client/peer",
@@ -6752,6 +6801,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
       "line": 95
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestNetworkProfilesForMedium",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/network_profile_parity_matterjs_test.go",
+      "line": 146
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestNetworkProfilesParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/network_profile_parity_matterjs_test.go",
+      "line": 22
     },
     {
       "package": "client/peer",
@@ -6961,14 +7024,14 @@
       "identifier": "TestProbeFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
-      "line": 132
+      "line": 134
     },
     {
       "package": "client/peer",
       "identifier": "TestProbeReadsTheReports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/probe_test.go",
-      "line": 86
+      "line": 88
     },
     {
       "package": "client/peer",
@@ -6976,6 +7039,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/reboot_armer_parity_matterjs_test.go",
       "line": 113
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestSemaphoreParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/network_profile_parity_matterjs_test.go",
+      "line": 177
     },
     {
       "package": "client/peer",

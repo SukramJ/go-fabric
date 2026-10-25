@@ -48,6 +48,7 @@ still held there. Each row names the facade route, or the section of
 | --- | --- |
 | `node.Aggregator.MarkComplete`, `node.Partition.MarkComplete`, `node.Batch.MarkComplete` | drop the call: a stored endpoint number is kept until `Forget` (or `RetirePartition` for a whole source) erases it, whether or not the device is in the set; `Forget` a device that is gone for good |
 | `endpoint.Snapshot.ModelComplete`, `endpoint.Snapshot.Retain` (a host with its own assembler) | drop the fields: the assembler collects no stored identity absent from its snapshots; erase one with `endpoint.Store.RemoveEndpoint` |
+| `client/peer.ConnectOptions.Priority`, `client/interaction.ExchangeOptions.Priority` | `Network: peer.NetworkICDLit`, the unthrottled profile matter.js routes an await-mode LIT ICD through |
 
 ## The node features in v0.10.4
 

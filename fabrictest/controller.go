@@ -4,6 +4,7 @@
 package fabrictest
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -60,6 +61,14 @@ type ControllerOptions struct {
 	// controller without a DclCertificateService: every attestation
 	// carries the DclServiceUnavailable warning. It overrides Attestation.
 	NoAttestationStore bool
+	// Networks overrides the network profiles' templates (matter.js
+	// `network: { profiles }`, NetworkServer.ts:248 at 862ad75f); nil keeps
+	// the defaults.
+	Networks *peer.ProfilesConfig
+	// OwnNetworkProfile is the profile of our own network, whose margin
+	// pads every exchange's sends (ownNetworkProfileId,
+	// NetworkServer.ts:242); "" is "fast".
+	OwnNetworkProfile string
 }
 
 // Controller is an in-process Matter controller of a site: the module's
@@ -184,7 +193,15 @@ func (c *Controller) build() (*stack, error) {
 		return st, fmt.Errorf("listen: %w", err)
 	}
 	st.listener = l
-	if st.mgr, err = exchange.NewManager(l, exchange.Config{Clock: clk, Logger: log}); err != nil {
+	networks := peer.NewNetworkProfiles(clk, nil, log)
+	if c.opts.Networks != nil {
+		networks.SetDefaults(*c.opts.Networks)
+	}
+	own, err := networks.Get(cmp.Or(c.opts.OwnNetworkProfile, peer.NetworkFast))
+	if err != nil {
+		return st, err
+	}
+	if st.mgr, err = exchange.NewManager(l, exchange.Config{Clock: clk, Logger: log, LocalAdditionalMrpDelay: own.AdditionalMrpDelay}); err != nil {
 		return st, fmt.Errorf("exchange manager: %w", err)
 	}
 	ctx, stop := context.WithCancel(context.Background())
@@ -206,6 +223,7 @@ func (c *Controller) build() (*stack, error) {
 	}
 	if st.set, err = peer.NewSet(peer.Context{
 		Exchanges: st.mgr, Names: st.names, Fabrics: st.fabric.Lookup, Resumption: c.resume, Logger: log, Clock: clk,
+		Networks: networks,
 	}); err != nil {
 		return st, fmt.Errorf("peer set: %w", err)
 	}

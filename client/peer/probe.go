@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/im"
@@ -38,12 +39,29 @@ const (
 // last one unless it suppresses the response, the last one not awaited.
 // It reports true on the final report and false on any error or the end of
 // ctx (:345-355); the exchange is closed either way (:356-359).
-func probe(ctx context.Context, mgr *exchange.Manager, s *exchange.Session, override *net.UDPAddr, log *slog.Logger) bool {
+//
+// With a network profile the probe takes a slot of it, released when the
+// exchange closes, and pads the exchange with margin — the probe network
+// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at 862ad75f)
+// and the medium margin PeerExchangeProvider.initiateExchange applies
+// (PeerExchangeProvider.ts:87-92, :136-141).
+func probe(ctx context.Context, mgr *exchange.Manager, s *exchange.Session, override *net.UDPAddr, log *slog.Logger, network *NetworkProfile, margin *time.Duration) bool {
 	if ctx.Err() != nil || s == nil || s.IsClosed() || s.IsPeerLost() {
 		return false
 	}
-	x, err := mgr.Initiate(s, im.InteractionModelProtocolID, exchange.Options{AddressOverride: override})
+	opts := exchange.Options{AddressOverride: override, PeerAdditionalMrpDelay: margin}
+	if network != nil {
+		slot, err := network.Semaphore.Obtain(ctx)
+		if err != nil {
+			return false
+		}
+		opts.OnClosing = slot.Close
+	}
+	x, err := mgr.Initiate(s, im.InteractionModelProtocolID, opts)
 	if err != nil {
+		if opts.OnClosing != nil {
+			opts.OnClosing()
+		}
 		return false
 	}
 	err = readEmpty(ctx, x)

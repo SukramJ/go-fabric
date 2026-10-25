@@ -14,5 +14,5 @@ import (
 // commission through bridge/bridgetest — which imports this package, so
 // they cannot live in it (brief AJ §5).
 func Probe(ctx context.Context, mgr *exchange.Manager, s *exchange.Session) bool {
-	return probe(ctx, mgr, s, nil, slog.New(slog.DiscardHandler))
+	return probe(ctx, mgr, s, nil, slog.New(slog.DiscardHandler), nil, nil)
 }

@@ -340,6 +340,11 @@ func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	// The peer's physical property the session parameters read
 	// (Peer.ts:305-315).
 	p.SetLongIdleTimeOperating(func() bool { return n.Properties().LongIdleTimeOperating })
+	// The peer's medium selects its network profile: matter.js sets the
+	// peer's physicalProperties from the client node at startup
+	// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
+	// 862ad75f).
+	p.SetMedium(func() peer.Medium { return n.Properties().Medium() })
 	follow := func() {
 		d := p.Descriptor()
 		n.updateRecord(func(rec *Record) { rec.applyPeer(d) })

@@ -212,7 +212,16 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		log.Info("matter.controller.peer.address_gone_probing")
 	}
 	mgr := p.set.ctx.Exchanges
-	if probe(ctx, mgr, s, nil, log) {
+	// The probe network: the medium profile's probe sub-profile, else the
+	// profile itself (PeerAddressMonitor.ts:202-203); the margin is the
+	// medium's messaging margin (PeerExchangeProvider.ts:89-91).
+	network := p.Network()
+	margin := network.Margins.Messaging
+	probeNetwork := network
+	if network.ProbeAddress != nil {
+		probeNetwork = network.ProbeAddress
+	}
+	if probe(ctx, mgr, s, nil, log, probeNetwork, &margin) {
 		if reason == ReasonAddressChange {
 			m.advanceBackoff()
 		}
@@ -226,7 +235,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 			if a.AddrPort() == current {
 				continue
 			}
-			if probe(ctx, mgr, s, a.UDPAddr(), log) {
+			if probe(ctx, mgr, s, a.UDPAddr(), log, probeNetwork, &margin) {
 				log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
 				s.SetAddr(a.UDPAddr())
 				p.followAddress(s)

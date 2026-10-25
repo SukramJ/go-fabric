@@ -89,17 +89,19 @@ type ConnectOptions struct {
 	// HandleError replaces the set's error handler for a process this call
 	// starts (Peer.ts:745-751).
 	HandleError ErrorHandler
-	// Priority marks a time-critical connection — matter.js's "icdLit"
-	// priority network a sustained subscription to a LIT ICD peer uses so
-	// its subscribe lands inside the peer's brief active window
-	// (SustainedSubscription.ts:133-149). matter.js's network profiles
-	// throttle connections per network and the priority one bypasses the
-	// throttle; this module has no network profiles and throttles no
-	// connection until milestone 5 phase 25 (notes/parity/matter_behaviour_findings.md,
-	// "Network profiles"; the register's NetworkProfileTest), so every
-	// connection already goes out at once and the flag only records the
-	// intent.
-	Priority bool
+	// Network names the network profile whose throttle the connection
+	// process takes a slot of — its connect sub-profile when it has one —
+	// for a process this call starts; "" is the peer's medium profile
+	// (matter.js PeerConnection.ts:110-118 at 862ad75f, options.network).
+	// "icdLit" is the unthrottled profile a sustained subscription to a
+	// LIT ICD peer connects on, so its subscribe lands inside the peer's
+	// brief active window (SustainedSubscription.ts:133-149). A name no
+	// profile has fails the call with [ErrUnknownNetworkProfile].
+	Network string
+	// AdditionalMrpDelay, when set, is the MRP margin of the CASE exchange
+	// in place of the medium profile's connect margin
+	// (PeerConnection.ts:111-114).
+	AdditionalMrpDelay *time.Duration
 }
 
 // attempt is the connection attempt to one address (PeerConnection.ts:863-866).
@@ -121,11 +123,15 @@ type connection struct {
 	timing      Timing
 	setTiming   Timing
 	handleError ErrorHandler
-	ctx         context.Context
-	cancel      context.CancelFunc
-	done        chan struct{}
-	workers     sync.WaitGroup
-	wake        chan struct{}
+	// network and margin are the profile the process holds a slot of and
+	// the CASE exchanges' MRP margin (PeerConnection.ts:110-118).
+	network *NetworkProfile
+	margin  time.Duration
+	ctx     context.Context
+	cancel  context.CancelFunc
+	done    chan struct{}
+	workers sync.WaitGroup
+	wake    chan struct{}
 
 	// mu guards the connection's state: every field below it, session
 	// through kickHandlers.
@@ -166,12 +172,18 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 	if handleError == nil {
 		handleError = p.set.errorHandler()
 	}
+	network, margin, err := p.connectNetwork(opts)
+	if err != nil {
+		return &connection{fatal: err, done: closedDone}
+	}
 	ctx, cancel := context.WithCancel(p.ctx)
 	c := &connection{
 		p:            p,
 		timing:       timing,
 		setTiming:    setTiming,
 		handleError:  handleError,
+		network:      network,
+		margin:       margin,
 		ctx:          ctx,
 		cancel:       cancel,
 		done:         make(chan struct{}),
@@ -213,6 +225,9 @@ func (p *Peer) Connect(ctx context.Context, opts ConnectOptions) (*exchange.Sess
 		c := p.initiateConnection(opts) //nolint:contextcheck // see above
 		if c == nil {
 			return nil, ErrClosed
+		}
+		if c.p == nil {
+			return nil, c.fatal // the process could not start (connectNetwork)
 		}
 		if err := p.waitFor(ctx, c, opts); err != nil {
 			return nil, err
@@ -306,9 +321,43 @@ func (p *Peer) sessionAdded() {
 	}
 }
 
-// run is the body of PeerConnection (:123-215).
+// closedDone is the done channel of a process that never ran.
+var closedDone = func() chan struct{} { c := make(chan struct{}); close(c); return c }()
+
+// connectNetwork is the profile a connection process opts start throttles
+// on and the MRP margin of its CASE exchanges — PeerConnection.ts:110-118:
+// the profile opts.Network names, else the medium profile, its connect
+// sub-profile when it has one; the margin is opts.AdditionalMrpDelay, else
+// the medium profile's connect margin, else its margin.
+func (p *Peer) connectNetwork(opts ConnectOptions) (*NetworkProfile, time.Duration, error) {
+	networks := p.set.networks
+	network, err := networks.Select(p, opts.Network)
+	if err != nil {
+		return nil, 0, err
+	}
+	medium := networks.ForPeer(p)
+	margin := medium.AdditionalMrpDelay
+	if medium.Connect != nil {
+		margin = medium.Connect.AdditionalMrpDelay
+	}
+	if opts.AdditionalMrpDelay != nil {
+		margin = *opts.AdditionalMrpDelay
+	}
+	if network.Connect != nil {
+		network = network.Connect
+	}
+	return network, margin, nil
+}
+
+// run is the body of PeerConnection (:123-215), which first reserves a
+// slot of its network profile for the whole process (:110-121).
 func (c *connection) run() {
 	p := c.p
+	slot, err := c.network.Semaphore.Obtain(c.ctx)
+	if err != nil {
+		return
+	}
+	defer slot.Close()
 	result := make(chan bool, 1)
 	p.mu.Lock()
 	p.connectionInitiatedAt = p.set.clock.Now()
@@ -671,7 +720,9 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 			}
 		})
 	})
+	margin := c.margin
 	notifiers := exchange.Options{
+		PeerAdditionalMrpDelay: &margin,
 		OnSend: func(n int) {
 			if n > 0 {
 				// Retransmitting: let discovery look for a fresh address.

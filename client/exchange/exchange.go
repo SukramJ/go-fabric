@@ -70,11 +70,27 @@ type Options struct {
 	// :771-774, :953). Nil sends to the session's address.
 	AddressOverride *net.UDPAddr
 
+	// PeerAdditionalMrpDelay, when set, is the peer-medium MRP margin of
+	// the exchange's sends, in place of the session's peer margins for the
+	// exchange's protocol — matter.js MessageExchange.Config
+	// peerAdditionalMrpDelay (MessageExchange.ts:1289-1295), which a
+	// network profile supplies per interaction (PeerExchangeProvider.ts:89-91,
+	// PeerConnection.ts:111-114). The margin applied is the larger of it
+	// and the manager's [Config].LocalAdditionalMrpDelay (:1216-1222).
+	PeerAdditionalMrpDelay *time.Duration
+
 	// OnReceive is called for every message the exchange takes, a
 	// duplicate and a standalone ack included — matter.js
 	// MessageExchange.Options.onReceive (:1245-1248), called at :469
 	// after the protocol check.
 	OnReceive func()
+
+	// OnClosing is called once, when the exchange starts to close — a
+	// Close, an Abort or its final close, whichever comes first. A network
+	// profile's slot is released there: matter.js releases it on the
+	// exchange's closing or closed event, whichever fires first
+	// (PeerExchangeProvider.ts:136-141). It must not block.
+	OnClosing func()
 }
 
 // SendOptions configures [Exchange.Send] — matter.js ExchangeSendOptions
@@ -170,6 +186,11 @@ type Exchange struct {
 	// state, the close state and the activity times.
 	mu              sync.Mutex
 	addressOverride *net.UDPAddr
+	// peerAdditional is [Options].PeerAdditionalMrpDelay.
+	peerAdditional *time.Duration
+	// onClosing is [Options].OnClosing, run once by notifyClosing.
+	onClosing       func()
+	onClosingOnce   sync.Once
 	onSend          func(retransmission int)
 	onReceive       func()
 	queue           []*Message
@@ -247,6 +268,8 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, op
 		used:             !initiator,
 		suppressPeerLoss: opts.SuppressPeerLoss,
 		addressOverride:  opts.AddressOverride,
+		peerAdditional:   opts.PeerAdditionalMrpDelay,
+		onClosing:        opts.OnClosing,
 		onSend:           opts.OnSend,
 		onReceive:        opts.OnReceive,
 		done:             make(chan struct{}),
@@ -554,6 +577,25 @@ const bdxProtocolID uint16 = 0x0002
 // MessageExchange.ts:63-77 (BDX_MAX_RETRANSMISSION_INTERVAL).
 const bdxMaxRetransmissionInterval = 30*time.Second/(MaxTransmissions-1) - 100*time.Millisecond
 
+// sendPad is the pad of our sends: [Exchange.sendAdditionalDelay] and the
+// manager's fixed backoff (MessageExchange.ts:1236-1240).
+func (x *Exchange) sendPad() Pad {
+	return Pad{Additional: x.sendAdditionalDelay(), Fixed: x.m.localFixed}
+}
+
+// sendAdditionalDelay is the amplified backoff addition of our sends: the
+// larger of our own network's margin and the peer's for the exchange's
+// traffic class — the exchange's PeerAdditionalMrpDelay, else the
+// session's peer margins (matter.js MessageExchange.ts:1215-1222,
+// #sendAdditionalDelay).
+func (x *Exchange) sendAdditionalDelay() time.Duration {
+	if x.peerAdditional != nil {
+		return max(x.m.localAdditional, *x.peerAdditional)
+	}
+	peer, _ := MarginFor(x.session.peerMarginsNow(), x.protocol)
+	return max(x.m.localAdditional, peer)
+}
+
 // backoffLocked is the scheduled wait after transmission n: the MRP
 // interval for the peer's state, plus InitialRetransmissionTime, capped
 // at max(MaxRetransmissionTime, peer idle interval), and on a BDX exchange
@@ -561,7 +603,7 @@ const bdxMaxRetransmissionInterval = 30*time.Second/(MaxTransmissions-1) - 100*t
 // MessageExchange.ts:1234-1251 (#backOffFor).
 func (x *Exchange) backoffLocked(n int) time.Duration {
 	iv, active := x.session.timing()
-	d := RetransmissionInterval(n, iv, active, x.m.rand())
+	d := RetransmissionIntervalPadded(n, iv, active, x.m.rand(), x.sendPad())
 	d += x.sendOpts.InitialRetransmissionTime
 	if x.sendOpts.MaxRetransmissionTime > 0 {
 		d = min(d, max(x.sendOpts.MaxRetransmissionTime, iv.Idle))
@@ -613,7 +655,7 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	closing := x.closed || x.closing
 	if closing || (limit > 0 && x.retransCount >= limit) {
 		if expectedProcessingTime > 0 && !closing {
-			final := MaxPeerResponseTime(nil, false, IntervalsOf(x.m.local), expectedProcessingTime) - x.retransInterval
+			final := MaxPeerResponseTimePadded(nil, false, IntervalsOf(x.m.local), expectedProcessingTime, x.sendPad()) - x.retransInterval
 			if final > 0 {
 				x.retransCount--
 				x.armRetransLocked(p, final, 0)
@@ -661,7 +703,8 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 // last transmission slot, never faster than the peer's active interval and
 // only when the scheduled attempt lies beyond the peer's active threshold.
 // Mirrors matter.js MessageExchange.ts:564-617
-// (#kickRetransmissionForLiveness) without a network-profile delay.
+// (#kickRetransmissionForLiveness), the cadence with the medium margin
+// (:588-589).
 func (x *Exchange) kickLocked(dup *Message) *pending {
 	if x.protocol != bdxProtocolID || x.closed || (x.initiator && x.closing) {
 		return nil
@@ -675,7 +718,7 @@ func (x *Exchange) kickLocked(dup *Message) *pending {
 	}
 	iv, _ := x.session.timing()
 	elapsed := x.m.clock.Now().Sub(x.lastTransmitAt)
-	if !x.lastTransmitAt.IsZero() && elapsed < iv.Active {
+	if !x.lastTransmitAt.IsZero() && elapsed < iv.Active+x.sendAdditionalDelay() {
 		return nil
 	}
 	if remaining := max(0, x.retransInterval-elapsed); remaining <= iv.ActiveThreshold {
@@ -822,7 +865,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 			ept = DefaultExpectedProcessingTime
 		}
 		if x.session.UsesMRP() {
-			timeout = MaxPeerResponseTime(nil, false, IntervalsOf(x.m.local), ept)
+			timeout = MaxPeerResponseTimePadded(nil, false, IntervalsOf(x.m.local), ept, x.sendPad())
 		} else {
 			timeout = ReliableMaxPeerResponseTime(ept)
 		}
@@ -874,6 +917,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 // closes then. An exchange that never sent closes at once. Close returns
 // without waiting; [Exchange.Done] reports the end. It is idempotent.
 func (x *Exchange) Close() {
+	x.notifyClosing()
 	x.mu.Lock()
 	x.releaseHeldLocked()
 	if x.closed || x.closeTimer != nil {
@@ -898,11 +942,21 @@ func (x *Exchange) Close() {
 	}
 	iv, active := x.session.timing()
 	var wait time.Duration
+	pad := x.sendPad()
 	for i := x.retransCount; i <= MaxTransmissions; i++ {
-		wait += RetransmissionInterval(i, iv, active, 1)
+		wait += RetransmissionIntervalPadded(i, iv, active, 1, pad)
 	}
 	x.closeTimer = x.m.clock.AfterFunc(wait, func() { x.finalClose(nil) })
 	x.mu.Unlock()
+}
+
+// notifyClosing runs [Options].OnClosing once.
+func (x *Exchange) notifyClosing() {
+	x.onClosingOnce.Do(func() {
+		if x.onClosing != nil {
+			x.onClosing()
+		}
+	})
 }
 
 // Abort closes the exchange at once with cause: an acknowledgement still
@@ -913,6 +967,7 @@ func (x *Exchange) Abort(cause error) {
 }
 
 func (x *Exchange) abort(cause error) {
+	x.notifyClosing()
 	x.mu.Lock()
 	x.releaseHeldLocked()
 	if x.closed {
@@ -934,6 +989,7 @@ func (x *Exchange) abort(cause error) {
 // and removes the exchange (MessageExchange.ts:1132-1155,
 // ExchangeManager.ts:494-501).
 func (x *Exchange) finalClose(cause error) {
+	x.notifyClosing()
 	x.mu.Lock()
 	if x.closed {
 		x.mu.Unlock()

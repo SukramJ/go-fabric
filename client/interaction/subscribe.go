@@ -53,6 +53,10 @@ type SubscribeRequest struct {
 	EventFilters       []im.EventMinimumNumber
 	DataVersionFilters []im.DataVersionFilter
 	NoFabricFilter     bool
+	// ClientRequest names the subscribe exchange's network profile and
+	// margin; a sustained subscription's attempts take it, the priority
+	// network aside (SustainedSubscription.ts:139-149).
+	ClientRequest
 	// ReplaceSubscriptions is keepSubscriptions false: our other
 	// subscriptions with the peer are closed first and the peer is told to
 	// drop its own (CI:996-1008). keepSubscriptions defaults to true
@@ -180,7 +184,7 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 	if req.Sustain {
 		return c.sustain(peer, req, floor, ceiling), nil
 	}
-	sub, err := c.subscribeOnce(ctx, peer, req, floor, ceiling, ExchangeOptions{})
+	sub, err := c.subscribeOnce(ctx, peer, req, floor, ceiling, req.exchangeOptions())
 	if err != nil {
 		return nil, err
 	}
