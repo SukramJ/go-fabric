@@ -12,7 +12,15 @@ had ahead of it — a row of the *Ahead of matter.js* register in
 matter.js and the row closes, see `CLAUDE.md` workflow step 5), or **open**
 (to be settled by the test port named). Independently of the commit list,
 every lift re-reads each marker of that register at the new pin: an upstream
-change can close a gap without a commit message that says so. Owner's work (Fable
+change can close a gap without a commit message that says so. The trigger
+is the check over those markers: `script/aheadcheck` (`make ahead-check`)
+reads each row's marker file and text at the pin and at a ref, and the
+weekly `ahead-markers` job in `.github/workflows/matterjs-pin.yml` runs it
+against matter.js `origin/main` and goes red with the finding "caught up?"
+naming the row as soon as a marker text is gone there — between lifts, not
+only at one. The manual re-read at the lift is the confirmation: a row gets
+the verdict **caught up** only after the new pin has been read and the
+behaviour compared, never on the check's finding alone. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
