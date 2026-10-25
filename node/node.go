@@ -649,12 +649,8 @@ func (n *Node) Start(ctx context.Context) error {
 	// #online (:352) → #assertDataModelTest (:125-143): without the feature a
 	// MaxPathsPerInvoke above one fails the node's start, with it a limit of
 	// one is logged.
-	maxPaths := n.cfg.MaxPathsPerInvoke
-	if maxPaths == 0 {
-		maxPaths = im.DefaultMaxPathsPerInvoke
-	}
-	if err := n.root.GeneralDiagnostics.CheckDataModelTest(maxPaths, n.logger); err != nil {
-		return fmt.Errorf("node: %w", err)
+	if err := n.checkDataModelTest(); err != nil {
+		return err
 	}
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
@@ -711,13 +707,7 @@ func (n *Node) Start(ctx context.Context) error {
 	for _, fabric := range loaded {
 		n.br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
-	// An ICD enters active mode once its fabrics are announced: the first
-	// Check-Ins go out (IcdManagementServer.ts:252-343, #online).
-	if srv := n.root.ICDManagement; srv != nil {
-		if err := srv.Start(ctx); err != nil {
-			n.logger.Warn("icd.start_failed", slog.Any("err", err))
-		}
-	}
+	n.startICD(ctx)
 	// The Binding servers register their entries once the node is online
 	// and its CASE identities are loaded (BindingManager.ts:65-78: the
 	// queue flushes on the node's online event).
@@ -1011,4 +1001,18 @@ func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
 		b.WriteString("no diagnostic events recorded\n")
 	}
 	return []byte(b.String()), nil
+}
+
+// checkDataModelTest holds the DataModelTest feature against the node's
+// MaxPathsPerInvoke (GeneralDiagnosticsServer.ts #assertDataModelTest,
+// :125-143).
+func (n *Node) checkDataModelTest() error {
+	maxPaths := n.cfg.MaxPathsPerInvoke
+	if maxPaths == 0 {
+		maxPaths = im.DefaultMaxPathsPerInvoke
+	}
+	if err := n.root.GeneralDiagnostics.CheckDataModelTest(maxPaths, n.logger); err != nil {
+		return fmt.Errorf("node: %w", err)
+	}
+	return nil
 }

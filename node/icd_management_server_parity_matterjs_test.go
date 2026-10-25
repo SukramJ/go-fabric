@@ -210,7 +210,8 @@ func registerClient(ctx context.Context, p *fabrictest.Pair, req icddef.Register
 		return icddef.RegisterClientResponse{}, err
 	}
 	var resp icddef.RegisterClientResponse
-	return resp, resp.DecodeTLV(res.Fields)
+	err = resp.DecodeTLV(res.Fields)
+	return resp, err
 }
 
 func unregisterClient(ctx context.Context, p *fabrictest.Pair, req icddef.UnregisterClientRequest) error {
@@ -231,8 +232,8 @@ func stayActive(ctx context.Context, t *testing.T, p *fabrictest.Pair, ms uint32
 	return resp.PromisedActiveDuration
 }
 
-func permanent(node uint64, key []byte) icddef.RegisterClientRequest {
-	return icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: key, ClientType: icddef.ClientTypePermanent}
+func permanent(nodeID uint64, key []byte) icddef.RegisterClientRequest {
+	return icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: key, ClientType: icddef.ClientTypePermanent}
 }
 
 func icdState(ctx context.Context, t *testing.T, p *fabrictest.Pair) icddef.State {
@@ -414,8 +415,8 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
 			ctx := t.Context()
-			node := pair.Address.NodeID
-			resp, err := registerClient(ctx, pair, permanent(node, icdKeyA))
+			nodeID := pair.Address.NodeID
+			resp, err := registerClient(ctx, pair, permanent(nodeID, icdKeyA))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -423,7 +424,7 @@ func TestIcdManagementServer(t *testing.T) {
 				t.Fatalf("response counter %d", resp.IcdCounter)
 			}
 			got := registeredClients(ctx, t, pair)
-			if len(got) != 1 || got[0].CheckInNodeId != node || got[0].ClientType != icddef.ClientTypePermanent || got[0].Key != nil {
+			if len(got) != 1 || got[0].CheckInNodeId != nodeID || got[0].ClientType != icddef.ClientTypePermanent || got[0].Key != nil {
 				t.Fatalf("registered %+v", got)
 			}
 			regs := icdServer(pair).Registrations(pairFabric(ctx, t, pair))
@@ -445,11 +446,11 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
 			ctx := t.Context()
-			node := pair.Address.NodeID
-			if _, err := registerClient(ctx, pair, permanent(node, icdKeyA)); err != nil {
+			nodeID := pair.Address.NodeID
+			if _, err := registerClient(ctx, pair, permanent(nodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := registerClient(ctx, pair, icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: icdKeyB, ClientType: icddef.ClientTypeEphemeral}); err != nil {
+			if _, err := registerClient(ctx, pair, icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: icdKeyB, ClientType: icddef.ClientTypeEphemeral}); err != nil {
 				t.Fatal(err)
 			}
 			got := registeredClients(ctx, t, pair)
@@ -469,11 +470,11 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
 			ctx := t.Context()
-			node := pair.Address.NodeID
-			if _, err := registerClient(ctx, pair, permanent(node, icdKeyA)); err != nil {
+			nodeID := pair.Address.NodeID
+			if _, err := registerClient(ctx, pair, permanent(nodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
-			if err := unregisterClient(ctx, pair, icddef.UnregisterClientRequest{CheckInNodeId: node}); err != nil {
+			if err := unregisterClient(ctx, pair, icddef.UnregisterClientRequest{CheckInNodeId: nodeID}); err != nil {
 				t.Fatal(err)
 			}
 			if got := registeredClients(ctx, t, pair); len(got) != 0 {
@@ -522,21 +523,21 @@ func TestIcdManagementServer(t *testing.T) {
 		withRegisteredNode := func(t *testing.T) (*fabrictest.Pair, uint64) {
 			t.Helper()
 			_, pair := icdPair(t, icdSetup{})
-			node := uint64(0x0101)
-			if _, err := registerClient(t.Context(), pair, permanent(node, icdKeyA)); err != nil {
+			nodeID := uint64(0x0101)
+			if _, err := registerClient(t.Context(), pair, permanent(nodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
 			if err := pair.Grant(t.Context(), store.PrivilegeManage); err != nil {
 				t.Fatal(err)
 			}
-			return pair, node
+			return pair, nodeID
 		}
 		vk := func(b []byte) *[]byte { return &b }
 		t.Run("registerClient update as Manage with correct verificationKey succeeds and updates the entry", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
+			pair, nodeID := withRegisteredNode(t)
 			ctx := t.Context()
-			if _, err := registerClient(ctx, pair, icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: icdKeyB, VerificationKey: vk(icdKeyA), ClientType: icddef.ClientTypeEphemeral}); err != nil {
+			if _, err := registerClient(ctx, pair, icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: icdKeyB, VerificationKey: vk(icdKeyA), ClientType: icddef.ClientTypeEphemeral}); err != nil {
 				t.Fatal(err)
 			}
 			regs := icdServer(pair).Registrations(pairFabric(ctx, t, pair))
@@ -546,21 +547,21 @@ func TestIcdManagementServer(t *testing.T) {
 		})
 		t.Run("registerClient update as Manage with wrong verificationKey rejects with Failure", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
-			_, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: icdKeyB, VerificationKey: vk(icdKeyF), ClientType: icddef.ClientTypeEphemeral})
+			pair, nodeID := withRegisteredNode(t)
+			_, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: icdKeyB, VerificationKey: vk(icdKeyF), ClientType: icddef.ClientTypeEphemeral})
 			wantStatus(t, err, im.StatusFailure)
 		})
 		t.Run("registerClient update as Manage with missing verificationKey rejects with Failure", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
-			_, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: icdKeyB, ClientType: icddef.ClientTypeEphemeral})
+			pair, nodeID := withRegisteredNode(t)
+			_, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: icdKeyB, ClientType: icddef.ClientTypeEphemeral})
 			wantStatus(t, err, im.StatusFailure)
 		})
 		t.Run("unregisterClient as Manage with correct verificationKey succeeds and removes the entry", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
+			pair, nodeID := withRegisteredNode(t)
 			ctx := t.Context()
-			if err := unregisterClient(ctx, pair, icddef.UnregisterClientRequest{CheckInNodeId: node, VerificationKey: vk(icdKeyA)}); err != nil {
+			if err := unregisterClient(ctx, pair, icddef.UnregisterClientRequest{CheckInNodeId: nodeID, VerificationKey: vk(icdKeyA)}); err != nil {
 				t.Fatal(err)
 			}
 			if regs := icdServer(pair).Registrations(pairFabric(ctx, t, pair)); len(regs) != 0 {
@@ -569,13 +570,13 @@ func TestIcdManagementServer(t *testing.T) {
 		})
 		t.Run("unregisterClient as Manage with wrong verificationKey rejects with Failure", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
-			wantStatus(t, unregisterClient(t.Context(), pair, icddef.UnregisterClientRequest{CheckInNodeId: node, VerificationKey: vk(icdKeyF)}), im.StatusFailure)
+			pair, nodeID := withRegisteredNode(t)
+			wantStatus(t, unregisterClient(t.Context(), pair, icddef.UnregisterClientRequest{CheckInNodeId: nodeID, VerificationKey: vk(icdKeyF)}), im.StatusFailure)
 		})
 		t.Run("unregisterClient as Manage with missing verificationKey rejects with Failure", func(t *testing.T) {
 			t.Parallel()
-			pair, node := withRegisteredNode(t)
-			wantStatus(t, unregisterClient(t.Context(), pair, icddef.UnregisterClientRequest{CheckInNodeId: node}), im.StatusFailure)
+			pair, nodeID := withRegisteredNode(t)
+			wantStatus(t, unregisterClient(t.Context(), pair, icddef.UnregisterClientRequest{CheckInNodeId: nodeID}), im.StatusFailure)
 		})
 	})
 
@@ -630,8 +631,8 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
 			ctx := t.Context()
-			node := pair.Address.NodeID
-			if _, err := registerClient(ctx, pair, permanent(node, icdKeyA)); err != nil {
+			nodeID := pair.Address.NodeID
+			if _, err := registerClient(ctx, pair, permanent(nodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
 			fabric := pairFabric(ctx, t, pair)
@@ -642,7 +643,7 @@ func TestIcdManagementServer(t *testing.T) {
 				t.Fatal(err)
 			}
 			regs := icdServer(pair).Registrations(fabric)
-			if len(regs) != 1 || regs[0].CheckInNodeID != node || !bytes.Equal(regs[0].Key, icdKeyA) {
+			if len(regs) != 1 || regs[0].CheckInNodeID != nodeID || !bytes.Equal(regs[0].Key, icdKeyA) {
 				t.Fatalf("restored %+v", regs)
 			}
 		})
@@ -1007,15 +1008,15 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			rec := &icdRecorder{}
 			site, pair := icdPair(t, icdSetup{cfg: checkInConfig, recorder: rec})
-			node := pair.Address.NodeID
-			if _, err := registerClient(t.Context(), pair, permanent(node, icdKeyA)); err != nil {
+			nodeID := pair.Address.NodeID
+			if _, err := registerClient(t.Context(), pair, permanent(nodeID, icdKeyA)); err != nil {
 				t.Fatal(err)
 			}
 			before := icdServer(pair).Counter().Value()
 			rec.reset()
 			wake(t, site, pair)
 			sent := rec.snapshot()
-			if len(sent) != 1 || sent[0].PeerNodeID != node || icdServer(pair).Counter().Value() != before+1 {
+			if len(sent) != 1 || sent[0].PeerNodeID != nodeID || icdServer(pair).Counter().Value() != before+1 {
 				t.Fatalf("sent %+v, counter %d after %d", sent, icdServer(pair).Counter().Value(), before)
 			}
 		})
@@ -1073,8 +1074,8 @@ func TestIcdManagementServer(t *testing.T) {
 			t.Parallel()
 			rec := &icdRecorder{}
 			site, pair := icdPair(t, icdSetup{cfg: checkInConfig, recorder: rec})
-			node := pair.Address.NodeID
-			if _, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: node, MonitoredSubject: node, Key: icdKeyA, ClientType: icddef.ClientTypeEphemeral}); err != nil {
+			nodeID := pair.Address.NodeID
+			if _, err := registerClient(t.Context(), pair, icddef.RegisterClientRequest{CheckInNodeId: nodeID, MonitoredSubject: nodeID, Key: icdKeyA, ClientType: icddef.ClientTypeEphemeral}); err != nil {
 				t.Fatal(err)
 			}
 			rec.reset()
@@ -1155,7 +1156,7 @@ func (e *icdEvents) want(t *testing.T, want ...string) {
 	t.Helper()
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if !slices.Equal(e.events, want) && !(len(want) == 0 && len(e.events) == 0) {
+	if !slices.Equal(e.events, want) && (len(want) != 0 || len(e.events) != 0) {
 		t.Fatalf("events %v, want %v", e.events, want)
 	}
 }

@@ -427,7 +427,7 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 		r.SessionIdleInterval = uint32(dd.SII.Milliseconds()) //nolint:gosec // TXTData bounds SII to one hour
 	}
 	if fn := p.litOperating.Load(); fn != nil && r.SessionIdleInterval == 0 && (*fn)() {
-		r.SessionIdleInterval = uint32(LITMinIdleInterval.Milliseconds())
+		r.SessionIdleInterval = uint32(LITMinIdleInterval.Milliseconds()) //nolint:gosec // 5000 ms
 	}
 	if r.SessionActiveInterval == 0 && dd.SAI != nil {
 		r.SessionActiveInterval = uint32(dd.SAI.Milliseconds()) //nolint:gosec // TXTData bounds SAI to one hour

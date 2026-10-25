@@ -115,11 +115,11 @@ func (e ICDModeEvent) String() string { return mattercore.ICDModeEvent(e).String
 func (c *ICDConfig) coreConfig() (mattercore.ICDManagementConfig, error) {
 	var errs []error
 	whole := func(name string, d, unit time.Duration, maxUnits uint64) uint64 {
-		if d < 0 || d%unit != 0 || uint64(d/unit) > maxUnits {
+		if d < 0 || d%unit != 0 || uint64(d/unit) > maxUnits { //nolint:gosec // d is not negative here
 			errs = append(errs, fmt.Errorf("node: ICD.%s %v is not a whole number of %v up to %d", name, d, unit, maxUnits))
 			return 0
 		}
-		return uint64(d / unit)
+		return uint64(d / unit) //nolint:gosec // d is not negative here
 	}
 	idle := whole("IdleModeDuration", c.IdleModeDuration, time.Second, 64800)
 	backoff := whole("MaximumCheckInBackoff", c.MaximumCheckInBackoff, time.Second, 64800)
@@ -321,4 +321,15 @@ func (i *ICD) OnModeChangeAsync(fn func(ICDModeEvent)) (unsubscribe func()) {
 	}
 	q := i.n.callbacks
 	return i.srv.OnModeEvent(func(e mattercore.ICDModeEvent) { q.Enqueue(func() { fn(ICDModeEvent(e)) }) })
+}
+
+// startICD enters active mode once the node's fabrics are announced: the
+// first Check-Ins go out (IcdManagementServer.ts:252-343, #online). A
+// node that is no ICD does nothing.
+func (n *Node) startICD(ctx context.Context) {
+	if srv := n.root.ICDManagement; srv != nil {
+		if err := srv.Start(ctx); err != nil {
+			n.logger.Warn("icd.start_failed", slog.Any("err", err))
+		}
+	}
 }

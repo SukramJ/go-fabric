@@ -41,7 +41,7 @@ func icdStore(t *testing.T) *memstore.Store {
 }
 
 // invokeCtx is a command's context on fabric, with privilege granted.
-func icdInvokeCtx(fabric uint8, privilege uint8) context.Context {
+func icdInvokeCtx(fabric, privilege uint8) context.Context {
 	ctx := im.WithFabricFilter(context.Background(), true, fabric)
 	ctx = im.WithCommandPath(ctx, im.ConcreteCommandPath{Endpoint: 0, Cluster: core.ICDManagementClusterID})
 	return im.WithAuthority(ctx, func(_ uint16, _ uint32, want uint8) im.StatusCode {

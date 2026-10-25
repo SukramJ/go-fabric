@@ -465,7 +465,7 @@ func (s *ICDManagement) loadCounter(ctx context.Context) (*icd.Counter, error) {
 		return nil, err
 	}
 	counter.OnChange(func(v uint32) {
-		if err := s.saveCounter(context.Background(), v); err != nil {
+		if err := s.saveCounter(context.WithoutCancel(ctx), v); err != nil {
 			s.logger.Warn("icd.management.persist_counter", slog.Any("err", err))
 		}
 	})

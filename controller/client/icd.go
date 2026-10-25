@@ -779,7 +779,7 @@ func (c *ICDClient) registerClient(ctx context.Context, req icddef.RegisterClien
 		return 0, err
 	}
 	if !res.HasFields {
-		return 0, fmt.Errorf("client: RegisterClient answered without a response")
+		return 0, errors.New("client: RegisterClient answered without a response")
 	}
 	var resp icddef.RegisterClientResponse
 	if err := resp.DecodeTLV(res.Fields); err != nil {
@@ -915,7 +915,7 @@ func (c *ICDClient) StayActive(ctx context.Context, d time.Duration) (time.Durat
 	}
 	var resp icddef.StayActiveResponse
 	if !res.HasFields {
-		return 0, fmt.Errorf("client: StayActiveRequest answered without a response")
+		return 0, errors.New("client: StayActiveRequest answered without a response")
 	}
 	if err := resp.DecodeTLV(res.Fields); err != nil {
 		return 0, fmt.Errorf("client: StayActiveResponse: %w", err)
@@ -1276,7 +1276,7 @@ func (c *ICDClient) readOperatingMode(ctx context.Context) (uint64, error) {
 	}
 	v, ok := rep.Value(0, icddef.ClusterID, icddef.AttrOperatingMode)
 	if !ok {
-		return 0, fmt.Errorf("client: the peer reported no OperatingMode")
+		return 0, errors.New("client: the peer reported no OperatingMode")
 	}
 	return v.El.Uint, nil
 }

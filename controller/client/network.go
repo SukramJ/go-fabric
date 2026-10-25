@@ -41,6 +41,16 @@ func (n *Node) defaultRequest() SubscribeRequest {
 	return r
 }
 
+// dropDefaultSubscription closes the default subscription no longer
+// desired (NetworkClient.ts:113-196).
+func (n *Node) dropDefaultSubscription() {
+	n.mu.Lock()
+	s := n.sub
+	n.sub = nil
+	n.mu.Unlock()
+	s.Close()
+}
+
 // syncAutoSubscribe is NetworkClient.#syncAutoSubscribe
 // (NetworkClient.ts:113-196): a newly commissioned node reads the default
 // subscription's paths once (:133-143, unless NoInitialRead); then, when a
@@ -66,11 +76,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		return nil
 	}
 	if !desired {
-		n.mu.Lock()
-		s := n.sub
-		n.sub = nil
-		n.mu.Unlock()
-		s.Close()
+		n.dropDefaultSubscription()
 		return nil
 	}
 	sreq := req
@@ -91,12 +97,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 			n.cfg.Hooks.SubscriptionAlive()
 		}
 	}
-	// The ICD branches of the sustained subscription
-	// (ClientNodeInteraction.ts:174, :178).
-	if n.icd != nil {
-		sreq.Wakefulness = n.icd.Wakefulness
-		sreq.PeerFed = n.icd.peerFed
-	}
+	n.icdSustainHooks(&sreq)
 	sreq.Updated = func(*Report) { alive() }
 	sreq.KeepaliveReceived = alive
 	sreq.Closed = func() {
@@ -389,4 +390,13 @@ func (n *Node) Seeded() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.seeded
+}
+
+// icdSustainHooks gives the default subscription the ICD branches of the
+// sustained subscription (ClientNodeInteraction.ts:174, :178).
+func (n *Node) icdSustainHooks(req *SubscribeRequest) {
+	if n.icd != nil {
+		req.Wakefulness = n.icd.Wakefulness
+		req.PeerFed = n.icd.peerFed
+	}
 }

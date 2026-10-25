@@ -56,7 +56,7 @@ func (r *receiver) handle(c icd.ReceivedCheckIn) {
 func (r *receiver) counters() []uint32 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var out []uint32
+	out := make([]uint32, 0, len(r.got))
 	for _, c := range r.got {
 		out = append(out, c.Counter)
 	}
@@ -130,7 +130,9 @@ func TestFabricIcdControllerRole(t *testing.T) {
 			r := &receiver{}
 			table.AddPeer(icd.Peer{PeerNodeID: 11, Key: fabricKeyA, CounterStart: 10}, r.handle)
 			payload := encodeICD(t, fabricKeyA, 12, 5000)
-			if !processed(t, table, payload) || !processed(t, table, payload) || len(r.got) != 1 {
+			first := processed(t, table, payload)
+			second := processed(t, table, payload)
+			if !first || !second || len(r.got) != 1 {
 				t.Fatal(r.got)
 			}
 		})

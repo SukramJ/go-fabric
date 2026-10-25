@@ -35,7 +35,8 @@ func TestDoublingCheckInBackOff(t *testing.T) {
 	t.Parallel()
 	t.Run("doubles the gap, capped at maximumCheckInBackoff", func(t *testing.T) {
 		t.Parallel()
-		b := icd.NewDoublingBackOff(60*time.Second, 960*time.Second) // maxCycles = 16
+		// The back-off allows 16 cycles.
+		b := icd.NewDoublingBackOff(60*time.Second, 960*time.Second)
 		if got := sendCycles(b, keyA, 64); !slices.Equal(got, []int{0, 1, 3, 7, 15, 31, 47, 63}) {
 			t.Fatal(got)
 		}

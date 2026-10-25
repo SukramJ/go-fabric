@@ -134,6 +134,7 @@ func HoldUntilICDPeerAwake(ctx context.Context, w *icd.PeerWakefulness, peer Pee
 		return ctx.Err()
 	case icd.AwaitTimeout:
 		return &ICDPeerAsleepError{Peer: peer, Timeout: timeout}
+	case icd.AwaitAwakeResult:
 	}
 	return nil
 }

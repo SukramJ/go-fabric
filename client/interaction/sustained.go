@@ -276,12 +276,7 @@ const SITRetryInterval = 15 * time.Second
 func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Duration) {
 	st := outer.sustained
 	ctx := outer.ctx
-	wakefulness := func() *icd.PeerWakefulness {
-		if outer.request.Wakefulness == nil {
-			return nil
-		}
-		return outer.request.Wakefulness()
-	}
+	wakefulness := outer.wakefulness
 	defer func() {
 		st.mu.Lock()
 		inner := st.inner
@@ -306,85 +301,19 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// connection (:133-135).
 	recreatePriority := false
 	for {
-		closed := make(chan struct{})
-		var closeOnce sync.Once
-		// deliberate detaches the closed callback from a teardown of our own
-		// (:305-308).
-		var deliberate atomic.Bool
-		req := outer.request
-		req.Updated = updated
-		req.Sustain, req.BootstrapRead, req.ActiveChanged = false, nil, nil
-		req.Wakefulness, req.PeerFed = nil, nil
-		req.Closed = func() {
-			if deliberate.Load() {
-				return
-			}
-			closeOnce.Do(func() {
-				st.mu.Lock()
-				st.inner = nil
-				st.trusted = false
-				st.mu.Unlock()
-				st.releaseHold()
-				outer.mu.Lock()
-				outer.id = NoSubscription
-				outer.mu.Unlock()
-				close(closed)
-			})
-		}
-		priority := false
-		if recreatePriority {
-			priority, recreatePriority = true, false
-		} else if w := wakefulness(); w != nil && w.RequiresAwait() {
-			priority = true
-		}
+		req, closed, deliberate := innerRequest(outer, updated)
+		priority := recreatePriority || requiresAwait(wakefulness())
+		recreatePriority = false
 
-		if w := wakefulness(); w != nil && w.RequiresAwait() {
-			switch {
-			case awaitFreshSignal:
-				outer.setActive(false)
-				if !c.nextWake(ctx, w) {
-					return
-				}
-				awaitFreshSignal = false
-			case !w.Awake():
-				outer.setActive(false)
-				if !w.Awake() && !c.awaitAwake(ctx, w) {
-					return
-				}
-			}
-			if ctx.Err() != nil {
-				return
-			}
-		} else {
-			st.mu.Lock()
-			trusted := st.trusted
-			st.mu.Unlock()
-			if !trusted {
-				if !c.provider.VerifyReachability(ctx) && ctx.Err() == nil {
-					// Probing failed, so we get a new session anyway.
-					c.log.Info("matter.controller.interaction.sustain_probe_failed", slog.Uint64("node_id", outer.peer.NodeID))
-				}
-				if ctx.Err() != nil {
-					return
-				}
-			}
+		if !c.sustainGate(ctx, outer, wakefulness(), &awaitFreshSignal) {
+			return
 		}
 
 		schedule := newRetries(DefaultSustainRetries, c.rand)
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh, priority)
 			if err == nil {
-				st.mu.Lock()
-				st.inner = inner
-				st.trusted = true
-				st.mu.Unlock()
-				outer.mu.Lock()
-				outer.id = inner.ID()
-				outer.mu.Unlock()
-				st.releaseHold()
-				if w := wakefulness(); w != nil {
-					st.setHold(w.HoldSubscription())
-				}
+				established(outer, inner, wakefulness())
 				break
 			}
 			if ctx.Err() != nil {
@@ -426,21 +355,130 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			continue
 		}
 		deliberate.Store(true)
-		st.mu.Lock()
-		inner := st.inner
-		st.inner = nil
-		st.trusted = true // the CASE session is untouched: no probe
-		st.mu.Unlock()
-		outer.mu.Lock()
-		outer.id = NoSubscription
-		outer.mu.Unlock()
-		st.releaseHold()
-		if inner != nil {
-			inner.Close()
-		}
+		tearDownForRecreate(outer)
 		c.log.Info("matter.controller.interaction.sustain_recreating", slog.Uint64("node_id", outer.peer.NodeID),
 			slog.String("reason", "ICD operating mode change"))
 		recreatePriority = true
+	}
+}
+
+// wakefulness is the peer's ICD wakefulness, read live on every use so a
+// peer registered or flipped SIT⇄LIT later is honoured
+// (SustainedSubscription.ts:160-162); nil for a peer that is no ICD.
+func (s *Subscription) wakefulness() *icd.PeerWakefulness {
+	if s.request.Wakefulness == nil {
+		return nil
+	}
+	return s.request.Wakefulness()
+}
+
+// innerRequest is one attempt's request (SustainedSubscription.ts:141-158):
+// the outer request without the sustained fields, its closed callback
+// clearing the inner subscription and closing the returned channel, unless
+// the returned flag marks a teardown of our own (:305-308).
+func innerRequest(outer *Subscription, updated func(*Report)) (SubscribeRequest, <-chan struct{}, *atomic.Bool) {
+	st := outer.sustained
+	closed := make(chan struct{})
+	var closeOnce sync.Once
+	deliberate := new(atomic.Bool)
+	req := outer.request
+	req.Updated = updated
+	req.Sustain, req.BootstrapRead, req.ActiveChanged = false, nil, nil
+	req.Wakefulness, req.PeerFed = nil, nil
+	req.Closed = func() {
+		if deliberate.Load() {
+			return
+		}
+		closeOnce.Do(func() {
+			st.mu.Lock()
+			st.inner = nil
+			st.trusted = false
+			st.mu.Unlock()
+			st.releaseHold()
+			outer.mu.Lock()
+			outer.id = NoSubscription
+			outer.mu.Unlock()
+			close(closed)
+		})
+	}
+	return req, closed, deliberate
+}
+
+// requiresAwait reports a peer whose interactions wait for its wake; every
+// connection to it is the priority one (SustainedSubscription.ts:145-149).
+func requiresAwait(w *icd.PeerWakefulness) bool { return w != nil && w.RequiresAwait() }
+
+// sustainGate runs before an attempt (SustainedSubscription.ts:129-131,
+// :160-200): a peer that requires awaiting is waited for — its next wake
+// after a failed attempt, its wake while it sleeps — and any other peer
+// whose session is not trusted is probed. It reports false when ctx ended.
+func (c *Interaction) sustainGate(ctx context.Context, outer *Subscription, w *icd.PeerWakefulness, awaitFreshSignal *bool) bool {
+	st := outer.sustained
+	if w != nil && w.RequiresAwait() {
+		switch {
+		case *awaitFreshSignal:
+			outer.setActive(false)
+			if !c.nextWake(ctx, w) {
+				return false
+			}
+			*awaitFreshSignal = false
+		case !w.Awake():
+			outer.setActive(false)
+			if !w.Awake() && !c.awaitAwake(ctx, w) {
+				return false
+			}
+		}
+		return ctx.Err() == nil
+	}
+	st.mu.Lock()
+	trusted := st.trusted
+	st.mu.Unlock()
+	if !trusted {
+		if !c.provider.VerifyReachability(ctx) && ctx.Err() == nil {
+			// Probing failed, so we get a new session anyway.
+			c.log.Info("matter.controller.interaction.sustain_probe_failed", slog.Uint64("node_id", outer.peer.NodeID))
+		}
+		if ctx.Err() != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// established records the inner subscription an attempt established and,
+// for an ICD peer, holds the peer's wakefulness for it
+// (SustainedSubscription.ts:224-229).
+func established(outer, inner *Subscription, w *icd.PeerWakefulness) {
+	st := outer.sustained
+	st.mu.Lock()
+	st.inner = inner
+	st.trusted = true
+	st.mu.Unlock()
+	outer.mu.Lock()
+	outer.id = inner.ID()
+	outer.mu.Unlock()
+	st.releaseHold()
+	if w != nil {
+		st.setHold(w.HoldSubscription())
+	}
+}
+
+// tearDownForRecreate closes the inner subscription for a mode-flip
+// recreate; the CASE session is untouched, so the next attempt does not
+// probe (SustainedSubscription.ts:300-312).
+func tearDownForRecreate(outer *Subscription) {
+	st := outer.sustained
+	st.mu.Lock()
+	inner := st.inner
+	st.inner = nil
+	st.trusted = true
+	st.mu.Unlock()
+	outer.mu.Lock()
+	outer.id = NoSubscription
+	outer.mu.Unlock()
+	st.releaseHold()
+	if inner != nil {
+		inner.Close()
 	}
 }
 

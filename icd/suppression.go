@@ -30,7 +30,7 @@ func SubjectMatches(target, candidate uint64) bool {
 	if !isCATSubject(target) || !isCATSubject(candidate) {
 		return false
 	}
-	t, c := uint32(target), uint32(candidate)
+	t, c := uint32(target), uint32(candidate) //nolint:gosec // a CAT subject's low 32 bits are the CAT (isCATSubject)
 	return t>>16 == c>>16 && c&0xFFFF >= t&0xFFFF
 }
 

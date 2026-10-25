@@ -6,9 +6,11 @@ package peer
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 )
 
@@ -177,30 +179,8 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	current := addressOf(s.Addr()).AddrPort()
 	discovered := p.service.Addresses()
 	log := p.log.With(slog.String("reason", reason.String()), slog.String("address", current.String()))
-	// A sleeping LIT ICD does not answer a probe, and a failed probe would
-	// close a healthy session: it is never probed. When its address left
-	// mDNS a discovered one is adopted on trust, the session's IP family
-	// preferred, since the other family cannot be ruled out without a
-	// probe. Mirrors PeerAddressMonitor.ts:143-172 (Core §4.12.2.1).
 	if p.icdAwaited() {
-		if len(discovered) == 0 {
-			return true
-		}
-		for _, a := range discovered {
-			if a.AddrPort() == current {
-				return true
-			}
-		}
-		next := discovered[0]
-		for _, a := range discovered {
-			if a.IP.Is4() == current.Addr().Is4() {
-				next = a
-				break
-			}
-		}
-		log.Info("matter.controller.peer.icd_address_adopted", slog.String("to", next.String()))
-		s.SetAddr(next.UDPAddr())
-		p.followAddress(s)
+		adoptICDAddress(p, s, current, discovered, log)
 		return true
 	}
 	if reason == ReasonSessionSuspect {
@@ -295,4 +275,31 @@ func (m *monitor) resetBackoff() {
 	defer m.mu.Unlock()
 	m.fibPrev, m.fibCurr = 0, 0
 	m.lastProbeAt = time.Time{}
+}
+
+// adoptICDAddress is the monitor's ICD branch. A sleeping LIT ICD does not
+// answer a probe, and a failed probe would close a healthy session: it is
+// never probed. When its address left mDNS a discovered one is adopted on
+// trust, the session's IP family preferred, since the other family cannot
+// be ruled out without a probe. Mirrors PeerAddressMonitor.ts:143-172
+// (Core §4.12.2.1).
+func adoptICDAddress(p *Peer, s *exchange.Session, current netip.AddrPort, discovered []discovery.Address, log *slog.Logger) {
+	if len(discovered) == 0 {
+		return
+	}
+	for _, a := range discovered {
+		if a.AddrPort() == current {
+			return
+		}
+	}
+	next := discovered[0]
+	for _, a := range discovered {
+		if a.IP.Is4() == current.Addr().Is4() {
+			next = a
+			break
+		}
+	}
+	log.Info("matter.controller.peer.icd_address_adopted", slog.String("to", next.String()))
+	s.SetAddr(next.UDPAddr())
+	p.followAddress(s)
 }
