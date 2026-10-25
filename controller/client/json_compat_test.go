@@ -374,6 +374,27 @@ func TestJSONAccessControlOnASite(t *testing.T) {
 // type is ErrJSONValue.
 func TestJSONForms(t *testing.T) {
 	t.Parallel()
+	// "<", ">" and "&" render as they are, as JSON.stringify writes them
+	// (matterjs-server), not as json.Marshal's < escapes; no
+	// trailing newline. BasicInformation NodeLabel (0x0028/0x0005) and
+	// the untyped form.
+	for _, c := range []struct {
+		f  client.Field
+		in string
+	}{
+		{client.AttributeField(0x0028, 0x0005), `"a<b>&c"`},
+		{client.Field{}, `{"0":"<&>"}`},
+	} {
+		e, err := client.EncodeJSON(c.f, json.RawMessage(c.in))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, form := range []client.Form{client.TagBased, client.NameBased} {
+			if got, err := client.DecodeJSON(c.f, valueOf(t, e), form); err != nil || string(got) != c.in {
+				t.Fatalf("DecodeJSON(%s) = %s (%v), want the bytes unescaped", c.in, got, err)
+			}
+		}
+	}
 	// BasicInformation UniqueID is a string; OnOff's GlobalSceneControl a bool.
 	roundTrip(t, "bool", client.AttributeField(onoffdef.ClusterID, onoffdef.AttrGlobalSceneControl), json.RawMessage(`true`), client.TagBased)
 	// GeneralDiagnostics UpTime is a uint64 (0x0033/0x0002).

@@ -168,7 +168,7 @@ func EncodeJSON(f Field, raw json.RawMessage) (Encodable, error) {
 	if err := dec.Decode(&v); err != nil {
 		return nil, errors.Join(ErrJSONValue, err)
 	}
-	b, err := json.Marshal(prepareJSON(f.f.Type, v, f.request))
+	b, err := marshalJSON(prepareJSON(f.f.Type, v, f.request))
 	if err != nil {
 		return nil, errors.Join(ErrJSONValue, err)
 	}
@@ -320,11 +320,25 @@ func DecodeJSON(f Field, v Value, form Form) (json.RawMessage, error) {
 	} else {
 		out = typedJSON(f.f.Type, v, form)
 	}
-	b, err := json.Marshal(out)
+	b, err := marshalJSON(out)
 	if err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+// marshalJSON is json.Marshal without its HTML escaping: "<", ">" and "&"
+// stay as they are, as JavaScript's JSON.stringify — the writer of
+// matterjs-server's JSON — leaves them, so a string attribute renders the
+// bytes a matter.js-based server sends. No trailing newline.
+func marshalJSON(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
 func typedJSON(t spec.Type, n Value, form Form) any {
