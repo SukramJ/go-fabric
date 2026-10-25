@@ -177,7 +177,20 @@ _ = site.Run(ctx, func(ctx context.Context) error {
 })
 ```
 
-*Source: `fabrictest/controller_config.go`, `controller/site_test.go`.*
+The device side has the same route. `Site.AddNode(cfg)` takes the
+`node.Config` a daemon composes for `node.New` and runs it on the site:
+the site puts in its network (the listen address and, with
+`Client.Enabled`, the client socket and DNS-SD cache), its clock, an
+advertiser whose records it answers DNS-SD with, its logger when the
+configuration has none, and a store of its own when the configuration
+states none; TCP and the re-announcement are off. Everything else — the
+passcode and discriminator, the product, the labels, the ICD or OTA
+configuration, the host topology — is the daemon's. The device serves
+`cfg.Topology` or the node's Aggregator, empty until the test adds to it
+through `Device.Act`; `Device.Restart` builds the node from the same
+configuration again.
+
+*Source: `fabrictest/controller_config.go`, `fabrictest/device.go` (`AddNode`), `controller/site_test.go`, `fabrictest/addnode_test.go`.*
 
 ## Time
 
