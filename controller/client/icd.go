@@ -332,8 +332,8 @@ func (c *ICDClient) Available() bool {
 	return c.available
 }
 
-// PeerSupportsLIT is [ICDClient.litSupported] on the image.
-func (c *ICDClient) PeerSupportsLIT() bool { return c.n.litSupported() }
+// PeerSupportsLIT is [Node.LITSupported] (IcdClient.ts:68-70).
+func (c *ICDClient) PeerSupportsLIT() bool { return c.n.LITSupported() }
 
 // Awake reports a peer to which a message goes out now: a non-LIT or not
 // yet registered peer reads true (IcdClient.ts:75-77).
@@ -429,10 +429,10 @@ func (c *ICDClient) emit(f func(icdObserver)) {
 	}
 }
 
-// litSupported is matter.js IcdClient.litSupported (IcdClient.ts:967-974):
+// LITSupported is matter.js IcdClient.litSupported (IcdClient.ts:967-974):
 // the peer's IcdManagement has LongIdleTimeSupport and its BasicInformation
 // reports specification 1.4.0 or later.
-func (n *Node) litSupported() bool {
+func (n *Node) LITSupported() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.litSupportedLocked()
@@ -489,7 +489,7 @@ func (n *Node) icdImage() icdImage {
 // litOperating is #peerIsLongIdleTimeOperating (IcdClient.ts:89-94).
 func (c *ICDClient) litOperating() bool {
 	img := c.n.icdImage()
-	return c.n.litSupported() && img.mode != nil && *img.mode == uint64(icddef.OperatingModeLit)
+	return c.n.LITSupported() && img.mode != nil && *img.mode == uint64(icddef.OperatingModeLit)
 }
 
 // fabricContext is our side of the peer's fabric (IcdClient.ts:715-724).
@@ -1191,7 +1191,7 @@ func (c *ICDClient) onOperatingModeChanged() {
 // subscription when nothing is stored or running; a trigger during an
 // attempt re-runs it once (IcdClient.ts:195-215).
 func (c *ICDClient) ensureLITRegistration() {
-	if c.ctx.Err() != nil || !c.n.litSupported() || !c.n.SubscriptionActive() {
+	if c.ctx.Err() != nil || !c.n.LITSupported() || !c.n.SubscriptionActive() {
 		return
 	}
 	c.mu.Lock()
@@ -1232,7 +1232,7 @@ func (c *ICDClient) autoRegister() {
 		defer c.mu.Unlock()
 		return c.op == nil && c.reg == nil
 	}
-	if !idle() || !c.n.online() || !c.n.litSupported() {
+	if !idle() || !c.n.online() || !c.n.LITSupported() {
 		return
 	}
 	mode, err := c.readOperatingMode(ctx)
