@@ -99,8 +99,8 @@ one none uses, and both come before completeness for its own sake.
 | 3 | [Behaviour depth](#milestone-3-behaviour-depth) | `v0.9.0` | 17–19 | the 25 matter.js servers with logic are ported line for line — remotes, thermostats, locks behave as the ecosystems expect |
 | 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.11.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
 | 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` (23–24), `v0.13.0` (25) | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
-| 6 | [Completeness](#milestone-6-completeness) | `v0.13.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
-| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.14.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+| 6 | [Completeness](#milestone-6-completeness) | `v0.14.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
+| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.15.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 
 Milestones 2 and 3 are the owner's order of 2026-10-17: the test
 foundation first, because milestones 3–7 are proved on it; the behaviour

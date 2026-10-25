@@ -4130,3 +4130,73 @@ with eight processes beside it the build took up to 1.27 s (brief CG), so
 the budget would move the fake clock mid-build. Reasoning: the budget
 exists to end work that waits for a clock nobody moves; a construction
 waits for the CPU, and `Options.Wait` still ends one that never returns.
+
+### BD-Matter-ICD-NoNetworkProfiles — the sustained subscription records the priority intent; no connection is throttled until phase 25
+
+matter.js re-subscribes a LIT peer on the `icdLit` network profile so the
+recreate bypasses the per-network throttle and lands inside the peer's
+active window (`packages/protocol/src/action/client/subscription/SustainedSubscription.ts:133-149`
+at `862ad75f`). Go has one network and no throttle (findings register,
+"Network profiles"), so `ConnectOptions.Priority`
+(`client/peer/connection.go:92-102`) marks the connection and the park-resume
+takes it, while nothing is queued behind it. Reasoning: the flag is what the
+profile exists for; the profile itself arrives with phase 25's network
+profiles, and the flag is already the seam it plugs into.
+
+### BD-Matter-ICDClient-OneOperationSlot — the ICD client serialises on one operation slot with abandonment, not on matter.js's transaction participant
+
+matter.js runs register, refresh, unregister and forget as `Operation`s a
+second caller joins or abandons (`packages/node/src/behavior/system/icd/IcdClient.ts:980-991`
+at `862ad75f`) inside its transaction model. Go has no transaction model
+(ADR 0029): `controller/client/icd.go:148-162` keeps one operation at a time,
+Unregister and Forget take over a running Register or refresh, and the
+abandoned caller gets `ErrICDAbandoned`. The transaction and interleaving
+groups of `IcdClientTest` are not ported for this reason (findings register).
+Reasoning: the observable contract — the later intent wins, the earlier
+caller learns it — holds without a transaction participant Go has no
+counterpart for.
+
+### BD-Matter-ICD-RegistrationsInStoreArea — the device's registrations and keys live in the `store.ICD` area, not in behaviour state
+
+matter.js keeps `registeredClients`, `icdCounter` and the per-registration
+ICDToken keys as nonvolatile behaviour state
+(`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:777-791`
+at `862ad75f`). Go has no behaviour state: `cluster/core/icd_management.go:253`
+reads and writes the `store.ICD` area (`store/icd.go`, table
+`matter_icd_registrations`, metadata counter `icd_management.counter`),
+as every other persisted server state does here (ADR 0029). The keys are
+stored in clear as matter.js stores them; the owner decided on 2026-10-25
+to encrypt them at rest like the DoorLock credentials (brief CJ), which
+changes the storage, not the protocol.
+
+### BD-Matter-ICD-ZeroBackoffIsIdleDuration — a zero `MaximumCheckInBackoff` in the facade means IdleModeDuration
+
+matter.js's state carries `maximumCheckInBackOff` with the schema default
+(IdleModeDuration, `icd-management.element.ts`) and a host that leaves it
+gets that value. Go's `node.ICDConfig` is a plain struct, so its zero value
+has to mean something: `node/icd.go:52` and `:70` resolve a zero
+`MaximumCheckInBackoff` to the configured IdleModeDuration, the same default
+by another route. Reasoning: a Go zero value is not "unset" in a schema
+sense; mapping it to the schema default keeps the wire identical.
+
+### BD-Matter-ICD-ActivityNotedOnReceipt — inbound activity extends the active window when a message arrives, not when the exchange ends
+
+matter.js notes activity when `NodeActivity` reports inactive, that is when
+the last exchange closes (`IcdManagementServer.ts:300-306` at `862ad75f`).
+Go notes it on receipt: `bridge/icd.go:57` calls the hook for every
+authenticated inbound message and `node/icd.go:207` wires it to
+`ICDManagement.NoteActivity`. Reasoning: the Go bridge has no node-wide
+activity counter whose close is observable without the counted-work seam
+of the test site; noting on receipt extends the window earlier by at most
+one exchange, never shorter, so a controller's follow-up still finds the
+device awake.
+
+### BD-Matter-ICD-FakeClockSingleReading — the fake clock has one reading, so matter.js's separate wall-clock steps are not ported
+
+matter.js's MockTime can advance the wall clock apart from the monotonic
+timers, and two cases each in `IcdModeTest` and `IcdPeerWakefulnessTest`
+step them separately. `clock/clocktest/fake.go:60` has one `Now` for both,
+by ADR 0028's clock ownership rule. The four cases are listed in the
+findings register; the behaviour they check (a wall-clock jump does not
+move a timer) is held by construction here, since no timer reads the wall
+clock.
