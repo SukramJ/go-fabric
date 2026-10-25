@@ -128,10 +128,22 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	n.mu.Lock()
-	sub, n.sub = s, s
-	n.mu.Unlock()
+	n.adoptDefaultSubscription(s, &sub)
 	return nil
+}
+
+// adoptDefaultSubscription makes s the default subscription, also in the
+// caller's own variable its callbacks compare against. s can go
+// active before n.sub names it, and an ICD trigger that ran then read
+// SubscriptionActive false: the ICD client gets the edge again now that it
+// can see it (a duplicate trigger is absorbed by its own guards).
+func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription) {
+	n.mu.Lock()
+	*own, n.sub = s, s
+	n.mu.Unlock()
+	if s.Active() && n.icd != nil {
+		n.icd.onSubscriptionActive(true)
+	}
 }
 
 // bootstrapRead is the read a sustained default subscription performs

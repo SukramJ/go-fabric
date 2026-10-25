@@ -30,7 +30,7 @@ func (icdLookup) FabricFor(id uint16) (uint8, bool) {
 	return 0, false
 }
 
-func (icdLookup) SubjectFor(id uint16) (uint64, []uint32, bool) {
+func (icdLookup) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok bool) {
 	if id == 7 {
 		return 0x1234, []uint32{0x0001_0001}, true
 	}
