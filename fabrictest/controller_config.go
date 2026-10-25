@@ -4,13 +4,16 @@
 package fabrictest
 
 import (
+	"context"
 	"log/slog"
+	"net"
 	"path/filepath"
 	"strconv"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // ControllerConfig is a controller.Config wired to the site, for a
@@ -60,7 +63,7 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 	if label == "" {
 		label = "fabrictest"
 	}
-	return controller.Config{
+	cfg := controller.Config{
 		DB: db, Attestation: trust, VendorID: opts.VendorID, Label: label, Logger: log,
 		Clock: s.hostClock(g), Listener: l, Networks: opts.Networks, OwnNetworkProfile: opts.OwnNetworkProfile,
 		TCP: opts.TCP, TransportPreference: opts.TransportPreference,
@@ -68,4 +71,19 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 			return discovery.NewNames(newQueryConn(s), log), nil
 		},
 	}
+	if opts.OTA != nil {
+		ota := *opts.OTA
+		if ota.StartNode == nil {
+			ota.StartNode = s.startOwnNode
+		}
+		cfg.OTA = &ota
+	}
+	return cfg
+}
+
+// startOwnNode runs a controller's own node on the site ([Site.AddNode]):
+// the site's network, clock and DNS-SD, the controller's store.
+func (s *Site) startOwnNode(_ context.Context, cfg node.Config) (*node.Node, *net.UDPAddr, error) {
+	d := s.AddNode(cfg)
+	return d.Node(), d.Addr(), nil
 }

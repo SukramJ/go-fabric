@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -50,7 +51,9 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -160,6 +163,9 @@ type Config struct {
 	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:219-222,
 	// NetworkClient.ts:73-79 at 862ad75f).
 	TransportPreference exchange.Transport
+	// OTA, when set, turns on the OTA push: the update manager and the
+	// own node its provider runs on ([OTAConfig]); nil runs neither.
+	OTA *OTAConfig
 	// Advertiser publishes the Advertise record; nil is
 	// mdns.NewZeroconf(), which Close closes. A test passes
 	// mdns.NewNoop().
@@ -186,6 +192,16 @@ type Controller struct {
 	tcpAddr *net.TCPAddr
 	// unadvertise withdraws the commissioner record (advertise.go).
 	unadvertise func(context.Context) error
+
+	// The OTA push (ota.go): the update manager and the reboot armer, the
+	// own node with its node id and address; registry is reg for the
+	// node hooks, which run while New builds it.
+	ota       atomic.Pointer[softwareupdate.Manager]
+	registry  atomic.Pointer[client.Registry]
+	armer     *peer.RebootResubscribeArmer
+	ownNode   *node.Node
+	ownNodeID uint64
+	ownAddr   *net.UDPAddr
 }
 
 // New builds the controller over cfg.DB: the fabric is created on the
@@ -273,7 +289,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
-		TransportPreference: cfg.TransportPreference,
+		TransportPreference: cfg.TransportPreference, SessionAdded: c.sessionAdded,
 	}
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
@@ -281,7 +297,10 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.peers, err = peer.NewSet(pctx); err != nil {
 		return nil, err
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk})
+	if cfg.OTA != nil {
+		c.armer = peer.NewRebootResubscribeArmer(c.armerContext())
+	}
+	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk, ReportStarted: c.reportStarted})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
@@ -289,19 +308,29 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}); err != nil {
 		return nil, err
 	}
-	node := cfg.Node
-	if node.Logger == nil {
-		node.Logger = log
+	nodeCfg := cfg.Node
+	if nodeCfg.Logger == nil {
+		nodeCfg.Logger = log
 	}
-	if node.Clock == nil {
-		node.Clock = clk
+	if nodeCfg.Clock == nil {
+		nodeCfg.Clock = clk
+	}
+	hooksFor := cfg.HooksFor
+	if cfg.OTA != nil {
+		hooksFor = c.otaHooks(cfg.HooksFor)
 	}
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
-		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: node, HooksFor: cfg.HooksFor, AutoStart: !cfg.ManualStart,
+		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: nodeCfg, HooksFor: hooksFor, AutoStart: !cfg.ManualStart,
 	}); err != nil {
 		return nil, err
+	}
+	c.registry.Store(c.reg)
+	if cfg.OTA != nil {
+		if err := c.startOTA(ctx, cfg); err != nil {
+			return nil, err
+		}
 	}
 	if !cfg.ManualStart {
 		if err := c.reg.Start(ctx); err != nil {
@@ -339,13 +368,24 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 	return nil
 }
 
-// Close tears the stack down in the reverse order of [New]: the
-// registry (its nodes and their subscriptions), the client
+// Close tears the stack down in the reverse order of [New]: the update
+// manager and the own node, the registry (its nodes and their
+// subscriptions), the client
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is
 // idempotent.
 func (c *Controller) Close(ctx context.Context) error {
 	var errs []error
+	if m := c.ota.Swap(nil); m != nil {
+		m.Close()
+	}
+	if c.ownNode != nil {
+		errs = append(errs, c.ownNode.Stop(ctx))
+		c.ownNode = nil
+	}
+	if c.armer != nil {
+		c.armer.Close()
+	}
 	if c.reg != nil {
 		errs = append(errs, c.reg.Close(ctx))
 		c.reg = nil

@@ -193,6 +193,18 @@ type OTAProviderConfig struct {
 	// matter.js SoftwareUpdateManager.onOtaStatusChange (OP:608-612) — with
 	// the version the update brings; nil observes nothing.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
+	// RebootQuery, when set, learns a QueryImage the provider took for the
+	// requestor's restart — another session than the transfer's, which
+	// it cancelled — with the query's session: matter.js hands it to
+	// SoftwareUpdateManager.suppressNextStartUp, so the StartUp event that
+	// follows on that session is not taken for a failed apply
+	// (OtaSoftwareUpdateProviderServer.ts:221-224 at 862ad75f).
+	RebootQuery func(peer OTAPeer, sessionID uint16)
+	// TransferBlockSize, when set, caps the block size of one peer's
+	// transfer in place of BDXMaxBlockSize; 0 falls back to it. matter.js
+	// takes the peer's options from its SoftwareUpdateManager
+	// (bdxTransferOptionsFor, OtaSoftwareUpdateProviderServer.ts:293-298).
+	TransferBlockSize func(peer OTAPeer) uint16
 	// Clock is the provider's clock. Nil is [clock.System].
 	Clock clock.Clock
 	// Rand stands in for crypto/rand in tests.
@@ -475,6 +487,9 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 			return busy, true
 		}
 		p.removeInProgress(peer)
+		if fn := p.cfg.RebootQuery; fn != nil {
+			fn(peer, sessionID) // OtaSoftwareUpdateProviderServer.ts:221-224 at 862ad75f
+		}
 		return provdef.QueryImageResponse{}, false
 	}
 	p.logger.Info("ota.provider.busy", slog.Uint64("node_id", peer.NodeID))
@@ -486,10 +501,16 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 // idle timeout, and its transfer sessions move the update's state.
 func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string, provdef.QueryImageResponse, bool) {
 	responder := p.cfg.BDX
+	blockSize := p.cfg.BDXMaxBlockSize
+	if fn := p.cfg.TransferBlockSize; fn != nil {
+		if b := fn(peer); b != 0 {
+			blockSize = b
+		}
+	}
 	if !responder.EnablePeerForScope(peer.bdx(), otaScope, p.storage, bdx.ScopeConfig{
 		PreferredDriverModes: []bdx.DriverMode{bdx.ReceiverDrive},
 		MessageTimeout:       otaBdxMessageTimeout,
-		MaxBlockSize:         p.cfg.BDXMaxBlockSize,
+		MaxBlockSize:         blockSize,
 	}) {
 		// OP:299-305.
 		p.logger.Info("ota.provider.bdx_not_enabled", slog.Uint64("node_id", peer.NodeID))

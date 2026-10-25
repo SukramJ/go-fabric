@@ -361,6 +361,9 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.mu.Unlock()
 	p.sessionAdded()
+	if fn := p.set.ctx.SessionAdded; fn != nil {
+		fn(p, s)
+	}
 	for _, o := range p.observing() {
 		if o.SessionAdded != nil {
 			o.SessionAdded(s)

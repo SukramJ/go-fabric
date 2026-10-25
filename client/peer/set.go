@@ -74,6 +74,10 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
+	// SessionAdded is called when a peer takes a session — the
+	// SessionManager's sessions.added a controller's reboot armer watches
+	// (RebootResubscribeArmer.ts:117-150 at 862ad75f); nil ignores it.
+	SessionAdded func(p *Peer, s *exchange.Session)
 	// DialTCP opens a TCP connection for a connection attempt over TCP;
 	// nil is no TCP interface — an attempt over TCP fails as a network
 	// error (PeerSet.ts:284-288 at 862ad75f).
@@ -100,6 +104,9 @@ type Set struct {
 
 	// networks is [Context].Networks or the default profiles.
 	networks *NetworkProfiles
+	// initiated are the sessions a connection process of the set opened
+	// (Initiated).
+	initiated sync.Map
 
 	// mu guards disconnected, handleError, peers and timing.
 	mu           sync.Mutex
@@ -132,6 +139,14 @@ func NewSet(c Context) (*Set, error) {
 		s.networks = NewNetworkProfiles(s.clock, nil, s.log)
 	}
 	return s, nil
+}
+
+// Initiated reports a session a connection process of the set opened —
+// a CASE session we initiated, not one the peer opened towards us
+// (the armer's session isInitiator, RebootResubscribeArmer.ts:131-134).
+func (s *Set) Initiated(x *exchange.Session) bool {
+	_, ok := s.initiated.Load(x)
+	return ok
 }
 
 // Networks are the set's network profiles.

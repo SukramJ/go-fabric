@@ -80,6 +80,10 @@ type ControllerOptions struct {
 	// TransportPreference is each peer's preferred transport
 	// (controller.Config.TransportPreference).
 	TransportPreference exchange.Transport
+	// OTA turns on controller.New's OTA push ([Site.ControllerConfig]);
+	// the own node runs on the site unless OTA.StartNode is set. The
+	// fabrictest Controller ignores it.
+	OTA *controller.OTAConfig
 }
 
 // Controller is an in-process Matter controller of a site: the module's

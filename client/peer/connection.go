@@ -879,6 +879,8 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 		c.mu.Lock()
 		c.session = s
 		c.mu.Unlock()
+		p.set.initiated.Store(s, struct{}{})
+		go func() { <-s.Closing(); p.set.initiated.Delete(s) }()
 		p.set.Adopt(s)
 		c.cancel()
 		return nil

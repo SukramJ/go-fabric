@@ -36,6 +36,13 @@ type OTAProviderConfig struct {
 	// OnStatusChange observes the requestors' update states; nil observes
 	// nothing.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
+	// RebootQuery learns a QueryImage taken for the requestor's restart
+	// (mattercore.OTAProviderConfig.RebootQuery); nil ignores it.
+	RebootQuery func(peer OTAPeer, sessionID uint16)
+	// TransferBlockSize caps one peer's transfer block size in place of
+	// BDXMaxBlockSize (mattercore.OTAProviderConfig.TransferBlockSize);
+	// nil uses BDXMaxBlockSize.
+	TransferBlockSize func(peer OTAPeer) uint16
 }
 
 // otaProviderKey is the stable key the provider endpoint's number is kept
@@ -70,6 +77,7 @@ func (n *Node) buildOTAProvider() error {
 	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
 		ImageSource: cfg.ImageSource, Consent: cfg.Consent, ApplyPolicy: cfg.ApplyPolicy,
 		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize, OnStatusChange: cfg.OnStatusChange,
+		RebootQuery: cfg.RebootQuery, TransferBlockSize: cfg.TransferBlockSize,
 		// The URI names this node on the requestor's fabric (OP:381).
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			_, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
@@ -91,6 +99,21 @@ func (n *Node) buildOTAProvider() error {
 // own topology ([Config].Topology) mounts it on an endpoint of its own;
 // with the facade's Aggregator the node mounts it.
 func (n *Node) OTAProvider() *mattercore.OTAProvider { return n.otaProvider }
+
+// OTAProviderEndpoint is the provider endpoint's number, false without a
+// provider or before Start's assembly.
+func (n *Node) OTAProviderEndpoint() (uint16, bool) {
+	if n.otaProvider == nil {
+		return 0, false
+	}
+	return n.otaProviderEndpointID()
+}
+
+// BDX is the BDX responder the provider serves its images through — the
+// transfers a controller's update manager reads the liveness of and
+// closes (matter.js SoftwareUpdateManager.#bdxSessionFor,
+// SoftwareUpdateManager.ts:322-328 at 862ad75f); nil without a provider.
+func (n *Node) BDX() *bdx.Responder { return n.bdx }
 
 // placeOTAProvider turns the provider's assembled endpoint from a bridged
 // one into a child of the root, the Aggregator's sibling: matter.js adds
