@@ -67,7 +67,7 @@ func TestSwitchPositionsReachTheWire(t *testing.T) {
 		}
 		spec := endpoint.Spec{StableKey: endpoint.StringKey("button"), DeviceType: 0x000F, FriendlyName: "Button", Measurement: src}
 		return func(ctx context.Context) (*endpoint.Topology, error) {
-			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: []endpoint.Spec{spec}, ModelComplete: true}})
+			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: []endpoint.Spec{spec}}})
 		}, nil
 	})
 	h.allowAll()

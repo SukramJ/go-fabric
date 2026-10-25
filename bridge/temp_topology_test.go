@@ -87,9 +87,8 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 			return nil, err
 		}
 		return asm.Assemble(ctx, []endpoint.Snapshot{{
-			Scope:         "ccu1",
-			Endpoints:     specs,
-			ModelComplete: true,
+			Scope:     "ccu1",
+			Endpoints: specs,
 		}})
 	}, sources
 }

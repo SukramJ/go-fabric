@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Break:** `node.Aggregator.MarkComplete`, `node.Partition.MarkComplete` and `node.Batch.MarkComplete` are removed (brief CM §6, owner decision 2026-10-25), and with them `endpoint.Snapshot.ModelComplete`, `endpoint.Snapshot.Retain` and the assembler's collection of stored endpoints absent from a snapshot. A stored key keeps its endpoint number until `Forget` (Aggregator, Partition, Batch) or `RetirePartition` erases it, however many assemblies run without it — as matter.js keeps every stored number until its store is erased (`ServerEndpointStores.ts:33-45`, `:109-130`; `ServerEndpointInitializer.ts:59-69` at 862ad75f). A host drops its `MarkComplete` call and calls `Forget` for a device that is gone for good; a host with its own assembler drops `ModelComplete` and `Retain` from its snapshots and erases a number with `endpoint.Store.RemoveEndpoint`. `RetirePartition` erases its scope's records directly. Migration guide, removed in v0.13.0.
+
 ## [0.12.4] — 2026-10-25
 
 ### Added

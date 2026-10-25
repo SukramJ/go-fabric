@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/device"
@@ -27,8 +26,8 @@ import (
 // (ServerEndpointInitializer.ts:59-65 eraseDescendant →
 // eraseStoreForEndpoint). Aggregator.Remove is the close, Aggregator.Forget
 // the erase: a removed key keeps its record in the endpoint store, and a
-// reservation in the settings table keeps a model-complete assembly from
-// collecting it (endpoint.Snapshot.Retain).
+// reservation in the settings table names the keys of its tree, so a
+// Forget of the removed key erases its parts' numbers too.
 
 // endpointReservedKeyRoot prefixes the reservation of one stable key; its
 // value is the JSON list of every stable key of the removed endpoint's
@@ -167,57 +166,31 @@ func (a *Aggregator) removeRecords(ctx context.Context, scope string, keys []str
 	return errors.Join(errs...)
 }
 
-// retained lists the stored identities of scope a model-complete
-// assembly keeps although the set no longer holds them: those with a
-// reservation (endpoint.Snapshot.Retain). present are the keys the set's
-// endpoints and their parts hold.
-func (a *Aggregator) retained(ctx context.Context, scope string, present map[string]bool) []endpoint.SourceKey {
+// eraseScope frees every number stored for a retired scope: the
+// reservations of its stored identities, then the identities themselves.
+func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 	store := a.n.cfg.Store.Endpoints
 	if store == nil {
 		return nil
 	}
 	recs, err := store.ListEndpoints(ctx, scope)
 	if err != nil {
-		a.n.logger.Warn("node.aggregator.reservations", slog.String("scope", scope), slog.Any("err", err))
-		return nil
+		return fmt.Errorf("node: retire %s: %w", scope, err)
 	}
-	var out []endpoint.SourceKey
-	for _, rec := range recs {
-		if rec.Key == nil || present[rec.Key.String()] {
-			continue
-		}
-		tree, err := a.n.persisted.reservedTree(ctx, rec.Key.String())
-		if err != nil {
-			// Unreadable: kept, the safe direction — a number survives
-			// rather than goes to another device.
-			a.n.logger.Warn("node.aggregator.reservations", slog.String("key", rec.Key.String()), slog.Any("err", err))
-		}
-		if err != nil || tree != nil {
-			out = append(out, rec.Key)
-		}
-	}
-	return out
-}
-
-// releaseScope drops the reservations of every stored identity of a
-// retired scope before the assembly collects it.
-func (a *Aggregator) releaseScope(ctx context.Context, scope string) {
-	store := a.n.cfg.Store.Endpoints
-	if store == nil {
-		return
-	}
-	recs, err := store.ListEndpoints(ctx, scope)
-	if err != nil {
-		return
-	}
+	var errs []error
 	for _, rec := range recs {
 		if rec.Key == nil {
 			continue
 		}
 		if _, err := a.n.persisted.release(ctx, rec.Key.String()); err != nil {
-			a.n.logger.Warn("node.aggregator.reservations", slog.String("key", rec.Key.String()), slog.Any("err", err))
+			errs = append(errs, err)
 		}
+		errs = append(errs, store.RemoveEndpoint(ctx, rec.Key))
 	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("node: retire %s: %w", scope, err)
+	}
+	return nil
 }
 
 // Forget removes the endpoint with key from the default partition if it

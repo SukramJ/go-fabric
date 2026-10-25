@@ -66,7 +66,7 @@ func newAppHarness(t *testing.T, devices ...appDevice) *appHarness {
 			}
 		}
 		return func(ctx context.Context) (*endpoint.Topology, error) {
-			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: specs, ModelComplete: true}})
+			return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "app", Endpoints: specs}})
 		}, nil
 	})
 	h.allowAll()

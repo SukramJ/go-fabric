@@ -316,11 +316,6 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 			return nil, fmt.Errorf("aggregator: %w", err)
 		}
 	}
-	// The fleet is hard-coded, so it is complete from the first assembly. A
-	// host whose model loads asynchronously marks it complete once loaded,
-	// or the assembler's vanished-source collection wipes every persisted
-	// endpoint number at boot.
-	agg.MarkComplete() //nolint:contextcheck // the node's own; the first assembly is Start's
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.
 	devices.configChange = func() error { //nolint:contextcheck // the app pipe's command carries no context; the node persists with its own

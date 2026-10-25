@@ -127,7 +127,6 @@ func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	if err := n.Aggregator().Add(ctx, lamp); err != nil {
 		t.Fatal(err)
 	}
-	n.Aggregator().MarkComplete()
 	if err := n.Start(ctx); err != nil {
 		t.Fatal(err)
 	}

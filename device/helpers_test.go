@@ -74,7 +74,7 @@ func assemble(t *testing.T, devices ...*Device) *endpoint.Topology {
 	for _, d := range devices {
 		specs = append(specs, d.Spec())
 	}
-	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "test", Endpoints: specs, ModelComplete: true}})
+	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "test", Endpoints: specs}})
 	if err != nil {
 		t.Fatal(err)
 	}

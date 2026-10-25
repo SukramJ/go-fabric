@@ -24,9 +24,8 @@
 //	if err := sqlitestore.Apply(ctx, db); err != nil { ... }
 //	asm, err := endpoint.New(sqlitestore.New(db), cfg, logger)
 //
-// A host whose [endpoint.SourceKey] is not an [endpoint.StringKey] must
-// also pass [WithKeyDecoder] — see its documentation for what goes wrong
-// otherwise.
+// A host whose [endpoint.SourceKey] is not an [endpoint.StringKey] and
+// that reads keys back from ListEndpoints passes [WithKeyDecoder].
 package sqlitestore
 
 import (
@@ -89,16 +88,14 @@ type Option func(*Store)
 // [endpoint.SourceKey.String] rendering back into the host's own key type.
 // The default wraps it in an [endpoint.StringKey].
 //
-// A host whose keys are StringKey needs nothing here. Any other host does,
-// and the failure without it is silent and destructive rather than loud:
-// the assembler garbage-collects by comparing the keys a store lists
-// against the keys the live snapshot carried, as Go interface values
-// (endpoint/assembler.go: `seen[rec.Key]`). An [endpoint.StringKey] and a
-// host's own key type never compare equal even when both render the same
-// text, so every listed row looks vanished, every endpoint number is
-// deleted on the first model-complete assembly, and the next assembly
-// allocates fresh numbers — which is exactly the accessory loss this
-// package exists to prevent.
+// A host whose keys are StringKey needs nothing here. Any other host that
+// compares the keys [Store.ListEndpoints] returns with its own, as Go
+// interface values, does: an [endpoint.StringKey] and a host's own key type
+// never compare equal even when both render the same text. Lookups by key
+// (GetEndpoint, RemoveEndpoint) match the rendering and need no decoder,
+// and since v0.13.0 the assembler compares no listed key — it collects
+// nothing (endpoint.Snapshot) — so a missing decoder no longer costs an
+// endpoint number.
 //
 // The decoder is the host's, because parsing a rendering back into its
 // parts is only guesswork when someone other than its author does it.

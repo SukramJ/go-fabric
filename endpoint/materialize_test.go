@@ -192,7 +192,7 @@ func TestClusterServersBridgedNodeHostTypeListedOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{{
 		StableKey: StringKey("node"), DeviceType: dt, FriendlyName: "Node",
 		Source: deviceTypeSource{dt: dt, servers: []contract.ClusterServer{dtServer{id: 0x0006}}},
 	}}}})

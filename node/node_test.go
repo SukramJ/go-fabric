@@ -309,7 +309,6 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	if err := n.Aggregator().Add(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	n.Aggregator().MarkComplete()
 	idA, okA := endpointOf(t, n, "plug:a")
 	idB, okB := endpointOf(t, n, "plug:b")
 	idC, okC := endpointOf(t, n, "plug:c")
@@ -342,9 +341,7 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	if err := m.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// A complete set without plug:a: its reservation outlives the
-	// restart and the collection.
-	m.Aggregator().MarkComplete()
+	// A set without plug:a: its reservation outlives the restart.
 	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
 		t.Fatal(err)
 	}
@@ -535,69 +532,45 @@ func TestOTARequestorMounted(t *testing.T) {
 	}
 }
 
-// TestMarkComplete: a node started with an empty Aggregator keeps the
-// number of an endpoint stored by a previous run until MarkComplete, so
-// one added after Start gets its old number back; once MarkComplete was
-// called, a stored endpoint absent from the set is garbage-collected and
-// a later add gets a fresh number.
-func TestMarkComplete(t *testing.T) {
+// TestStoredNumbersSurviveAbsence: a stored endpoint absent from a
+// running node's set keeps its number, however many assemblies run
+// without it, as matter.js keeps every stored number until the store is
+// erased (packages/node/src/storage/server/ServerEndpointStores.ts:33-45
+// load, :109-130 assignNumber at 862ad75f). It replaces TestMarkComplete:
+// v0.13.0 removed Aggregator.MarkComplete and the collection it enabled.
+func TestStoredNumbersSurviveAbsence(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	seed := func(t *testing.T, path string) (idA uint16) {
-		t.Helper()
-		n := newNode(t, minimalConfig(openDB(t, path)))
-		for _, k := range []string{"plug:a", "plug:b"} {
-			if err := n.Aggregator().Add(ctx, newPlug(t, k)); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if err := n.Start(ctx); err != nil {
+	path := filepath.Join(t.TempDir(), "node.db")
+	n := newNode(t, minimalConfig(openDB(t, path)))
+	for _, k := range []string{"plug:a", "plug:b"} {
+		if err := n.Aggregator().Add(ctx, newPlug(t, k)); err != nil {
 			t.Fatal(err)
 		}
-		n.Aggregator().MarkComplete()
-		n.Aggregator().MarkComplete() // idempotent
-		idA, _ = endpointOf(t, n, "plug:a")
-		if err := n.Stop(ctx); err != nil {
-			t.Fatal(err)
-		}
-		return idA
 	}
-
-	t.Run("retained until MarkComplete", func(t *testing.T) {
-		t.Parallel()
-		path := filepath.Join(t.TempDir(), "node.db")
-		idA := seed(t, path)
-		m := newNode(t, minimalConfig(openDB(t, path)))
-		if err := m.Start(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
-			t.Fatal(err)
-		}
-		if got, _ := endpointOf(t, m, "plug:a"); got != idA {
-			t.Errorf("plug:a endpoint %d after Start, want its stored %d", got, idA)
-		}
-	})
-
-	t.Run("collected after MarkComplete", func(t *testing.T) {
-		t.Parallel()
-		path := filepath.Join(t.TempDir(), "node.db")
-		idA := seed(t, path)
-		m := newNode(t, minimalConfig(openDB(t, path)))
-		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:b")); err != nil {
-			t.Fatal(err)
-		}
-		if err := m.Start(ctx); err != nil {
-			t.Fatal(err)
-		}
-		m.Aggregator().MarkComplete()
-		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
-			t.Fatal(err)
-		}
-		if got, _ := endpointOf(t, m, "plug:a"); got == idA || got == 0 {
-			t.Errorf("plug:a endpoint %d, want a fresh number (stored %d was collected)", got, idA)
-		}
-	})
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	idA, _ := endpointOf(t, n, "plug:a")
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	m := newNode(t, minimalConfig(openDB(t, path)))
+	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:b")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:c")); err != nil {
+		t.Fatal(err) // a second assembly without plug:a
+	}
+	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := endpointOf(t, m, "plug:a"); got != idA {
+		t.Errorf("plug:a endpoint %d, want its stored %d", got, idA)
+	}
 }
 
 // TestBootReason: the node reports the BootReason its GeneralDiagnostics
@@ -664,7 +637,6 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	n.Aggregator().MarkComplete()
 	const count = 16
 	var wg sync.WaitGroup
 	for i := range count {

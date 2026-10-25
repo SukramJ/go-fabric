@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
 	"slices"
 	"sync"
@@ -68,19 +67,17 @@ var (
 // [Aggregator.RetirePartition] for a whole partition) frees it — matter.js
 // reserving a number per endpoint store (reserve.go).
 //
-// Call [Aggregator.MarkComplete] once the host has added every device it
-// knows about; before that, numbers of stored endpoints are retained. The
-// snapshots carry ModelComplete false until then and true afterwards, when
-// a stored endpoint absent from the set that holds no reservation — one a
-// previous run held and this run never added or removed — is
-// garbage-collected (endpoint.Snapshot.ModelComplete,
-// BD-Matter-EndpointGC-ModelCompleteGate). Start does not mark the set
-// complete.
+// A stored key the set does not hold — one a previous run held and this
+// run has not added yet, or never will — keeps its number too: nothing is
+// collected because it is absent, as matter.js keeps every stored number
+// until its store is erased (packages/node/src/storage/server/
+// ServerEndpointStores.ts:33-45 load, :109-130 assignNumber at 862ad75f).
+// A host that knows a device is gone for good calls Forget.
 //
 // The set is partitioned for a host whose devices come from several
 // sources that load independently: [Aggregator.Partition] names one, with
-// its own snapshot scope and its own completeness, so one source marked
-// complete collects only its own vanished endpoints. The Aggregator's own
+// its own snapshot scope, and [Aggregator.RetirePartition] erases every
+// number stored for a source that left. The Aggregator's own
 // methods act on the default partition, scope [Scope]; a host without
 // partitions sees one snapshot, as before. A StableKey is unique across
 // all partitions.
@@ -111,8 +108,7 @@ type Aggregator struct {
 	// reassembleMu serialises reassembly: each snapshot is taken after the
 	// previous topology was installed, so of two concurrent Add/Remove
 	// calls the later install always reflects both — without it an older
-	// snapshot could install last, dropping a just-added device and, on a
-	// model-complete set, releasing its endpoint number.
+	// snapshot could install last, dropping a just-added device.
 	reassembleMu sync.Mutex
 	// reassemblies counts the successful reassemblies (tests; the
 	// aggregator.reassemblies metric counts beside it).
@@ -120,15 +116,14 @@ type Aggregator struct {
 }
 
 // partition is one snapshot scope of the set: its endpoints in insertion
-// order and whether the host marked it complete.
+// order.
 type partition struct {
-	scope    string
-	eps      []Endpoint
-	complete bool
+	scope string
+	eps   []Endpoint
 }
 
 // Partition is a named part of the Aggregator's set: its own snapshot
-// scope, its own [Partition.MarkComplete]. Its methods have the
+// scope. Its methods have the
 // Aggregator's semantics, on its endpoints only.
 type Partition struct {
 	a     *Aggregator
@@ -174,7 +169,7 @@ func (a *Aggregator) Partition(name string) *Partition {
 }
 
 // partLocked returns the partition of scope, creating it; a.mu is held. A
-// scope retired and not yet collected is taken back: the new partition's
+// scope retired and not yet erased is taken back: the new partition's
 // own snapshot speaks for it.
 func (a *Aggregator) partLocked(scope string) *partition {
 	if len(a.parts) == 0 {
@@ -208,9 +203,10 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // RetirePartition gives up the partition name for good: a source that left
 // the host's configuration, whose stored endpoint numbers no snapshot would
 // ever list again. It needs no handle — after a restart there is none. The
-// next assembly adds one empty, model-complete snapshot with Scope name, so
-// the assembler collects every stored endpoint of that scope; the name is
-// then forgotten. A running node reassembles at once; before [Node.Start]
+// next assembly first erases every endpoint number stored for scope name
+// and their reservations — matter.js erasing each endpoint's store
+// (packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
+// eraseDescendant at 862ad75f) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
 // the retirement rides on Start's assembly. The default partition is
 // refused ([ErrRetireDefault]), and so is a partition that still holds
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
@@ -267,8 +263,8 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 }
 
 // Remove drops the endpoint with key; a running node reassembles. The key
-// keeps its endpoint number, and its parts theirs, across restarts and
-// [Aggregator.MarkComplete]: an Add of the same key gets them back, and
+// keeps its endpoint number, and its parts theirs, across restarts: an Add
+// of the same key gets them back, and
 // no other device is given them. [Aggregator.Forget] frees them. It
 // mirrors matter.js closing an endpoint, which keeps its number
 // reservation (packages/node/src/node/server/ServerEndpointInitializer.ts:
@@ -278,14 +274,6 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
 	return a.Partition(Scope).Remove(ctx, key)
 }
-
-// MarkComplete declares the default partition authoritative: every later
-// snapshot of it is model-complete, so stored endpoints absent from it are
-// garbage-collected, except those a Remove reserved. Call it once the host has added every device it
-// knows about; before that, numbers of stored endpoints are retained. On a
-// running node it reassembles at once; a failure is logged and the next
-// Add, Remove or Reassemble retries.
-func (a *Aggregator) MarkComplete() { a.Partition(Scope).MarkComplete() }
 
 // Endpoints returns the default partition's set, in insertion order.
 func (a *Aggregator) Endpoints() []Endpoint { return a.Partition(Scope).Endpoints() }
@@ -312,17 +300,6 @@ func (p *Partition) Replace(ctx context.Context, key device.SourceKey, ep Endpoi
 // A key of another partition is [ErrUnknownKey].
 func (p *Partition) Remove(ctx context.Context, key device.SourceKey) error {
 	return p.Batch(ctx, func(b *Batch) error { return b.Remove(key) })
-}
-
-// MarkComplete declares the partition authoritative: its later snapshots
-// are model-complete, and the assembler collects the stored endpoints of
-// its scope that are absent from it — the other partitions' are not
-// touched. See [Aggregator.MarkComplete].
-func (p *Partition) MarkComplete() {
-	err := p.Batch(context.Background(), func(b *Batch) error { b.MarkComplete(); return nil })
-	if err != nil {
-		p.a.n.logger.Warn("node.aggregator.mark_complete", slog.String("scope", p.scope), slog.Any("err", err))
-	}
 }
 
 // Endpoints returns the partition's set, in insertion order.
@@ -485,20 +462,6 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 	b.changed = true
 }
 
-// MarkComplete marks the batch's partition complete
-// ([Partition.MarkComplete]); the batch's reassembly is then its first
-// model-complete one, and collects in the same assembly.
-func (b *Batch) MarkComplete() {
-	a := b.a
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	part := a.partLocked(b.scope)
-	if !part.complete {
-		part.complete = true
-		b.changed = true
-	}
-}
-
 // attach binds ep to the node when it is a device; the returned detach is
 // nil for any other endpoint and on a stopped node. a.mu is held.
 func (a *Aggregator) attach(ep Endpoint) (func(), error) {
@@ -617,35 +580,35 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 }
 
 // snapshot is the bridge's Snapshotter: one snapshot per partition, the
-// default first and then the others in creation order, each
-// model-complete once its MarkComplete was called, each endpoint's
+// default first and then the others in creation order, each endpoint's
 // persisted NodeLabel and ConfigurationVersion restored as the daemon's
 // fleet does (fleet.go:1625-1647 at b4ea1f96^). A persisted label
 // replaces the Spec's; the version is the larger of the two. A retired
-// partition adds one empty model-complete snapshot, once.
+// partition's stored numbers are erased first, once.
 func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	type part struct {
-		scope    string
-		eps      []Endpoint
-		complete bool
+		scope string
+		eps   []Endpoint
 	}
 	a.mu.Lock()
 	a.partLocked(Scope)
 	parts := make([]part, 0, len(a.parts))
 	for _, p := range a.parts {
-		parts = append(parts, part{p.scope, slices.Clone(p.eps), p.complete})
+		parts = append(parts, part{p.scope, slices.Clone(p.eps)})
 	}
 	retired := slices.Clone(a.retired)
 	a.mu.Unlock()
-	snaps := make([]endpoint.Snapshot, 0, len(parts)+len(retired))
+	for _, scope := range retired {
+		// Retired for good: the scope's numbers and reservations go.
+		if err := a.eraseScope(ctx, scope); err != nil {
+			return nil, err
+		}
+	}
+	snaps := make([]endpoint.Snapshot, 0, len(parts))
 	for i, p := range parts {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
-		present := map[string]bool{}
 		for _, ep := range p.eps {
 			spec := ep.Spec()
-			for _, k := range reservationTree(spec) {
-				present[k] = true
-			}
 			if label := a.n.endpoints.NodeLabel(ctx, spec.StableKey); label != "" {
 				spec.NodeLabel = label
 			}
@@ -657,24 +620,14 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		if i == 0 && a.n.otaProvider != nil {
 			specs = append(specs, otaProviderEndpoint{a.n.otaProvider}.spec())
 		}
-		snap := endpoint.Snapshot{Scope: p.scope, Endpoints: specs, ModelComplete: p.complete}
-		if p.complete {
-			// A removed key's number waits for its return (reserve.go).
-			snap.Retain = a.retained(ctx, p.scope, present)
-		}
-		snaps = append(snaps, snap)
-	}
-	for _, scope := range retired {
-		// Retired for good: the scope's reservations go with its numbers.
-		a.releaseScope(ctx, scope)
-		snaps = append(snaps, endpoint.Snapshot{Scope: scope, ModelComplete: true})
+		snaps = append(snaps, endpoint.Snapshot{Scope: p.scope, Endpoints: specs})
 	}
 	topo, err := a.n.assembler.Assemble(ctx, snaps)
 	if err != nil {
 		return nil, err
 	}
 	if len(retired) > 0 {
-		// Collected: the names are forgotten.
+		// Erased: the names are forgotten.
 		a.mu.Lock()
 		a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return slices.Contains(retired, s) })
 		a.mu.Unlock()

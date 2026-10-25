@@ -30,7 +30,7 @@ func TestParityMatterJS_BridgedVendorNameComesFromTheHost(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []endpoint.Spec{spec}}})
+		topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{spec}}})
 		if err != nil {
 			t.Fatal(err)
 		}

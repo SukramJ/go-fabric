@@ -291,7 +291,7 @@ func parseHostKey(rendered string) endpoint.SourceKey {
 	return hostKey{central: central, address: address}
 }
 
-// assembleTwice runs two model-complete assemblies over one spec — a boot
+// assembleTwice runs two assemblies over one spec — a boot
 // and the next reassembly — and returns the endpoint id each produced.
 func assembleTwice(t *testing.T, s endpoint.Store, key endpoint.SourceKey) (boot, reassembly uint16) {
 	t.Helper()
@@ -300,8 +300,7 @@ func assembleTwice(t *testing.T, s endpoint.Store, key endpoint.SourceKey) (boot
 		t.Fatalf("endpoint.New: %v", err)
 	}
 	snap := []endpoint.Snapshot{{
-		Scope:         "site",
-		ModelComplete: true,
+		Scope: "site",
 		Endpoints: []endpoint.Spec{{
 			StableKey: key, DeviceType: 0x0100, FriendlyName: "lamp",
 		}},
@@ -321,19 +320,16 @@ func assembleTwice(t *testing.T, s endpoint.Store, key endpoint.SourceKey) (boot
 	return ids[0], ids[1]
 }
 
-// TestKeyDecoderKeepsGarbageCollectionFromEatingLiveRows drives the real
-// assembler, because the defect it guards lives in the seam between the two:
-// garbage collection compares the keys a store LISTS against the keys the
-// snapshot carried, as interface values (endpoint/assembler.go, `seen[rec.Key]`).
-//
-// With the host's decoder the listed key equals the live one and the row
-// survives, so the endpoint number is stable across reassemblies.
-func TestKeyDecoderKeepsGarbageCollectionFromEatingLiveRows(t *testing.T) {
+// TestKeyDecoderListsTheHostsKey drives the real assembler: the endpoint
+// number is stable across reassemblies, and ListEndpoints returns the
+// host's own key type through the decoder.
+func TestKeyDecoderListsTheHostsKey(t *testing.T) {
 	t.Parallel()
 	db := openAt(t, filepath.Join(t.TempDir(), "endpoints.db"))
 	s := sqlitestore.New(db, sqlitestore.WithKeyDecoder(parseHostKey))
 
-	first, second := assembleTwice(t, s, hostKey{central: "ccu1", address: "ABC:1"})
+	key := hostKey{central: "ccu1", address: "ABC:1"}
+	first, second := assembleTwice(t, s, key)
 	if first != second {
 		t.Errorf("endpoint id changed between two assemblies: %d then %d", first, second)
 	}
@@ -341,29 +337,30 @@ func TestKeyDecoderKeepsGarbageCollectionFromEatingLiveRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListEndpoints: %v", err)
 	}
-	if len(rows) != 1 {
-		t.Errorf("after two assemblies the store holds %d rows, want 1", len(rows))
+	if len(rows) != 1 || rows[0].Key != endpoint.SourceKey(key) {
+		t.Errorf("after two assemblies the store lists %v, want one row with the host's key", rows)
 	}
 }
 
-// TestWithoutAKeyDecoderACompositeKeyIsCollected is the negative control
-// for the test above, and the reason [sqlitestore.WithKeyDecoder] exists at
-// all: it records what the default StringKey decoding does to a host that
-// does not use StringKey, so the option cannot be dismissed as ceremony.
-//
-// If this ever stops holding — because the assembler grew to compare
-// renderings rather than interface values — the option has become optional
-// in fact, and its documentation must be corrected rather than this test
-// deleted.
-func TestWithoutAKeyDecoderACompositeKeyIsCollected(t *testing.T) {
+// TestWithoutAKeyDecoderTheNumberIsStillStable is the negative control
+// for the test above: without a decoder the listed key is a StringKey, not
+// the host's — and since v0.13.0, when the assembler stopped collecting
+// stored rows absent from its snapshots, that costs no endpoint number.
+func TestWithoutAKeyDecoderTheNumberIsStillStable(t *testing.T) {
 	t.Parallel()
 	db := openAt(t, filepath.Join(t.TempDir(), "endpoints.db"))
 	s := sqlitestore.New(db) // no decoder: rows come back as endpoint.StringKey
 
-	first, second := assembleTwice(t, s, hostKey{central: "ccu1", address: "ABC:1"})
-	if first == second {
-		t.Fatalf("both assemblies returned endpoint %d — the mismatch this option guards against "+
-			"no longer happens, so WithKeyDecoder's documentation is now wrong", first)
+	key := hostKey{central: "ccu1", address: "ABC:1"}
+	first, second := assembleTwice(t, s, key)
+	if first != second {
+		t.Errorf("endpoint id changed between two assemblies: %d then %d", first, second)
 	}
-	t.Logf("without a decoder the endpoint number moved from %d to %d on the second assembly", first, second)
+	rows, err := s.ListEndpoints(t.Context(), "site")
+	if err != nil {
+		t.Fatalf("ListEndpoints: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Key == endpoint.SourceKey(key) {
+		t.Errorf("without a decoder the store lists %v, want one row with a StringKey", rows)
+	}
 }

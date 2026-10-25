@@ -104,8 +104,8 @@ A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
 **Costs.** With `Config.Topology` the node builds no assembler and no
-`Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, the
-vanished-source collection (`Snapshot.ModelComplete`), device-type
+`Aggregator` (`Node.Aggregator` is nil). Endpoint numbering, erasing
+the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 

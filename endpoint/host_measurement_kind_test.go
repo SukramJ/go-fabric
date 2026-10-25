@@ -133,8 +133,7 @@ func TestHostRegisteredMeasurementKindMaterialisesAnEndpoint(t *testing.T) {
 		t.Fatalf("endpoint.New: %v", err)
 	}
 	topology, err := assembler.Assemble(context.Background(), []endpoint.Snapshot{{
-		Scope:         "host",
-		ModelComplete: true,
+		Scope: "host",
 		Endpoints: []endpoint.Spec{{
 			StableKey:    endpoint.StringKey("host:flow-1"),
 			DeviceType:   contract.MeasurementClassDeviceType(hostFlowClass),
@@ -199,8 +198,7 @@ func TestHostRegisteredMeasurementKindReceivesTheEndpointID(t *testing.T) {
 		t.Fatalf("endpoint.New: %v", err)
 	}
 	topology, err := assembler.Assemble(context.Background(), []endpoint.Snapshot{{
-		Scope:         "host",
-		ModelComplete: true,
+		Scope: "host",
 		Endpoints: []endpoint.Spec{{
 			StableKey:    endpoint.StringKey("host:flow-endpointed"),
 			DeviceType:   contract.MeasurementClassDeviceType(hostFlowClass),

@@ -104,6 +104,5 @@ func newNode(ctx context.Context, db *sql.DB, network node.Network, adv mdns.Adv
 		_ = n.Stop(context.WithoutCancel(ctx))
 		return nil, err
 	}
-	n.Aggregator().MarkComplete() //nolint:contextcheck // the node's own; every device is added: stale endpoint numbers may go
 	return n, nil
 }

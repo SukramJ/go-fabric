@@ -23,7 +23,7 @@ func TestSpecClientClustersReadBackInTheDescriptor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{
 		{
 			StableKey: StringKey("bell"), DeviceType: dtDoorbell, FriendlyName: "Bell", ClientClusters: []uint32{chime},
 			Source: deviceTypeSource{dt: dtDoorbell, servers: []contract.ClusterServer{dtServer{id: 0x003B}}},

@@ -142,7 +142,7 @@ atomically, so an in-flight request always sees one consistent topology.
 
 Two reassemblies that run at the same time are not ordered: the last one to
 finish wins, even when it took its snapshot first. Call `Add`, `Remove`
-and `MarkComplete` from one goroutine, or serialise them yourself.
+and `Forget` from one goroutine, or serialise them yourself.
 
 The `Snapshotter` of a host with its own topology is called at `Start` and
 on every `Reassemble`, and its result is never cached.

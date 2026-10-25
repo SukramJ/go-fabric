@@ -94,9 +94,8 @@ func benchAssembler(tb testing.TB) *endpoint.Assembler {
 func BenchmarkAssembleReassembly(b *testing.B) {
 	asm := benchAssembler(b)
 	snapshots := []endpoint.Snapshot{{
-		Scope:         "bench",
-		Endpoints:     benchSpecs(benchFleetSize),
-		ModelComplete: true,
+		Scope:     "bench",
+		Endpoints: benchSpecs(benchFleetSize),
 	}}
 	ctx := context.Background()
 	if _, err := asm.Assemble(ctx, snapshots); err != nil {
@@ -121,9 +120,8 @@ func BenchmarkAssembleReassembly(b *testing.B) {
 func BenchmarkClusterServers(b *testing.B) {
 	asm := benchAssembler(b)
 	top, err := asm.Assemble(context.Background(), []endpoint.Snapshot{{
-		Scope:         "bench",
-		Endpoints:     benchSpecs(benchFleetSize),
-		ModelComplete: true,
+		Scope:     "bench",
+		Endpoints: benchSpecs(benchFleetSize),
 	}})
 	if err != nil {
 		b.Fatalf("Assemble: %v", err)

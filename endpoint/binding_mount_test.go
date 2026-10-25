@@ -31,7 +31,7 @@ func TestDeclaredClientMountsBinding(t *testing.T) {
 	src := func() contract.EndpointSource {
 		return deviceTypeSource{dt: switchDT, servers: []contract.ClusterServer{dtServer{id: 0x0003}}}
 	}
-	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{
 		{StableKey: StringKey("bound"), DeviceType: switchDT, FriendlyName: "Bound", ClientClusters: []uint32{onOff}, Source: src()},
 		{StableKey: StringKey("unbindable"), DeviceType: switchDT, FriendlyName: "Unbindable", ClientClusters: []uint32{webRTCProvider}, Source: src()},
 		{StableKey: StringKey("none"), DeviceType: switchDT, FriendlyName: "None", Source: src()},

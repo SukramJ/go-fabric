@@ -85,7 +85,7 @@ func newDSTree(t *testing.T) *dsTree {
 func (d *dsTree) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.a.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: slices.Clone(d.specs)}})
+	return d.a.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: slices.Clone(d.specs)}})
 }
 
 // number pins the endpoint number of key, a matter.js manual ID: the
