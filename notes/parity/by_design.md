@@ -62,8 +62,9 @@ against matter.js `origin/main`). The contract:
   into the class's closing brace; the `matter.js marker` column says which
   kind the row's marker is.
 - Both columns read `not recorded` for a row without a marker; the check
-  accepts such a row only while it is listed in
-  `script/aheadcheck/todo-marker.txt`.
+  refuses such a row (the transitional allowance file
+  `script/aheadcheck/todo-marker.txt` went with the last of the six
+  `BD-chip` rows on 2026-10-25).
 
 The check reads every marker at the pin (absent there: the row is wrong)
 and at the ref it is given (absent there: the finding "caught up?", which a
@@ -76,12 +77,12 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command (absence: the operational-error handler is the class's last member; presence: the RVC doc leaves pause and resume to the device, `:18-20`) | `packages/node/src/behaviors/operational-state/OperationalStateServer.ts`<br>`packages/node/src/behaviors/rvc-operational-state/RvcOperationalStateServer.ts` | `"        this.events.operationalError.emit({ errorState: operationalError }, this.context);\n    }\n}"`<br>`"To execute the basic validation for pause and resume commands the utility methods"` | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
 | BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode (presence: `RvcRunModeServer.ts:71-77` sets CurrentMode on ModeUtils' Success) | `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts` | `"        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }"` | `mode-base.resource.ts` |
 | BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (18 lines at the pin; absence: the empty class body) | `packages/node/src/behaviors/temperature-control/TemperatureControlServer.ts` | `"export class TemperatureControlServer extends TemperatureControlBehavior {}"` | connectedhomeip `TemperatureControlCluster.cpp` |
-| BD-chip-BooleanStateConfiguration-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
-| BD-chip-WaterHeaterManagement-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
-| BD-chip-AlarmBase-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
-| BD-chip-Appliance-RulesInServer | not recorded (the entry cites `OvenCavityOperationalStateServer.ts:35-46` for the cavity, not for the gap) | not recorded | not recorded | connectedhomeip |
-| BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
-| BD-chip-ClosureDimension-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
+| BD-chip-BooleanStateConfiguration-RulesInServer | `BooleanStateConfigurationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/boolean-state-configuration/BooleanStateConfigurationServer.ts` | `"export class BooleanStateConfigurationServer extends BooleanStateConfigurationBehavior {}"` | connectedhomeip |
+| BD-chip-WaterHeaterManagement-RulesInServer | `WaterHeaterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/water-heater-management/WaterHeaterManagementServer.ts` | `"export class WaterHeaterManagementServer extends WaterHeaterManagementBehavior {}"` | connectedhomeip |
+| BD-chip-AlarmBase-RulesInServer | `DishwasherAlarmServer.ts:14`, `RefrigeratorAlarmServer.ts:14`, `TemperatureAlarmServer.ts:17` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/dishwasher-alarm/DishwasherAlarmServer.ts`<br>`packages/node/src/behaviors/refrigerator-alarm/RefrigeratorAlarmServer.ts`<br>`packages/node/src/behaviors/temperature-alarm/TemperatureAlarmServer.ts` | `"export class DishwasherAlarmServer extends DishwasherAlarmBehavior {}"`<br>`"export class RefrigeratorAlarmServer extends RefrigeratorAlarmBehavior {}"`<br>`"export class TemperatureAlarmServer extends TemperatureAlarmBehavior {}"` | connectedhomeip |
+| BD-chip-Appliance-RulesInServer | `MicrowaveOvenControlServer.ts:18`, `LaundryWasherControlsServer.ts:18`, `LaundryDryerControlsServer.ts:14` are empty subclasses (absence: the class lines); the oven cavity has logic (`OvenCavityOperationalStateServer.ts:21-107`) and is not a marker | `packages/node/src/behaviors/microwave-oven-control/MicrowaveOvenControlServer.ts`<br>`packages/node/src/behaviors/laundry-washer-controls/LaundryWasherControlsServer.ts`<br>`packages/node/src/behaviors/laundry-dryer-controls/LaundryDryerControlsServer.ts` | `"export class MicrowaveOvenControlServer extends MicrowaveOvenControlBehavior {}"`<br>`"export class LaundryWasherControlsServer extends LaundryWasherControlsBehavior {}"`<br>`"export class LaundryDryerControlsServer extends LaundryDryerControlsBehavior {}"` | connectedhomeip |
+| BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | `DeviceEnergyManagementServer.ts:18`, `EnergyEvseServer.ts:14` are empty subclasses (absence: the class lines) | `packages/node/src/behaviors/device-energy-management/DeviceEnergyManagementServer.ts`<br>`packages/node/src/behaviors/energy-evse/EnergyEvseServer.ts` | `"export class DeviceEnergyManagementServer extends DeviceEnergyManagementBehavior {}"`<br>`"export class EnergyEvseServer extends EnergyEvseBehavior {}"` | connectedhomeip |
+| BD-chip-ClosureDimension-RulesInServer | `ClosureDimensionServer.ts:17` is the empty subclass (absence: the class line, 17 lines in all) | `packages/node/src/behaviors/closure-dimension/ClosureDimensionServer.ts` | `"export class ClosureDimensionServer extends ClosureDimensionBehavior {}"` | connectedhomeip |
 
 ---
 
