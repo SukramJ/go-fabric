@@ -70,7 +70,7 @@ type PeerWakefulness struct {
 
 type wakeObserver struct {
 	awake, available, mode func(bool)
-	missed               func()
+	missed                 func()
 }
 
 // event is one emission, delivered after the lock is released.
