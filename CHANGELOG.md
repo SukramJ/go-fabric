@@ -10,6 +10,27 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- ICD on the device side (brief CH, milestone 5 phase 23): `node.Config.ICD` (`node.ICDConfig`: SIT or LIT, the timings, `ClientsSupportedPerFabric`, `UserActiveModeTrigger`, `DynamicSITLIT`) mounts ICD Management on the root endpoint; `Node.ICD()` returns the host's handle on the mode machine (`RequestActiveMode`, `EnterIdleMode`, `TriggerUserActiveMode`, `Active`, `Mode`, `SetOperatingMode`, `WithdrawForcedOperatingMode`, `OnModeChange`, `OnModeChangeAsync`). An ICD node sends Check-Ins at every wake, advertises `ICD`/`SAT`, pads its MRP backoff by 200 ms and keeps no subscription across a restart. [ICD guide](docs/guides/icd.md).
+- `cluster/core.ICDManagement` is the port of matter.js `IcdManagementServer.ts` and `IcdMode.ts`: every attribute, RegisterClient, UnregisterClient and StayActiveRequest with matter.js's statuses, the persisted registration table and ICDCounter (`ICDManagementConfig`, `ICDManagementStore`, `ICDModeEvent`, `ICDAdvertisement`, `ICDFastPollingInterval`, `ErrICDManagementConfig`, `ErrICDOperatingMode`).
+- Package `icd` after matter.js `protocol/src/icd`: the counter, the Check-In back-off and suppression, the device's registrations and Check-In sender, the mode state, and the controller's peer table, peer schedule and peer wakefulness; `icd/checkin`, the Check-In message codec (AES-CCM over `secure/aesccm`) with matter.js's vectors.
+- `store.ICD`, the persistence area of the ICD registrations and counter (migration v7, table `matter_icd_registrations`; the metadata counter `icd_management.counter`), in `store.Store`, `store/memstore` and `store/storetest`.
+- ICD on the controller side (milestone 5 phase 24): `controller/client.Node.ICD()` returns an `*client.ICDClient` (`Register`, `Unregister`, `Forget`, `StayActive`, `Registration`, `Registered`, `Available`, `Awake`, `NextExpectedCheckIn`, `PeerSupportsLIT`, the `On…` hooks) after matter.js `IcdClient.ts`: LIT auto-registration, Check-In receipt with the key refresh, the registration persisted in the client store; `Node.LITSupported`, `client.MinLITSpecificationVersion`, `client.HoldUntilICDPeerAwake`, `client.WithICDAwaitTimeout`, `*client.ICDMultiAdminError`, `*client.ICDPeerAsleepError`, `client.TrustedEcosystemVendors`, `client.ErrICDOperation`, `client.ErrICDAbandoned`. A Read, Write or Invoke to a sleeping registered LIT peer waits for its Check-In.
+- The sustained subscription's ICD branches (`client/interaction`, `SustainedSubscription.ts`): it parks on a registered LIT peer's wake signal, re-subscribes on the priority connection when the operating mode flips, and takes `SubscribeRequest.Wakefulness`/`PeerFed`; `client/peer`: `ConnectOptions.Priority`, `Peer.SetLongIdleTimeOperating` with the LIT idle-interval floor `peer.LITMinIdleInterval`, `Peer.SetICDAwait` for the address monitor's ICD branch, and `peer.RebootResubscribeArmer` (`RebootResubscribeArmer.ts`; the OTA push of phase 25 arms it).
+- The ports: the ICD Management server, the eight `protocol/test/icd` files, the ICD client, hold, LIT-support and physical-properties files, `RebootResubscribeArmerTest`, `SecureChannelProtocolTest` and the ICD part of `SustainedSubscriptionTest`; an end-to-end test holds a subscription to the module's own LIT node across three idle cycles.
+
+### Changed
+
+- **Break:** `store.Port` gains the `store.ICD` area. A host's own `store.Port` implementation must add its methods (`ICD.ListICDRegistrations`, `ICD.ReplaceICDRegistrations`, `ICD.LoadICDCounter`, `ICD.SaveICDCounter`); `store.Store` and `store/memstore` have them, and `store/storetest` checks them. Migration guide, the ICD store area in v0.12.0.
+- **Break:** `core.NewICDManagement()` is `core.NewICDManagement(cfg ICDManagementConfig) (*ICDManagement, error)`, and `core.ICDManagement` holds state now, so it is no longer comparable. The node mounts the server itself from `node.Config.ICD`; a host that mounted the former stub by hand passes a configuration. Migration guide, the ICD store area in v0.12.0.
+- `controller/client`: a peer's `LongIdleTimeOperating` property needs a specification version of 1.4.0 or later besides the LIT feature, as matter.js's `litSupported` does.
+- The roadmap: phases 23 and 24 are released as `v0.12.0`, phase 25 follows as `v0.13.0`.
+
+### Removed
+
+- The ICD Management stub's behaviour: the unmounted server answered attributes 0x0000–0x0002 only. It was mounted nowhere, so nothing was observable on the wire; the full server replaces it.
+
 ## [0.11.0] — 2026-10-25
 
 ### Added
