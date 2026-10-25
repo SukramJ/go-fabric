@@ -147,7 +147,14 @@ func (r *Registry) cull(ctx context.Context) error {
 // and the search repeated (:360-368); a match is refreshed from the device
 // (:369-375, the record's applyDevice); otherwise a new node is created
 // with an allocated id (:376). The host runs discovery.Scanner and hands
-// the device over; Commission commissions the node.
+// the device over; Commission commissions the node. A device known by its
+// address alone — no DNS-SD answer, no instance id, its Addresses only
+// (controller.DeviceAt) — is a supported input: it matches no node and a
+// new one is created, as matter.js's MatterController.commission hands
+// Peers.forDescriptor a descriptor of the known address only
+// (packages/matter.js/src/MatterController.ts:545-549 at 862ad75f) and
+// RemoteDescriptor.is matches nothing on an absent identifier
+// (RemoteDescriptor.ts:37-50).
 func (r *Registry) ForDevice(ctx context.Context, d Device) (*Node, error) {
 	for {
 		n, op, err := r.findOrCreate(d)
