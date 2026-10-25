@@ -44,6 +44,31 @@ func NewCommissioningCredentials() (Commissioning, error) {
 	}, nil
 }
 
+// NewWindowCredentials draws fresh credentials for one
+// [Node.OpenBasicWindow] window that stays open for timeout (0 is the
+// node's own window default): a random 12-bit discriminator, a random
+// passcode that passes [ValidateSetupPIN], a random 32-byte salt and
+// [PBKDFIterationsMin] PBKDF iterations — NewCommissioningCredentials()
+// .WindowCredentials(timeout). A host that serves "open a window with a
+// fresh code" draws them here instead of re-implementing the passcode
+// rule; [Node.PairingCodesFor] encodes their codes.
+//
+// Mirrors matter.js PaseClient.generateRandomPasscode and
+// generateRandomDiscriminator (packages/protocol/src/session/pase/
+// PaseClient.ts:55-71 at 862ad75f; the rule is PairingCodeSchema.ts:
+// 171-178 isValidPasscode) and the random 32-byte salt and 1000
+// iterations of CommissioningClient.openEnhancedCommissioningWindow
+// (packages/node/src/behavior/system/commissioning/
+// CommissioningClient.ts:522-525), which draws the same for a window it opens
+// on a peer.
+func NewWindowCredentials(timeout time.Duration) (WindowCredentials, error) {
+	c, err := NewCommissioningCredentials()
+	if err != nil {
+		return WindowCredentials{}, err
+	}
+	return c.WindowCredentials(timeout), nil
+}
+
 // WindowCredentials are c's secret as the credentials of one
 // [Node.OpenBasicWindow] window that stays open for timeout (0 is the
 // node's own window default) — a fresh window secret is

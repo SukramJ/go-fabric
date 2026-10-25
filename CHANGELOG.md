@@ -10,6 +10,15 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- Observers on a running node (brief CK §1.1): `Node.Observe(node.Observers) (unsubscribe func())` registers hooks after `Config.Observers`, in registration order, on the same goroutine rules; the unsubscribe is idempotent. A handler mounted after `Start` sees commissionings, fabric changes and window transitions.
+- The commissioning window at any time (§1.2): `Node.Window() node.WindowSnapshot`, the value `OnWindowTransition` receives, which gains `Kind` (`node.WindowNone`, `WindowOwn`, `WindowBasic`, `WindowEnhanced`), `OpenedAt`, `Deadline` and `Timeout` on the node's clock; the discriminator is the advertised one for every window, the node's own and basic windows included. Below it, `bridge.CommissioningWindow.Timing()`.
+- The configured setup payload (§1.3): `Node.SetupPayload() (node.SetupPayload, error)` with the passcode, discriminator, vendor and product id and the QR and manual codes `PairingCodes` returns; it carries the passcode by design.
+- Cluster names on the topology (§1.4): `node.BridgedDevice.Clusters []node.ClusterInfo{ID, Name, Revision}` and `BridgedDevice.DeviceTypeRevision`, from the mounted servers and the generated schema, for every endpoint — parts and a host Snapshotter's endpoints included.
+- Fresh window credentials (§1.5): `node.NewWindowCredentials(timeout)` draws a discriminator, a passcode that passes the setup-PIN rule, a 32-byte salt and 1000 iterations for one `OpenBasicWindow`. `bridge.RandomPasscode` now applies `setup.IsValidPasscode` instead of a list of its own.
+- Read-only session diagnostics (§1.6): `Node.SessionDiagnostics()` returns each session's id, fabric, node ids, PASE flag, subscription count, last activities and idle ages measured on the node's clock, and the session table's occupancy; `Node.Clock()` returns the node's time source.
+
 ## [0.12.1] — 2026-10-25
 
 ### Changed

@@ -113,6 +113,8 @@ type CommissioningWindow struct {
 	// blocked, while non-nil, refuses every window ([SetBlocked]).
 	blocked        error
 	open           bool
+	openedAt       time.Time
+	timeout        time.Duration
 	expiresAt      time.Time
 	discriminator  uint16
 	durationSec    uint16
@@ -271,6 +273,24 @@ func (w *CommissioningWindow) RequestedDurationSeconds() uint16 {
 	return w.durationSec
 }
 
+// Timing returns when the open window was opened, when its timer closes it
+// and the timeout it was opened with, all on the window's clock
+// ([CommissioningWindow.SetClock]); zero values while no window is open. A
+// window the node restarts (OpenOwnWindow on an open own window) reports
+// the restart. Unlike [CommissioningWindow.RequestedDurationSeconds] the
+// timeout is not clamped to 16 bits, so the node's own 48-hour window
+// reads as it runs. matter.js keeps the same three in the window's timer
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:256-265 at
+// 862ad75f, `Time.getTimer("Commissioning timeout", timeout ?? …)`).
+func (w *CommissioningWindow) Timing() (openedAt, deadline time.Time, timeout time.Duration) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if !w.open {
+		return time.Time{}, time.Time{}, 0
+	}
+	return w.openedAt, w.expiresAt, w.timeout
+}
+
 // HasSuppliedVerifier reports whether the currently-open window was opened
 // with a commissioner-supplied PAKE verifier (a true Matter Enhanced
 // Commissioning Window), as opposed to the REST/operator open (also
@@ -425,7 +445,9 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	}
 	w.open = true
 	w.own = true
-	w.expiresAt = w.clock.Load().Now().Add(timeout)
+	w.openedAt = w.clock.Load().Now()
+	w.timeout = timeout
+	w.expiresAt = w.openedAt.Add(timeout)
 	w.durationSec = uint16(min(timeout/time.Second, 1<<16-1)) //nolint:gosec // clamped to uint16
 	var timer clock.Timer
 	timer = w.clock.Load().AfterFunc(timeout, func() {
@@ -590,7 +612,9 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	w.open = true
 	w.discriminator = params.Discriminator
 	w.durationSec = params.CommissioningTimeoutSeconds
-	w.expiresAt = w.clock.Load().Now().Add(time.Duration(params.CommissioningTimeoutSeconds) * time.Second)
+	w.openedAt = w.clock.Load().Now()
+	w.timeout = time.Duration(params.CommissioningTimeoutSeconds) * time.Second
+	w.expiresAt = w.openedAt.Add(w.timeout)
 	// Persist admin fabric / vendor metadata so the cluster can
 	// reflect them via AdminFabricIndex / AdminVendorId attributes
 	// per Matter §11.19.5.2.
@@ -969,33 +993,22 @@ func RandomDiscriminator() (uint16, error) {
 }
 
 // RandomPasscode returns a uniformly-random 8-decimal-digit passcode
-// from the §5.1.1.1.1 valid-passcode set. Per spec the following are
-// invalid and excluded by re-rolling: the all-same-digit values
-// 00000000..99999999 plus 12345678 and 87654321.
+// from the §5.1.1.1.1 valid-passcode set: a candidate that fails
+// [setup.IsValidPasscode] — 0, the all-same-digit values 11111111..99999999,
+// 12345678 and 87654321, matter.js packages/types/src/schema/
+// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at 862ad75f — is
+// re-rolled, as matter.js PaseClient.generateRandomPasscode does
+// (packages/protocol/src/session/pase/PaseClient.ts:55-67). The rule is
+// that one function; this one only draws.
 func RandomPasscode() (uint32, error) {
-	invalid := map[uint32]struct{}{
-		0:        {},
-		11111111: {},
-		22222222: {},
-		33333333: {},
-		44444444: {},
-		55555555: {},
-		66666666: {},
-		77777777: {},
-		88888888: {},
-		99999999: {},
-		12345678: {},
-		87654321: {},
-	}
 	for {
 		var b [4]byte
 		if _, err := rand.Read(b[:]); err != nil {
 			return 0, fmt.Errorf("rand passcode: %w", err)
 		}
-		// 99999998 inclusive — drops 99999999 anyway, then re-rolls
-		// any other excluded value below.
+		// 0..99999998: 99999999 is out of range anyway.
 		v := binary.BigEndian.Uint32(b[:]) % 99999999
-		if _, bad := invalid[v]; bad {
+		if !setup.IsValidPasscode(v) {
 			continue
 		}
 		return v, nil

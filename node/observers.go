@@ -7,6 +7,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
+	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -102,7 +105,13 @@ func fabricInfoOf(rec store.FabricRecord) FabricInfo {
 	}
 }
 
-// WindowSnapshot is the commissioning window after a transition.
+// WindowSnapshot is the commissioning window as the node serves it: what
+// OnWindowTransition receives after a transition and [Node.Window] returns
+// at any time. matter.js keeps the same state in DeviceCommissioner's
+// window — its status, byAdministrator and its timer
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:344-350,
+// :236-266 #openWindow at 862ad75f) — and the advertised discriminator
+// (`discriminator ?? commissioningConfig.discriminator`, :252).
 type WindowSnapshot struct {
 	// Open reports whether a window is open, whoever opened it.
 	Open bool
@@ -123,6 +132,114 @@ type WindowSnapshot struct {
 	// Discriminator is the published record's discriminator; 0 when
 	// CommissioningMode is 0.
 	Discriminator uint16
+	// Kind is which window is open; [WindowNone] while none is.
+	Kind WindowKind
+	// OpenedAt is when the window opened (or the node restarted its own
+	// window), and Deadline when its timer closes it, both on the node's
+	// clock ([Node.Clock]); zero while no window is open.
+	OpenedAt, Deadline time.Time
+	// Timeout is the duration the window was opened for; 0 while no
+	// window is open.
+	Timeout time.Duration
+}
+
+// WindowKind names the open commissioning window by who opened it with
+// which credentials.
+type WindowKind uint8
+
+const (
+	// WindowNone: no window is open.
+	WindowNone WindowKind = iota
+	// WindowOwn is the node's own window with the configured credentials
+	// ([Config].Commissioning): the one an uncommissioned node opens, or
+	// one the host opened through CommissioningWindow().OpenOwnWindow —
+	// matter.js's window with byAdministrator false
+	// (DeviceCommissioner.ts:236-266 at 862ad75f).
+	WindowOwn
+	// WindowBasic is the node's own window [Node.OpenBasicWindow] opened
+	// with the host's credentials (a host extension; see there).
+	WindowBasic
+	// WindowEnhanced is an administrator's OpenCommissioningWindow with
+	// its PAKE verifier — matter.js's EnhancedWindowOpen with
+	// byAdministrator true.
+	WindowEnhanced
+)
+
+// String names the kind.
+func (k WindowKind) String() string {
+	switch k {
+	case WindowNone:
+		return "none"
+	case WindowOwn:
+		return "own"
+	case WindowBasic:
+		return "basic"
+	case WindowEnhanced:
+		return "enhanced"
+	default:
+		return fmt.Sprintf("WindowKind(%d)", uint8(k))
+	}
+}
+
+// Window returns the commissioning window as the node serves it now —
+// the value OnWindowTransition receives, readable at any time.
+func (n *Node) Window() WindowSnapshot {
+	win := n.br.CommissioningWindow()
+	if n.window == nil || win == nil {
+		return WindowSnapshot{}
+	}
+	return n.window.snapshot(win)
+}
+
+// observerSet holds the observers [Node.Observe] registered, in
+// registration order.
+type observerSet struct {
+	mu   sync.Mutex
+	list []*Observers
+}
+
+// observerList is every observer of the node: [Config].Observers first,
+// then the registered ones in registration order. A copy: an observer
+// registered or unsubscribed while an event is dispatched takes effect
+// from the next event.
+func (n *Node) observerList() []Observers {
+	n.observers.mu.Lock()
+	defer n.observers.mu.Unlock()
+	out := make([]Observers, 0, 1+len(n.observers.list))
+	out = append(out, n.cfg.Observers)
+	for _, o := range n.observers.list {
+		out = append(out, *o)
+	}
+	return out
+}
+
+// Observe registers o's hooks on a running (or not yet started) node:
+// each hook o sets runs after [Config].Observers' hook for the same event
+// and after the hooks registered before it, under the same rules — on
+// the event's goroutine, after the facade's own handling, an error or a
+// panic logged and never returned. The returned unsubscribe removes them;
+// it is idempotent, and an event already being dispatched may still reach
+// them. A host that mounts a handler after [Node.Start] (a web UI) learns
+// of commissionings and fabric changes this way.
+//
+// matter.js's node events are Observables a handler attaches to and
+// detaches from at any time (packages/general/src/util/Observable.ts:55
+// `on`, :70 `off` at 862ad75f — the FabricManager events of
+// packages/protocol/src/fabric/FabricManager.ts:41-48 among them);
+// Config.Observers is the attach at construction, Observe the attach later.
+func (n *Node) Observe(o Observers) (unsubscribe func()) {
+	entry := &o
+	n.observers.mu.Lock()
+	n.observers.list = append(n.observers.list, entry)
+	n.observers.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			n.observers.mu.Lock()
+			n.observers.list = slices.DeleteFunc(n.observers.list, func(e *Observers) bool { return e == entry })
+			n.observers.mu.Unlock()
+		})
+	}
 }
 
 // observe runs one observer after the facade's handler: a nil observer is

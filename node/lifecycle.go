@@ -10,6 +10,7 @@ import (
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // The node's half of a device's lifecycle (ADR 0025 principle 2): the
@@ -100,8 +101,16 @@ type BridgedDevice struct {
 	Key device.SourceKey
 	// Endpoint is its endpoint number.
 	Endpoint uint16
-	// DeviceType is its device type id.
-	DeviceType uint16
+	// DeviceType is its device type id, DeviceTypeRevision the revision
+	// its Descriptor's DeviceTypeList serves for it (the generated
+	// schema's, schema.DeviceTypeRevision; 0 for an id the schema does
+	// not know).
+	DeviceType         uint16
+	DeviceTypeRevision uint16
+	// Clusters are the cluster servers mounted on the endpoint, in the
+	// order its Descriptor's ServerList lists them — for every endpoint,
+	// parts and the endpoints of a host's own [Snapshotter] included.
+	Clusters []ClusterInfo
 	// Name is the NodeLabel it serves: a controller's or the host's
 	// rename, else its Name.
 	Name string
@@ -113,6 +122,19 @@ type BridgedDevice struct {
 	Added Endpoint
 	// Parts are its parts, by endpoint number.
 	Parts []BridgedDevice
+}
+
+// ClusterInfo names one cluster server a [BridgedDevice] serves.
+type ClusterInfo struct {
+	// ID is the cluster id.
+	ID uint32
+	// Name is the cluster's name in the generated schema
+	// (schema.ClusterName: "OnOff", "LevelControl", …); empty for a
+	// cluster the schema does not know (a manufacturer-specific one).
+	Name string
+	// Revision is the schema's ClusterRevision of the cluster
+	// (schema.ClusterRevision); 0 for a cluster the schema does not know.
+	Revision uint16
 }
 
 // Topology returns the host's view of the bridge as the node serves it
@@ -147,11 +169,47 @@ func (n *Node) Topology() BridgeTopology {
 	return out
 }
 
+// mountedClusters are the cluster servers the assembled endpoint serves
+// (endpoint.ClusterServers: the set its Descriptor's ServerList is derived
+// from), each once, with the generated schema's name and revision.
+// Walking the mounted servers rather than the declaration
+// (Added.Spec().Source) covers parts and a host Snapshotter's endpoints,
+// and the servers the assembler adds itself (Descriptor,
+// BridgedDeviceBasicInformation, Identify, Groups, …). matter.js reads
+// the same from the endpoint's behaviors — DescriptorServer's serverList
+// is the endpoint's supported cluster behaviors
+// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275
+// #serverList at 862ad75f).
+func mountedClusters(ep *endpoint.Endpoint) []ClusterInfo {
+	servers := endpoint.ClusterServers(ep)
+	out := make([]ClusterInfo, 0, len(servers))
+	seen := make(map[uint32]bool, len(servers))
+	for _, srv := range servers {
+		if srv == nil {
+			continue
+		}
+		id := srv.MatterClusterID()
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		info := ClusterInfo{ID: id}
+		info.Name, _ = schema.ClusterName(id)
+		info.Revision, _ = schema.ClusterRevision(id)
+		out = append(out, info)
+	}
+	return out
+}
+
 // bridgedDevice is ep with its parts, recursively.
 func bridgedDevice(topo *endpoint.Topology, ep *endpoint.Endpoint) BridgedDevice {
 	d := BridgedDevice{
 		Key: ep.SourceKey, Endpoint: ep.ID, DeviceType: ep.DeviceType,
 		Name: ep.NodeLabel(), Reachable: ep.Availability == nil || ep.Availability(),
+		Clusters: mountedClusters(ep),
+	}
+	if id, ok := schema.DeviceTypeIDOf(uint32(ep.DeviceType)); ok {
+		d.DeviceTypeRevision, _ = schema.DeviceTypeRevision(id)
 	}
 	// Its parts are the endpoints whose parent it is (the PartsList of a
 	// bridged node lists every descendant).

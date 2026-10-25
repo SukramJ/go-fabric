@@ -22,15 +22,17 @@ A host names none of the packages below for these:
 | The store | `Config.Store.Path` (the node opens and closes the SQLite file), or `Store.DB` for the host's own handle |
 | DNS-SD | a nil `Config.Advertiser`: Zeroconf with the subtype responder, shaped by `Network.MDNS` (`Disabled`, `HostName`); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
-| Credentials | `node.NewCommissioningCredentials`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodes`, `Node.PairingCodesFor` |
+| Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodes`, `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
+| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenBasicWindow` |
 | Health | `Config.Health{Interval, OnSample}`, `Node.Health`, `Node.LocalAddr` |
-| Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers` |
+| Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` for hooks registered on a running node |
+| Sessions | `Node.SessionDiagnostics()`: each session's id, fabric, peer and local node id, PASE or CASE, subscription count, last activity and idle ages, and the session table's occupancy — read-only; `Node.Clock()` for ages a host computes itself |
 | UniqueID | `Node.UniqueID`; `Config.BootID.RotateUniqueIDs` for the development rotation |
-| The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type, name, reachability and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
+| The served topology | `Node.Topology()`: the Aggregator's endpoint and each bridged device's key, endpoint, device type and its revision, name, reachability, mounted clusters (id, schema name, revision: `node.ClusterInfo`) and parts (`node.BridgeTopology`, `node.BridgedDevice`) |
 | A device's lifecycle | `Device.SetReachable`, `Device.Rename` (a persisted label, as a controller writes it), `Device.Update` (the host's statements: name, addresses, availability probe — persisted nowhere, a written label wins), `Device.EndpointNumber`; `Aggregator.Add`, `Remove`, `Replace` |
 | A bridged NodeLabel | `device.ComposeNodeLabel(base, suffix)`: the parameter suffix and the 32-byte cap of the generated definition; `device.New`, `Rename` and `Update` cap a name with it |
 | Who changed an attribute | `contract.Change.Origin` in every `OnChanged` callback (`OriginHostSet`, `OriginControllerWrite`, `OriginCommand`) |
-| Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `SessionManager`, `SubscriptionManager`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
+| Field and return types | the aliases `node.Groups` (`Config.Groups`, `Node.Groups`), `node.Advertiser` (`Config.Advertiser`), `node.Snapshotter`, `Topology`, `TCPConfig`, `CommissioningWindow`, `DiagnosticEvent`, `HealthSample`, `MDNSFinding`, `MDNSService`, `AttestationFiles`, `AttestationChain`, `WindowStatus`, `DeviceTypeValidationMode`, `CapabilityMinimaStruct`, `GeneralDiagnosticsFeatures`; the host ports `node.OTAImageSource`, `OTAConsent`, `OTAConsentState`, `OTAApplyPolicy`, `OTAPeer`, `OTAUpdateStatus`, `OTAApplier`, `WiFiReporter`, `CommissioningApprover`, `ReverseCommissioner`; `device.SourceKey`, `device.AvailabilityProbe` |
 | Peers (seam) | `Node.Peers()` returns the client stack's `*peer.Set` (nil without `Config.Client`); no facade route yet, the type stays the controller package's |
 | Bindings (seam) | `Node.Bindings()` returns the `*binding.Manager` that resolves the Binding servers' entries into peers; no facade route yet |
 | The controller's stack in a test (seam) | `fabrictest.Controller.Exchanges()` (`*exchange.Manager`), `Names()` (`*discovery.Names`, the DNS-SD cache the site answers), `Peers()` (`*peer.Set`), `Subscriptions()` (`*interaction.Subscriptions`): the `client/…` machinery the site's controller runs on, for a test that drives a layer below `controller/client` |
@@ -184,8 +186,11 @@ imports its configuration package but no Matter code from 18.4 MB to
 **Costs.** Everything else in `secure/` is the node's: the session table,
 the CASE and PASE responders, the verifier of the commissioning window.
 A host that touches them takes the security of the node's commissioning
-and sessions into its own hands; the facade's accessors
-(`Node.Sessions`, `Node.Subscriptions`) are for reading, and closing is
+and sessions into its own hands. Reading them is a facade route,
+`Node.SessionDiagnostics`; the accessors `Node.Sessions` and
+`Node.Subscriptions` (the aliases `node.SessionManager` and
+`node.SubscriptionManager`) hand out the mutating managers and are the
+seam, for a host that needs what the diagnostics leave out. Closing is
 the node's.
 
 *Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
@@ -211,7 +216,9 @@ the one manager.
 **Gives.** `*subscription.Manager` (`Node.Subscriptions`, the alias
 `node.SubscriptionManager`): `Active`, `CountBySession`.
 
-**When.** Diagnostics: how many subscriptions ride on each session.
+**When.** Rarely: the subscriptions riding on each session are in
+`Node.SessionDiagnostics` (`SessionInfo.Subscriptions`); the manager is for
+a host that needs more than the count.
 
 **Costs.** The manager's lifecycle is the node's; a host that closes
 subscriptions itself ends a controller's view without the controller's

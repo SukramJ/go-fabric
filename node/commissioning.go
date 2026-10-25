@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -52,8 +53,9 @@ type commissioningHost struct {
 	// installMu guards active.
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
-	// observer is the host's OnWindowTransition (nil: none).
-	observer func(WindowSnapshot) error
+	// observers lists the host's observers, Config.Observers first
+	// (Node.observerList); nil: none.
+	observers func() []Observers
 
 	// basicMu guards basic.
 	basicMu sync.Mutex
@@ -251,23 +253,47 @@ func (h *commissioningHost) setAnnounced(mode uint8, discriminator uint16) {
 	h.announcedMu.Unlock()
 }
 
-// notifyTransition hands the window after a transition to the host's
-// OnWindowTransition.
+// notifyTransition hands the window after a transition to every
+// OnWindowTransition, the configured one first.
 func (h *commissioningHost) notifyTransition(window *bridge.CommissioningWindow) {
-	fn := h.observer
-	if fn == nil {
+	if h.observers == nil {
 		return
 	}
-	h.announcedMu.Lock()
-	snap := WindowSnapshot{
-		Open:              window.IsOpen(),
-		Own:               window.IsOwnWindow(),
-		Administrator:     window.CurrentWindow(),
-		CommissioningMode: h.announcedMode,
-		Discriminator:     h.announcedDiscriminator,
+	obs := h.observers()
+	if !slices.ContainsFunc(obs, func(o Observers) bool { return o.OnWindowTransition != nil }) {
+		return
 	}
+	snap := h.snapshot(window)
+	for _, o := range obs {
+		if fn := o.OnWindowTransition; fn != nil {
+			observe(h.logger, "window_transition", func() error { return fn(snap) })
+		}
+	}
+}
+
+// snapshot is the window as the node serves it now: what the window
+// observer receives and [Node.Window] returns.
+func (h *commissioningHost) snapshot(window *bridge.CommissioningWindow) WindowSnapshot {
+	snap := WindowSnapshot{
+		Open:          window.IsOpen(),
+		Own:           window.IsOwnWindow(),
+		Administrator: window.CurrentWindow(),
+	}
+	if snap.Open {
+		snap.OpenedAt, snap.Deadline, snap.Timeout = window.Timing()
+		switch {
+		case !snap.Own:
+			snap.Kind = WindowEnhanced
+		case h.currentBasic() != nil:
+			snap.Kind = WindowBasic
+		default:
+			snap.Kind = WindowOwn
+		}
+	}
+	h.announcedMu.Lock()
+	snap.CommissioningMode, snap.Discriminator = h.announcedMode, h.announcedDiscriminator
 	h.announcedMu.Unlock()
-	observe(h.logger, "window_transition", func() error { return fn(snap) })
+	return snap
 }
 
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
