@@ -230,7 +230,8 @@ loom and the HA bridge is mains-powered and gains the server only for
 completeness.
 
 **Done when.** The comparison's ICD and CASE-initiator rows are ✅; the
-ICDM / ICDB families are green or classified.
+ICDM / ICDB families are green or classified; issues #273 and #274
+closed.
 
 **Status 2026-10-25.** Phases 23 and 24 are one bundle, released as
 `v0.12.0` (owner decision 2026-10-24: one release per bundle; phase 25
@@ -247,6 +248,9 @@ subscription to the module's own LIT node across three idle cycles
 ICDM and ICDB are classified as not applicable to the reference daemon,
 which is mains-powered and sets no `Config.ICD`, and applicable to a host
 that sets it. The [ICD guide](./guides/icd.md) is the host's view.
+Milestone 5 also closes issues #274 (the Ahead-of-matter.js marker check,
+wave CN) and #273 (wave CO, three pull requests after phase 25), owner
+decision 2026-10-25.
 
 ### Milestone 6: Completeness
 
