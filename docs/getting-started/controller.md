@@ -379,6 +379,40 @@ doc comment names the fields a host sets.
 
 *Source: `controller/client/surface.go`, `controller/client/interact.go:15-122`, `cluster/spec/value.go`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
 
+## More of the facade
+
+The calls below cover what a resident controller program (a daemon that
+serves other clients) needs beyond pairing and the four interactions.
+Each names its matter.js counterpart in its doc comment.
+
+### Hooks per node
+
+`Config.Node.Hooks` is one set of hooks for every node.
+`Config.HooksFor(id)` returns the hooks of the node with that local id
+instead, so a host attributes a report, an event or a subscription signal
+to its node, as matter.js gives each paired node its own events.
+
+### Discovery
+
+`Controller.Discover(ctx, id, timeout)` searches DNS-SD for the
+commissionable devices a `discovery.Identifier` selects
+(`ByLongDiscriminator`, `ByShortDiscriminator`, `ByVendor`,
+`ByVendorProduct`, `ByDeviceType`, `ByInstanceID`) until the timeout passes
+on the controller's clock (0 is 15 minutes, matter.js's default), and
+returns every device found, each once. The end of the search is no error.
+
+### Pairing codes
+
+`controller.ParsePairingCode(code)` decodes a QR code (`MT:…`) or a manual
+code with matter.js's validation: `Manual`, `Version`, `VendorID`,
+`ProductID`, `Flow`, `Capabilities` (the discovery bitmap), `Discriminator`
+(the long one of a QR code, the short one of a manual code), `Passcode` and
+`HasExtra` (the QR code carries TLV data). `PairingCode.Identifier()` is
+the discovery selector. A code it refuses is `controller.ErrPairingCode`,
+and `Pair` returns the same error for the same code.
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/facade_test.go`.*
+
 ## What is not here yet
 
 BLE on macOS and Windows (ADR 0024 decision 6) and TCP on the controller

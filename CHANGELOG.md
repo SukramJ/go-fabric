@@ -14,6 +14,9 @@ pseudo-version of `main`.
 
 - A controller on a test site (brief CJ §1.1): `controller.Config.Clock` and `controller.Config.Listener` give `controller.New` the stack's time source and a socket to serve on; `fabrictest.Site.ControllerConfig(opts)` returns a `controller.Config` wired to the site (network, DNS-SD, fake clock, a database of its own), so a program's own `controller.New` commissions and reads the site's devices.
 - Openers (§1.11): `controller.OpenDB(path)` opens a SQLite file with the module's driver, so a controller program imports none; `controller.ProductionTrust()` is the production trust store of the embedded DCL snapshot. The quickstart and the reference controller open their databases with `OpenDB`.
+- Hooks per node (§1.3): `controller.Config.HooksFor(id) client.Hooks`, passed to the registry.
+- Discovery on the controller (§1.4): `Controller.Discover(ctx, discovery.Identifier, timeout)` returns every commissionable device found before the timeout on the controller's clock; `controller.DefaultDiscoveryTimeout` (15 minutes, matter.js's).
+- The pairing-code decoder (§1.5): `controller.ParsePairingCode(code) (PairingCode, error)` with `PairingCode.Identifier()`, and `controller.ErrPairingCode`, which `Pair` now wraps for a code it cannot read. The reference controller parses its `pair --code` with it.
 
 ## [0.12.0] — 2026-10-25
 

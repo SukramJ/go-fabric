@@ -46,7 +46,6 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -92,8 +91,15 @@ type Config struct {
 	// Logger receives the stack's logs; nil is slog.Default().
 	Logger *slog.Logger
 	// Node configures every client node of the registry (client.Config;
-	// its Logger defaults to Logger).
+	// its Logger defaults to Logger, its Clock to Clock).
 	Node client.Config
+	// HooksFor, when set, returns the hooks of the client node with local
+	// id ("peer1", …) in place of Node.Hooks, so a host tells its nodes'
+	// reports, events and subscription signals apart
+	// (client.RegistryConfig.HooksFor) — matter.js gives each paired node
+	// its own events (packages/matter.js/src/device/PairedNode.ts:276-282
+	// at 862ad75f, attributeChanged and eventTriggered among them).
+	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
 	// false starts each, as matter.js's start connects them unless
 	// autoConnect is false (CommissioningController.ts:864-866). A
@@ -209,7 +215,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
-		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: node, AutoStart: !cfg.ManualStart,
+		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: node, HooksFor: cfg.HooksFor, AutoStart: !cfg.ManualStart,
 	}); err != nil {
 		return nil, err
 	}
@@ -316,20 +322,17 @@ type PairOptions struct {
 // pairing code names, over DNS-SD by its discriminator, and commissions
 // it into our fabric with the code's passcode: PASE, attestation against
 // [Config].Attestation, the operational certificate,
-// CommissioningComplete. A ctx without a deadline is bounded by
+// CommissioningComplete. A code [ParsePairingCode] refuses is
+// [ErrPairingCode]; a ctx without a deadline is bounded by
 // [DefaultPairTimeout]; a code no device answers before it is
 // [ErrNoDevice]. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:462-500).
+// (CommissioningController.ts:462-500 at 862ad75f).
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
-	var passcode uint32
-	var id discovery.Identifier
-	if qr, err := setup.DecodeQRCode(code); err == nil {
-		passcode, id = qr.Passcode, discovery.ByLongDiscriminator(qr.Discriminator)
-	} else if m, err := setup.DecodeManualCode(code); err == nil {
-		passcode, id = m.Passcode, discovery.ByShortDiscriminator(m.ShortDiscriminator)
-	} else {
-		return nil, fmt.Errorf("controller: pairing code: %w", err)
+	pc, err := ParsePairingCode(code)
+	if err != nil {
+		return nil, err
 	}
+	passcode, id := pc.Passcode, pc.Identifier()
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
