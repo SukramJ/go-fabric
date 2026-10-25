@@ -58,3 +58,71 @@ jobs:
       # could not run must not be reported as a check that passed.
       - name: measure the pin's distance from matter.js HEAD
         run: bash script/matterjs-pin-distance.sh "${RUNNER_TEMP}/matter.js"
+
+  # The Ahead-of-matter.js register (notes/parity/by_design.md) names, per
+  # row, a matter.js file and a text that holds while matter.js lacks the
+  # behaviour this module implements ahead of it. script/aheadcheck reads
+  # each marker at the pin and at matter.js's default branch; a text gone at
+  # the branch is the finding "caught up?" naming the row, and the job goes
+  # red. The reconciliation itself stays a pin-lift task
+  # (notes/parity/pin-lifts.md); this job is its trigger, issue #274.
+  #
+  # After pin-distance, and independent of its verdict: a stale pin is no
+  # reason not to look at the markers. Nothing in the pin-distance job
+  # changes for this one.
+  ahead-markers:
+    name: Ahead-of-matter.js markers
+    runs-on: ubuntu-latest
+    needs: pin-distance
+    if: ${{ !cancelled() }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The same blobless, unchecked-out clone as pin-distance: history and
+      # trees, no file contents. `git fetch --filter=blob:none` would not add
+      # contents either; instead `git show <rev>:<path>`, which the check
+      # runs for each marker at the pin and at origin/main, makes git fetch
+      # exactly that blob from the promisor remote. The clone size before and
+      # after goes into the job summary, so a check that started pulling the
+      # tree would show.
+      - name: clone matter.js history
+        run: |
+          git clone --filter=blob:none --no-checkout --quiet \
+            https://github.com/matter-js/matter.js.git "${RUNNER_TEMP}/matter.js"
+          du -sk "${RUNNER_TEMP}/matter.js/.git" | cut -f1 > "${RUNNER_TEMP}/clone-before-kb"
+
+      # Exit 1 is a finding (a row that is wrong at the pin, or "caught up?"
+      # at origin/main), 2 a check that could not run; both are red.
+      - name: check the markers at the pin and at origin/main
+        run: |
+          set +e
+          make ahead-check MATTERJS_DIR="${RUNNER_TEMP}/matter.js" MATTERJS_REF=origin/main \
+            > "${RUNNER_TEMP}/ahead-check.log" 2>&1
+          rc=$?
+          set -e
+          cat "${RUNNER_TEMP}/ahead-check.log"
+          before=$(cat "${RUNNER_TEMP}/clone-before-kb")
+          after=$(du -sk "${RUNNER_TEMP}/matter.js/.git" | cut -f1)
+          {
+            echo "### Ahead-of-matter.js markers"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| matter.js origin/main | \`$(git -C "${RUNNER_TEMP}/matter.js" rev-parse origin/main)\` |"
+            echo "| Clone before the check | ${before} KiB |"
+            echo "| Clone after the check | ${after} KiB |"
+            echo "| Exit status | ${rc} |"
+            echo
+            echo '```'
+            cat "${RUNNER_TEMP}/ahead-check.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" -ne 0 ]; then
+            # One annotation per finding, so the red run names the rows.
+            grep '^aheadcheck: ' "${RUNNER_TEMP}/ahead-check.log" | sed 's/^/::error::/' || true
+          fi
+          exit "$rc"
