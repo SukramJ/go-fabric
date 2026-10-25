@@ -6,7 +6,13 @@ classified against this module: **have it** (by construction or already
 ported), **gap** (a register entry in `matter_behaviour_findings.md`, closed by
 a later wave), **not applicable** (JS-runtime concern, harness, a role or
 feature this module does not have yet — with the milestone that will have
-it), or **open** (to be settled by the test port named). Owner's work (Fable
+it), **caught up** (matter.js now implements behaviour this module already
+had ahead of it — a row of the *Ahead of matter.js* register in
+[`by_design.md`](./by_design.md); the two implementations are reconciled onto
+matter.js and the row closes, see `CLAUDE.md` workflow step 5), or **open**
+(to be settled by the test port named). Independently of the commit list,
+every lift re-reads each marker of that register at the new pin: an upstream
+change can close a gap without a commit message that says so. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
