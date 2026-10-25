@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -115,6 +116,10 @@ type Manager struct {
 	// the group the clock carries, nil outside a fabrictest site.
 	inflight *inflight.Group
 
+	// icdIdleMax is the IdleModeDuration of a LIT-capable ICD publisher,
+	// seconds; zero for a node that is no such ICD.
+	icdIdleMax atomic.Uint32
+
 	// mu guards byID, eventReporter, nextID, onClosed, onTerminated and perFabric.
 	mu        sync.RWMutex
 	byID      map[uint32]*Subscription
@@ -130,6 +135,17 @@ type Manager struct {
 	stopCh    chan struct{}
 	wg        sync.WaitGroup
 }
+
+// SetICDIdleModeDuration makes the manager a LIT-capable ICD publisher:
+// every subscription from now on is granted the ICD's IdleModeDuration as
+// its MaxInterval — its full idle cycle — floored at the subscriber's
+// MinIntervalFloor, whatever ceiling the subscriber requested and without
+// the publisher limit (IdleModeDuration is always within the §2.11 ICD
+// publisher limit MAX(IdleModeDuration, 60 min)). Zero restores the
+// generic negotiation. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:302-312
+// (#icdIdleMaxInterval) and chip's ReadHandler.
+func (m *Manager) SetICDIdleModeDuration(seconds uint16) { m.icdIdleMax.Store(uint32(seconds)) }
 
 // SetEventReporter wires the optional event-drain hook. Pass nil to
 // detach. Safe to call before Start; calling after Start swaps in the
@@ -317,6 +333,9 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// accepts the requested MaxInterval; such a request was refused as
 	// inverted after the clamp.
 	maxCeil := max(min(req.MaxIntervalCeiling, m.cfg.MaxIntervalCeilingSeconds), req.MinIntervalFloor)
+	if idle := uint16(m.icdIdleMax.Load()); idle > 0 { //nolint:gosec // G115: SetICDIdleModeDuration stores a uint16
+		maxCeil = max(req.MinIntervalFloor, idle)
+	}
 	minFloor := max(req.MinIntervalFloor, m.cfg.MinIntervalFloorSeconds)
 	// Re-validate AFTER clamp: the configured ceiling may be below the
 	// floored minimum, producing a silent inversion that permanently

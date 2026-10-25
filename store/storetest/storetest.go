@@ -72,6 +72,7 @@ var cases = []testCase{
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
+	{"icd", icdCase},
 	{"unknown-fabric-refused", unknownFabricRefused},
 	{"constraints", constraintsCase},
 	{"fabric-cascade", fabricCascade},
@@ -583,6 +584,42 @@ func otaCase(ctx context.Context, t *testing.T, p store.Port) {
 	}
 }
 
+// icdCase: registrations per fabric in registration order, a replace that
+// leaves the other fabric's, the key and the subject round-tripped, and the
+// counter before and after its first save.
+func icdCase(ctx context.Context, t *testing.T, p store.Port) {
+	one := addFabric(ctx, t, p, 1)
+	two := addFabric(ctx, t, p, 2)
+	if got, err := p.ListICDRegistrations(ctx); err != nil || len(got) != 0 {
+		t.Fatalf("ListICDRegistrations on an empty store = %v, %v", got, err)
+	}
+	key := func(b byte) []byte { return bytes.Repeat([]byte{b}, 16) }
+	must(t, p.ReplaceICDRegistrations(ctx, two, []store.ICDRegistration{{CheckInNodeID: 0x22, MonitoredSubject: 0x22, Key: key(2)}}))
+	must(t, p.ReplaceICDRegistrations(ctx, one, []store.ICDRegistration{
+		{FabricIndex: 9, CheckInNodeID: 0x12, MonitoredSubject: 0xFFFF_FFFD_0001_0002, Key: key(1), ClientType: 1},
+		{CheckInNodeID: 0x11, MonitoredSubject: 0x11, Key: key(3)},
+	}))
+	got, err := p.ListICDRegistrations(ctx)
+	must(t, err)
+	wantEqual(t, "ListICDRegistrations", got, []store.ICDRegistration{
+		{FabricIndex: one, CheckInNodeID: 0x12, MonitoredSubject: 0xFFFF_FFFD_0001_0002, Key: key(1), ClientType: 1},
+		{FabricIndex: one, CheckInNodeID: 0x11, MonitoredSubject: 0x11, Key: key(3)},
+		{FabricIndex: two, CheckInNodeID: 0x22, MonitoredSubject: 0x22, Key: key(2)},
+	})
+	must(t, p.ReplaceICDRegistrations(ctx, one, nil))
+	got, err = p.ListICDRegistrations(ctx)
+	must(t, err)
+	wantEqual(t, "ListICDRegistrations after clearing fabric 1", got, []store.ICDRegistration{{FabricIndex: two, CheckInNodeID: 0x22, MonitoredSubject: 0x22, Key: key(2)}})
+
+	if c, ok, err := p.LoadICDCounter(ctx); err != nil || ok || c != 0 {
+		t.Fatalf("LoadICDCounter before a save = %d, %v, %v", c, ok, err)
+	}
+	must(t, p.SaveICDCounter(ctx, 0xffffffff))
+	if c, ok, err := p.LoadICDCounter(ctx); err != nil || !ok || c != 0xffffffff {
+		t.Fatalf("LoadICDCounter = %#x, %v, %v", c, ok, err)
+	}
+}
+
 func presetsCase(ctx context.Context, t *testing.T, p store.Port) {
 	if pr, act, ok, err := p.LoadThermostatPresets(ctx, "t1"); err != nil || ok || pr != nil || act != nil {
 		t.Fatalf("LoadThermostatPresets before a save = %v, %v, %v, %v", pr, act, ok, err)
@@ -687,6 +724,7 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 		"UpsertGroupcastGroup":       p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: missing, GroupID: 1}),
 		"UpsertResumption":           p.UpsertResumption(ctx, resumptionRec(missing, 1, 1)),
 		"ReplaceDefaultOTAProviders": p.ReplaceDefaultOTAProviders(ctx, missing, []store.OTAProviderLocation{{ProviderNodeID: 1}}),
+		"ReplaceICDRegistrations":    p.ReplaceICDRegistrations(ctx, missing, []store.ICDRegistration{{CheckInNodeID: 1, Key: make([]byte, 16)}}),
 	} {
 		if err == nil {
 			t.Errorf("%s for an unknown fabric succeeded", name)
@@ -695,6 +733,7 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 	// Writes that add no row need no fabric.
 	must(t, p.ReplaceACL(ctx, missing, nil))
 	must(t, p.ReplaceDefaultOTAProviders(ctx, missing, nil))
+	must(t, p.ReplaceICDRegistrations(ctx, missing, nil))
 }
 
 // fabricCascade is the removal of a fabric: everything it owns goes, the
@@ -712,6 +751,7 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 		must(t, p.UpsertGroupcastGroup(ctx, store.GroupcastGroup{FabricIndex: f, GroupID: 1}))
 		must(t, p.UpsertResumption(ctx, resumptionRec(f, 7, f)))
 		must(t, p.ReplaceDefaultOTAProviders(ctx, f, []store.OTAProviderLocation{{ProviderNodeID: uint64(f)}}))
+		must(t, p.ReplaceICDRegistrations(ctx, f, []store.ICDRegistration{{CheckInNodeID: uint64(f), Key: make([]byte, 16)}}))
 		must(t, p.SaveServerSubscription(ctx, uint32(f), f, 7, []byte{f}))
 	}
 	must(t, p.SaveThermostatPresets(ctx, "t", []byte{1}, nil))
@@ -721,7 +761,7 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, p.RemoveFabric(ctx, one))
 
 	count := func(f uint8) map[string]int {
-		n := map[string]int{"identity": 0, "resumption": 0, "ota": 0}
+		n := map[string]int{"identity": 0, "resumption": 0, "ota": 0, "icd": 0}
 		if _, err := p.GetIdentity(ctx, f); err == nil {
 			n["identity"]++
 		}
@@ -744,10 +784,16 @@ func fabricCascade(ctx context.Context, t *testing.T, p store.Port) {
 				n["ota"]++
 			}
 		}
+		regs, _ := p.ListICDRegistrations(ctx)
+		for _, r := range regs {
+			if r.FabricIndex == f {
+				n["icd"]++
+			}
+		}
 		return n
 	}
-	all := map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1}
-	none := map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0}
+	all := map[string]int{"identity": 1, "acl": 1, "key sets": 1, "key map": 1, "group table": 1, "groupcast": 1, "resumption": 1, "ota": 1, "icd": 1}
+	none := map[string]int{"identity": 0, "acl": 0, "key sets": 0, "key map": 0, "group table": 0, "groupcast": 0, "resumption": 0, "ota": 0, "icd": 0}
 	wantEqual(t, "the removed fabric's rows", count(one), none)
 	wantEqual(t, "the other fabric's rows", count(two), all)
 	if _, err := p.GetResumptionByID(ctx, resumptionRec(one, 7, one).ResumptionID); !errors.Is(err, store.ErrResumptionNotFound) {

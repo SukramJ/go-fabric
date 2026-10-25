@@ -83,7 +83,16 @@ func (s *structure) computeProperties() Properties {
 	if icd != nil {
 		// The owner reads IcdClient.litSupported as the LITS feature bit
 		// (NodePhysicalProperties.ts:33-35, :45).
+		// isLongIdleTimeOperating is IcdClient.litSupported — the LITS
+		// feature and specification 1.4.0 or later — and OperatingMode LIT
+		// (NodePhysicalProperties.ts:33-35, :45; IcdClient.ts:967-974).
 		lits := icd.injected.featureMap&uint32(icdmanagement.FeatureLongIdleTimeSupport) != 0
+		if bi := readyCluster(root, basicinformation.ClusterID); lits && bi != nil {
+			v, ok := uintOf(bi, basicinformation.AttrSpecificationVersion)
+			lits = ok && v >= uint64(MinLITSpecificationVersion)
+		} else {
+			lits = false
+		}
 		if mode, ok := uintOf(icd, icdmanagement.AttrOperatingMode); ok {
 			p.LongIdleTimeOperating = lits && mode == uint64(icdmanagement.OperatingModeLit)
 		}

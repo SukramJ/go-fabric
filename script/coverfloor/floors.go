@@ -150,6 +150,8 @@ var floors = []packageFloor{
 		min: 20,
 		why: "brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/icd", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so

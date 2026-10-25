@@ -69,7 +69,7 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 	}
 	var backoff time.Duration
 	for n := 0; n <= mrp.MaxRetransmissions; n++ {
-		backoff += mrp.BackoffDuration(base, n, func() float64 { return 1 })
+		backoff += mrp.BackoffDuration(base, n, func() float64 { return 1 }) + b.LocalFixedMRPBackoff()
 	}
 	return backoff + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
 }

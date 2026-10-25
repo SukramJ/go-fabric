@@ -89,6 +89,17 @@ type ConnectOptions struct {
 	// HandleError replaces the set's error handler for a process this call
 	// starts (Peer.ts:745-751).
 	HandleError ErrorHandler
+	// Priority marks a time-critical connection — matter.js's "icdLit"
+	// priority network a sustained subscription to a LIT ICD peer uses so
+	// its subscribe lands inside the peer's brief active window
+	// (SustainedSubscription.ts:133-149). matter.js's network profiles
+	// throttle connections per network and the priority one bypasses the
+	// throttle; this module has no network profiles and throttles no
+	// connection until milestone 5 phase 25 (notes/parity/matter_behaviour_findings.md,
+	// "Network profiles"; the register's NetworkProfileTest), so every
+	// connection already goes out at once and the flag only records the
+	// intent.
+	Priority bool
 }
 
 // attempt is the connection attempt to one address (PeerConnection.ts:863-866).

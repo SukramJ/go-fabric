@@ -315,6 +315,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), cfg.Limits, n.logger)
+	n.wireICD()
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
 	advert, err := n.advertisement()
@@ -490,6 +491,9 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		log.DropFabric(fabricIndex)
 	}
 	n.removeFabricBindings(fabricIndex)
+	if srv := n.root.ICDManagement; srv != nil {
+		srv.FabricRemoved(ctx, fabricIndex)
+	}
 	n.reopenWhenIdle()
 }
 
@@ -645,12 +649,8 @@ func (n *Node) Start(ctx context.Context) error {
 	// #online (:352) → #assertDataModelTest (:125-143): without the feature a
 	// MaxPathsPerInvoke above one fails the node's start, with it a limit of
 	// one is logged.
-	maxPaths := n.cfg.MaxPathsPerInvoke
-	if maxPaths == 0 {
-		maxPaths = im.DefaultMaxPathsPerInvoke
-	}
-	if err := n.root.GeneralDiagnostics.CheckDataModelTest(maxPaths, n.logger); err != nil {
-		return fmt.Errorf("node: %w", err)
+	if err := n.checkDataModelTest(); err != nil {
+		return err
 	}
 	if err := n.br.Start(ctx); err != nil {
 		return fmt.Errorf("node: bridge start: %w", err)
@@ -707,6 +707,7 @@ func (n *Node) Start(ctx context.Context) error {
 	for _, fabric := range loaded {
 		n.br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
+	n.startICD(ctx)
 	// The Binding servers register their entries once the node is online
 	// and its CASE identities are loaded (BindingManager.ts:65-78: the
 	// queue flushes on the node's online event).
@@ -785,6 +786,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	}
 	n.stopReannounceLoop()
 	n.stopHealthProbe()
+	if srv := n.root.ICDManagement; srv != nil {
+		srv.Stop()
+	}
 	err := n.br.Stop(ctx)
 	// The devices are unbound once no controller reaches them: each
 	// device's queue drains before Stop returns.
@@ -997,4 +1001,18 @@ func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
 		b.WriteString("no diagnostic events recorded\n")
 	}
 	return []byte(b.String()), nil
+}
+
+// checkDataModelTest holds the DataModelTest feature against the node's
+// MaxPathsPerInvoke (GeneralDiagnosticsServer.ts #assertDataModelTest,
+// :125-143).
+func (n *Node) checkDataModelTest() error {
+	maxPaths := n.cfg.MaxPathsPerInvoke
+	if maxPaths == 0 {
+		maxPaths = im.DefaultMaxPathsPerInvoke
+	}
+	if err := n.root.GeneralDiagnostics.CheckDataModelTest(maxPaths, n.logger); err != nil {
+		return fmt.Errorf("node: %w", err)
+	}
+	return nil
 }

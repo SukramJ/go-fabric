@@ -85,6 +85,10 @@ type Interaction struct {
 	log      *slog.Logger
 	clock    exchange.Clock
 	rand     func() float64
+	// attemptHook, a test seam, replaces a sustained subscription's
+	// subscribe of one attempt — matter.js's injected subscribe
+	// (SustainedSubscription.Configuration.subscribe).
+	attemptHook func(ctx context.Context, req SubscribeRequest, opts ExchangeOptions) (*Subscription, error)
 }
 
 // Config configures an [Interaction] — what matter.js ClientInteraction

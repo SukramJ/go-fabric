@@ -41,6 +41,10 @@ type ExchangeOptions struct {
 	// 0 is the peer set's default, negative waits without bound (matter.js
 	// Forever, ClientInteraction.ts:1095).
 	ConnectionTimeout time.Duration
+	// Priority is the connection's peer.ConnectOptions.Priority — the
+	// "icdLit" priority network of a sustained subscription to a LIT ICD
+	// peer (SustainedSubscription.ts:133-149).
+	Priority bool
 }
 
 // Provider gives an interaction its exchanges — matter.js ExchangeProvider
@@ -132,7 +136,7 @@ type peerProvider struct {
 func (p *peerProvider) InitiateExchange(ctx context.Context, opts ExchangeOptions) (*exchange.Exchange, error) {
 	for {
 		if !opts.RequireExistingSession {
-			if _, err := p.p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: opts.ConnectionTimeout}); err != nil {
+			if _, err := p.p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: opts.ConnectionTimeout, Priority: opts.Priority}); err != nil {
 				return nil, err
 			}
 		}

@@ -54,6 +54,7 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 	b.ackTracker = t
 	if b.outboundReliable == nil {
 		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
+		b.outboundReliable.fixedBackoff.Store(b.icd.fixedBackoff.Load())
 	}
 	b.mu.Unlock()
 }

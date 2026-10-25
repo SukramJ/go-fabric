@@ -121,6 +121,7 @@ type Manager struct {
 	mu             sync.Mutex
 	closed         bool
 	handlers       map[uint16]ProtocolHandler
+	checkIn        CheckInReceiver
 	sessions       map[uint16]*Session
 	unsecured      map[uint64]*Session
 	exchanges      map[uint32]*Exchange
@@ -222,6 +223,32 @@ func (m *Manager) SetProtocolHandler(protocol uint16, h ProtocolHandler) {
 		return
 	}
 	m.handlers[protocol] = h
+}
+
+// CheckInReceiver takes the payload of an ICD Check-In message and reports
+// whether a registered peer's key matched it.
+type CheckInReceiver func(payload []byte) bool
+
+// SetCheckInReceiver installs fn for the ICD Check-In messages (Secure
+// Channel opcode 0x50) peers send unsecured: each one goes to fn, nothing is
+// answered and, the Check-In being unreliable, nothing is acknowledged; the
+// exchange closes once fn returns. nil drops them again. Mirrors matter.js
+// packages/protocol/src/securechannel/SecureChannelProtocol.ts:149-180
+// (#handleIcdCheckIn), where the fabrics' ICD state is fn.
+func (m *Manager) SetCheckInReceiver(fn CheckInReceiver) {
+	m.mu.Lock()
+	m.checkIn = fn
+	m.mu.Unlock()
+}
+
+// receiveCheckIn hands a Check-In to the receiver (SecureChannelProtocol.ts:164-180).
+func (m *Manager) receiveCheckIn(_ *Exchange, msg *Message) {
+	m.mu.Lock()
+	fn := m.checkIn
+	m.mu.Unlock()
+	if fn == nil || !fn(msg.Payload) {
+		m.log.Debug("matter.controller.icd_checkin_unmatched", slog.Int("exchange_id", int(msg.ExchangeID)))
+	}
 }
 
 func (m *Manager) handler(protocol uint16) ProtocolHandler {
@@ -786,8 +813,9 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 
 // handlerFor is the handler of the exchange msg opens on s, nil for
 // none: on an unsecured session the installed Secure Channel handler for
-// a Sigma1 (SecureChannelProtocol.ts:146-148) and the built-in refusal for
-// a PBKDFParamRequest (:129-137); on a secure session the installed
+// a Sigma1 (SecureChannelProtocol.ts:146-148), the built-in refusal for
+// a PBKDFParamRequest (:129-137) and the Check-In receiver for an ICD
+// Check-In (:149-151); on a secure session the installed
 // handler of any protocol but the Secure Channel, whose secure-session
 // handler is built in.
 func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
@@ -800,6 +828,13 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 			return m.handler(mrp.SecureChannelProtocolID)
 		case mrp.SCOpcodePBKDFParamRequest:
 			return m.refusePASE
+		case mrp.SCOpcodeIcdCheckIn:
+			m.mu.Lock()
+			set := m.checkIn != nil
+			m.mu.Unlock()
+			if set {
+				return m.receiveCheckIn
+			}
 		}
 		return nil
 	}

@@ -41,6 +41,16 @@ func (n *Node) defaultRequest() SubscribeRequest {
 	return r
 }
 
+// dropDefaultSubscription closes the default subscription no longer
+// desired (NetworkClient.ts:113-196).
+func (n *Node) dropDefaultSubscription() {
+	n.mu.Lock()
+	s := n.sub
+	n.sub = nil
+	n.mu.Unlock()
+	s.Close()
+}
+
 // syncAutoSubscribe is NetworkClient.#syncAutoSubscribe
 // (NetworkClient.ts:113-196): a newly commissioned node reads the default
 // subscription's paths once (:133-143, unless NoInitialRead); then, when a
@@ -66,11 +76,7 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		return nil
 	}
 	if !desired {
-		n.mu.Lock()
-		s := n.sub
-		n.sub = nil
-		n.mu.Unlock()
-		s.Close()
+		n.dropDefaultSubscription()
 		return nil
 	}
 	sreq := req
@@ -86,10 +92,12 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		n.mu.RLock()
 		s := n.sub
 		n.mu.RUnlock()
+		n.noteICDActive()
 		if s != nil && s.ID() != interaction.NoSubscription && n.cfg.Hooks.SubscriptionAlive != nil {
 			n.cfg.Hooks.SubscriptionAlive()
 		}
 	}
+	n.icdSustainHooks(&sreq)
 	sreq.Updated = func(*Report) { alive() }
 	sreq.KeepaliveReceived = alive
 	sreq.Closed = func() {
@@ -102,6 +110,9 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	sreq.ActiveChanged = func(active bool) {
 		if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
 			h(active)
+		}
+		if n.icd != nil {
+			n.icd.onSubscriptionActive(active)
 		}
 		if active {
 			if h := n.cfg.Hooks.SubscriptionAlive; h != nil {
@@ -117,10 +128,22 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	n.mu.Lock()
-	sub, n.sub = s, s
-	n.mu.Unlock()
+	n.adoptDefaultSubscription(s, &sub)
 	return nil
+}
+
+// adoptDefaultSubscription makes s the default subscription, also in the
+// caller's own variable its callbacks compare against. s can go
+// active before n.sub names it, and an ICD trigger that ran then read
+// SubscriptionActive false: the ICD client gets the edge again now that it
+// can see it (a duplicate trigger is absorbed by its own guards).
+func (n *Node) adoptDefaultSubscription(s *Subscription, own **Subscription) {
+	n.mu.Lock()
+	*own, n.sub = s, s
+	n.mu.Unlock()
+	if s.Active() && n.icd != nil {
+		n.icd.onSubscriptionActive(true)
+	}
 }
 
 // bootstrapRead is the read a sustained default subscription performs
@@ -379,4 +402,13 @@ func (n *Node) Seeded() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.seeded
+}
+
+// icdSustainHooks gives the default subscription the ICD branches of the
+// sustained subscription (ClientNodeInteraction.ts:174, :178).
+func (n *Node) icdSustainHooks(req *SubscribeRequest) {
+	if n.icd != nil {
+		req.Wakefulness = n.icd.Wakefulness
+		req.PeerFed = n.icd.peerFed
+	}
 }

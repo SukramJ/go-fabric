@@ -85,6 +85,8 @@ type RootClusters struct {
 	// PowerSourceConfiguration lists the node's PowerSource endpoints;
 	// it starts empty, for the host to fill once the topology exists.
 	PowerSourceConfiguration *mattercore.PowerSourceConfiguration
+	// ICDManagement is nil unless [Config].ICD is set.
+	ICDManagement *mattercore.ICDManagement
 
 	servers []contract.ClusterServer
 }
@@ -285,12 +287,17 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		netComm = r.NetworkCommissioning
 	}
 
-	// IcdManagement is NOT mounted: RootNode requires it under "Sit | Lit"
-	// (root-node.element.ts), which an always-on, mains-powered bridge is
-	// not, and matter.js mounts it on no node that is not an ICD (it is in
-	// neither ServerNode.RootEndpoint nor any non-ICD test app). A
-	// controller reads its presence as "this node sleeps"
-	// (NodePhysicalProperties isIntermittentlyConnected).
+	// IcdManagement is mounted only on an ICD ([Config].ICD): RootNode
+	// requires it under "Sit | Lit" (root-node.element.ts:91), which an
+	// always-on, mains-powered node is not, and matter.js mounts it on no
+	// node that is not an ICD (it is in neither ServerNode.RootEndpoint
+	// nor any non-ICD test app). A controller reads its presence as "this
+	// node sleeps" (NodePhysicalProperties isIntermittentlyConnected).
+	if cfg.ICD != nil {
+		if r.ICDManagement, err = buildICDManagement(cfg, d.st, d.logger); err != nil {
+			return nil, fmt.Errorf("root icd management: %w", err)
+		}
+	}
 
 	if wifi := cfg.Network.WiFi; wifi.Reporter != nil {
 		r.WiFiNetworkDiagnostics, err = mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
@@ -331,6 +338,9 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	)
 	if r.OTARequestor != nil {
 		servers = append(servers, r.OTARequestor)
+	}
+	if r.ICDManagement != nil {
+		servers = append(servers, r.ICDManagement)
 	}
 	servers = append(servers, optional...)
 	r.servers = servers

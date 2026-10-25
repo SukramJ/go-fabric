@@ -58,6 +58,12 @@ const (
 	// on a loaded machine it outlasts any budget a waiting operation
 	// gets.
 	NodeBuild = "node.build"
+	// ICDCheckIns: an ICD node's Check-In pass after an idle→active wake
+	// (cluster/core ICDManagement), from the wake until every Check-In of
+	// the pass went out or failed. Its sends are unreliable datagrams and
+	// its address resolution reads the cached session address first, so
+	// the pass waits on no peer.
+	ICDCheckIns = "icd.checkins"
 )
 
 // Group is one host's counters. Its methods are safe for concurrent use;

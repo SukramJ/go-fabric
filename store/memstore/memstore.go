@@ -42,11 +42,12 @@ import (
 
 // Keys shared with SQLite's [store.Store], so the two hold the same settings
 // and counters for the same state (store/metadata.go, store/ota.go,
-// store/doorlock.go).
+// store/doorlock.go, store/icd.go).
 const (
 	metadataKeyNextFabricIndex = "next_fabric_index"
 	otaRequestorStateKey       = "ota_requestor.state"
 	settingDoorLockSaved       = "door_lock.saved:"
+	metadataKeyICDCounter      = "icd_management.counter"
 )
 
 // maxMetadataCounter is SQLite's bound: the counter rides in an INTEGER.
@@ -71,6 +72,7 @@ type Store struct {
 	groupcast  map[uint8]map[uint16]store.GroupcastGroup
 	resumption map[resumptionKey]store.ResumptionRecord
 	otaDefault map[uint8][]store.OTAProviderLocation
+	icd        map[uint8][]store.ICDRegistration
 	subs       map[uint32]subscription
 	subsSeq    uint64
 	settings   map[string]string
@@ -110,6 +112,7 @@ func New() *Store {
 		groupcast:  map[uint8]map[uint16]store.GroupcastGroup{},
 		resumption: map[resumptionKey]store.ResumptionRecord{},
 		otaDefault: map[uint8][]store.OTAProviderLocation{},
+		icd:        map[uint8][]store.ICDRegistration{},
 		subs:       map[uint32]subscription{},
 		settings:   map[string]string{},
 		metadata:   map[string]uint64{metadataKeyNextFabricIndex: 1},
@@ -255,8 +258,8 @@ func (s *Store) updateFabric(fabricIndex uint8, change func(*store.FabricRecord)
 
 // RemoveFabric implements [store.Fabrics]: the fabric and every row the
 // SQLite schema's ON DELETE CASCADE removes with it — identity, group key
-// sets, key map, group table, groupcast groups, ACL, resumption records and
-// default OTA providers. Server subscriptions, presets, lock records,
+// sets, key map, group table, groupcast groups, ACL, resumption records,
+// default OTA providers and ICD registrations. Server subscriptions, presets, lock records,
 // settings and counters stay, as they do in SQLite.
 func (s *Store) RemoveFabric(_ context.Context, fabricIndex uint8) error {
 	s.mu.Lock()
@@ -272,6 +275,7 @@ func (s *Store) RemoveFabric(_ context.Context, fabricIndex uint8) error {
 	delete(s.groupcast, fabricIndex)
 	delete(s.acl, fabricIndex)
 	delete(s.otaDefault, fabricIndex)
+	delete(s.icd, fabricIndex)
 	for k := range s.resumption {
 		if k.fabric == fabricIndex {
 			delete(s.resumption, k)
@@ -714,6 +718,57 @@ func (s *Store) LoadOTARequestorState(ctx context.Context) (state []byte, ok boo
 // SaveOTARequestorState implements [store.OTA].
 func (s *Store) SaveOTARequestorState(ctx context.Context, state []byte) error {
 	return s.SetSetting(ctx, otaRequestorStateKey, string(state))
+}
+
+// --- ICD ---
+
+// ListICDRegistrations implements [store.ICD].
+func (s *Store) ListICDRegistrations(_ context.Context) ([]store.ICDRegistration, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []store.ICDRegistration
+	for _, f := range sortedKeys(s.icd) {
+		for _, r := range s.icd[f] {
+			r.Key = slices.Clone(r.Key)
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+// ReplaceICDRegistrations implements [store.ICD].
+func (s *Store) ReplaceICDRegistrations(_ context.Context, fabricIndex uint8, regs []store.ICDRegistration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(regs) == 0 {
+		delete(s.icd, fabricIndex)
+		return nil
+	}
+	if !s.hasFabric(fabricIndex) {
+		return fmt.Errorf("memstore: replace icd registrations: %w %d", errUnknownFabric, fabricIndex)
+	}
+	out := slices.Clone(regs)
+	for i := range out {
+		out[i].FabricIndex = fabricIndex
+		out[i].Key = slices.Clone(out[i].Key)
+	}
+	s.icd[fabricIndex] = out
+	return nil
+}
+
+// LoadICDCounter implements [store.ICD]; the counter is a metadata counter,
+// as in SQLite.
+func (s *Store) LoadICDCounter(ctx context.Context) (counter uint32, ok bool, err error) {
+	v, ok, err := s.GetMetadataCounter(ctx, metadataKeyICDCounter)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return uint32(v), true, nil //nolint:gosec // G115: SaveICDCounter stores a uint32
+}
+
+// SaveICDCounter implements [store.ICD].
+func (s *Store) SaveICDCounter(ctx context.Context, counter uint32) error {
+	return s.SetMetadataCounter(ctx, metadataKeyICDCounter, uint64(counter))
 }
 
 // --- ThermostatPresets ---

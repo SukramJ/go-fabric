@@ -73,6 +73,17 @@ nothing.
 | `(*store.Store).ThermostatPresets(key)` | `store.NewThermostatPresetStore(st, key)` over any `store.ThermostatPresets` (removed) |
 | a fabrictest device on a SQLite file | in memory by default; `fabrictest.Options{StoreOnDisk: true}` keeps the file |
 
+## The ICD store area in v0.12.0
+
+ICD Management is a real server now ([ICD guide](icd.md)). A host that
+uses `store.Store`, `store/memstore` or `Store.Path` changes nothing.
+
+| Before | Now |
+| --- | --- |
+| a host's own `store.Port` implementation | adds `store.ICD`: `ListICDRegistrations`, `ReplaceICDRegistrations` (a removed fabric takes its registrations along), `LoadICDCounter`, `SaveICDCounter`; `store/storetest` checks them |
+| a host that carries the schema in its own migrations | applies `store/migrations/v7.up.sql` (`matter_icd_registrations`) |
+| `core.NewICDManagement()` | `node.Config.ICD` mounts the server; by hand, `core.NewICDManagement(cfg)` returns the server and the configuration's error |
+
 ## Observability and the Base device type's clusters in v0.10.6
 
 The keys, the metrics port and the trace are in the

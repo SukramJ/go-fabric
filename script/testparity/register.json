@@ -496,42 +496,102 @@
     },
     {
       "path": "packages/node/test/behavior/system/icd/IcdClientTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's ICD client (registration, check-in receipt, key refresh, LIT auto-registration), which milestone 5 builds.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestIcdClientParity",
+        "client/peer:TestIcdClientPeerParity"
+      ],
+      "missing": [
+        "offers no key and keeps the receive path on the committed state when storing the offered key fails",
+        "rejects a replay of a Check-In accepted while storing the offered key failed",
+        "refreshes the key while the Check-In that requested it still commits",
+        "stores the confirmed key when another transaction holds the ICD state at the response",
+        "keeps the pending key when the device refuses the refresh, and offers it again",
+        "decrypts Check-Ins under the pending key after a controller restart",
+        "registers once the state is free",
+        "waits for the state in forget()",
+        "clears the registration once when a decommission waits behind unregister() for the state",
+        "measures from the response's starting counter when a Check-In confirmed the key first",
+        "rejects a replay after a restart between a Check-In that confirmed the key and the lost response",
+        "rejects a replay after a restart when shutdown abandoned a teardown that accepted the Check-In",
+        "starts no refresh after a checkedIn listener began forget()",
+        "keeps the registration when a registered listener throws, and unregisters it later",
+        "keeps the clear when an unregistered listener throws, and registers again later",
+        "ends a retry when a Check-In under the pending key confirms it while the retry waits for the state",
+        "unregister() abandons a key refresh that waits for its response",
+        "joins a registration in flight with the same options and refuses other options",
+        "unregister() during a registration abandons it and removes it from the device",
+        "forget() during a registration abandons it",
+        "refuses register() while a key refresh runs",
+        "refuses register() and does not auto-register while unregister() waits for a sleeping peer",
+        "keeps the registration when unregister() gives up on a peer that does not wake",
+        "forget() abandons a key refresh parked on a sleeping peer",
+        "unregister() abandons a key refresh parked on a sleeping peer and unregisters once it wakes",
+        "closes without waiting for a key refresh parked on a sleeping peer",
+        "keeps the stored registration when closing abandons an unregister() parked on a sleeping peer",
+        "logs an error when the stored registration cannot be refreshed",
+        "stores nothing for a registration that closing abandoned after the device answered",
+        "forget() ends an unregister() parked on a sleeping peer",
+        "ignores a Check-In whose reaction runs after forget() cleared the registration",
+        "clears the registration when closing abandons an unregister() whose request went out",
+        "rejects forget() that shutdown abandons before it cleared, and keeps the registration",
+        "ends with no registration when a decommission lands while the registration commits",
+        "announces the clear once when a decommission waits behind an unregister() commit",
+        "announces registered, then unregistered, when a decommission waits behind the register commit",
+        "forget() after unregister() cleared locally leaves its UnregisterClient running",
+        "refuses unregister() while forget() runs",
+        "clears the time of the last Check-In with the registration",
+        "joins a second unregister() of a sleeping peer and sends one UnregisterClient",
+        "stores the offset of an old-key Check-In that arrives while a refresh waits",
+        "registers without the pending key of a refresh that a forget() ended",
+        "starts no second refresh for a Check-In handled while a refresh runs",
+        "starts no second refresh for an old-key Check-In while the refresh waits for its response",
+        "ends a key refresh quietly when the peer is decommissioned",
+        "parks a registered await-mode LIT peer's sustained subscription on its wake signal",
+        "routes a non-ICD peer to a plain (non-parking) SustainedSubscription",
+        "recreates the running subscription on the first registration-induced SIT→LIT flip",
+        "resubscribes when a LIT peer reports on a subscription the controller already timed out",
+        "does NOT auto-register a LIT-advertising peer below spec 1.4.0",
+        "does not auto-register when the fresh operating mode is Sit despite a persisted Lit",
+        "exposes nextExpectedCheckin on the wall clock once no subscription is held"
+      ],
+      "reason": "Registration, unregistration, forget, StayActive, LIT auto-registration, Check-In receipt with the replay drop and the key refresh, persistence across a restart, the decommission hooks, the LIT idle-interval floor and the address monitor's ICD branch (controller/client/icd_client_parity_matterjs_test.go, client/peer/icd_parity_matterjs_test.go). Missing: matter.js's transaction model (the ICD state as a lockable transaction participant, the waits and abandonments it orders), storage-failure injection during a key refresh, the routing of the sustained subscription through the client (held by the SustainedSubscriptionTest port), and three cases skipped for a seam this module lacks — a peer reporting a pre-1.4 version, a stale LIT seeded into the cache, MockTime.stepWallClock.",
       "snapshotSha": "621b035602c12be5c0ea3d8cfc6bd10ccdf7003f"
     },
     {
       "path": "packages/node/test/behavior/system/icd/IcdMultiAdminErrorTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The ICD client's single-admin guard before registration.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestIcdMultiAdminErrorParity"
+      ],
+      "reason": "The single-admin guard's error, its fields and its message (controller/client/icd_hold_parity_matterjs_test.go).",
       "snapshotSha": "abf5578094db058c0238bfae6fe8277c8f986ec6"
     },
     {
       "path": "packages/node/test/behavior/system/icd/IcdPeerAsleepErrorTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The error a controller raises for a sleeping ICD peer.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestIcdPeerAsleepErrorParity"
+      ],
+      "reason": "The error a held interaction returns for a LIT peer that does not wake (controller/client/icd_hold_parity_matterjs_test.go).",
       "snapshotSha": "1ff415acc0fc1cff5387d6da1ab70452d95f5752"
     },
     {
       "path": "packages/node/test/behavior/system/icd/holdUntilIcdPeerAwakeTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "Holding a controller interaction until a sleeping ICD peer wakes.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestHoldUntilIcdPeerAwakeParity"
+      ],
+      "reason": "HoldUntilICDPeerAwake on the fake clock: an awake peer passes, a sleeping one waits for its Check-In or times out, cancellation ends the wait (controller/client/icd_hold_parity_matterjs_test.go).",
       "snapshotSha": "4ad65cf77dbe7c82d98c94b8266de6a06b9df99b"
     },
     {
       "path": "packages/node/test/behavior/system/icd/litSupportedTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's LIT-support check of a peer (LongIdleTimeSupport and specification version 1.4).",
+      "status": "ported",
+      "go": [
+        "controller/client:TestLITSupportedParity"
+      ],
+      "reason": "Node.LITSupported: LongIdleTimeSupport and a specification version of 1.4.0 or later, applied to a node's image (controller/client/icd_lit_supported_parity_matterjs_test.go).",
       "snapshotSha": "58ed84ce06c1480a57769f288b5a0fba8f677684"
     },
     {
@@ -992,16 +1052,24 @@
     },
     {
       "path": "packages/node/test/behaviors/icd-management/IcdManagementServerTest.ts",
-      "status": "planned",
-      "until": "M5 phase 23",
-      "reason": "The device-side ICD server (attribute defaults, constraints, counter, RegisterClient, StayActive), which milestone 5 phase 23 builds.",
+      "status": "ported",
+      "go": [
+        "node:TestIcdManagementServer"
+      ],
+      "reason": "The ICD Management server of a node with node.Config.ICD on a commissioned fabrictest pair: the attribute defaults, the refused timings, the counter's boot bump and persistence, the MRP fast-poll pad, subscription persistence off, RegisterClient (slots, the Administrator update), UnregisterClient (NOT_FOUND), StayActiveRequest, the Manage-privilege VerificationKey rule after Pair.Grant, the LIT feature, the restore after a restart and the drop on fabric removal, the advertisement with ICD, SAT and no SII for LIT, the trigger, the DSLS switch, the idle/active mode on the site's clock and the Check-In pass with a recording sender over the real icd.Sender; the server variants the facade cannot state (a LIT server without its OperatingMode, a LITS server without CIP) and the prune of a key of a departed fabric are checked on the cluster/core server's own configuration (node/icd_management_server_parity_matterjs_test.go).",
       "snapshotSha": "f168fd993e7a6406e0233a3d47dea95842515a2b"
     },
     {
       "path": "packages/node/test/behaviors/icd-management/IcdModeTest.ts",
-      "status": "planned",
-      "until": "M5 phase 23",
-      "reason": "The ICD active/idle state machine of the device side, built with the ICD server in milestone 5 phase 23.",
+      "status": "partial",
+      "go": [
+        "icd:TestIcdModeState"
+      ],
+      "missing": [
+        "keeps the active deadline and promise across a forward step",
+        "keeps the active deadline and promise across a backward step"
+      ],
+      "reason": "The machine on the fake clock: start, the may-enter-idle signal without a transition, the forced idle, the two wakes, the window that is never shortened, stop, the promise from one clock reading and in whole milliseconds (icd/mode_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move.",
       "snapshotSha": "7b99feb752196c8cda93148580223886a42c2b95"
     },
     {
@@ -2779,11 +2847,10 @@
         "im/subscription:TestHandlerParity_SendInterval_HalfUnder60s_Uses80Percent",
         "im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed",
         "node:TestServerSubscriptionParity",
-        "im/subscription:TestServerSubscriptionParity"
+        "im/subscription:TestServerSubscriptionParity",
+        "node:TestServerSubscriptionLITParity"
       ],
       "missing": [
-        "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a higher ceiling",
-        "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a lower ceiling",
         "terminates when the peer refuses a report sent during a shutdown close",
         "keeps a subscription that joins a session closing for shutdown",
         "terminates when the peer answers a report with an error status",
@@ -2812,7 +2879,7 @@
         "completes session force-close triggered from inside an in-flight update",
         "suppresses peer loss on the exchanges it opens to push subscription reports"
       ],
-      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest). Missing: the LIT ICD intervals (the device ICD role, M5 phase 23); the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
       "snapshotSha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820"
     },
     {
@@ -2854,18 +2921,23 @@
     },
     {
       "path": "packages/node/test/node/client/ClientNodeInteractionIcdTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "Holding controller interactions for an idle LIT peer until it checks in.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientNodeInteractionIcdParity"
+      ],
+      "missing": [
+        "routes a woken LIT read through the icdLit network profile"
+      ],
+      "reason": "A read, write and invoke of a sleeping LIT peer held until its Check-In, a non-ICD peer passed through (controller/client/icd_hold_parity_matterjs_test.go). Missing: the icdLit network profile — this module has no network profiles; the priority intent travels with the sustained subscription's connection.",
       "snapshotSha": "9da38fcd797e58ae516b293033782ad23ec8d803"
     },
     {
       "path": "packages/node/test/node/client/ClientNodePhysicalPropertiesIcdTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's view of a peer's LIT operating mode.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientNodePhysicalPropertiesIcdParity"
+      ],
+      "reason": "The peer's LongIdleTimeOperating from its ICD Management image, gated on specification 1.4 (controller/client/icd_hold_parity_matterjs_test.go).",
       "snapshotSha": "486381f021feb18de5462aa4d237e73b174f6306"
     },
     {
@@ -3071,40 +3143,13 @@
         "client/interaction:TestSustainedSubscriptionClose",
         "client/interaction:TestSustainedSubscriptionNonICD",
         "client/interaction:TestSustainedSubscriptionEventNumbers",
-        "client/interaction:TestSustainedSubscriptionMaxEventNumberChanged"
+        "client/interaction:TestSustainedSubscriptionMaxEventNumberChanged",
+        "client/interaction:TestSustainedSubscriptionICD"
       ],
       "missing": [
         "never reports active when an inactive observer closes the subscription while going live",
         "ends not live and rejects done when an inactive observer throws while going live",
         "still reports inactive when an active observer throws during the final not-live update",
-        "treats a wakefulness with requiresAwait===false as non-ICD (timed retry, probe)",
-        "parks on the next loss once its wakefulness flips to requiresAwait===true",
-        "parks while asleep and subscribes only after a wake signal",
-        "leaves a subscribed LIT peer's availability to the subscription",
-        "fires checkInMissed for a parked LIT peer that never subscribes and misses its Check-In",
-        "goes inactive immediately on a subscription loss, regardless of the availability window",
-        "parks on subscribe failure instead of running a timed retry",
-        "retries a flipped SIT peer after a bounded delay instead of stranding on a wake edge",
-        "close() resolves done cleanly while parked",
-        "closes the active peer subscription on abort",
-        "honors a wakefulness provider that returns undefined until the peer registers",
-        "recreates the subscription immediately on a LIT->SIT runtime flip",
-        "recreates after the next check-in on a SIT->LIT runtime flip",
-        "does not emit an active dip across an instant mode-flip recreate",
-        "reports not live when closed while a mode-flip recreate tears down the old subscription",
-        "recreates on the icdLit network profile, then reverts to the default on a later loss",
-        "keeps a runtime SIT→LIT peer on icdLit for a post-loss resubscribe, not just the flip recreate",
-        "keeps active live across a report-driven SIT→LIT flip when the recreate lands in-window",
-        "drops to not-live when a mode-flip recreate parks for a peer that never wakes",
-        "recreates on the first registration-induced feed while the subscription was established unfed",
-        "does not double-recreate: a stray feed signal after the peer is fed is a no-op, later flips use the observer",
-        "has no Check-In deadline while subscribed",
-        "releases its hold when closed",
-        "releases its hold when the subscription is lost",
-        "releases its hold when the recreate after a mode change fails",
-        "keeps its subscription when the peer's wakefulness is suspended",
-        "stops observing the peer's mode once closed",
-        "ignores a feed signal for a different peer",
         "requests events above the bootstrap read's highest event",
         "keeps a subscription whose priming report fails to process and counts its events",
         "keeps a subscription whose live report fails to process and counts its events",
@@ -3112,7 +3157,7 @@
         "keeps the failure of the report",
         "passes a failure while ${failure} on and counts the events received before it"
       ],
-      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking with its maxEventNumberChanged hook are covered; missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), the ICD await mode (no controller-side wakefulness before milestone 5 phase 24), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
+      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking with its maxEventNumberChanged hook are covered, and so is the ICD await mode — the parking of a sleeping LIT peer, the hold, the operating-mode recreate on the priority connection (matter.js's icdLit network, ExchangeOptions.Priority) and the registration feed (client/interaction/sustained_icd_parity_matterjs_test.go); missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
       "snapshotSha": "5452d36b2dc08104d60de241f6ee35269f7fdcb5"
     },
     {
@@ -4037,60 +4082,80 @@
     },
     {
       "path": "packages/protocol/test/icd/CheckInMessageTest.ts",
-      "status": "planned",
-      "reason": "The ICD Check-In message nonce, encoding and decoding against the specification vectors, built with the ICD server in milestone 5 phase 23.",
-      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd/checkin:TestCheckInMessage"
+      ],
+      "reason": "The nonce, the encoding and the decoding against the CHIP SDK's three vectors, the tampered-nonce, tampered-ciphertext, wrong-key and short-payload refusals as ErrMalformed, the ICD round trip with its two-byte threshold, and the counter validation with the uint32 wrap and the refresh boundary at 2^31 (icd/checkin/checkin_parity_matterjs_test.go).",
+      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af"
     },
     {
       "path": "packages/protocol/test/icd/FabricIcdTest.ts",
-      "status": "planned",
-      "reason": "The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.",
-      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestFabricIcdDeviceRole",
+        "icd:TestFabricIcdControllerRole"
+      ],
+      "reason": "Go splits matter.js's FabricIcd by role: the device's registrations are icd.Registrations, the controller's peers icd.PeerTable — trial decryption under the current and the pending key, the replay drop, the promotion counted modulo 2^32, ConfirmKey, RefreshNeeded and the peers' wakefulness on the fake clock; the thrown handler error is a handler panic, the broken crypto a peer key the codec cannot use, which ProcessCheckIn returns (icd/fabricicd_parity_matterjs_test.go, icd/fabricicd_controller_parity_matterjs_test.go).",
+      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInBackOffTest.ts",
-      "status": "planned",
-      "reason": "The device's doubling Check-In back-off, milestone 5 phase 23.",
-      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestDoublingCheckInBackOff"
+      ],
+      "reason": "The doubling gap capped at the maximum back-off, the one-cycle cap, recordAnswered, resetAll and forget, keyed by icd.ClientKey for matter.js's string key (icd/backoff_parity_matterjs_test.go).",
+      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSenderTest.ts",
-      "status": "planned",
-      "reason": "The device's Check-In sender, milestone 5 phase 23.",
-      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIcdCheckInSender"
+      ],
+      "reason": "A decodable 0x50 to the resolved address, and false without an error for an unresolvable client, a failed send and a failing collaborator — matter.js's throw is a returned error (icd/sender_parity_matterjs_test.go).",
+      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSuppressionTest.ts",
-      "status": "planned",
-      "reason": "Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23.",
-      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIsMonitoredSubjectCovered"
+      ],
+      "reason": "A monitored subject covered by a subscription's node id or by a CAT of a later version, and not covered otherwise; Go carries a session's CATs as the 32-bit tags (icd/suppression_parity_matterjs_test.go).",
+      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7"
     },
     {
       "path": "packages/protocol/test/icd/IcdCounterTest.ts",
-      "status": "planned",
-      "reason": "The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23.",
-      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250",
-      "until": "M5 phase 23"
+      "status": "ported",
+      "go": [
+        "icd:TestIcdCounter"
+      ],
+      "reason": "The boot bump, the change callback on increment and advance, the wrap at 2^32, and the refused advance as ErrCounterAdvance; the fractional and NaN advances are not representable in the Go signature, so the refusal holds the two ends of the range (icd/counter_parity_matterjs_test.go).",
+      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250"
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerScheduleTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's schedule of an ICD peer's active mode.",
+      "status": "ported",
+      "go": [
+        "icd:TestIcdPeerSchedule"
+      ],
+      "reason": "A LIT peer's active mode after a Check-In, other activity and a StayActive promise, and its next Check-In's deadline with the margin (icd/peer_schedule_parity_matterjs_test.go).",
       "snapshotSha": "a384c9fd72822a0f56f2b4c2e2dc538a6b6db7ed"
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerWakefulnessTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller's view of whether an ICD peer is awake and available.",
+      "status": "partial",
+      "go": [
+        "icd:TestIcdPeerWakefulness",
+        "icd:TestAwaitAwake"
+      ],
+      "missing": [
+        "keeps its deadline across a forward wall-clock step",
+        "ends Active Mode on time across a backward wall-clock step"
+      ],
+      "reason": "Awake and available on the fake clock, the subscriptions held, the default wait, the operating-mode flips, suspend and close; matter.js's observables are the On… registrations and the signal channels (icd/peer_wakefulness_parity_matterjs_test.go). Missing: the two wall-clock steps — MockTime.stepWallClock moves the wall clock apart from the monotonic one, clocktest.Fake has one reading, and on the system clock a time.Time carries the monotonic reading a wall step does not move.",
       "snapshotSha": "5bdf22eb5e54328ad9715454ab897b117e9c943d"
     },
     {
@@ -4347,7 +4412,7 @@
       "status": "planned",
       "reason": "Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.",
       "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d",
-      "until": "M5 phase 24"
+      "until": "M5 phase 25"
     },
     {
       "path": "packages/protocol/test/peer/PeerDescriptorTest.ts",
@@ -4381,10 +4446,11 @@
     },
     {
       "path": "packages/protocol/test/peer/RebootResubscribeArmerTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "The controller re-subscribing a peer after an OTA reboot, which milestone 5 phase 24 builds.",
+      "status": "ported",
+      "go": [
+        "client/peer:TestRebootResubscribeArmerParity"
+      ],
+      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer arrives with phase 25.",
       "snapshotSha": "9bb466928aabe62ec0f56bb215d217c223096c49"
     },
     {
@@ -4640,10 +4706,12 @@
     },
     {
       "path": "packages/protocol/test/securechannel/SecureChannelProtocolTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 24",
-      "reason": "Routing an ICD Check-In to the owning fabric peer on the controller.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestSecureChannelCheckInRoutingParity",
+        "client/exchange:TestCheckInReachesTheReceiver"
+      ],
+      "reason": "Go splits SecureChannelProtocol's Check-In path: the exchange manager sends nothing and closes the exchange and the inbound session (client/exchange/checkin_test.go), the registry offers the payload to its fabrics' ICD peer tables and drops one no peer matches (controller/client/checkin_routing_parity_matterjs_test.go).",
       "snapshotSha": "5c8a8d7cf6d42e511bce0d354c4c8c7b5a315577"
     },
     {

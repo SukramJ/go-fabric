@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/icd"
 )
 
 // RegistryConfig is what a [Registry] works with.
@@ -110,6 +111,11 @@ type Registry struct {
 	timer  exchange.Timer
 	closed bool
 
+	// icdMu guards icdTables, the ICD state of our fabrics — matter.js
+	// Fabric.icd (FabricIcd.ts), one peer table per fabric.
+	icdMu     sync.Mutex
+	icdTables map[uint8]*icd.PeerTable
+
 	// ctx ends the registry's background work on Close.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -144,6 +150,10 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 		r.store = &MemoryStore{}
 	}
 	r.ctx, r.cancel = context.WithCancel(context.Background())
+	r.icdTables = map[uint8]*icd.PeerTable{}
+	// Check-Ins arrive unsecured on the exchange manager
+	// (SecureChannelProtocol.ts:149-180).
+	cfg.Exchanges.SetCheckInReceiver(r.receiveCheckIn)
 	ids, err := r.store.NodeIDs()
 	if err != nil {
 		return nil, fmt.Errorf("client: registry: %w", err)
@@ -231,6 +241,11 @@ func (r *Registry) build(id string, p *peer.Peer) (*Node, error) {
 		return nil, err
 	}
 	holder.set(n)
+	n.icd = newICDClient(n, icdEnv{table: r.icdTable, ownNodeID: r.ownNodeID})
+	if err := n.icd.load(n.storedICD); err != nil {
+		return nil, fmt.Errorf("client: loading node %q: icd registration: %w", id, err)
+	}
+	n.storedICD = nil
 	if n.Record().DiscoveredAt.IsZero() {
 		// CommissioningClient.initialize (CommissioningClient.ts:125-127).
 		now := r.clock.Now()
@@ -238,8 +253,62 @@ func (r *Registry) build(id string, p *peer.Peer) (*Node, error) {
 	}
 	if p != nil {
 		r.bindPeer(n, p)
+		// The Check-In receive path of a stored registration is re-armed
+		// with the registry (IcdClient.ts:107-115, :413-420).
+		n.icd.restoreReceivePath()
 	}
 	return n, nil
+}
+
+// icdTable is the ICD peer table of our fabric index, nil for a fabric we
+// do not have.
+func (r *Registry) icdTable(fabricIndex uint8) *icd.PeerTable {
+	if r.fabricByIndex(fabricIndex) == nil {
+		return nil
+	}
+	r.icdMu.Lock()
+	defer r.icdMu.Unlock()
+	t := r.icdTables[fabricIndex]
+	if t == nil {
+		t = icd.NewPeerTable(r.clock, r.log)
+		r.icdTables[fabricIndex] = t
+	}
+	return t
+}
+
+// ownNodeID is our node id on the fabric (IcdClient.ts:715-724, fabric.nodeId).
+func (r *Registry) ownNodeID(fabricIndex uint8) (uint64, bool) {
+	f := r.fabricByIndex(fabricIndex)
+	if f == nil || f.Identity == nil {
+		return 0, false
+	}
+	return f.Identity.NodeID, true
+}
+
+// receiveCheckIn trial-decrypts a Check-In against every fabric with ICD
+// peers and reports whether one matched. Mirrors matter.js
+// SecureChannelProtocol.ts:164-180 (#handleIcdCheckIn).
+func (r *Registry) receiveCheckIn(payload []byte) bool {
+	r.icdMu.Lock()
+	tables := make([]*icd.PeerTable, 0, len(r.icdTables))
+	for _, t := range r.icdTables {
+		tables = append(tables, t)
+	}
+	r.icdMu.Unlock()
+	for _, t := range tables {
+		if !t.HasPeers() {
+			continue
+		}
+		ok, err := t.ProcessCheckIn(payload)
+		if err != nil {
+			r.log.Warn("matter.controller.client.icd_checkin_failed", slog.Any("err", err))
+			continue
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 // nodeHolder hands a node's wrapped hooks the node they belong to.
@@ -268,6 +337,9 @@ func (h *nodeHolder) get() *Node {
 // takes a session.
 func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	n.bind(p, r.cfg.Commissioner.Interaction(p))
+	// The peer's physical property the session parameters read
+	// (Peer.ts:305-315).
+	p.SetLongIdleTimeOperating(func() bool { return n.Properties().LongIdleTimeOperating })
 	follow := func() {
 		d := p.Descriptor()
 		n.updateRecord(func(rec *Record) { rec.applyPeer(d) })
@@ -410,6 +482,13 @@ func (r *Registry) Close(ctx context.Context) error {
 		r.unbindPeer(n)
 		errs = append(errs, n.Close(ctx))
 	}
+	// The fabrics' ICD state goes with the registry (Fabric.ts:308-311).
+	r.cfg.Exchanges.SetCheckInReceiver(nil)
+	r.icdMu.Lock()
+	for _, t := range r.icdTables {
+		t.Close()
+	}
+	r.icdMu.Unlock()
 	return errors.Join(errs...)
 }
 

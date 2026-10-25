@@ -198,7 +198,7 @@ func TestSmallSystemServersMatchTheGeneratedDefinitions(t *testing.T) {
 	t.Parallel()
 	spectest.CheckServer(t, NewTimeSynchronization(), timesyncdef.Definition, 0)
 	spectest.CheckServer(t, NewBinding(), bindingdef.Definition, 0)
-	spectest.CheckServer(t, NewICDManagement(), icddef.Definition, 0)
+	spectest.CheckServer(t, mustICD(t, ICDManagementConfig{}), icddef.Definition, uint32(icddef.FeatureCheckInProtocolSupport))
 	spectest.CheckServer(t, NewNetworkCommissioning(NetworkCommissioningConfig{}), netcommdef.Definition, NetworkCommFeatureEthernet)
 	d := NewDiagnosticLogs()
 	spectest.CheckServer(t, d, diaglogsdef.Definition, 0)
