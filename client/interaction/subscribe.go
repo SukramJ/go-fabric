@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -97,6 +98,21 @@ type SubscribeRequest struct {
 	// logged and the subscription continues. matter.js
 	// maxEventNumberChanged (SustainedSubscription.ts:354-364).
 	MaxEventNumberChanged func(number uint64) error
+	// Wakefulness, for a sustained subscription, returns the peer's ICD
+	// wakefulness, nil while the peer is no registered ICD — matter.js
+	// icdWakefulness (ClientSubscribe.ts:51-56). It is asked again on
+	// every iteration, so a peer registered later or flipped SIT⇄LIT is
+	// honoured live: while it requires awaiting the subscription parks
+	// instead of retrying on a timer, holds the wakefulness while
+	// subscribed, and recreates itself on an operating-mode flip
+	// (SustainedSubscription.ts:116-337).
+	Wakefulness func() *icd.PeerWakefulness
+	// PeerFed, for a sustained subscription, registers fn for the start of
+	// a peer's ICD registration on the fabric, with the peer's node id —
+	// matter.js peerFed (SustainedSubscription.ts:600-605, FabricIcd
+	// peerFed); it returns the unsubscribe. A subscription running without
+	// a wakefulness races it, to recreate itself for the peer's mode.
+	PeerFed func(fn func(peerNodeID uint64)) (unsubscribe func())
 }
 
 // Interval returns d as a subscription interval bound.
