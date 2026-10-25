@@ -29,6 +29,11 @@ type Node struct {
 	store   Store
 	persist *persister
 	s       *structure
+	// subSync serialises the default subscription's synchronisation
+	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
+	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
+	// SetAutoSubscribe do not both establish one.
+	subSync sync.Mutex
 
 	// mu guards the node's mutable state, every field below it, and the
 	// image: the structure, its Endpoints and Clusters all share this lock.
@@ -432,6 +437,39 @@ func (n *Node) icdModeLocked() int64 {
 		return int64(v) //nolint:gosec // an enum8
 	}
 	return -1
+}
+
+// SetAutoSubscribe switches the node's default subscription on or off
+// and persists the choice with the node's settings: a started node
+// establishes the sustained default subscription at once (reading first
+// when newly commissioned) or closes it; a stopped one follows the choice
+// at its next start — matter.js NetworkClient's autoSubscribe state, whose
+// change runs #syncAutoSubscribe (NetworkClient.ts:46, :113-115, :130-196
+// at 862ad75f). An unchanged choice is nothing.
+func (n *Node) SetAutoSubscribe(ctx context.Context, on bool) error {
+	n.mu.Lock()
+	if n.settings.autoSubscribe == on {
+		n.mu.Unlock()
+		return nil
+	}
+	n.settings.autoSubscribe = on
+	n.saveSettingsLocked()
+	started := n.started && !n.closing
+	n.mu.Unlock()
+	if !started {
+		return nil
+	}
+	err := n.syncAutoSubscribe(ctx)
+	n.recompute()
+	return err
+}
+
+// AutoSubscribe reports whether the node keeps the default subscription
+// ([Node.SetAutoSubscribe]).
+func (n *Node) AutoSubscribe() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.settings.autoSubscribe
 }
 
 // Disable takes the node offline and keeps it so, persisted

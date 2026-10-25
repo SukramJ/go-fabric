@@ -17,11 +17,15 @@
 // The cluster's identity is the generated definition (cluster/spec/
 // windowcovering, ADR 0013): ids, revision, the attribute and command
 // lists, the write statuses and checks and the privileges. The FeatureMap
-// names the axes the server serves — Lift with PositionAwareLift
-// ([ServedFeatureMap], the default), Tilt with PositionAwareTilt
-// ([ServedTiltFeatureMap]), or both ([ServedLiftTiltFeatureMap]) — and is
-// not taken on trust: any other host FeatureMap is refused at
-// construction. GoToLiftPercentage and GoToTiltPercentage decode through
+// names the axes the server serves — Lift, Tilt or both, each with or
+// without its position-aware feature ([ServedFeatureMap], Lift with
+// PositionAwareLift, is the default) — and is not taken on trust: a
+// FeatureMap with AbsolutePosition, or a position-aware feature without
+// its axis, is refused at construction. An axis without its
+// position-aware feature has no position: UpOrOpen and DownOrClose set
+// its movement in OperationalStatus, StopMotion stops it, as matter.js's
+// WindowCoveringServer does (WindowCoveringServer.ts:123-141, :487-504,
+// :518-560 at 862ad75f). GoToLiftPercentage and GoToTiltPercentage decode through
 // the definition; the position arithmetic and the travel are the server's.
 package cover
 
@@ -67,9 +71,13 @@ const ServedTiltFeatureMap = uint32(wcdef.FeatureTilt | wcdef.FeaturePositionAwa
 // (Type TiltBlindLift, 8).
 const ServedLiftTiltFeatureMap = ServedFeatureMap | ServedTiltFeatureMap
 
-// ErrFeatureMap reports a Config.FeatureMap other than [ServedFeatureMap],
-// [ServedTiltFeatureMap] or [ServedLiftTiltFeatureMap].
+// ErrFeatureMap reports a Config.FeatureMap the server does not serve:
+// one without Lift or Tilt, with AbsolutePosition, or with a
+// position-aware feature without its axis.
 var ErrFeatureMap = errors.New("cover: FeatureMap names features this server does not serve")
+
+// servableFeatures are the features the server serves.
+const servableFeatures = uint32(wcdef.FeatureLift | wcdef.FeatureTilt | wcdef.FeaturePositionAwareLift | wcdef.FeaturePositionAwareTilt)
 
 // ErrMoverWithMoveStep reports a [Config] that sets both a Mover and a
 // MoveStep: the device moves, the server does not simulate it.
@@ -107,7 +115,10 @@ type Mover interface {
 	// lift is the lift target and tilt the tilt target; nil leaves that
 	// axis untouched. An axis the server does not serve is always nil;
 	// UpOrOpen and DownOrClose carry every served axis, GoToLiftPercentage
-	// only lift, GoToTiltPercentage only tilt.
+	// only lift, GoToTiltPercentage only tilt. An axis without its
+	// position-aware feature has no target: UpOrOpen gives it 0 and
+	// DownOrClose 10000 as the direction to move, and the server stores
+	// none.
 	GoTo(ctx context.Context, lift, tilt *uint16) error
 	// Stop stops every movement (StopMotion, matter.js handleStopMovement
 	// :487-504). The server has set each served target to its current
@@ -119,10 +130,12 @@ type Mover interface {
 // features: the deprecated percentage of each served axis and SafetyStatus.
 func servedOptional(features uint32) []uint32 {
 	out := []uint32{wcdef.AttrSafetyStatus}
-	if features&uint32(wcdef.FeatureLift) != 0 {
+	// "[LF & PA_LF]" and "[TL & PA_TL]": the deprecated percentage of a
+	// position-aware axis.
+	if features&uint32(wcdef.FeatureLift|wcdef.FeaturePositionAwareLift) == uint32(wcdef.FeatureLift|wcdef.FeaturePositionAwareLift) {
 		out = append(out, wcdef.AttrCurrentPositionLiftPercentage)
 	}
-	if features&uint32(wcdef.FeatureTilt) != 0 {
+	if features&uint32(wcdef.FeatureTilt|wcdef.FeaturePositionAwareTilt) == uint32(wcdef.FeatureTilt|wcdef.FeaturePositionAwareTilt) {
 		out = append(out, wcdef.AttrCurrentPositionTiltPercentage)
 	}
 	return out
@@ -141,9 +154,10 @@ type Config struct {
 	// EndProductType is the Matter WindowCovering EndProductType
 	// attribute value (enum8).
 	EndProductType uint8
-	// FeatureMap is the Matter FeatureMap: [ServedFeatureMap] (zero
-	// selects it), [ServedTiltFeatureMap] or [ServedLiftTiltFeatureMap];
-	// any other value is refused by [New].
+	// FeatureMap is the Matter FeatureMap: Lift and/or Tilt, each with or
+	// without its position-aware feature; zero selects [ServedFeatureMap].
+	// AbsolutePosition, or a position-aware feature without its axis, is
+	// refused by [New].
 	FeatureMap uint32
 	// InitialPositionPercent100ths is the starting value for
 	// CurrentPositionLiftPercent100ths and
@@ -221,9 +235,12 @@ type WindowCoveringServer struct {
 	veto   spec.WriteVeto
 }
 
-// axis is one position-aware axis of the covering: its positions, its
-// attribute ids and its running travel.
+// axis is one axis of the covering: its positions, its attribute ids and
+// its running travel. An axis that is not position-aware serves no
+// position: current and target stay unused.
 type axis struct {
+	// aware is the axis's position-aware feature (PA_LF, PA_TL).
+	aware           bool
 	current, target uint16
 	// move is the running movement; nil when the axis stands still.
 	move *movement
@@ -292,21 +309,24 @@ func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)
 	return s.changes.OnAttributeChange(cb)
 }
 
-// New constructs a [WindowCoveringServer] from cfg. A cfg.FeatureMap other
-// than zero, [ServedFeatureMap], [ServedTiltFeatureMap] and
-// [ServedLiftTiltFeatureMap] is refused with [ErrFeatureMap]: advertising
-// it would list attributes or commands the server does not serve. A Mover
-// together with a non-zero MoveStep is refused with [ErrMoverWithMoveStep],
-// a Type or EndProductType the FeatureMap disallows with [ErrEnumValue].
+// New constructs a [WindowCoveringServer] from cfg. A cfg.FeatureMap
+// without Lift or Tilt, with AbsolutePosition, or with PositionAwareLift
+// (PositionAwareTilt) but not Lift (Tilt) is refused with [ErrFeatureMap]:
+// advertising it would list attributes or commands the server does not
+// serve, or break the features' conformance (PA_LF "LF", PA_TL "TL",
+// window-covering-cluster.element.ts at 862ad75f). A Mover together with
+// a non-zero MoveStep is refused with [ErrMoverWithMoveStep], a Type or
+// EndProductType the FeatureMap disallows with [ErrEnumValue].
 func New(cfg Config) (*WindowCoveringServer, error) {
 	features := cfg.FeatureMap
 	if features == 0 {
 		features = ServedFeatureMap
 	}
-	switch features {
-	case ServedFeatureMap, ServedTiltFeatureMap, ServedLiftTiltFeatureMap:
-	default:
-		return nil, fmt.Errorf("%w: 0x%X, the server serves 0x%X, 0x%X or 0x%X", ErrFeatureMap, cfg.FeatureMap, ServedFeatureMap, ServedTiltFeatureMap, ServedLiftTiltFeatureMap)
+	lift, tilt := uint32(wcdef.FeatureLift), uint32(wcdef.FeatureTilt)
+	paLift, paTilt := uint32(wcdef.FeaturePositionAwareLift), uint32(wcdef.FeaturePositionAwareTilt)
+	if features&^servableFeatures != 0 || features&(lift|tilt) == 0 ||
+		(features&paLift != 0 && features&lift == 0) || (features&paTilt != 0 && features&tilt == 0) {
+		return nil, fmt.Errorf("%w: 0x%X, the server serves Lift (0x1) and/or Tilt (0x2), each optionally position-aware (0x4, 0x10)", ErrFeatureMap, cfg.FeatureMap)
 	}
 	if cfg.Mover != nil && cfg.MoveStep != 0 {
 		return nil, fmt.Errorf("%w: MoveStep %s", ErrMoverWithMoveStep, cfg.MoveStep)
@@ -341,6 +361,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	}
 	if features&uint32(wcdef.FeatureLift) != 0 {
 		s.lift = &axis{
+			aware:   features&paLift != 0,
 			current: cfg.InitialPositionPercent100ths, target: cfg.InitialPositionPercent100ths,
 			attrCurrent: wcdef.AttrCurrentPositionLiftPercent100ths, attrPercentage: wcdef.AttrCurrentPositionLiftPercentage,
 			attrTarget: wcdef.AttrTargetPositionLiftPercent100ths, shift: liftShift,
@@ -348,6 +369,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	}
 	if features&uint32(wcdef.FeatureTilt) != 0 {
 		s.tilt = &axis{
+			aware:   features&paTilt != 0,
 			current: cfg.InitialTiltPositionPercent100ths, target: cfg.InitialTiltPositionPercent100ths,
 			attrCurrent: wcdef.AttrCurrentPositionTiltPercent100ths, attrPercentage: wcdef.AttrCurrentPositionTiltPercentage,
 			attrTarget: wcdef.AttrTargetPositionTiltPercent100ths, shift: tiltShift,
@@ -396,7 +418,7 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 		return uint16(0), true
 	}
 	for _, a := range []*axis{s.lift, s.tilt} {
-		if a == nil {
+		if a == nil || !a.aware {
 			continue
 		}
 		switch attrID {
@@ -446,12 +468,14 @@ func (s *WindowCoveringServer) configStatusLocked() uint8 {
 		st |= configStatusOperational
 	}
 	if s.lift != nil {
-		st |= configStatusLiftPositionAware
+		if s.lift.aware {
+			st |= configStatusLiftPositionAware
+		}
 		if s.wcMode&uint8(wcdef.ModeMotorDirectionReversed) != 0 {
 			st |= configStatusLiftMovementReversed
 		}
 	}
-	if s.tilt != nil {
+	if s.tilt != nil && s.tilt.aware {
 		st |= configStatusTiltPositionAware
 	}
 	return st
@@ -535,7 +559,9 @@ func (s *WindowCoveringServer) MinWritePrivilege(attrID uint32) uint8 {
 }
 
 // command is a validated movement command: the target of each served
-// axis it moves (nil = axis untouched), or a stop.
+// axis it moves (nil = axis untouched), or a stop. For an axis that is not
+// position-aware the target is the direction alone: 0 opens, 10000
+// closes.
 type command struct {
 	lift, tilt *uint16
 	stop       bool
@@ -567,8 +593,8 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 	case wire.WindowCoveringCmdStopMotion:
 		return command{stop: true}, nil
 	case wire.WindowCoveringCmdGoToLiftPercentage:
-		if s.lift == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
+		if s.lift == nil || !s.lift.aware {
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift and PositionAwareLift features")
 		}
 		pct, err := extractPercent100ths(fields, "GoToLiftPercentage")
 		if err != nil {
@@ -576,8 +602,8 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 		}
 		return command{lift: &pct}, nil
 	case wire.WindowCoveringCmdGoToTiltPercentage:
-		if s.tilt == nil {
-			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
+		if s.tilt == nil || !s.tilt.aware {
+			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt and PositionAwareTilt features")
 		}
 		pct, err := extractPercent100ths(fields, "GoToTiltPercentage")
 		if err != nil {
@@ -617,15 +643,21 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if c.stop {
-		// matter.js handleStopMovement (:487-504): each axis stops where
-		// it is, and the target follows the position.
+		// matter.js handleStopMovement (:487-504 at 862ad75f): each
+		// position-aware axis stops where it is, and the target follows the
+		// position; with no position-aware axis every movement is Stopped.
+		anyAware := false
 		for _, a := range []*axis{s.lift, s.tilt} {
-			if a == nil {
+			if a == nil || !a.aware {
 				continue
 			}
+			anyAware = true
 			s.stopLocked(a)
 			a.target = a.current
 			s.setAxisStatusLocked(a, movementStopped)
+		}
+		if !anyAware {
+			s.operationalStatus = globalStatus(movementStopped, movementStopped)
 		}
 		return nil, nil
 	}
@@ -653,20 +685,23 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 	defer s.op.Unlock()
 	s.mu.Lock()
 	if c.stop {
-		if s.lift != nil {
+		if s.lift != nil && s.lift.aware {
 			v := s.lift.current
 			c.lift = &v
 		}
-		if s.tilt != nil {
+		if s.tilt != nil && s.tilt.aware {
 			v := s.tilt.current
 			c.tilt = &v
 		}
 	}
+	// Only a position-aware axis stores its target.
+	liftTarget := c.lift != nil && s.lift.aware
+	tiltTarget := c.tilt != nil && s.tilt.aware
 	var prevLift, prevTilt uint16
-	if c.lift != nil {
+	if liftTarget {
 		prevLift, s.lift.target = s.lift.target, *c.lift
 	}
-	if c.tilt != nil {
+	if tiltTarget {
 		prevTilt, s.tilt.target = s.tilt.target, *c.tilt
 	}
 	s.mu.Unlock()
@@ -681,10 +716,10 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, c 
 		return nil
 	}
 	s.mu.Lock()
-	if c.lift != nil && s.lift.target == *c.lift {
+	if liftTarget && s.lift.target == *c.lift {
 		s.lift.target = prevLift
 	}
-	if c.tilt != nil && s.tilt.target == *c.tilt {
+	if tiltTarget && s.tilt.target == *c.tilt {
 		s.tilt.target = prevTilt
 	}
 	s.mu.Unlock()
@@ -742,7 +777,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 		a *axis
 		v *uint16
 	}{{s.lift, lift}, {s.tilt, tilt}} {
-		if in.a == nil || in.v == nil {
+		if in.a == nil || !in.a.aware || in.v == nil {
 			continue
 		}
 		v := *in.v
@@ -786,6 +821,18 @@ func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 // says which way (#computeOperationalState, WindowCoveringServer.ts:273-283),
 // and the position moves in six steps.
 func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
+	if !a.aware {
+		// An axis without a position moves in the command's direction
+		// until StopMotion (matter.js #prepareMovement sets the axis's
+		// OperationalStatus, :420-446 at 862ad75f; handleMovement moves
+		// no position, :336-356).
+		dir := movementOpening
+		if target != 0 {
+			dir = movementClosing
+		}
+		s.setAxisStatusLocked(a, dir)
+		return
+	}
 	s.stopLocked(a)
 	a.target = target
 	cur := a.current

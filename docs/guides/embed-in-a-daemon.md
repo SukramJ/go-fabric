@@ -101,6 +101,12 @@ dev, err := device.NewElectricalSensor(device.Options{
 - PowerSource's `EndpointList` names the device's own endpoint. The kit
   fills it, together with Status, Description and BatChargeLevel. The host
   states `Order` and `BatReplacementNeeded`.
+- The declared PowerSource states `BridgedPowerSourceInfo` for the bridged
+  node, under which BridgedNode makes PowerSourceConfiguration mandatory
+  (its conformance `BridgedPowerSourceInfo, D` only announces a
+  deprecation). The kit mounts it with its default server, so the device
+  reports no device-type violation; `powersourceconfigurationdef.Declare`
+  states its `Sources` when the host wants them listed.
 
 The stable key is the unit's serial number, the identity the daemon already
 uses for its MQTT topics. Under it the unit keeps its endpoint number

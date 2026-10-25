@@ -134,6 +134,9 @@ type settings struct {
 	// declared are the clusters whose declaration carries a port or a
 	// feature selection: their self-held server is asked for.
 	declared map[uint32]bool
+	// identify are the hooks of an identifydef.Declare, installed on the
+	// device's Identify handlers ([Device.Identify]).
+	identify []func(contract.ClusterServer) error
 }
 
 func newSettings() *settings {
@@ -177,6 +180,9 @@ func (s *settings) declare(d Declaration) error {
 		return fmt.Errorf("%w: cluster 0x%04X is declared twice", ErrConfiguration, id)
 	}
 	s.typed[id] = true
+	if id == identifyClusterID {
+		return s.declareIdentify(d, decl)
+	}
 	if len(decl.Initial) == 0 {
 		// An empty Initial states nothing: the declaration's hooks may
 		// go on the host's server (HostServer).

@@ -807,15 +807,28 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 }
 
 // classifyError maps a cluster server's write or invoke error to the
-// status it answers: an [im.MatterClusterStatusError] carries the
+// status it answers: a host's [contract.StatusError] its Status (and
+// ClusterStatus), an [im.MatterClusterStatusError] carries the
 // cluster-specific code into StatusIB.ClusterStatus as well (Matter
 // §10.6.2.2), an [im.StatusCodeError] its IM status, and any other error
 // is FAILURE — a server names its status by type, never by the wording of
-// its message (ADR 0026 principle 8). Returns (status, clusterStatus,
-// hasClusterStatus).
+// its message (ADR 0026 principle 8). A status error naming Success
+// answers FAILURE. Mirrors matter.js's answer to a StatusResponseError a
+// behaviour throws, its code and clusterCode
+// (packages/types/src/common/StatusResponseError.ts:18-25 at 862ad75f).
+// Returns (status, clusterStatus, hasClusterStatus).
 func classifyError(err error) (im.StatusCode, uint8, bool) {
 	if err == nil {
 		return im.StatusSuccess, 0, false
+	}
+	if se, ok := hostStatusError(err); ok {
+		if se.Status == uint8(im.StatusSuccess) {
+			return im.StatusFailure, 0, false
+		}
+		if se.ClusterStatus != nil {
+			return im.StatusCode(se.Status), *se.ClusterStatus, true
+		}
+		return im.StatusCode(se.Status), 0, false
 	}
 	if cse, ok := errors.AsType[im.MatterClusterStatusError](err); ok {
 		return cse.MatterStatusCode(), cse.MatterClusterStatus(), true
@@ -824,6 +837,18 @@ func classifyError(err error) (im.StatusCode, uint8, bool) {
 		return sce.MatterStatusCode(), 0, false
 	}
 	return im.StatusFailure, 0, false
+}
+
+// hostStatusError is the [contract.StatusError] in err's chain, by value or
+// by pointer.
+func hostStatusError(err error) (contract.StatusError, bool) {
+	if se, ok := errors.AsType[contract.StatusError](err); ok {
+		return se, true
+	}
+	if se, ok := errors.AsType[*contract.StatusError](err); ok && se != nil {
+		return *se, true
+	}
+	return contract.StatusError{}, false
 }
 
 // MinReadPrivilege implements [im.AttributeReadPrivilegeProvider]. It

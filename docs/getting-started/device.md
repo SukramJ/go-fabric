@@ -221,9 +221,24 @@ serves (`device/defaults.go` lists them) — otherwise the generated
 `spec.Server`, whose commands are unimplemented until you handle them. A `NewDimmableLight` therefore dims:
 a controller's MoveToLevel moves its level, and the "with On/Off" commands
 switch its OnOff.
+A generated server starts where matter.js's state starts: every attribute
+it lists holds the type's default, the host's `Initial`, or the fallback
+matter.js's `SelectDefaultValue` gives — null when nullable, 0 for a
+number or bitmap, false, an empty list — and what matter.js's default
+server sets in its `initialize` (FanControl's FanMode Off, SmokeCoAlarm's
+alarm states Normal, OccupancySensing's sensor type from its features). A
+TemperatureSensor therefore answers MeasuredValue null until you set a
+reading. An enum, a string or a struct has no fallback in matter.js either
+and stays yours to state (the test `TestEveryListedAttributeHasAValue`
+names them).
 The endpoint assembler mounts Descriptor, Identify,
 BridgedDeviceBasicInformation, Groups and ScenesManagement; the device
-layer never does.
+layer never does. To make the device blink, declare
+`identifydef.Declare{HandleIdentify: …, HandleTriggerEffect: …}` — the
+assembler's Identify server runs your handler before it counts
+IdentifyTime, and an error refuses the command — or install them at run
+time with `light.Identify().HandleIdentify(fn)`. An Identify declaration
+takes these two handlers only; the assembler keeps IdentifyTime.
 
 `device.Options` identifies the device:
 
@@ -291,7 +306,13 @@ calls:
   own; and a host port, the device the server drives. To refuse a command,
   for example when the physical lamp did not switch, declare the light's
   switch: `onoffdef.Declare{Sink: relay}`. An error from the sink answers
-  FAILURE and stores nothing.
+  FAILURE and stores nothing. A hook, a port or a host server that wants
+  another status returns (or wraps) a `contract.StatusError{Status: …,
+  ClusterStatus: …}`: the controller receives that status, as matter.js
+  answers a `StatusResponseError` — `contract.StatusTimeout` for an
+  answer the device could not give in time, `0x87` for a value it refuses,
+  `0x01` with a cluster status for a cluster-specific one. A status error
+  naming Success answers FAILURE.
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
   `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored

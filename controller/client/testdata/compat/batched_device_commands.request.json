@@ -1,0 +1,13 @@
+{
+  "message_id": "1",
+  "command": "batched_device_commands",
+  "args": {
+    "node_id": 1,
+    "commands": [
+      { "endpoint_id": 1, "cluster_id": 6, "command_name": "On", "payload": {} },
+      { "endpoint_id": 2, "cluster_id": 6, "command_name": "Toggle" }
+    ],
+    "timed_request_timeout_ms": 500,
+    "interaction_timeout_ms": 3000
+  }
+}

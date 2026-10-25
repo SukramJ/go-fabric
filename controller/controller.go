@@ -40,12 +40,13 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -91,8 +92,15 @@ type Config struct {
 	// Logger receives the stack's logs; nil is slog.Default().
 	Logger *slog.Logger
 	// Node configures every client node of the registry (client.Config;
-	// its Logger defaults to Logger).
+	// its Logger defaults to Logger, its Clock to Clock).
 	Node client.Config
+	// HooksFor, when set, returns the hooks of the client node with local
+	// id ("peer1", …) in place of Node.Hooks, so a host tells its nodes'
+	// reports, events and subscription signals apart
+	// (client.RegistryConfig.HooksFor) — matter.js gives each paired node
+	// its own events (packages/matter.js/src/device/PairedNode.ts:276-282
+	// at 862ad75f, attributeChanged and eventTriggered among them).
+	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
 	// false starts each, as matter.js's start connects them unless
 	// autoConnect is false (CommissioningController.ts:864-866). A
@@ -101,6 +109,17 @@ type Config struct {
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
 	Names func(*slog.Logger) (*discovery.Names, error)
+	// Clock is the time source of the whole stack — the exchanges' and
+	// MRP's timers, the certificate authority's issuing instant, the
+	// peers' back-off, the subscriptions' liveness, the registry's
+	// expiry; nil is the system clock. A test passes its fake clock
+	// (fabrictest.Site.ControllerConfig).
+	Clock clock.Clock
+	// Listener, when set, is the UDP socket the controller serves on in
+	// place of opening Listen: New serves its datagrams and Close closes
+	// it. A test passes one on its own network
+	// (fabrictest.Site.ControllerConfig); a program leaves it nil.
+	Listener *udp.Listener
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -108,6 +127,7 @@ type Config struct {
 type Controller struct {
 	db     *sql.DB
 	log    *slog.Logger
+	clock  clock.Clock
 	fabric *commissioner.Fabric
 	mgr    *exchange.Manager
 	names  *discovery.Names
@@ -146,7 +166,8 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if openNames == nil {
 		openNames = discovery.Open
 	}
-	c := &Controller{db: cfg.DB, log: log, stop: func() {}}
+	clk := clock.Or(cfg.Clock)
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -156,7 +177,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: store.New(cfg.DB)} // "controller.ca" and "controller.ca.fabric"
-	authority, err := ca.New(ca.Config{Store: keep})
+	authority, err := ca.New(ca.Config{Store: keep, Clock: clk})
 	if err != nil {
 		return nil, err
 	}
@@ -169,18 +190,18 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
 		return nil, err
 	}
-	if err := c.openNetwork(ctx, listen, openNames); err != nil {
+	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames); err != nil {
 		return nil, err
 	}
 	resumption := &peer.MemoryResumptionStore{}
 	fabrics := []*commissioner.Fabric{c.fabric}
-	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log}); err != nil {
+	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk}); err != nil {
 		return nil, err
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log})
+	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
-		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log,
+		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
 		Subscriptions: c.subs, Fabrics: fabrics, Resumption: resumption,
 	}); err != nil {
 		return nil, err
@@ -189,10 +210,13 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if node.Logger == nil {
 		node.Logger = log
 	}
+	if node.Clock == nil {
+		node.Clock = clk
+	}
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
-		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Node: node, AutoStart: !cfg.ManualStart,
+		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: node, HooksFor: cfg.HooksFor, AutoStart: !cfg.ManualStart,
 	}); err != nil {
 		return nil, err
 	}
@@ -204,15 +228,19 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	return c, nil
 }
 
-// openNetwork opens the socket, the exchanges over it and DNS-SD: the
-// steps of [New] between the fabric and the peers.
-func (c *Controller) openNetwork(ctx context.Context, listen string, openNames func(*slog.Logger) (*discovery.Names, error)) error {
+// openNetwork opens the socket (or takes the one [Config].Listener
+// gives), the exchanges over it and DNS-SD: the steps of [New] between
+// the fabric and the peers.
+func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.Listener, openNames func(*slog.Logger) (*discovery.Names, error)) error {
 	log := c.log
-	l, err := udp.New(udp.Config{LocalAddr: listen})
-	if err != nil {
-		return err
+	if l == nil {
+		var err error
+		if l, err = udp.New(udp.Config{LocalAddr: listen}); err != nil {
+			return err
+		}
 	}
-	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log}); err != nil {
+	var err error
+	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log, Clock: c.clock}); err != nil {
 		_ = l.Close()
 		return err
 	}
@@ -220,7 +248,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, openNames f
 	served := make(chan struct{})
 	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
 	go func() { defer close(served); _ = l.Serve(serveCtx, handle) }()
-	c.stop = func() { cancel(); <-served }
+	c.stop = func() { cancel(); <-served; _ = l.Close() }
 	if c.names, err = openNames(log); err != nil {
 		return err
 	}
@@ -287,6 +315,19 @@ type PairOptions struct {
 	// OnAttestationFailure decides a node whose attestation fails; the zero
 	// value rejects it (attestation.Reject()).
 	OnAttestationFailure attestation.Policy
+	// BLE, when set, is the Bluetooth LE central Pair finds the device
+	// through, by its advertisement in place of DNS-SD, and commissions it
+	// over BTP: PASE over BLE, then the network steps put the device on
+	// WiFi or Thread, where CASE finds it over DNS-SD (ADR 0024). A device
+	// on BLE has no network yet, so one of WiFi and Thread is required
+	// ([ErrConfiguration] otherwise). The BlueZ central is ble/bluez's.
+	BLE ble.Central
+	// WiFi and Thread are the operational network the commissioning
+	// provisions on a device that advertises Wi-Fi or Thread
+	// (commissioner.Options.WiFiNetwork, ThreadNetwork); nil provisions
+	// none.
+	WiFi   *commissioner.WiFiNetwork
+	Thread *commissioner.ThreadNetwork
 	// Edit adjusts the commissioner's options last (a seam).
 	Edit func(*commissioner.Options)
 }
@@ -295,44 +336,48 @@ type PairOptions struct {
 // pairing code names, over DNS-SD by its discriminator, and commissions
 // it into our fabric with the code's passcode: PASE, attestation against
 // [Config].Attestation, the operational certificate,
-// CommissioningComplete. A ctx without a deadline is bounded by
+// CommissioningComplete. A code [ParsePairingCode] refuses is
+// [ErrPairingCode]; a ctx without a deadline is bounded by
 // [DefaultPairTimeout]; a code no device answers before it is
-// [ErrNoDevice]. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:462-500).
+// [ErrNoDevice]. With [PairOptions].BLE the device is found over BLE and
+// commissioned over BTP. Mirrors CommissioningController.commissionNode
+// (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
+// BLE when the options name a BLE capability (discoveryCapabilities,
+// :280-283).
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
-	var passcode uint32
-	var id discovery.Identifier
-	if qr, err := setup.DecodeQRCode(code); err == nil {
-		passcode, id = qr.Passcode, discovery.ByLongDiscriminator(qr.Discriminator)
-	} else if m, err := setup.DecodeManualCode(code); err == nil {
-		passcode, id = m.Passcode, discovery.ByShortDiscriminator(m.ShortDiscriminator)
-	} else {
-		return nil, fmt.Errorf("controller: pairing code: %w", err)
+	pc, err := ParsePairingCode(code)
+	if err != nil {
+		return nil, err
 	}
+	if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
+		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
+	}
+	passcode, id := pc.Passcode, pc.Identifier()
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
 		defer cancel()
 	}
-	sc := discovery.NewScanner(c.names)
-	defer sc.Close()
-	fctx, found := context.WithCancel(ctx)
 	var dev *discovery.Device
-	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
-		if dev == nil && len(d.Addresses) > 0 {
-			dev = &d
-			found()
+	var channel commissioner.Channel
+	if opts.BLE != nil {
+		d, ch, err := c.dialBLE(ctx, opts.BLE, id)
+		if err != nil {
+			return nil, err
 		}
-	})
-	found()
-	if dev == nil {
+		defer func() { _ = ch.Close() }()
+		dev, channel = &d, ch
+	} else if dev = c.findCommissionable(ctx, id); dev == nil {
 		return nil, ErrNoDevice
 	}
 	n, err := c.reg.ForDevice(ctx, *dev)
 	if err != nil {
 		return nil, err
 	}
-	o := commissioner.Options{Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure}
+	o := commissioner.Options{
+		Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure,
+		Channel: channel, WiFiNetwork: opts.WiFi, ThreadNetwork: opts.Thread,
+	}
 	if o.OnAttestationFailure.Decide == nil && o.OnAttestationFailure.OnFailure == nil {
 		o.OnAttestationFailure = attestation.Reject()
 	}
@@ -343,6 +388,49 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		return n, err
 	}
 	return n, nil
+}
+
+// findCommissionable is the first commissionable device id selects that
+// DNS-SD reports with an address before ctx ends; nil when none does.
+func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identifier) *discovery.Device {
+	sc := discovery.NewScanner(c.names)
+	defer sc.Close()
+	fctx, found := context.WithCancel(ctx)
+	defer found()
+	var dev *discovery.Device
+	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
+		if dev == nil && len(d.Addresses) > 0 {
+			dev = &d
+			found()
+		}
+	})
+	return dev
+}
+
+// dialBLE scans central until the first device id selects advertises —
+// the long discriminator of a QR code, the short one of a manual code, as
+// over DNS-SD — and opens the BTP channel to it (ble.Dial): matter.js's
+// BleScanner.findCommissionableDevices and the BLE channel of its
+// commissioning (packages/protocol/src/common/BleScanner.ts:543-575 at
+// 862ad75f). The scan runs until ctx ends, at most [DefaultPairTimeout] on
+// the controller's clock; none found is [ErrNoDevice].
+func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier) (discovery.Device, *ble.Channel, error) {
+	sc := ble.NewScanner(central, ble.ScannerOptions{Clock: c.clock, Logger: c.log})
+	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
+	// ctx's deadline ends the scan first; the timeout bounds it on the
+	// controller's clock otherwise.
+	devs, err := sc.Find(ctx, id, DefaultPairTimeout, false)
+	if err != nil {
+		return discovery.Device{}, nil, err
+	}
+	if len(devs) == 0 {
+		return discovery.Device{}, nil, fmt.Errorf("%w over BLE", ErrNoDevice)
+	}
+	ch, err := ble.Dial(ctx, central, devs[0].Peripheral, ble.DialOptions{Clock: c.clock, Logger: c.log})
+	if err != nil {
+		return discovery.Device{}, nil, err
+	}
+	return devs[0].Commissionable(), ch, nil
 }
 
 func random() uint64 {

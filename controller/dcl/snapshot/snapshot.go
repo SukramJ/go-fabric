@@ -101,6 +101,9 @@ type Snapshot struct {
 	paas      map[string]attestation.PAA
 	cdSigners map[string]*ecdsa.PublicKey
 	skipped   int
+	// vendors are the vendor list's records over the static vendors
+	// ([Snapshot.Vendors]).
+	vendors map[uint16]Vendor
 }
 
 var _ attestation.PAAStore = (*Snapshot)(nil)
@@ -132,9 +135,10 @@ func LoadAt(fsys fs.FS, now time.Time) (*Snapshot, error) { return load(fsys, no
 
 func load(fsys fs.FS, now time.Time) (*Snapshot, error) {
 	s := &Snapshot{paas: map[string]attestation.PAA{}, cdSigners: map[string]*ecdsa.PublicKey{}}
+	errVendors := s.loadVendors(fsys)
 	b, err := fs.ReadFile(fsys, SourceFile)
 	if errors.Is(err, fs.ErrNotExist) {
-		return s, nil
+		return s, errVendors
 	}
 	if err != nil {
 		return nil, err
@@ -144,7 +148,7 @@ func load(fsys fs.FS, now time.Time) (*Snapshot, error) {
 	}
 	errPAA := s.consume(fsys, s.src.PAA, dcl.KindPAA, PAADir, now)
 	errCD := s.consume(fsys, s.src.CDSigners, dcl.KindCDSigner, CDSignerDir, now)
-	return s, errors.Join(errPAA, errCD)
+	return s, errors.Join(errVendors, errPAA, errCD)
 }
 
 func (s *Snapshot) consume(fsys fs.FS, sec Section, kind dcl.Kind, dir string, now time.Time) error {

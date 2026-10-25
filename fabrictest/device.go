@@ -83,6 +83,9 @@ type Device struct {
 	site  *Site
 	index int
 	topo  Topology
+	// base is the program's own configuration of [Site.AddNode]; nil for
+	// [Site.AddDevice], whose configuration the site builds.
+	base *node.Config
 	// store is the device's persistence, kept across restarts: in memory
 	// (store/memstore, endpoint/memstore), or with Options.StoreOnDisk a
 	// SQLite file the node opens the stores on.
@@ -121,10 +124,36 @@ func (s *Site) AddDevice(topo Topology) *Device {
 	if topo.Snapshotter != nil && len(topo.Bridged) > 0 {
 		s.tb.Fatal("fabrictest: Topology.Bridged with a Snapshotter: the node has no Aggregator to add them to")
 	}
-	d := &Device{site: s, index: s.index(), topo: topo}
+	return s.addDevice(topo, nil)
+}
+
+// AddNode builds a device from a program's own node configuration — the
+// one its daemon composes for node.New — starts it and returns it, so the
+// test runs the program's composition on the site. The site puts its own
+// parts in: its network (the node's listen address and, with
+// cfg.Client.Enabled, its client socket and DNS-SD cache), its clock with
+// the host's in-flight counters, an advertiser whose records the site
+// answers DNS-SD with, the site's logger when cfg has none, and a store of
+// its own when cfg.Store states none (the program's store, a Path or a
+// DB, stays the program's). TCP and the re-announcement are off on the
+// site. The device serves cfg.Topology or the node's Aggregator, empty
+// until the test adds to it ([Device.Act]); a restart builds the node from
+// cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
+// test's own options in the site's environment (mock-site.ts:59-106 at
+// 862ad75f). A node that fails to build fails the test.
+func (s *Site) AddNode(cfg node.Config) *Device {
+	s.tb.Helper()
+	return s.addDevice(Topology{}, &cfg)
+}
+
+func (s *Site) addDevice(topo Topology, base *node.Config) *Device {
+	s.tb.Helper()
+	d := &Device{site: s, index: s.index(), topo: topo, base: base}
 	d.group = s.newGroup("device " + strconv.Itoa(d.index))
 	var db *sql.DB
-	if s.opts.StoreOnDisk {
+	if base != nil && (base.Store.Path != "" || base.Store.DB != nil || base.Store.Credentials != nil || base.Store.Endpoints != nil) {
+		d.store = base.Store
+	} else if s.opts.StoreOnDisk {
 		path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
 		var err error
 		if db, err = sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"); err != nil {
@@ -241,8 +270,12 @@ func (d *Device) Start(ctx context.Context) error {
 }
 
 // config is the node's configuration: the site's defaults, then
-// Topology.Configure.
+// Topology.Configure; for [Site.AddNode] the program's configuration with
+// the site's parts put in.
 func (d *Device) config() node.Config {
+	if d.base != nil {
+		return d.programConfig()
+	}
 	i := strconv.Itoa(d.index)
 	cfg := node.Config{
 		Network: node.Network{Listen: "[::1]:0", DisableReannounce: true},
@@ -268,6 +301,26 @@ func (d *Device) config() node.Config {
 		cfg.Advertiser = mdns.NewNoop()
 	}
 	if cfg.Client.Enabled {
+		d.siteClient(&cfg)
+	}
+	return cfg
+}
+
+// programConfig is [Site.AddNode]'s configuration: the program's, with
+// the site's network, clock, advertiser, logger and store put in.
+func (d *Device) programConfig() node.Config {
+	cfg := *d.base
+	cfg.Store = d.store
+	cfg.Network.Listen = "[::1]:0"
+	cfg.Network.DisableReannounce = true
+	cfg.Network.TCP = node.TCPConfig{}
+	cfg.Advertiser = mdns.NewNoop()
+	if cfg.Logger == nil {
+		cfg.Logger = d.site.log
+	}
+	cfg.Clock = d.site.hostClock(d.group)
+	if cfg.Client.Enabled {
+		cfg.Client.Names, cfg.Client.Listen = nil, ""
 		d.siteClient(&cfg)
 	}
 	return cfg

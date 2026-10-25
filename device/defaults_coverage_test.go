@@ -188,9 +188,15 @@ func TestWindowCoveringDefaultTakesTheDeclaration(t *testing.T) {
 	if _, err := selfHeldDefaults[wcdef.ClusterID](moving); err != nil {
 		t.Fatalf("with transitions: %v", err)
 	}
+	// Lift alone is served, as matter.js serves it (WindowCoveringServer.ts:123-141
+	// at 862ad75f); AbsolutePosition is not.
 	b.opts.Features = 0x1
+	if _, err := selfHeldDefaults[wcdef.ClusterID](b); err != nil {
+		t.Errorf("Lift alone: %v", err)
+	}
+	b.opts.Features = 0x1 | 0x4 | 0x8
 	if _, err := selfHeldDefaults[wcdef.ClusterID](b); !errors.Is(err, ErrSelectionNotServed) {
-		t.Errorf("Lift alone: %v, want ErrSelectionNotServed", err)
+		t.Errorf("AbsolutePosition: %v, want ErrSelectionNotServed", err)
 	}
 }
 

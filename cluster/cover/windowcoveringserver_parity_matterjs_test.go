@@ -17,10 +17,9 @@
 //     OperationalStatus around each command — the oldValue and newValue
 //     of each $Changed event — as the attribute value a controller reads.
 //   - matter.js's shutter servers are WindowCoveringServer.with("Lift") and
-//     .with("Tilt"); the Go server serves an axis position-aware only
-//     (ServedFeatureMap, ServedTiltFeatureMap), which leaves the enum
-//     conformances ("LF & !TL | !LF & TL", "LF & TL", "LF & !TL") the
-//     cases test unchanged. matter.js's MatterAggregateError with an
+//     .with("Tilt"), its blinds .with("Lift", "Tilt"): the FeatureMaps 0x1,
+//     0x2 and 0x3, without position awareness, which the Go server serves
+//     as they are. matter.js's MatterAggregateError with an
 //     EnumValueConformanceError cause is cover.ErrEnumValue from cover.New.
 package cover_test
 
@@ -106,14 +105,14 @@ func TestParityMatterJS_WindowCoveringServerTest(t *testing.T) {
 			cfg  cover.Config
 			ok   bool
 		}{
-			{"accepts a shutter that lifts", with(shutter, cover.ServedFeatureMap), true},
-			{"accepts a shutter that tilts", with(shutter, cover.ServedTiltFeatureMap), true},
+			{"accepts a shutter that lifts", with(shutter, uint32(wcdef.FeatureLift)), true},
+			{"accepts a shutter that tilts", with(shutter, uint32(wcdef.FeatureTilt)), true},
 			{"rejects a shutter that lifts and tilts", cover.Config{
-				FeatureMap: cover.ServedLiftTiltFeatureMap,
+				FeatureMap: uint32(wcdef.FeatureLift | wcdef.FeatureTilt),
 				Type:       uint8(wcdef.TypeShutter), EndProductType: uint8(wcdef.EndProductTypeInteriorVenetianBlind),
 			}, false},
 			{"rejects an end product that only lifts on a covering that lifts and tilts", cover.Config{
-				FeatureMap: cover.ServedLiftTiltFeatureMap,
+				FeatureMap: uint32(wcdef.FeatureLift | wcdef.FeatureTilt),
 				Type:       uint8(wcdef.TypeTiltBlindLift), EndProductType: uint8(wcdef.EndProductTypeRollerShade),
 			}, false},
 		} {

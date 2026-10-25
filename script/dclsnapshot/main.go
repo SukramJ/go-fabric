@@ -29,11 +29,20 @@ func main() {
 func run() error {
 	out := flag.String("out", "controller/dcl/snapshot/data", "the snapshot directory")
 	ledger := flag.String("ledger", dcl.ProductionURL, "the ledger's base URL")
+	vendorsOnly := flag.Bool("vendors-only", false, "refresh the vendor list alone, leaving the certificates as they are")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	client := dcl.NewClient(*ledger)
 	client.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	if *vendorsOnly {
+		n, err := snapshot.FetchVendors(ctx, client, *out, time.Now().UTC().Truncate(time.Second).Format(time.RFC3339))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s: %d vendors from %s\n", *out, n, *ledger)
+		return nil
+	}
 	src, err := snapshot.Fetch(ctx, client, snapshot.CDSignerKeyIDs, *out, time.Now())
 	if err != nil {
 		return err

@@ -1,0 +1,11 @@
+{
+  "message_id": "1",
+  "command": "device_command",
+  "args": {
+    "node_id": 1,
+    "endpoint_id": 1,
+    "cluster_id": 6,
+    "command_name": "on",
+    "payload": {}
+  }
+}

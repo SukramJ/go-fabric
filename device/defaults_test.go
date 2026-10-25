@@ -5,7 +5,6 @@ package device
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -132,16 +131,20 @@ func TestSelfHeldDefaults(t *testing.T) {
 }
 
 // TestADeclaredSelectionTheServerDoesNotServeIsRefused: a host that
-// declares a cluster's features asked for the self-held server, so a
-// selection it does not serve (WindowCovering's Lift without
-// PositionAware) fails the construction with ErrSelectionNotServed and the
-// server's reason; a DoorLock without features mounts the self-held lock
-// since lock.New reads the empty selection as none (brief BU).
+// declares a cluster's features asked for the self-held server; Lift
+// without PositionAware is the self-held cover now, as matter.js serves it
+// (brief CJ §1.22); a DoorLock without features mounts the self-held lock
+// since lock.New reads the empty selection as none (brief BU). A selection
+// a self-held factory does not serve is refused with ErrSelectionNotServed
+// (TestSelfHeldFactoriesRefuseASelectionTheyDoNotServe).
 func TestADeclaredSelectionTheServerDoesNotServeIsRefused(t *testing.T) {
 	t.Parallel()
-	_, err := New(&WindowCoveringType, testOptions("wc"), wcdef.Declare{Features: wcdef.FeatureLift})
-	if !errors.Is(err, ErrSelectionNotServed) || !strings.Contains(err.Error(), "cover:") {
-		t.Errorf("WindowCovering Lift alone: %v, want ErrSelectionNotServed with the server's reason", err)
+	wc, err := New(&WindowCoveringType, testOptions("wc2"), wcdef.Declare{Features: wcdef.FeatureLift})
+	if err != nil {
+		t.Fatalf("WindowCovering Lift alone: %v", err)
+	}
+	if _, ok := wc.Server(wcdef.ClusterID).(*cover.WindowCoveringServer); !ok {
+		t.Errorf("WindowCovering Lift alone: %T, want the self-held cover", wc.Server(wcdef.ClusterID))
 	}
 	dl, err := New(&DoorLockType, testOptions("dl"))
 	if err != nil {

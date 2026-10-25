@@ -1,0 +1,9 @@
+{
+  "message_id": "1",
+  "command": "write_attribute",
+  "args": {
+    "node_id": 1,
+    "attribute_path": "1/6/16385",
+    "value": 10
+  }
+}

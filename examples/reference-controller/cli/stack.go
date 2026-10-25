@@ -17,13 +17,11 @@ import (
 	"strings"
 	"time"
 
-	// The pure-Go SQLite driver; no store package imports one.
-	_ "modernc.org/sqlite"
-
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -88,9 +86,9 @@ type stack struct {
 // openDB opens the database and applies the node store's and the client
 // registry's schemas (both idempotent).
 func openDB(ctx context.Context, path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, err := controller.OpenDB(path)
 	if err != nil {
-		return nil, fmt.Errorf("open %q: %w", path, err)
+		return nil, err
 	}
 	if err := store.Apply(ctx, db); err != nil {
 		_ = db.Close()

@@ -116,7 +116,7 @@ needs one today can derive it from the logs.
 | Name (`node.Metric…`) | Kind | One unit | Fed from |
 | --- | --- | --- | --- |
 | `sessions.open` (`MetricSessionsOpen`) | gauge | an entry of the secure-session table (PASE and CASE) | set from the table's count when a responder handshake establishes a session (`bridge/conn.go`, `bindEstablishedSession`), when the CASE initiator does (`bridge/case_initiator.go`), and when a session closes (`Bridge.SessionClosed`) |
-| `subscriptions.active` (`MetricSubscriptionsActive`) | gauge | a subscription the node serves | set from the subscription table when one is established (`bridge/subscribe_dispatch.go`), restored after a restart (`bridge/subscription_reestablish.go`) or closed (the manager's close hook, `bridge/subscribe.go`) |
+| `subscriptions.active` (`MetricSubscriptionsActive`) | gauge | a subscription the node serves | set from the subscription table when one is established (`bridge/subscribe_dispatch.go`), restored after a restart (`bridge/subscription_reestablish.go`) or closed (the manager's close hook, `bridge/subscribe.go`); a host that reacts to the count watches this gauge on its port instead of polling `Node.Subscriptions().Active()` |
 | `im.received` (`MetricIMReceived`) | counter | an Interaction Model message received | beside DeviceLoadStatus' `TotalInteractionModelMessagesReceived` (`bridge/receive.go`, `handleIMOpcode`) |
 | `im.sent` (`MetricIMSent`) | counter | an Interaction Model message sent | beside `TotalInteractionModelMessagesSent` (`bridge/reply.go`, `bridge/subscribe.go`) |
 | `pase.failures` (`MetricPASEFailures`) | counter | a failed PASE pairing attempt, not a retransmitted step | `Bridge.recordPaseFailure` (`bridge/securechannel.go`) |

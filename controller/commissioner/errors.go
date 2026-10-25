@@ -39,7 +39,28 @@ var (
 	// errRecoverable is RecoverableCommissioningError (:251, not
 	// exported there either): the flow logs it and continues.
 	errRecoverable = errors.New("commissioner: recoverable commissioning error")
+	// ErrAttestationRejected: the device's attestation produced findings
+	// and the policy (Options.OnAttestationFailure) rejected them, or a
+	// chain the validator refused was not accepted — the two throws of
+	// matter.js's #deviceAttestation after #resolveAttestationFindings
+	// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1306-1315
+	// at 862ad75f). matter.js names no class of its own for it (the error
+	// is a CommissioningError or the validator's DeviceAttestationError);
+	// errors.Is matches this sentinel besides the error matter.js throws,
+	// whose message the error keeps. A policy function's own error is
+	// returned verbatim, without it.
+	ErrAttestationRejected = errors.New("commissioner: device attestation rejected")
 )
+
+// attestationRejected is a rejection of the device's attestation: err as
+// matter.js throws it, matching [ErrAttestationRejected] as well.
+type attestationRejected struct{ err error }
+
+func (e attestationRejected) Error() string { return e.err.Error() }
+
+// Unwrap makes ErrAttestationRejected and the rejection's own chain match
+// errors.Is and errors.As.
+func (e attestationRejected) Unwrap() []error { return []error{ErrAttestationRejected, e.err} }
 
 // CommissioningError is a commissioning failure of one of the kinds above.
 type CommissioningError struct {

@@ -1,0 +1,9 @@
+{
+  "event": "subscription_report",
+  "data": {
+    "node_id": 1,
+    "subscription_id": 2864434397,
+    "attributes": { "1/6/0": true },
+    "events": []
+  }
+}

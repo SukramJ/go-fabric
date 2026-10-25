@@ -3829,9 +3829,10 @@ branches per feature) and `DoorLockServer` is the server "with no
 features enabled" (`packages/node/src/behaviors/door-lock/DoorLockServer.ts:1591-1593`).
 The kit's default for a cluster with a self-held server is that server
 (`device/defaults.go`, gate 1 G1-1), but where the self-held server does
-not serve the device type's selection — WindowCovering with Lift but
-without PositionAwareLift, DoorLock without features, a filter monitor
-with ResetCondition, LaundryWasherControls with Rinse — the kit keeps the
+not serve the device type's selection — DoorLock without features, a
+filter monitor with ResetCondition, LaundryWasherControls with Rinse
+(WindowCovering with Lift alone was one until v0.12.1, brief CJ 1.22:
+the self-held server serves it now, `BD-Matter-WindowCovering-LiftAlone`) — the kit keeps the
 generated `spec.Server` for that endpoint (`errSelectionNotServed`), and
 a host that needs the self-held server there selects its features or
 mounts it with `WithServer`. Reasoning: a self-held server that advertises
@@ -4164,10 +4165,14 @@ ICDToken keys as nonvolatile behaviour state
 at `862ad75f`). Go has no behaviour state: `cluster/core/icd_management.go:253`
 reads and writes the `store.ICD` area (`store/icd.go`, table
 `matter_icd_registrations`, metadata counter `icd_management.counter`),
-as every other persisted server state does here (ADR 0029). The keys are
-stored in clear as matter.js stores them; the owner decided on 2026-10-25
-to encrypt them at rest like the DoorLock credentials (brief CJ), which
-changes the storage, not the protocol.
+as every other persisted server state does here (ADR 0029). matter.js
+keeps the keys in clear (`IcdManagementServer.ts:787-791`); since v0.12.1
+(brief CJ 1.25, owner decision 2026-10-25) the store seals them at rest
+as it seals the DoorLock credentials (`store/icd_cipher.go`, AES-128-GCM
+under the store-held key `icd_management.key`; `store.Upgrade` re-seals
+clear keys, no SQL migration). In memory `ICDRegistration.Key` is clear;
+the wire is unchanged. The protection is against a casual read of the
+file, not against theft of the whole store, which holds the sealing key.
 
 ### BD-Matter-ICD-ZeroBackoffIsIdleDuration — a zero `MaximumCheckInBackoff` in the facade means IdleModeDuration
 
@@ -4200,3 +4205,76 @@ by ADR 0028's clock ownership rule. The four cases are listed in the
 findings register; the behaviour they check (a wall-clock jump does not
 move a timer) is held by construction here, since no timer reads the wall
 clock.
+
+### BD-Matter-WindowCovering-LiftAlone — the self-held WindowCovering server serves Lift without PositionAwareLift, as matter.js does
+
+matter.js's `WindowCoveringServer` serves every feature selection; with
+Lift alone, `handleStopMovement` sets no target position and reports
+Stopped on every axis (`packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:487-504`
+at `862ad75f`), and on a mixed covering only the position-aware axis gets
+its target set. Since v0.12.1 (brief CJ 1.22) `cluster/cover` serves Lift
+alone and mirrors that (`windowcovering_server.go`); `device.New` no
+longer refuses a cover whose FeatureMap names Lift without
+PositionAwareLift. No divergence; the entry records that ADR 0013's
+WindowCovering row ("the one profile … Lift + PositionAwareLift") is
+superseded and that `BD-Matter-SelfHeldDefault-SelectionNotServed` no
+longer lists this case.
+
+### BD-Matter-JSONRoute-MandatoryDefault — the JSON command route fills a mandatory member the caller leaves out with the schema's mandatory default
+
+matter.js's `MandatoryDefaultValue` (`packages/model/src/logic/SelectDefaultValue.ts:72-131`
+at `862ad75f`) is a state rule: it seeds a mandatory member of behaviour
+state that nothing set. Go's `client.EncodeJSON` (`controller/client/json.go`,
+brief CJ 1.1) applies the same selection to a *request*: a mandatory
+command field the JSON leaves out takes that default rather than failing
+the encode. Reasoning: the route exists so a JSON client (go-fabric-server,
+matterjs-server's clients) can send what matterjs-server accepts, and
+matterjs-server's command path fills the same defaults before the TLV
+encoder sees the request; the rule is the schema's, only the place it is
+applied differs.
+
+### BD-Matter-FabricLabel-EveryNode — `Registry.SetFabricLabel` updates every connected node, where matter.js returns after the first
+
+matter.js's `CommissioningController` validates and updates the label on
+the first connected node and returns (`packages/matter.js/src/CommissioningController.ts:996-998`
+at `862ad75f`); the other nodes learn it on their next connection. Go
+(`controller/client/label.go`, brief CJ 1.8/Q8) walks every connected
+node in one call and reports the first error. Reasoning: a controller
+daemon exposes the label as one setting; a caller expects it to be
+applied, not scheduled, and a node that is away is updated on reconnect
+in both implementations.
+
+### BD-Matter-AttestationRejected-Sentinel — `commissioner.ErrAttestationRejected` is a sentinel for a rejection matter.js reports as a plain `CommissioningError`
+
+matter.js throws `CommissioningError` with a policy message, or the
+resolver's own reason wrapped around it
+(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1306-1315` at
+`862ad75f`); there is no class a caller can match. Go wraps the same
+failure in `commissioner.ErrAttestationRejected` (brief CJ Q6) so a host
+can `errors.Is` it and offer the override the DCL policy allows. The
+message text and the findings carried are matter.js's.
+
+### BD-Matter-Identify-HostHandlerThenServer — a device's Identify handlers run before the assembler's IdentifyTime handling, where matter.js's override replaces `identify`
+
+matter.js's `IdentifyServer.identify` sets `identifyTime` and a host that
+wants to act overrides the method, replacing it
+(`packages/node/src/behaviors/identify/IdentifyServer.ts:129-135` at
+`862ad75f`). Go keeps the assembler's Identify server (the countdown, the
+attribute reports) and calls the host's handlers through
+`contract.IdentifyHandler` first (`device/identify.go`, brief CJ 1.16).
+Reasoning: in Go a host cannot override a method of a server it does not
+construct; the hook keeps the server's protocol duties intact and gives
+the host the event — the same observable behaviour unless the host wanted
+to suppress IdentifyTime, which no declaration asks for.
+
+### BD-Matter-OpenWindow-ReadsBasicInformation — `client.Node.OpenCommissioningWindow` reads BasicInformation for an unseeded node, where matter.js throws
+
+matter.js requires the node to be seeded with BasicInformation before an
+enhanced window is opened, because the vendor and product id go into the
+QR code, and throws `ImplementationError` otherwise
+(`packages/node/src/behavior/system/commissioning/CommissioningClient.ts:507-515`
+at `862ad75f`). Go (`controller/client/window.go`, brief CJ Q5) reads the
+two attributes from the node when its record lacks them, then opens the
+window. Reasoning: a Go controller has no seeding step a caller could
+have skipped by mistake; the read is what seeding would have done, and
+the error for an unreachable node is the read's.

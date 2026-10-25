@@ -5,6 +5,7 @@ package device
 
 import (
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -74,23 +75,23 @@ func withBaseOptional(t *Type, s *settings) *Type {
 const ConditionBridgedPowerSourceInfo = "BridgedPowerSourceInfo"
 
 // bridgedPowerSourceServers are the server clusters the BridgedNode device
-// type lists under the condition BridgedPowerSourceInfo alone: PowerSource
-// (0x002F) at the pin. Every endpoint the node's Aggregator serves lists
-// BridgedNode beside its own device type (endpoint listedDeviceTypes), so
-// a bridged device of any type may carry them; the type's own list does
-// not name them.
+// type lists under the condition BridgedPowerSourceInfo: PowerSource
+// (0x002F, "BridgedPowerSourceInfo") and PowerSourceConfiguration
+// (0x002E, "BridgedPowerSourceInfo, D") at the pin. Every endpoint the
+// node's Aggregator serves lists BridgedNode beside its own device type
+// (endpoint listedDeviceTypes), so a bridged device of any type may carry
+// them; the type's own list does not name them. Under the condition both
+// are mandatory: a trailing "D" announces a future deprecation and the
+// terms before it decide (matter.js packages/model/src/aspects/Conformance.ts:937-940
+// at 862ad75f), so the device-type validator demands
+// PowerSourceConfiguration wherever the condition holds.
 //
-// Mirrors matter.js packages/model/src/standard/elements/bridged-node.element.ts:23
-// at 862ad75f (`Requirement({ name: "PowerSource", id: 0x2f, conformance:
-// "BridgedPowerSourceInfo", element: "serverCluster" })`). Read from the
-// generated BridgedNode type, not hand-coded. PowerSourceConfiguration
-// (`BridgedPowerSourceInfo, D`, :22) is deprecated where the condition
-// does not hold and stays out, as the Base rule leaves out what is not
-// plain optional.
+// Mirrors matter.js packages/model/src/standard/elements/bridged-node.element.ts:22-23
+// at 862ad75f. Read from the generated BridgedNode type, not hand-coded.
 var bridgedPowerSourceServers = sync.OnceValue(func() []ClusterRequirement {
 	var out []ClusterRequirement
 	for _, r := range typeBridgedNode.Servers {
-		if r.Conformance != ConditionBridgedPowerSourceInfo || r.Definition == nil {
+		if !strings.HasPrefix(r.Conformance, ConditionBridgedPowerSourceInfo) || r.Definition == nil {
 			continue
 		}
 		out = append(out, ClusterRequirement{ID: r.ID, Name: r.Name, Conformance: r.Conformance, Definition: r.Definition})
@@ -99,23 +100,37 @@ var bridgedPowerSourceServers = sync.OnceValue(func() []ClusterRequirement {
 })
 
 // withBridgedPowerSource returns t with the BridgedNode clusters under
-// BridgedPowerSourceInfo the declarations name and t does not list
-// appended, as optional requirements, and whether it appended any: a
-// declared PowerSource on a device is the device stating the condition
-// for the bridged node it becomes, which [New] records in the device's
-// conditions so the device-type validator judges the BridgedNode
-// requirement as stated (endpoint StatedConditions). t itself, false when
-// there are none.
+// BridgedPowerSourceInfo appended, and whether it appended any: a declared
+// PowerSource on a device is the device stating the condition for the
+// bridged node it becomes, which [New] records in the device's conditions
+// so the device-type validator judges the BridgedNode requirements as
+// stated (endpoint StatedConditions). PowerSource is appended as the
+// declared optional requirement; PowerSourceConfiguration, which the
+// condition makes mandatory, as a mandatory one — mounted with its
+// default server unless declared — so the stated condition leaves no
+// violation. t itself, false when PowerSource is not declared or t lists
+// it.
 func withBridgedPowerSource(t *Type, s *settings) (*Type, bool) {
+	var stated bool
+	for _, r := range bridgedPowerSourceServers() {
+		if _, listed := t.Server(r.ID); !listed && r.Conformance == ConditionBridgedPowerSourceInfo && s.names(r.ID) {
+			stated = true
+		}
+	}
+	if !stated {
+		return t, false
+	}
 	var extra []ClusterRequirement
 	for _, r := range bridgedPowerSourceServers() {
-		if _, listed := t.Server(r.ID); listed || !s.names(r.ID) {
+		if _, listed := t.Server(r.ID); listed {
+			continue
+		}
+		if r.Conformance != ConditionBridgedPowerSourceInfo {
+			r.Mandatory = true
+		} else if !s.names(r.ID) {
 			continue
 		}
 		extra = append(extra, r)
-	}
-	if len(extra) == 0 {
-		return t, false
 	}
 	eff := *t
 	eff.Servers = append(slices.Clone(t.Servers), extra...)

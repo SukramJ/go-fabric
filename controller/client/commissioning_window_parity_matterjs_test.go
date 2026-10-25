@@ -6,8 +6,8 @@
 //
 // matter.js's helpers are CommissioningClient's openEnhancedCommissioningWindow
 // and openBasicCommissioningWindow on the controller's peer; the module's
-// are the reference controller's openEnhancedWindow and openBasicWindow
-// (window.go), which mirror them over a client.Node. The pair is a
+// is Node.OpenCommissioningWindow (window.go), which mirrors both over a
+// client.Node (WindowOptions.Basic for the basic one). The pair is a
 // fabrictest device commissioned through the controller's registry
 // (MockSite.addCommissionedPair with subscribedPeer). matter.js spies on
 // the OpenCommissioningWindow request; the Go observables are the device's
@@ -17,10 +17,11 @@
 // the verifier sent was derived from that passcode. The Basic cases need a
 // device with the Basic feature, which a node cannot serve (the register
 // names why).
-package cli
+package client_test
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -62,16 +63,16 @@ func windowCtx(t *testing.T) context.Context {
 	return ctx
 }
 
-// openEnhanced runs openEnhancedWindow on the site.
-func (wp *windowPair) openEnhanced(t *testing.T, timeout uint16) enhancedWindow {
+// openEnhanced runs Node.OpenCommissioningWindow on the site.
+func (wp *windowPair) openEnhanced(t *testing.T, timeout time.Duration) client.CommissioningWindow {
 	t.Helper()
-	var w enhancedWindow
+	var w client.CommissioningWindow
 	if err := wp.site.Run(windowCtx(t), func(ctx context.Context) error {
 		var err error
-		w, err = openEnhancedWindow(ctx, wp.node, timeout)
+		w, err = wp.node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions{})
 		return err
 	}); err != nil {
-		t.Fatalf("openEnhancedWindow: %v", err)
+		t.Fatalf("OpenCommissioningWindow: %v", err)
 	}
 	return w
 }
@@ -115,15 +116,18 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 	// :71-95.
 	t.Run("opens a window with a generated verifier and returns pairing codes", func(t *testing.T) {
 		wp := newWindowPair(t)
-		w := wp.openEnhanced(t, uint16(defaultWindowTimeout/time.Second))
-		if w.manual == "" || w.qr == "" {
-			t.Fatalf("pairing codes %q / %q", w.manual, w.qr)
+		w := wp.openEnhanced(t, client.DefaultWindowTimeout)
+		if w.ManualCode == "" || w.QRCode == "" {
+			t.Fatalf("pairing codes %q / %q", w.ManualCode, w.QRCode)
+		}
+		if w.Timeout != client.DefaultWindowTimeout {
+			t.Errorf("timeout %v, want %v", w.Timeout, client.DefaultWindowTimeout)
 		}
 		win := wp.pair.Device.Bridge().CommissioningWindow()
 		if !win.IsOpen() || !win.HasSuppliedVerifier() {
 			t.Fatalf("window open %v, supplied verifier %v", win.IsOpen(), win.HasSuppliedVerifier())
 		}
-		qr, err := setup.DecodeQRCode(w.qr)
+		qr, err := setup.DecodeQRCode(w.QRCode)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,37 +136,40 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// :97-130. The helper takes whole seconds (the CLI's --timeout), so
-	// Seconds(300.5) arrives as 300; the verifier is proven by a second
-	// administrator commissioning with the returned passcode.
+	// :97-130. The window takes whole seconds, so Seconds(300.5) arrives
+	// as 300; the verifier is proven by a second administrator
+	// commissioning with the returned passcode.
 	t.Run("returns the values it sent to the device and encoded in the pairing codes", func(t *testing.T) {
 		wp := newWindowPair(t)
-		w := wp.openEnhanced(t, 300)
+		w := wp.openEnhanced(t, 300500*time.Millisecond)
 		win := wp.pair.Device.Bridge().CommissioningWindow()
-		if w.discriminator != win.Discriminator() {
-			t.Errorf("discriminator %d, the window advertises %d", w.discriminator, win.Discriminator())
+		if w.Discriminator != win.Discriminator() {
+			t.Errorf("discriminator %d, the window advertises %d", w.Discriminator, win.Discriminator())
+		}
+		if w.Timeout != 300*time.Second {
+			t.Errorf("returned timeout %v, want 300 s", w.Timeout)
 		}
 		if got := win.RequestedDurationSeconds(); got != 300 {
 			t.Errorf("commissioningTimeout %d s, want 300", got)
 		}
-		qr, err := setup.DecodeQRCode(w.qr)
+		qr, err := setup.DecodeQRCode(w.QRCode)
 		if err != nil {
 			t.Fatal(err)
 		}
-		manual, err := setup.DecodeManualCode(w.manual)
+		manual, err := setup.DecodeManualCode(w.ManualCode)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if qr.Passcode != w.passcode || qr.Discriminator != w.discriminator || manual.Passcode != w.passcode {
-			t.Errorf("QR %+v, manual %+v, sent passcode %d discriminator %d", qr, manual, w.passcode, w.discriminator)
+		if qr.Passcode != w.Passcode || qr.Discriminator != w.Discriminator || manual.Passcode != w.Passcode {
+			t.Errorf("QR %+v, manual %+v, sent passcode %d discriminator %d", qr, manual, w.Passcode, w.Discriminator)
 		}
 		// BasicInformation's vendor and product of the fabrictest device.
-		if qr.VendorID != 0xFFF1 || qr.ProductID != 0x8001 {
-			t.Errorf("QR vendor 0x%04X product 0x%04X, want BasicInformation's 0xFFF1 / 0x8001", qr.VendorID, qr.ProductID)
+		if qr.VendorID != 0xFFF1 || qr.ProductID != 0x8001 || w.VendorID != 0xFFF1 || w.ProductID != 0x8001 {
+			t.Errorf("QR vendor 0x%04X product 0x%04X, window %04X/%04X, want BasicInformation's 0xFFF1 / 0x8001", qr.VendorID, qr.ProductID, w.VendorID, w.ProductID)
 		}
 		second := wp.site.AddController(fabrictest.ControllerOptions{})
 		if _, err := second.Commission(windowCtx(t), wp.pair.Device, fabrictest.CommissionOptions{
-			Edit: func(o *commissioner.Options) { o.Passcode = w.passcode },
+			Edit: func(o *commissioner.Options) { o.Passcode = w.Passcode },
 		}); err != nil {
 			t.Fatalf("commissioning with the returned passcode: %v", err)
 		}
@@ -172,18 +179,19 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 	// WindowNotOpen.
 	t.Run("tolerates a WindowNotOpen error on the pre-emptive revoke (enhanced)", func(t *testing.T) {
 		wp := newWindowPair(t)
-		wp.openEnhanced(t, uint16(defaultWindowTimeout/time.Second))
+		wp.openEnhanced(t, 0)
 	})
 
-	// :144-150. matter.js throws ImplementationError; the Go helper
-	// refuses with an error before sending anything.
+	// :144-150. matter.js throws ImplementationError; the Go window
+	// refuses with ErrNoBasicWindow before sending anything.
 	t.Run("throws ImplementationError when the peer does not support the basic feature", func(t *testing.T) {
 		wp := newWindowPair(t)
 		err := wp.site.Run(windowCtx(t), func(ctx context.Context) error {
-			return openBasicWindow(ctx, wp.node, uint16(defaultWindowTimeout/time.Second))
+			_, err := wp.node.OpenCommissioningWindow(ctx, 0, client.WindowOptions{Basic: true})
+			return err
 		})
-		if err == nil {
-			t.Fatal("openBasicWindow on a device without the Basic feature succeeded")
+		if !errors.Is(err, client.ErrNoBasicWindow) {
+			t.Fatalf("a basic window on a device without the Basic feature: %v, want ErrNoBasicWindow", err)
 		}
 		if wp.pair.Device.Bridge().CommissioningWindow().IsOpen() {
 			t.Error("a window opened")
@@ -198,7 +206,7 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 	// observable.
 	t.Run("clears AdminFabricIndex when the admin fabric is removed after its Fabric object was replaced", func(t *testing.T) {
 		wp := newWindowPair(t)
-		wp.openEnhanced(t, uint16(defaultWindowTimeout/time.Second))
+		wp.openEnhanced(t, 0)
 		addr, _ := wp.node.PeerAddress()
 		admin := wp.deviceFabric(t, addr.NodeID)
 		if got, ok := wp.adminFabric(); !ok || got != admin {
@@ -227,15 +235,15 @@ func TestCommissioningWindowParityMatterJS(t *testing.T) {
 	// removes its own fabric.
 	t.Run("keeps AdminFabricIndex when another fabric is removed", func(t *testing.T) {
 		wp := newWindowPair(t)
-		first := wp.openEnhanced(t, uint16(defaultWindowTimeout/time.Second))
+		first := wp.openEnhanced(t, 0)
 		other := wp.site.AddController(fabrictest.ControllerOptions{})
 		op, err := other.Commission(windowCtx(t), wp.pair.Device, fabrictest.CommissionOptions{
-			Edit: func(o *commissioner.Options) { o.Passcode = first.passcode },
+			Edit: func(o *commissioner.Options) { o.Passcode = first.Passcode },
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		wp.openEnhanced(t, uint16(defaultWindowTimeout/time.Second))
+		wp.openEnhanced(t, 0)
 		addr, _ := wp.node.PeerAddress()
 		admin := wp.deviceFabric(t, addr.NodeID)
 		otherFabric := wp.deviceFabric(t, op.Address.NodeID)

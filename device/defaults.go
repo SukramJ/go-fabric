@@ -111,9 +111,9 @@ func notServed(err error) error { return fmt.Errorf("%w: %w", ErrSelectionNotSer
 // A self-held server is the default where it serves the selection the
 // device type and the host make — its FeatureMap and every attribute,
 // command and event the selection mandates; a selection it does not serve
-// (WindowCovering's Lift without PositionAware, a DoorLock without
-// features) keeps the generated server ([ErrSelectionNotServed]), so no
-// selection that built a device before is refused now.
+// (WindowCovering's AbsolutePosition, a LevelControl with Frequency)
+// keeps the generated server ([ErrSelectionNotServed]), so no selection
+// that built a device before is refused now.
 //
 // The table is hand-written: each entry maps the selection onto its
 // server's own configuration, which no generator knows.

@@ -147,7 +147,7 @@ idempotent.
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
 | `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |
-| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric |
+| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric. Since v0.12.1 the key is sealed at rest (AES-128-GCM under `icd_management.key`, bound to its row); `store.Upgrade` seals the keys an earlier release stored in clear |
 
 ### Tables of `endpoint/sqlitestore`
 
@@ -181,6 +181,7 @@ facade's own state.
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |
 | `door_lock.credential_key` | `cluster/lock` | the key the DoorLock server encrypts credential data with |
+| `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
 | `matter.fabric.<fabric>.vid.statement`, `.vvsc` | `cluster/core` | the VID verification statement and VVSC per fabric |

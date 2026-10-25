@@ -29,16 +29,28 @@ the reference controller's `openStack` builds them:
 `Controller.Close` tears the stack down in reverse; the database stays
 the host's. `Config` takes:
 
-- `DB` (required): the host opens it with the SQLite driver of its choice.
+- `DB` (required): `controller.OpenDB(path)` opens a SQLite file with the
+  module's own pure-Go driver (foreign keys on, a 5 s busy timeout, the
+  write-ahead log), so the program imports no driver; a host may open the
+  database itself with the driver of its choice.
 - `Attestation` (required): the PAA trust store. There is no default, so
   a controller never trusts the test PAAs by accident.
-  `attestation.TestStore()` is for development devices; a production
-  controller passes a DCL-backed store.
+  `attestation.TestStore()` is for development devices;
+  `controller.ProductionTrust()` is the production set of the DCL snapshot
+  embedded in the module, without the test roots and without a network;
+  a controller that also asks the online ledger layers a
+  `dcl.CertificateStore` over it with `attestation.Trust`.
 - `Listen`, `VendorID` (0 is the test vendor 0xFFF1), `Label`, `Logger`,
   `Node` (every client node's `client.Config`).
 - `ManualStart`: false starts the commissioned nodes, as matter.js's
   controller connects them on start. A program that only pairs or reads
   once sets it.
+- `Clock` and `Listener`: the stack's time source (nil is the system
+  clock) and a UDP socket to serve on in place of opening `Listen`. A test
+  passes both: `fabrictest.Site.ControllerConfig(opts)` returns a `Config`
+  wired to the site — its network, its DNS-SD answers, its fake clock and
+  a database of its own — so the program's own `controller.New` runs on
+  the site (see [testing in process](../guides/testing-in-process.md)).
 
 `Controller.Registry`, `Controller.Commissioner` and `Controller.Fabric`
 are the role's seams ([advanced seams](../guides/advanced-seams.md)). A
@@ -46,7 +58,7 @@ host with a different composition, such as its own trust policy per
 finding or a BLE channel, builds the parts itself, as the reference
 controller does.
 
-*Source: `controller/controller.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
+*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -74,8 +86,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	_ "modernc.org/sqlite" // the host picks the SQLite driver
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -125,10 +135,9 @@ func run(ctx context.Context, dbPath, code string) error {
 	return use(ctx, nodes[0])
 }
 
-// openDB opens the SQLite file the controller keeps its fabric in.
-func openDB(path string) (*sql.DB, error) {
-	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-}
+// openDB opens the SQLite file the controller keeps its fabric in, with
+// the module's own driver.
+func openDB(path string) (*sql.DB, error) { return controller.OpenDB(path) }
 
 // open builds the controller over the database: the fabric (created on the
 // first run, loaded afterwards), the socket, DNS-SD, peers, commissioner,
@@ -287,6 +296,13 @@ The commissioner checks the device's attestation against a trust store:
   then learns the key identifiers of the PAAs, PAIs and CD signers of the
   devices you attest; no device identity, passcode or fabric key is sent.
 
+The snapshot also names the vendors offline: `snapshot.Vendors()` and
+`snapshot.Vendor(id)` are the ledger's vendor records it was built with,
+over matter.js's static vendors (the test vendors 0xFFF1–0xFFF4 and Nabu
+Casa), so a vendor id resolves to a name without the network.
+`make update-dcl-snapshot` refreshes them with the certificates (or alone,
+`go run ./script/dclsnapshot -vendors-only`).
+
 The policy decides what a finding does:
 
 | Policy | Effect on a finding |
@@ -297,7 +313,12 @@ The policy decides what a finding does:
 | zero value `Policy{}` | **proceeds**, with a warning per finding |
 
 The zero value proceeds because matter.js does the same for backward
-compatibility. Set the policy explicitly.
+compatibility. Set the policy explicitly. (`controller.Pair` sets
+`attestation.Reject()` when its options leave the policy unset.)
+
+A rejection matches `commissioner.ErrAttestationRejected` through
+`errors.Is`, besides `commissioner.ErrCommissioning`, so a host tells a
+refused device from a network failure.
 
 *Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:242-297`.*
 
@@ -369,6 +390,142 @@ doc comment names the fields a host sets.
   `Close`; `Done` is closed then.
 
 *Source: `controller/client/surface.go`, `controller/client/interact.go:15-122`, `cluster/spec/value.go`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
+
+## More of the facade
+
+The calls below cover what a resident controller program (a daemon that
+serves other clients) needs beyond pairing and the four interactions.
+Each names its matter.js counterpart in its doc comment.
+
+### Hooks per node
+
+`Config.Node.Hooks` is one set of hooks for every node.
+`Config.HooksFor(id)` returns the hooks of the node with that local id
+instead, so a host attributes a report, an event or a subscription signal
+to its node, as matter.js gives each paired node its own events.
+
+### JSON values
+
+A host that speaks JSON to its own clients reads and builds values
+without a TLV type. `client.Value` is the decoded tree the role hands out
+(an attribute value, an event's data, a command response's fields);
+`client.Encodable` is what a write or an invoke takes. The type comes from
+the generated cluster definitions:
+
+| Call | The type of |
+| --- | --- |
+| `client.AttributeField(cluster, attribute)` | an attribute's value (a global attribute for any cluster) |
+| `client.CommandField(cluster, command)` | a request command's fields |
+| `client.ResponseField(cluster, command)` | a response command's fields |
+| `client.EventField(cluster, event)` | an event's data |
+
+`client.DecodeJSON(field, value, form)` renders a value in the forms of
+matterjs-server's WebSocket API: `client.TagBased` keys a struct by its
+field ids (`{"0": true}`, the attribute form), `client.NameBased` by its
+camelCase names (`{"newPosition": 1}`, the form of command fields and
+event data); bytes are standard base64, integers JSON numbers (64-bit ones
+in full), lists arrays, null a nullable value's null; a member the model
+does not name is left out. `client.EncodeJSON(field, raw)` reads either
+key form (names compared without regard to case, or decimal ids) and
+base64 bytes; null for an optional member that is not nullable counts as
+left out, and a mandatory member a command's fields leave out takes the
+specification's fallback, as matter.js's `MandatoryDefaultValue` computes
+it (0, false, empty; an enum stays required). A value of an element no
+definition names is untyped: a struct keyed by its context tags. A value
+that does not fit is `client.ErrJSONValue`.
+
+### Discovery
+
+`Controller.Discover(ctx, id, timeout)` searches DNS-SD for the
+commissionable devices a `discovery.Identifier` selects
+(`ByLongDiscriminator`, `ByShortDiscriminator`, `ByVendor`,
+`ByVendorProduct`, `ByDeviceType`, `ByInstanceID`) until the timeout passes
+on the controller's clock (0 is 15 minutes, matter.js's default), and
+returns every device found, each once. The end of the search is no error.
+
+### Pairing codes
+
+`controller.ParsePairingCode(code)` decodes a QR code (`MT:…`) or a manual
+code with matter.js's validation: `Manual`, `Version`, `VendorID`,
+`ProductID`, `Flow`, `Capabilities` (the discovery bitmap), `Discriminator`
+(the long one of a QR code, the short one of a manual code), `Passcode` and
+`HasExtra` (the QR code carries TLV data). `PairingCode.Identifier()` is
+the discovery selector. A code it refuses is `controller.ErrPairingCode`,
+and `Pair` returns the same error for the same code.
+
+### The commissioning window
+
+`Node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions{})` opens
+an enhanced commissioning window on a paired node so another administrator
+can add it, as matter.js's `openEnhancedCommissioningWindow` does: a window
+open before is revoked, a random discriminator and passcode are drawn, the
+PAKE verifier is derived over a random 32-byte salt at 1000 iterations, and
+`OpenCommissioningWindow` is sent (timed). The `client.CommissioningWindow`
+it returns carries the manual code, the QR code, the passcode, the long
+discriminator, the node's vendor and product id and the timeout (0 is
+`client.DefaultWindowTimeout`, 900 s). `WindowOptions{Basic: true}` opens a
+basic window, in which the node takes its own passcode; a node without the
+Basic feature is `client.ErrNoBasicWindow`.
+`Node.RevokeCommissioningWindow(ctx)` closes a window and reports whether
+one was open.
+
+### Batched invokes
+
+`Node.InvokeBatch(ctx, []client.CommandRequest, opts)` sends several
+commands and returns one `Result` per command, in their order. The
+commands go in batches of the peer's `Node.MaxPathsPerInvoke()` (its
+session parameters; 1 when it reported none), each batch on an exchange of
+its own, in parallel, as matter.js splits an invoke. A command's own status
+is its `Result.Status` — `NoCommandResponse` for a command the peer did not
+answer — and not an error; the error is an exchange that failed.
+
+### The fabric label
+
+`Registry.SetFabricLabel(ctx, label)` renames our fabric at run time:
+the label (at most 32 characters, else `commissioner.ErrLabel`) is saved
+with the fabric record (`commissioner.Fabric.SetLabel`), and every
+connected node gets `UpdateFabricLabel` at once; a node that is not
+connected gets it at its next start. A node that refuses the name because
+another of its fabrics carries it is `commissioner.ErrFabricLabelConflict`;
+the errors of the nodes not updated are joined. `Fabric.CurrentLabel()`
+reads the label.
+
+### The default subscription per node
+
+`Node.SetAutoSubscribe(ctx, on)` switches a node's sustained default
+subscription on or off and stores the choice with the node's settings: a
+started node establishes or closes the subscription at once, a stopped one
+follows the choice at its next start, as matter.js's `autoSubscribe` state
+does. `Node.AutoSubscribe()` reads it.
+
+### The specification version
+
+`Node.Properties().Specification()` decodes the node's BasicInformation
+SpecificationVersion into a `client.SpecVersion` (`Major`, `Minor`,
+`Patch`, `Reserved`); `String()` renders it as `"1.4.0"`, `Uint32()`
+gives the attribute value back for comparisons, and `client.SpecVersionOf`
+decodes a value a host holds. An unknown or zero version reports false.
+
+### Pairing over BLE
+
+`PairOptions.BLE` is a Bluetooth LE central (`ble/bluez` on Linux,
+`controller/ble/bletest` in a test): `Pair` then finds the device by its
+BLE advertisement instead of DNS-SD, runs PASE over BTP, and the network
+steps provision `PairOptions.WiFi` or `PairOptions.Thread` before CASE
+finds the device on the network. A device on BLE has no network yet, so
+one of the two is required. `PairOptions.WiFi` and `Thread` also provision
+a device found over DNS-SD that advertises Wi-Fi or Thread.
+
+### Thread datasets
+
+`thread.DecodeDataset(b)` (package `controller/thread`) reads a Thread
+operational dataset, as matter.js's `OperationalDataset.decode` does:
+`NetworkName`, `ExtPANID`, `Channel`, `PANID` and every other MeshCoP TLV;
+`DecodeDatasetHex` takes hex, and `Redact` drops the secrets for a log
+line. The commissioner provisions the dataset as bytes
+(`commissioner.ThreadNetwork`).
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
 
 ## What is not here yet
 

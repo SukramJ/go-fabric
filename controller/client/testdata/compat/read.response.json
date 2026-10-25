@@ -1,0 +1,12 @@
+{
+  "message_id": "1",
+  "result": {
+    "attributes": { "1/6/0": true, "0/40/1": "Vendor" },
+    "events": [
+      {
+        "node_id": 1, "endpoint_id": 1, "cluster_id": 59, "event_id": 1, "event_number": 121,
+        "priority": 1, "timestamp": 1704067200000, "timestamp_type": 1, "data": { "newPosition": 1 }
+      }
+    ]
+  }
+}

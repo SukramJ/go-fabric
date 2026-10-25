@@ -18,6 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
@@ -34,20 +35,18 @@ type pairing struct {
 	what     string
 }
 
-// parseCode reads a QR code ("MT:…") or a manual code (11 or 21 digits).
+// parseCode reads a QR code ("MT:…") or a manual code (11 or 21 digits)
+// with the facade's decoder (controller.ParsePairingCode).
 func parseCode(code string) (pairing, error) {
-	if strings.HasPrefix(code, "MT:") {
-		p, err := setup.DecodeQRCode(code)
-		if err != nil {
-			return pairing{}, err
-		}
-		return pairing{passcode: p.Passcode, id: discovery.ByLongDiscriminator(p.Discriminator), what: fmt.Sprintf("long discriminator %d", p.Discriminator)}, nil
-	}
-	m, err := setup.DecodeManualCode(code)
+	p, err := controller.ParsePairingCode(code)
 	if err != nil {
 		return pairing{}, err
 	}
-	return pairing{passcode: m.Passcode, id: discovery.ByShortDiscriminator(m.ShortDiscriminator), what: fmt.Sprintf("short discriminator %d", m.ShortDiscriminator)}, nil
+	what := fmt.Sprintf("long discriminator %d", p.Discriminator)
+	if p.Manual {
+		what = fmt.Sprintf("short discriminator %d", p.Discriminator)
+	}
+	return pairing{passcode: p.Passcode, id: p.Identifier(), what: what}, nil
 }
 
 // networkOptions are the operational network the device is to join

@@ -21,8 +21,6 @@ import (
 	"syscall"
 	"time"
 
-	_ "modernc.org/sqlite" // the host picks the SQLite driver
-
 	"github.com/SukramJ/go-fabric/client/discovery"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
@@ -71,10 +69,9 @@ func run(ctx context.Context, dbPath, code string) error {
 	return use(ctx, nodes[0])
 }
 
-// openDB opens the SQLite file the controller keeps its fabric in.
-func openDB(path string) (*sql.DB, error) {
-	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-}
+// openDB opens the SQLite file the controller keeps its fabric in, with
+// the module's own driver.
+func openDB(path string) (*sql.DB, error) { return controller.OpenDB(path) }
 
 // open builds the controller over the database: the fabric (created on the
 // first run, loaded afterwards), the socket, DNS-SD, peers, commissioner,

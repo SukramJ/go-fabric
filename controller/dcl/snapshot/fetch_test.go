@@ -53,6 +53,10 @@ func TestFetch(t *testing.T) {
 				"subject": "B", "subjectKeyId": colons(strings.Repeat("AB", 20)), "schemaVersion": 0,
 				"certs": []map[string]any{{"pemCert": pemOf(secattestation.TestPAANoVIDCert), "subjectKeyId": colons(strings.Repeat("AB", 20)), "isRoot": true}},
 			}}
+		case r.URL.Path == "/dcl/vendorinfo/vendors":
+			body = map[string]any{"vendorInfo": []map[string]any{
+				{"vendorID": 0x1234, "vendorName": "Lamps Inc", "companyLegalName": "Lamps Incorporated", "schemaVersion": 0},
+			}, "pagination": map[string]any{"next_key": nil}}
 		case r.URL.Path == "/dcl/pki/all-certificates":
 			body = map[string]any{"certificates": []map[string]any{{
 				"schemaVersion": 0, "subjectKeyId": colons(cdSKID),
@@ -80,6 +84,9 @@ func TestFetch(t *testing.T) {
 	}
 	if paas, cds := s.Len(); paas != 1 || cds != 1 {
 		t.Fatalf("loaded %d PAAs, %d CD signers", paas, cds)
+	}
+	if v, ok := s.Vendor(0x1234); !ok || v.Name != "Lamps Inc" || v.CompanyLegalName != "Lamps Incorporated" {
+		t.Fatalf("vendor 0x1234: %+v (%v)", v, ok)
 	}
 	empty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"approvedRootCertificates":{"schemaVersion":0,"certs":[]}}`))

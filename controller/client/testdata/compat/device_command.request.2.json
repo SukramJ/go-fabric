@@ -1,0 +1,14 @@
+{
+  "message_id": "1",
+  "command": "device_command",
+  "args": {
+    "node_id": 1,
+    "endpoint_id": 1,
+    "cluster_id": 8,
+    "command_name": "moveToLevelWithOnOff",
+    "payload": {
+      "level": 128,
+      "transitionTime": 10
+    }
+  }
+}

@@ -71,6 +71,10 @@ type Device struct {
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
+
+	// identify holds the host's Identify and TriggerEffect handlers
+	// ([Device.Identify]); never mounted.
+	identify *spec.Server
 }
 
 // Compile-time assertion.
@@ -197,8 +201,14 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
 	}
+	if d.identify, err = newIdentifyHandlers(s); err != nil {
+		return nil, fmt.Errorf("%s: %w", t.Name, err)
+	}
 	return d, nil
 }
+
+// identifyClusterID is Identify (identify.element.ts, 0x0003).
+const identifyClusterID uint32 = 0x0003
 
 // attachHooks installs every declaration's hooks on its cluster's server,
 // in cluster order.
@@ -381,6 +391,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		}
 		switch {
 		case err == nil:
+			fillSelectDefaults(def, srv)
 			return srv, nil
 		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
@@ -399,7 +410,10 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
-	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
+	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d). Its state
+	// starts where matter.js's does: the default server's initialize
+	// values, then SelectDefaultValue for what is still unset
+	// (defaults_fallback.go).
 	srv, err := spec.NewServer(def, opts, generatedConfig(r.ID, features, initial, s.self))
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
@@ -407,13 +421,18 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	case err != nil:
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
+	fillSelectDefaults(def, srv)
 	return srv, nil
 }
 
 // generatedConfig is the configuration of the generated server of cluster
-// id: its Initial, unimplemented commands until the host handles them,
-// and a PowerSource's own additions ([powerSource]).
+// id: its Initial with the default server's initialize values
+// ([initializeDefaults]), unimplemented commands until the host handles
+// them, and a PowerSource's own additions ([powerSource]).
 func generatedConfig(id, features uint32, initial map[uint32]any, self func() (uint16, bool)) spec.ServerConfig {
+	if init, ok := initializeDefaults[id]; ok {
+		init(features, initial)
+	}
 	cfg := spec.ServerConfig{Initial: initial, Unimplemented: true}
 	if id == powersourcedef.ClusterID {
 		powerSource(&cfg, features, self)

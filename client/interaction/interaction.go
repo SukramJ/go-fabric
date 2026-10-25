@@ -9,8 +9,10 @@
 // Subscribe with the registry of subscriptions and their liveness, the
 // handler of the reports a peer pushes, and sustained subscriptions. An
 // [Interaction] is bound to an exchange [Provider]: one session, or a peer
-// whose sessions come and go. Invoke batching and splitting, ICD
-// wakefulness, TCP and large messages are not ported.
+// whose sessions come and go. An invoke of several commands is split by
+// the peer's MaxPathsPerInvoke (InvokeBatch); the batching of single
+// commands across a timer tick, ICD wakefulness, TCP and large messages
+// are not ported.
 //
 // The messages are encoded and decoded with im/'s client encoders and
 // decoders, the shapes of matter.js's TLV message definitions.

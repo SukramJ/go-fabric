@@ -42,10 +42,11 @@ on separate paths since ADR 0020.
 - The transaction and interleaving groups of `IcdClientTest` are not
   portable and are listed in the findings register with this ADR as the
   reason; phase 25 ports what the network profiles make observable.
-- The ICD keys are stored in clear, as matter.js stores them. The owner
-  decided on 2026-10-25 to encrypt them at rest like the DoorLock credentials
-  (`cluster/lock/auth.go`, AES-128-GCM under a store-held key); brief CJ
-  carries it as a storage migration without a protocol change.
+- The ICD keys are sealed at rest since v0.12.1 (brief CJ 1.25; owner
+  decision 2026-10-25), as the DoorLock credentials are (`store/icd_cipher.go`,
+  AES-128-GCM under the store-held key `icd_management.key`; `store.Upgrade`
+  re-seals clear keys). matter.js keeps them in clear. No protocol change;
+  `by_design` `BD-Matter-ICD-RegistrationsInStoreArea`.
 
 ## Alternatives considered
 

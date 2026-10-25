@@ -604,7 +604,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 43,
+    "line": 45,
     "citation": "InteractionMessenger.ts:186-190",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "MatterFlowError",
@@ -613,7 +613,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 53,
+    "line": 55,
     "citation": "ControllerCommissioningFlow.ts:519-523",
     "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
     "identifier": "StatusResponseError",
@@ -622,7 +622,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 55,
+    "line": 57,
     "citation": "InteractionMessenger.ts:201-214",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ReceivedStatusResponseError",
@@ -631,7 +631,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 144,
+    "line": 146,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -640,7 +640,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 169,
+    "line": 171,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1172,7 +1172,17 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 233,
+    "line": 27,
+    "citation": "WindowCoveringServer.ts:123-141",
+    "resolved": "packages/node/src/behaviors/window-covering/WindowCoveringServer.ts",
+    "at": "862ad75f",
+    "identifier": "OperationalStatus",
+    "nearest": 203,
+    "occurrences": 1
+  },
+  {
+    "file": "cluster/cover/windowcovering_server.go",
+    "line": 250,
     "citation": "window-covering-cluster.element.ts:130-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1181,7 +1191,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 765,
+    "line": 800,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1625,7 +1635,7 @@
   },
   {
     "file": "controller/client/label.go",
-    "line": 25,
+    "line": 34,
     "citation": "NetworkClient.ts:259-307",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#reconcileFabricLabel",
@@ -1634,7 +1644,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 209,
+    "line": 211,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1643,7 +1653,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 54,
+    "line": 59,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -1652,7 +1662,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 62,
+    "line": 67,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -1661,7 +1671,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 331,
+    "line": 336,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -1759,6 +1769,16 @@
     "occurrences": 6
   },
   {
+    "file": "controller/code.go",
+    "line": 55,
+    "citation": "PairingCodeSchema.ts:330-345",
+    "resolved": "packages/types/src/schema/PairingCodeSchema.ts",
+    "at": "862ad75f",
+    "identifier": "ManualPairingCodeCodec",
+    "nearest": 496,
+    "occurrences": 1
+  },
+  {
     "file": "controller/dcl/cert.go",
     "line": 31,
     "citation": "DclCertificateService.ts:2089",
@@ -1787,7 +1807,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 570,
+    "line": 589,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -1832,7 +1852,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 720,
+    "line": 726,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1857,51 +1877,6 @@
     "identifier": "ApplyUpdate",
     "nearest": 405,
     "occurrences": 1
-  },
-  {
-    "file": "examples/reference-controller/cli/window.go",
-    "line": 31,
-    "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:454",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "commissioningTimeout",
-    "nearest": 486,
-    "occurrences": 7
-  },
-  {
-    "file": "examples/reference-controller/cli/window.go",
-    "line": 35,
-    "citation": "CommissioningClient.ts:492",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "randomBytes",
-    "nearest": 524,
-    "occurrences": 1
-  },
-  {
-    "file": "examples/reference-controller/cli/window.go",
-    "line": 140,
-    "citation": "CommissioningClient.ts:538-549",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "#revokeStaleCommissioningWindow",
-    "nearest": 518,
-    "occurrences": 3
-  },
-  {
-    "file": "examples/reference-controller/cli/window.go",
-    "line": 170,
-    "citation": "CommissioningClient.ts:788",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "EnhancedCommissioningWindow",
-    "nearest": 820,
-    "occurrences": 2
-  },
-  {
-    "file": "examples/reference-controller/cli/window.go",
-    "line": 203,
-    "citation": "CommissioningClient.ts:454-465",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "openBasicCommissioningWindow",
-    "nearest": 486,
-    "occurrences": 2
   },
   {
     "file": "groups/request_chunk_test.go",
