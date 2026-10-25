@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/controller/ca"
@@ -78,12 +80,67 @@ type Fabric struct {
 	RootNodeID   uint64
 	RootVendorID uint16
 	IPK          []byte
-	Label        string
-	FabricIndex  uint8
+	// Label is the fabric label the fabric was built with; read the
+	// current one with [Fabric.CurrentLabel] once [Fabric.SetLabel] may
+	// run.
+	Label       string
+	FabricIndex uint8
 	// CA is the authority that issues the fabric's NOCs.
 	CA *ca.CA
 
 	keyRef string // set: Identity.Signer is FabricConfig.OperationalSigner
+	// labelMu guards Label against SetLabel; store is FabricConfig.Store,
+	// where SetLabel saves.
+	labelMu *sync.RWMutex
+	store   ca.FabricStore
+}
+
+// MaxLabelLength is the longest fabric label, in characters — matter.js
+// Fabric.setLabel's 32 (packages/protocol/src/fabric/Fabric.ts:193-196 at
+// 862ad75f).
+const MaxLabelLength = 32
+
+// ErrLabel is a fabric label [Fabric.SetLabel] refuses.
+var ErrLabel = errors.New("commissioner: fabric label must be at most 32 characters long")
+
+// CurrentLabel is the fabric's label: the one it was built with, or the
+// one [Fabric.SetLabel] set last.
+func (f *Fabric) CurrentLabel() string {
+	if f.labelMu == nil {
+		return f.Label
+	}
+	f.labelMu.RLock()
+	defer f.labelMu.RUnlock()
+	return f.Label
+}
+
+// SetLabel sets the fabric's label and saves the fabric record when it
+// changed — matter.js Fabric.setLabel (Fabric.ts:193-201 at 862ad75f): a
+// label longer than 32 characters is [ErrLabel], an unchanged one is
+// nothing, a changed one is persisted. The commissioner gives the new
+// label to the nodes it commissions from then on; a client.Registry
+// reconciles it to the nodes commissioned before (Registry.SetFabricLabel).
+func (f *Fabric) SetLabel(label string) error {
+	if utf8.RuneCountInString(label) > MaxLabelLength {
+		return ErrLabel
+	}
+	if f.labelMu == nil {
+		f.labelMu = &sync.RWMutex{}
+	}
+	f.labelMu.Lock()
+	defer f.labelMu.Unlock()
+	if f.Label == label {
+		return nil
+	}
+	old := f.Label
+	f.Label = label
+	if f.store != nil {
+		if err := f.store.SaveFabric(fabricRecord(f, f.CA)); err != nil {
+			f.Label = old
+			return fmt.Errorf("commissioner: save fabric: %w", err)
+		}
+	}
+	return nil
 }
 
 // NewFabric loads the fabric cfg.Store keeps, or mints our own key and NOC
@@ -91,6 +148,16 @@ type Fabric struct {
 // (sigma.DeriveOperationalIPK over the compressed fabric id), the ids —
 // as bridge/bridgetest's Commissioner.identity does for its test CA.
 func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
+	f, err := newFabric(c, cfg)
+	if err != nil {
+		return nil, err
+	}
+	f.store = cfg.Store
+	return f, nil
+}
+
+// newFabric is [NewFabric] without the store kept for SetLabel.
+func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	if c == nil {
 		return nil, errors.New("commissioner: NewFabric needs a CA")
 	}
@@ -198,7 +265,7 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 		cfg.IPK = rec.IPK
 		store := cfg.Store
 		cfg.Store = nil
-		f, err := NewFabric(c, cfg)
+		f, err := newFabric(c, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -238,7 +305,7 @@ func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric,
 	} else {
 		cfg.IPK = rec.IPK
 		cfg.Store = nil
-		if f, err = NewFabric(c, cfg); err != nil {
+		if f, err = newFabric(c, cfg); err != nil {
 			return nil, err
 		}
 	}
@@ -303,6 +370,7 @@ func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, 
 			Verifier:      c.Verifier(),
 		},
 		keyRef:       keyRef,
+		labelMu:      &sync.RWMutex{},
 		FabricID:     cfg.FabricID,
 		RootNodeID:   cfg.RootNodeID,
 		RootVendorID: cfg.VendorID,

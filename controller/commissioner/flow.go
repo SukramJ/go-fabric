@@ -395,7 +395,7 @@ func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) e
 	case what == "addNoc" && r.status == nocStatusTableFull:
 		return newError(ErrMaximumCommissionedFabricsReached, "Commission error: This device reached the maximum number of fabrics it can be part of. Please remove a fabric before trying to add another one.", nil)
 	case what == "updateFabricLabel" && r.status == nocStatusLabelConflict:
-		return newError(ErrFabricLabelConflict, fmt.Sprintf("Cannot set fabric label to %q because another fabric on this device already uses this name. Please adjust fabric labels to be unique.", f.fabric.Label), nil)
+		return newError(ErrFabricLabelConflict, fmt.Sprintf("Cannot set fabric label to %q because another fabric on this device already uses this name. Please adjust fabric labels to be unique.", f.fabric.CurrentLabel()), nil)
 	}
 	return newError(ErrCommissioning, fmt.Sprintf("Commission error for %q: %s (%d)%s", what, nocStatusNames[r.status], r.status, suffix), nil)
 }
@@ -937,7 +937,7 @@ func (f *flow) updateFabricLabel(ctx context.Context) (stepResult, error) {
 		f.log.Error("matter.controller.commissioning.no_fabric_index")
 		return stepFailure, nil
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdUpdateFabricLabel, updateFabricLabelRequest(f.fabric.Label), false)
+	res, err := f.invoke(ctx, opCredsCluster, cmdUpdateFabricLabel, updateFabricLabelRequest(f.fabric.CurrentLabel()), false)
 	if err == nil {
 		var nr nocResponse
 		err = response(res, "NocResponse", func(n spec.Node) (err error) {

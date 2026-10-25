@@ -442,7 +442,18 @@ its own, in parallel, as matter.js splits an invoke. A command's own status
 is its `Result.Status` — `NoCommandResponse` for a command the peer did not
 answer — and not an error; the error is an exchange that failed.
 
-*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
+### The fabric label
+
+`Registry.SetFabricLabel(ctx, label)` renames our fabric at run time:
+the label (at most 32 characters, else `commissioner.ErrLabel`) is saved
+with the fabric record (`commissioner.Fabric.SetLabel`), and every
+connected node gets `UpdateFabricLabel` at once; a node that is not
+connected gets it at its next start. A node that refuses the name because
+another of its fabrics carries it is `commissioner.ErrFabricLabelConflict`;
+the errors of the nodes not updated are joined. `Fabric.CurrentLabel()`
+reads the label.
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
 
 ## What is not here yet
 
