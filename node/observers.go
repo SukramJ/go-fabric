@@ -148,7 +148,7 @@ type WindowSnapshot struct {
 type WindowKind uint8
 
 const (
-	// WindowNone: no window is open.
+	// WindowNone is no window: none is open.
 	WindowNone WindowKind = iota
 	// WindowOwn is the node's own window with the configured credentials
 	// ([Config].Commissioning): the one an uncommissioned node opens, or
