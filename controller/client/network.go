@@ -58,6 +58,8 @@ func (n *Node) dropDefaultSubscription() {
 // established, sustained, with the event minimum past the highest event
 // seen and a bootstrap read unless the initial read ran (:149-156).
 func (n *Node) syncAutoSubscribe(ctx context.Context) error {
+	n.subSync.Lock()
+	defer n.subSync.Unlock()
 	n.mu.Lock()
 	desired := n.settings.autoSubscribe && !n.settings.disabled
 	newly := n.newlyCommissioned

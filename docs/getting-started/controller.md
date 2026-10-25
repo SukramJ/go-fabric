@@ -453,6 +453,14 @@ another of its fabrics carries it is `commissioner.ErrFabricLabelConflict`;
 the errors of the nodes not updated are joined. `Fabric.CurrentLabel()`
 reads the label.
 
+### The default subscription per node
+
+`Node.SetAutoSubscribe(ctx, on)` switches a node's sustained default
+subscription on or off and stores the choice with the node's settings: a
+started node establishes or closes the subscription at once, a stopped one
+follows the choice at its next start, as matter.js's `autoSubscribe` state
+does. `Node.AutoSubscribe()` reads it.
+
 *Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
 
 ## What is not here yet
