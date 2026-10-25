@@ -19,6 +19,7 @@ import (
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/store/memstore"
 )
@@ -188,13 +189,19 @@ func TestICDManagementRegistrationLifecycle(t *testing.T) {
 	rec := &icdRecorder{}
 	cfg := core.ICDManagementConfig{
 		IdleModeDuration: 4, MaximumCheckInBackoff: 4, ActiveModeDuration: 2000, ActiveModeThreshold: 1000,
-		ClientsSupportedPerFabric: 2, Store: st, Clock: clocktest.New(icdEpoch),
+		ClientsSupportedPerFabric: 2, Store: st, Clock: inflight.WithGroup(clocktest.New(icdEpoch), inflight.New("icd-test")),
 	}
+	work := inflight.Of(cfg.Clock)
 	s := newICDServer(t, cfg)
 	s.SetCheckInSender(rec.send)
 	if err := s.Start(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	// Start enters active mode, which runs a Check-In pass in the
+	// background (activeEntered). Drain it before registering: a pass that
+	// runs after the registrations below answers them, and the back-off
+	// then suppresses the wake's Check-Ins this test counts.
+	icdWaitFor(t, "the start-time Check-In pass", func() bool { return !work.Busy() })
 	if c := s.Counter(); c == nil || c.Value() <= icd.BootBump {
 		t.Fatalf("counter %v", c)
 	}
@@ -250,10 +257,11 @@ func TestICDManagementRegistrationLifecycle(t *testing.T) {
 	}
 
 	// A wake sends one Check-In per Permanent client, post-increment.
-	before := s.Counter().Value()
+	before, sent := s.Counter().Value(), rec.count()
 	s.EnterIdleMode()
 	s.RequestActiveMode()
-	icdWaitFor(t, "two Check-Ins", func() bool { return rec.count() == 2 })
+	icdWaitFor(t, "two Check-Ins", func() bool { return rec.count() == sent+2 })
+	icdWaitFor(t, "the pass to finish", func() bool { return !work.Busy() })
 	s.Stop()
 	if got := s.Counter().Value(); got != before+2 {
 		t.Fatalf("counter %d, want %d", got, before+2)

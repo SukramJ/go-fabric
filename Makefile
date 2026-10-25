@@ -68,7 +68,8 @@ STRESS_FLAKES = \
 	'./node:^TestOtaParityMatterJS$$' \
 	'./node:^TestSessionAndSubscriptionDiagnostics$$' \
 	'./controller/commissioner:^Test(Commissioning)?Connection' \
-	'./controller/client:^TestIcdClientParity$$/availability'
+	'./controller/client:^TestIcdClientParity$$/availability' \
+	'./cluster/core:^TestICDManagementRegistrationLifecycle$$'
 
 .DEFAULT_GOAL := help
 
