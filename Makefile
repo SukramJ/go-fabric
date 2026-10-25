@@ -67,7 +67,8 @@ STRESS_FLAKES = \
 	'./controller/client:^TestRegistryDecommission$$' \
 	'./node:^TestOtaParityMatterJS$$' \
 	'./node:^TestSessionAndSubscriptionDiagnostics$$' \
-	'./controller/commissioner:^Test(Commissioning)?Connection'
+	'./controller/commissioner:^Test(Commissioning)?Connection' \
+	'./controller/client:^TestIcdClientParity$$/availability'
 
 .DEFAULT_GOAL := help
 
