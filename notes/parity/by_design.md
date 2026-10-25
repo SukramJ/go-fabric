@@ -46,19 +46,42 @@ named. "Not recorded" means the entry states that matter.js has no logic but
 cites no matter.js line; the marker is set when the entry is next touched or
 at the next pin lift, read from the tree — never assumed.
 
-| Entry | matter.js marker | Behaviour source |
-| --- | --- | --- |
-| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only | specification text in `smoke-co-alarm-cluster.resource.ts` |
-| BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only | `fan-control.resource.ts`, connectedhomeip `fan-control-server.cpp` |
-| BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
-| BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode | `mode-base.resource.ts` |
-| BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (19 lines at the pin) | connectedhomeip `TemperatureControlCluster.cpp` |
-| BD-chip-BooleanStateConfiguration-RulesInServer | not recorded | connectedhomeip |
-| BD-chip-WaterHeaterManagement-RulesInServer | not recorded | connectedhomeip |
-| BD-chip-AlarmBase-RulesInServer | not recorded | connectedhomeip |
-| BD-chip-Appliance-RulesInServer | not recorded (the entry cites `OvenCavityOperationalStateServer.ts:35-46` for the cavity, not for the gap) | connectedhomeip |
-| BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | not recorded | connectedhomeip |
-| BD-chip-ClosureDimension-RulesInServer | not recorded | connectedhomeip |
+**The marker columns are machine-read** by `script/aheadcheck`
+(`make ahead-check`, and weekly in `.github/workflows/matterjs-pin.yml`
+against matter.js `origin/main`). The contract:
+
+- `marker file` holds one or more matter.js paths from the tree root, each in
+  backticks, several separated by `<br>`.
+- `marker text` holds one Go-quoted string per path, in backticks and in the
+  same order (`\n` is a line break, `\"` a quote; no `|` and no backtick
+  inside). It is a substring of that file **while the gap exists**.
+- A **presence** marker quotes the line that states the gap (a doc sentence
+  that leaves the work to the device, the code that accepts everything). An
+  **absence** marker quotes the text that would have to change for matter.js
+  to add the logic — the class body, or the end of its last member running
+  into the class's closing brace; the `matter.js marker` column says which
+  kind the row's marker is.
+- Both columns read `not recorded` for a row without a marker; the check
+  accepts such a row only while it is listed in
+  `script/aheadcheck/todo-marker.txt`.
+
+The check reads every marker at the pin (absent there: the row is wrong)
+and at the ref it is given (absent there: the finding "caught up?", which a
+pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
+
+| Entry | matter.js marker | marker file | marker text | Behaviour source |
+| --- | --- | --- | --- | --- |
+| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only (absence: `initialize` is the class's last member) | `packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts` | `"            this.state.endOfServiceAlert = SmokeCoAlarm.EndOfService.Normal;\n        }\n    }\n}"` | specification text in `smoke-co-alarm-cluster.resource.ts` |
+| BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only (absence: the whole class body) | `packages/node/src/behaviors/fan-control/FanControlServer.ts` | `"export class FanControlServer extends FanControlBehavior {\n    override initialize() {\n        if (this.state.fanMode === undefined) {\n            this.state.fanMode = FanControl.FanMode.Off;\n        }\n    }\n}"` | `fan-control.resource.ts`, connectedhomeip `fan-control-server.cpp` |
+| BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command (absence: the operational-error handler is the class's last member; presence: the RVC doc leaves pause and resume to the device, `:18-20`) | `packages/node/src/behaviors/operational-state/OperationalStateServer.ts`<br>`packages/node/src/behaviors/rvc-operational-state/RvcOperationalStateServer.ts` | `"        this.events.operationalError.emit({ errorState: operationalError }, this.context);\n    }\n}"`<br>`"To execute the basic validation for pause and resume commands the utility methods"` | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
+| BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode (presence: `RvcRunModeServer.ts:71-77` sets CurrentMode on ModeUtils' Success) | `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts` | `"        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }"` | `mode-base.resource.ts` |
+| BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (18 lines at the pin; absence: the empty class body) | `packages/node/src/behaviors/temperature-control/TemperatureControlServer.ts` | `"export class TemperatureControlServer extends TemperatureControlBehavior {}"` | connectedhomeip `TemperatureControlCluster.cpp` |
+| BD-chip-BooleanStateConfiguration-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
+| BD-chip-WaterHeaterManagement-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
+| BD-chip-AlarmBase-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
+| BD-chip-Appliance-RulesInServer | not recorded (the entry cites `OvenCavityOperationalStateServer.ts:35-46` for the cavity, not for the gap) | not recorded | not recorded | connectedhomeip |
+| BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
+| BD-chip-ClosureDimension-RulesInServer | not recorded | not recorded | not recorded | connectedhomeip |
 
 ---
 
