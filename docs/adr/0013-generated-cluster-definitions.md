@@ -160,6 +160,49 @@ without their types and access.
   floor; its generated test round-trips every codec and holds the definition
   against the snapshot, which covers it fully.
 
+## Amendment of 2026-10-25 — a definition for every snapshot cluster
+
+Brief CL §1 (go-fabric-server S3 Q20; owner decision of 2026-10-25):
+**every snapshot cluster has a definition and a generated server unless the
+comparison names a hand-written one.** Decision 2's committed set was the
+clusters a server is built on; it is now the whole snapshot, in two lists
+of `script/clustergen/clusters.go`:
+
+- `committed` — a definition and the generated server (`server_gen.go`:
+  State, Patch, StateFrom, the typed Server and Declare). It gains the
+  camera (CameraAvStreamManagement, CameraAvSettingsUserLevelManagement,
+  WebRtcTransportProvider, WebRtcTransportRequestor, PushAvStreamTransport,
+  ZoneManagement), Thread (ThreadNetworkDiagnostics,
+  ThreadBorderRouterManagement, ThreadNetworkDirectory), Joint Fabric
+  (JointFabricDatastore, JointFabricAdministrator) and TLS
+  (TlsCertificateManagement, TlsClientManagement) clusters, which the
+  generated server serves as matter.js serves them: each of their servers
+  at the pin is the generated behaviour stub (`export class XServer
+  extends XBehavior {}`, e.g.
+  `packages/node/src/behaviors/thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts`
+  at 862ad75f), except `WebRtcTransportRequestorServer.ts`, whose session
+  logic is not ported yet (`docs/matterjs-comparison.md`).
+  ThreadBorderRouterManagement's logic after chip's rules is milestone 6
+  phase 26a ([ADR 0027](./0027-thread-border-router-over-otbr-rest.md)).
+- `definitionOnly` — a definition and a typed state only (`state_gen.go`:
+  State, Patch, StateFrom; no Server, Wrap or Declare) for AccessControl,
+  OperationalCredentials and GroupKeyManagement, whose servers stay the
+  hand-written `cluster/core` ones of the migration list below ("skipped").
+  The definitions type the client role's JSON route and `StateFrom` for
+  them; a hand-written `core_parity_test.go` in each package holds the
+  server's cluster id, revision, FeatureMap, lists, privileges and exported
+  wire constants against the definition
+  (`spectest.CheckHandWrittenServer`). The bridge never decodes their
+  requests through the definitions (`bridge/fields_definition.go`
+  `handWrittenServers`), whether or not a binary links them, and a device
+  declares them through nothing (`device.WithServer` mounts the
+  hand-written server as before).
+
+`TestEverySnapshotClusterIsCommitted` fails when a snapshot cluster is in
+neither list; `TestCommittedPackagesAreCurrent` covers both;
+`script/devicegen` treats only a package with `server_gen.go` as a typed
+package of a device.
+
 ## Migration list
 
 Every cluster server in the module, whether it is a candidate for its

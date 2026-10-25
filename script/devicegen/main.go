@@ -146,7 +146,11 @@ func newGenerator(root string) (*generator, error) {
 		if !e.IsDir() {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(root, specDir, e.Name(), "definition_gen.go")); err == nil {
+		// A package with a generated server (server_gen.go): its Declare,
+		// State, Patch and Server. A definition-only package (state_gen.go,
+		// a cluster a hand-written core server serves, ADR 0013 amendment
+		// of 2026-10-25) is no typed package of a device.
+		if _, err := os.Stat(filepath.Join(root, specDir, e.Name(), "server_gen.go")); err == nil {
 			defs[e.Name()] = true
 		}
 	}

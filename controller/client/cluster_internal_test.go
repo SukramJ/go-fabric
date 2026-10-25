@@ -38,7 +38,9 @@ func TestClusterNames(t *testing.T) {
 	t.Parallel()
 	for id, want := range map[uint32]string{0x0006: "OnOff", 0x0035: "ThreadNetworkDiagnostics", 0xFFF1FC01: "Cluster$fff1fc01"} {
 		c := shaped(id, nil)
-		if c.Name() != want || c.ID() != id || (c.Definition() != nil) != (id == 0x0006) {
+		// Every snapshot cluster has a generated definition (ADR 0013,
+		// amendment of 2026-10-25); only the unknown one has none.
+		if c.Name() != want || c.ID() != id || (c.Definition() != nil) != (id != 0xFFF1FC01) {
 			t.Errorf("0x%X: %q definition %v", id, c.Name(), c.Definition() != nil)
 		}
 	}
@@ -95,12 +97,13 @@ func TestClusterShape(t *testing.T) {
 		t.Fatal("an empty cluster has a shape")
 	}
 
-	// A named cluster: the schema names its features, every non-global
-	// listed id is extra (no definition to subtract).
-	a := shaped(0x001F, map[uint32]spec.Node{spec.AttrFeatureMap: uintNode(0b101), spec.AttrAttributeList: listNode(0, 0xFFFC)})
+	// A cluster served by a hand-written core server: its definition-only
+	// definition names its features, and its defined attribute is no
+	// extra (ADR 0013, amendment of 2026-10-25).
+	a := shaped(0x001F, map[uint32]spec.Node{spec.AttrFeatureMap: uintNode(0b101), spec.AttrAttributeList: listNode(0, 0x7001, 0xFFFC)})
 	attrs, cmds = a.Extra()
-	if !reflect.DeepEqual(a.Features(), []string{"EXTS", "AUX"}) || !reflect.DeepEqual(attrs, []uint32{0}) || cmds != nil {
-		t.Fatalf("named cluster features %v extra %v %v", a.Features(), attrs, cmds)
+	if !reflect.DeepEqual(a.Features(), []string{"EXTS", "AUX"}) || !reflect.DeepEqual(attrs, []uint32{0x7001}) || cmds != nil {
+		t.Fatalf("definition-only cluster features %v extra %v %v", a.Features(), attrs, cmds)
 	}
 	// An unknown cluster: no features, every listed id extra.
 	u := shaped(0xFFF1FC01, map[uint32]spec.Node{spec.AttrFeatureMap: uintNode(1), spec.AttrAttributeList: listNode(0, 0xFFFC), spec.AttrAcceptedCommandList: listNode(3)})
@@ -136,12 +139,18 @@ func TestClusterDecoded(t *testing.T) {
 	if _, err := c.Decoded(onoff.AttrOnTime); !errors.Is(err, ErrNoValue) {
 		t.Fatalf("absent %v", err)
 	}
-	u := shaped(0x0035, map[uint32]spec.Node{0: uintNode(15), spec.AttrClusterRevision: uintNode(3)})
-	if _, err := u.Decoded(0); !errors.Is(err, ErrUntyped) {
-		t.Fatalf("named cluster %v", err)
+	// ThreadNetworkDiagnostics, untyped before brief CL gave it a
+	// generated definition: its Channel decodes by the definition, an
+	// extra attribute stays untyped.
+	u := shaped(0x0035, map[uint32]spec.Node{0: uintNode(15), 0x7001: uintNode(1), spec.AttrClusterRevision: uintNode(3)})
+	if v, err := u.Decoded(0); err != nil || v == nil {
+		t.Fatalf("ThreadNetworkDiagnostics.Channel %v %v", v, err)
+	}
+	if _, err := u.Decoded(0x7001); !errors.Is(err, ErrUntyped) {
+		t.Fatalf("extra attribute of ThreadNetworkDiagnostics %v", err)
 	}
 	if v, err := u.Decoded(spec.AttrClusterRevision); err != nil || v != uint64(3) {
-		t.Fatalf("global of a named cluster %v %v", v, err)
+		t.Fatalf("global of ThreadNetworkDiagnostics %v %v", v, err)
 	}
 }
 

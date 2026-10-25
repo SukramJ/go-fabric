@@ -152,6 +152,9 @@ func (g *generator) server() ([]byte, error) {
 		}
 	}
 	c := g.c
+	if g.definitionOnly {
+		return g.stateOnly(fields, omitted, nullable)
+	}
 	w := &writer{}
 	w.WriteString(header)
 	w.p("package %s", g.pkg)
@@ -168,40 +171,7 @@ func (g *generator) server() ([]byte, error) {
 	w.p(")")
 	w.p("")
 
-	w.p("// State is the typed state of the %s cluster: one field per attribute", c.Name)
-	w.p("// of [Definition], a nullable one a pointer (nil for null), a list a")
-	w.p("// slice. [Server.Get] fills it from the stored values; an attribute the")
-	w.p("// server does not serve stays at its zero value.")
-	if len(omitted) > 0 {
-		w.p("//")
-		w.p("// Not in State, and set only untyped (spec.Server.Set):")
-		for _, o := range omitted {
-			w.p("//   - %s (0x%04X): %s.", o.a.Name, o.a.ID, o.why)
-		}
-	}
-	w.p("type State struct {")
-	for _, f := range fields {
-		w.p("\t%s %s // attribute 0x%04X: %s", f.goName, f.goType, f.a.ID, describe(&f.a.Effective.value))
-	}
-	w.p("}")
-	w.p("")
-
-	w.p("// Patch is a change to the %s state: each non-nil field is set, the", c.Name)
-	w.p("// others are left as they are.")
-	if nullable {
-		w.p("// Null lists the nullable attributes the patch sets to null.")
-	}
-	w.p("type Patch struct {")
-	for _, f := range fields {
-		w.p("\t%s *%s // attribute 0x%04X", f.goName, f.base, f.a.ID)
-	}
-	if nullable {
-		w.p("\tNull []uint32 // attribute ids set to null")
-	}
-	w.p("}")
-	w.p("")
-	g.stateValues(w, fields)
-	g.patchValues(w, fields, nullable)
+	g.stateTypes(w, fields, omitted, nullable)
 
 	w.p("// Server is the typed %s server over the cluster's server — the", c.Name)
 	w.p("// generated spec.Server or a self-held one (Underlying) — with a typed")
@@ -297,6 +267,90 @@ func (g *generator) server() ([]byte, error) {
 		return nil, fmt.Errorf("gofmt server: %w\n%s", err, w.String())
 	}
 	return out, nil
+}
+
+// stateTypes renders State and Patch with their value conversions —
+// the part of server_gen.go a definition-only cluster's state_gen.go
+// holds too.
+func (g *generator) stateTypes(w *writer, fields []hullField, omitted []hullOmitted, nullable bool) {
+	c := g.c
+	w.p("// State is the typed state of the %s cluster: one field per attribute", c.Name)
+	w.p("// of [Definition], a nullable one a pointer (nil for null), a list a")
+	if g.definitionOnly {
+		w.p("// slice. [StateFrom] fills it from a peer's values; an attribute the")
+		w.p("// values do not hold stays at its zero value.")
+	} else {
+		w.p("// slice. [Server.Get] fills it from the stored values; an attribute the")
+		w.p("// server does not serve stays at its zero value.")
+	}
+	if len(omitted) > 0 {
+		w.p("//")
+		if g.definitionOnly {
+			w.p("// Not in State, and read only untyped:")
+		} else {
+			w.p("// Not in State, and set only untyped (spec.Server.Set):")
+		}
+		for _, o := range omitted {
+			w.p("//   - %s (0x%04X): %s.", o.a.Name, o.a.ID, o.why)
+		}
+	}
+	w.p("type State struct {")
+	for _, f := range fields {
+		w.p("\t%s %s // attribute 0x%04X: %s", f.goName, f.goType, f.a.ID, describe(&f.a.Effective.value))
+	}
+	w.p("}")
+	w.p("")
+
+	w.p("// Patch is a change to the %s state: each non-nil field is set, the", c.Name)
+	w.p("// others are left as they are.")
+	if nullable {
+		w.p("// Null lists the nullable attributes the patch sets to null.")
+	}
+	w.p("type Patch struct {")
+	for _, f := range fields {
+		w.p("\t%s *%s // attribute 0x%04X", f.goName, f.base, f.a.ID)
+	}
+	if nullable {
+		w.p("\tNull []uint32 // attribute ids set to null")
+	}
+	w.p("}")
+	w.p("")
+	g.stateValues(w, fields)
+	g.patchValues(w, fields, nullable)
+}
+
+// stateOnly renders state_gen.go, the typed state of a definition-only
+// cluster (the definitionOnly list): State, Patch and StateFrom — what a
+// controller reads and writes the cluster typed through — and no Server,
+// Wrap or Declare, since a hand-written server of this module serves the
+// cluster (ADR 0013, amendment of 2026-10-25).
+func (g *generator) stateOnly(fields []hullField, omitted []hullOmitted, nullable bool) ([]byte, error) {
+	if ps := ports[g.c.Name]; len(ps.ports) > 0 || len(ps.types) > 0 || len(ps.imports) > 0 {
+		return nil, fmt.Errorf("definition-only cluster %s has declared ports", g.c.Name)
+	}
+	w := &writer{}
+	w.WriteString(header)
+	w.p("package %s", g.pkg)
+	w.p("")
+	w.p("import \"github.com/SukramJ/go-fabric/cluster/spec\"")
+	w.p("")
+	g.stateTypes(w, fields, omitted, nullable)
+	out, err := format.Source(w.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("gofmt state: %w\n%s", err, w.String())
+	}
+	return out, nil
+}
+
+// stateTest is a definition-only cluster's TestTypedState: the Patch and
+// StateFrom checks TestTypedServer runs for a cluster with a server.
+func (g *generator) stateTest(w *writer) {
+	w.p("")
+	w.p("// TestTypedState holds Patch, State and StateFrom against each other.")
+	w.p("func TestTypedState(t *testing.T) {")
+	w.p("\tt.Parallel()")
+	g.patchValuesTest(w)
+	w.p("}")
 }
 
 // serverTest is the generated test's TestTypedServer: every method of the
@@ -429,8 +483,13 @@ func (g *generator) stateFrom(w *writer) {
 	w.p("// StateFrom is the State of a peer's values of the %s cluster —", g.c.Name)
 	w.p("// a controller's client image of it (client.Cluster), one cluster of a")
 	w.p("// report (client.Report.Values) — each attribute decoded by")
-	w.p("// [Definition] and converted to its field's type as [Server.Get]")
-	w.p("// converts a stored one (spec.StateFrom). absent lists the attributes")
+	if g.definitionOnly {
+		w.p("// [Definition] and converted to its field's type as a server's state")
+		w.p("// converts a stored one (spec.StateFrom). absent lists the attributes")
+	} else {
+		w.p("// [Definition] and converted to its field's type as [Server.Get]")
+		w.p("// converts a stored one (spec.StateFrom). absent lists the attributes")
+	}
 	w.p("// of State the values do not hold; their fields stay at the zero value.")
 	w.p("func StateFrom(values spec.Values) (state State, absent []uint32) {")
 	w.p("	return spec.StateFrom[State](Definition, values)")

@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -347,6 +348,17 @@ type PairOptions struct {
 	// on BLE has no network yet, so one of WiFi and Thread is required
 	// ([ErrConfiguration] otherwise). The BlueZ central is ble/bluez's.
 	BLE ble.Central
+	// Address, when set, is the device's UDP address: Pair dials it
+	// without DNS-SD — no advertisement is needed — as a client.Device
+	// holding that address alone (no instance id, no TXT record, so the
+	// registry never matches it to a node it knows). The code still
+	// supplies the passcode; its discriminator is not checked. Mirrors
+	// matter.js MatterController.commission, which commissions a
+	// discovery's knownAddress through Peers.forDescriptor({addresses})
+	// without a scan (packages/matter.js/src/MatterController.ts:539-566 at
+	// 862ad75f; the option is CommissioningController.ts:289). Address
+	// and BLE together are [ErrConfiguration].
+	Address *net.UDPAddr
 	// WiFi and Thread are the operational network the commissioning
 	// provisions on a device that advertises Wi-Fi or Thread
 	// (commissioner.Options.WiFiNetwork, ThreadNetwork); nil provisions
@@ -365,7 +377,8 @@ type PairOptions struct {
 // [ErrPairingCode]; a ctx without a deadline is bounded by
 // [DefaultPairTimeout]; a code no device answers before it is
 // [ErrNoDevice]. With [PairOptions].BLE the device is found over BLE and
-// commissioned over BTP. Mirrors CommissioningController.commissionNode
+// commissioned over BTP; with [PairOptions].Address it is dialled at that
+// address without discovery. Mirrors CommissioningController.commissionNode
 // (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
 // BLE when the options name a BLE capability (discoveryCapabilities,
 // :280-283).
@@ -373,6 +386,17 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	pc, err := ParsePairingCode(code)
 	if err != nil {
 		return nil, err
+	}
+	if opts.BLE != nil && opts.Address != nil {
+		return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
+	}
+	var known *discovery.Device
+	if opts.Address != nil {
+		d, err := DeviceAt(opts.Address)
+		if err != nil {
+			return nil, err
+		}
+		known = &d
 	}
 	if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
 		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
@@ -392,6 +416,8 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		}
 		defer func() { _ = ch.Close() }()
 		dev, channel = &d, ch
+	} else if known != nil {
+		dev = known
 	} else if dev = c.findCommissionable(ctx, id); dev == nil {
 		return nil, ErrNoDevice
 	}
@@ -413,6 +439,30 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		return n, err
 	}
 	return n, nil
+}
+
+// DeviceAt is the client.Device of a device known by its address alone,
+// without a DNS-SD answer: no instance id, no TXT record, addr as its one
+// address. It is a supported input of client.Registry.ForDevice — which
+// matches it to no known node and creates one, as matter.js's
+// Peers.forDescriptor does for a descriptor of addresses only
+// (RemoteDescriptor.is matches nothing on an absent identifier,
+// packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:37-50
+// at 862ad75f) — and what [PairOptions].Address pairs. An address without
+// an IP or a port is [ErrConfiguration].
+func DeviceAt(addr *net.UDPAddr) (client.Device, error) {
+	if addr == nil {
+		return client.Device{}, fmt.Errorf("%w: no address", ErrConfiguration)
+	}
+	ap := addr.AddrPort()
+	if !ap.Addr().IsValid() || ap.Port() == 0 {
+		return client.Device{}, fmt.Errorf("%w: address %v has no IP or no port", ErrConfiguration, addr)
+	}
+	ip := ap.Addr()
+	if ip.Is4In6() {
+		ip = ip.Unmap()
+	}
+	return client.Device{Addresses: []discovery.Address{{IP: ip, Port: ap.Port()}}}, nil
 }
 
 // findCommissionable is the first commissionable device id selects that

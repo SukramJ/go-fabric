@@ -33,8 +33,26 @@ const header = `// SPDX-License-Identifier: Apache-2.0
 type output struct {
 	Package string
 	Source  []byte // definition_gen.go
-	Server  []byte // server_gen.go, the typed server (hull.go)
+	Server  []byte // server_gen.go, the typed server (hull.go); state_gen.go for a definition-only cluster
 	Test    []byte // definition_gen_test.go
+	// DefinitionOnly is set for a cluster of the definitionOnly list:
+	// Server then holds state_gen.go — the typed state, no server.
+	DefinitionOnly bool
+}
+
+// serverFile is the name of the file o.Server is written to: server_gen.go,
+// or state_gen.go for a definition-only cluster, whose package holds no
+// server (devicegen tells the two apart by it).
+func (o *output) serverFile() string {
+	if o.DefinitionOnly {
+		return "state_gen.go"
+	}
+	return "server_gen.go"
+}
+
+// files are o's files by name, as they are written below its package.
+func (o *output) files() map[string][]byte {
+	return map[string][]byte{"definition_gen.go": o.Source, o.serverFile(): o.Server, "definition_gen_test.go": o.Test}
 }
 
 // kind is the encoded shape of a value.
@@ -106,6 +124,10 @@ type generator struct {
 	payloads []*payload
 	anon     []*payload
 	attrType map[uint32]typeInfo
+	// definitionOnly: the cluster is in the definitionOnly list — a
+	// definition and a typed state, no generated server and no Declare
+	// (a hand-written server in this module serves it).
+	definitionOnly bool
 }
 
 // generate produces the package of cluster name.
@@ -117,6 +139,7 @@ func generate(snap *snapshot, name string) (*output, error) {
 	g := &generator{
 		snap: snap, c: c, pkg: packageName(c.Name),
 		used: map[string]string{}, data: map[string]*dataInfo{}, attrType: map[uint32]typeInfo{},
+		definitionOnly: slices.Contains(definitionOnly, c.Name),
 	}
 	for _, id := range []string{"ClusterID", "Name", "Revision", "Definition", "Feature", "State", "Patch", "Server", "Wrap", "WrapOn", "Declare"} {
 		g.used[id] = "package identifier"
@@ -136,7 +159,7 @@ func generate(snap *snapshot, name string) (*output, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
-	return &output{Package: g.pkg, Source: src, Server: srv, Test: test}, nil
+	return &output{Package: g.pkg, Source: src, Server: srv, Test: test, DefinitionOnly: g.definitionOnly}, nil
 }
 
 func (g *generator) claim(id, what string) error {
@@ -1649,12 +1672,16 @@ func (g *generator) test() ([]byte, error) {
 	w.p("package %s", g.pkg)
 	w.p("")
 	w.p("import (")
-	w.p("\t\"context\"")
+	if !g.definitionOnly {
+		w.p("\t\"context\"")
+	}
 	w.p("\t\"testing\"")
 	w.p("")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec/spectest\"")
-	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
+	if !g.definitionOnly {
+		w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
+	}
 	w.p(")")
 	w.p("")
 	w.p("var _ = spec.Register")
@@ -1702,7 +1729,11 @@ func (g *generator) test() ([]byte, error) {
 		w.p("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample)
 	}
 	w.p("}")
-	g.serverTest(w)
+	if g.definitionOnly {
+		g.stateTest(w)
+	} else {
+		g.serverTest(w)
+	}
 	out, err := format.Source(w.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())

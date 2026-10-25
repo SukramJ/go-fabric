@@ -8,6 +8,7 @@ package device
 import (
 	ethernetnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -34,6 +35,7 @@ var typeSecondaryNetworkInterface = Type{
 		},
 		{
 			ID: 0x0035, Name: "ThreadNetworkDiagnostics", Conformance: "[Thread]",
+			Definition: threadnetworkdiagnosticsdef.Definition,
 		},
 		{
 			ID: 0x0036, Name: "WiFiNetworkDiagnostics", Conformance: "[WiFi]",
@@ -63,6 +65,11 @@ func NewSecondaryNetworkInterface(opts Options, decls ...Declaration) (*Secondar
 // NetworkCommissioning is the device's typed NetworkCommissioning server; the type mandates it.
 func (d *SecondaryNetworkInterface) NetworkCommissioning() *networkcommissioningdef.Server {
 	return networkcommissioningdef.WrapOn(d.Server(0x0031), d.queue)
+}
+
+// ThreadNetworkDiagnostics is the device's typed ThreadNetworkDiagnostics server, nil until a declaration mounts it.
+func (d *SecondaryNetworkInterface) ThreadNetworkDiagnostics() *threadnetworkdiagnosticsdef.Server {
+	return threadnetworkdiagnosticsdef.WrapOn(d.Server(0x0035), d.queue)
 }
 
 // WiFiNetworkDiagnostics is the device's typed WiFiNetworkDiagnostics server, nil until a declaration mounts it.

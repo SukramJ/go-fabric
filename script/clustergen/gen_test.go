@@ -9,6 +9,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -80,17 +81,52 @@ func TestCommittedPackagesAreCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range committed {
+	for _, name := range slices.Concat(committed, definitionOnly) {
 		o, err := generate(snap, name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		for file, want := range map[string][]byte{"definition_gen.go": o.Source, "server_gen.go": o.Server, "definition_gen_test.go": o.Test} {
+		for file, want := range o.files() {
 			path := filepath.Join(root, outDir, o.Package, file)
 			got, err := os.ReadFile(path)
 			if err != nil || !bytes.Equal(got, want) {
 				t.Errorf("%s is stale: run go run ./script/clustergen", path)
 			}
+		}
+	}
+}
+
+// TestEverySnapshotClusterIsCommitted fails when a snapshot cluster is in
+// neither committed nor definitionOnly, or in both: every cluster has a
+// committed definition (ADR 0013, amendment of 2026-10-25), and a
+// definition-only cluster has no generated server.
+func TestEverySnapshotClusterIsCommitted(t *testing.T) {
+	t.Parallel()
+	snap := testSnapshot(t)
+	listed := map[string]int{}
+	for _, n := range slices.Concat(committed, definitionOnly) {
+		listed[n]++
+	}
+	for _, n := range sortedClusterNames(snap) {
+		switch listed[n] {
+		case 0:
+			t.Errorf("%s is in neither committed nor definitionOnly (script/clustergen/clusters.go)", n)
+		case 1:
+		default:
+			t.Errorf("%s is listed %d times", n, listed[n])
+		}
+		delete(listed, n)
+	}
+	for n := range listed {
+		t.Errorf("%s is listed but not a snapshot cluster", n)
+	}
+	for _, n := range definitionOnly {
+		o, err := generate(snap, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !o.DefinitionOnly || o.serverFile() != "state_gen.go" || bytes.Contains(o.Server, []byte("type Declare")) || bytes.Contains(o.Server, []byte("type Server")) {
+			t.Errorf("%s: a definition-only package with a server", n)
 		}
 	}
 }

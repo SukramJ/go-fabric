@@ -1,7 +1,7 @@
 # ADR 0027 — A Thread Border Router over OTBR REST: ThreadBorderRouterManagement enters the scope as a server with logic; the Thread radio stays out
 
-- **Status**: Proposed (draft, 2026-10-23; roadmap milestone 6, phase 26a — the four
-  open points decided by the owner the same day, see "Decisions taken")
+- **Status**: Accepted (2026-10-25; roadmap milestone 6, phase 26a — the four
+  open points decided by the owner on 2026-10-23, see "Decisions taken")
 - **Date**: 2026-10-23
 - **Related**: [ADR 0024 — BLE commissioning in the controller role](./0024-ble-commissioning-in-the-controller.md)
   (decision 4: provisioning a Thread dataset needs no Thread radio),

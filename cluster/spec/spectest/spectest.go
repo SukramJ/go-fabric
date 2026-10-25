@@ -22,6 +22,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/paritytest"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -309,6 +310,15 @@ func RoundTripAttribute(tb testing.TB, def *spec.Cluster, attrID uint32, v spec.
 // UNSUPPORTED_WRITE.
 func CheckServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, features uint32) {
 	tb.Helper()
+	checkServer(tb, srv, def, features, srv.MatterWrite, false)
+}
+
+// checkServer is CheckServer with the write path a read-only write takes;
+// globalsListed admits the global attributes in the server's own
+// AttributeList (a hand-written server lists them itself, the generated
+// one leaves them to the dispatcher).
+func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, features uint32, write func(context.Context, uint32, any) error, globalsListed bool) {
+	tb.Helper()
 	if srv.MatterClusterID() != def.ID {
 		tb.Errorf("cluster id 0x%04X, want 0x%04X", srv.MatterClusterID(), def.ID)
 	}
@@ -322,16 +332,8 @@ func CheckServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 
 	if l, ok := srv.(contract.ClusterAttributeLister); ok {
 		attrs := l.MatterAttributes()
-		for ai := range def.Attributes {
-			a := &def.Attributes[ai]
-			checkPresence(tb, def.Name, "attribute", a.Name, a.Conformance.Applicability(ctx), slices.Contains(attrs, a.ID))
-		}
-		for _, id := range attrs {
-			if def.Attribute(id) == nil {
-				tb.Errorf("%s: lists undefined attribute 0x%04X", def.Name, id)
-			}
-		}
-		checkWrites(tb, srv, def, attrs)
+		checkAttributeList(tb, def, ctx, attrs, globalsListed)
+		checkWrites(tb, srv, def, attrs, write)
 	}
 
 	if l, ok := srv.(contract.ClusterCommandLister); ok {
@@ -382,6 +384,25 @@ func CheckServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 	}
 }
 
+// checkAttributeList holds a server's AttributeList against def's
+// conformance: every mandatory attribute listed, none disallowed or
+// undefined (the globals admitted with globalsListed).
+func checkAttributeList(tb testing.TB, def *spec.Cluster, ctx spec.FeatureContext, attrs []uint32, globalsListed bool) {
+	tb.Helper()
+	for ai := range def.Attributes {
+		a := &def.Attributes[ai]
+		checkPresence(tb, def.Name, "attribute", a.Name, a.Conformance.Applicability(ctx), slices.Contains(attrs, a.ID))
+	}
+	for _, id := range attrs {
+		if globalsListed && id >= spec.AttrGeneratedCommandList {
+			continue
+		}
+		if def.Attribute(id) == nil {
+			tb.Errorf("%s: lists undefined attribute 0x%04X", def.Name, id)
+		}
+	}
+}
+
 func checkPresence(tb testing.TB, cluster, kind, name string, a spec.Applicability, has bool) {
 	tb.Helper()
 	switch {
@@ -392,7 +413,7 @@ func checkPresence(tb testing.TB, cluster, kind, name string, a spec.Applicabili
 	}
 }
 
-func checkWrites(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, attrs []uint32) {
+func checkWrites(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, attrs []uint32, write func(context.Context, uint32, any) error) {
 	tb.Helper()
 	wp, hasPriv := srv.(contract.ClusterAttributeWritePrivilege)
 	for _, id := range attrs {
@@ -406,10 +427,45 @@ func checkWrites(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, a
 			}
 			continue
 		}
-		err := srv.MatterWrite(context.Background(), id, nil)
+		err := write(context.Background(), id, nil)
 		var sce im.StatusCodeError
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusUnsupportedWrite {
 			tb.Errorf("%s.%s: write to a read-only attribute answered %v, want UNSUPPORTED_WRITE", def.Name, a.Name, err)
 		}
 	}
 }
+
+// CheckHandWrittenServer is [CheckServer] for a hand-written server that
+// is not built on def (the cluster/core servers ADR 0013 skips): the
+// FeatureMap is the server's own, held to the bits def defines and to
+// def's feature conformance ([spec.CheckFeatures]), and a write reaches
+// the server through the dispatcher's schema gate
+// (schema.AttributeWritable, endpoint/dispatcher.go), which answers a
+// read-only attribute UNSUPPORTED_WRITE before the server sees it — as
+// matter.js's AttributeWriteResponse.ts:229-231 answers it.
+func CheckHandWrittenServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster) {
+	tb.Helper()
+	v, _ := srv.MatterRead(spec.AttrFeatureMap)
+	features, ok := v.(uint32)
+	if !ok {
+		tb.Fatalf("%s: FeatureMap = %v, want a uint32", def.Name, v)
+	}
+	if extra := features &^ def.FeatureMask(); extra != 0 {
+		tb.Errorf("%s: FeatureMap 0x%X sets bits 0x%X the definition does not define", def.Name, features, extra)
+	}
+	if err := spec.CheckFeatures(def, features); err != nil {
+		tb.Errorf("%s: FeatureMap 0x%X: %v", def.Name, features, err)
+	}
+	checkServer(tb, srv, def, features, func(ctx context.Context, attrID uint32, value any) error {
+		if writable, known := schema.AttributeWritable(def.ID, attrID); known && !writable {
+			return unsupportedWrite{}
+		}
+		return srv.MatterWrite(ctx, attrID, value)
+	}, true)
+}
+
+// unsupportedWrite is the gate's UNSUPPORTED_WRITE.
+type unsupportedWrite struct{}
+
+func (unsupportedWrite) Error() string                   { return "unsupported write" }
+func (unsupportedWrite) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }

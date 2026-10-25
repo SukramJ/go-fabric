@@ -440,7 +440,13 @@ left out, and a mandatory member a command's fields leave out takes the
 specification's fallback, as matter.js's `MandatoryDefaultValue` computes
 it (0, false, empty; an enum stays required). A value of an element no
 definition names is untyped: a struct keyed by its context tags. A value
-that does not fit is `client.ErrJSONValue`.
+that does not fit is `client.ErrJSONValue`. Every cluster of the Matter
+1.6.1 model has a definition, AccessControl, OperationalCredentials and
+GroupKeyManagement included (their servers are hand-written; their
+packages carry the definition and the typed state only), so an ACL entry
+or a fabric list reads and writes typed. The JSON is written as
+JavaScript's `JSON.stringify` writes it: `<`, `>` and `&` are not escaped,
+and there is no trailing newline.
 
 ### Discovery
 
@@ -450,6 +456,20 @@ commissionable devices a `discovery.Identifier` selects
 `ByVendorProduct`, `ByDeviceType`, `ByInstanceID`) until the timeout passes
 on the controller's clock (0 is 15 minutes, matter.js's default), and
 returns every device found, each once. The end of the search is no error.
+`Controller.DiscoverWith(ctx, id, timeout, controller.DiscoverOptions{First:
+true})` returns the first device that answers with an address instead, as
+soon as it answers — matter.js's `Peers.locate`; none before the timeout is
+an empty result. The reference controller's `discover --first` uses it.
+
+### Pairing by address
+
+`PairOptions.Address` (a `*net.UDPAddr`) pairs a device at that address
+without DNS-SD: no advertisement is needed, the code supplies the passcode
+and its discriminator is not checked. `controller.DeviceAt(addr)` is the
+`client.Device` of an address alone — no instance id, no TXT record — and
+a supported input of `Registry.ForDevice`, which creates a new node for
+it, as matter.js commissions a `knownAddress`. `Address` with `BLE` is
+`controller.ErrConfiguration`.
 
 ### Pairing codes
 

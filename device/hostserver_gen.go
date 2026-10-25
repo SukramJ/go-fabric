@@ -20,6 +20,8 @@ import (
 	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
 	bridgeddevicebasicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	cameraavsettingsuserlevelmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	cameraavstreammanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	carbondioxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
 	carbonmonoxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
@@ -61,6 +63,8 @@ import (
 	icdmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	illuminancemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
+	jointfabricadministratordef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
+	jointfabricdatastoredef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	keypadinputdef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
 	laundrydryercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
 	laundrywashercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
@@ -93,6 +97,7 @@ import (
 	powertopologydef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
 	pressuremeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
 	pumpconfigurationandcontroldef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	pushavstreamtransportdef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	radonconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement"
 	refrigeratoralarmdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	refrigeratorandtemperaturecontrolledcabinetmodedef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
@@ -112,8 +117,13 @@ import (
 	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	threadborderroutermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
+	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	threadnetworkdirectorydef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
 	timeformatlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	timesynchronizationdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	tlscertificatemanagementdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
+	tlsclientmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
 	totalvolatileorganiccompoundsconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
 	unitlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
@@ -122,9 +132,12 @@ import (
 	waterheatermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
 	waterheatermodedef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
 	watertanklevelmonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/watertanklevelmonitoring"
+	webrtctransportproviderdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
+	webrtctransportrequestordef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	wifinetworkmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	windowcoveringdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	zonemanagementdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -154,6 +167,7 @@ var hostServers = map[uint32]func(contract.ClusterServer) Declaration{
 	diagnosticlogsdef.ClusterID:            func(s contract.ClusterServer) Declaration { return diagnosticlogsdef.Declare{HostServer: s} },
 	generaldiagnosticsdef.ClusterID:        func(s contract.ClusterServer) Declaration { return generaldiagnosticsdef.Declare{HostServer: s} },
 	softwarediagnosticsdef.ClusterID:       func(s contract.ClusterServer) Declaration { return softwarediagnosticsdef.Declare{HostServer: s} },
+	threadnetworkdiagnosticsdef.ClusterID:  func(s contract.ClusterServer) Declaration { return threadnetworkdiagnosticsdef.Declare{HostServer: s} },
 	wifinetworkdiagnosticsdef.ClusterID:    func(s contract.ClusterServer) Declaration { return wifinetworkdiagnosticsdef.Declare{HostServer: s} },
 	ethernetnetworkdiagnosticsdef.ClusterID: func(s contract.ClusterServer) Declaration {
 		return ethernetnetworkdiagnosticsdef.Declare{HostServer: s}
@@ -279,24 +293,40 @@ var hostServers = map[uint32]func(contract.ClusterServer) Declaration{
 	soilmeasurementdef.ClusterID:       func(s contract.ClusterServer) Declaration { return soilmeasurementdef.Declare{HostServer: s} },
 	ambientcontextsensingdef.ClusterID: func(s contract.ClusterServer) Declaration { return ambientcontextsensingdef.Declare{HostServer: s} },
 	wifinetworkmanagementdef.ClusterID: func(s contract.ClusterServer) Declaration { return wifinetworkmanagementdef.Declare{HostServer: s} },
-	wakeonlandef.ClusterID:             func(s contract.ClusterServer) Declaration { return wakeonlandef.Declare{HostServer: s} },
-	channeldef.ClusterID:               func(s contract.ClusterServer) Declaration { return channeldef.Declare{HostServer: s} },
-	targetnavigatordef.ClusterID:       func(s contract.ClusterServer) Declaration { return targetnavigatordef.Declare{HostServer: s} },
-	mediaplaybackdef.ClusterID:         func(s contract.ClusterServer) Declaration { return mediaplaybackdef.Declare{HostServer: s} },
-	mediainputdef.ClusterID:            func(s contract.ClusterServer) Declaration { return mediainputdef.Declare{HostServer: s} },
-	lowpowerdef.ClusterID:              func(s contract.ClusterServer) Declaration { return lowpowerdef.Declare{HostServer: s} },
-	keypadinputdef.ClusterID:           func(s contract.ClusterServer) Declaration { return keypadinputdef.Declare{HostServer: s} },
-	contentlauncherdef.ClusterID:       func(s contract.ClusterServer) Declaration { return contentlauncherdef.Declare{HostServer: s} },
-	audiooutputdef.ClusterID:           func(s contract.ClusterServer) Declaration { return audiooutputdef.Declare{HostServer: s} },
-	applicationlauncherdef.ClusterID:   func(s contract.ClusterServer) Declaration { return applicationlauncherdef.Declare{HostServer: s} },
-	applicationbasicdef.ClusterID:      func(s contract.ClusterServer) Declaration { return applicationbasicdef.Declare{HostServer: s} },
-	accountlogindef.ClusterID:          func(s contract.ClusterServer) Declaration { return accountlogindef.Declare{HostServer: s} },
-	contentcontroldef.ClusterID:        func(s contract.ClusterServer) Declaration { return contentcontroldef.Declare{HostServer: s} },
-	contentappobserverdef.ClusterID:    func(s contract.ClusterServer) Declaration { return contentappobserverdef.Declare{HostServer: s} },
-	chimedef.ClusterID:                 func(s contract.ClusterServer) Declaration { return chimedef.Declare{HostServer: s} },
-	commoditytariffdef.ClusterID:       func(s contract.ClusterServer) Declaration { return commoditytariffdef.Declare{HostServer: s} },
-	ecosysteminformationdef.ClusterID:  func(s contract.ClusterServer) Declaration { return ecosysteminformationdef.Declare{HostServer: s} },
-	commissionercontroldef.ClusterID:   func(s contract.ClusterServer) Declaration { return commissionercontroldef.Declare{HostServer: s} },
-	meteridentificationdef.ClusterID:   func(s contract.ClusterServer) Declaration { return meteridentificationdef.Declare{HostServer: s} },
-	commoditymeteringdef.ClusterID:     func(s contract.ClusterServer) Declaration { return commoditymeteringdef.Declare{HostServer: s} },
+	threadborderroutermanagementdef.ClusterID: func(s contract.ClusterServer) Declaration {
+		return threadborderroutermanagementdef.Declare{HostServer: s}
+	},
+	threadnetworkdirectorydef.ClusterID:   func(s contract.ClusterServer) Declaration { return threadnetworkdirectorydef.Declare{HostServer: s} },
+	wakeonlandef.ClusterID:                func(s contract.ClusterServer) Declaration { return wakeonlandef.Declare{HostServer: s} },
+	channeldef.ClusterID:                  func(s contract.ClusterServer) Declaration { return channeldef.Declare{HostServer: s} },
+	targetnavigatordef.ClusterID:          func(s contract.ClusterServer) Declaration { return targetnavigatordef.Declare{HostServer: s} },
+	mediaplaybackdef.ClusterID:            func(s contract.ClusterServer) Declaration { return mediaplaybackdef.Declare{HostServer: s} },
+	mediainputdef.ClusterID:               func(s contract.ClusterServer) Declaration { return mediainputdef.Declare{HostServer: s} },
+	lowpowerdef.ClusterID:                 func(s contract.ClusterServer) Declaration { return lowpowerdef.Declare{HostServer: s} },
+	keypadinputdef.ClusterID:              func(s contract.ClusterServer) Declaration { return keypadinputdef.Declare{HostServer: s} },
+	contentlauncherdef.ClusterID:          func(s contract.ClusterServer) Declaration { return contentlauncherdef.Declare{HostServer: s} },
+	audiooutputdef.ClusterID:              func(s contract.ClusterServer) Declaration { return audiooutputdef.Declare{HostServer: s} },
+	applicationlauncherdef.ClusterID:      func(s contract.ClusterServer) Declaration { return applicationlauncherdef.Declare{HostServer: s} },
+	applicationbasicdef.ClusterID:         func(s contract.ClusterServer) Declaration { return applicationbasicdef.Declare{HostServer: s} },
+	accountlogindef.ClusterID:             func(s contract.ClusterServer) Declaration { return accountlogindef.Declare{HostServer: s} },
+	contentcontroldef.ClusterID:           func(s contract.ClusterServer) Declaration { return contentcontroldef.Declare{HostServer: s} },
+	contentappobserverdef.ClusterID:       func(s contract.ClusterServer) Declaration { return contentappobserverdef.Declare{HostServer: s} },
+	zonemanagementdef.ClusterID:           func(s contract.ClusterServer) Declaration { return zonemanagementdef.Declare{HostServer: s} },
+	cameraavstreammanagementdef.ClusterID: func(s contract.ClusterServer) Declaration { return cameraavstreammanagementdef.Declare{HostServer: s} },
+	cameraavsettingsuserlevelmanagementdef.ClusterID: func(s contract.ClusterServer) Declaration {
+		return cameraavsettingsuserlevelmanagementdef.Declare{HostServer: s}
+	},
+	webrtctransportproviderdef.ClusterID:  func(s contract.ClusterServer) Declaration { return webrtctransportproviderdef.Declare{HostServer: s} },
+	webrtctransportrequestordef.ClusterID: func(s contract.ClusterServer) Declaration { return webrtctransportrequestordef.Declare{HostServer: s} },
+	pushavstreamtransportdef.ClusterID:    func(s contract.ClusterServer) Declaration { return pushavstreamtransportdef.Declare{HostServer: s} },
+	chimedef.ClusterID:                    func(s contract.ClusterServer) Declaration { return chimedef.Declare{HostServer: s} },
+	commoditytariffdef.ClusterID:          func(s contract.ClusterServer) Declaration { return commoditytariffdef.Declare{HostServer: s} },
+	ecosysteminformationdef.ClusterID:     func(s contract.ClusterServer) Declaration { return ecosysteminformationdef.Declare{HostServer: s} },
+	commissionercontroldef.ClusterID:      func(s contract.ClusterServer) Declaration { return commissionercontroldef.Declare{HostServer: s} },
+	jointfabricdatastoredef.ClusterID:     func(s contract.ClusterServer) Declaration { return jointfabricdatastoredef.Declare{HostServer: s} },
+	jointfabricadministratordef.ClusterID: func(s contract.ClusterServer) Declaration { return jointfabricadministratordef.Declare{HostServer: s} },
+	tlscertificatemanagementdef.ClusterID: func(s contract.ClusterServer) Declaration { return tlscertificatemanagementdef.Declare{HostServer: s} },
+	tlsclientmanagementdef.ClusterID:      func(s contract.ClusterServer) Declaration { return tlsclientmanagementdef.Declare{HostServer: s} },
+	meteridentificationdef.ClusterID:      func(s contract.ClusterServer) Declaration { return meteridentificationdef.Declare{HostServer: s} },
+	commoditymeteringdef.ClusterID:        func(s contract.ClusterServer) Declaration { return commoditymeteringdef.Declare{HostServer: s} },
 }

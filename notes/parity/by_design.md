@@ -4342,3 +4342,27 @@ window with random credentials from a UI) is now named in `Node.Window()`'s
 snapshot as `WindowBasic` beside `WindowOwn` and `WindowEnhanced`
 (brief CK §1.2), so a host can tell the three apart; the wire behaviour
 of each window is matter.js's.
+
+### BD-Matter-DiscoverFirst-EmptyResult — `DiscoverOptions.First` returns an empty result where matter.js throws `DeviceNotDiscoveredError`
+
+matter.js's `InstanceDiscovery.onComplete` throws when nothing answered
+(`packages/node/src/behavior/system/controller/discovery/InstanceDiscovery.ts:41-44`
+at `862ad75f`). Go's `Controller.DiscoverWith(ctx, id, timeout, DiscoverOptions{First: true})`
+(brief CL §2) keeps one outcome shape with `Discover`: a slice, empty when
+nothing answered within the timeout; `Controller.Pair` is the call that
+needs a device and answers `ErrNoDevice`. Reasoning: a discovery with no
+answer is a normal result for a list call, and the error belongs to the
+caller that cannot proceed without one.
+
+### BD-Matter-PairAddress-NoDiscoveryFallback — `PairOptions.Address` does not fall back to discovery when the address fails
+
+matter.js's `MatterController.connectPaseChannel` tries a known address
+first and falls back to full discovery when it fails
+(`packages/matter.js/src/MatterController.ts:620-647` at `862ad75f`),
+while `commission` (`:539-566`) takes the discovery the caller gave it.
+Go's `Pair` with `PairOptions.Address` (brief CL §4) mirrors the
+`commission` path: the address is the caller's statement, and a failure
+there is reported, not silently widened into a scan the caller did not
+ask for; a caller that wants the fallback calls `Pair` without the
+address. go-fabric-server's `commission_on_network` with `ip_addr`
+implements matterjs-server's "dial first, then discover" on top of it.

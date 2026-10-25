@@ -138,9 +138,17 @@ func TestEveryClusterGeneratesAndCompiles(t *testing.T) {
 	if len(entries) != len(snap.Clusters) {
 		t.Fatalf("%d packages for %d clusters", len(entries), len(snap.Clusters))
 	}
+	stateOnly := map[string]bool{}
+	for _, n := range definitionOnly {
+		stateOnly[packageName(n)] = true
+	}
 	for _, e := range entries {
-		if _, err := os.Stat(filepath.Join(dir, e.Name(), "server_gen.go")); err != nil {
-			t.Errorf("%s has no typed server: %v", e.Name(), err)
+		file := "server_gen.go"
+		if stateOnly[e.Name()] {
+			file = "state_gen.go" // a definition-only cluster: typed state, no server
+		}
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), file)); err != nil {
+			t.Errorf("%s has no %s: %v", e.Name(), file, err)
 		}
 	}
 	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.2\n\nrequire github.com/SukramJ/go-fabric v0.0.0\n\nreplace github.com/SukramJ/go-fabric => %s\n", root)

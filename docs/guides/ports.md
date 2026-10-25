@@ -188,4 +188,14 @@ Host ports of the root servers, reached through `node.Config` or
 | `core.ActionsHost` | an Actions server's lists and commands |
 | `core.LogProvider` | DiagnosticLogs content. The facade serves its diagnostic event ring |
 
+Clusters the generated server serves with no hand-written logic — among
+them the camera, Thread, Joint Fabric and TLS clusters, as matter.js serves
+them with its generated behaviour stubs — have no port beyond their
+`Declare`: its command handler fields (`<cluster>def.Declare{…}`, or the
+typed server's setters at run time) are the host's part, and a mandatory
+command without a handler is unimplemented, absent from
+AcceptedCommandList. AccessControl, OperationalCredentials and
+GroupKeyManagement have a definition but no `Declare`: their servers are
+the hand-written `cluster/core` ones the node mounts.
+
 *Source: `cluster/levelcontrol/native.go:18-73`, `mdns/reannounce.go:15-55`, `node/reannounce.go:15-50`, `node/config.go:237-256`, `cluster/onoff/server.go:55-73`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go:909-915`.*

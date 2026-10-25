@@ -24,6 +24,9 @@ import (
 // server installs ([refineDoorLockRequest]). ok is false, and nothing is
 // read, for a cluster or command no registered definition decodes.
 func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (fields any, ok bool, err error) {
+	if handWrittenServers[path.Cluster] {
+		return nil, false, nil
+	}
 	def := spec.Lookup(path.Cluster)
 	if def == nil {
 		return nil, false, nil
@@ -47,6 +50,17 @@ func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.El
 	}
 	return fields, true, err
 }
+
+// handWrittenServers are the clusters whose committed definition is
+// definition-only (script/clustergen/clusters.go definitionOnly): the
+// hand-written cluster/core servers of AccessControl (0x001F),
+// OperationalCredentials (0x003E) and GroupKeyManagement (0x003F) are
+// written against their own request forms, so their requests never decode
+// into the generated structs — whether or not a binary links the
+// definitions (controller/client does, for its typed JSON route). A
+// command of theirs no hand-written reader decodes is salvaged as a tag
+// map, as before the definitions existed.
+var handWrittenServers = map[uint32]bool{0x001F: true, 0x003E: true, 0x003F: true}
 
 // fallback is the value an omitted mandatory request field decodes as:
 // TLV null for a nullable field, an unsigned 0 otherwise.

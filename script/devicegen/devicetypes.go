@@ -18,15 +18,24 @@ package main
 // OtaProvider, which ADR 0021 takes in with the OTA Software Update
 // Provider server (brief AQ), and the three media device types
 // (BasicVideoPlayer, CastingVideoPlayer, ContentApp), which ADR 0022 takes
-// in with the media and content clusters (brief AR). Sorted by name.
+// in with the media and content clusters (brief AR), and the camera and
+// infrastructure device types (Camera, SnapshotCamera, AudioDoorbell,
+// Intercom, Chime, CameraController, ThreadBorderRouter,
+// NetworkInfrastructureManager, JointFabricAdministrator), which brief CL
+// takes in with the generated servers of their clusters (owner decision,
+// 2026-10-25). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
 	"AirQualitySensor",
+	"AudioDoorbell",
 	"BasicVideoPlayer",
 	"BatteryStorage",
 	"BridgedNode",
+	"Camera",
+	"CameraController",
 	"CastingVideoPlayer",
+	"Chime",
 	"Closure",
 	"ClosureController",
 	"ClosurePanel",
@@ -57,7 +66,9 @@ var committed = []string{
 	"GenericSwitch",
 	"HeatPump",
 	"HumiditySensor",
+	"Intercom",
 	"IrrigationSystem",
+	"JointFabricAdministrator",
 	"LaundryDryer",
 	"LaundryWasher",
 	"LightSensor",
@@ -66,6 +77,7 @@ var committed = []string{
 	"ModeSelect",
 	"MountedDimmableLoadControl",
 	"MountedOnOffControl",
+	"NetworkInfrastructureManager",
 	"OccupancySensor",
 	"OnOffLight",
 	"OnOffLightSwitch",
@@ -85,6 +97,7 @@ var committed = []string{
 	"RootNode",
 	"SecondaryNetworkInterface",
 	"SmokeCoAlarm",
+	"SnapshotCamera",
 	"SoilSensor",
 	"SolarPower",
 	"Speaker",
@@ -92,6 +105,7 @@ var committed = []string{
 	"TemperatureSensor",
 	"Thermostat",
 	"ThermostatController",
+	"ThreadBorderRouter",
 	"VideoRemoteControl",
 	"WaterFreezeDetector",
 	"WaterHeater",
@@ -108,19 +122,12 @@ const cameraMedia = "camera / media (Appendix F.3: their mandatory clusters are 
 // excluded names every other snapshot device type with its group in
 // docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3.
 var excluded = map[string]string{
-	// Camera device types: they mandate the F.2 camera clusters.
-	"Camera":           "F.3 camera device types",
-	"SnapshotCamera":   "F.3 camera device types",
-	"AudioDoorbell":    "F.3 camera device types",
-	"Intercom":         "F.3 camera device types",
-	"Chime":            "F.3 camera device types",
-	"CameraController": "F.3 camera device types",
-	// The media device types left the group with ADR 0022.
-	// Infrastructure: F.2 Thread or Joint Fabric. OtaProvider left the
-	// group with ADR 0021.
-	"ThreadBorderRouter":           "F.3 infrastructure",
-	"NetworkInfrastructureManager": "F.3 infrastructure",
-	"JointFabricAdministrator":     "F.3 infrastructure",
+	// The camera device types (Camera, SnapshotCamera, AudioDoorbell,
+	// Intercom, Chime, CameraController) and the infrastructure ones
+	// (ThreadBorderRouter, NetworkInfrastructureManager,
+	// JointFabricAdministrator) left the group on 2026-10-25 (brief CL §1,
+	// owner decision): their clusters have generated servers. The media
+	// device types left it with ADR 0022, OtaProvider with ADR 0021.
 	// Camera / media by their mandatory requirements (owner's decision,
 	// 2026-10-11), read from parity/schema.json effective.requirements:
 	// VideoDoorbell and FloodlightCamera mandate a Camera component
