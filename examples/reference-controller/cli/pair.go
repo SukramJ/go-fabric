@@ -14,12 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/im"
@@ -28,11 +26,11 @@ import (
 
 const defaultTimeout = 60 * time.Second
 
-// pairing is what a code or the passcode and discriminator flags give.
+// pairing is what a code or the passcode and discriminator flags give:
+// the code controller.Pair takes, and how the error names the device.
 type pairing struct {
-	passcode uint32
-	id       discovery.Identifier
-	what     string
+	code string
+	what string
 }
 
 // parseCode reads a QR code ("MT:…") or a manual code (11 or 21 digits)
@@ -46,7 +44,18 @@ func parseCode(code string) (pairing, error) {
 	if p.Manual {
 		what = fmt.Sprintf("short discriminator %d", p.Discriminator)
 	}
-	return pairing{passcode: p.Passcode, id: p.Identifier(), what: what}, nil
+	return pairing{code: code, what: what}, nil
+}
+
+// codeOf is the QR code of a passcode and a long discriminator, the code
+// controller.Pair takes for --passcode and --discriminator: no vendor or
+// product (0 is unspecified), discovery on the IP network.
+func codeOf(passcode uint32, discriminator uint16) (pairing, error) {
+	qr, err := setup.QRCode(setup.Payload{Discriminator: discriminator, Passcode: passcode, DiscoveryCaps: setup.DiscoveryOnIP})
+	if err != nil {
+		return pairing{}, err
+	}
+	return pairing{code: qr, what: fmt.Sprintf("long discriminator %d", discriminator)}, nil
 }
 
 // networkOptions are the operational network the device is to join
@@ -77,14 +86,14 @@ var errNoBLE = errors.New("this build has no BLE; build ble/bluez/cmd/reference-
 // errBLENeedsNetwork is pair --ble without the network the device is to join.
 var errBLENeedsNetwork = errors.New("pair --ble needs --wifi-ssid and --wifi-credentials, or --thread-dataset: a device on BLE has no network yet")
 
-// cmdPair: discovery over DNS-SD, PASE, attestation, NOC, the registry's
-// record — the flow of node/binding_live_test.go:392-410 (ForDevice and
-// Commission) after the scanner found the device by its discriminator.
+// cmdPair is controller.Pair: discovery over DNS-SD by the code's
+// discriminator, PASE, attestation, NOC, the registry's record.
 // --wifi-ssid / --wifi-credentials and --thread-dataset give the
-// operational network the flow configures on a Wi-Fi or Thread device.
-// --ble finds the device by its BLE advertisement instead and runs PASE
-// over BTP (commissioner.Options.Channel); the network steps then put it
-// on the network, where operational discovery finds it over DNS-SD.
+// operational network the flow configures on a Wi-Fi or Thread device
+// (PairOptions.WiFi, Thread). --ble finds the device by its BLE
+// advertisement instead and runs PASE over BTP (PairOptions.BLE); the
+// network steps then put it on the network, where operational discovery
+// finds it over DNS-SD.
 func cmdPair(e *env, args []string) error {
 	var code, label string
 	var passcode, discriminator uint
@@ -123,7 +132,9 @@ func cmdPair(e *env, args []string) error {
 		if !setup.IsValidPasscode(uint32(passcode)) {
 			return fmt.Errorf("--passcode %d is not a valid setup passcode", passcode)
 		}
-		pr = pairing{passcode: uint32(passcode), id: discovery.ByLongDiscriminator(uint16(discriminator)), what: fmt.Sprintf("long discriminator %d", discriminator)}
+		if pr, err = codeOf(uint32(passcode), uint16(discriminator)); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("usage: %s", commands["pair"].usage)
 	}
@@ -149,30 +160,27 @@ func cmdPair(e *env, args []string) error {
 	return withStack(e, func(s *stack) error {
 		ctx, cancel := e.timeoutCtx()
 		defer cancel()
-		var dev discovery.Device
-		var channel commissioner.Channel
-		if useBLE {
-			ch, d, release, err := dialBLE(ctx, e, bleAdapter, pr)
-			if err != nil {
-				return err
-			}
-			defer release()
-			dev, channel = d, ch
-		} else if dev, err = findCommissionable(ctx, s, pr); err != nil {
-			return err
-		}
-		n, err := s.reg.ForDevice(ctx, dev)
-		if err != nil {
-			return err
-		}
 		noSubscribe := false
-		if err := s.reg.Commission(ctx, n, client.CommissionOptions{
-			Options: commissioner.Options{
-				Passcode: pr.passcode, NodeID: nodeID, OnAttestationFailure: s.policy,
-				WiFiNetwork: wifi, ThreadNetwork: thread, Channel: channel,
-			},
-			AutoSubscribe: &noSubscribe,
-		}); err != nil {
+		opts := controller.PairOptions{
+			AutoSubscribe: &noSubscribe, OnAttestationFailure: s.policy, WiFi: wifi, Thread: thread,
+			Edit: func(o *commissioner.Options) { o.NodeID = nodeID },
+		}
+		over := ""
+		if useBLE {
+			central, err := e.central(bleAdapter)
+			if err != nil {
+				return fmt.Errorf("ble adapter %s: %w", bleAdapter, err)
+			}
+			if c, ok := central.(io.Closer); ok {
+				defer func() { _ = c.Close() }()
+			}
+			opts.BLE, over = central, " over BLE"
+		}
+		n, err := s.ctl.Pair(ctx, pr.code, opts)
+		switch {
+		case errors.Is(err, controller.ErrNoDevice):
+			return fmt.Errorf("no commissionable device with %s answered%s: %w", pr.what, over, err)
+		case err != nil:
 			return fmt.Errorf("pairing: %w", err)
 		}
 		addr, _ := n.PeerAddress()
@@ -185,63 +193,6 @@ func cmdPair(e *env, args []string) error {
 		printDevice(e, n)
 		return nil
 	})
-}
-
-// findCommissionable runs the scanner until the first device of the
-// identifier answers.
-func findCommissionable(ctx context.Context, s *stack, pr pairing) (discovery.Device, error) {
-	sc := discovery.NewScanner(s.names)
-	defer sc.Close()
-	fctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var found *discovery.Device
-	_, err := sc.FindCommissionable(fctx, pr.id, func(d discovery.Device) {
-		if found == nil && len(d.Addresses) > 0 {
-			found = &d
-			cancel()
-		}
-	})
-	if found != nil {
-		return *found, nil
-	}
-	if err == nil {
-		err = context.DeadlineExceeded
-	}
-	return discovery.Device{}, fmt.Errorf("no commissionable device with %s answered: %w", pr.what, err)
-}
-
-// dialBLE opens the adapter's central, scans until the first device of the
-// identifier advertises — the long discriminator of a QR code, the short
-// one of a manual code, as over DNS-SD — and opens the BTP channel to it
-// (controller/ble.Dial). release closes the channel and a central that
-// has Close.
-func dialBLE(ctx context.Context, e *env, adapter string, pr pairing) (ch *ble.Channel, dev discovery.Device, release func(), err error) {
-	central, err := e.central(adapter)
-	if err != nil {
-		return nil, discovery.Device{}, nil, fmt.Errorf("ble adapter %s: %w", adapter, err)
-	}
-	closeCentral := func() {
-		if c, ok := central.(io.Closer); ok {
-			_ = c.Close()
-		}
-	}
-	sc := ble.NewScanner(central, ble.ScannerOptions{Logger: e.log})
-	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
-	devs, err := sc.Find(ctx, pr.id, e.opts.timeout.or(defaultTimeout), false)
-	if err == nil && len(devs) == 0 {
-		err = context.DeadlineExceeded
-	}
-	if err != nil {
-		closeCentral()
-		return nil, discovery.Device{}, nil, fmt.Errorf("no commissionable device with %s advertised over BLE: %w", pr.what, err)
-	}
-	ch, err = ble.Dial(ctx, central, devs[0].Peripheral, ble.DialOptions{Logger: e.log})
-	if err != nil {
-		closeCentral()
-		return nil, discovery.Device{}, nil, err
-	}
-	e.log.Info("controller.pair.ble", "peripheral", devs[0].Peripheral.Address, "discriminator", devs[0].Discriminator)
-	return ch, devs[0].Commissionable(), func() { _ = ch.Close(); closeCentral() }, nil
 }
 
 // setNodeLabel writes BasicInformation.NodeLabel.

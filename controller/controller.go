@@ -28,6 +28,7 @@ package controller
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"database/sql"
 	"encoding/binary"
@@ -117,9 +118,19 @@ type Config struct {
 	Clock clock.Clock
 	// Listener, when set, is the UDP socket the controller serves on in
 	// place of opening Listen: New serves its datagrams and Close closes
-	// it. A test passes one on its own network
+	// it, as a New that fails does. A test passes one on its own network
 	// (fabrictest.Site.ControllerConfig); a program leaves it nil.
 	Listener *udp.Listener
+	// CAKey, when set, is the root key of our certificate authority, held
+	// outside the database: a P-256 crypto.Signer over a key file
+	// (controller/ca/keyfile), an HSM or a KMS (ca.Config.RootSigner). A
+	// new CA issues its root certificate for it; a stored CA must have
+	// been made under it, and a stored root private key is then dropped
+	// from the database. nil keeps the root key in the database.
+	// matter.js has no such seam: its CertificateAuthority keeps the key
+	// pair in its storage (packages/protocol/src/certificate/
+	// CertificateAuthority.ts:53, :169 at 862ad75f).
+	CAKey crypto.Signer
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -144,6 +155,12 @@ type Controller struct {
 // the registry, which loads the nodes paired before. A failure tears down
 // what was built.
 func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
+	defer func() {
+		if err != nil && cfg.Listener != nil {
+			// A failed New closes the socket it was given, as Close would.
+			_ = cfg.Listener.Close()
+		}
+	}()
 	switch {
 	case cfg.DB == nil:
 		return nil, fmt.Errorf("%w: DB is required", ErrConfiguration)
@@ -177,7 +194,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: store.New(cfg.DB)} // "controller.ca" and "controller.ca.fabric"
-	authority, err := ca.New(ca.Config{Store: keep, Clock: clk})
+	authority, err := ca.New(ca.Config{Store: keep, Clock: clk, RootSigner: cfg.CAKey})
 	if err != nil {
 		return nil, err
 	}
@@ -300,6 +317,14 @@ func (c *Controller) Nodes() []*client.Node { return c.reg.Commissioned() }
 // Fabric is our fabric: its ID, our node ID, the root of trust. A seam of
 // the role.
 func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
+
+// Peers is the peer set the registry and the commissioner reach nodes
+// through: a program that talks to a node it did not pair through the
+// registry (its own node on a known address, say) adds it here
+// (peer.Set.AddKnownPeer) and reaches it with
+// Commissioner().Interaction. A seam of the role — matter.js's node
+// peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
+func (c *Controller) Peers() *peer.Set { return c.peers }
 
 // Commissioner is the commissioner the registry pairs through. A seam of
 // the role.

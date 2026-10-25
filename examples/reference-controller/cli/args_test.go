@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
@@ -103,8 +104,15 @@ func TestArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p, err := parseCode(qr); err != nil || p.passcode != 20202021 || !strings.Contains(p.what, "long discriminator 3840") {
+	if p, err := parseCode(qr); err != nil || p.code != qr || !strings.Contains(p.what, "long discriminator 3840") {
 		t.Errorf("parseCode(%s) = %+v, %v", qr, p, err)
+	}
+	// --passcode and --discriminator become the QR code controller.Pair
+	// takes, which decodes to them.
+	if p, err := codeOf(20202021, 3840); err != nil || p.what != "long discriminator 3840" {
+		t.Errorf("codeOf = %+v, %v", p, err)
+	} else if pc, err := controller.ParsePairingCode(p.code); err != nil || pc.Passcode != 20202021 || pc.Discriminator != 3840 || pc.Manual {
+		t.Errorf("codeOf's code %s decodes to %+v, %v", p.code, pc, err)
 	}
 	if d, err := parseDuration("250ms", time.Second); err != nil || d != 250*time.Millisecond {
 		t.Errorf("parseDuration: %v %v", d, err)

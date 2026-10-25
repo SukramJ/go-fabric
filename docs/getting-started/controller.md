@@ -51,14 +51,22 @@ the host's. `Config` takes:
   wired to the site — its network, its DNS-SD answers, its fake clock and
   a database of its own — so the program's own `controller.New` runs on
   the site (see [testing in process](../guides/testing-in-process.md)).
+- `CAKey`: the certificate authority's root key held outside the
+  database, a P-256 `crypto.Signer` (a key file through
+  `controller/ca/keyfile`, an HSM, a KMS). nil keeps the root key in the
+  database; with it, a stored root private key leaves the database.
 
-`Controller.Registry`, `Controller.Commissioner` and `Controller.Fabric`
-are the role's seams ([advanced seams](../guides/advanced-seams.md)). A
-host with a different composition, such as its own trust policy per
-finding or a BLE channel, builds the parts itself, as the reference
-controller does.
+`Controller.Registry`, `Controller.Commissioner`, `Controller.Fabric` and
+`Controller.Peers` are the role's seams
+([advanced seams](../guides/advanced-seams.md)). The reference controller
+builds on `controller.New`: it composes its trust set
+(`attestation.Trust` over the DCL snapshot and the online ledger) into
+`Attestation`, opens its CA key file into `CAKey` and its socket into
+`Listener`, and pairs through `Controller.Pair`, over BLE with
+`PairOptions.BLE`; its own node is reached through `Peers` and
+`Commissioner().Interaction`.
 
-*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
+*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:114-190`, `examples/reference-controller/cli/pair.go` (`cmdPair`), `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -320,7 +328,7 @@ A rejection matches `commissioner.ErrAttestationRejected` through
 `errors.Is`, besides `commissioner.ErrCommissioning`, so a host tells a
 refused device from a network failure.
 
-*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:242-297`.*
+*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:192-274`.*
 
 ## The registry and the device view
 
