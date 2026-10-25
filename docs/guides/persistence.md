@@ -27,6 +27,7 @@ module's consumers call:
 | `store.OTA` | the OTA requestor's DefaultOTAProviders and state | the OTA requestor |
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
+| `store.ICD` | the ICD Management server's registered Check-In clients with their keys, and the ICDCounter | ICD Management (`node.Config.ICD`) |
 
 A consumer names the areas it uses, never the whole port; the node, which
 wires every consumer, holds a `store.Port`.
@@ -137,7 +138,7 @@ idempotent.
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
 | `matter_resumption` | v1 | CASE resumption records with the peer's CATs |
 | `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings` |
-| `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling` |
+| `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, and since v0.12.0 an ICD node's `icd_management.counter` |
 | `matter_settings` | v1 | string key/value pairs (next section) |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
@@ -146,6 +147,7 @@ idempotent.
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
 | `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |
+| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric |
 
 ### Tables of `endpoint/sqlitestore`
 
@@ -192,7 +194,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `examples/reference-bridge/persist.go:21-44`.*
 
 ## What survives a restart
 
@@ -202,8 +204,9 @@ above use.
 | group keys, group table, Groupcast properties | the event log's events (their numbers continue past the stored ceiling) |
 | endpoint numbers, labels, ConfigurationVersions, scene tables, bindings | an open commissioning window (an uncommissioned node opens its own again at `Start`) |
 | CASE resumption records | the diagnostic event ring behind DiagnosticLogs |
-| the subscriptions of active CASE sessions, re-established under their old ids | |
+| the subscriptions of active CASE sessions, re-established under their old ids (not on an ICD node, whose controllers re-subscribe on a Check-In) | |
 | UniqueID, RebootCount, operational time, OTA default providers | |
+| an ICD node's Check-In registrations and ICDCounter | |
 
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
@@ -223,6 +226,7 @@ and `sqlstore.Apply`:
 | `matter_settings` `controller.dcl.trust` | the DCL trust store (reference controller, with `--dcl`) |
 | `matter_client_values` | each paired node's attribute values, as TLV |
 | `matter_client_versions` | each stored cluster's DataVersion |
+| `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. Controller-side CASE resumption records are kept in

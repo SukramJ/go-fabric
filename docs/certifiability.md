@@ -566,7 +566,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | PWRTL, ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` PowerTopology, Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | EEM, EPM | the module serves both clusters (`cluster/measurement`) and the reference daemon's ElectricalMeter carries them, but the harness does not run the families | (c) not yet run |
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
-| ICDB | the module is not an ICD | (b) not supported |
+| ICDM, ICDB | not applicable to the reference daemon: it is mains-powered and sets no `node.Config.ICD`, so it serves no ICD Management (`ICDM.S` is false in its generated PICS). Applicable to a host that sets `Config.ICD`: the module then serves ICD Management and the Check-In protocol after matter.js ([ICD guide](./guides/icd.md)); the harness does not run the families against such a node | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Thread cases | the device side has no Thread radio | (d) out of scope |
 

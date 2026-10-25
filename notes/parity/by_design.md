@@ -1312,6 +1312,13 @@ The same reasoning covers the sibling MRP keys **SII and SAI** on both the opera
 
 ### BD-chip-ICD-Attrs-0x3-0x5 — ICDManagement attributes 0x0003–0x0005 not implemented
 
+**Superseded 2026-10-25 (brief CH, milestone 5 phase 23).** `cluster/core.ICDManagement`
+is now the port of matter.js `IcdManagementServer.ts` with every attribute,
+RegisteredClients, ICDCounter and ClientsSupportedPerFabric among them, and
+mounts on the root endpoint only when the host sets `node.Config.ICD`; the
+reference daemon sets none and still serves no ICD Management. The text below
+is kept as the record of the former decision.
+
 **chip reference:** `src/app/clusters/icd-management-server/ICDManagementServer.cpp` — implements `RegisteredClients` (0x0003), `ICDCounter` (0x0004), `ClientsSupportedPerFabric` (0x0005).
 
 **Go path:** `cluster/core/icd_management.go:34-100` — implements `IdleModeDuration` (0x0000), `ActiveModeDuration` (0x0001), `ActiveModeThreshold` (0x0002) only. Parity test comment marks this as intentional.

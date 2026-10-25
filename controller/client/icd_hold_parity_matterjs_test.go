@@ -318,7 +318,7 @@ func TestClientNodeInteractionIcdParity(t *testing.T) {
 			}
 		})
 		t.Run("routes a woken LIT read through the icdLit network profile", func(t *testing.T) {
-			t.Skip("matter.js NetworkProfiles: this module has no network profiles and throttles no connection (notes/parity/by_design.md, NetworkProfileTest); the priority intent travels with the sustained subscription's connection (TestSustainedSubscriptionICD)")
+			t.Skip("matter.js NetworkProfiles: this module has no network profiles and throttles no connection until milestone 5 phase 25 (notes/parity/matter_behaviour_findings.md, \"Network profiles\"; the register's NetworkProfileTest); the priority intent travels with the sustained subscription's connection (TestSustainedSubscriptionICD)")
 		})
 		t.Run("honors a per-call timeout override that expires before the default window", func(t *testing.T) {
 			p := registeredLITPair(t)

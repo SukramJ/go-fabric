@@ -98,7 +98,7 @@ one none uses, and both come before completeness for its own sake.
 | 2 | [The test foundation](#milestone-2-the-test-foundation) | `v0.8.0` | 14–16 | every later milestone is proved against matter.js's own tests; consumers test their bridge without hardware |
 | 3 | [Behaviour depth](#milestone-3-behaviour-depth) | `v0.9.0` | 17–19 | the 25 matter.js servers with logic are ported line for line — remotes, thermostats, locks behave as the ecosystems expect |
 | 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.11.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
-| 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
+| 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.12.0` (23–24), `v0.13.0` (25) | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
 | 6 | [Completeness](#milestone-6-completeness) | `v0.13.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
 | 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.14.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
 
@@ -231,6 +231,22 @@ completeness.
 
 **Done when.** The comparison's ICD and CASE-initiator rows are ✅; the
 ICDM / ICDB families are green or classified.
+
+**Status 2026-10-25.** Phases 23 and 24 are one bundle, released as
+`v0.12.0` (owner decision 2026-10-24: one release per bundle; phase 25
+follows as `v0.13.0`). Phase 23 (brief CH): `cluster/core.ICDManagement`
+after `IcdManagementServer.ts` and `IcdMode.ts`, the `icd` package after
+`protocol/src/icd` (counter, back-off, suppression, registrations, sender,
+the Check-In codec in `icd/checkin`), `store.ICD` (migration v7), the
+facade's `node.Config.ICD` and `Node.ICD()`. Phase 24: the Check-In
+receive path, `controller/client.ICDClient` after `IcdClient.ts`, the hold
+of a sleeping LIT peer, the sustained subscription's ICD branches,
+`client/peer.RebootResubscribeArmer`; the end-to-end proof holds a
+subscription to the module's own LIT node across three idle cycles
+(`controller/client/icd_e2e_test.go`). The comparison's ICD rows are ✅;
+ICDM and ICDB are classified as not applicable to the reference daemon,
+which is mains-powered and sets no `Config.ICD`, and applicable to a host
+that sets it. The [ICD guide](./guides/icd.md) is the host's view.
 
 ### Milestone 6: Completeness
 

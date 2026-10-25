@@ -95,7 +95,8 @@ type ConnectOptions struct {
 	// (SustainedSubscription.ts:133-149). matter.js's network profiles
 	// throttle connections per network and the priority one bypasses the
 	// throttle; this module has no network profiles and throttles no
-	// connection (notes/parity/by_design.md, NetworkProfileTest), so every
+	// connection until milestone 5 phase 25 (notes/parity/matter_behaviour_findings.md,
+	// "Network profiles"; the register's NetworkProfileTest), so every
 	// connection already goes out at once and the flag only records the
 	// intent.
 	Priority bool
