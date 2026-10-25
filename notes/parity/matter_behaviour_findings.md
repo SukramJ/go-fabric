@@ -816,6 +816,18 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 
 ## Application cluster servers — open items
 
+- **WebRtcTransportRequestor is served by the generated server without
+  matter.js's session logic.** matter.js's `WebRtcTransportRequestorServer`
+  (`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:42-187`
+  at `862ad75f`) tracks offered and answered sessions, auto-installs the
+  ACL entry a provider needs and emits the session events; Go's
+  `cluster/spec/webrtctransportrequestor` (brief CL §1, owner scope
+  decision 2026-10-25) answers by the definition only. The ACL
+  auto-install writes to AccessControl, an owner path, so the port is a
+  wave of its own (milestone 6 completeness, with the camera device types
+  that compose it). Until then a camera host drives the requestor's state
+  itself.
+
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
 FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 `../connectedhomeip` was not checked out when they were written, so the
