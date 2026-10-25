@@ -51,6 +51,13 @@ type ExchangeOptions struct {
 	// AdditionalMrpDelay, when set, overrides the peer-medium MRP margin of
 	// the exchange (ClientRequest.ts:26-32).
 	AdditionalMrpDelay *time.Duration
+	// RequiredTransport is a hard transport constraint: an exchange on a
+	// session over it, established over it when none is — TCP for a large
+	// message (ClientInteraction.ts:1235). nil for none. A provider bound to
+	// one session ignores it (ClientRequest.ts:81-84).
+	RequiredTransport *exchange.Transport
+	// PreferredTransport overrides the peer's transport preference.
+	PreferredTransport *exchange.Transport
 }
 
 // ClientRequest is what every interaction request carries for its
@@ -63,11 +70,27 @@ type ClientRequest struct {
 	Network string
 	// AdditionalMrpDelay is [ExchangeOptions].AdditionalMrpDelay.
 	AdditionalMrpDelay *time.Duration
+	// LargeMessage requires a session that permits payloads larger than
+	// the IPv6 MTU: a TCP session, established or failing, never the MRP
+	// fallback of a transport preference (ClientRequest.ts:62-86). A peer
+	// that negotiates TCP and then denies it fails with
+	// peer.ErrTCPUnsupported. nil and false are no requirement; an invoke
+	// tells them apart for its inference (ClientInteraction.ts:716-719).
+	LargeMessage *bool
 }
 
-// exchangeOptions are the exchange options of the request.
+// large reports a large-message request.
+func (r ClientRequest) large() bool { return r.LargeMessage != nil && *r.LargeMessage }
+
+// exchangeOptions are the exchange options of the request: a large message
+// requires TCP (ClientInteraction.ts:1235).
 func (r ClientRequest) exchangeOptions() ExchangeOptions {
-	return ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay}
+	o := ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay}
+	if r.large() {
+		tcp := exchange.TransportTCP
+		o.RequiredTransport = &tcp
+	}
+	return o
 }
 
 // Provider gives an interaction its exchanges — matter.js ExchangeProvider
@@ -164,7 +187,10 @@ type peerProvider struct {
 func (p *peerProvider) InitiateExchange(ctx context.Context, opts ExchangeOptions) (*exchange.Exchange, error) {
 	for {
 		if !opts.RequireExistingSession {
-			if _, err := p.p.Connect(ctx, peer.ConnectOptions{ConnectionTimeout: opts.ConnectionTimeout, Network: opts.Network, AdditionalMrpDelay: opts.AdditionalMrpDelay}); err != nil {
+			if _, err := p.p.Connect(ctx, peer.ConnectOptions{
+				ConnectionTimeout: opts.ConnectionTimeout, Network: opts.Network, AdditionalMrpDelay: opts.AdditionalMrpDelay,
+				RequiredTransport: opts.RequiredTransport, PreferredTransport: opts.PreferredTransport,
+			}); err != nil {
 				return nil, err
 			}
 		}
@@ -181,7 +207,9 @@ func (p *peerProvider) InitiateExchange(ctx context.Context, opts ExchangeOption
 		if err != nil {
 			return nil, err
 		}
-		s := p.p.NewestSession()
+		// The newest session over the first resolved transport that has one
+		// (PeerExchangeProvider.ts:104-115).
+		s := p.p.SessionFor(opts.RequiredTransport, opts.PreferredTransport)
 		if s == nil {
 			slot.Close()
 			if opts.RequireExistingSession {
@@ -212,9 +240,15 @@ func (p *peerProvider) PeerAddress() (exchange.PeerAddress, bool) { return p.p.A
 // MaximumPeerResponseTime is PeerExchangeProvider.maximumPeerResponseTime
 // (:152-162): the peer counted active, its parameters only with
 // includeSending.
+//
+// Over a TCP session it is the reliable channel's (MRP.ts:88-91, the
+// provider's channelType, PeerExchangeProvider.ts:50-56).
 func (p *peerProvider) MaximumPeerResponseTime(ept time.Duration, includeSending bool) time.Duration {
 	if ept == 0 {
 		ept = exchange.DefaultExpectedProcessingTime
+	}
+	if s := p.p.NewestSession(); s != nil && !s.UsesMRP() {
+		return exchange.ReliableMaxPeerResponseTime(ept)
 	}
 	local := exchange.IntervalsOf(p.p.Exchanges().LocalParameters())
 	if !includeSending {

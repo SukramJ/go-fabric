@@ -176,6 +176,11 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	if s == nil {
 		return false
 	}
+	if s.Transport() == exchange.TransportTCP {
+		// A TCP session is evicted when its connection drops: probing is
+		// moot (PeerAddressMonitor.ts:137-141 at 862ad75f).
+		return true
+	}
 	current := addressOf(s.Addr()).AddrPort()
 	discovered := p.service.Addresses()
 	log := p.log.With(slog.String("reason", reason.String()), slog.String("address", current.String()))

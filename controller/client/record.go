@@ -114,8 +114,8 @@ type Record struct {
 	// when it announced none (:1067-1071).
 	AdvertisedIntervals *AdvertisedIntervals
 	// TCPUnsupported is set when a TCP session reported no TCP server
-	// support (:1073-1078); this module has no TCP client and never sets
-	// it, but keeps what a store holds.
+	// support (:1073-1078): the peer's descriptor flag, saved with it
+	// (CommissioningClient.ts:737, :761 at 862ad75f).
 	TCPUnsupported bool
 	// TCPSupport is the announced transports bitmap (T), nil when unknown
 	// (:1080-1084).
@@ -607,7 +607,7 @@ func (r *Record) applyPeer(d peer.Descriptor) {
 		p := *d.ReportedSessionParameters
 		r.ReportedSessionParameters = &p
 	}
-	r.TCPUnsupported = false
+	r.TCPUnsupported = d.TCPUnsupported
 	if d.DiscoveryData != nil {
 		r.applyTXT(*d.DiscoveryData)
 	}
@@ -623,7 +623,7 @@ func (r *Record) applyPeer(d peer.Descriptor) {
 // the first address as the operational one, the discovery data, the CATs,
 // the reported session parameters.
 func (r Record) knownDescriptor() peer.Descriptor {
-	d := peer.Descriptor{CaseAuthenticatedTags: slices.Clone(r.CaseAuthenticatedTags), ReportedSessionParameters: clonePtr(r.ReportedSessionParameters)}
+	d := peer.Descriptor{CaseAuthenticatedTags: slices.Clone(r.CaseAuthenticatedTags), ReportedSessionParameters: clonePtr(r.ReportedSessionParameters), TCPUnsupported: r.TCPUnsupported}
 	if r.PeerAddress != nil {
 		d.Address = *r.PeerAddress
 	}

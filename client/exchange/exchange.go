@@ -498,7 +498,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 		}
 		x.sentToAck = p
 	}
-	if err := x.m.conn.Send(x.dest(), datagram); err != nil {
+	if err := x.m.send(x.session, x.dest(), datagram); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNetwork, err)
 	}
 	if !isAck {
@@ -684,7 +684,7 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	if x.m.retransmitted != nil {
 		x.m.retransmitted()
 	}
-	if err := x.m.conn.Send(x.dest(), p.datagram); err != nil {
+	if err := x.m.send(x.session, x.dest(), p.datagram); err != nil {
 		x.m.log.Debug("matter.controller.retransmit_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
 	}
 	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange_id", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
@@ -760,7 +760,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.notifySentLocked()
 		datagram := p.datagram
 		x.mu.Unlock()
-		_ = x.m.conn.Send(x.dest(), datagram)
+		_ = x.m.send(x.session, x.dest(), datagram)
 		return
 	}
 	if p := x.sentToAck; p != nil {

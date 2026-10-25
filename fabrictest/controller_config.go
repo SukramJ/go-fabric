@@ -63,6 +63,7 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 	return controller.Config{
 		DB: db, Attestation: trust, VendorID: opts.VendorID, Label: label, Logger: log,
 		Clock: s.hostClock(g), Listener: l, Networks: opts.Networks, OwnNetworkProfile: opts.OwnNetworkProfile,
+		TCP: opts.TCP, TransportPreference: opts.TransportPreference,
 		Names: func(log *slog.Logger) (*discovery.Names, error) {
 			return discovery.NewNames(newQueryConn(s), log), nil
 		},

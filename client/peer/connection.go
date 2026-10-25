@@ -102,11 +102,42 @@ type ConnectOptions struct {
 	// in place of the medium profile's connect margin
 	// (PeerConnection.ts:111-114).
 	AdditionalMrpDelay *time.Duration
+	// RequiredTransport is a hard transport constraint for a process this
+	// call starts: TCP or UDP only — "Large Message Quality requires TCP"
+	// (Peer.ts:734 at 862ad75f); nil for none.
+	RequiredTransport *exchange.Transport
+	// PreferredTransport overrides the peer's transport preference for a
+	// process this call starts; nil keeps it (Peer.ts:736-741).
+	PreferredTransport *exchange.Transport
+}
+
+// attemptKey is an attempt's (ip, port, transport) — the variant of an
+// address matter.js keys its attempts by (PeerConnection.ts:338-358).
+type attemptKey struct {
+	ap  netip.AddrPort
+	tcp bool
+}
+
+// target is one variant of an address to attempt: over UDP, or over TCP
+// (expandAddresses, PeerConnection.ts:323-336).
+type target struct {
+	addr discovery.Address
+	tcp  bool
+}
+
+func (t target) key() attemptKey { return attemptKey{t.addr.AddrPort(), t.tcp} }
+
+func (t target) String() string {
+	if t.tcp {
+		return "tcp://" + t.addr.String()
+	}
+	return t.addr.String()
 }
 
 // attempt is the connection attempt to one address (PeerConnection.ts:863-866).
 type attempt struct {
 	addr   discovery.Address
+	tcp    bool
 	addrNo int
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -117,7 +148,8 @@ type attempt struct {
 
 // connection is one run of the connection process of a peer — matter.js
 // PeerConnection (packages/protocol/src/peer/PeerConnection.ts:93-753 at
-// 0ceb202d) for UDP. Its state (:129-177) is guarded by mu.
+// 0ceb202d): an attempt per address and transport variant, over UDP or
+// TCP. Its state (:129-177) is guarded by mu.
 type connection struct {
 	p           *Peer
 	timing      Timing
@@ -127,19 +159,22 @@ type connection struct {
 	// the CASE exchanges' MRP margin (PeerConnection.ts:110-118).
 	network *NetworkProfile
 	margin  time.Duration
-	ctx     context.Context
-	cancel  context.CancelFunc
-	done    chan struct{}
-	workers sync.WaitGroup
-	wake    chan struct{}
+	// required and preferred are the transport options of the call that
+	// started the process (PeerConnection.ts:101-105).
+	required, preferred *exchange.Transport
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	done                chan struct{}
+	workers             sync.WaitGroup
+	wake                chan struct{}
 
 	// mu guards the connection's state: every field below it, session
 	// through kickHandlers.
 	mu             sync.Mutex
 	session        *exchange.Session
 	fatal          error
-	attempts       map[netip.AddrPort]*attempt
-	pending        []discovery.Address
+	attempts       map[attemptKey]*attempt
+	pending        []target
 	fallback       *discovery.Address
 	lastAttemptAt  time.Time
 	addrsAttempted int
@@ -184,11 +219,13 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 		handleError:  handleError,
 		network:      network,
 		margin:       margin,
+		required:     opts.RequiredTransport,
+		preferred:    opts.PreferredTransport,
 		ctx:          ctx,
 		cancel:       cancel,
 		done:         make(chan struct{}),
 		wake:         make(chan struct{}, 1),
-		attempts:     make(map[netip.AddrPort]*attempt),
+		attempts:     make(map[attemptKey]*attempt),
 		kickHandlers: make(map[*attempt]func(kickOrigin)),
 	}
 	p.connecting = c
@@ -213,11 +250,13 @@ func (p *Peer) initiateConnection(opts ConnectOptions) *connection {
 // connection process starts (or is kicked) and Connect waits for it within
 // the connection timeout, then looks again. A process that ended with a
 // fatal error returns it; a timeout is a [*UnreachableError]; a closed
-// peer [ErrClosed]. Mirrors matter.js Peer.connect (Peer.ts:414-491)
-// without the group and transport branches.
+// peer [ErrClosed]. With a transport list ([Peer.ResolveTransports]) the
+// newest session over its first transport that has one is returned.
+// Mirrors matter.js Peer.connect (Peer.ts:414-491) without the group
+// branch.
 func (p *Peer) Connect(ctx context.Context, opts ConnectOptions) (*exchange.Session, error) {
 	for {
-		if s := p.NewestSession(); s != nil {
+		if s := p.sessionFor(p.ResolveTransports(opts.RequiredTransport, opts.PreferredTransport)); s != nil {
 			return s, nil
 		}
 		// The process is shared and outlives this call: it runs on the
@@ -459,39 +498,78 @@ func (c *connection) scheduleAttempts() {
 }
 
 // shiftLocked takes the most desirable pending address — the heap of
-// :145-152 ordered by discovery.CompareDesirability, the first of equals.
-func (c *connection) shiftLocked() discovery.Address {
+// :145-152 ordered by discovery.CompareDesirability, the variants of one
+// address by their index in the transport list, the first of equals.
+func (c *connection) shiftLocked() target {
+	transports := c.p.ResolveTransports(c.required, c.preferred)
+	index := func(t target) int {
+		for i, tr := range transports {
+			if (tr == exchange.TransportTCP) == t.tcp {
+				return i
+			}
+		}
+		return -1
+	}
 	best := 0
 	for i := 1; i < len(c.pending); i++ {
-		if discovery.CompareDesirability(c.pending[i], c.pending[best]) < 0 {
+		d := discovery.CompareDesirability(c.pending[i].addr, c.pending[best].addr)
+		if d < 0 || (d == 0 && transports != nil && index(c.pending[i]) < index(c.pending[best])) {
 			best = i
 		}
 	}
-	a := c.pending[best]
+	t := c.pending[best]
 	c.pending = append(c.pending[:best], c.pending[best+1:]...)
-	return a
+	return t
 }
 
-// pendingAddLocked queues a once (the heap holds an item once,
+// expand is one variant of a per transport to attempt, or its UDP one
+// without a transport list (PeerConnection.ts:323-336).
+func (c *connection) expand(a discovery.Address) []target {
+	transports := c.p.ResolveTransports(c.required, c.preferred)
+	if transports == nil {
+		return []target{{addr: a}}
+	}
+	out := make([]target, 0, len(transports))
+	for _, tr := range transports {
+		out = append(out, target{addr: a, tcp: tr == exchange.TransportTCP})
+	}
+	return out
+}
+
+// pendingAddLocked queues t once (the heap holds an item once,
 // general/src/util/Heap.ts:119-138).
-func (c *connection) pendingAddLocked(a discovery.Address) {
+func (c *connection) pendingAddLocked(t target) {
 	for _, x := range c.pending {
-		if x.AddrPort() == a.AddrPort() {
+		if x.key() == t.key() {
 			return
 		}
 	}
-	c.pending = append(c.pending, a)
+	c.pending = append(c.pending, t)
 	c.signal()
 }
 
+// pendingDeleteLocked unqueues every variant of a.
 func (c *connection) pendingDeleteLocked(a discovery.Address) {
-	for i, x := range c.pending {
-		if x.AddrPort() == a.AddrPort() {
-			c.pending = append(c.pending[:i], c.pending[i+1:]...)
-			c.signal()
-			return
+	kept := c.pending[:0]
+	for _, x := range c.pending {
+		if x.addr.AddrPort() != a.AddrPort() {
+			kept = append(kept, x)
 		}
 	}
+	if len(kept) != len(c.pending) {
+		c.pending = kept
+		c.signal()
+	}
+}
+
+// attemptingLocked reports an attempt at any variant of a.
+func (c *connection) attemptingLocked(a discovery.Address) bool {
+	for k := range c.attempts {
+		if k.ap == a.AddrPort() {
+			return true
+		}
+	}
+	return false
 }
 
 // retireStaleFallback drops the speculative fallback once discovery
@@ -554,14 +632,16 @@ func (c *connection) fallbackSuperseded() bool {
 // fallback that discovery now names is a real address and kicks the
 // process (PeerConnection.ts:338-358).
 func (c *connection) addAddressLocked(a discovery.Address) {
-	if _, ok := c.attempts[a.AddrPort()]; ok {
-		if c.fallback != nil && c.fallback.AddrPort() == a.AddrPort() {
-			c.fallback = nil
-			c.kickLocked(kickDiscover)
+	for _, v := range c.expand(a) {
+		if _, ok := c.attempts[v.key()]; ok {
+			if c.fallback != nil && c.fallback.AddrPort() == a.AddrPort() {
+				c.fallback = nil
+				c.kickLocked(kickDiscover)
+			}
+			continue
 		}
-		return
+		c.pendingAddLocked(v)
 	}
-	c.pendingAddLocked(a)
 }
 
 // maybeAttemptFallbackLocked queues the descriptor's operational address
@@ -578,7 +658,9 @@ func (c *connection) maybeAttemptFallbackLocked() {
 	}
 	a := addressOf(op)
 	c.fallback = &a
-	c.pendingAddLocked(a)
+	for _, v := range c.expand(a) {
+		c.pendingAddLocked(v)
+	}
 }
 
 // addressOf is an operational address as a discovered one.
@@ -593,16 +675,16 @@ func addressOf(u *net.UDPAddr) discovery.Address {
 // the attempt is registered (:469-484): a non-fallback address while the
 // fallback is attempted deletes the fallback — which keeps it as fallback
 // when it is the only attempt, and stops marking it either way.
-func (c *connection) initiateAttemptLocked(a discovery.Address) {
-	key := a.AddrPort()
+func (c *connection) initiateAttemptLocked(t target) {
+	key := t.key()
 	if _, ok := c.attempts[key]; ok {
 		return
 	}
 	ctx, cancel := context.WithCancel(c.ctx)
 	c.lastAttemptAt = c.p.set.clock.Now()
 	c.addrsAttempted++
-	att := &attempt{addr: a, addrNo: c.addrsAttempted, ctx: ctx, cancel: cancel}
-	if c.fallback != nil && c.fallback.AddrPort() != key {
+	att := &attempt{addr: t.addr, tcp: t.tcp, addrNo: c.addrsAttempted, ctx: ctx, cancel: cancel}
+	if c.fallback != nil && c.fallback.AddrPort() != key.ap {
 		c.deleteAddressLocked(*c.fallback, "aborting attempt to last known address because device reports address change", false)
 		c.fallback = nil
 	}
@@ -623,21 +705,26 @@ func (c *connection) initiateAttemptLocked(a discovery.Address) {
 // operational address stays as fallback when it is the last attempt and
 // the deletion is not forced (PeerConnection.ts:412-440).
 func (c *connection) deleteAddressLocked(a discovery.Address, why string, force bool) {
-	key := a.AddrPort()
+	ap := a.AddrPort()
 	op := c.p.Descriptor().OperationalAddress
-	isOperational := op != nil && addressOf(op).AddrPort() == key
-	remaining := len(c.attempts)
-	if _, ok := c.attempts[key]; ok {
-		remaining--
+	isOperational := op != nil && addressOf(op).AddrPort() == ap
+	remaining := 0
+	for k := range c.attempts {
+		if k.ap != ap {
+			remaining++
+		}
 	}
 	if !force && isOperational && remaining == 0 {
 		c.fallback = &a
 		return
 	}
-	if att, ok := c.attempts[key]; ok {
-		c.p.log.Debug("matter.controller.peer.attempt_aborted", slog.String("address", a.String()), slog.String("reason", why))
+	for k, att := range c.attempts {
+		if k.ap != ap {
+			continue
+		}
+		c.p.log.Debug("matter.controller.peer.attempt_aborted", slog.String("address", a.String()), slog.Bool("tcp", k.tcp), slog.String("reason", why))
 		att.cancel()
-		delete(c.attempts, key)
+		delete(c.attempts, k)
 	}
 	c.pendingDeleteLocked(a)
 }
@@ -760,7 +847,34 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	if r := p.set.ctx.Resumption; r != nil {
 		opts.Resumption = r
 	}
-	s, _, err := handshake.CASE(local, p.set.ctx.Exchanges, att.addr.UDPAddr(), fabric, p.address.NodeID, opts)
+	addr := att.addr.UDPAddr()
+	var ch exchange.Channel
+	if att.tcp {
+		// A TCP attempt opens its connection first (PeerSet.ts:274-304);
+		// the address the manager names it by binds the handshake's
+		// sessions to it.
+		dial := p.set.ctx.DialTCP
+		if dial == nil {
+			return ErrNoTCP
+		}
+		var err error
+		if ch, err = dial(local, addr); err != nil {
+			if local.Err() != nil {
+				return nil
+			}
+			return fmt.Errorf("%w: %w", exchange.ErrNetwork, err)
+		}
+		addr = p.set.ctx.Exchanges.AttachChannel(ch)
+	}
+	s, _, err := handshake.CASE(local, p.set.ctx.Exchanges, addr, fabric, p.address.NodeID, opts)
+	if err == nil && att.tcp && p.tcpDenied(s.ReportedParameters()) {
+		// The session-parameter validation of a TCP attempt
+		// (PeerConnection.ts:596-621), after the handshake: the peer is
+		// marked and the session dropped.
+		p.MarkTCPUnsupported()
+		s.Close()
+		return ErrTCPUnsupported
+	}
 	if err == nil {
 		c.mu.Lock()
 		c.session = s
@@ -768,6 +882,11 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 		p.set.Adopt(s)
 		c.cancel()
 		return nil
+	}
+	if ch != nil {
+		// No session took the connection over (PeerConnection.ts:514-516,
+		// :640-650).
+		_ = ch.Close()
 	}
 	if local.Err() != nil {
 		return nil
@@ -832,7 +951,7 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 }
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
-// it (PeerConnection.ts:653-752, the TCP branch aside): a Busy status
+// it (PeerConnection.ts:653-752): a Busy status
 // waits the peer's delay plus up to DelayAfterNetworkError of jitter; a
 // NoSharedTrustRoots status whose resumption record could be deleted
 // retries at once; any other status waits DelayAfterPeerError; a transient
@@ -841,6 +960,21 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 // consulted when a delay was chosen; it may replace it or end the process.
 func (c *connection) handleConnectionError(err error, att *attempt) {
 	p := c.p
+	if errors.Is(err, ErrTCPUnsupported) {
+		// The peer accepted TCP but denies it (PeerConnection.ts:656-672):
+		// with TCP required that is fatal; otherwise the process ends, the
+		// peer is flagged, and Connect reconnects over UDP.
+		if c.required != nil && *c.required == exchange.TransportTCP {
+			p.log.Error("matter.controller.peer.tcp_required_unsupported", slog.String("address", att.addr.String()))
+			c.mu.Lock()
+			c.fatal = err
+			c.mu.Unlock()
+		} else {
+			p.log.Info("matter.controller.peer.tcp_unsupported_fallback", slog.String("address", att.addr.String()))
+		}
+		c.cancel()
+		return
+	}
 	delay, hasDelay, category := classifyError(err, c.timing, p.set.rand, c.deleteResumptionRecord)
 	if flagsUnreachable(err) {
 		p.status.SetReachable(false)

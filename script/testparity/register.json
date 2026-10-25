@@ -2284,10 +2284,13 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTcpTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The controller's TCP transport (interface registration, preference, commissioning over TCP), which milestone 5 phase 25 builds.",
+      "status": "ported",
+      "go": [
+        "controller:TestClientNodeTcpParity",
+        "controller:TestLargeMessageReadOverTCP",
+        "client/peer:TestPeerTransportGateParity"
+      ],
+      "reason": "The controller's and the device's TCP roles (controller.Config.TCP, node.Network.TCP), the transport preference (controller.Config.TransportPreference, Peer.SetTransportPreference), commissioning and default traffic over UDP, the soft TCP preference, the session-parameter gate and the tcp-unsupported flag, on a loopback site; the gate cases that set a peer's reported parameters by hand on a client/peer harness peer. Beyond matter.js, whose mock TCP does not survive CASE, a large-message read runs over a real TCP session.",
       "snapshotSha": "6503ded1a403462512bb4bd206ee6f882ad140d9"
     },
     {
@@ -3043,10 +3046,27 @@
     },
     {
       "path": "packages/protocol/test/action/InvokeLargeMessageTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The largeMessage command quality steering an invoke onto TCP, which the controller gains with its TCP initiator in milestone 5 phase 25.",
+      "status": "partial",
+      "go": [
+        "client/interaction:TestInvokeLargeMessageParity"
+      ],
+      "missing": [
+        "parses largeMessage from quality DSL string 'L'",
+        "does not set largeMessage when quality is empty",
+        "CommandModel with largeMessage quality reports effectiveQuality.largeMessage",
+        "CommandModel without largeMessage quality does not report largeMessage",
+        "largeMessage flag matches the pattern used in ClientCommandMethod",
+        "detects L quality on a concrete command request",
+        "returns false for a command without L quality",
+        "flags the whole invoke when any one command carries L quality",
+        "ignores legacy command requests (no model link)",
+        "detects L quality on a wildcard command request",
+        "swallows MalformedRequestError when cluster/command unresolved",
+        "rethrows non-MalformedRequestError raised during model probing",
+        "preserves an explicit largeMessage:false on a command with L quality",
+        "does not batch L commands even when batchable shape allows it"
+      ],
+      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends. Missing: the Large Message quality of a command (the 'L' quality) is not in parity/schema.json — the extractor emits no largeMessage quality — so the CommandModel quality, inferLargeMessage and the inference policy cases have no Go subject (a question to the owner: extend the extractor); the ClientCommandMethod pattern is matter.js's typed command API; and the controller has no automatic invoke batcher, so 'does not batch L commands' does not arise.",
       "snapshotSha": "08ffe617eb5b02a7b5253cde9e714413da17f104"
     },
     {
@@ -3095,10 +3115,11 @@
     },
     {
       "path": "packages/protocol/test/action/client/LargeMessageTransportTest.ts",
-      "status": "excluded",
-      "class": "controller-stage",
-      "until": "M5 phase 25",
-      "reason": "The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25.",
+      "status": "ported",
+      "go": [
+        "client/interaction:TestLargeMessageTransportParity"
+      ],
+      "reason": "A read's ClientRequest.LargeMessage requires TCP of its exchange (ExchangeOptions.RequiredTransport), and nil and false require nothing, through a recording provider.",
       "snapshotSha": "c24beaf874e59c6d35ddb66ccd36b6ac1984ac2f"
     },
     {
@@ -4404,10 +4425,18 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionSocketOwnershipTest.ts",
-      "status": "planned",
-      "reason": "Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.",
-      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d",
-      "until": "M5 phase 25"
+      "status": "partial",
+      "go": [
+        "client/peer:TestPeerConnectionSocketOwnershipParity",
+        "controller:TestLargeMessageReadOverTCP"
+      ],
+      "missing": [
+        "does not close the channel when a later step throws after ownership transferred",
+        "does not close on success (session adopts the channel)",
+        "invokes close on failure (harmless because real UdpChannel.close is a no-op)"
+      ],
+      "reason": "A TCP attempt's channel is closed when the pairing fails or is aborted (client/peer harness), and kept by the session it established (the loopback large-message read). Missing: the step after a transferred ownership has no counterpart — the Go attempt's only later step, the TCP session-parameter check, drops the session, whose channel then closes as its last; and the two UDP cases characterise a per-attempt UdpChannel whose close is a no-op, where the Go attempt shares the manager's socket and closes nothing.",
+      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d"
     },
     {
       "path": "packages/protocol/test/peer/PeerDescriptorTest.ts",
@@ -4602,22 +4631,19 @@
       "status": "partial",
       "go": [
         "bridge:TestTCPConnectionDropEvictsBoundSessions",
-        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
-        "bridge:TestTcpSessionBindingManagerReaction",
-        "bridge:TestTcpSessionBindingConnectionLifecycle",
         "bridge:TestTcpSessionBindingChannelTypeDetection",
+        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
+        "bridge:TestTcpSessionBindingConnectionLifecycle",
+        "bridge:TestTcpSessionBindingManagerReaction",
+        "client/exchange:TestTCPSessionBindingParity",
+        "client/peer:TestPeerTCPSessionSelectionParity",
         "transport/tcp:TestTcpTransportOnDisconnect"
       ],
       "missing": [
-        "gives the closed exchange a cause that claims nothing about the peer",
         "disconnect listener can be removed",
-        "onDisconnect is detected via typeof check",
-        "finds a TCP session among mixed sessions",
-        "returns undefined when no TCP session exists",
-        "skips closing TCP sessions",
-        "returns undefined when all TCP sessions are closing"
+        "onDisconnect is detected via typeof check"
       ],
-      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp. Missing: \"gives the closed exchange a cause that claims nothing about the peer\", js-runtime-only: the error cause of the rejected promise a closed exchange holds (the device bridge's exchanges hold no awaitable); \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object; the four TCP session selection cases (\"finds a TCP session among mixed sessions\", \"returns undefined when no TCP session exists\", \"skips closing TCP sessions\", \"returns undefined when all TCP sessions are closing\"), controller-side: PeerExchangeProvider's choice of a TCP session among a peer's sessions, which the module's controller does not make (client/peer opens UDP sessions); Register candidate.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and, for the controller, on client/exchange (Manager.AttachChannel; the cause of an evicted exchange is ErrTransportClosed, no peer loss) with the TCP session selection on client/peer (Peer.NewestSessionOn); the listener's disconnect callback on transport/tcp. Missing: \"disconnect listener can be removed\", js-runtime-only: an observer handle (the listener's onClose is a Serve argument, nothing to remove); \"onDisconnect is detected via typeof check\", js-runtime-only: a duck-typed probe of a TypeScript object.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {

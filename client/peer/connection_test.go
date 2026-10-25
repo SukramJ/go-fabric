@@ -135,7 +135,7 @@ func TestFallbackRetiredAfterStabilization(t *testing.T) {
 		c := process(p)
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		_, ok := c.attempts[addressOf(udpAddr(addr9)).AddrPort()]
+		_, ok := c.attempts[attemptKey{ap: addressOf(udpAddr(addr9)).AddrPort()}]
 		return !ok && c.fallback == nil
 	})
 }

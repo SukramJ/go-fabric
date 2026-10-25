@@ -133,13 +133,17 @@ type Manager struct {
 
 	// mu guards closed, the handler, session and exchange tables and the
 	// id counters below.
-	mu             sync.Mutex
-	closed         bool
-	handlers       map[uint16]ProtocolHandler
-	checkIn        CheckInReceiver
-	sessions       map[uint16]*Session
-	unsecured      map[uint64]*Session
-	exchanges      map[uint32]*Exchange
+	mu        sync.Mutex
+	closed    bool
+	handlers  map[uint16]ProtocolHandler
+	checkIn   CheckInReceiver
+	sessions  map[uint16]*Session
+	unsecured map[uint64]*Session
+	exchanges map[uint32]*Exchange
+	// channels and channelAddrs are the attached channels by the address
+	// that names them and back (channel.go).
+	channels       map[*net.UDPAddr]Channel
+	channelAddrs   map[Channel]*net.UDPAddr
 	exchangeID     uint16
 	nextSessionID  uint16
 	sessionIDLimit uint16
@@ -173,9 +177,11 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		sessions:        make(map[uint16]*Session),
 		// unsecured is keyed by our ephemeral initiator node id
 		// (SessionManager.ts:446-454).
-		unsecured: make(map[uint64]*Session),
-		exchanges: make(map[uint32]*Exchange),
-		handlers:  make(map[uint16]ProtocolHandler),
+		unsecured:    make(map[uint64]*Session),
+		exchanges:    make(map[uint32]*Exchange),
+		handlers:     make(map[uint16]ProtocolHandler),
+		channels:     make(map[*net.UDPAddr]Channel),
+		channelAddrs: make(map[Channel]*net.UDPAddr),
 		// The exchange counter and the session-id cursor start at a
 		// random value (ExchangeManager.ts:729-734, SessionManager.ts:264).
 		exchangeID:     binary.LittleEndian.Uint16(seed[0:2]),
@@ -293,6 +299,7 @@ func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Par
 	s := &Session{
 		m:         m,
 		addr:      addr,
+		channel:   m.channelOf(addr),
 		window:    mrp.NewWindow(),
 		params:    PeerParameters(peer),
 		exchanges: make(map[*Exchange]struct{}),
@@ -426,6 +433,7 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		id:                   cfg.ID,
 		peer:                 cfg.Channel.PeerSessionID,
 		addr:                 cfg.Addr,
+		channel:              m.channelOf(cfg.Addr),
 		secure:               ch,
 		cats:                 append([]uint32(nil), cfg.CaseAuthenticatedTags...),
 		attestationChallenge: append([]byte(nil), cfg.AttestationChallenge...),
@@ -563,9 +571,16 @@ func (m *Manager) closeAll() {
 	for _, s := range m.unsecured {
 		all = append(all, s)
 	}
+	chans := make([]Channel, 0, len(m.channelAddrs))
+	for ch := range m.channelAddrs {
+		chans = append(chans, ch)
+	}
 	m.mu.Unlock()
 	for _, s := range all {
 		s.Close()
+	}
+	for _, ch := range chans {
+		_ = ch.Close()
 	}
 }
 
@@ -742,6 +757,7 @@ func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Sess
 	s := &Session{
 		m:         m,
 		addr:      src,
+		channel:   m.channelOf(src),
 		nodeID:    hdr.SourceNodeID,
 		inbound:   true,
 		window:    mrp.NewWindow(),
@@ -917,7 +933,7 @@ func (m *Manager) sendAck(s *Session, msg *Message, dest uint64) {
 	if err != nil {
 		return
 	}
-	_ = m.conn.Send(s.Addr(), datagram)
+	_ = m.send(s, s.Addr(), datagram)
 }
 
 // seal frames one message on s: on the unsecured session with the global

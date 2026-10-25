@@ -445,6 +445,11 @@ func (c *Interaction) sustainGate(ctx context.Context, outer *Subscription, w *i
 	st.mu.Lock()
 	trusted := st.trusted
 	st.mu.Unlock()
+	if s := c.provider.Session(); s != nil && s.Transport() == exchange.TransportTCP {
+		// TCP evicts the session when its connection drops: no liveness
+		// probe (ClientInteraction.ts:1155-1159 at 862ad75f).
+		trusted = true
+	}
 	if !trusted {
 		if !c.provider.VerifyReachability(ctx) && ctx.Err() == nil {
 			// Probing failed, so we get a new session anyway.

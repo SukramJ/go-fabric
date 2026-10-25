@@ -74,6 +74,13 @@ type Context struct {
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).
 	EstablishmentUnresponsive func(p *Peer)
+	// DialTCP opens a TCP connection for a connection attempt over TCP;
+	// nil is no TCP interface — an attempt over TCP fails as a network
+	// error (PeerSet.ts:284-288 at 862ad75f).
+	DialTCP DialTCP
+	// TransportPreference is the transport preference each new peer takes
+	// (PeerSet.ts:151-157, :178-180): [exchange.TransportTCP] or UDP.
+	TransportPreference exchange.Transport
 	// Networks are the network profiles that throttle the peers'
 	// connections and exchanges and pad their MRP backoff; nil is
 	// NewNetworkProfiles over the defaults on Clock (matter.js PeerSet's
@@ -228,6 +235,7 @@ func (s *Set) AddKnownPeer(d Descriptor) (*Peer, error) {
 		}
 	}
 	p := newPeer(s, d, fabric)
+	p.preferTCP = s.ctx.TransportPreference == exchange.TransportTCP
 	s.peers = append(s.peers, p)
 	s.mu.Unlock()
 	p.start()

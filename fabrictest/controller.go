@@ -19,11 +19,14 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/internal/inflight"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -69,6 +72,14 @@ type ControllerOptions struct {
 	// pads every exchange's sends (ownNetworkProfileId,
 	// NetworkServer.ts:242); "" is "fast".
 	OwnNetworkProfile string
+	// TCP is the controller's TCP roles (controller.TCPConfig). TCP runs
+	// over kernel sockets: it needs a site with Options.Loopback, as a
+	// device with TCP does. The fabrictest Controller dials (Outgoing);
+	// Incoming is controller.New's ([Site.ControllerConfig]).
+	TCP controller.TCPConfig
+	// TransportPreference is each peer's preferred transport
+	// (controller.Config.TransportPreference).
+	TransportPreference exchange.Transport
 }
 
 // Controller is an in-process Matter controller of a site: the module's
@@ -165,6 +176,19 @@ func (c *Controller) start() error {
 	return nil
 }
 
+// dialTCP is the controller's TCP dialer over kernel sockets, each
+// connection's messages handed to mgr (controller/tcp.go's).
+func dialTCP(mgr *exchange.Manager, log *slog.Logger) peer.DialTCP {
+	d := &tcp.Dialer{Logger: log}
+	return func(ctx context.Context, addr *net.UDPAddr) (exchange.Channel, error) {
+		conn, err := d.Dial(ctx, addr.String(), func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) })
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	}
+}
+
 // stack is one run of a controller's stack: what [Controller.start] builds
 // and [Controller.shutdown] closes.
 type stack struct {
@@ -201,7 +225,14 @@ func (c *Controller) build() (*stack, error) {
 	if err != nil {
 		return st, err
 	}
-	if st.mgr, err = exchange.NewManager(l, exchange.Config{Clock: clk, Logger: log, LocalAdditionalMrpDelay: own.AdditionalMrpDelay}); err != nil {
+	xcfg := exchange.Config{Clock: clk, Logger: log, LocalAdditionalMrpDelay: own.AdditionalMrpDelay}
+	if c.opts.TCP.Outgoing {
+		p := exchange.DefaultLocalParameters()
+		p.SupportedTransports |= sessionparams.TransportTCPClient
+		p.MaxTCPMessageSize = sessionparams.DefaultMaxTCPMessageSize
+		xcfg.LocalParameters = &p
+	}
+	if st.mgr, err = exchange.NewManager(l, xcfg); err != nil {
 		return st, fmt.Errorf("exchange manager: %w", err)
 	}
 	ctx, stop := context.WithCancel(context.Background())
@@ -221,10 +252,14 @@ func (c *Controller) build() (*stack, error) {
 	}); err != nil {
 		return st, fmt.Errorf("fabric: %w", err)
 	}
-	if st.set, err = peer.NewSet(peer.Context{
+	pctx := peer.Context{
 		Exchanges: st.mgr, Names: st.names, Fabrics: st.fabric.Lookup, Resumption: c.resume, Logger: log, Clock: clk,
-		Networks: networks,
-	}); err != nil {
+		Networks: networks, TransportPreference: c.opts.TransportPreference,
+	}
+	if c.opts.TCP.Outgoing {
+		pctx.DialTCP = dialTCP(mgr, log)
+	}
+	if st.set, err = peer.NewSet(pctx); err != nil {
 		return st, fmt.Errorf("peer set: %w", err)
 	}
 	st.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: clk, Logger: log})

@@ -14,8 +14,7 @@ import (
 
 // Descriptor is what is known about a peer — a node on one of our
 // fabrics — and what a [Store] keeps of it. It is matter.js PeerDescriptor
-// (packages/protocol/src/peer/PeerDescriptor.ts:34-81 at 0ceb202d) without
-// the TCP flag (this module has no TCP client).
+// (packages/protocol/src/peer/PeerDescriptor.ts:34-81 at 0ceb202d).
 type Descriptor struct {
 	// Address is the peer's logical address: our fabric index and its node
 	// id (:40-43).
@@ -24,9 +23,10 @@ type Descriptor struct {
 	// when unknown (:45-48).
 	DataModelRevision uint16
 	// OperationalAddress is where the peer was last reached, nil when
-	// unknown (:50-53). It is a UDP address: matter.js
-	// OperationalAddress.from (:22-31) tags an untyped address as UDP, and
-	// this module speaks UDP only.
+	// unknown (:50-53). It is kept as a UDP address: matter.js
+	// OperationalAddress.from (:22-31) tags an untyped address as UDP; a
+	// TCP session's address is recorded with the discovered port, the
+	// transport not kept.
 	OperationalAddress *net.UDPAddr
 	// DiscoveryData is what the peer's operational TXT record announced,
 	// nil when nothing is known (:55-58).
@@ -38,6 +38,11 @@ type Descriptor struct {
 	// CaseAuthenticatedTags are our CATs for CASE sessions to the peer;
 	// nil is unknown, as distinct from an empty set (:73-80).
 	CaseAuthenticatedTags []uint32
+	// TCPUnsupported records a peer that negotiated a TCP session but
+	// reported no TCP server: TCP is not attempted again until a later
+	// session reports TCP server support (PeerDescriptor.ts:62-66,
+	// Peer.ts:346-353 at 862ad75f).
+	TCPUnsupported bool
 }
 
 // clone deep-copies d.

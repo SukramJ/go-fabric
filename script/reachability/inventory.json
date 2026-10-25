@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6550,
+  "entry_points": 6558,
   "entry_packages": [
     ".",
     "bdx",
@@ -257,9 +257,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 16051,
-    "reachable": 11347,
-    "whitelisted": 4701,
+    "total_exported": 16067,
+    "reachable": 11357,
+    "whitelisted": 4707,
     "unreachable": 3
   },
   "by_package": [
@@ -6440,6 +6440,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestTCPSessionBindingParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/tcp_session_binding_parity_matterjs_test.go",
+      "line": 93
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
@@ -6605,6 +6612,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/input_chunk_parity_matterjs_test.go",
       "line": 301
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestInvokeLargeMessageParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/large_message_parity_matterjs_test.go",
+      "line": 97
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestLargeMessageTransportParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/large_message_parity_matterjs_test.go",
+      "line": 63
     },
     {
       "package": "client/interaction",
@@ -6947,28 +6968,28 @@
       "identifier": "TestPeerConnectionFallbackRetirementAfterStabilization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 50
+      "line": 49
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementKeepAlive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 126
+      "line": 125
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 168
+      "line": 167
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerConnectionFallbackRetirementSuperseded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connection_fallback_retirement_parity_matterjs_test.go",
-      "line": 97
+      "line": 96
     },
     {
       "package": "client/peer",
@@ -7014,10 +7035,31 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestPeerConnectionSocketOwnershipParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/transport_parity_matterjs_test.go",
+      "line": 242
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestPeerEstablishmentProgressDetector",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_establishment_progress_parity_matterjs_test.go",
       "line": 18
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerTCPSessionSelectionParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/transport_parity_matterjs_test.go",
+      "line": 144
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestPeerTransportGateParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/transport_parity_matterjs_test.go",
+      "line": 35
     },
     {
       "package": "client/peer",
