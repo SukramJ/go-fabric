@@ -411,7 +411,23 @@ code with matter.js's validation: `Manual`, `Version`, `VendorID`,
 the discovery selector. A code it refuses is `controller.ErrPairingCode`,
 and `Pair` returns the same error for the same code.
 
-*Source: `controller/controller.go`, `controller/code.go`, `controller/facade_test.go`.*
+### The commissioning window
+
+`Node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions{})` opens
+an enhanced commissioning window on a paired node so another administrator
+can add it, as matter.js's `openEnhancedCommissioningWindow` does: a window
+open before is revoked, a random discriminator and passcode are drawn, the
+PAKE verifier is derived over a random 32-byte salt at 1000 iterations, and
+`OpenCommissioningWindow` is sent (timed). The `client.CommissioningWindow`
+it returns carries the manual code, the QR code, the passcode, the long
+discriminator, the node's vendor and product id and the timeout (0 is
+`client.DefaultWindowTimeout`, 900 s). `WindowOptions{Basic: true}` opens a
+basic window, in which the node takes its own passcode; a node without the
+Basic feature is `client.ErrNoBasicWindow`.
+`Node.RevokeCommissioningWindow(ctx)` closes a window and reports whether
+one was open.
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/facade_test.go`.*
 
 ## What is not here yet
 
