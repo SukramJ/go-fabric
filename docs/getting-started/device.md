@@ -291,7 +291,13 @@ calls:
   own; and a host port, the device the server drives. To refuse a command,
   for example when the physical lamp did not switch, declare the light's
   switch: `onoffdef.Declare{Sink: relay}`. An error from the sink answers
-  FAILURE and stores nothing.
+  FAILURE and stores nothing. A hook, a port or a host server that wants
+  another status returns (or wraps) a `contract.StatusError{Status: …,
+  ClusterStatus: …}`: the controller receives that status, as matter.js
+  answers a `StatusResponseError` — `contract.StatusTimeout` for an
+  answer the device could not give in time, `0x87` for a value it refuses,
+  `0x01` with a cluster status for a cluster-specific one. A status error
+  naming Success answers FAILURE.
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
   `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored
