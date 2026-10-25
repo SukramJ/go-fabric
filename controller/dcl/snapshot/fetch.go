@@ -107,6 +107,9 @@ func Fetch(ctx context.Context, client *dcl.Client, cdSigners []string, dir stri
 	if err := os.WriteFile(filepath.Join(dir, SourceFile), append(b, '\n'), 0o644); err != nil { //nolint:gosec // G306: see above
 		return Source{}, err
 	}
+	if _, err := FetchVendors(ctx, client, dir, src.BuiltAt.Format(time.RFC3339)); err != nil {
+		return Source{}, err
+	}
 	return src, nil
 }
 

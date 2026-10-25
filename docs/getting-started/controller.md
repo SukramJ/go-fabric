@@ -296,6 +296,13 @@ The commissioner checks the device's attestation against a trust store:
   then learns the key identifiers of the PAAs, PAIs and CD signers of the
   devices you attest; no device identity, passcode or fabric key is sent.
 
+The snapshot also names the vendors offline: `snapshot.Vendors()` and
+`snapshot.Vendor(id)` are the ledger's vendor records it was built with,
+over matter.js's static vendors (the test vendors 0xFFF1–0xFFF4 and Nabu
+Casa), so a vendor id resolves to a name without the network.
+`make update-dcl-snapshot` refreshes them with the certificates (or alone,
+`go run ./script/dclsnapshot -vendors-only`).
+
 The policy decides what a finding does:
 
 | Policy | Effect on a finding |

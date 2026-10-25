@@ -69,7 +69,9 @@ repository"),
 <https://csa-iot.org/wp-content/uploads/2024/02/pki-certificate-policy-2025.pdf>.
 connectedhomeip (Apache-2.0) commits the same certificates under
 `credentials/production/`. Revocation information is not redistributed: the
-CRL check stays online.
+CRL check stays online. The same directory holds `vendors.json`, the
+ledger's public vendor records (id, name, company names, landing page,
+creator address), fetched from the ledger's `/dcl/vendorinfo/vendors`.
 
 ### matterjs-server — test fixtures
 
