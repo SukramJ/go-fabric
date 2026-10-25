@@ -1634,7 +1634,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 197,
+    "line": 209,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",

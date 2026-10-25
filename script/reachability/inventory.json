@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6426,
+  "entry_points": 6427,
   "entry_packages": [
     ".",
     "bdx",
@@ -240,9 +240,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14798,
+    "total_exported": 14799,
     "reachable": 10321,
-    "whitelisted": 4474,
+    "whitelisted": 4475,
     "unreachable": 3
   },
   "by_package": [
@@ -3522,6 +3522,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_handshake_test.go",
       "line": 142
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestICDSeams",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/icd_test.go",
+      "line": 43
     },
     {
       "package": "bridge",
