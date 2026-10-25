@@ -185,3 +185,40 @@ func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodab
 	}
 	return res, err
 }
+
+// InvokeBatch invokes several commands on the peer and returns one
+// [Result] per command, in their order, a command's own status in its
+// Result (NoCommandResponse for one the peer did not answer). The commands
+// go in batches of the peer's [Node.MaxPathsPerInvoke], each batch on an
+// exchange of its own, in parallel — matter.js ClientInteraction.invoke
+// with #invokeWithSplitting (packages/protocol/src/action/client/ClientInteraction.ts:654-737
+// at 862ad75f) behind ClientNodeInteraction.invoke
+// (packages/node/src/node/client/ClientNodeInteraction.ts). A batch's
+// exchange failure is the error; the Results of the other batches stand.
+func (n *Node) InvokeBatch(ctx context.Context, cmds []CommandRequest, opts InvokeOptions) ([]Result, error) {
+	ia, err := n.interaction()
+	if err != nil {
+		return nil, err
+	}
+	if err := n.holdICD(ctx); err != nil {
+		return nil, err
+	}
+	res, err := ia.InvokeBatch(ctx, cmds, n.MaxPathsPerInvoke(), opts)
+	if err == nil {
+		n.noteICDActive()
+	}
+	return res, err
+}
+
+// MaxPathsPerInvoke is the number of commands the peer takes in one
+// InvokeRequest: the MaxPathsPerInvoke of its session parameters, 1 when
+// it reported none or the node has no peer — matter.js
+// PeerExchangeProvider.maxPathsPerInvoke (packages/protocol/src/peer/PeerExchangeProvider.ts:30-32
+// at 862ad75f) and ClientInteraction's fallback of 1 (ClientInteraction.ts:721).
+func (n *Node) MaxPathsPerInvoke() int {
+	p := n.peer()
+	if p == nil {
+		return 1
+	}
+	return max(int(p.SessionParameters().MaxPathsPerInvoke), 1)
+}

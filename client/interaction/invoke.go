@@ -75,9 +75,33 @@ type Result struct {
 //
 // Errors of the exchange layer pass through unchanged.
 func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
+	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
+	entries, err := c.exchangeInvoke(ctx, []im.CommandInvocation{{Path: path, Fields: fields}}, opts)
+	if err != nil || opts.SuppressResponse {
+		return Result{}, err
+	}
+	if len(entries) == 0 {
+		return Result{}, ErrNoResponse
+	}
+	res := resultOf(entries[0])
+	if res.Status != im.StatusSuccess {
+		return res, &StatusError{Status: res.Status, ClusterStatus: res.ClusterStatus}
+	}
+	return res, nil
+}
+
+// exchangeInvoke sends one InvokeRequest of invokes on a fresh exchange —
+// the TimedRequest first for a timed invoke, the commands with their
+// fields (each invocation's Fields a spec.Encodable, nil for an empty
+// payload) — and returns the entries of every InvokeResponse chunk, none
+// for a suppressed response. It is the exchange of [Interaction.Invoke]
+// and of each batch of [Interaction.InvokeBatch]: matter.js
+// ClientInteraction.#invokeSingle (ClientInteraction.ts:487-649 at
+// 862ad75f) up to the decoding of its entries.
+func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandInvocation, opts InvokeOptions) ([]im.InvokeResponseEntry, error) {
 	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 	defer m.x.Close()
 	// A timeout alone marks the invoke timed, as a write's does. Mirrors
@@ -90,17 +114,17 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 			timeout = DefaultTimedRequestTimeout
 		}
 		if err := m.timed(ctx, timeout); err != nil {
-			return Result{}, err
+			return nil, err
 		}
 	}
 	ept := opts.ExpectedProcessingTime
 	if ept == 0 && opts.ExtendedFailSafeTimeout {
 		ept = DefaultMinimumResponseTimeoutWithFailsafe
 	}
-	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: []im.CommandInvocation{{Path: path}}},
-		func(e *tlv.Encoder, tag tlv.Tag, _ any) {
+	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: invokes},
+		func(e *tlv.Encoder, tag tlv.Tag, v any) {
+			fields, _ := v.(spec.Encodable)
 			if fields == nil {
 				e.StartStruct(tag)
 				_ = e.EndContainer()
@@ -110,9 +134,12 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 		})
 	req, err := enc.Bytes()
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
-	c.log.Debug("matter.controller.interaction.invoke", slog.Uint64("endpoint", uint64(path.Endpoint)), slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("command", uint64(path.Command)))
+	for _, inv := range invokes {
+		path := inv.Path
+		c.log.Debug("matter.controller.interaction.invoke", slog.Uint64("endpoint", uint64(path.Endpoint)), slog.Uint64("cluster", uint64(path.Cluster)), slog.Uint64("command", uint64(path.Command)))
+	}
 	if opts.SuppressResponse {
 		// A suppressed invoke expects an acknowledgement only; a message in
 		// its place is tolerated unless it is a StatusResponse with an
@@ -123,51 +150,49 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 		err := m.x.Send(ctx, im.OpcodeInvokeRequest, req, exchange.SendOptions{ExpectAckOnly: true, ExpectedProcessingTime: ept})
 		var unexpected *exchange.UnexpectedMessageError
 		if errors.As(err, &unexpected) {
-			return Result{}, statusOf(unexpected.Message)
+			return nil, statusOf(unexpected.Message)
 		}
-		return Result{}, err
+		return nil, err
 	}
 	if err := m.send(ctx, im.OpcodeInvokeRequest, req, ept); err != nil {
-		return Result{}, err
+		return nil, err
 	}
 	var entries []im.InvokeResponseEntry
 	for {
 		msg, err := m.next(ctx, im.OpcodeInvokeResponse, ept)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 		resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), readFields)
 		if err != nil {
-			return Result{}, fmt.Errorf("%w: InvokeResponse: %w", ErrUnexpectedMessage, err)
+			return nil, fmt.Errorf("%w: InvokeResponse: %w", ErrUnexpectedMessage, err)
 		}
 		entries = append(entries, resp.Responses...)
 		if !resp.MoreChunkedMessages {
-			break
+			return entries, nil
 		}
 		if err := m.sendStatus(ctx, im.StatusSuccess); err != nil {
-			return Result{}, err
+			return nil, err
 		}
 	}
-	if len(entries) == 0 {
-		return Result{}, ErrNoResponse
-	}
-	e := entries[0]
+}
+
+// resultOf is one entry of an InvokeResponse as a [Result]: the response
+// command and its fields, or the status and cluster status.
+func resultOf(e im.InvokeResponseEntry) Result {
 	if e.IsStatus {
 		res := Result{Status: e.Status.Status}
 		if e.Status.HasClusterStatus {
 			cs := e.Status.ClusterStatus
 			res.ClusterStatus = &cs
 		}
-		if res.Status != im.StatusSuccess {
-			return res, &StatusError{Status: res.Status, ClusterStatus: res.ClusterStatus}
-		}
-		return res, nil
+		return res
 	}
 	res := Result{Command: e.Path.Command, Status: im.StatusSuccess}
 	if n, ok := e.Response.(spec.Node); ok {
 		res.HasFields, res.Fields = true, n
 	}
-	return res, nil
+	return res
 }
 
 // readFields keeps a response command's fields as a node tree.

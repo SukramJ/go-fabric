@@ -94,6 +94,9 @@ type (
 	// WriteStatuses are a write's answers, one per path; Err is the first
 	// that is not Success, as a *StatusError.
 	WriteStatuses = interaction.WriteStatuses
+	// CommandRequest is one command of [Node.InvokeBatch]: its Path and
+	// its request Fields (a generated request's value, nil for none).
+	CommandRequest = interaction.CommandRequest
 	// InvokeOptions are an invoke's options: Timed (a TimedRequest first —
 	// schema.IsTimedInvoke says which commands need one), TimedTimeout,
 	// ExpectedProcessingTime, ExtendedFailSafeTimeout, SuppressResponse.

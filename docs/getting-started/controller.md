@@ -432,7 +432,17 @@ Basic feature is `client.ErrNoBasicWindow`.
 `Node.RevokeCommissioningWindow(ctx)` closes a window and reports whether
 one was open.
 
-*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/facade_test.go`.*
+### Batched invokes
+
+`Node.InvokeBatch(ctx, []client.CommandRequest, opts)` sends several
+commands and returns one `Result` per command, in their order. The
+commands go in batches of the peer's `Node.MaxPathsPerInvoke()` (its
+session parameters; 1 when it reported none), each batch on an exchange of
+its own, in parallel, as matter.js splits an invoke. A command's own status
+is its `Result.Status` — `NoCommandResponse` for a command the peer did not
+answer — and not an error; the error is an exchange that failed.
+
+*Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
 
 ## What is not here yet
 
