@@ -127,6 +127,10 @@ is `ReadCluster` with the generated `StateFrom`, which fills the same
 A status other than Success is an `*StatusError`: the IM status,
 the cluster status when the device sent one, and the attribute path for an
 attribute. An uncommissioned pair returns `fabrictest.ErrNotCommissioned`.
+`ReadCluster` reads every attribute of the cluster, a wildcard path the
+device skips without a status where it matches nothing: on an endpoint
+the device no longer serves (removed from its Aggregator) it returns no
+values and no error, so a test of a removal checks for the empty result.
 
 *Source: `fabrictest/wire.go`, `fabrictest/raw.go`, `fabrictest/access.go`,
 `fabrictest/pase.go`, `fabrictest/window.go`.*
