@@ -306,7 +306,12 @@ The policy decides what a finding does:
 | zero value `Policy{}` | **proceeds**, with a warning per finding |
 
 The zero value proceeds because matter.js does the same for backward
-compatibility. Set the policy explicitly.
+compatibility. Set the policy explicitly. (`controller.Pair` sets
+`attestation.Reject()` when its options leave the policy unset.)
+
+A rejection matches `commissioner.ErrAttestationRejected` through
+`errors.Is`, besides `commissioner.ErrCommissioning`, so a host tells a
+refused device from a network failure.
 
 *Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:242-297`.*
 

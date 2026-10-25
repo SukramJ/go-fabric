@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/secure/setup"
 )
@@ -76,6 +77,26 @@ func TestDiscover(t *testing.T) {
 		if tc.want == 1 && found[0].D != dev.Discriminator() {
 			t.Fatalf("found discriminator %d, want %d", found[0].D, dev.Discriminator())
 		}
+	}
+}
+
+// TestPairAttestationRejected: Pair's default policy rejects the site
+// device's test Certification Declaration finding, and the error is
+// commissioner.ErrAttestationRejected besides ErrCommissioning.
+func TestPairAttestationRejected(t *testing.T) {
+	t.Parallel()
+	site, dev, c := siteController(t, fabrictest.Topology{}, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err := site.Run(ctx, func(ctx context.Context) error {
+		_, err := c.Pair(ctx, manualCode(t, dev), controller.PairOptions{})
+		return err
+	})
+	if !errors.Is(err, commissioner.ErrAttestationRejected) || !errors.Is(err, commissioner.ErrCommissioning) {
+		t.Fatalf("Pair: %v, want ErrAttestationRejected and ErrCommissioning", err)
+	}
+	if len(c.Nodes()) != 0 {
+		t.Fatalf("%d commissioned nodes after a rejection", len(c.Nodes()))
 	}
 }
 

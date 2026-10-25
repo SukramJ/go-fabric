@@ -754,9 +754,9 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 				baseErr = newError(ErrCommissioning, fmt.Sprintf("Device attestation produced %d finding(s) and was rejected by policy", len(findings)), nil)
 			}
 			if reason != "" {
-				return 0, newError(ErrCommissioning, reason, baseErr)
+				return 0, attestationRejected{newError(ErrCommissioning, reason, baseErr)}
 			}
-			return 0, baseErr
+			return 0, attestationRejected{baseErr}
 		}
 		f.log.Info("matter.controller.commissioning.attestation_verified", slog.Int("accepted_findings", len(findings)))
 	} else {

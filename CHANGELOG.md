@@ -18,6 +18,7 @@ pseudo-version of `main`.
 - Discovery on the controller (§1.4): `Controller.Discover(ctx, discovery.Identifier, timeout)` returns every commissionable device found before the timeout on the controller's clock; `controller.DefaultDiscoveryTimeout` (15 minutes, matter.js's).
 - The pairing-code decoder (§1.5): `controller.ParsePairingCode(code) (PairingCode, error)` with `PairingCode.Identifier()`, and `controller.ErrPairingCode`, which `Pair` now wraps for a code it cannot read. The reference controller parses its `pair --code` with it.
 - The commissioning window from the controller (§1.6): `client.Node.OpenCommissioningWindow(ctx, timeout, client.WindowOptions)` returns a `client.CommissioningWindow` (manual and QR code, passcode, discriminator, vendor and product id, timeout); `client.Node.RevokeCommissioningWindow`, `client.DefaultWindowTimeout`, `client.ErrNoBasicWindow`. The reference controller's `window open` and `window revoke` run on them, and the port of matter.js's `CommissioningWindowTest.ts` moves to `controller/client`.
+- Attestation rejection as a sentinel (§1.7): `commissioner.ErrAttestationRejected` matches, through `errors.Is`, the error a commissioning returns when the attestation policy rejects the device's findings; the error keeps matter.js's message and still matches `ErrCommissioning`. `controller.Pair` and `client.Registry.Commission` return it.
 
 ## [0.12.0] — 2026-10-25
 
