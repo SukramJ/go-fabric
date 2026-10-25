@@ -391,8 +391,19 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 		if err != nil {
 			return fmt.Errorf("endpoint: gc list: %w", err)
 		}
+		retained := make(map[string]bool, len(snap.Retain))
+		for _, key := range snap.Retain {
+			if key != nil {
+				retained[key.String()] = true
+			}
+		}
 		for _, rec := range records {
 			if _, kept := seen[rec.Key]; kept {
+				continue
+			}
+			if rec.Key != nil && retained[rec.Key.String()] {
+				// Reserved by the owner (Snapshot.Retain): the number
+				// waits for the key's return.
 				continue
 			}
 			if err := a.store.RemoveEndpoint(ctx, rec.Key); err != nil {

@@ -217,7 +217,8 @@ and Aggregator endpoints, PASE and CASE, the subscription engine, mDNS.
 `Aggregator().Add` puts each device under the Aggregator; before `Start`
 it only changes the set, after `Start` it reassembles the running bridge.
 `MarkComplete` says every device the host knows is added, so the node may
-drop the stored endpoint numbers of devices that are gone. On an error
+drop the stored endpoint numbers of devices that are gone. A device the
+host removes keeps its number for its return (`Remove`); `Forget` frees it. On an error
 path the node is stopped: `New` already started its engine.
 
 A host whose devices come from several sources that load on their own
@@ -225,7 +226,7 @@ gives each a partition: `Aggregator().Partition(name)` has the same
 `Add`, `Replace`, `Remove` and `MarkComplete`, under its own snapshot
 scope, so marking one source complete drops only that source's vanished
 numbers. `RetirePartition(ctx, name)` drops the stored numbers of a source
-the host no longer has, without a handle. `Batch(ctx, fn)` applies many
+the host no longer has, without a handle, reserved ones included. `Batch(ctx, fn)` applies many
 changes and reassembles once after `fn`; each change in it returns its
 own error and stays applied when another fails. The Aggregator's own
 methods are the default partition's, so a host with one source writes

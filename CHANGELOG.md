@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `node.Aggregator.Remove` keeps the endpoint numbers of the removed key and its parts (brief CK §2): an `Add` of the same key gets them back, across restarts and `MarkComplete`, and no other device is given them — matter.js's `close()` keeping its number reservation (`ServerEndpointInitializer.ts:67-69`, `ServerEndpointStores.ts:20-22` at 862ad75f). A host that removed a device for good and wants a re-add numbered anew calls `Forget`. The reservation lives in the settings table (`endpoint_number_reserved.<key>`); no store migration. `RetirePartition` frees a partition's reservations with its numbers.
+
 ### Added
 
 - Observers on a running node (brief CK §1.1): `Node.Observe(node.Observers) (unsubscribe func())` registers hooks after `Config.Observers`, in registration order, on the same goroutine rules; the unsubscribe is idempotent. A handler mounted after `Start` sees commissionings, fabric changes and window transitions.
@@ -17,6 +21,7 @@ pseudo-version of `main`.
 - The configured setup payload (§1.3): `Node.SetupPayload() (node.SetupPayload, error)` with the passcode, discriminator, vendor and product id and the QR and manual codes `PairingCodes` returns; it carries the passcode by design.
 - Cluster names on the topology (§1.4): `node.BridgedDevice.Clusters []node.ClusterInfo{ID, Name, Revision}` and `BridgedDevice.DeviceTypeRevision`, from the mounted servers and the generated schema, for every endpoint — parts and a host Snapshotter's endpoints included.
 - Fresh window credentials (§1.5): `node.NewWindowCredentials(timeout)` draws a discriminator, a passcode that passes the setup-PIN rule, a 32-byte salt and 1000 iterations for one `OpenBasicWindow`. `bridge.RandomPasscode` now applies `setup.IsValidPasscode` instead of a list of its own.
+- Endpoint-number reservation per stable key (§2): `Aggregator.Forget(ctx, key)` (and `Partition.Forget`, `Batch.Forget`) removes a key if the set holds it and frees the endpoint numbers stored for it and its parts, matter.js's `delete()`; `endpoint.Snapshot.Retain` lists stored identities a model-complete assembly keeps though absent.
 - Read-only session diagnostics (§1.6): `Node.SessionDiagnostics()` returns each session's id, fabric, node ids, PASE flag, subscription count, last activities and idle ages measured on the node's clock, and the session table's occupancy; `Node.Clock()` returns the node's time source.
 
 ## [0.12.1] — 2026-10-25

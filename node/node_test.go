@@ -278,20 +278,23 @@ func TestRunStopsWithTheContext(t *testing.T) {
 	}
 }
 
-// TestAggregatorAcrossRestart: Add before and after Start, Remove on a
-// complete set, and a restart on the same database. An endpoint kept
-// across the restart keeps its number (BD-Matter-EndpointID-Persistent);
-// one removed and added again gets a fresh one, as the allocator never
-// reissues a released number (BD-Matter-EndpointNumber-Monotonic). In
-// matter.js, delete() erases the endpoint's storage
-// (packages/node/src/endpoint/Endpoint.ts:987-990).
+// TestAggregatorAcrossRestart: Add before and after Start, Remove and
+// Forget on a complete set, and a restart on the same database. An
+// endpoint kept across the restart keeps its number
+// (BD-Matter-EndpointID-Persistent); one removed keeps its reservation
+// across the restart and gets its number back, as a closed matter.js
+// endpoint does (packages/node/src/node/server/ServerEndpointInitializer.ts:
+// 67-69 at 862ad75f); one forgotten and added again gets a fresh one, as
+// the allocator never reissues a released number
+// (BD-Matter-EndpointNumber-Monotonic) — matter.js's delete() erases the
+// endpoint's storage (packages/node/src/endpoint/Endpoint.ts:987-992).
 func TestAggregatorAcrossRestart(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "node.db")
 	ctx := context.Background()
 
 	n := newNode(t, minimalConfig(openDB(t, path)))
-	a, b := newPlug(t, "plug:a"), newPlug(t, "plug:b")
+	a, b, c := newPlug(t, "plug:a"), newPlug(t, "plug:b"), newPlug(t, "plug:c")
 	if err := n.Aggregator().Add(ctx, a); err != nil {
 		t.Fatal(err)
 	}
@@ -301,13 +304,17 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	if err := n.Aggregator().Add(ctx, b); err != nil {
 		t.Fatal(err)
 	}
+	if err := n.Aggregator().Add(ctx, c); err != nil {
+		t.Fatal(err)
+	}
 	n.Aggregator().MarkComplete()
 	idA, okA := endpointOf(t, n, "plug:a")
 	idB, okB := endpointOf(t, n, "plug:b")
-	if !okA || !okB || idA == idB {
-		t.Fatalf("endpoints a=%d (%v) b=%d (%v)", idA, okA, idB, okB)
+	idC, okC := endpointOf(t, n, "plug:c")
+	if !okA || !okB || !okC || idA == idB || idB == idC {
+		t.Fatalf("endpoints a=%d (%v) b=%d (%v) c=%d (%v)", idA, okA, idB, okB, idC, okC)
 	}
-	if got := len(n.Aggregator().Endpoints()); got != 2 {
+	if got := len(n.Aggregator().Endpoints()); got != 3 {
 		t.Errorf("Endpoints() has %d entries", got)
 	}
 	if err := n.Aggregator().Remove(ctx, endpoint.StringKey("plug:a")); err != nil {
@@ -315,6 +322,12 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	}
 	if _, ok := endpointOf(t, n, "plug:a"); ok {
 		t.Error("removed endpoint still in the topology")
+	}
+	if err := n.Aggregator().Forget(ctx, endpoint.StringKey("plug:c")); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := endpointOf(t, n, "plug:c"); ok {
+		t.Error("forgotten endpoint still in the topology")
 	}
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
@@ -324,17 +337,26 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:b")); err != nil {
 		t.Fatal(err)
 	}
+	if err := m.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// A complete set without plug:a: its reservation outlives the
+	// restart and the collection.
+	m.Aggregator().MarkComplete()
 	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.Start(ctx); err != nil {
+	if err := m.Aggregator().Add(ctx, newPlug(t, "plug:c")); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := endpointOf(t, m, "plug:b"); got != idB {
 		t.Errorf("plug:b endpoint %d after the restart, want %d", got, idB)
 	}
-	if got, _ := endpointOf(t, m, "plug:a"); got == idA || got == 0 {
-		t.Errorf("re-added plug:a endpoint %d, want a fresh number (was %d)", got, idA)
+	if got, _ := endpointOf(t, m, "plug:a"); got != idA {
+		t.Errorf("re-added plug:a endpoint %d, want its reserved number %d", got, idA)
+	}
+	if got, _ := endpointOf(t, m, "plug:c"); got == idC || got == 0 {
+		t.Errorf("re-added plug:c endpoint %d, want a fresh number (was %d)", got, idC)
 	}
 }
 

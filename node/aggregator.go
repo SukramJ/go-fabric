@@ -63,12 +63,19 @@ var (
 // each one reassembles the running bridge, and a [Aggregator.Batch]
 // reassembles once for many changes.
 //
+// Each stable key keeps its endpoint number: [Aggregator.Remove] reserves
+// it for the key's return, and only [Aggregator.Forget] (or
+// [Aggregator.RetirePartition] for a whole partition) frees it — matter.js
+// reserving a number per endpoint store (reserve.go).
+//
 // Call [Aggregator.MarkComplete] once the host has added every device it
 // knows about; before that, numbers of stored endpoints are retained. The
 // snapshots carry ModelComplete false until then and true afterwards, when
-// a stored endpoint absent from the set is garbage-collected
-// (endpoint.Snapshot.ModelComplete, BD-Matter-EndpointGC-ModelCompleteGate).
-// Start does not mark the set complete.
+// a stored endpoint absent from the set that holds no reservation — one a
+// previous run held and this run never added or removed — is
+// garbage-collected (endpoint.Snapshot.ModelComplete,
+// BD-Matter-EndpointGC-ModelCompleteGate). Start does not mark the set
+// complete.
 //
 // The set is partitioned for a host whose devices come from several
 // sources that load independently: [Aggregator.Partition] names one, with
@@ -259,19 +266,22 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 	return a.Partition(Scope).Replace(ctx, key, ep)
 }
 
-// Remove drops the endpoint with key; a running node reassembles. Once the
-// set is complete ([Aggregator.MarkComplete]) the assembler releases the
-// endpoint's number then, as matter.js erases a deleted endpoint's storage
-// (ServerEndpointInitializer.ts eraseDescendant, cited at
-// endpoint.Snapshot.ModelComplete); a re-add gets a fresh number. It acts
-// on the default partition.
+// Remove drops the endpoint with key; a running node reassembles. The key
+// keeps its endpoint number, and its parts theirs, across restarts and
+// [Aggregator.MarkComplete]: an Add of the same key gets them back, and
+// no other device is given them. [Aggregator.Forget] frees them. It
+// mirrors matter.js closing an endpoint, which keeps its number
+// reservation (packages/node/src/node/server/ServerEndpointInitializer.ts:
+// 67-69 at 862ad75f) and hands it back to the endpoint that returns
+// (packages/node/src/storage/server/ServerEndpointStores.ts:117-123). It
+// acts on the default partition.
 func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
 	return a.Partition(Scope).Remove(ctx, key)
 }
 
 // MarkComplete declares the default partition authoritative: every later
 // snapshot of it is model-complete, so stored endpoints absent from it are
-// garbage-collected. Call it once the host has added every device it
+// garbage-collected, except those a Remove reserved. Call it once the host has added every device it
 // knows about; before that, numbers of stored endpoints are retained. On a
 // running node it reassembles at once; a failure is logged and the next
 // Add, Remove or Reassemble retries.
@@ -332,6 +342,9 @@ type Batch struct {
 	// detach are the devices removed or replaced, unbound after the
 	// reassembly.
 	detach []func()
+	// ops are the reservation changes of the batch's Add, Remove and
+	// Forget calls, applied in order after fn (reserve.go).
+	ops []reservationOp
 }
 
 // Batch runs fn with a [Batch] bound to the partition. Each of its calls
@@ -350,6 +363,9 @@ type Batch struct {
 func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	b := &Batch{a: p.a, scope: p.scope}
 	fnErr := fn(b)
+	// The reservations first, so the reassembly keeps a removed key's
+	// number and collects a forgotten one's.
+	resErr := p.a.applyReservations(ctx, b.ops)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
@@ -357,6 +373,7 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	if b.changed && started {
 		err = p.a.reassemble(ctx)
 	}
+	err = errors.Join(resErr, err)
 	// Unbound after the reassembly: no controller reaches them any more.
 	for _, d := range b.detach {
 		d()
@@ -391,6 +408,9 @@ func (b *Batch) Add(ep Endpoint) error {
 	part.eps = append(part.eps, ep)
 	a.detachSetLocked(key, detach)
 	b.changed = true
+	// A returning key takes its reserved number back; the reservation is
+	// done with.
+	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key})
 	return nil
 }
 
@@ -441,18 +461,28 @@ func (b *Batch) Remove(key device.SourceKey) error {
 	}
 	a := b.a
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	part, i := a.findLocked(key.String())
 	if part == nil || part.scope != b.scope {
+		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
+	removed := part.eps[i]
+	b.dropLocked(part, i, key.String())
+	a.mu.Unlock()
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec())})
+	return nil
+}
+
+// dropLocked takes the endpoint at i out of part, its device unbound after
+// the batch's reassembly; a.mu is held.
+func (b *Batch) dropLocked(part *partition, i int, key string) {
+	a := b.a
 	part.eps = slices.Delete(part.eps, i, i+1)
-	if d := a.detach[key.String()]; d != nil {
+	if d := a.detach[key]; d != nil {
 		b.detach = append(b.detach, d)
 	}
-	a.detachSetLocked(key.String(), nil)
+	a.detachSetLocked(key, nil)
 	b.changed = true
-	return nil
 }
 
 // MarkComplete marks the batch's partition complete
@@ -610,8 +640,12 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	snaps := make([]endpoint.Snapshot, 0, len(parts)+len(retired))
 	for i, p := range parts {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
+		present := map[string]bool{}
 		for _, ep := range p.eps {
 			spec := ep.Spec()
+			for _, k := range reservationTree(spec) {
+				present[k] = true
+			}
 			if label := a.n.endpoints.NodeLabel(ctx, spec.StableKey); label != "" {
 				spec.NodeLabel = label
 			}
@@ -623,9 +657,16 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		if i == 0 && a.n.otaProvider != nil {
 			specs = append(specs, otaProviderEndpoint{a.n.otaProvider}.spec())
 		}
-		snaps = append(snaps, endpoint.Snapshot{Scope: p.scope, Endpoints: specs, ModelComplete: p.complete})
+		snap := endpoint.Snapshot{Scope: p.scope, Endpoints: specs, ModelComplete: p.complete}
+		if p.complete {
+			// A removed key's number waits for its return (reserve.go).
+			snap.Retain = a.retained(ctx, p.scope, present)
+		}
+		snaps = append(snaps, snap)
 	}
 	for _, scope := range retired {
+		// Retired for good: the scope's reservations go with its numbers.
+		a.releaseScope(ctx, scope)
 		snaps = append(snaps, endpoint.Snapshot{Scope: scope, ModelComplete: true})
 	}
 	topo, err := a.n.assembler.Assemble(ctx, snaps)

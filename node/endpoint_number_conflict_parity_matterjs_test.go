@@ -265,6 +265,42 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 		})
 	})
 
+	t.Run("keeps a closed endpoint's number for its return", func(t *testing.T) {
+		// ServerEndpointStores.ts:20-22 at 862ad75f: "Each number is
+		// reserved for one store"; a closed endpoint keeps it
+		// (ServerEndpointInitializer.ts:67-69). In Go the owner lists the
+		// reserved key in Snapshot.Retain; a model-complete assembly then
+		// keeps its record, gives the number to no other key and hands it
+		// back on the key's return.
+		store := memstore.New()
+		topo := assembleWith(t, store, kitSpec(t, "closed"), kitSpec(t, "kept"))
+		closed := numberOf(topo, "closed")
+		a, err := endpoint.New(store, endpointtest.AssemblerConfig(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx := context.Background()
+		if _, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept")}, ModelComplete: true, Retain: []endpoint.SourceKey{endpoint.StringKey("closed")}}}); err != nil {
+			t.Fatal(err)
+		}
+		topo, err = a.Assemble(ctx, []endpoint.Snapshot{{Scope: "host", Endpoints: []endpoint.Spec{kitSpec(t, "kept"), kitSpec(t, "newcomer")}, ModelComplete: true, Retain: []endpoint.SourceKey{endpoint.StringKey("closed")}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := numberOf(topo, "newcomer"); n == closed || n == 0 {
+			t.Errorf("the newcomer took %d, the closed endpoint's reserved number", n)
+		}
+		topo = assembleWith(t, store, kitSpec(t, "kept"), kitSpec(t, "newcomer"), kitSpec(t, "closed"))
+		if n := numberOf(topo, "closed"); n != closed {
+			t.Errorf("the returning endpoint is at %d, want its reserved %d", n, closed)
+		}
+		// Without the reservation the same assembly collects it.
+		assembleWith(t, store, kitSpec(t, "kept"))
+		if n := numberOf(assembleWith(t, store, kitSpec(t, "closed")), "closed"); n == closed {
+			t.Errorf("an unreserved closed endpoint kept %d", n)
+		}
+	})
+
 	t.Run("allocates around a preset sibling", func(t *testing.T) {
 		store := memstore.New()
 		preset(t, store, "preset", 2)
