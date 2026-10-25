@@ -469,6 +469,16 @@ SpecificationVersion into a `client.SpecVersion` (`Major`, `Minor`,
 gives the attribute value back for comparisons, and `client.SpecVersionOf`
 decodes a value a host holds. An unknown or zero version reports false.
 
+### Pairing over BLE
+
+`PairOptions.BLE` is a Bluetooth LE central (`ble/bluez` on Linux,
+`controller/ble/bletest` in a test): `Pair` then finds the device by its
+BLE advertisement instead of DNS-SD, runs PASE over BTP, and the network
+steps provision `PairOptions.WiFi` or `PairOptions.Thread` before CASE
+finds the device on the network. A device on BLE has no network yet, so
+one of the two is required. `PairOptions.WiFi` and `Thread` also provision
+a device found over DNS-SD that advertises Wi-Fi or Thread.
+
 ### Thread datasets
 
 `thread.DecodeDataset(b)` (package `controller/thread`) reads a Thread

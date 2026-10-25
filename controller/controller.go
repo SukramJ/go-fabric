@@ -42,6 +42,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
@@ -314,6 +315,19 @@ type PairOptions struct {
 	// OnAttestationFailure decides a node whose attestation fails; the zero
 	// value rejects it (attestation.Reject()).
 	OnAttestationFailure attestation.Policy
+	// BLE, when set, is the Bluetooth LE central Pair finds the device
+	// through, by its advertisement in place of DNS-SD, and commissions it
+	// over BTP: PASE over BLE, then the network steps put the device on
+	// WiFi or Thread, where CASE finds it over DNS-SD (ADR 0024). A device
+	// on BLE has no network yet, so one of WiFi and Thread is required
+	// ([ErrConfiguration] otherwise). The BlueZ central is ble/bluez's.
+	BLE ble.Central
+	// WiFi and Thread are the operational network the commissioning
+	// provisions on a device that advertises Wi-Fi or Thread
+	// (commissioner.Options.WiFiNetwork, ThreadNetwork); nil provisions
+	// none.
+	WiFi   *commissioner.WiFiNetwork
+	Thread *commissioner.ThreadNetwork
 	// Edit adjusts the commissioner's options last (a seam).
 	Edit func(*commissioner.Options)
 }
@@ -325,12 +339,18 @@ type PairOptions struct {
 // CommissioningComplete. A code [ParsePairingCode] refuses is
 // [ErrPairingCode]; a ctx without a deadline is bounded by
 // [DefaultPairTimeout]; a code no device answers before it is
-// [ErrNoDevice]. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:462-500 at 862ad75f).
+// [ErrNoDevice]. With [PairOptions].BLE the device is found over BLE and
+// commissioned over BTP. Mirrors CommissioningController.commissionNode
+// (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
+// BLE when the options name a BLE capability (discoveryCapabilities,
+// :280-283).
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
 	pc, err := ParsePairingCode(code)
 	if err != nil {
 		return nil, err
+	}
+	if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
+		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
 	}
 	passcode, id := pc.Passcode, pc.Identifier()
 	if _, ok := ctx.Deadline(); !ok {
@@ -338,25 +358,26 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		ctx, cancel = context.WithTimeout(ctx, DefaultPairTimeout)
 		defer cancel()
 	}
-	sc := discovery.NewScanner(c.names)
-	defer sc.Close()
-	fctx, found := context.WithCancel(ctx)
 	var dev *discovery.Device
-	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
-		if dev == nil && len(d.Addresses) > 0 {
-			dev = &d
-			found()
+	var channel commissioner.Channel
+	if opts.BLE != nil {
+		d, ch, err := c.dialBLE(ctx, opts.BLE, id)
+		if err != nil {
+			return nil, err
 		}
-	})
-	found()
-	if dev == nil {
+		defer func() { _ = ch.Close() }()
+		dev, channel = &d, ch
+	} else if dev = c.findCommissionable(ctx, id); dev == nil {
 		return nil, ErrNoDevice
 	}
 	n, err := c.reg.ForDevice(ctx, *dev)
 	if err != nil {
 		return nil, err
 	}
-	o := commissioner.Options{Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure}
+	o := commissioner.Options{
+		Passcode: passcode, OnAttestationFailure: opts.OnAttestationFailure,
+		Channel: channel, WiFiNetwork: opts.WiFi, ThreadNetwork: opts.Thread,
+	}
 	if o.OnAttestationFailure.Decide == nil && o.OnAttestationFailure.OnFailure == nil {
 		o.OnAttestationFailure = attestation.Reject()
 	}
@@ -367,6 +388,51 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 		return n, err
 	}
 	return n, nil
+}
+
+// findCommissionable is the first commissionable device id selects that
+// DNS-SD reports with an address before ctx ends; nil when none does.
+func (c *Controller) findCommissionable(ctx context.Context, id discovery.Identifier) *discovery.Device {
+	sc := discovery.NewScanner(c.names)
+	defer sc.Close()
+	fctx, found := context.WithCancel(ctx)
+	defer found()
+	var dev *discovery.Device
+	_, _ = sc.FindCommissionable(fctx, id, func(d discovery.Device) {
+		if dev == nil && len(d.Addresses) > 0 {
+			dev = &d
+			found()
+		}
+	})
+	return dev
+}
+
+// dialBLE scans central until the first device id selects advertises —
+// the long discriminator of a QR code, the short one of a manual code, as
+// over DNS-SD — and opens the BTP channel to it (ble.Dial): matter.js's
+// BleScanner.findCommissionableDevices and the BLE channel of its
+// commissioning (packages/protocol/src/common/BleScanner.ts:543-575 at
+// 862ad75f). The scan runs until ctx's deadline on the controller's
+// clock; none found is [ErrNoDevice].
+func (c *Controller) dialBLE(ctx context.Context, central ble.Central, id discovery.Identifier) (discovery.Device, *ble.Channel, error) {
+	sc := ble.NewScanner(central, ble.ScannerOptions{Clock: c.clock, Logger: c.log})
+	defer func() { _ = sc.Close(context.WithoutCancel(ctx)) }()
+	timeout := DefaultPairTimeout
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = max(time.Until(deadline), time.Millisecond)
+	}
+	devs, err := sc.Find(ctx, id, timeout, false)
+	if err != nil {
+		return discovery.Device{}, nil, err
+	}
+	if len(devs) == 0 {
+		return discovery.Device{}, nil, fmt.Errorf("%w over BLE", ErrNoDevice)
+	}
+	ch, err := ble.Dial(ctx, central, devs[0].Peripheral, ble.DialOptions{Clock: c.clock, Logger: c.log})
+	if err != nil {
+		return discovery.Device{}, nil, err
+	}
+	return devs[0].Commissionable(), ch, nil
 }
 
 func random() uint64 {
