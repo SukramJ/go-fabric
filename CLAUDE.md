@@ -257,6 +257,23 @@ projection — is the host's decision and the host's own gold standard.
 consumer, mirrors `aiohomematic` there; the two reference layers do not
 overlap, and CCU wire knowledge never enters this module.
 
+### Work that starts in a host
+
+Matter rules live here. A rule decided while working in a host — how this
+module treats matter.js, what a server must do, how a divergence is recorded
+— is written into this file or `notes/parity/` in this repository, not only
+into the host's notes; the host's own documents point here.
+
+Implementation this module needs is handed over in a go-fabric issue complete
+enough to continue here without the host session's context: why (the host's
+need, in the module's terms), the verified sources with `file:line` at the
+pins (matter.js at `parity/schema.json` → `matter.sourceCommit`,
+connectedhomeip at the harness commit), the scope and the port or facade
+shape, the parity tests to port, the `by_design.md` row it adds, acceptance
+criteria, what stays host-side, and the open questions. The host's own
+follow-up is a separate issue in the host repository that references this
+one. A host does not implement in this module from its own session.
+
 ---
 
 ## Regenerate the Matter schema from matter.js HEAD
