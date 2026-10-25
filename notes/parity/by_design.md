@@ -31,6 +31,35 @@ projection stayed in OpenCCU-Loom's own
 Some entries are part-German; that is how they were written and the text is
 left verbatim rather than re-translated after the fact.
 
+## Ahead of matter.js — register
+
+Behaviour this module implements where matter.js implements none
+([`CLAUDE.md`](../../CLAUDE.md), workflow step 5). Each row names the
+**marker**: the matter.js line at the pin that shows the gap. At every pin
+lift the markers are re-read at the new pin; a marker that no longer holds is
+the verdict **caught up** in [`pin-lifts.md`](./pin-lifts.md), and the two
+implementations are reconciled onto matter.js before the row closes. A new
+ahead-of-matter.js implementation adds its row in the same change.
+
+Markers below were checked at the pin `862ad75f` where a matter.js file is
+named. "Not recorded" means the entry states that matter.js has no logic but
+cites no matter.js line; the marker is set when the entry is next touched or
+at the next pin lift, read from the tree — never assumed.
+
+| Entry | matter.js marker | Behaviour source |
+| --- | --- | --- |
+| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only | specification text in `smoke-co-alarm-cluster.resource.ts` |
+| BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only | `fan-control.resource.ts`, connectedhomeip `fan-control-server.cpp` |
+| BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
+| BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode | `mode-base.resource.ts` |
+| BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (19 lines at the pin) | connectedhomeip `TemperatureControlCluster.cpp` |
+| BD-chip-BooleanStateConfiguration-RulesInServer | not recorded | connectedhomeip |
+| BD-chip-WaterHeaterManagement-RulesInServer | not recorded | connectedhomeip |
+| BD-chip-AlarmBase-RulesInServer | not recorded | connectedhomeip |
+| BD-chip-Appliance-RulesInServer | not recorded (the entry cites `OvenCavityOperationalStateServer.ts:35-46` for the cavity, not for the gap) | connectedhomeip |
+| BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer | not recorded | connectedhomeip |
+| BD-chip-ClosureDimension-RulesInServer | not recorded | connectedhomeip |
+
 ---
 
 ### BD-Matter-SmokeCoAlarmRulesInServer — ExpressedState, the self-test gate and the events are derived by the server
