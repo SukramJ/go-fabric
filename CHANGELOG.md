@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.12.3] — 2026-10-25
+
 ### Added
 
 - A definition for every cluster of the snapshot (brief CL §1, go-fabric-server S3 Q20; ADR 0013 amendment of 2026-10-25). The camera (CameraAvStreamManagement, CameraAvSettingsUserLevelManagement, WebRtcTransportProvider, WebRtcTransportRequestor, PushAvStreamTransport, ZoneManagement), Thread (ThreadNetworkDiagnostics, ThreadBorderRouterManagement, ThreadNetworkDirectory), Joint Fabric (JointFabricDatastore, JointFabricAdministrator) and TLS (TlsCertificateManagement, TlsClientManagement) clusters get generated packages under `cluster/spec/` with their generated server and `Declare`, as matter.js serves them with its generated behaviour stubs (owner decision 2026-10-25). AccessControl, OperationalCredentials and GroupKeyManagement get definition-only packages — the definition, `State`, `Patch` and `StateFrom`, no server — beside their hand-written `cluster/core` servers, which are unchanged; a parity test holds each server against its definition (`spectest.CheckHandWrittenServer`, new). The controller's JSON route (`client.EncodeJSON` / `DecodeJSON`, `client.AttributeField` and the rest) now types every cluster: an ACL entry, a fabric list, Thread diagnostics.
@@ -4828,7 +4830,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.3...HEAD
+[0.12.3]: https://github.com/SukramJ/go-fabric/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/SukramJ/go-fabric/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/SukramJ/go-fabric/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/SukramJ/go-fabric/compare/v0.11.0...v0.12.0
