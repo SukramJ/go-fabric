@@ -76,6 +76,12 @@ its error on stderr.
   reference-controller pair --ble --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
   ```
 
+- `discover [--code <MT:… | 11 or 21 digits> | --discriminator N] [--first]`
+  — searches DNS-SD for the commissionable devices the code's or the long
+  discriminator selects (every one with neither) until `--timeout` passes,
+  and prints each with its discriminator, vendor and product, commissioning
+  mode and addresses; `--first` stops at the first that answers
+  (`Controller.DiscoverWith`, `DiscoverOptions.First`).
 - `unpair <node>` — RemoveFabric on the node, then its record is deleted.
 
   ```sh

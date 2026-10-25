@@ -10,6 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- A definition for every cluster of the snapshot (brief CL §1, go-fabric-server S3 Q20; ADR 0013 amendment of 2026-10-25). The camera (CameraAvStreamManagement, CameraAvSettingsUserLevelManagement, WebRtcTransportProvider, WebRtcTransportRequestor, PushAvStreamTransport, ZoneManagement), Thread (ThreadNetworkDiagnostics, ThreadBorderRouterManagement, ThreadNetworkDirectory), Joint Fabric (JointFabricDatastore, JointFabricAdministrator) and TLS (TlsCertificateManagement, TlsClientManagement) clusters get generated packages under `cluster/spec/` with their generated server and `Declare`, as matter.js serves them with its generated behaviour stubs (owner decision 2026-10-25). AccessControl, OperationalCredentials and GroupKeyManagement get definition-only packages — the definition, `State`, `Patch` and `StateFrom`, no server — beside their hand-written `cluster/core` servers, which are unchanged; a parity test holds each server against its definition (`spectest.CheckHandWrittenServer`, new). The controller's JSON route (`client.EncodeJSON` / `DecodeJSON`, `client.AttributeField` and the rest) now types every cluster: an ACL entry, a fabric list, Thread diagnostics.
+- The device types Camera, SnapshotCamera, AudioDoorbell, Intercom, Chime, CameraController, ThreadBorderRouter, NetworkInfrastructureManager and JointFabricAdministrator under `device/` (owner decision 2026-10-25); `RootNode` gains the typed accessors `ThreadNetworkDiagnostics`, `TlsCertificateManagement` and `TlsClientManagement`.
+- First-match discovery (§2, S3 Q21): `Controller.DiscoverWith(ctx, id, timeout, controller.DiscoverOptions{First: true})` returns the first device that answers with an address, as matter.js's `Peers.locate` (InstanceDiscovery) stops at the first; `Discover` is `DiscoverWith` with no options. The reference controller gains `discover [--code C | --discriminator N] [--first]`.
+- Pairing by address (§4, S3 Q24): `PairOptions.Address` dials a device at a `*net.UDPAddr` without DNS-SD, as matter.js commissions a `knownAddress` (`MatterController.ts:539-566` at 862ad75f); `controller.DeviceAt(addr)` is the `client.Device` of an address alone, a supported input of `Registry.ForDevice`.
+
+### Changed
+
+- The controller's JSON route writes `<`, `>` and `&` unescaped and without a trailing newline (§3, S3 Q23), as `JSON.stringify` — matterjs-server's writer — does; it wrote `\u003c`, `\u003e`, `\u0026`.
+- The bridge never decodes an AccessControl, OperationalCredentials or GroupKeyManagement request through a linked generated definition; `device.WithServer` refuses only a cluster with a generated `Declare`, so the three hand-written core servers mount as before whether or not their definitions are linked.
+
 ## [0.12.2] — 2026-10-25
 
 ### Changed
