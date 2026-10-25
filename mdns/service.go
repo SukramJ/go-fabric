@@ -175,7 +175,7 @@ func (s Service) Validate() error {
 	if len(s.InstanceName) > 63 {
 		return fmt.Errorf("%w: instance name length=%d (max 63)", ErrInvalidService, len(s.InstanceName))
 	}
-	if s.ServiceType != ServiceTypeOperational && s.ServiceType != ServiceTypeCommissionable {
+	if s.ServiceType != ServiceTypeOperational && s.ServiceType != ServiceTypeCommissionable && s.ServiceType != ServiceTypeCommissioner {
 		return fmt.Errorf("%w: unknown service type %q", ErrInvalidService, s.ServiceType)
 	}
 	if s.Port == 0 {

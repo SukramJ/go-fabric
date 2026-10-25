@@ -4244,18 +4244,17 @@
       "path": "packages/protocol/test/mdns/MdnsTest.ts",
       "status": "partial",
       "go": [
+        "controller:TestControllerAdvertisesItsCommissionerRecord",
+        "mdns:TestCommissionerAdvertisementParity",
         "mdns:TestParityMdnsServer_CommissionableTXTSchemaLock",
         "mdns:TestParityMdnsServer_OperationalSIIFloor500ms"
       ],
       "missing": [
         "has correct crypto installed",
         "it broadcasts the device fabric on one port and expires",
-        "it broadcasts the controller commissioner on one port",
-        "it omits vendor details from commissioner broadcasts when privacy masked",
-        "it allows announcements of multiple devices on different ports",
         "splits oversized announcements into multiple packets with all records in the answer section"
       ],
-      "reason": "The commissionable and operational TXT content BuildCommissionableService/BuildOperationalService own is covered; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive, the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted), and the device side has no _matterd._udp commissioner advertisement, so the three commissioner cases have no Go subject.",
+      "reason": "The commissionable, operational and commissioner (_matterd._udp, BuildCommissionerService, controller.Config.Advertise) record content go-fabric builds is covered, the commissioner cases at the record level; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, and the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive; the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted).",
       "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
     },
     {

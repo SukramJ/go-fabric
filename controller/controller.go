@@ -49,6 +49,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -132,6 +133,15 @@ type Config struct {
 	// pair in its storage (packages/protocol/src/certificate/
 	// CertificateAuthority.ts:53, :169 at 862ad75f).
 	CAKey crypto.Signer
+	// Advertise, when set, publishes our commissioner record
+	// (`_matterd._udp`) on the controller's UDP port until Close
+	// ([Advertise]); nil publishes none, as matter.js advertises a
+	// commissioner only when asked.
+	Advertise *Advertise
+	// Advertiser publishes the Advertise record; nil is
+	// mdns.NewZeroconf(), which Close closes. A test passes
+	// mdns.NewNoop().
+	Advertiser mdns.Advertiser
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -147,7 +157,10 @@ type Controller struct {
 	subs   *interaction.Subscriptions
 	com    *commissioner.Commissioner
 	reg    *client.Registry
+	udp    *udp.Listener
 	stop   func()
+	// unadvertise withdraws the commissioner record (advertise.go).
+	unadvertise func(context.Context) error
 }
 
 // New builds the controller over cfg.DB: the fabric is created on the
@@ -211,6 +224,11 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames); err != nil {
 		return nil, err
 	}
+	if cfg.Advertise != nil {
+		if err := c.advertise(ctx, *cfg.Advertise, cfg.Advertiser, c.fabric.RootVendorID); err != nil {
+			return nil, err
+		}
+	}
 	resumption := &peer.MemoryResumptionStore{}
 	fabrics := []*commissioner.Fabric{c.fabric}
 	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk}); err != nil {
@@ -257,6 +275,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 			return err
 		}
 	}
+	c.udp = l
 	var err error
 	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log, Clock: c.clock}); err != nil {
 		_ = l.Close()
@@ -275,8 +294,9 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 
 // Close tears the stack down in the reverse order of [New]: the
 // registry (its nodes and their subscriptions), the client
-// subscriptions, the commissioner, the peers, the exchanges, the socket,
-// DNS-SD. The database stays open. It is idempotent.
+// subscriptions, the commissioner, the peers, the commissioner record,
+// the exchanges, the socket, DNS-SD. The database stays open. It is
+// idempotent.
 func (c *Controller) Close(ctx context.Context) error {
 	var errs []error
 	if c.reg != nil {
@@ -294,6 +314,10 @@ func (c *Controller) Close(ctx context.Context) error {
 	if c.peers != nil {
 		c.peers.Close(ctx)
 		c.peers = nil
+	}
+	if c.unadvertise != nil {
+		errs = append(errs, c.unadvertise(ctx))
+		c.unadvertise = nil
 	}
 	if c.mgr != nil {
 		c.mgr.Close()
