@@ -233,7 +233,7 @@ The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. Controller-side CASE resumption records are kept in
 memory only, so the first command of a run makes a full CASE handshake.
 
-*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:35-41`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
+*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
 
 ## Schema changes
 

@@ -112,7 +112,8 @@ records after the port returns stands over what the port set meanwhile.
 WindowCovering's `Mover` and MicrowaveOvenControl's `Oven` run behind the
 command queue alike.
 
-**`node.Config.Observers`** run synchronously on the event's goroutine. For
+**`node.Config.Observers`**, and the hooks `Node.Observe` registers after
+them, run synchronously on the event's goroutine. For
 fabric events, that is inside the command that caused the event, before
 its response is sent, so a blocking observer delays the response. Hand
 network work to your own goroutine. An observer's error or panic is logged

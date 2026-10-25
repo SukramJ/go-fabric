@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -22,7 +23,7 @@ func caSetting(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	v, _, err := store.New(db).GetSetting(context.Background(), caKey)
+	v, _, err := store.New(db).GetSetting(context.Background(), ca.DefaultSettingKey)
 	if err != nil {
 		t.Fatal(err)
 	}

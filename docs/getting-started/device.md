@@ -336,12 +336,21 @@ calls:
 - An endpoint without a `StableKey` is refused with `ErrNoStableKey`. A
   second endpoint with the same key is refused with `ErrDuplicateKey`.
 
+Each stable key keeps its endpoint number. `Remove` drops a device from
+the set but reserves its number, and its parts' numbers, for the key's
+return, across restarts too: an `Add` of the same key gets them back, and
+no other device is given them, as a closed matter.js endpoint keeps its
+number. `Forget(ctx, key)` frees them — the device is gone for good, and
+an `Add` of the key later is numbered like a new device.
+
 Call `MarkComplete` once every device you know about is added. Until then
 the node keeps the stored endpoint numbers of devices that are absent.
-Afterwards, a stored device missing from the set loses its number. A host
-whose model loads asynchronously calls `MarkComplete` after the load. If it
-is called too early, the endpoint numbers of devices not yet loaded are
-garbage-collected at boot, and every controller sees those devices as new.
+Afterwards, a stored device missing from the set that no `Remove` reserved
+— one a previous run served and this run never added — loses its number.
+A host whose model loads asynchronously calls `MarkComplete` after the
+load. If it is called too early, the endpoint numbers of devices not yet
+loaded are garbage-collected at boot, and every controller sees those
+devices as new.
 
 Once a device is added, it has a lifecycle of its own:
 `Device.SetReachable(ctx, false)` reports it unreachable (the bridged

@@ -45,6 +45,17 @@ type Snapshot struct {
 	// eraseDescendant) — never because state has not been populated yet.
 	// See BD-Matter-EndpointID-Persistent in notes/parity/by_design.md.
 	ModelComplete bool
+	// Retain lists stored identities of this scope that a model-complete
+	// snapshot keeps although Endpoints no longer holds them, matched by
+	// String(): the owner reserved their numbers for the key's return. A
+	// key listed here and assembled again gets its stored number back.
+	// Mirrors matter.js, where a closed endpoint keeps its number
+	// reservation and only an erased store frees it
+	// (packages/node/src/node/server/ServerEndpointInitializer.ts:67-69
+	// deactivateDescendant, :59-65 eraseDescendant;
+	// packages/node/src/storage/server/ServerEndpointStores.ts:20-22,
+	// :109-130 assignNumber at 862ad75f).
+	Retain []SourceKey
 }
 
 // Endpoint describes one Matter endpoint in the assembled topology.

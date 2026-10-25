@@ -1852,7 +1852,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 726,
+    "line": 737,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2070,7 +2070,7 @@
   },
   {
     "file": "node/observers.go",
-    "line": 46,
+    "line": 49,
     "citation": "FabricManager.ts:253",
     "resolved": "packages/protocol/src/fabric/FabricManager.ts",
     "identifier": "deleted",

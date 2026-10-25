@@ -63,6 +63,9 @@ type Node struct {
 	caseIDs   *caseIdentities
 	sec       *security
 	window    *commissioningHost
+	// observers are the hooks Observe registered after
+	// Config.Observers (observers.go).
+	observers observerSet
 	diagRing  *diagevent.Ring
 	// callbacks is the node's serial goroutine of the `…Async` callbacks
 	// it owns (OnDiagnosticEventAsync), running from Start to Stop.
@@ -324,7 +327,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
-		baseline: n.sec.pase, advert: advert, observer: cfg.Observers.OnWindowTransition,
+		baseline: n.sec.pase, advert: advert, observers: n.observerList,
 		responderParams: n.sec.responderParams,
 	}
 	wireCommissioningWindow(n.life, n.window, n.st)
@@ -557,15 +560,19 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 // host's OnFabricAdded with what the AddNOC hook carries.
 func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte) {
 	n.fabricInstalled(ctx, fabricIndex, fabricID, nodeID, rootPublicKey)
-	fn := n.cfg.Observers.OnFabricAdded
-	if fn == nil {
+	obs := n.observerList()
+	if !slices.ContainsFunc(obs, func(o Observers) bool { return o.OnFabricAdded != nil }) {
 		return
 	}
 	info := FabricInfo{FabricIndex: fabricIndex, FabricID: fabricID, NodeID: nodeID, RootPublicKey: append([]byte(nil), rootPublicKey...)}
 	if stored, ok := n.fabricInfo(ctx, fabricIndex); ok {
 		info.CompressedFabricID = stored.CompressedFabricID
 	}
-	observe(n.logger, "fabric_added", func() error { return fn(info) })
+	for _, o := range obs {
+		if fn := o.OnFabricAdded; fn != nil {
+			observe(n.logger, "fabric_added", func() error { return fn(info) })
+		}
+	}
 }
 
 // observedFabricRemoved is the facade's fabricRemoved, then the host's
@@ -581,8 +588,10 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 		info.RootPublicKey = append([]byte(nil), f.rootPublicKey...)
 	}
 	n.fabricRemoved(ctx, fabricIndex)
-	if fn := n.cfg.Observers.OnFabricRemoved; fn != nil {
-		observe(n.logger, "fabric_removed", func() error { return fn(info) })
+	for _, o := range n.observerList() {
+		if fn := o.OnFabricRemoved; fn != nil {
+			observe(n.logger, "fabric_removed", func() error { return fn(info) })
+		}
 	}
 }
 
@@ -590,10 +599,7 @@ func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
 // OnFabricUpdated with the fabric as the store now holds it.
 func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 	n.fabricUpdated(ctx, fabricIndex)
-	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
-		info, _ := n.fabricInfo(ctx, fabricIndex)
-		observe(n.logger, "fabric_updated", func() error { return fn(info) })
-	}
+	n.notifyFabricUpdated(ctx, fabricIndex)
 }
 
 // observedFabricChanged is the host's OnFabricUpdated after UpdateFabricLabel
@@ -604,10 +610,7 @@ func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // fabric's persist emitting its replaced event (FabricManager.ts:236-246),
 // which the node hands on as fabricsChanged (CommissioningServer.ts:118-141).
 func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
-	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
-		info, _ := n.fabricInfo(ctx, fabricIndex)
-		observe(n.logger, "fabric_updated", func() error { return fn(info) })
-	}
+	n.notifyFabricUpdated(ctx, fabricIndex)
 }
 
 // commissioningCompleted runs the host's OnCommissioningComplete; the
@@ -615,8 +618,25 @@ func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 // (root.go).
 func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
 	n.ensureOTAProviderACL(ctx)
-	if fn := n.cfg.Observers.OnCommissioningComplete; fn != nil {
-		observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
+	for _, o := range n.observerList() {
+		if fn := o.OnCommissioningComplete; fn != nil {
+			observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
+		}
+	}
+}
+
+// notifyFabricUpdated runs every OnFabricUpdated with the fabric as the
+// store now holds it.
+func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
+	obs := n.observerList()
+	if !slices.ContainsFunc(obs, func(o Observers) bool { return o.OnFabricUpdated != nil }) {
+		return
+	}
+	info, _ := n.fabricInfo(ctx, fabricIndex)
+	for _, o := range obs {
+		if fn := o.OnFabricUpdated; fn != nil {
+			observe(n.logger, "fabric_updated", func() error { return fn(info) })
+		}
 	}
 }
 

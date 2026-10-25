@@ -79,7 +79,7 @@ these interfaces does not drag the host's dependencies into the module.
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
 | `Topology` | the host's own `bridge.Snapshotter` | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
-| `Observers` | the host's callbacks on fabric, commissioning and window events | nothing observes. An observer's error or panic is logged, never returned |
+| `Observers` | the host's callbacks on fabric, commissioning and window events; `Node.Observe` registers more on a running node, each after these, in registration order, until its unsubscribe | nothing observes. An observer's error or panic is logged, never returned |
 | `Metrics` | the node's named counters and gauges ([Observability](observability.md)); `node/metrics/expvar` publishes them on expvar | nothing recorded |
 | `Diagnostics` | the capacity of the diagnostic trace (`Node.DiagnosticEvents`) | 256 events |
 | `Logger` | the node's logger; the attribute keys and event names are in [Observability](observability.md) | `slog.Default()` |

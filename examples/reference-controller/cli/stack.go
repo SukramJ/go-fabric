@@ -18,8 +18,6 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -34,26 +32,21 @@ import (
 )
 
 // Settings keys of the database (store.Store's matter_settings table).
+// The CA and the fabric record are controller.New's, under
+// ca.DefaultSettingKey ("controller.ca", the fabric under
+// "controller.ca.fabric"), the keys this tool always used.
 const (
-	caKey        = "controller.ca" // the CA; the fabric record is under caKey+".fabric"
 	dclTrustKey  = "controller.dcl.trust"
 	selfKey      = "controller.self"
 	groupKeyPref = "controller.group."
 )
 
-// The fabric a first run creates. Mirrors matter.js
-// packages/protocol/src/fabric/FabricAuthority.ts:133-171 (createFabric) at
-// 0ceb202d: a random operational root node id (:134), a random 64-bit
-// fabric id (:155), the test vendor 0xFFF1 when none is configured
-// (:47, :137-140). The label is this tool's.
+// The fabric a first run creates: controller.New's random fabric and root
+// node id under the test vendor 0xFFF1; the label is this tool's.
 const (
-	fabricVendorID = 0xFFF1
+	fabricVendorID = controller.DefaultVendorID
 	fabricLabel    = "go-fabric controller"
 )
-
-// Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 at 0ceb202d.
-const operationalNodeMax = 0xFFFF_FFEF_FFFF_FFFF
 
 // hooks are the seams a test replaces: the DNS-SD socket of the
 // controller and the own node's advertiser and group transport.
@@ -61,26 +54,22 @@ var hooks struct {
 	names func(log *slog.Logger) (*discovery.Names, error)
 }
 
-// stack is the controller: database, CA, fabric, socket, DNS-SD cache, peer
-// set, subscriptions, commissioner and registry — in the order
-// controller/client/registry_live_test.go:82-162 builds them.
+// stack is the controller (controller.New over the database: CA, fabric,
+// socket, DNS-SD, peers, commissioner, registry), the trust store this
+// tool composes for it, and the own node.
 type stack struct {
 	e        *env
 	db       *sql.DB
 	settings *store.Store
+	ctl      *controller.Controller
 	fabric   *commissioner.Fabric
-	mgr      *exchange.Manager
-	names    *discovery.Names
 	set      *peer.Set
-	subs     *interaction.Subscriptions
 	com      *commissioner.Commissioner
 	reg      *client.Registry
 	certs    *dcl.CertificateStore
 	policy   attestation.Policy
 
-	stopServe func()
-	served    chan struct{}
-	self      *selfNode
+	self *selfNode
 }
 
 // openDB opens the database and applies the node store's and the client
@@ -101,11 +90,16 @@ func openDB(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// randomUint64 draws the own node's ids (self.go).
 func randomUint64() uint64 {
 	var b [8]byte
 	_, _ = rand.Read(b[:]) // crypto/rand.Read never fails
 	return binary.BigEndian.Uint64(b[:])
 }
+
+// Operational node id range — matter.js packages/types/src/datatype/
+// NodeId.ts:27-28 at 0ceb202d.
+const operationalNodeMax = 0xFFFF_FFEF_FFFF_FFFF
 
 // isIPv4Listen reports whether a listen address names an IPv4 host.
 func isIPv4Listen(addr string) bool {
@@ -117,9 +111,11 @@ func isIPv4Listen(addr string) bool {
 	return ip != nil && ip.To4() != nil
 }
 
-// openStack builds the controller stack over the database.
-//
-//nolint:funlen // the stack is built in one place, in order
+// openStack builds the controller over the database: the trust set
+// --trust, --trust-dir and --dcl name, the CA root key --ca-key names, the
+// socket --listen names, then controller.New, which creates or loads the
+// fabric and builds the rest. The nodes stay stopped (ManualStart): each
+// command connects the node it acts on.
 func openStack(e *env) (_ *stack, err error) {
 	s := &stack{e: e}
 	defer func() {
@@ -134,56 +130,10 @@ func openStack(e *env) (_ *stack, err error) {
 	if s.policy, err = attestationPolicy(e); err != nil {
 		return nil, err
 	}
-	cs := ca.SettingStore{Settings: s.settings, Key: caKey}
-	rootSigner, err := openCAKey(e, cs)
+	rootSigner, err := openCAKey(e, ca.SettingStore{Settings: s.settings})
 	if err != nil {
 		return nil, err
 	}
-	authority, err := ca.New(ca.Config{Store: cs, RootSigner: rootSigner})
-	if err != nil {
-		return nil, err
-	}
-	fcfg := commissioner.FabricConfig{VendorID: fabricVendorID, Label: fabricLabel, Store: cs}
-	if _, ok, lerr := cs.LoadFabric(); lerr != nil {
-		return nil, lerr
-	} else if !ok {
-		fcfg.FabricID = randomUint64()
-		for fcfg.FabricID == 0 {
-			fcfg.FabricID = randomUint64()
-		}
-		fcfg.RootNodeID = randomUint64()%operationalNodeMax + 1
-	}
-	if s.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
-		return nil, err
-	}
-
-	l, err := udp.New(udp.Config{LocalAddr: e.opts.listen, PreferIPv4: isIPv4Listen(e.opts.listen)})
-	if err != nil {
-		return nil, err
-	}
-	if s.mgr, err = exchange.NewManager(l, exchange.Config{Logger: e.log}); err != nil {
-		_ = l.Close()
-		return nil, err
-	}
-	serveCtx, stop := context.WithCancel(context.Background())
-	s.stopServe, s.served = stop, make(chan struct{})
-	go func() {
-		defer close(s.served)
-		_ = l.Serve(serveCtx, s.mgr.HandleDatagram)
-	}()
-	openNames := discovery.Open
-	if hooks.names != nil {
-		openNames = hooks.names
-	}
-	if s.names, err = openNames(e.log); err != nil {
-		return nil, fmt.Errorf("DNS-SD: %w", err)
-	}
-
-	resumption := &peer.MemoryResumptionStore{}
-	if s.set, err = peer.NewSet(peer.Context{Exchanges: s.mgr, Names: s.names, Fabrics: s.fabric.Lookup, Resumption: resumption, Logger: e.log}); err != nil {
-		return nil, err
-	}
-	s.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: e.log})
 	mode, err := attestation.ParseTrustMode(e.opts.trust)
 	if err != nil {
 		return nil, fmt.Errorf("--trust: %w", err)
@@ -199,51 +149,37 @@ func openStack(e *env) (_ *stack, err error) {
 	if s.certs != nil {
 		online = s.certs
 	}
-	trust := attestation.Trust(mode, snap, online)
-	if s.com, err = commissioner.New(commissioner.Context{
-		Exchanges: s.mgr, Peers: s.set, Attestation: trust, Logger: e.log,
-		Subscriptions: s.subs, Fabrics: []*commissioner.Fabric{s.fabric}, Resumption: resumption,
-	}); err != nil {
+	// The socket is this tool's, for --listen's IPv4 preference;
+	// controller.New serves it and closes it.
+	l, err := udp.New(udp.Config{LocalAddr: e.opts.listen, PreferIPv4: isIPv4Listen(e.opts.listen)})
+	if err != nil {
 		return nil, err
 	}
-	if s.reg, err = client.NewRegistry(client.RegistryConfig{
-		Store: sqlstore.New(s.db), Commissioner: s.com, Peers: s.set, Exchanges: s.mgr,
-		Fabrics: []*commissioner.Fabric{s.fabric}, Subscriptions: s.subs, Logger: e.log,
-		Node: client.Config{Logger: e.log},
-	}); err != nil {
-		return nil, err
+	openNames := discovery.Open
+	if hooks.names != nil {
+		openNames = hooks.names
 	}
+	s.ctl, err = controller.New(e.ctx, controller.Config{
+		DB: s.db, Attestation: attestation.Trust(mode, snap, online), Listener: l,
+		VendorID: fabricVendorID, Label: fabricLabel, CAKey: rootSigner,
+		Logger: e.log, Node: client.Config{Logger: e.log}, ManualStart: true, Names: openNames,
+	})
+	if err != nil {
+		return nil, err // New closed the socket
+	}
+	s.fabric, s.set, s.com, s.reg = s.ctl.Fabric(), s.ctl.Peers(), s.ctl.Commissioner(), s.ctl.Registry()
 	return s, nil
 }
 
-// close tears the stack down in the reverse order
-// (registry_live_test.go:129-139).
+// close tears the stack down: the own node, the controller, the trust
+// store, the database.
 func (s *stack) close() {
 	ctx := context.Background()
 	if s.self != nil {
 		s.self.stop()
 	}
-	if s.reg != nil {
-		_ = s.reg.Close(ctx)
-	}
-	if s.subs != nil {
-		_ = s.subs.Close(ctx)
-	}
-	if s.com != nil {
-		s.com.Close()
-	}
-	if s.set != nil {
-		s.set.Close(ctx)
-	}
-	if s.mgr != nil {
-		s.mgr.Close()
-	}
-	if s.stopServe != nil {
-		s.stopServe()
-		<-s.served
-	}
-	if s.names != nil {
-		_ = s.names.Close()
+	if s.ctl != nil {
+		_ = s.ctl.Close(ctx)
 	}
 	if s.certs != nil {
 		s.certs.Close()
