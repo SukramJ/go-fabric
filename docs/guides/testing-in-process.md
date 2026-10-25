@@ -148,6 +148,37 @@ started: a test that wants `AutoStart` calls `Registry().Start`.
 
 *Source: `fabrictest/node.go`, `fabrictest/controller.go`.*
 
+## A program's own composition
+
+`Site.AddController` builds the controller stack the site's way. A program
+that composes its controller with `controller.New` tests that composition
+instead: `Site.ControllerConfig(opts)` returns a `controller.Config` wired
+to the site — a host index with its socket on the site's network
+(`Listener`), the DNS-SD browser on the site's answers (`Names`), the
+site's clock with the host's in-flight counters (`Clock`), the site's
+logger and a SQLite database of its own in the site's directory. The test
+edits the configuration as the program does, calls `controller.New` and
+`Controller.Pair` under `Site.Run`, and closes the controller under
+`Site.Run` before the site closes. The site's devices do not resolve such a
+controller as an operational peer: a device's subscription re-establishment
+and an ICD Check-In reach the controllers of `AddController` only.
+
+```go
+site := fabrictest.NewSite(t, fabrictest.Options{})
+dev := site.AddDevice(fabrictest.Topology{})
+cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
+var c *controller.Controller
+_ = site.Run(ctx, func(ctx context.Context) (err error) { c, err = controller.New(ctx, cfg); return err })
+defer site.Run(ctx, c.Close)
+code, _ := setup.ManualCode(dev.Discriminator(), dev.Passcode())
+_ = site.Run(ctx, func(ctx context.Context) error {
+	_, err := c.Pair(ctx, code, controller.PairOptions{OnAttestationFailure: attestation.Accept()})
+	return err
+})
+```
+
+*Source: `fabrictest/controller_config.go`, `controller/site_test.go`.*
+
 ## Time
 
 A site's default clock is a `clocktest.Fake` starting at

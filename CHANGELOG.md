@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- A controller on a test site (brief CJ §1.1): `controller.Config.Clock` and `controller.Config.Listener` give `controller.New` the stack's time source and a socket to serve on; `fabrictest.Site.ControllerConfig(opts)` returns a `controller.Config` wired to the site (network, DNS-SD, fake clock, a database of its own), so a program's own `controller.New` commissions and reads the site's devices.
+- Openers (§1.11): `controller.OpenDB(path)` opens a SQLite file with the module's driver, so a controller program imports none; `controller.ProductionTrust()` is the production trust store of the embedded DCL snapshot. The quickstart and the reference controller open their databases with `OpenDB`.
+
 ## [0.12.0] — 2026-10-25
 
 ### Added

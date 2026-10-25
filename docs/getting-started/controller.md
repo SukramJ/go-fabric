@@ -29,16 +29,28 @@ the reference controller's `openStack` builds them:
 `Controller.Close` tears the stack down in reverse; the database stays
 the host's. `Config` takes:
 
-- `DB` (required): the host opens it with the SQLite driver of its choice.
+- `DB` (required): `controller.OpenDB(path)` opens a SQLite file with the
+  module's own pure-Go driver (foreign keys on, a 5 s busy timeout, the
+  write-ahead log), so the program imports no driver; a host may open the
+  database itself with the driver of its choice.
 - `Attestation` (required): the PAA trust store. There is no default, so
   a controller never trusts the test PAAs by accident.
-  `attestation.TestStore()` is for development devices; a production
-  controller passes a DCL-backed store.
+  `attestation.TestStore()` is for development devices;
+  `controller.ProductionTrust()` is the production set of the DCL snapshot
+  embedded in the module, without the test roots and without a network;
+  a controller that also asks the online ledger layers a
+  `dcl.CertificateStore` over it with `attestation.Trust`.
 - `Listen`, `VendorID` (0 is the test vendor 0xFFF1), `Label`, `Logger`,
   `Node` (every client node's `client.Config`).
 - `ManualStart`: false starts the commissioned nodes, as matter.js's
   controller connects them on start. A program that only pairs or reads
   once sets it.
+- `Clock` and `Listener`: the stack's time source (nil is the system
+  clock) and a UDP socket to serve on in place of opening `Listen`. A test
+  passes both: `fabrictest.Site.ControllerConfig(opts)` returns a `Config`
+  wired to the site — its network, its DNS-SD answers, its fake clock and
+  a database of its own — so the program's own `controller.New` runs on
+  the site (see [testing in process](../guides/testing-in-process.md)).
 
 `Controller.Registry`, `Controller.Commissioner` and `Controller.Fabric`
 are the role's seams ([advanced seams](../guides/advanced-seams.md)). A
@@ -46,7 +58,7 @@ host with a different composition, such as its own trust policy per
 finding or a BLE channel, builds the parts itself, as the reference
 controller does.
 
-*Source: `controller/controller.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
+*Source: `controller/controller.go`, `controller/open.go`, `fabrictest/controller_config.go`, `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -74,8 +86,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	_ "modernc.org/sqlite" // the host picks the SQLite driver
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -125,10 +135,9 @@ func run(ctx context.Context, dbPath, code string) error {
 	return use(ctx, nodes[0])
 }
 
-// openDB opens the SQLite file the controller keeps its fabric in.
-func openDB(path string) (*sql.DB, error) {
-	return sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-}
+// openDB opens the SQLite file the controller keeps its fabric in, with
+// the module's own driver.
+func openDB(path string) (*sql.DB, error) { return controller.OpenDB(path) }
 
 // open builds the controller over the database: the fabric (created on the
 // first run, loaded afterwards), the socket, DNS-SD, peers, commissioner,

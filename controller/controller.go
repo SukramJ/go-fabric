@@ -40,6 +40,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -101,6 +102,17 @@ type Config struct {
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
 	Names func(*slog.Logger) (*discovery.Names, error)
+	// Clock is the time source of the whole stack — the exchanges' and
+	// MRP's timers, the certificate authority's issuing instant, the
+	// peers' back-off, the subscriptions' liveness, the registry's
+	// expiry; nil is the system clock. A test passes its fake clock
+	// (fabrictest.Site.ControllerConfig).
+	Clock clock.Clock
+	// Listener, when set, is the UDP socket the controller serves on in
+	// place of opening Listen: New serves its datagrams and Close closes
+	// it. A test passes one on its own network
+	// (fabrictest.Site.ControllerConfig); a program leaves it nil.
+	Listener *udp.Listener
 }
 
 // Controller is a running controller: one fabric, the nodes paired into
@@ -108,6 +120,7 @@ type Config struct {
 type Controller struct {
 	db     *sql.DB
 	log    *slog.Logger
+	clock  clock.Clock
 	fabric *commissioner.Fabric
 	mgr    *exchange.Manager
 	names  *discovery.Names
@@ -146,7 +159,8 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if openNames == nil {
 		openNames = discovery.Open
 	}
-	c := &Controller{db: cfg.DB, log: log, stop: func() {}}
+	clk := clock.Or(cfg.Clock)
+	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -156,7 +170,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: store.New(cfg.DB)} // "controller.ca" and "controller.ca.fabric"
-	authority, err := ca.New(ca.Config{Store: keep})
+	authority, err := ca.New(ca.Config{Store: keep, Clock: clk})
 	if err != nil {
 		return nil, err
 	}
@@ -169,18 +183,18 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabric(authority, fcfg); err != nil {
 		return nil, err
 	}
-	if err := c.openNetwork(ctx, listen, openNames); err != nil {
+	if err := c.openNetwork(ctx, listen, cfg.Listener, openNames); err != nil {
 		return nil, err
 	}
 	resumption := &peer.MemoryResumptionStore{}
 	fabrics := []*commissioner.Fabric{c.fabric}
-	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log}); err != nil {
+	if c.peers, err = peer.NewSet(peer.Context{Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk}); err != nil {
 		return nil, err
 	}
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log})
+	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: log, Clock: clk})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
-		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log,
+		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
 		Subscriptions: c.subs, Fabrics: fabrics, Resumption: resumption,
 	}); err != nil {
 		return nil, err
@@ -189,10 +203,13 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if node.Logger == nil {
 		node.Logger = log
 	}
+	if node.Clock == nil {
+		node.Clock = clk
+	}
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
 		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
-		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Node: node, AutoStart: !cfg.ManualStart,
+		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: node, AutoStart: !cfg.ManualStart,
 	}); err != nil {
 		return nil, err
 	}
@@ -204,15 +221,19 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	return c, nil
 }
 
-// openNetwork opens the socket, the exchanges over it and DNS-SD: the
-// steps of [New] between the fabric and the peers.
-func (c *Controller) openNetwork(ctx context.Context, listen string, openNames func(*slog.Logger) (*discovery.Names, error)) error {
+// openNetwork opens the socket (or takes the one [Config].Listener
+// gives), the exchanges over it and DNS-SD: the steps of [New] between
+// the fabric and the peers.
+func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.Listener, openNames func(*slog.Logger) (*discovery.Names, error)) error {
 	log := c.log
-	l, err := udp.New(udp.Config{LocalAddr: listen})
-	if err != nil {
-		return err
+	if l == nil {
+		var err error
+		if l, err = udp.New(udp.Config{LocalAddr: listen}); err != nil {
+			return err
+		}
 	}
-	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log}); err != nil {
+	var err error
+	if c.mgr, err = exchange.NewManager(l, exchange.Config{Logger: log, Clock: c.clock}); err != nil {
 		_ = l.Close()
 		return err
 	}
@@ -220,7 +241,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, openNames f
 	served := make(chan struct{})
 	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
 	go func() { defer close(served); _ = l.Serve(serveCtx, handle) }()
-	c.stop = func() { cancel(); <-served }
+	c.stop = func() { cancel(); <-served; _ = l.Close() }
 	if c.names, err = openNames(log); err != nil {
 		return err
 	}
