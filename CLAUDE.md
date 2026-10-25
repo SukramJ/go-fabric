@@ -222,7 +222,24 @@ function it mirrors in a comment + the contract it enforces.
    verbatim from matter.js. A gap that is *not* deliberate belongs in
    `notes/parity/matter_behaviour_findings.md` instead; closing one removes it
    from that list.
-5. **Behavioral-parity contract + standing guards.** Ongoing parity is held by
+5. **Ahead of matter.js is allowed — documented, then reconciled.** matter.js
+   is the reference for what it models, never a veto on what it does not.
+   Schema values still come from it verbatim, and behaviour it implements is
+   mirrored; but where it leaves a behaviour unimplemented — a feature its
+   server declines, a cluster it gives no server logic — this module may
+   implement it, with connectedhomeip as the behavioural authority and its
+   tests as the parity cases. Every such implementation is an entry in the
+   *Ahead of matter.js* register at the head of `notes/parity/by_design.md`:
+   the **matter.js marker** (the line at the pin that shows the gap, e.g.
+   `ThermostatServer.ts:82`, "MatterScheduleConfiguration: This feature is not
+   implemented yet"), the source the behaviour follows, and the entry that
+   describes it. At every pin lift each marker is re-read at the new pin. A
+   marker that no longer holds is the verdict **caught up** in
+   `notes/parity/pin-lifts.md`, and the implementations are reconciled: read
+   matter.js's, compare it with ours, adopt matter.js's behaviour where they
+   differ — or record the difference as an ordinary divergence with its
+   reason — move the parity tests onto matter.js, and close the register row.
+6. **Behavioral-parity contract + standing guards.** Ongoing parity is held by
    the build- and test-time guards catalogued in
    [`docs/matter-parity-contract.md`](./docs/matter-parity-contract.md)
    — schema parity tests, the behavioural negative-write parity table,
