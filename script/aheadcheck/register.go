@@ -19,8 +19,11 @@ const registerHeading = "## Ahead of matter.js — register"
 const notRecorded = "not recorded"
 
 // marker is one file and the text that holds in it while the gap exists.
+// A class marker names a class instead; its text is the class's body as
+// it stands at the pin, read by resolve.
 type marker struct {
 	file, text string
+	class      string
 }
 
 // row is one register row.
@@ -35,8 +38,8 @@ type row struct {
 }
 
 var (
-	codeSpan   = regexp.MustCompile("`([^`]+)`")
-	quotedSpan = regexp.MustCompile("`(\"(?:[^\"\\\\]|\\\\.)*\")`")
+	codeSpan  = regexp.MustCompile("`([^`]+)`")
+	className = regexp.MustCompile(`^class ([A-Za-z_$][A-Za-z0-9_$]*)$`)
 )
 
 // parseRegister reads the register table out of by_design.md.
@@ -108,18 +111,27 @@ func parseRow(entry, fileCell, textCell string, line int) row {
 	for _, m := range codeSpan.FindAllStringSubmatch(fileCell, -1) {
 		files = append(files, m[1])
 	}
-	var texts []string
-	for _, m := range quotedSpan.FindAllStringSubmatch(textCell, -1) {
-		t, err := strconv.Unquote(m[1])
-		if err != nil {
-			r.problem = fmt.Sprintf("marker text %s is no Go-quoted string: %v", m[1], err)
+	var texts []marker
+	for _, m := range codeSpan.FindAllStringSubmatch(textCell, -1) {
+		span := m[1]
+		if c := className.FindStringSubmatch(span); c != nil {
+			texts = append(texts, marker{class: c[1]})
+			continue
+		}
+		if !strings.HasPrefix(span, `"`) {
+			r.problem = fmt.Sprintf("marker text %s is neither a Go-quoted string nor \"class <Name>\"", span)
 			return r
 		}
-		texts = append(texts, t)
+		t, err := strconv.Unquote(span)
+		if err != nil {
+			r.problem = fmt.Sprintf("marker text %s is no Go-quoted string: %v", span, err)
+			return r
+		}
+		texts = append(texts, marker{text: t})
 	}
 	switch {
 	case len(files) == 0 || len(texts) == 0:
-		r.problem = "marker file or marker text is neither \"not recorded\" nor a backticked path and a backticked Go-quoted string"
+		r.problem = "marker file or marker text is neither \"not recorded\" nor a backticked path and a backticked Go-quoted string or class name"
 	case len(files) != len(texts):
 		r.problem = fmt.Sprintf("%d marker files but %d marker texts", len(files), len(texts))
 	}
@@ -127,11 +139,12 @@ func parseRow(entry, fileCell, textCell string, line int) row {
 		return r
 	}
 	for i := range files {
-		if strings.TrimSpace(texts[i]) == "" {
+		if texts[i].class == "" && strings.TrimSpace(texts[i].text) == "" {
 			r.problem = "an empty marker text holds in every file"
 			return r
 		}
-		r.markers = append(r.markers, marker{file: files[i], text: texts[i]})
+		texts[i].file = files[i]
+		r.markers = append(r.markers, texts[i])
 	}
 	return r
 }
@@ -188,7 +201,11 @@ func check(rows []row, allow map[string]bool, show showFunc, pin, ref revision) 
 			out = append(out, at+": has a marker but is still in todo-marker.txt — remove its line")
 		}
 		for _, m := range r.markers {
-			if f := holds(show, pin, m); f != "" {
+			m, f := resolve(show, pin, m)
+			if f == "" {
+				f = holds(show, pin, m)
+			}
+			if f != "" {
 				out = append(out, fmt.Sprintf("%s: the row is wrong: %s", at, f))
 				continue
 			}
@@ -210,6 +227,52 @@ func check(rows []row, allow map[string]bool, show showFunc, pin, ref revision) 
 	return append(out, stale...)
 }
 
+// resolve turns a class marker into a text marker: the class's body as it
+// stands at the pin, from its declaration line through the first line
+// that is a lone '}' (or the declaration line alone when it ends in
+// "{}"). A text marker is returned as it is. The second result says why
+// the class could not be read, or is "".
+func resolve(show showFunc, pin revision, m marker) (resolved marker, finding string) {
+	if m.class == "" {
+		return m, ""
+	}
+	content, err := show(pin.sha, m.file)
+	if errors.Is(err, errNoFile) {
+		return m, fmt.Sprintf("%s does not exist at %s (%s)", m.file, pin.name, short(pin.sha))
+	}
+	if err != nil {
+		return m, fmt.Sprintf("%s at %s (%s): %v", m.file, pin.name, short(pin.sha), err)
+	}
+	body, ok := classBody(content, m.class)
+	if !ok {
+		return m, fmt.Sprintf("no class %s in %s at %s (%s)", m.class, m.file, pin.name, short(pin.sha))
+	}
+	m.text = body
+	return m, ""
+}
+
+// classBody returns the body of the top-level class name in a TypeScript
+// file: matter.js formats a class's closing brace alone at column 0.
+func classBody(content, name string) (string, bool) {
+	lines := strings.SplitAfter(content, "\n")
+	for i, l := range lines {
+		decl := strings.TrimPrefix(l, "export ")
+		if !strings.HasPrefix(decl, "class "+name+" ") && !strings.HasPrefix(decl, "class "+name+"{") {
+			continue
+		}
+		if strings.HasSuffix(strings.TrimRight(l, "\r\n"), "{}") {
+			return l, true
+		}
+		for j := i + 1; j < len(lines); j++ {
+			if strings.TrimRight(lines[j], "\r\n") == "}" {
+				return strings.Join(lines[i:j+1], ""), true
+			}
+		}
+		return "", false
+	}
+	return "", false
+}
+
 // holds reports why m does not hold at rev, or "" when it does.
 func holds(show showFunc, rev revision, m marker) string {
 	content, err := show(rev.sha, m.file)
@@ -220,6 +283,9 @@ func holds(show showFunc, rev revision, m marker) string {
 		return fmt.Sprintf("%s at %s (%s): %v", m.file, rev.name, short(rev.sha), err)
 	}
 	if !strings.Contains(content, m.text) {
+		if m.class != "" {
+			return fmt.Sprintf("the body of class %s in %s differs from the pin's at %s (%s)", m.class, m.file, rev.name, short(rev.sha))
+		}
 		return fmt.Sprintf("the marker text %s is not in %s at %s (%s)", strconv.Quote(firstLine(m.text)), m.file, rev.name, short(rev.sha))
 	}
 	return ""

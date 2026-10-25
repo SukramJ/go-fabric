@@ -135,16 +135,45 @@ that follows is notes-only, so no guard was run again for it).
 - A file gone at the ref is a "caught up?" finding, not a check that could
   not run: a moved or deleted server is as much a reason to re-read the row.
 - The weekly job runs even when pin-distance is red.
+- Owner's review, 2026-10-25 (6017a41a): the six `BD-chip` rows carry
+  their markers (the empty matter.js subclasses) and `todo-marker.txt` is
+  removed. The decisions on the four questions, applied in the follow-up
+  commit:
+  - Q1 SmokeCoAlarm: the whole body of `SmokeCoAlarmBaseServer`
+    (`SmokeCoAlarmServer.ts:18-42`) is the marker.
+  - Q2 OperationalState: the whole body of each class,
+    `OperationalStateServer.ts:17-89` and `RvcOperationalStateServer.ts:26-98`,
+    two absence markers on the row. The RVC doc sentence is no longer a
+    marker.
+  - Q3 ModeBase: the four servers the entry cites, one presence marker
+    each, their whole `changeToMode` method, read at the pin:
+    `RvcRunModeServer.ts:71-77`, `RvcCleanModeServer.ts:53-59`,
+    `LaundryWasherModeServer.ts:51-57`, `DishwasherModeServer.ts:51-57`.
+  - Q4 FanControl and TemperatureControl stay as they are. The column
+    contract now says that an absence marker over a whole class body also
+    reports cosmetic edits, and that this is intended.
+- A class body of 25 to 73 lines does not fit into a quoted Markdown cell,
+  and the two operational-state classes contain `|` and backticks, which
+  the contract excludes. So a marker text can also be `class <Name>`. It
+  stands for that class's whole body as it reads at the pin, from its
+  declaration line through the lone `}` at column 0 that closes it. The
+  check reads that body at the pin, where a class it cannot find makes the
+  row wrong. At the ref it requires the same body, byte for byte. Fixture
+  rows and unit tests cover the class form: `classBody`, a class that
+  changes, and a class or file missing at the pin.
 
 ## Left out
 
-- The six `BD-chip` markers (owner's review commit, with the matching lines
-  of `todo-marker.txt` removed).
+- The six `BD-chip` markers (written in the owner's review commit 6017a41a,
+  which also removed `todo-marker.txt`).
 - The reconciliation of any row (out of scope by the issue).
 - No chip-tool run, no schema regeneration: nothing on the device or schema
   side moved.
 
 ## Questions
+
+All four were answered in the owner's review of 2026-10-25 (see
+Decisions). They stay below as they were asked.
 
 1. **SmokeCoAlarm (absence).** The marker is the last default of
    `initialize` running into the class's end (`SmokeCoAlarmServer.ts:39-42`).

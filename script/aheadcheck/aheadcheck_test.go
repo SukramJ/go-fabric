@@ -22,7 +22,8 @@ import (
 
 // fixtureRepo is a git repository with three commits: the markers present
 // (first), the absence marker's class gaining a member (second), the
-// presence marker's file removed (third).
+// presence marker's file removed and the class marker's class gaining a
+// member (third).
 type fixtureRepo struct {
 	dir                  string
 	first, second, third string
@@ -69,6 +70,8 @@ func newFixtureRepo(t *testing.T) fixtureRepo {
 	server := filepath.Join(dir, "src", "FixtureServer.ts")
 	writeFile(t, server, "export class FixtureServer extends FixtureBehavior {}\n")
 	writeFile(t, filepath.Join(dir, "src", "Other.ts"), "/** The work is left to the device.\n */\n")
+	multi := filepath.Join(dir, "src", "Multi.ts")
+	writeFile(t, multi, "export class Base {\n    b() {}\n}\n\nexport class Multi extends Base {\n    a() {}\n}\n\nexport class After {}\n")
 	r := fixtureRepo{dir: dir}
 	r.first = commit("the markers present")
 	writeFile(t, server, "export class FixtureServer extends FixtureBehavior {\n    override initialize() {}\n}\n")
@@ -76,7 +79,8 @@ func newFixtureRepo(t *testing.T) fixtureRepo {
 	if err := os.Remove(filepath.Join(dir, "src", "Other.ts")); err != nil {
 		t.Fatal(err)
 	}
-	r.third = commit("the presence marker's file removed")
+	writeFile(t, multi, "export class Base {\n    b() {}\n}\n\nexport class Multi extends Base {\n    a() {}\n    c() {}\n}\n\nexport class After {}\n")
+	r.third = commit("the presence marker's file removed, the class marker's class gains a member")
 	return r
 }
 
@@ -118,7 +122,7 @@ func TestAheadcheckQuietWhileTheMarkersHold(t *testing.T) {
 	if code != 0 || len(lines) != 1 || !strings.Contains(lines[0], "every marker holds") {
 		t.Fatalf("at the first commit = %d %q, want 0 and the all-clear", code, lines)
 	}
-	if !strings.Contains(lines[0], "3 rows, 2 with a marker, 1 in todo-marker.txt") {
+	if !strings.Contains(lines[0], "4 rows, 3 with a marker, 1 in todo-marker.txt") {
 		t.Errorf("summary %q does not count the section's rows only", lines[0])
 	}
 }
@@ -136,8 +140,11 @@ func TestAheadcheckReportsTheRowAtTheRef(t *testing.T) {
 		}
 	}
 	code, lines = runFixture(t, root, repo.dir, repo.first, repo.third)
-	if code != 1 || len(lines) != 2 {
-		t.Fatalf("at the third commit = %d %q, want 1 and two findings", code, lines)
+	if code != 1 || len(lines) != 3 {
+		t.Fatalf("at the third commit = %d %q, want 1 and three findings", code, lines)
+	}
+	if !strings.Contains(lines[2], "BD-Fixture-Class") || !strings.Contains(lines[2], "the body of class Multi in src/Multi.ts differs") {
+		t.Errorf("third finding %q does not name the class row", lines[2])
 	}
 	if !strings.Contains(lines[1], "BD-Fixture-TwoFiles") || !strings.Contains(lines[1], "src/Other.ts does not exist") {
 		t.Errorf("second finding %q does not name the row and the gone file", lines[1])
@@ -312,5 +319,43 @@ func TestAheadcheckRegisterHoldsAtThePin(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := run(&out, &errOut, filepath.Join("..", ".."), dir, pin, pin); code != 0 {
 		t.Errorf("exit %d at the pin:\n%s%s", code, out.String(), errOut.String())
+	}
+}
+
+func TestClassBody(t *testing.T) {
+	src := "export class Base {\n    b() {}\n}\nclass Multi{\n    a() {}\n}\nexport class Empty extends Base {}\nexport class Open {\n    x() {}\n"
+	for name, want := range map[string]string{
+		"Base":  "export class Base {\n    b() {}\n}\n",
+		"Multi": "class Multi{\n    a() {}\n}\n",
+		"Empty": "export class Empty extends Base {}\n",
+	} {
+		if got, ok := classBody(src, name); !ok || got != want {
+			t.Errorf("classBody(%s) = %q, %v; want %q", name, got, ok, want)
+		}
+	}
+	for _, name := range []string{"Open", "None", "Bas"} {
+		if got, ok := classBody(src, name); ok {
+			t.Errorf("classBody(%s) = %q, want none", name, got)
+		}
+	}
+}
+
+func TestClassMarkerWrongAtThePin(t *testing.T) {
+	rows, err := parseRegister(registerHeading + "\n\n| Entry | marker file | marker text |\n| --- | --- | --- |\n" +
+		"| A | `a.ts` | `class None` |\n| B | `gone.ts` | `class B` |\n| C | `a.ts` | `class Some extra` |\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	show := func(_, path string) (string, error) {
+		if path == "a.ts" {
+			return "export class Some {}\n", nil
+		}
+		return "", errNoFile
+	}
+	pin := revision{name: "the pin", sha: "p"}
+	f := check(rows, nil, show, pin, revision{name: "ref", sha: "r"})
+	if len(f) != 3 || !strings.Contains(f[0], "no class None in a.ts") || !strings.Contains(f[1], "gone.ts does not exist") ||
+		!strings.Contains(f[2], "neither a Go-quoted string") {
+		t.Errorf("findings %q", f)
 	}
 }

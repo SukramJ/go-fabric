@@ -19,8 +19,10 @@
 //     register" whose header names the columns "Entry", "marker file" and
 //     "marker text". A marker file cell holds one or more backticked paths
 //     (several separated by <br>), a marker text cell one backticked
-//     Go-quoted string per path, in the same order (the column contract
-//     above the table in by_design.md).
+//     marker per path, in the same order: a Go-quoted string, or
+//     `class <Name>`, which stands for that class's whole body as it reads
+//     at the pin, from its declaration through the lone '}' closing it (the
+//     column contract above the table in by_design.md).
 //  2. Allowance. A row whose two marker cells read "not recorded" is
 //     refused unless it is listed in todo-marker.txt next to this file (one
 //     entry per line, '#' starts a comment; a missing file is an empty

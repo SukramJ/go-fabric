@@ -52,15 +52,21 @@ against matter.js `origin/main`). The contract:
 
 - `marker file` holds one or more matter.js paths from the tree root, each in
   backticks, several separated by `<br>`.
-- `marker text` holds one Go-quoted string per path, in backticks and in the
-  same order (`\n` is a line break, `\"` a quote; no `|` and no backtick
-  inside). It is a substring of that file **while the gap exists**.
+- `marker text` holds one marker per path, in backticks and in the same
+  order: a Go-quoted string (`\n` is a line break, `\"` a quote; no `|` and
+  no backtick inside) that is a substring of that file **while the gap
+  exists**, or `class <Name>`, which stands for the whole body of that
+  class as it reads at the pin — from its declaration line through the
+  lone `}` that closes it — and holds while the file still contains that
+  body unchanged.
 - A **presence** marker quotes the line that states the gap (a doc sentence
   that leaves the work to the device, the code that accepts everything). An
   **absence** marker quotes the text that would have to change for matter.js
-  to add the logic — the class body, or the end of its last member running
-  into the class's closing brace; the `matter.js marker` column says which
-  kind the row's marker is.
+  to add the logic — the whole class body (`class <Name>`, or a quoted
+  one-line class); the `matter.js marker` column says which kind the row's
+  marker is. An absence marker over a whole class body reports every edit
+  of that class, a cosmetic one included; that is intended — a sure
+  trigger is worth a re-read that finds nothing.
 - Both columns read `not recorded` for a row without a marker; the check
   refuses such a row (the transitional allowance file
   `script/aheadcheck/todo-marker.txt` went with the last of the six
@@ -72,10 +78,10 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 
 | Entry | matter.js marker | marker file | marker text | Behaviour source |
 | --- | --- | --- | --- | --- |
-| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only (absence: `initialize` is the class's last member) | `packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts` | `"            this.state.endOfServiceAlert = SmokeCoAlarm.EndOfService.Normal;\n        }\n    }\n}"` | specification text in `smoke-co-alarm-cluster.resource.ts` |
+| BD-Matter-SmokeCoAlarmRulesInServer | `SmokeCoAlarmServer.ts:19-43` seeds the initial state only (absence: the whole body of `SmokeCoAlarmBaseServer`, :18-42) | `packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts` | `class SmokeCoAlarmBaseServer` | specification text in `smoke-co-alarm-cluster.resource.ts` |
 | BD-Matter-FanControlCouplingInServer | `FanControlServer.ts:13-19` defaults FanMode only (absence: the whole class body) | `packages/node/src/behaviors/fan-control/FanControlServer.ts` | `"export class FanControlServer extends FanControlBehavior {\n    override initialize() {\n        if (this.state.fanMode === undefined) {\n            this.state.fanMode = FanControl.FanMode.Off;\n        }\n    }\n}"` | `fan-control.resource.ts`, connectedhomeip `fan-control-server.cpp` |
-| BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command (absence: the operational-error handler is the class's last member; presence: the RVC doc leaves pause and resume to the device, `:18-20`) | `packages/node/src/behaviors/operational-state/OperationalStateServer.ts`<br>`packages/node/src/behaviors/rvc-operational-state/RvcOperationalStateServer.ts` | `"        this.events.operationalError.emit({ errorState: operationalError }, this.context);\n    }\n}"`<br>`"To execute the basic validation for pause and resume commands the utility methods"` | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
-| BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode (presence: `RvcRunModeServer.ts:71-77` sets CurrentMode on ModeUtils' Success) | `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts` | `"        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }"` | `mode-base.resource.ts` |
+| BD-Matter-OperationalStateRulesInServer | `OperationalStateServer.ts`, `RvcOperationalStateServer.ts` implement no command (absence: the whole body of each class, `OperationalStateServer.ts:17-89`, `RvcOperationalStateServer.ts:26-98`) | `packages/node/src/behaviors/operational-state/OperationalStateServer.ts`<br>`packages/node/src/behaviors/rvc-operational-state/RvcOperationalStateServer.ts` | `class OperationalStateServer`<br>`class RvcOperationalStateServer` | `operational-state.resource.ts`, `rvc-operational-state.resource.ts` |
+| BD-Matter-ModeBaseRulesInServer | the mode servers' default `changeToMode` accepts every supported mode (presence: each of the four servers the entry cites sets CurrentMode on ModeUtils' Success, `RvcRunModeServer.ts:71-77`, `RvcCleanModeServer.ts:53-59`, `LaundryWasherModeServer.ts:51-57`, `DishwasherModeServer.ts:51-57`) | `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts`<br>`packages/node/src/behaviors/rvc-clean-mode/RvcCleanModeServer.ts`<br>`packages/node/src/behaviors/laundry-washer-mode/LaundryWasherModeServer.ts`<br>`packages/node/src/behaviors/dishwasher-mode/DishwasherModeServer.ts` | `"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"`<br>`"    override changeToMode({ newMode }: ModeBase.ChangeToModeRequest): MaybePromise<ModeBase.ChangeToModeResponse> {\n        const result = ModeUtils.assertModeChange(this.state.supportedModes, this.state.currentMode, newMode);\n        if (result.status === ModeBase.ModeChangeStatus.Success) {\n            this.state.currentMode = newMode;\n        }\n        return result;\n    }"` | `mode-base.resource.ts` |
 | BD-Matter-TemperatureControl-RulesInServer | `TemperatureControlServer.ts` adds nothing to the generated behaviour (18 lines at the pin; absence: the empty class body) | `packages/node/src/behaviors/temperature-control/TemperatureControlServer.ts` | `"export class TemperatureControlServer extends TemperatureControlBehavior {}"` | connectedhomeip `TemperatureControlCluster.cpp` |
 | BD-chip-BooleanStateConfiguration-RulesInServer | `BooleanStateConfigurationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/boolean-state-configuration/BooleanStateConfigurationServer.ts` | `"export class BooleanStateConfigurationServer extends BooleanStateConfigurationBehavior {}"` | connectedhomeip |
 | BD-chip-WaterHeaterManagement-RulesInServer | `WaterHeaterManagementServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/water-heater-management/WaterHeaterManagementServer.ts` | `"export class WaterHeaterManagementServer extends WaterHeaterManagementBehavior {}"` | connectedhomeip |

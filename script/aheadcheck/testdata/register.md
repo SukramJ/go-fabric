@@ -14,6 +14,7 @@ The column contract stands here in the real file.
 | --- | --- | --- | --- | --- |
 | BD-Fixture-Absence | the server adds nothing (absence: the empty class body) | `src/FixtureServer.ts` | `"export class FixtureServer extends FixtureBehavior {}"` | the specification |
 | BD-Fixture-TwoFiles | two servers (absence, presence) | `src/FixtureServer.ts`<br>`src/Other.ts` | `"export class FixtureServer"`<br>`"left to the device.\n"` | the specification |
+| BD-Fixture-Class | a class body (absence: the whole class) | `src/Multi.ts` | `class Multi` | the specification |
 | BD-Fixture-Todo | not recorded | not recorded | not recorded | connectedhomeip |
 
 ## The next section

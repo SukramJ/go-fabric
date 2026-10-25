@@ -12,7 +12,7 @@ pseudo-version of `main`.
 
 ### Added
 
-- The Ahead-of-matter.js marker check (issue #274, brief CN; planned as `v0.12.4`). The register at the head of `notes/parity/by_design.md` gains the machine-read columns `marker file` and `marker text`; `script/aheadcheck` (`make ahead-check`, `MATTERJS_REF` default `HEAD`) reads every marker at the pin and at the ref, reports a text gone at the ref as "caught up?" naming the row, refuses a row whose text is not at the pin, and refuses a row without a marker unless `script/aheadcheck/todo-marker.txt` lists it (the six `BD-chip` rows, until the owner's review records their markers). The weekly `matterjs-pin.yml` gains the job `ahead-markers`, which runs it against matter.js `origin/main` on the blobless clone and reports the clone size before and after. No API change.
+- The Ahead-of-matter.js marker check (issue #274, brief CN; planned as `v0.12.4`). The register at the head of `notes/parity/by_design.md` gains the machine-read columns `marker file` and `marker text`; `script/aheadcheck` (`make ahead-check`, `MATTERJS_REF` default `HEAD`) reads every marker at the pin and at the ref, reports a text gone at the ref as "caught up?" naming the row, refuses a row whose text is not at the pin, and refuses a row without a marker; every row of the register carries one. A marker text is a quoted string or `class <Name>`, the class's whole body as it reads at the pin. The weekly `matterjs-pin.yml` gains the job `ahead-markers`, which runs it against matter.js `origin/main` on the blobless clone and reports the clone size before and after. No API change.
 
 ## [0.12.3] — 2026-10-25
 
