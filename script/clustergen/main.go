@@ -20,8 +20,10 @@
 //	go run ./script/clustergen -all -out DIR
 //	                                      # every cluster into DIR
 //
-// The committed set is the clusters a server in this module is built on
-// (committed in clusters.go); adding one is adding its name there.
+// The committed set is every cluster of the snapshot (committed and
+// definitionOnly in clusters.go): a definition and a generated server for
+// each, a definition and a typed state only for a cluster a hand-written
+// server of this module serves (ADR 0013, amendment of 2026-10-25).
 package main
 
 import (
@@ -33,6 +35,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 )
 
 const (
@@ -68,7 +71,7 @@ func run(args []string, stdout io.Writer) error {
 	if dir == "" {
 		dir = filepath.Join(root, outDir)
 	}
-	names := committed
+	names := slices.Concat(committed, definitionOnly)
 	if *all {
 		names = sortedClusterNames(snap)
 	}
@@ -95,7 +98,7 @@ func write(dir string, o *output) (changed bool, err error) {
 	if err := os.MkdirAll(pkgDir, 0o750); err != nil {
 		return false, err
 	}
-	for name, content := range map[string][]byte{"definition_gen.go": o.Source, "server_gen.go": o.Server, "definition_gen_test.go": o.Test} {
+	for name, content := range o.files() {
 		path := filepath.Join(pkgDir, name)
 		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, content) { //nolint:gosec // a path below the output directory this tool writes
 

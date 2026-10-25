@@ -8,15 +8,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acdef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/device"
@@ -279,6 +282,89 @@ func TestJSONOnASite(t *testing.T) {
 		if err != nil || string(got) != want {
 			t.Fatalf("attribute %d: %s (%v), want %s", attr, got, err, want)
 		}
+	}
+}
+
+// TestJSONAccessControlOnASite: the ACL of a commissioned site device
+// reads through DecodeJSON and writes through EncodeJSON — typed by the
+// definition-only AccessControl definition (ADR 0013, amendment of
+// 2026-10-25), served by the hand-written cluster/core server.
+func TestJSONAccessControlOnASite(t *testing.T) {
+	t.Parallel()
+	light, err := device.NewOnOffLight(device.Options{StableKey: device.StringKey("light"), Name: "light"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	pair := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{light}}})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	n, err := pair.Controller.CommissionNode(ctx, pair.Device, client.CommissionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acl := client.AttributeField(acdef.ClusterID, acdef.AttrAcl)
+	if !acl.Typed() {
+		t.Fatal("AccessControl.ACL is untyped")
+	}
+	path := client.AttributeAt(0, acdef.ClusterID, acdef.AttrAcl)
+	readACL := func(ctx context.Context) ([]map[string]any, error) {
+		var req client.ReadRequest
+		req.Attributes = []client.AttributePath{path}
+		rep, err := n.Read(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		v, ok := rep.Value(0, acdef.ClusterID, acdef.AttrAcl)
+		if !ok {
+			return nil, errors.New("ACL not read")
+		}
+		raw, err := client.DecodeJSON(acl, v, client.NameBased)
+		if err != nil {
+			return nil, err
+		}
+		var entries []map[string]any
+		if err := json.Unmarshal(raw, &entries); err != nil {
+			return nil, fmt.Errorf("%s: %w", raw, err)
+		}
+		return entries, nil
+	}
+	var before, after []map[string]any
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		if before, err = readACL(ctx); err != nil {
+			return err
+		}
+		// The commissioner's Administer entry, plus an Operate entry for a
+		// second node on endpoint 1's OnOff cluster.
+		added := map[string]any{"privilege": 3, "authMode": 2, "subjects": []any{0x1234}, "targets": []any{map[string]any{"endpoint": 1, "cluster": 6, "deviceType": nil}}}
+		raw, err := json.Marshal(append(slices.Clone(before), added))
+		if err != nil {
+			return err
+		}
+		val, err := client.EncodeJSON(acl, raw)
+		if err != nil {
+			return err
+		}
+		st, err := n.Write(ctx, []client.WriteRequest{{Path: path, Value: val}}, client.WriteOptions{})
+		if err != nil {
+			return err
+		}
+		if err := st.Err(); err != nil {
+			return err
+		}
+		after, err = readACL(ctx)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != 1 || before[0]["privilege"] != float64(5) || before[0]["authMode"] != float64(2) {
+		t.Fatalf("commissioned ACL %v, want the one Administer CASE entry", before)
+	}
+	if len(after) != 2 || after[1]["privilege"] != float64(3) || after[1]["fabricIndex"] != before[0]["fabricIndex"] {
+		t.Fatalf("ACL after the write %v", after)
+	}
+	if subjects, _ := after[1]["subjects"].([]any); len(subjects) != 1 || subjects[0] != float64(0x1234) {
+		t.Fatalf("written subjects %v", after[1]["subjects"])
 	}
 }
 

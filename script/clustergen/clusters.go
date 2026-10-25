@@ -3,9 +3,12 @@
 
 package main
 
-// committed lists the clusters whose generated definitions are committed
-// under cluster/spec/: each is the definition a server in this module is
-// built on, or one the client role reads typed (the last group). A server's
+// committed lists the clusters whose generated definitions and servers
+// are committed under cluster/spec/: each is the definition a server in
+// this module is built on, one the client role reads typed, or one the
+// generated server serves as matter.js's stub behaviour does (the last
+// two groups). With definitionOnly it names every snapshot cluster
+// (TestEverySnapshotClusterIsCommitted). A server's
 // cluster joins when its server does; the migration list in
 // docs/adr/0013-generated-cluster-definitions.md says which servers are
 // next.
@@ -155,13 +158,45 @@ var committed = []string{
 	"CommissionerControl",
 	// controller/client: definitions without a server in this module, so
 	// the client role reads their attributes, commands and events typed
-	// (register line 441, brief AX §11). Left out: AccessControl,
-	// OperationalCredentials and GroupKeyManagement (hand-written core
-	// servers, ADR 0013's skip list), the camera clusters, Joint Fabric,
-	// TLS and Thread (out of scope, docs/matterjs-comparison.md).
+	// (register line 441, brief AX §11).
 	"Groupcast",
 	"WaterTankLevelMonitoring",
 	"AmbientContextSensing",
 	"WiFiNetworkManagement",
 	"Chime",
+	// The camera, Thread, Joint Fabric and TLS clusters (brief CL §1,
+	// owner decision 2026-10-25): served by the generated server as
+	// matter.js serves them — its server for each is the generated
+	// behaviour stub (`export class XServer extends XBehavior {}`, e.g.
+	// packages/node/src/behaviors/thread-network-diagnostics/
+	// ThreadNetworkDiagnosticsServer.ts at 862ad75f), except
+	// WebRtcTransportRequestorServer.ts, whose session logic is not ported
+	// here (docs/matterjs-comparison.md).
+	"CameraAvStreamManagement",
+	"CameraAvSettingsUserLevelManagement",
+	"WebRtcTransportProvider",
+	"WebRtcTransportRequestor",
+	"PushAvStreamTransport",
+	"ZoneManagement",
+	"ThreadNetworkDiagnostics",
+	"ThreadBorderRouterManagement",
+	"ThreadNetworkDirectory",
+	"JointFabricDatastore",
+	"JointFabricAdministrator",
+	"TlsCertificateManagement",
+	"TlsClientManagement",
+}
+
+// definitionOnly lists the clusters whose definition is committed without
+// a generated server: a hand-written server of this module serves each
+// (ADR 0013's skip list — the access control, operational credentials and
+// group key servers of cluster/core), so the package holds the definition
+// and the typed state (State, Patch, StateFrom) the client role reads and
+// writes the cluster through, and no Server, Wrap or Declare. Each
+// package's hand-written core_parity_test.go holds the server's wire
+// constants against the definition (ADR 0013, amendment of 2026-10-25).
+var definitionOnly = []string{
+	"AccessControl",
+	"OperationalCredentials",
+	"GroupKeyManagement",
 }

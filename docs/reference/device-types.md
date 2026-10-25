@@ -2,7 +2,7 @@
 
 # Device types
 
-The 79 device types of the `device` package, from the matter.js model at
+The 88 device types of the `device` package, from the matter.js model at
 `862ad75` (Matter 1.6.1). Each section is what the type's `device.<Name>Type`
 carries: the server and client clusters matter.js's generator derives,
 whether the type mandates each, the features it requires and the
@@ -57,6 +57,26 @@ Conditions: FabricSynchronization.
 | TotalVolatileOrganicCompoundsConcentrationMeasurement | `0x042E` | `O` | optional | — | — | `totalvolatileorganiccompoundsconcentrationmeasurementdef.Declare` |
 | RadonConcentrationMeasurement | `0x042F` | `O` | optional | — | — | `radonconcentrationmeasurementdef.Declare` |
 
+## AudioDoorbell
+
+`device.NewAudioDoorbell` · id `0x0141` · revision 2 · simple · matter.js `packages/node/src/devices/audio-doorbell.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| Identify | `0x0003` | `M` | mandatory | — | — | `identifydef.Declare` |
+| Switch | `0x003B` | `M` | mandatory | — | — | `switchclusterdef.Declare` |
+| CameraAvStreamManagement | `0x0551` | `M` | mandatory | Audio (ADO) | — | `cameraavstreammanagementdef.Declare` |
+| WebRtcTransportProvider | `0x0553` | `M` | mandatory | — | — | `webrtctransportproviderdef.Declare` |
+| Binding | `0x001E` | `Simple & Client` | mandatory | — | — | `bindingdef.Declare` |
+| WebRtcTransportRequestor | `0x0554` | `O` | optional | — | — | `webrtctransportrequestordef.Declare` |
+| PushAvStreamTransport | `0x0555` | `O` | optional | — | — | `pushavstreamtransportdef.Declare` |
+
+| Client cluster | ID | Conformance | Required |
+| --- | --- | --- | --- |
+| WebRtcTransportRequestor | `0x0554` | `M` | mandatory |
+| Chime | `0x0556` | `M` | mandatory |
+| WebRtcTransportProvider | `0x0553` | `O` | optional |
+
 ## BasicVideoPlayer
 
 `device.NewBasicVideoPlayer` · id `0x0028` · revision 2 · simple · matter.js `packages/node/src/devices/basic-video-player.ts`
@@ -99,6 +119,47 @@ Conditions: FabricSynchronizedNode.
 | AdministratorCommissioning | `0x003C` | `FabricSynchronizedNode` | optional | — | — | `administratorcommissioningdef.Declare` |
 | EcosystemInformation | `0x0750` | `FabricSynchronizedNode, O` | optional | — | — | `ecosysteminformationdef.Declare` |
 
+## Camera
+
+`device.NewCamera` · id `0x0142` · revision 1 · simple · matter.js `packages/node/src/devices/camera.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| CameraAvStreamManagement | `0x0551` | `M` | mandatory | Video (VDO), Audio (ADO), Snapshot (SNP) | — | `cameraavstreammanagementdef.Declare` |
+| WebRtcTransportProvider | `0x0553` | `M` | mandatory | — | — | `webrtctransportproviderdef.Declare` |
+| WebRtcTransportRequestor | `0x0554` | `O` | optional | — | — | `webrtctransportrequestordef.Declare` |
+| PushAvStreamTransport | `0x0555` | `O` | optional | — | — | `pushavstreamtransportdef.Declare` |
+| CameraAvSettingsUserLevelManagement | `0x0552` | `O` | optional | — | — | `cameraavsettingsuserlevelmanagementdef.Declare` |
+| ZoneManagement | `0x0550` | `O` | optional | TwoDimensionalCartesianZone (TWODCART) | — | `zonemanagementdef.Declare` |
+| OccupancySensing | `0x0406` | `O` | optional | — | — | `occupancysensingdef.Declare` |
+| Identify | `0x0003` | `O` | optional | — | — | `identifydef.Declare` |
+
+| Client cluster | ID | Conformance | Required |
+| --- | --- | --- | --- |
+| WebRtcTransportRequestor | `0x0554` | `M` | mandatory |
+| WebRtcTransportProvider | `0x0553` | `O` | optional |
+
+## CameraController
+
+`device.NewCameraController` · id `0x0147` · revision 1 · simple · matter.js `packages/node/src/devices/camera-controller.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| WebRtcTransportRequestor | `0x0554` | `M` | mandatory | — | — | `webrtctransportrequestordef.Declare` |
+
+| Client cluster | ID | Conformance | Required |
+| --- | --- | --- | --- |
+| WebRtcTransportProvider | `0x0553` | `M` | mandatory |
+| Identify | `0x0003` | `O` | optional |
+| PowerSource | `0x002F` | `O` | optional |
+| OccupancySensing | `0x0406` | `O` | optional |
+| ZoneManagement | `0x0550` | `O` | optional |
+| CameraAvStreamManagement | `0x0551` | `O` | optional |
+| CameraAvSettingsUserLevelManagement | `0x0552` | `O` | optional |
+| PushAvStreamTransport | `0x0555` | `O` | optional |
+| TlsCertificateManagement | `0x0801` | `O` | optional |
+| TlsClientManagement | `0x0802` | `O` | optional |
+
 ## CastingVideoPlayer
 
 `device.NewCastingVideoPlayer` · id `0x0023` · revision 2 · simple · matter.js `packages/node/src/devices/casting-video-player.ts`
@@ -121,6 +182,15 @@ Conditions: ContentAppPlatform, PhysicalInputs.
 | ApplicationLauncher | `0x050C` | `ContentAppPlatform` | optional | ApplicationPlatform (AP) | — | `applicationlauncherdef.Declare` |
 | AccountLogin | `0x050E` | `O` | optional | — | — | `accountlogindef.Declare` |
 | ContentControl | `0x050F` | `P, [Rev >= v2]` | optional | — | — | `contentcontroldef.Declare` |
+
+## Chime
+
+`device.NewChime` · id `0x0146` · revision 2 · simple · matter.js `packages/node/src/devices/chime.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| Chime | `0x0556` | `M` | mandatory | — | — | `chimedef.Declare` |
+| Identify | `0x0003` | `O` | optional | — | — | `identifydef.Declare` |
 
 ## Closure
 
@@ -504,6 +574,24 @@ Conditions: ActiveTariff.
 | Identify | `0x0003` | `M` | mandatory | — | — | `identifydef.Declare` |
 | RelativeHumidityMeasurement | `0x0405` | `M` | mandatory | — | — | `relativehumiditymeasurementdef.Declare` |
 
+## Intercom
+
+`device.NewIntercom` · id `0x0140` · revision 2 · simple · matter.js `packages/node/src/devices/intercom.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| CameraAvStreamManagement | `0x0551` | `M` | mandatory | Audio (ADO) | — | `cameraavstreammanagementdef.Declare` |
+| WebRtcTransportProvider | `0x0553` | `M` | mandatory | — | — | `webrtctransportproviderdef.Declare` |
+| WebRtcTransportRequestor | `0x0554` | `M` | mandatory | — | — | `webrtctransportrequestordef.Declare` |
+| Identify | `0x0003` | `O` | optional | — | — | `identifydef.Declare` |
+| CameraAvSettingsUserLevelManagement | `0x0552` | `O` | optional | — | — | `cameraavsettingsuserlevelmanagementdef.Declare` |
+
+| Client cluster | ID | Conformance | Required |
+| --- | --- | --- | --- |
+| WebRtcTransportProvider | `0x0553` | `M` | mandatory |
+| WebRtcTransportRequestor | `0x0554` | `M` | mandatory |
+| Chime | `0x0556` | `O` | optional |
+
 ## IrrigationSystem
 
 `device.NewIrrigationSystem` · id `0x0040` · revision 1 · simple · matter.js `packages/node/src/devices/irrigation-system.ts`
@@ -517,6 +605,15 @@ Conditions: ActiveTariff.
 | Client cluster | ID | Conformance | Required |
 | --- | --- | --- | --- |
 | FlowMeasurement | `0x0404` | `O` | optional |
+
+## JointFabricAdministrator
+
+`device.NewJointFabricAdministrator` · id `0x0130` · revision 1 · utility · matter.js `packages/node/src/endpoints/joint-fabric-administrator.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| JointFabricDatastore | `0x0752` | `M` | mandatory | — | — | `jointfabricdatastoredef.Declare` |
+| JointFabricAdministrator | `0x0753` | `M` | mandatory | — | — | `jointfabricadministratordef.Declare` |
 
 ## LaundryDryer
 
@@ -614,6 +711,17 @@ Conditions: ElectricalEnergy.
 | Client cluster | ID | Conformance | Required |
 | --- | --- | --- | --- |
 | OccupancySensing | `0x0406` | `O` | optional |
+
+## NetworkInfrastructureManager
+
+`device.NewNetworkInfrastructureManager` · id `0x0090` · revision 2 · simple · matter.js `packages/node/src/devices/network-infrastructure-manager.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| ThreadNetworkDiagnostics | `0x0035` | `M` | mandatory | — | — | `threadnetworkdiagnosticsdef.Declare` |
+| WiFiNetworkManagement | `0x0451` | `M` | mandatory | — | — | `wifinetworkmanagementdef.Declare` |
+| ThreadBorderRouterManagement | `0x0452` | `M` | mandatory | — | — | `threadborderroutermanagementdef.Declare` |
+| ThreadNetworkDirectory | `0x0453` | `M` | mandatory | — | — | `threadnetworkdirectorydef.Declare` |
 
 ## OccupancySensor
 
@@ -857,14 +965,14 @@ Conditions: CustomNetworkConfig, ManagedAclAllowed, TimeSyncCond, TimeSyncWithCl
 | NetworkCommissioning | `0x0031` | `!CustomNetworkConfig` | optional | — | — | `networkcommissioningdef.Declare` |
 | DiagnosticLogs | `0x0032` | `O` | optional | — | — | `diagnosticlogsdef.Declare` |
 | SoftwareDiagnostics | `0x0034` | `O` | optional | — | — | `softwarediagnosticsdef.Declare` |
-| ThreadNetworkDiagnostics | `0x0035` | `[Thread]` | optional | — | — | — |
+| ThreadNetworkDiagnostics | `0x0035` | `[Thread]` | optional | — | — | `threadnetworkdiagnosticsdef.Declare` |
 | WiFiNetworkDiagnostics | `0x0036` | `[WiFi]` | optional | — | — | `wifinetworkdiagnosticsdef.Declare` |
 | EthernetNetworkDiagnostics | `0x0037` | `[Ethernet]` | optional | — | — | `ethernetnetworkdiagnosticsdef.Declare` |
 | TimeSynchronization | `0x0038` | `TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNtpcCond, TimeSyncWithTzCond, TlsClientCond, TlsCertificatesCond, O` | optional | — | — | `timesynchronizationdef.Declare` |
 | IcdManagement | `0x0046` | `Sit \| Lit` | optional | — | — | `icdmanagementdef.Declare` |
 | Groupcast | `0x0065` | `GroupcastListenerCond, GroupcastSenderCond, O` | optional | — | — | `groupcastdef.Declare` |
-| TlsCertificateManagement | `0x0801` | `TlsCertificatesCond, O` | optional | — | — | — |
-| TlsClientManagement | `0x0802` | `TlsClientCond, O` | optional | — | — | — |
+| TlsCertificateManagement | `0x0801` | `TlsCertificatesCond, O` | optional | — | — | `tlscertificatemanagementdef.Declare` |
+| TlsClientManagement | `0x0802` | `TlsClientCond, O` | optional | — | — | `tlsclientmanagementdef.Declare` |
 
 | Client cluster | ID | Conformance | Required |
 | --- | --- | --- | --- |
@@ -877,7 +985,7 @@ Conditions: CustomNetworkConfig, ManagedAclAllowed, TimeSyncCond, TimeSyncWithCl
 | Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
 | --- | --- | --- | --- | --- | --- | --- |
 | NetworkCommissioning | `0x0031` | `M` | mandatory | — | — | `networkcommissioningdef.Declare` |
-| ThreadNetworkDiagnostics | `0x0035` | `[Thread]` | optional | — | — | — |
+| ThreadNetworkDiagnostics | `0x0035` | `[Thread]` | optional | — | — | `threadnetworkdiagnosticsdef.Declare` |
 | WiFiNetworkDiagnostics | `0x0036` | `[WiFi]` | optional | — | — | `wifinetworkdiagnosticsdef.Declare` |
 | EthernetNetworkDiagnostics | `0x0037` | `[Ethernet]` | optional | — | — | `ethernetnetworkdiagnosticsdef.Declare` |
 
@@ -893,6 +1001,18 @@ Conditions: CustomNetworkConfig, ManagedAclAllowed, TimeSyncCond, TimeSyncWithCl
 | RelativeHumidityMeasurement | `0x0405` | `O` | optional | — | — | `relativehumiditymeasurementdef.Declare` |
 | TemperatureMeasurement | `0x0402` | `O` | optional | — | — | `temperaturemeasurementdef.Declare` |
 | CarbonMonoxideConcentrationMeasurement | `0x040C` | `O` | optional | — | — | `carbonmonoxideconcentrationmeasurementdef.Declare` |
+
+## SnapshotCamera
+
+`device.NewSnapshotCamera` · id `0x0145` · revision 1 · simple · matter.js `packages/node/src/devices/snapshot-camera.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| CameraAvStreamManagement | `0x0551` | `M` | mandatory | Snapshot (SNP) | — | `cameraavstreammanagementdef.Declare` |
+| Identify | `0x0003` | `O` | optional | — | — | `identifydef.Declare` |
+| OccupancySensing | `0x0406` | `O` | optional | — | — | `occupancysensingdef.Declare` |
+| ZoneManagement | `0x0550` | `O` | optional | TwoDimensionalCartesianZone (TWODCART) | — | `zonemanagementdef.Declare` |
+| CameraAvSettingsUserLevelManagement | `0x0552` | `O` | optional | — | — | `cameraavsettingsuserlevelmanagementdef.Declare` |
 
 ## SoilSensor
 
@@ -980,6 +1100,16 @@ Conditions: Cooler, Heater.
 | Identify | `0x0003` | `O` | optional |
 | Groups | `0x0004` | `O` | optional |
 | ScenesManagement | `0x0062` | `O` | optional |
+
+## ThreadBorderRouter
+
+`device.NewThreadBorderRouter` · id `0x0091` · revision 2 · simple · matter.js `packages/node/src/devices/thread-border-router.ts`
+
+| Server cluster | ID | Conformance | Required | Features | Elements | Declaration |
+| --- | --- | --- | --- | --- | --- | --- |
+| ThreadNetworkDiagnostics | `0x0035` | `M` | mandatory | — | — | `threadnetworkdiagnosticsdef.Declare` |
+| ThreadBorderRouterManagement | `0x0452` | `M` | mandatory | — | — | `threadborderroutermanagementdef.Declare` |
+| ThreadNetworkDirectory | `0x0453` | `O` | optional | — | — | `threadnetworkdirectorydef.Declare` |
 
 ## VideoRemoteControl
 

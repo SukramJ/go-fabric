@@ -163,7 +163,13 @@ func (s *settings) declare(d Declaration) error {
 			if o.decl.Server == nil {
 				return fmt.Errorf("%w: WithServer(nil)", ErrConfiguration)
 			}
-			if def := spec.Lookup(o.decl.Cluster); def != nil {
+			// Refused only for a cluster with a generated Declare
+			// (hostServers): a definition-only cluster — AccessControl,
+			// OperationalCredentials, GroupKeyManagement, whose servers
+			// are hand-written (ADR 0013, amendment of 2026-10-25) — has
+			// a definition but nothing to declare it through.
+			if _, declarable := hostServers[o.decl.Cluster]; declarable {
+				def := spec.Lookup(o.decl.Cluster)
 				return fmt.Errorf("%w: WithServer for %s (0x%04X): declare it, %sdef.Declare{HostServer: …} or device.HostServer(srv)",
 					ErrConfiguration, def.Name, o.decl.Cluster, strings.ToLower(def.Name))
 			}

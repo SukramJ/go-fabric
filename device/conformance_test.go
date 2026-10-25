@@ -41,6 +41,7 @@ var refusedDefaults = map[string]string{
 	"ElectricalMeter":        "ElectricalPowerMeasurement needs a feature selection",
 	"ElectricalSensor":       "PowerTopology needs a feature selection",
 	"GenericSwitch":          "Switch needs a feature selection",
+	"AudioDoorbell":          "Switch needs a feature selection",
 	"MicrowaveOven":          "MicrowaveOvenControl needs a feature selection",
 	"OccupancySensor":        "OccupancySensing needs a feature selection",
 	"PowerSource":            "PowerSource needs a feature selection",
@@ -196,6 +197,16 @@ var fixtures = map[string]fixture{
 		},
 	},
 	"GenericSwitch": {with: opts(feat(0x003B, switchdef.FeatureLatchingSwitch))},
+	// A doorbell's button is momentary.
+	"AudioDoorbell": {with: opts(feat(0x003B, switchdef.FeatureMomentarySwitch))},
+	// An Intercom mandates a GenericSwitch component ("deviceType
+	// GenericSwitch, M, 1" in parity/schema.json).
+	"Intercom": {
+		parts: func(t *testing.T, d *Device) {
+			t.Helper()
+			part(t, d, "GenericSwitch", nil, feat(0x003B, switchdef.FeatureMomentarySwitch))
+		},
+	},
 	"HeatPump": {
 		parts: func(t *testing.T, d *Device) {
 			t.Helper()

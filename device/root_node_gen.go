@@ -18,8 +18,11 @@ import (
 	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	powersourceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
 	softwarediagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/softwarediagnostics"
+	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
 	timeformatlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	timesynchronizationdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	tlscertificatemanagementdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
+	tlsclientmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
 	unitlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
 	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/schema"
@@ -103,6 +106,7 @@ var typeRootNode = Type{
 		},
 		{
 			ID: 0x0035, Name: "ThreadNetworkDiagnostics", Conformance: "[Thread]",
+			Definition: threadnetworkdiagnosticsdef.Definition,
 		},
 		{
 			ID: 0x0036, Name: "WiFiNetworkDiagnostics", Conformance: "[WiFi]",
@@ -126,9 +130,11 @@ var typeRootNode = Type{
 		},
 		{
 			ID: 0x0801, Name: "TlsCertificateManagement", Conformance: "TlsCertificatesCond, O",
+			Definition: tlscertificatemanagementdef.Definition,
 		},
 		{
 			ID: 0x0802, Name: "TlsClientManagement", Conformance: "TlsClientCond, O",
+			Definition: tlsclientmanagementdef.Definition,
 		},
 	},
 	Clients: []ClusterRequirement{
@@ -207,6 +213,11 @@ func (d *RootNode) SoftwareDiagnostics() *softwarediagnosticsdef.Server {
 	return softwarediagnosticsdef.WrapOn(d.Server(0x0034), d.queue)
 }
 
+// ThreadNetworkDiagnostics is the device's typed ThreadNetworkDiagnostics server, nil until a declaration mounts it.
+func (d *RootNode) ThreadNetworkDiagnostics() *threadnetworkdiagnosticsdef.Server {
+	return threadnetworkdiagnosticsdef.WrapOn(d.Server(0x0035), d.queue)
+}
+
 // WiFiNetworkDiagnostics is the device's typed WiFiNetworkDiagnostics server, nil until a declaration mounts it.
 func (d *RootNode) WiFiNetworkDiagnostics() *wifinetworkdiagnosticsdef.Server {
 	return wifinetworkdiagnosticsdef.WrapOn(d.Server(0x0036), d.queue)
@@ -230,4 +241,14 @@ func (d *RootNode) IcdManagement() *icdmanagementdef.Server {
 // Groupcast is the device's typed Groupcast server, nil until a declaration mounts it.
 func (d *RootNode) Groupcast() *groupcastdef.Server {
 	return groupcastdef.WrapOn(d.Server(0x0065), d.queue)
+}
+
+// TlsCertificateManagement is the device's typed TlsCertificateManagement server, nil until a declaration mounts it.
+func (d *RootNode) TlsCertificateManagement() *tlscertificatemanagementdef.Server {
+	return tlscertificatemanagementdef.WrapOn(d.Server(0x0801), d.queue)
+}
+
+// TlsClientManagement is the device's typed TlsClientManagement server, nil until a declaration mounts it.
+func (d *RootNode) TlsClientManagement() *tlsclientmanagementdef.Server {
+	return tlsclientmanagementdef.WrapOn(d.Server(0x0802), d.queue)
 }

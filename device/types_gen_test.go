@@ -123,6 +123,41 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("AirQualitySensor") {
 		t.Errorf("AirQualitySensor: %v", err)
 	}
+	if _, err := NewAudioDoorbell(Options{}); err == nil {
+		t.Error("AudioDoorbell: constructed without a StableKey")
+	}
+	if d, err := NewAudioDoorbell(testOptions("AudioDoorbell"), testWith(t, "AudioDoorbell")...); err == nil {
+		if d.Type() != &AudioDoorbellType {
+			t.Errorf("AudioDoorbell: type %v", d.Type().Name)
+		}
+		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
+			t.Error("AudioDoorbell: mandatory Switch not mounted")
+		}
+		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
+			t.Error("AudioDoorbell: mandatory CameraAvStreamManagement not mounted")
+		}
+		if s := d.WebRtcTransportProvider(); s == nil || s.Underlying() != d.Server(0x0553) {
+			t.Error("AudioDoorbell: mandatory WebRtcTransportProvider not mounted")
+		}
+		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
+			t.Error("AudioDoorbell: mandatory Binding not mounted")
+		}
+		if s, srv := d.WebRtcTransportRequestor(), d.Server(0x0554); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("AudioDoorbell: optional WebRtcTransportRequestor is not the device's server")
+		}
+		if s, srv := d.PushAvStreamTransport(), d.Server(0x0555); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("AudioDoorbell: optional PushAvStreamTransport is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: AudioDoorbellID, Options: testOptions("AudioDoorbell"), Declarations: testWith(t, "AudioDoorbell")}); err != nil {
+			t.Errorf("AudioDoorbell: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "AudioDoorbell", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: AudioDoorbellID, Options: testOptions("AudioDoorbell"), Declarations: testWith(t, "AudioDoorbell")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("AudioDoorbell: FromSpec refuses with %v, NewAudioDoorbell with %v", serr, err)
+	} else if !refusesFixture("AudioDoorbell") {
+		t.Errorf("AudioDoorbell: %v", err)
+	}
 	if _, err := NewBasicVideoPlayer(Options{}); err == nil {
 		t.Error("BasicVideoPlayer: constructed without a StableKey")
 	}
@@ -219,6 +254,64 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("BridgedNode") {
 		t.Errorf("BridgedNode: %v", err)
 	}
+	if _, err := NewCamera(Options{}); err == nil {
+		t.Error("Camera: constructed without a StableKey")
+	}
+	if d, err := NewCamera(testOptions("Camera"), testWith(t, "Camera")...); err == nil {
+		if d.Type() != &CameraType {
+			t.Errorf("Camera: type %v", d.Type().Name)
+		}
+		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
+			t.Error("Camera: mandatory CameraAvStreamManagement not mounted")
+		}
+		if s := d.WebRtcTransportProvider(); s == nil || s.Underlying() != d.Server(0x0553) {
+			t.Error("Camera: mandatory WebRtcTransportProvider not mounted")
+		}
+		if s, srv := d.WebRtcTransportRequestor(), d.Server(0x0554); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Camera: optional WebRtcTransportRequestor is not the device's server")
+		}
+		if s, srv := d.PushAvStreamTransport(), d.Server(0x0555); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Camera: optional PushAvStreamTransport is not the device's server")
+		}
+		if s, srv := d.CameraAvSettingsUserLevelManagement(), d.Server(0x0552); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Camera: optional CameraAvSettingsUserLevelManagement is not the device's server")
+		}
+		if s, srv := d.ZoneManagement(), d.Server(0x0550); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Camera: optional ZoneManagement is not the device's server")
+		}
+		if s, srv := d.OccupancySensing(), d.Server(0x0406); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Camera: optional OccupancySensing is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: CameraID, Options: testOptions("Camera"), Declarations: testWith(t, "Camera")}); err != nil {
+			t.Errorf("Camera: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Camera", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CameraID, Options: testOptions("Camera"), Declarations: testWith(t, "Camera")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Camera: FromSpec refuses with %v, NewCamera with %v", serr, err)
+	} else if !refusesFixture("Camera") {
+		t.Errorf("Camera: %v", err)
+	}
+	if _, err := NewCameraController(Options{}); err == nil {
+		t.Error("CameraController: constructed without a StableKey")
+	}
+	if d, err := NewCameraController(testOptions("CameraController"), testWith(t, "CameraController")...); err == nil {
+		if d.Type() != &CameraControllerType {
+			t.Errorf("CameraController: type %v", d.Type().Name)
+		}
+		if s := d.WebRtcTransportRequestor(); s == nil || s.Underlying() != d.Server(0x0554) {
+			t.Error("CameraController: mandatory WebRtcTransportRequestor not mounted")
+		}
+		if s, err := FromSpec(Spec{Type: CameraControllerID, Options: testOptions("CameraController"), Declarations: testWith(t, "CameraController")}); err != nil {
+			t.Errorf("CameraController: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "CameraController", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: CameraControllerID, Options: testOptions("CameraController"), Declarations: testWith(t, "CameraController")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("CameraController: FromSpec refuses with %v, NewCameraController with %v", serr, err)
+	} else if !refusesFixture("CameraController") {
+		t.Errorf("CameraController: %v", err)
+	}
 	if _, err := NewCastingVideoPlayer(Options{}); err == nil {
 		t.Error("CastingVideoPlayer: constructed without a StableKey")
 	}
@@ -277,6 +370,26 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("CastingVideoPlayer: FromSpec refuses with %v, NewCastingVideoPlayer with %v", serr, err)
 	} else if !refusesFixture("CastingVideoPlayer") {
 		t.Errorf("CastingVideoPlayer: %v", err)
+	}
+	if _, err := NewChime(Options{}); err == nil {
+		t.Error("Chime: constructed without a StableKey")
+	}
+	if d, err := NewChime(testOptions("Chime"), testWith(t, "Chime")...); err == nil {
+		if d.Type() != &ChimeType {
+			t.Errorf("Chime: type %v", d.Type().Name)
+		}
+		if s := d.Chime(); s == nil || s.Underlying() != d.Server(0x0556) {
+			t.Error("Chime: mandatory Chime not mounted")
+		}
+		if s, err := FromSpec(Spec{Type: ChimeID, Options: testOptions("Chime"), Declarations: testWith(t, "Chime")}); err != nil {
+			t.Errorf("Chime: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Chime", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ChimeID, Options: testOptions("Chime"), Declarations: testWith(t, "Chime")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Chime: FromSpec refuses with %v, NewChime with %v", serr, err)
+	} else if !refusesFixture("Chime") {
+		t.Errorf("Chime: %v", err)
 	}
 	if _, err := NewClosure(Options{}); err == nil {
 		t.Error("Closure: constructed without a StableKey")
@@ -974,6 +1087,35 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("HumiditySensor") {
 		t.Errorf("HumiditySensor: %v", err)
 	}
+	if _, err := NewIntercom(Options{}); err == nil {
+		t.Error("Intercom: constructed without a StableKey")
+	}
+	if d, err := NewIntercom(testOptions("Intercom"), testWith(t, "Intercom")...); err == nil {
+		if d.Type() != &IntercomType {
+			t.Errorf("Intercom: type %v", d.Type().Name)
+		}
+		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
+			t.Error("Intercom: mandatory CameraAvStreamManagement not mounted")
+		}
+		if s := d.WebRtcTransportProvider(); s == nil || s.Underlying() != d.Server(0x0553) {
+			t.Error("Intercom: mandatory WebRtcTransportProvider not mounted")
+		}
+		if s := d.WebRtcTransportRequestor(); s == nil || s.Underlying() != d.Server(0x0554) {
+			t.Error("Intercom: mandatory WebRtcTransportRequestor not mounted")
+		}
+		if s, srv := d.CameraAvSettingsUserLevelManagement(), d.Server(0x0552); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("Intercom: optional CameraAvSettingsUserLevelManagement is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: IntercomID, Options: testOptions("Intercom"), Declarations: testWith(t, "Intercom")}); err != nil {
+			t.Errorf("Intercom: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "Intercom", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: IntercomID, Options: testOptions("Intercom"), Declarations: testWith(t, "Intercom")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("Intercom: FromSpec refuses with %v, NewIntercom with %v", serr, err)
+	} else if !refusesFixture("Intercom") {
+		t.Errorf("Intercom: %v", err)
+	}
 	if _, err := NewIrrigationSystem(Options{}); err == nil {
 		t.Error("IrrigationSystem: constructed without a StableKey")
 	}
@@ -996,6 +1138,29 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("IrrigationSystem: FromSpec refuses with %v, NewIrrigationSystem with %v", serr, err)
 	} else if !refusesFixture("IrrigationSystem") {
 		t.Errorf("IrrigationSystem: %v", err)
+	}
+	if _, err := NewJointFabricAdministrator(Options{}); err == nil {
+		t.Error("JointFabricAdministrator: constructed without a StableKey")
+	}
+	if d, err := NewJointFabricAdministrator(testOptions("JointFabricAdministrator"), testWith(t, "JointFabricAdministrator")...); err == nil {
+		if d.Type() != &JointFabricAdministratorType {
+			t.Errorf("JointFabricAdministrator: type %v", d.Type().Name)
+		}
+		if s := d.JointFabricDatastore(); s == nil || s.Underlying() != d.Server(0x0752) {
+			t.Error("JointFabricAdministrator: mandatory JointFabricDatastore not mounted")
+		}
+		if s := d.JointFabricAdministrator(); s == nil || s.Underlying() != d.Server(0x0753) {
+			t.Error("JointFabricAdministrator: mandatory JointFabricAdministrator not mounted")
+		}
+		if s, err := FromSpec(Spec{Type: JointFabricAdministratorID, Options: testOptions("JointFabricAdministrator"), Declarations: testWith(t, "JointFabricAdministrator")}); err != nil {
+			t.Errorf("JointFabricAdministrator: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "JointFabricAdministrator", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: JointFabricAdministratorID, Options: testOptions("JointFabricAdministrator"), Declarations: testWith(t, "JointFabricAdministrator")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("JointFabricAdministrator: FromSpec refuses with %v, NewJointFabricAdministrator with %v", serr, err)
+	} else if !refusesFixture("JointFabricAdministrator") {
+		t.Errorf("JointFabricAdministrator: %v", err)
 	}
 	if _, err := NewLaundryDryer(Options{}); err == nil {
 		t.Error("LaundryDryer: constructed without a StableKey")
@@ -1192,6 +1357,35 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("MountedOnOffControl: FromSpec refuses with %v, NewMountedOnOffControl with %v", serr, err)
 	} else if !refusesFixture("MountedOnOffControl") {
 		t.Errorf("MountedOnOffControl: %v", err)
+	}
+	if _, err := NewNetworkInfrastructureManager(Options{}); err == nil {
+		t.Error("NetworkInfrastructureManager: constructed without a StableKey")
+	}
+	if d, err := NewNetworkInfrastructureManager(testOptions("NetworkInfrastructureManager"), testWith(t, "NetworkInfrastructureManager")...); err == nil {
+		if d.Type() != &NetworkInfrastructureManagerType {
+			t.Errorf("NetworkInfrastructureManager: type %v", d.Type().Name)
+		}
+		if s := d.ThreadNetworkDiagnostics(); s == nil || s.Underlying() != d.Server(0x0035) {
+			t.Error("NetworkInfrastructureManager: mandatory ThreadNetworkDiagnostics not mounted")
+		}
+		if s := d.WiFiNetworkManagement(); s == nil || s.Underlying() != d.Server(0x0451) {
+			t.Error("NetworkInfrastructureManager: mandatory WiFiNetworkManagement not mounted")
+		}
+		if s := d.ThreadBorderRouterManagement(); s == nil || s.Underlying() != d.Server(0x0452) {
+			t.Error("NetworkInfrastructureManager: mandatory ThreadBorderRouterManagement not mounted")
+		}
+		if s := d.ThreadNetworkDirectory(); s == nil || s.Underlying() != d.Server(0x0453) {
+			t.Error("NetworkInfrastructureManager: mandatory ThreadNetworkDirectory not mounted")
+		}
+		if s, err := FromSpec(Spec{Type: NetworkInfrastructureManagerID, Options: testOptions("NetworkInfrastructureManager"), Declarations: testWith(t, "NetworkInfrastructureManager")}); err != nil {
+			t.Errorf("NetworkInfrastructureManager: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "NetworkInfrastructureManager", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: NetworkInfrastructureManagerID, Options: testOptions("NetworkInfrastructureManager"), Declarations: testWith(t, "NetworkInfrastructureManager")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("NetworkInfrastructureManager: FromSpec refuses with %v, NewNetworkInfrastructureManager with %v", serr, err)
+	} else if !refusesFixture("NetworkInfrastructureManager") {
+		t.Errorf("NetworkInfrastructureManager: %v", err)
 	}
 	if _, err := NewOccupancySensor(Options{}); err == nil {
 		t.Error("OccupancySensor: constructed without a StableKey")
@@ -1613,6 +1807,9 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s, srv := d.SoftwareDiagnostics(), d.Server(0x0034); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional SoftwareDiagnostics is not the device's server")
 		}
+		if s, srv := d.ThreadNetworkDiagnostics(), d.Server(0x0035); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("RootNode: optional ThreadNetworkDiagnostics is not the device's server")
+		}
 		if s, srv := d.WiFiNetworkDiagnostics(), d.Server(0x0036); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional WiFiNetworkDiagnostics is not the device's server")
 		}
@@ -1627,6 +1824,12 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 		if s, srv := d.Groupcast(), d.Server(0x0065); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("RootNode: optional Groupcast is not the device's server")
+		}
+		if s, srv := d.TlsCertificateManagement(), d.Server(0x0801); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("RootNode: optional TlsCertificateManagement is not the device's server")
+		}
+		if s, srv := d.TlsClientManagement(), d.Server(0x0802); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("RootNode: optional TlsClientManagement is not the device's server")
 		}
 		if s, err := FromSpec(Spec{Type: RootNodeID, Options: testOptions("RootNode"), Declarations: testWith(t, "RootNode")}); err != nil {
 			t.Errorf("RootNode: FromSpec: %v", err)
@@ -1647,6 +1850,9 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 		if s := d.NetworkCommissioning(); s == nil || s.Underlying() != d.Server(0x0031) {
 			t.Error("SecondaryNetworkInterface: mandatory NetworkCommissioning not mounted")
+		}
+		if s, srv := d.ThreadNetworkDiagnostics(), d.Server(0x0035); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("SecondaryNetworkInterface: optional ThreadNetworkDiagnostics is not the device's server")
 		}
 		if s, srv := d.WiFiNetworkDiagnostics(), d.Server(0x0036); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
 			t.Error("SecondaryNetworkInterface: optional WiFiNetworkDiagnostics is not the device's server")
@@ -1692,6 +1898,35 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("SmokeCoAlarm: FromSpec refuses with %v, NewSmokeCoAlarm with %v", serr, err)
 	} else if !refusesFixture("SmokeCoAlarm") {
 		t.Errorf("SmokeCoAlarm: %v", err)
+	}
+	if _, err := NewSnapshotCamera(Options{}); err == nil {
+		t.Error("SnapshotCamera: constructed without a StableKey")
+	}
+	if d, err := NewSnapshotCamera(testOptions("SnapshotCamera"), testWith(t, "SnapshotCamera")...); err == nil {
+		if d.Type() != &SnapshotCameraType {
+			t.Errorf("SnapshotCamera: type %v", d.Type().Name)
+		}
+		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
+			t.Error("SnapshotCamera: mandatory CameraAvStreamManagement not mounted")
+		}
+		if s, srv := d.OccupancySensing(), d.Server(0x0406); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("SnapshotCamera: optional OccupancySensing is not the device's server")
+		}
+		if s, srv := d.ZoneManagement(), d.Server(0x0550); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("SnapshotCamera: optional ZoneManagement is not the device's server")
+		}
+		if s, srv := d.CameraAvSettingsUserLevelManagement(), d.Server(0x0552); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("SnapshotCamera: optional CameraAvSettingsUserLevelManagement is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: SnapshotCameraID, Options: testOptions("SnapshotCamera"), Declarations: testWith(t, "SnapshotCamera")}); err != nil {
+			t.Errorf("SnapshotCamera: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "SnapshotCamera", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: SnapshotCameraID, Options: testOptions("SnapshotCamera"), Declarations: testWith(t, "SnapshotCamera")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("SnapshotCamera: FromSpec refuses with %v, NewSnapshotCamera with %v", serr, err)
+	} else if !refusesFixture("SnapshotCamera") {
+		t.Errorf("SnapshotCamera: %v", err)
 	}
 	if _, err := NewSoilSensor(Options{}); err == nil {
 		t.Error("SoilSensor: constructed without a StableKey")
@@ -1859,6 +2094,32 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Errorf("ThermostatController: FromSpec refuses with %v, NewThermostatController with %v", serr, err)
 	} else if !refusesFixture("ThermostatController") {
 		t.Errorf("ThermostatController: %v", err)
+	}
+	if _, err := NewThreadBorderRouter(Options{}); err == nil {
+		t.Error("ThreadBorderRouter: constructed without a StableKey")
+	}
+	if d, err := NewThreadBorderRouter(testOptions("ThreadBorderRouter"), testWith(t, "ThreadBorderRouter")...); err == nil {
+		if d.Type() != &ThreadBorderRouterType {
+			t.Errorf("ThreadBorderRouter: type %v", d.Type().Name)
+		}
+		if s := d.ThreadNetworkDiagnostics(); s == nil || s.Underlying() != d.Server(0x0035) {
+			t.Error("ThreadBorderRouter: mandatory ThreadNetworkDiagnostics not mounted")
+		}
+		if s := d.ThreadBorderRouterManagement(); s == nil || s.Underlying() != d.Server(0x0452) {
+			t.Error("ThreadBorderRouter: mandatory ThreadBorderRouterManagement not mounted")
+		}
+		if s, srv := d.ThreadNetworkDirectory(), d.Server(0x0453); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
+			t.Error("ThreadBorderRouter: optional ThreadNetworkDirectory is not the device's server")
+		}
+		if s, err := FromSpec(Spec{Type: ThreadBorderRouterID, Options: testOptions("ThreadBorderRouter"), Declarations: testWith(t, "ThreadBorderRouter")}); err != nil {
+			t.Errorf("ThreadBorderRouter: FromSpec: %v", err)
+		} else {
+			sameDevice(t, "ThreadBorderRouter", s, d.Device)
+		}
+	} else if _, serr := FromSpec(Spec{Type: ThreadBorderRouterID, Options: testOptions("ThreadBorderRouter"), Declarations: testWith(t, "ThreadBorderRouter")}); serr == nil || serr.Error() != err.Error() {
+		t.Errorf("ThreadBorderRouter: FromSpec refuses with %v, NewThreadBorderRouter with %v", serr, err)
+	} else if !refusesFixture("ThreadBorderRouter") {
+		t.Errorf("ThreadBorderRouter: %v", err)
 	}
 	if _, err := NewVideoRemoteControl(Options{}); err == nil {
 		t.Error("VideoRemoteControl: constructed without a StableKey")

@@ -24,6 +24,8 @@
 //   - github.com/SukramJ/go-fabric/cluster/spec/booleanstate
 //   - github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration
 //   - github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation
+//   - github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement
+//   - github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement
 //   - github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/channel
@@ -65,6 +67,8 @@
 //   - github.com/SukramJ/go-fabric/cluster/spec/icdmanagement
 //   - github.com/SukramJ/go-fabric/cluster/spec/identify
 //   - github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement
+//   - github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator
+//   - github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore
 //   - github.com/SukramJ/go-fabric/cluster/spec/keypadinput
 //   - github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols
 //   - github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols
@@ -97,6 +101,7 @@
 //   - github.com/SukramJ/go-fabric/cluster/spec/powertopology
 //   - github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol
+//   - github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport
 //   - github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm
 //   - github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode
@@ -116,8 +121,13 @@
 //   - github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/thermostat
 //   - github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration
+//   - github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement
+//   - github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics
+//   - github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory
 //   - github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization
 //   - github.com/SukramJ/go-fabric/cluster/spec/timesynchronization
+//   - github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement
+//   - github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement
 //   - github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement
 //   - github.com/SukramJ/go-fabric/cluster/spec/unitlocalization
 //   - github.com/SukramJ/go-fabric/cluster/spec/userlabel
@@ -126,9 +136,12 @@
 //   - github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement
 //   - github.com/SukramJ/go-fabric/cluster/spec/waterheatermode
 //   - github.com/SukramJ/go-fabric/cluster/spec/watertanklevelmonitoring
+//   - github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider
+//   - github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor
 //   - github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics
 //   - github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement
 //   - github.com/SukramJ/go-fabric/cluster/spec/windowcovering
+//   - github.com/SukramJ/go-fabric/cluster/spec/zonemanagement
 //
 // # Device types
 //
@@ -137,10 +150,14 @@
 //   - [Aggregator] (0x000E)
 //   - [AirPurifier] (0x002D)
 //   - [AirQualitySensor] (0x002C)
+//   - [AudioDoorbell] (0x0141)
 //   - [BasicVideoPlayer] (0x0028)
 //   - [BatteryStorage] (0x0018)
 //   - [BridgedNode] (0x0013)
+//   - [Camera] (0x0142)
+//   - [CameraController] (0x0147)
 //   - [CastingVideoPlayer] (0x0023)
+//   - [Chime] (0x0146)
 //   - [Closure] (0x0230)
 //   - [ClosureController] (0x023E)
 //   - [ClosurePanel] (0x0231)
@@ -171,7 +188,9 @@
 //   - [GenericSwitch] (0x000F)
 //   - [HeatPump] (0x0309)
 //   - [HumiditySensor] (0x0307)
+//   - [Intercom] (0x0140)
 //   - [IrrigationSystem] (0x0040)
+//   - [JointFabricAdministrator] (0x0130)
 //   - [LaundryDryer] (0x007C)
 //   - [LaundryWasher] (0x0073)
 //   - [LightSensor] (0x0106)
@@ -180,6 +199,7 @@
 //   - [ModeSelect] (0x0027)
 //   - [MountedDimmableLoadControl] (0x0110)
 //   - [MountedOnOffControl] (0x010F)
+//   - [NetworkInfrastructureManager] (0x0090)
 //   - [OccupancySensor] (0x0107)
 //   - [OnOffLight] (0x0100)
 //   - [OnOffLightSwitch] (0x0103)
@@ -199,6 +219,7 @@
 //   - [RootNode] (0x0016)
 //   - [SecondaryNetworkInterface] (0x0019)
 //   - [SmokeCoAlarm] (0x0076)
+//   - [SnapshotCamera] (0x0145)
 //   - [SoilSensor] (0x0045)
 //   - [SolarPower] (0x0017)
 //   - [Speaker] (0x0022)
@@ -206,6 +227,7 @@
 //   - [TemperatureSensor] (0x0302)
 //   - [Thermostat] (0x0301)
 //   - [ThermostatController] (0x030A)
+//   - [ThreadBorderRouter] (0x0091)
 //   - [VideoRemoteControl] (0x002A)
 //   - [WaterFreezeDetector] (0x0041)
 //   - [WaterHeater] (0x050F)
