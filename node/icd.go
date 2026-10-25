@@ -230,6 +230,11 @@ func (n *Node) wireICD() {
 		Logger: n.logger,
 	})
 	srv.SetCheckInSender(sender.Send)
+	// A LIT-capable publisher grants its idle cycle as every
+	// subscription's MaxInterval (ServerSubscription.ts:302-312).
+	if cc, err := n.cfg.ICD.coreConfig(); err == nil && n.cfg.ICD.Mode == ICDModeLIT {
+		n.sec.subs.SetICDIdleModeDuration(uint16(max(cc.IdleModeDuration, 1))) //nolint:gosec // G115: at most 64800
+	}
 	srv.SetOnOperatingModeChanged(func() { n.reannounceFabrics(n.life) })
 }
 

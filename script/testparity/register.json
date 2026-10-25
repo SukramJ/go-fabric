@@ -2787,11 +2787,10 @@
         "im/subscription:TestHandlerParity_SendInterval_HalfUnder60s_Uses80Percent",
         "im/subscription:TestHandlerParity_Close_WhileDirty_StillMarksClosed",
         "node:TestServerSubscriptionParity",
-        "im/subscription:TestServerSubscriptionParity"
+        "im/subscription:TestServerSubscriptionParity",
+        "node:TestServerSubscriptionLITParity"
       ],
       "missing": [
-        "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a higher ceiling",
-        "grants LIT ICD publisher maxInterval === idleModeDuration when the client requests a lower ceiling",
         "terminates when the peer refuses a report sent during a shutdown close",
         "keeps a subscription that joins a session closing for shutdown",
         "terminates when the peer answers a report with an error status",
@@ -2820,7 +2819,7 @@
         "completes session force-close triggered from inside an in-flight update",
         "suppresses peer loss on the exchanges it opens to push subscription reports"
       ],
-      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest). Missing: the LIT ICD intervals (the device ICD role, M5 phase 23); the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION, endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, repeated MRP exhaustion, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges.",
       "snapshotSha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820"
     },
     {

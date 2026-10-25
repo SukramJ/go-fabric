@@ -293,7 +293,6 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
 	n.root.DiagnosticLogs.SetLogger(n.logger)
 	n.br.AttachRootClusters(n.root.Servers())
-	n.wireICD()
 	if n.commissionerControl, err = n.buildCommissionerControl(); err != nil {
 		return nil, err
 	}
@@ -316,6 +315,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke), cfg.Limits, n.logger)
+	n.wireICD()
 
 	// --- the commissioning window (main.go:329-360 at b4ea1f96^) ---------------------
 	advert, err := n.advertisement()
