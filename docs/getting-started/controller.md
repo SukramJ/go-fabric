@@ -461,6 +461,23 @@ started node establishes or closes the subscription at once, a stopped one
 follows the choice at its next start, as matter.js's `autoSubscribe` state
 does. `Node.AutoSubscribe()` reads it.
 
+### The specification version
+
+`Node.Properties().Specification()` decodes the node's BasicInformation
+SpecificationVersion into a `client.SpecVersion` (`Major`, `Minor`,
+`Patch`, `Reserved`); `String()` renders it as `"1.4.0"`, `Uint32()`
+gives the attribute value back for comparisons, and `client.SpecVersionOf`
+decodes a value a host holds. An unknown or zero version reports false.
+
+### Thread datasets
+
+`thread.DecodeDataset(b)` (package `controller/thread`) reads a Thread
+operational dataset, as matter.js's `OperationalDataset.decode` does:
+`NetworkName`, `ExtPANID`, `Channel`, `PANID` and every other MeshCoP TLV;
+`DecodeDatasetHex` takes hex, and `Redact` drops the secrets for a log
+line. The commissioner provisions the dataset as bytes
+(`commissioner.ThreadNetwork`).
+
 *Source: `controller/controller.go`, `controller/code.go`, `controller/client/window.go`, `controller/client/interact.go`, `controller/client/label.go`, `controller/commissioner/fabric.go`, `client/interaction/invoke_batch.go`, `controller/facade_test.go`.*
 
 ## What is not here yet

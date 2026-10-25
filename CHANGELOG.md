@@ -22,6 +22,7 @@ pseudo-version of `main`.
 - Batched invokes (§1.8): `client.Node.InvokeBatch(ctx, []client.CommandRequest, client.InvokeOptions) ([]client.Result, error)` and `client.Node.MaxPathsPerInvoke()`; below them `interaction.Interaction.InvokeBatch`, `interaction.CommandRequest` and `interaction.ErrNoCommands`. The commands go in batches of the peer's MaxPathsPerInvoke on parallel exchanges, as matter.js's `ClientInteraction` splits an invoke; a command without an answer is `NoCommandResponse`.
 - The fabric label at run time (§1.9): `client.Registry.SetFabricLabel(ctx, label)` persists our fabric's label and reconciles it to every connected node at once (a node offline gets it at its next start); `commissioner.Fabric.SetLabel`, `Fabric.CurrentLabel`, `commissioner.MaxLabelLength`, `commissioner.ErrLabel`. Unlike matter.js's `updateFabricLabel`, which stops after the first connected node it updated, every connected node is updated.
 - The default subscription per node (§1.10): `client.Node.SetAutoSubscribe(ctx, on)` establishes or closes a started node's sustained default subscription and persists the choice in the node's settings; `client.Node.AutoSubscribe()`. The synchronisation of the default subscription is serialised per node.
+- The decoded specification version (§1.12): `client.SpecVersion` (`Major`, `Minor`, `Patch`, `Reserved`, `String`, `Uint32`), `client.SpecVersionOf(v)` and `client.Properties.Specification()`. `Properties.SpecificationVersion` keeps its raw value.
 
 ## [0.12.0] — 2026-10-25
 
