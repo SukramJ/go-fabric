@@ -130,6 +130,9 @@ func (r *Registry) onLeave(n *Node, fabricIndex uint8) {
 		return
 	}
 	r.log.Info("matter.controller.client.registry.peer_left", slog.String("node", n.ID()), slog.String("peer", peerAddressString(addr)))
+	if n.icd != nil {
+		n.icd.onDecommissioned()
+	}
 	if h := n.cfg.Hooks.Decommissioned; h != nil {
 		h()
 	}

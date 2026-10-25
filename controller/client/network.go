@@ -86,9 +86,16 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 		n.mu.RLock()
 		s := n.sub
 		n.mu.RUnlock()
+		n.noteICDActive()
 		if s != nil && s.ID() != interaction.NoSubscription && n.cfg.Hooks.SubscriptionAlive != nil {
 			n.cfg.Hooks.SubscriptionAlive()
 		}
+	}
+	// The ICD branches of the sustained subscription
+	// (ClientNodeInteraction.ts:174, :178).
+	if n.icd != nil {
+		sreq.Wakefulness = n.icd.Wakefulness
+		sreq.PeerFed = n.icd.peerFed
 	}
 	sreq.Updated = func(*Report) { alive() }
 	sreq.KeepaliveReceived = alive
@@ -102,6 +109,9 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	sreq.ActiveChanged = func(active bool) {
 		if h := n.cfg.Hooks.SubscriptionStatusChanged; h != nil {
 			h(active)
+		}
+		if n.icd != nil {
+			n.icd.onSubscriptionActive(active)
 		}
 		if active {
 			if h := n.cfg.Hooks.SubscriptionAlive; h != nil {

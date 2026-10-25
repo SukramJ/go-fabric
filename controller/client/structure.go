@@ -117,7 +117,7 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 			clusters = append([]StoredCluster{d}, slices.Delete(clusters, i, i+1)...)
 		}
 		for _, sc := range clusters {
-			if se.Number == 0 && sc.ID == settingsCluster {
+			if se.Number == 0 && (sc.ID == settingsCluster || sc.ID == icdCluster) {
 				continue
 			}
 			values := make(map[uint32]spec.Node, len(sc.Values))

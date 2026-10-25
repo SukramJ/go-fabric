@@ -9,6 +9,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -46,6 +47,28 @@ type Peer struct {
 	connectionInitiatedAt time.Time
 	monitor               *monitor
 	observers             []*observerEntry
+
+	// icdAwait reports a sleeping LIT ICD peer the controller awaits
+	// (SetICDAwait); nil for a peer that is no registered ICD.
+	icdAwait atomic.Pointer[func() bool]
+}
+
+// SetICDAwait sets the report of whether the peer is a LIT ICD the
+// controller awaits — its ICD wakefulness's RequiresAwait. While it
+// reports true the address monitor never probes the peer: a sleeping LIT
+// ICD does not answer, and a failed probe would close a healthy session
+// (PeerAddressMonitor.ts:143-148). nil removes it.
+func (p *Peer) SetICDAwait(fn func() bool) {
+	if fn == nil {
+		p.icdAwait.Store(nil)
+		return
+	}
+	p.icdAwait.Store(&fn)
+}
+
+func (p *Peer) icdAwaited() bool {
+	fn := p.icdAwait.Load()
+	return fn != nil && (*fn)()
 }
 
 // newPeer builds the peer d describes — Peer.ts:95-188. The peer's

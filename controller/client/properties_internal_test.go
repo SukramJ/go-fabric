@@ -94,7 +94,7 @@ func TestProperties(t *testing.T) {
 		descriptor.ClusterID, basicinformation.ClusterID, icdmanagement.ClusterID,
 		networkcommissioning.ClusterID, generaldiagnostics.ClusterID, powersource.ClusterID,
 	}, 1, 2)
-	b.cluster(0, basicinformation.ClusterID, 0, map[uint32]spec.Node{basicinformation.AttrSpecificationVersion: uintNode(0x0102_0000)})
+	b.cluster(0, basicinformation.ClusterID, 0, map[uint32]spec.Node{basicinformation.AttrSpecificationVersion: uintNode(0x0104_0000)})
 	b.cluster(0, icdmanagement.ClusterID, uint64(icdmanagement.FeatureLongIdleTimeSupport), map[uint32]spec.Node{
 		icdmanagement.AttrIdleModeDuration: uintNode(120), icdmanagement.AttrOperatingMode: uintNode(1),
 	})
@@ -117,7 +117,7 @@ func TestProperties(t *testing.T) {
 	n.apply(wildcard, &b.r)
 	p := n.Properties()
 	if !p.IntermittentlyConnected || !p.LongIdleTimeOperating || p.IdleModeDuration == nil || *p.IdleModeDuration != 2*time.Minute ||
-		p.SpecificationVersion == nil || *p.SpecificationVersion != 0x0102_0000 || !p.SupportsWifi || p.SupportsThread ||
+		p.SpecificationVersion == nil || *p.SpecificationVersion != 0x0104_0000 || !p.SupportsWifi || p.SupportsThread ||
 		p.WifiActive == nil || !*p.WifiActive || p.EthernetActive == nil || *p.EthernetActive || !p.MainsPowered || p.BatteryPowered ||
 		p.ThreadSleepyEndDevice || p.ThreadActive != nil {
 		t.Fatalf("properties %+v", p)

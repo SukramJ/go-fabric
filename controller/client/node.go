@@ -67,6 +67,10 @@ type Node struct {
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
 	requestObserver func(SubscribeRequest)
+	// icd is the ICD client a [Registry] gives its nodes, nil otherwise;
+	// storedICD its stored registration until the registry built it.
+	icd       *ICDClient
+	storedICD map[uint32][]byte
 }
 
 // New builds the node cfg describes and loads its image from the store.
@@ -112,13 +116,15 @@ func newNode(cfg Config) (*Node, error) {
 				n.settings, err = decodeSettings(c.Values)
 			case recordCluster:
 				n.record, err = decodeRecord(c.Values)
+			case icdCluster:
+				n.storedICD = c.Values
 			}
 			if err != nil {
 				return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 			}
 		}
 		// The record is no cluster of the image.
-		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool { return c.ID == recordCluster })
+		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool { return c.ID == recordCluster || c.ID == icdCluster })
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	if err := n.s.loadCache(stored); err != nil {
@@ -145,14 +151,20 @@ func newNode(cfg Config) (*Node, error) {
 func (n *Node) apply(sc scope, r *Report) {
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
+	icdBefore := n.icdModeLocked()
 	n.s.mutate(sc, r)
 	em := n.s.takeEmissions()
 	if !n.frozen {
 		n.props = nil
 	}
 	changed := n.changedConfigurationVersionsLocked(before)
+	icdAfter := n.icdModeLocked()
 	n.mu.Unlock()
 	n.deliver(em)
+	// IcdManagementClient.operatingMode$Changed (IcdClient.ts:118-123).
+	if n.icd != nil && icdBefore != icdAfter {
+		n.icd.onOperatingModeChanged()
+	}
 	if h := n.cfg.Hooks.ConfigurationVersionChanged; h != nil {
 		for _, ep := range changed {
 			n.structureHook("configuration_version_changed", func() { h(ep) })
@@ -339,6 +351,10 @@ func (n *Node) Start(ctx context.Context) error {
 	n.frozen, n.props = false, nil
 	n.mu.Unlock()
 	n.persist.restart()
+	if n.icd != nil {
+		// The peer coming online is proof it is awake (IcdClient.ts:156-158).
+		n.icd.noteActive()
+	}
 	stop := n.observePeer()
 	n.mu.Lock()
 	n.stopObserve = stop
@@ -387,7 +403,35 @@ func (n *Node) Close(ctx context.Context) error {
 	n.mu.Lock()
 	n.closing = true
 	n.mu.Unlock()
-	return n.Stop(ctx)
+	err := n.Stop(ctx)
+	if n.icd != nil {
+		n.icd.close()
+	}
+	return err
+}
+
+// online is a started, commissioned node — matter.js's ClientNode
+// lifecycle.isOnline as the ICD client reads it.
+func (n *Node) online() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.started && n.record.PeerAddress != nil
+}
+
+// icdModeLocked is the image's IcdManagement OperatingMode, -1 when it
+// has none. The caller holds the lock.
+func (n *Node) icdModeLocked() int64 {
+	if n.s == nil {
+		return -1
+	}
+	ic := readyCluster(n.s.root, icdmanagementClusterID)
+	if ic == nil {
+		return -1
+	}
+	if v, ok := uintOf(ic, icdmanagementAttrOperatingMode); ok {
+		return int64(v) //nolint:gosec // an enum8
+	}
+	return -1
 }
 
 // Disable takes the node offline and keeps it so, persisted

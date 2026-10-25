@@ -42,12 +42,34 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := n.holdICD(ctx); err != nil {
+		return nil, err
+	}
 	rep, err := ia.ReadWith(ctx, r)
 	if err != nil {
 		return nil, err
 	}
+	n.noteICDActive()
 	n.apply(sc, rep)
 	return rep, nil
+}
+
+// holdICD holds an interaction with a sleeping LIT ICD peer until it wakes
+// — matter.js ClientNodeInteraction.ts:87, :194, :219 (#holdUntilAwake,
+// :333-346); a non-LIT or awake peer, and a node without an ICD client,
+// pass at once.
+func (n *Node) holdICD(ctx context.Context) error {
+	if n.icd == nil {
+		return nil
+	}
+	return n.icd.hold(ctx)
+}
+
+// noteICDActive records the peer's answer (NodeSession.ts:278-283).
+func (n *Node) noteICDActive() {
+	if n.icd != nil {
+		n.icd.noteActive()
+	}
 }
 
 // Subscribe subscribes through the node — ClientNodeInteraction.subscribe
@@ -137,7 +159,14 @@ func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptio
 	if err != nil {
 		return nil, err
 	}
-	return ia.Write(ctx, writes, opts)
+	if err := n.holdICD(ctx); err != nil {
+		return nil, err
+	}
+	st, err := ia.Write(ctx, writes, opts)
+	if err == nil {
+		n.noteICDActive()
+	}
+	return st, err
 }
 
 // Invoke invokes a command on the peer — ClientNodeInteraction.invoke
@@ -147,5 +176,12 @@ func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodab
 	if err != nil {
 		return Result{}, err
 	}
-	return ia.Invoke(ctx, path, fields, opts)
+	if err := n.holdICD(ctx); err != nil {
+		return Result{}, err
+	}
+	res, err := ia.Invoke(ctx, path, fields, opts)
+	if err == nil {
+		n.noteICDActive()
+	}
+	return res, err
 }

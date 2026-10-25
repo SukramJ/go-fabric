@@ -358,6 +358,9 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 	r.log.Info("matter.controller.client.registry.decommissioned", slog.String("node", n.ID()), slog.String("formerly", former))
 	// The cleared peer address is lifecycle.decommissioned
 	// (CommissioningClient.ts:637-646).
+	if n.icd != nil {
+		n.icd.onDecommissioned()
+	}
 	if h := n.cfg.Hooks.Decommissioned; h != nil {
 		h()
 	}
