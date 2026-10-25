@@ -286,8 +286,10 @@ func TestRunStopsWithTheContext(t *testing.T) {
 // endpoint does (packages/node/src/node/server/ServerEndpointInitializer.ts:
 // 67-69 at 862ad75f); one forgotten and added again gets a fresh one, as
 // the allocator never reissues a released number
-// (BD-Matter-EndpointNumber-Monotonic) — matter.js's delete() erases the
-// endpoint's storage (packages/node/src/endpoint/Endpoint.ts:987-992).
+// (BD-Matter-EndpointNumber-Monotonic).
+//
+// matter.js's delete() erases the endpoint's storage
+// (packages/node/src/endpoint/Endpoint.ts:987-992).
 func TestAggregatorAcrossRestart(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "node.db")

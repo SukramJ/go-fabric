@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 6458,
+  "entry_points": 6466,
   "entry_packages": [
     ".",
     "bdx",
@@ -240,8 +240,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 14838,
-    "reachable": 10358,
+    "total_exported": 14849,
+    "reachable": 10369,
     "whitelisted": 4477,
     "unreachable": 3
   },
@@ -23548,7 +23548,7 @@
       "identifier": "TestArguments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/args_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "examples/reference-controller/cli",
@@ -23590,7 +23590,7 @@
       "identifier": "TestReferenceControllerCAKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/cakey_test.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "examples/reference-controller/cli",
