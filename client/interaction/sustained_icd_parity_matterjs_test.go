@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/icd"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -268,7 +268,7 @@ type registration struct {
 	w  *icd.PeerWakefulness
 }
 
-func (g *registration) get() *icd.PeerWakefulness { g.mu.Lock(); defer g.mu.Unlock(); return g.w }
+func (g *registration) get() *icd.PeerWakefulness  { g.mu.Lock(); defer g.mu.Unlock(); return g.w }
 func (g *registration) set(w *icd.PeerWakefulness) { g.mu.Lock(); g.w = w; g.mu.Unlock() }
 
 var errTransient = errors.New("transient send failure")
