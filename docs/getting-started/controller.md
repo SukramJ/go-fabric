@@ -397,6 +397,36 @@ Each names its matter.js counterpart in its doc comment.
 instead, so a host attributes a report, an event or a subscription signal
 to its node, as matter.js gives each paired node its own events.
 
+### JSON values
+
+A host that speaks JSON to its own clients reads and builds values
+without a TLV type. `client.Value` is the decoded tree the role hands out
+(an attribute value, an event's data, a command response's fields);
+`client.Encodable` is what a write or an invoke takes. The type comes from
+the generated cluster definitions:
+
+| Call | The type of |
+| --- | --- |
+| `client.AttributeField(cluster, attribute)` | an attribute's value (a global attribute for any cluster) |
+| `client.CommandField(cluster, command)` | a request command's fields |
+| `client.ResponseField(cluster, command)` | a response command's fields |
+| `client.EventField(cluster, event)` | an event's data |
+
+`client.DecodeJSON(field, value, form)` renders a value in the forms of
+matterjs-server's WebSocket API: `client.TagBased` keys a struct by its
+field ids (`{"0": true}`, the attribute form), `client.NameBased` by its
+camelCase names (`{"newPosition": 1}`, the form of command fields and
+event data); bytes are standard base64, integers JSON numbers (64-bit ones
+in full), lists arrays, null a nullable value's null; a member the model
+does not name is left out. `client.EncodeJSON(field, raw)` reads either
+key form (names compared without regard to case, or decimal ids) and
+base64 bytes; null for an optional member that is not nullable counts as
+left out, and a mandatory member a command's fields leave out takes the
+specification's fallback, as matter.js's `MandatoryDefaultValue` computes
+it (0, false, empty; an enum stays required). A value of an element no
+definition names is untyped: a struct keyed by its context tags. A value
+that does not fit is `client.ErrJSONValue`.
+
 ### Discovery
 
 `Controller.Discover(ctx, id, timeout)` searches DNS-SD for the

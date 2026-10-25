@@ -664,6 +664,18 @@ func writeAny(b *bytes.Buffer, n Node) error {
 	return nil
 }
 
+// PropertyName is the camelCase property name of a model name, the name
+// matter.js gives a field in its JavaScript form — camelize
+// (packages/general/src/util/identifier-case.ts:21 at 862ad75f) as
+// [DecodeJSON] keys a struct: "OnOff" is "onOff", "PIROccupiedToUnoccupiedDelay"
+// "pirOccupiedToUnoccupiedDelay".
+func PropertyName(name string) string { return camel(name) }
+
+// GlobalAttributeType is the type of a global attribute (Matter Core
+// §7.13: ClusterRevision, FeatureMap and the four id lists), whatever the
+// cluster; false for another attribute id.
+func GlobalAttributeType(attrID uint32) (Type, bool) { return globalType(attrID) }
+
 // camel is the camelCase property name of a model name, as matter.js's
 // camelize writes it: a leading acronym is lower-cased whole
 // ("PIROccupiedToUnoccupiedDelay" is "pirOccupiedToUnoccupiedDelay").
