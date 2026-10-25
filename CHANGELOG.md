@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.12.4] — 2026-10-25
+
 ### Added
 
 - The Ahead-of-matter.js marker check (issue #274, brief CN; planned as `v0.12.4`). The register at the head of `notes/parity/by_design.md` gains the machine-read columns `marker file` and `marker text`; `script/aheadcheck` (`make ahead-check`, `MATTERJS_REF` default `HEAD`) reads every marker at the pin and at the ref, reports a text gone at the ref as "caught up?" naming the row, refuses a row whose text is not at the pin, and refuses a row without a marker; every row of the register carries one. A marker text is a quoted string or `class <Name>`, the class's whole body as it reads at the pin. The weekly `matterjs-pin.yml` gains the job `ahead-markers`, which runs it against matter.js `origin/main` on the blobless clone and reports the clone size before and after. No API change.
@@ -4834,7 +4836,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.3...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.12.4...HEAD
+[0.12.4]: https://github.com/SukramJ/go-fabric/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/SukramJ/go-fabric/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/SukramJ/go-fabric/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/SukramJ/go-fabric/compare/v0.12.0...v0.12.1
