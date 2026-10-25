@@ -57,7 +57,8 @@ func cmdDiscover(e *env, args []string) error {
 		if len(found) == 0 {
 			e.println("no commissionable device answered")
 		}
-		for _, d := range found {
+		for i := range found {
+			d := &found[i]
 			addrs := make([]string, 0, len(d.Addresses))
 			for _, a := range d.Addresses {
 				addrs = append(addrs, a.AddrPort().String())

@@ -332,18 +332,7 @@ func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 
 	if l, ok := srv.(contract.ClusterAttributeLister); ok {
 		attrs := l.MatterAttributes()
-		for ai := range def.Attributes {
-			a := &def.Attributes[ai]
-			checkPresence(tb, def.Name, "attribute", a.Name, a.Conformance.Applicability(ctx), slices.Contains(attrs, a.ID))
-		}
-		for _, id := range attrs {
-			if globalsListed && id >= spec.AttrGeneratedCommandList {
-				continue
-			}
-			if def.Attribute(id) == nil {
-				tb.Errorf("%s: lists undefined attribute 0x%04X", def.Name, id)
-			}
-		}
+		checkAttributeList(tb, def, ctx, attrs, globalsListed)
 		checkWrites(tb, srv, def, attrs, write)
 	}
 
@@ -391,6 +380,25 @@ func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 		for ei := range def.Events {
 			e := &def.Events[ei]
 			checkPresence(tb, def.Name, "event", e.Name, e.Conformance.Applicability(ctx), slices.Contains(events, e.ID))
+		}
+	}
+}
+
+// checkAttributeList holds a server's AttributeList against def's
+// conformance: every mandatory attribute listed, none disallowed or
+// undefined (the globals admitted with globalsListed).
+func checkAttributeList(tb testing.TB, def *spec.Cluster, ctx spec.FeatureContext, attrs []uint32, globalsListed bool) {
+	tb.Helper()
+	for ai := range def.Attributes {
+		a := &def.Attributes[ai]
+		checkPresence(tb, def.Name, "attribute", a.Name, a.Conformance.Applicability(ctx), slices.Contains(attrs, a.ID))
+	}
+	for _, id := range attrs {
+		if globalsListed && id >= spec.AttrGeneratedCommandList {
+			continue
+		}
+		if def.Attribute(id) == nil {
+			tb.Errorf("%s: lists undefined attribute 0x%04X", def.Name, id)
 		}
 	}
 }
