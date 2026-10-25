@@ -202,6 +202,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/node/metrics/expvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/script/aheadcheck", min: 90, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, why: "doc and test only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 35, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
 	// BX4's forward generator; main() only writes the files its test compares.

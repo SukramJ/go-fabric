@@ -116,33 +116,33 @@ func readPin(schema []byte) (string, error) {
 func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 	reg, err := os.ReadFile(filepath.Join(root, registerPath)) //nolint:gosec // G304: fixed path under the module root
 	if err != nil {
-		fmt.Fprintln(errOut, "aheadcheck:", err)
+		_, _ = fmt.Fprintln(errOut, "aheadcheck:", err)
 		return 2
 	}
 	allow, err := readAllowance(filepath.Join(root, allowancePath))
 	if err != nil {
-		fmt.Fprintln(errOut, "aheadcheck:", err)
+		_, _ = fmt.Fprintln(errOut, "aheadcheck:", err)
 		return 2
 	}
 	rows, err := parseRegister(string(reg))
 	if err != nil {
-		fmt.Fprintln(errOut, "aheadcheck:", registerPath+":", err)
+		_, _ = fmt.Fprintln(errOut, "aheadcheck:", registerPath+":", err)
 		return 2
 	}
 	repo := gitRepo{dir: matterDir}
 	pinSha, err := repo.commit(pin)
 	if err != nil {
-		fmt.Fprintf(errOut, "aheadcheck: the pin %s in %s: %v\n", pin, matterDir, err)
+		_, _ = fmt.Fprintf(errOut, "aheadcheck: the pin %s in %s: %v\n", pin, matterDir, err)
 		return 2
 	}
 	refSha, err := repo.commit(ref)
 	if err != nil {
-		fmt.Fprintf(errOut, "aheadcheck: the ref %s in %s: %v\n", ref, matterDir, err)
+		_, _ = fmt.Fprintf(errOut, "aheadcheck: the ref %s in %s: %v\n", ref, matterDir, err)
 		return 2
 	}
 	findings := check(rows, allow, repo.show, revision{name: "the pin", sha: pinSha}, revision{name: ref, sha: refSha})
 	for _, f := range findings {
-		fmt.Fprintln(out, f)
+		_, _ = fmt.Fprintln(out, f)
 	}
 	if len(findings) > 0 {
 		return 1
@@ -153,7 +153,7 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 			marked++
 		}
 	}
-	fmt.Fprintf(out, "aheadcheck: %d rows, %d with a marker, %d in todo-marker.txt; every marker holds at the pin %s and at %s (%s)\n",
+	_, _ = fmt.Fprintf(out, "aheadcheck: %d rows, %d with a marker, %d in todo-marker.txt; every marker holds at the pin %s and at %s (%s)\n",
 		len(rows), marked, len(rows)-marked, short(pinSha), ref, short(refSha))
 	return 0
 }
