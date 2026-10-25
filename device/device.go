@@ -391,6 +391,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		}
 		switch {
 		case err == nil:
+			fillSelectDefaults(def, srv)
 			return srv, nil
 		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
@@ -409,7 +410,13 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
-	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
+	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d). Its state
+	// starts where matter.js's does: the default server's initialize
+	// values, then SelectDefaultValue for what is still unset
+	// (defaults_fallback.go).
+	if init, ok := initializeDefaults[r.ID]; ok {
+		init(features, initial)
+	}
 	srv, err := spec.NewServer(def, opts, generatedConfig(r.ID, features, initial, s.self))
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
@@ -417,6 +424,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	case err != nil:
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
+	fillSelectDefaults(def, srv)
 	return srv, nil
 }
 

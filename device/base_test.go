@@ -11,6 +11,7 @@ import (
 	boolstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	pscdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -98,16 +99,17 @@ func TestBaseOptionalConformsAndRefuses(t *testing.T) {
 }
 
 // TestBridgedPowerSourceServers: the BridgedNode device type's servers
-// under the condition BridgedPowerSourceInfo alone are PowerSource —
-// matter.js packages/model/src/standard/elements/bridged-node.element.ts:23
-// at 862ad75f — read from the generated type; PowerSourceConfiguration
-// (:22, `BridgedPowerSourceInfo, D`) is not among them, and the condition
-// is the Base device type's (base.element.ts:40).
+// under the condition BridgedPowerSourceInfo are PowerSourceConfiguration
+// (`BridgedPowerSourceInfo, D`) and PowerSource (`BridgedPowerSourceInfo`) —
+// matter.js packages/model/src/standard/elements/bridged-node.element.ts:22-23
+// at 862ad75f — read from the generated type with their definitions, and
+// the condition is the Base device type's (base.element.ts:40).
 func TestBridgedPowerSourceServers(t *testing.T) {
 	t.Parallel()
 	got := bridgedPowerSourceServers()
-	if len(got) != 1 || got[0].ID != powersourcedef.ClusterID || got[0].Mandatory || got[0].Definition == nil {
-		t.Fatalf("bridged power-source servers %+v, want PowerSource alone, optional, with its definition", got)
+	if len(got) != 2 || got[0].ID != pscdef.ClusterID || got[1].ID != powersourcedef.ClusterID ||
+		got[0].Mandatory || got[1].Mandatory || got[0].Definition == nil || got[1].Definition == nil {
+		t.Fatalf("bridged power-source servers %+v, want PowerSourceConfiguration and PowerSource with their definitions", got)
 	}
 	for _, b := range schema.BaseDeviceTypes() {
 		if slices.Contains(b.Conditions, ConditionBridgedPowerSourceInfo) {

@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- A bridged device that declares PowerSource now also mounts PowerSourceConfiguration (§1.20): BridgedNode's `BridgedPowerSourceInfo, D` is mandatory under the condition the declaration states (matter.js reads a trailing `D` as an announced deprecation, `Conformance.ts`), so the kit's devices no longer report the "BridgedNode PowerSourceConfiguration mandatory" violation. `powersourceconfigurationdef.Declare` on such a device is accepted. The reference bridge's battery and mains devices gain the cluster.
+- The kit's default servers serve every attribute they list where matter.js gives a value (§1.21): the `SelectDefaultValue` fallback for an attribute without a default (null when nullable, 0, false, an empty list) and the `initialize` values of FanControl, SmokeCoAlarm and OccupancySensing. A wildcard read of a TemperatureMeasurement, for one, answers MeasuredValue null instead of UnsupportedAttribute; `device.TestEveryListedAttributeHasAValue` holds every committed device type to it.
+
 ### Added
 
 - A controller on a test site (brief CJ §1.1): `controller.Config.Clock` and `controller.Config.Listener` give `controller.New` the stack's time source and a socket to serve on; `fabrictest.Site.ControllerConfig(opts)` returns a `controller.Config` wired to the site (network, DNS-SD, fake clock, a database of its own), so a program's own `controller.New` commissions and reads the site's devices.
